@@ -1,0 +1,6 @@
+/target
+app/target
+.DS_Store
+.idea
+converted.*
+fast_image.*

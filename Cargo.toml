@@ -1,0 +1,10 @@
+workspace = { members = ["app"] }
+
+[package]
+name = "image-scale"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+colorutils-rs = "0.2.5"
+num-traits = "0.2.19"
