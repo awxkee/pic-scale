@@ -17,7 +17,8 @@ mod sampler;
 mod scaler;
 mod acceleration_feature;
 mod nearest_sampler;
-mod sse_convolve_u8;
+mod sse_simd_u8;
+mod neon_simd_u8;
 
 pub use image_size::ImageSize;
 pub use image_store::ImageStore;

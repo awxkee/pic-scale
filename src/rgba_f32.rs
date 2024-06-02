@@ -304,6 +304,7 @@ impl HorizontalConvolutionPass<f32, 4> for ImageStore<f32, 4> {
             AccelerationFeature::Native => {
                 convolve_horizontal_rgba_f32_native(self, filter_weights, destination);
             }
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             AccelerationFeature::Sse => {}
         }
     }
@@ -330,6 +331,7 @@ impl VerticalConvolutionPass<f32, 4> for ImageStore<f32, 4> {
             AccelerationFeature::Native => {
                 convolve_vertical_rgba_f32_native(self, filter_weights, destination);
             }
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             AccelerationFeature::Sse => {}
         }
     }

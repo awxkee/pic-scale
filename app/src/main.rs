@@ -11,9 +11,9 @@ use image_scale::{ImageSize, ImageStore, LabScaler, ResamplingFunction, Scaler};
 use image_scale::ResamplingFunction::Nearest;
 
 fn main() {
-    // test_fast_image();
+    test_fast_image();
 
-    let img = ImageReader::open("./assets/asset_5.png")
+    let img = ImageReader::open("./assets/asset.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -25,8 +25,8 @@ fn main() {
     let start_time = Instant::now();
 
     let scaler = Scaler::new(ResamplingFunction::Lanczos3);
-    let store = ImageStore::<u8, 4>::new(Vec::from(img.as_bytes()), dimensions.0 as usize, dimensions.1 as usize);
-    let resized = scaler.resize_rgba(ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2), store);
+    let store = ImageStore::<u8, 3>::new(Vec::from(img.as_bytes()), dimensions.0 as usize, dimensions.1 as usize);
+    let resized = scaler.resize_rgb(ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2), store);
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
@@ -82,6 +82,11 @@ fn test_fast_image() {
     // Create Resizer instance and resize cropped source image
     // into buffer of destination image
     let mut resizer = Resizer::new();
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    unsafe {
+        resizer.set_cpu_extensions(CpuExtensions::Neon);
+    }
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     unsafe {
         resizer.set_cpu_extensions(CpuExtensions::Sse4_1);
     }

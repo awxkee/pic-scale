@@ -2,8 +2,10 @@ use crate::acceleration_feature::AccelerationFeature;
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_u8::*;
 use crate::filter_weights::FilterWeights;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::neon_simd_u8::*;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::sse_convolve_u8::*;
+use crate::sse_simd_u8::*;
 use crate::ImageStore;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use std::arch::aarch64::*;
@@ -48,7 +50,7 @@ fn convolve_horizontal_rgba_sse(
                 let weight2 = unsafe { ptr.add(2).read_unaligned() };
                 let weight3 = unsafe { ptr.add(3).read_unaligned() };
                 unsafe {
-                    store_0 = convolve_horizontal_parts_4_rgba_sse(
+                    store_0 = sse_convolve_u8::convolve_horizontal_parts_4_rgba_sse(
                         bounds.start + jx,
                         unsafe_source_ptr_0,
                         weight0,
@@ -57,7 +59,7 @@ fn convolve_horizontal_rgba_sse(
                         weight3,
                         store_0,
                     );
-                    store_1 = convolve_horizontal_parts_4_rgba_sse(
+                    store_1 = sse_convolve_u8::convolve_horizontal_parts_4_rgba_sse(
                         bounds.start + jx,
                         unsafe_source_ptr_0.add(src_stride),
                         weight0,
@@ -66,7 +68,7 @@ fn convolve_horizontal_rgba_sse(
                         weight3,
                         store_1,
                     );
-                    store_2 = convolve_horizontal_parts_4_rgba_sse(
+                    store_2 = sse_convolve_u8::convolve_horizontal_parts_4_rgba_sse(
                         bounds.start + jx,
                         unsafe_source_ptr_0.add(src_stride * 2),
                         weight0,
@@ -75,7 +77,7 @@ fn convolve_horizontal_rgba_sse(
                         weight3,
                         store_2,
                     );
-                    store_3 = convolve_horizontal_parts_4_rgba_sse(
+                    store_3 = sse_convolve_u8::convolve_horizontal_parts_4_rgba_sse(
                         bounds.start + jx,
                         unsafe_source_ptr_0.add(src_stride * 3),
                         weight0,
@@ -92,25 +94,25 @@ fn convolve_horizontal_rgba_sse(
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 let weight0 = unsafe { ptr.read_unaligned() };
                 unsafe {
-                    store_0 = convolve_horizontal_parts_one_rgba_sse(
+                    store_0 = sse_convolve_u8::convolve_horizontal_parts_one_rgba_sse(
                         bounds.start + jx,
                         unsafe_source_ptr_0,
                         weight0,
                         store_0,
                     );
-                    store_1 = convolve_horizontal_parts_one_rgba_sse(
+                    store_1 = sse_convolve_u8::convolve_horizontal_parts_one_rgba_sse(
                         bounds.start + jx,
                         unsafe_source_ptr_0.add(src_stride),
                         weight0,
                         store_1,
                     );
-                    store_2 = convolve_horizontal_parts_one_rgba_sse(
+                    store_2 = sse_convolve_u8::convolve_horizontal_parts_one_rgba_sse(
                         bounds.start + jx,
                         unsafe_source_ptr_0.add(src_stride * 2),
                         weight0,
                         store_2,
                     );
-                    store_3 = convolve_horizontal_parts_one_rgba_sse(
+                    store_3 = sse_convolve_u8::convolve_horizontal_parts_one_rgba_sse(
                         bounds.start + jx,
                         unsafe_source_ptr_0.add(src_stride * 3),
                         weight0,
@@ -119,7 +121,7 @@ fn convolve_horizontal_rgba_sse(
                 }
                 jx += 1;
             }
-            let store_16_8 = compress_i32(store_0);
+            let store_16_8 = sse_convolve_u8::compress_i32(store_0);
             let pixel = unsafe { _mm_extract_epi32::<0>(store_16_8) };
 
             let px = x * image_store.channels;
@@ -129,7 +131,7 @@ fn convolve_horizontal_rgba_sse(
                 *dest_ptr_32 = pixel;
             }
 
-            let store_16_8 = compress_i32(store_1);
+            let store_16_8 = sse_convolve_u8::compress_i32(store_1);
             let pixel = unsafe { _mm_extract_epi32::<0>(store_16_8) };
 
             let px = x * image_store.channels;
@@ -139,7 +141,7 @@ fn convolve_horizontal_rgba_sse(
                 *dest_ptr_32 = pixel;
             }
 
-            let store_16_8 = compress_i32(store_2);
+            let store_16_8 = sse_convolve_u8::compress_i32(store_2);
             let pixel = unsafe { _mm_extract_epi32::<0>(store_16_8) };
 
             let px = x * image_store.channels;
@@ -149,7 +151,7 @@ fn convolve_horizontal_rgba_sse(
                 *dest_ptr_32 = pixel;
             }
 
-            let store_16_8 = compress_i32(store_3);
+            let store_16_8 = sse_convolve_u8::compress_i32(store_3);
             let pixel = unsafe { _mm_extract_epi32::<0>(store_16_8) };
 
             let px = x * image_store.channels;
@@ -183,7 +185,7 @@ fn convolve_horizontal_rgba_sse(
                 let weight2 = unsafe { ptr.add(2).read_unaligned() };
                 let weight3 = unsafe { ptr.add(3).read_unaligned() };
                 unsafe {
-                    store = convolve_horizontal_parts_4_rgba_sse(
+                    store = sse_convolve_u8::convolve_horizontal_parts_4_rgba_sse(
                         bounds.start + jx,
                         unsafe_source_ptr_0,
                         weight0,
@@ -200,7 +202,7 @@ fn convolve_horizontal_rgba_sse(
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 let weight0 = unsafe { ptr.read_unaligned() };
                 unsafe {
-                    store = convolve_horizontal_parts_one_rgba_sse(
+                    store = sse_convolve_u8::convolve_horizontal_parts_one_rgba_sse(
                         bounds.start + jx,
                         unsafe_source_ptr_0,
                         weight0,
@@ -209,7 +211,7 @@ fn convolve_horizontal_rgba_sse(
                 }
                 jx += 1;
             }
-            let store_16_8 = compress_i32(store);
+            let store_16_8 = sse_convolve_u8::compress_i32(store);
             let pixel = unsafe { _mm_extract_epi32::<0>(store_16_8) };
 
             let px = x * image_store.channels;
@@ -258,7 +260,7 @@ fn convolve_horizontal_rgba_neon(
                 let weight2 = unsafe { ptr.add(2).read_unaligned() };
                 let weight3 = unsafe { ptr.add(3).read_unaligned() };
                 unsafe {
-                    store = convolve_horizontal_parts_4_rgba(
+                    store = neon_convolve_u8::convolve_horizontal_parts_4_rgba(
                         bounds.start + jx,
                         unsafe_source_ptr_0,
                         weight0,
@@ -274,7 +276,7 @@ fn convolve_horizontal_rgba_neon(
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 let weight0 = unsafe { ptr.read_unaligned() };
                 unsafe {
-                    store = convolve_horizontal_parts_one_rgba(
+                    store = neon_convolve_u8::convolve_horizontal_parts_one_rgba(
                         bounds.start + jx,
                         unsafe_source_ptr_0,
                         weight0,
@@ -389,7 +391,7 @@ fn convolve_vertical_rgba_sse(
 
         while cx + 32 < total_width {
             unsafe {
-                convolve_vertical_part_sse_32(
+                sse_convolve_u8::convolve_vertical_part_sse_32(
                     bounds.start,
                     cx,
                     unsafe_source_ptr_0,
@@ -405,7 +407,7 @@ fn convolve_vertical_rgba_sse(
 
         while cx + 16 < total_width {
             unsafe {
-                convolve_vertical_part_sse_16(
+                sse_convolve_u8::convolve_vertical_part_sse_16(
                     bounds.start,
                     cx,
                     unsafe_source_ptr_0,
@@ -420,7 +422,7 @@ fn convolve_vertical_rgba_sse(
         }
         while cx + 8 < total_width {
             unsafe {
-                convolve_vertical_part_sse_8::<false>(
+                sse_convolve_u8::convolve_vertical_part_sse_8::<false>(
                     bounds.start,
                     cx,
                     unsafe_source_ptr_0,
@@ -439,7 +441,7 @@ fn convolve_vertical_rgba_sse(
 
         if left > 0 {
             unsafe {
-                convolve_vertical_part_sse_8::<true>(
+                sse_convolve_u8::convolve_vertical_part_sse_8::<true>(
                     bounds.start,
                     cx,
                     unsafe_source_ptr_0,
@@ -481,9 +483,25 @@ fn convolve_vertical_rgba_neon(
         let bounds = unsafe { approx_weights.bounds.get_unchecked(y) };
         let weight_ptr = unsafe { approx_weights.weights.as_ptr().add(filter_offset) };
 
+        while cx + 32 < total_width {
+            unsafe {
+                neon_convolve_u8::convolve_vertical_part_neon_32(
+                    bounds.start,
+                    cx,
+                    unsafe_source_ptr_0,
+                    src_stride,
+                    unsafe_destination_ptr_0,
+                    weight_ptr,
+                    bounds,
+                );
+            }
+
+            cx += 32;
+        }
+
         while cx + 16 < total_width {
             unsafe {
-                convolve_vertical_part_neon_16(
+                neon_convolve_u8::convolve_vertical_part_neon_16(
                     bounds.start,
                     cx,
                     unsafe_source_ptr_0,
@@ -498,7 +516,7 @@ fn convolve_vertical_rgba_neon(
         }
         while cx + 8 < total_width {
             unsafe {
-                convolve_vertical_part_neon_8::<false>(
+                neon_convolve_u8::convolve_vertical_part_neon_8::<false>(
                     bounds.start,
                     cx,
                     unsafe_source_ptr_0,
@@ -517,7 +535,7 @@ fn convolve_vertical_rgba_neon(
 
         if left > 0 {
             unsafe {
-                convolve_vertical_part_neon_8::<true>(
+                neon_convolve_u8::convolve_vertical_part_neon_8::<true>(
                     bounds.start,
                     cx,
                     unsafe_source_ptr_0,
@@ -687,6 +705,7 @@ impl VerticalConvolutionPass<u8, 4> for ImageStore<u8, 4> {
             AccelerationFeature::Native => {
                 convolve_vertical_rgba_native(self, filter_weights, destination);
             }
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             AccelerationFeature::Sse => {
                 convolve_vertical_rgba_sse(self, filter_weights, destination);
             }

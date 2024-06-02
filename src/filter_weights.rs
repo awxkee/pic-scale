@@ -40,7 +40,9 @@ impl FilterWeights<f32> {
         for chunk in chunked(&self.weights, self.kernel_size) {
             for i in 0..chunk.len() {
                 let k = chunk_position + i;
-                output_kernel[k] = ((*chunk[i]) * precision_scale).round() as i16;
+                unsafe {
+                    *output_kernel.get_unchecked_mut(k) = ((*chunk[i]) * precision_scale).round() as i16;
+                }
             }
             chunk_position += align;
         }
@@ -48,7 +50,9 @@ impl FilterWeights<f32> {
         let mut new_bounds = vec![];
         new_bounds.resize(self.bounds.len(), FilterBounds::new(0, 0));
         for i in 0..self.bounds.len() {
-            new_bounds[i] = self.bounds[i];
+            unsafe {
+                *new_bounds.get_unchecked_mut(i) = *self.bounds.get_unchecked(i);
+            }
         }
 
         return FilterWeights::new(output_kernel, self.kernel_size, align, self.distinct_elements, self.coeffs_size, new_bounds);
