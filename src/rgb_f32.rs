@@ -291,18 +291,21 @@ impl HorizontalConvolutionPass<f32, 3> for ImageStore<f32, 3> {
         destination: &mut ImageStore<f32, 3>,
     ) {
         #[allow(unused_assignments)]
+        #[allow(unused_mut)]
         let mut using_feature = AccelerationFeature::Native;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             using_feature = AccelerationFeature::Neon;
         }
         match using_feature {
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             AccelerationFeature::Neon => {
                 convolve_horizontal_neon(self, filter_weights, destination);
             }
             AccelerationFeature::Native => {
                 convolve_horizontal_native(self, filter_weights, destination);
             }
+            AccelerationFeature::Sse => {}
         }
     }
 }
@@ -314,18 +317,21 @@ impl VerticalConvolutionPass<f32, 3> for ImageStore<f32, 3> {
         destination: &mut ImageStore<f32, 3>,
     ) {
         #[allow(unused_assignments)]
+        #[allow(unused_mut)]
         let mut using_feature = AccelerationFeature::Native;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             using_feature = AccelerationFeature::Neon;
         }
         match using_feature {
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             AccelerationFeature::Neon => {
                 convolve_vertical_neon(self, filter_weights, destination);
             }
             AccelerationFeature::Native => {
                 convolve_vertical_native(self, filter_weights, destination);
             }
+            AccelerationFeature::Sse => {}
         }
     }
 }

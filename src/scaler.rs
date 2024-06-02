@@ -1,3 +1,4 @@
+use std::time::Instant;
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::image_size::ImageSize;
@@ -96,20 +97,27 @@ impl<'a> Scaler {
                 ImageStore::<u8, 3>::new(allocated_store, new_size.width, new_size.height);
             return new_image;
         }
+
+        let vertical_filters = self.generate_weights(store.height, new_size.height);
+        let horizontal_filters = self.generate_weights(store.width, new_size.width);
+
+        let start_time = Instant::now();
         let mut allocated_store_vertical: Vec<u8> = vec![];
         allocated_store_vertical.resize(store.width * 3 * new_size.height, 0u8);
         let mut new_image_vertical =
             ImageStore::<u8, 3>::new(allocated_store_vertical, store.width, new_size.height);
-        let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
         store.convolve_vertical(vertical_filters, &mut new_image_vertical);
+        let elapsed_vertical = start_time.elapsed();
 
+        let start_time = Instant::now();
         let mut allocated_store_horizontal: Vec<u8> = vec![];
         allocated_store_horizontal.resize(new_size.width * 3 * new_size.height, 0u8);
         let mut new_image_horizontal =
             ImageStore::<u8, 3>::new(allocated_store_horizontal, new_size.width, new_size.height);
-        let horizontal_filters = self.generate_weights(store.width, new_size.width);
         new_image_vertical.convolve_horizontal(horizontal_filters, &mut new_image_horizontal);
-
+        let elapsed_time = start_time.elapsed();
+        println!("Vertical: {:.2?}", elapsed_vertical);
+        println!("Horizontal: {:.2?}", elapsed_time);
         new_image_horizontal
     }
 

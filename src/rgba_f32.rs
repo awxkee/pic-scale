@@ -1,10 +1,10 @@
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use std::arch::aarch64::*;
 use crate::acceleration_feature::AccelerationFeature;
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_f32::*;
 use crate::filter_weights::FilterWeights;
 use crate::ImageStore;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use std::arch::aarch64::*;
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 #[inline(always)]
@@ -290,18 +290,21 @@ impl HorizontalConvolutionPass<f32, 4> for ImageStore<f32, 4> {
         destination: &mut ImageStore<f32, 4>,
     ) {
         #[allow(unused_assignments)]
-            let mut using_feature = AccelerationFeature::Native;
+        #[allow(unused_mut)]
+        let mut using_feature = AccelerationFeature::Native;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             using_feature = AccelerationFeature::Neon;
         }
         match using_feature {
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             AccelerationFeature::Neon => {
                 convolve_horizontal_rgba_f32_neon(self, filter_weights, destination);
             }
             AccelerationFeature::Native => {
                 convolve_horizontal_rgba_f32_native(self, filter_weights, destination);
             }
+            AccelerationFeature::Sse => {}
         }
     }
 }
@@ -313,18 +316,21 @@ impl VerticalConvolutionPass<f32, 4> for ImageStore<f32, 4> {
         destination: &mut ImageStore<f32, 4>,
     ) {
         #[allow(unused_assignments)]
-            let mut using_feature = AccelerationFeature::Native;
+        #[allow(unused_mut)]
+        let mut using_feature = AccelerationFeature::Native;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             using_feature = AccelerationFeature::Neon;
         }
         match using_feature {
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             AccelerationFeature::Neon => {
                 convolve_vertical_rgba_f32_neon(self, filter_weights, destination);
             }
             AccelerationFeature::Native => {
                 convolve_vertical_rgba_f32_native(self, filter_weights, destination);
             }
+            AccelerationFeature::Sse => {}
         }
     }
 }
