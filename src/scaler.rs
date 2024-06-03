@@ -91,7 +91,7 @@ impl<'a> Scaler {
     pub fn resize_rgb(
         &self,
         new_size: ImageSize,
-        store: ImageStore<'static, u8, 3>,
+        store: ImageStore<'a, u8, 3>,
     ) -> ImageStore<u8, 3> {
         if self.function == Nearest {
             let mut allocated_store: Vec<u8> = vec![];

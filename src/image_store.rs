@@ -90,4 +90,13 @@ where
             BufferStore::Owned(v) => v,
         }
     }
+
+    pub fn linked(slice_ref: &'a mut [T], width: usize, height: usize) -> ImageStore<T, N> {
+        ImageStore::<T, N> {
+            buffer: BufferStore::Borrowed(slice_ref),
+            channels: N,
+            width,
+            height,
+        }
+    }
 }

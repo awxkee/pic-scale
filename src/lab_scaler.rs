@@ -47,18 +47,16 @@ impl<'a> LabScaler {
     }
 
     fn rgba_to_laba(store: ImageStore<'static, u8, 4>) -> ImageStore<'static, f32, 4> {
-        let mut lab_image = vec![];
-        lab_image.resize(store.width * 4 * store.height, 0f32);
+        let mut new_store = ImageStore::<f32, 4>::alloc(store.width, store.height);
         let lab_stride = store.width as u32 * 4u32 * std::mem::size_of::<f32>() as u32;
         rgba_to_lab_with_alpha(
             &store.buffer.borrow(),
             store.width as u32 * 4u32,
-            &mut lab_image,
+            &mut new_store.buffer.borrow_mut(),
             lab_stride,
             store.width as u32,
             store.height as u32,
         );
-        let new_store = ImageStore::<f32, 4>::new(lab_image, store.width, store.height);
         return new_store;
     }
 

@@ -374,7 +374,7 @@ fn convolve_vertical_rgba_f32_neon(
     }
 }
 
-impl HorizontalConvolutionPass<f32, 4> for ImageStore<'static, f32, 4> {
+impl<'a> HorizontalConvolutionPass<f32, 4> for ImageStore<'a, f32, 4> {
     #[inline(always)]
     fn convolve_horizontal(
         &self,
@@ -408,7 +408,7 @@ impl HorizontalConvolutionPass<f32, 4> for ImageStore<'static, f32, 4> {
     }
 }
 
-impl VerticalConvolutionPass<f32, 4> for ImageStore<'static, f32, 4> {
+impl<'a> VerticalConvolutionPass<f32, 4> for ImageStore<'a, f32, 4> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,

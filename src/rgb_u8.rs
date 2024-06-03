@@ -571,7 +571,7 @@ pub(crate) fn convolve_vertical_rgb_native_8<'a, const COMPONENTS: usize>(
     }
 }
 
-impl HorizontalConvolutionPass<u8, 3> for ImageStore<'static, u8, 3> {
+impl<'a> HorizontalConvolutionPass<u8, 3> for ImageStore<'a, u8, 3> {
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,
@@ -609,7 +609,7 @@ impl HorizontalConvolutionPass<u8, 3> for ImageStore<'static, u8, 3> {
     }
 }
 
-impl VerticalConvolutionPass<u8, 3> for ImageStore<'static, u8, 3> {
+impl<'a> VerticalConvolutionPass<u8, 3> for ImageStore<'a, u8, 3> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,

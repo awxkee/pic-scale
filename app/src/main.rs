@@ -21,13 +21,13 @@ fn main() {
 
     println!("{:?}", img.color());
 
-    let bytes = Vec::from(img.as_bytes());
+    let mut bytes = Vec::from(img.as_bytes());
 
     let start_time = Instant::now();
 
     let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
-    let store = ImageStore::<u8, 3>::new(bytes, dimensions.0 as usize, dimensions.1 as usize);
+    let store = ImageStore::<u8, 3>::linked(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
     let resized = scaler.resize_rgb(ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2), store);
 
     let elapsed_time = start_time.elapsed();
