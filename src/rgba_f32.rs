@@ -5,6 +5,7 @@ use crate::filter_weights::FilterWeights;
 use crate::ImageStore;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use std::arch::aarch64::*;
+use crate::threading_policy::ThreadingPolicy;
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 #[inline(always)]
@@ -403,6 +404,7 @@ impl HorizontalConvolutionPass<f32, 4> for ImageStore<f32, 4> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStore<f32, 4>,
+        threading_policy: ThreadingPolicy,
     ) {
         #[allow(unused_assignments)]
         #[allow(unused_mut)]
@@ -430,6 +432,7 @@ impl VerticalConvolutionPass<f32, 4> for ImageStore<f32, 4> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStore<f32, 4>,
+        threading_policy: ThreadingPolicy,
     ) {
         #[allow(unused_assignments)]
         #[allow(unused_mut)]

@@ -1,4 +1,5 @@
 use num_traits::FromPrimitive;
+use crate::ImageSize;
 
 #[derive(Clone)]
 pub struct ImageStore<T, const N: usize> where T: FromPrimitive, T: Clone, T: Copy {
@@ -11,6 +12,10 @@ pub struct ImageStore<T, const N: usize> where T: FromPrimitive, T: Clone, T: Co
 impl<'a, T, const N: usize> ImageStore<T, N> where T: FromPrimitive, T: Clone, T: Copy {
     pub fn new(slice_ref: Vec<T>, width: usize, height: usize) -> ImageStore<T, N> {
         ImageStore::<T, N> { buffer: slice_ref, channels: N, width, height }
+    }
+
+    pub fn get_size(&self) -> ImageSize {
+        ImageSize::new(self.width, self.height)
     }
 
 }

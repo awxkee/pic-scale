@@ -1,16 +1,18 @@
-use std::time::Instant;
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::image_size::ImageSize;
 use crate::image_store::ImageStore;
 use crate::nearest_sampler::resize_nearest;
+use crate::threading_policy::ThreadingPolicy;
 use crate::ResamplingFunction::Nearest;
 use crate::{ResamplingFilter, ResamplingFunction};
+use std::time::Instant;
 
 #[derive(Copy, Clone)]
 pub struct Scaler {
     pub(crate) resampling_filter: ResamplingFilter,
     pub(crate) function: ResamplingFunction,
+    pub(crate) threading_policy: ThreadingPolicy,
 }
 
 impl<'a> Scaler {
@@ -18,7 +20,12 @@ impl<'a> Scaler {
         Scaler {
             resampling_filter: filter.get_resampling_filter(),
             function: filter,
+            threading_policy: ThreadingPolicy::Single,
         }
+    }
+
+    pub fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy) {
+        self.threading_policy = threading_policy;
     }
 
     pub(crate) fn generate_weights(&self, in_size: usize, out_size: usize) -> FilterWeights<f32> {
@@ -106,7 +113,11 @@ impl<'a> Scaler {
         allocated_store_vertical.resize(store.width * 3 * new_size.height, 0u8);
         let mut new_image_vertical =
             ImageStore::<u8, 3>::new(allocated_store_vertical, store.width, new_size.height);
-        store.convolve_vertical(vertical_filters, &mut new_image_vertical);
+        store.convolve_vertical(
+            vertical_filters,
+            &mut new_image_vertical,
+            self.threading_policy,
+        );
         let elapsed_vertical = start_time.elapsed();
 
         let start_time = Instant::now();
@@ -114,7 +125,11 @@ impl<'a> Scaler {
         allocated_store_horizontal.resize(new_size.width * 3 * new_size.height, 0u8);
         let mut new_image_horizontal =
             ImageStore::<u8, 3>::new(allocated_store_horizontal, new_size.width, new_size.height);
-        new_image_vertical.convolve_horizontal(horizontal_filters, &mut new_image_horizontal);
+        new_image_vertical.convolve_horizontal(
+            horizontal_filters,
+            &mut new_image_horizontal,
+            self.threading_policy,
+        );
         let elapsed_time = start_time.elapsed();
         println!("Vertical: {:.2?}", elapsed_vertical);
         println!("Horizontal: {:.2?}", elapsed_time);
@@ -146,14 +161,22 @@ impl<'a> Scaler {
         let mut new_image_vertical =
             ImageStore::<f32, 3>::new(allocated_store_vertical, store.width, new_size.height);
         let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
-        store.convolve_vertical(vertical_filters, &mut new_image_vertical);
+        store.convolve_vertical(
+            vertical_filters,
+            &mut new_image_vertical,
+            self.threading_policy,
+        );
 
         let mut allocated_store_horizontal: Vec<f32> = vec![];
         allocated_store_horizontal.resize(new_size.width * 3 * new_size.height, 0f32);
         let mut new_image_horizontal =
             ImageStore::<f32, 3>::new(allocated_store_horizontal, new_size.width, new_size.height);
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
-        new_image_vertical.convolve_horizontal(horizontal_filters, &mut new_image_horizontal);
+        new_image_vertical.convolve_horizontal(
+            horizontal_filters,
+            &mut new_image_horizontal,
+            self.threading_policy,
+        );
         new_image_horizontal
     }
 
@@ -182,14 +205,22 @@ impl<'a> Scaler {
         let mut new_image_vertical =
             ImageStore::<f32, 4>::new(allocated_store_vertical, store.width, new_size.height);
         let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
-        store.convolve_vertical(vertical_filters, &mut new_image_vertical);
+        store.convolve_vertical(
+            vertical_filters,
+            &mut new_image_vertical,
+            self.threading_policy,
+        );
 
         let mut allocated_store_horizontal: Vec<f32> = vec![];
         allocated_store_horizontal.resize(new_size.width * 4 * new_size.height, 0f32);
         let mut new_image_horizontal =
             ImageStore::<f32, 4>::new(allocated_store_horizontal, new_size.width, new_size.height);
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
-        new_image_vertical.convolve_horizontal(horizontal_filters, &mut new_image_horizontal);
+        new_image_vertical.convolve_horizontal(
+            horizontal_filters,
+            &mut new_image_horizontal,
+            self.threading_policy,
+        );
         new_image_horizontal
     }
 
@@ -214,14 +245,22 @@ impl<'a> Scaler {
         let mut new_image_vertical =
             ImageStore::<u8, 4>::new(allocated_store_vertical, store.width, new_size.height);
         let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
-        store.convolve_vertical(vertical_filters, &mut new_image_vertical);
+        store.convolve_vertical(
+            vertical_filters,
+            &mut new_image_vertical,
+            self.threading_policy,
+        );
 
         let mut allocated_store_horizontal: Vec<u8> = vec![];
         allocated_store_horizontal.resize(new_size.width * 4 * new_size.height, 0u8);
         let mut new_image_horizontal =
             ImageStore::<u8, 4>::new(allocated_store_horizontal, new_size.width, new_size.height);
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
-        new_image_vertical.convolve_horizontal(horizontal_filters, &mut new_image_horizontal);
+        new_image_vertical.convolve_horizontal(
+            horizontal_filters,
+            &mut new_image_horizontal,
+            self.threading_policy,
+        );
 
         new_image_horizontal
     }

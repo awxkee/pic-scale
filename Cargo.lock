@@ -360,6 +360,7 @@ version = "0.1.0"
 dependencies = [
  "colorutils-rs",
  "num-traits",
+ "rayon",
 ]
 
 [[package]]

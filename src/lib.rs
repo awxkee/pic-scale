@@ -19,6 +19,9 @@ mod acceleration_feature;
 mod nearest_sampler;
 mod sse_simd_u8;
 mod neon_simd_u8;
+mod threading_policy;
+mod unsafe_slice;
+mod neon_rgb_u8;
 
 pub use image_size::ImageSize;
 pub use image_store::ImageStore;
@@ -27,3 +30,4 @@ pub use linear_scaler::LinearScaler;
 pub use math::*;
 pub use sampler::*;
 pub use scaler::Scaler;
+pub use threading_policy::*;
