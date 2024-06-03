@@ -23,13 +23,6 @@ pub(crate) enum BufferStore<'a, T: Copy + Debug> {
 }
 
 impl<'a, T: Copy + Debug> BufferStore<'a, T> {
-    fn as_vec(&self) -> Vec<T> {
-        match self {
-            Self::Borrowed(slice) => slice.to_vec(),
-            Self::Owned(vec) => vec.clone(),
-        }
-    }
-
     pub fn borrow(&self) -> &[T] {
         match self {
             Self::Borrowed(p_ref) => p_ref,
@@ -91,7 +84,7 @@ where
         }
     }
 
-    pub fn linked(slice_ref: &'a mut [T], width: usize, height: usize) -> ImageStore<T, N> {
+    pub fn from_slice(slice_ref: &'a mut [T], width: usize, height: usize) -> ImageStore<T, N> {
         ImageStore::<T, N> {
             buffer: BufferStore::Borrowed(slice_ref),
             channels: N,

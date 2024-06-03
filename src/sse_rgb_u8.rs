@@ -2,7 +2,6 @@
 pub mod sse_rgb {
     use crate::filter_weights::{FilterBounds, FilterWeights};
     use crate::sse_simd_u8::sse_convolve_u8;
-    use crate::sse_simd_u8::sse_convolve_u8::sse_weight_16_sum;
     use std::arch::x86_64::*;
 
     pub(crate) unsafe fn convolve_horizontal_rgba_sse_rows_4(
@@ -225,24 +224,24 @@ pub mod sse_rgb {
         let weights_ptr = approx_weights.weights.as_ptr();
 
         #[rustfmt::skip]
-        let shuffle_lo = unsafe { _mm_setr_epi8(0, -1, //r0
-                                                1, -1, //g0
-                                                2, -1, //b0
-                                                -1, -1, //a0
-                                                3, -1 , //r1
-                                                4,-1,//g1
-                                                5, -1, // b1
-                                                -1, -1) }; //a1
+        let shuffle_lo = unsafe { _mm_setr_epi8(0, -1,
+                                                3, -1,
+                                                1, -1,
+                                                4, -1,
+                                                2, -1 ,
+                                                5,-1,
+                                                -1, -1,
+                                                -1, -1) };
 
         #[rustfmt::skip]
-        let shuffle_hi = unsafe { _mm_setr_epi8(6, -1, //r0
-                                                    7, -1, //g0
-                                                    8, -1, //b0
-                                                    -1, -1, //a0
-                                                    9, -1 , //r1
-                                                    10,-1,//g1
-                                                    11, -1, // b1
-                                                    -1, -1) }; //a1
+        let shuffle_hi = unsafe { _mm_setr_epi8(6, -1,
+                                                9, -1,
+                                                7, -1,
+                                                10, -1 ,
+                                                8,-1,
+                                                11, -1,
+                                                -1, -1,
+                                                -1, -1) };
 
         for x in 0..dst_width {
             let bounds = unsafe { approx_weights.bounds.get_unchecked(x) };
@@ -255,10 +254,8 @@ pub mod sse_rgb {
             while jx + 4 < bounds.size && x + 6 < src_width {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 unsafe {
-                    let weight0 = _mm_set1_epi32(ptr.read_unaligned() as i32);
-                    let weight1 = _mm_set1_epi32(ptr.add(1).read_unaligned() as i32);
-                    let weight2 = _mm_set1_epi32(ptr.add(2).read_unaligned() as i32);
-                    let weight3 = _mm_set1_epi32(ptr.add(3).read_unaligned() as i32);
+                    let weight01 = _mm_set1_epi32((ptr as *const i32).read_unaligned());
+                    let weight23 = _mm_set1_epi32((ptr as *const i32).add(2).read_unaligned());
                     let bounds_start = bounds.start + jx;
 
                     let src_ptr_0 = unsafe_source_ptr_0.add(bounds_start * CHANNES);
@@ -267,32 +264,32 @@ pub mod sse_rgb {
                     let hi = _mm_shuffle_epi8(rgb_pixel, shuffle_hi);
                     let lo = _mm_shuffle_epi8(rgb_pixel, shuffle_lo);
 
-                    let acc = sse_weight_16_sum(store_0, lo, weight0, weight1);
-                    store_0 = sse_weight_16_sum(acc, hi, weight2, weight3);
+                    store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(lo, weight01));
+                    store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(hi, weight23));
 
                     let src_ptr = src_ptr_0.add(src_stride);
                     let rgb_pixel = _mm_loadu_si128(src_ptr as *const __m128i);
                     let hi = _mm_shuffle_epi8(rgb_pixel, shuffle_hi);
                     let lo = _mm_shuffle_epi8(rgb_pixel, shuffle_lo);
 
-                    let acc = sse_weight_16_sum(store_1, lo, weight0, weight1);
-                    store_1 = sse_weight_16_sum(acc, hi, weight2, weight3);
+                    store_1 = _mm_add_epi32(store_1, _mm_madd_epi16(lo, weight01));
+                    store_1 = _mm_add_epi32(store_1, _mm_madd_epi16(hi, weight23));
 
                     let src_ptr = src_ptr_0.add(src_stride * 2);
                     let rgb_pixel = _mm_loadu_si128(src_ptr as *const __m128i);
                     let hi = _mm_shuffle_epi8(rgb_pixel, shuffle_hi);
                     let lo = _mm_shuffle_epi8(rgb_pixel, shuffle_lo);
 
-                    let acc = sse_weight_16_sum(store_2, lo, weight0, weight1);
-                    store_2 = sse_weight_16_sum(acc, hi, weight2, weight3);
+                    store_2 = _mm_add_epi32(store_2, _mm_madd_epi16(lo, weight01));
+                    store_2 = _mm_add_epi32(store_2, _mm_madd_epi16(hi, weight23));
 
                     let src_ptr = src_ptr_0.add(src_stride * 3);
                     let rgb_pixel = _mm_loadu_si128(src_ptr as *const __m128i);
                     let hi = _mm_shuffle_epi8(rgb_pixel, shuffle_hi);
                     let lo = _mm_shuffle_epi8(rgb_pixel, shuffle_lo);
 
-                    let acc = sse_weight_16_sum(store_3, lo, weight0, weight1);
-                    store_3 = sse_weight_16_sum(acc, hi, weight2, weight3);
+                    store_3 = _mm_add_epi32(store_3, _mm_madd_epi16(lo, weight01));
+                    store_3 = _mm_add_epi32(store_3, _mm_madd_epi16(hi, weight23));
                 }
                 jx += 4;
             }
@@ -301,37 +298,32 @@ pub mod sse_rgb {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 unsafe {
                     let bounds_start = bounds.start + jx;
-                    let weight0 = _mm_set1_epi32(ptr.read_unaligned() as i32);
-                    let weight1 = _mm_set1_epi32(ptr.add(1).read_unaligned() as i32);
+                    let weight01 = _mm_set1_epi32((ptr as * const i32).read_unaligned());
                     store_0 = sse_convolve_u8::convolve_horizontal_parts_two_sse_rgb(
                         bounds_start,
                         unsafe_source_ptr_0,
-                        weight0,
-                        weight1,
+                        weight01,
                         store_0,
                         shuffle_lo,
                     );
                     store_1 = sse_convolve_u8::convolve_horizontal_parts_two_sse_rgb(
                         bounds_start,
                         unsafe_source_ptr_0.add(src_stride),
-                        weight0,
-                        weight1,
+                        weight01,
                         store_1,
                         shuffle_lo,
                     );
                     store_2 = sse_convolve_u8::convolve_horizontal_parts_two_sse_rgb(
                         bounds_start,
                         unsafe_source_ptr_0.add(src_stride * 2),
-                        weight0,
-                        weight1,
+                        weight01,
                         store_2,
                         shuffle_lo,
                     );
                     store_3 = sse_convolve_u8::convolve_horizontal_parts_two_sse_rgb(
                         bounds_start,
                         unsafe_source_ptr_0.add(src_stride * 3),
-                        weight0,
-                        weight1,
+                        weight01,
                         store_3,
                         shuffle_lo,
                     );
@@ -439,24 +431,24 @@ pub mod sse_rgb {
         let weights_ptr = approx_weights.weights.as_ptr();
 
         #[rustfmt::skip]
-        let shuffle_lo = unsafe { _mm_setr_epi8(0, -1, //r0
-                                                    1, -1, //g0
-                                                    2, -1, //b0
-                                                    -1, -1, //a0
-                                                    3, -1 , //r1
-                                                    4,-1,//g1
-                                                    5, -1, // b1
-                                                    -1, -1) }; //a1
+        let shuffle_lo = unsafe { _mm_setr_epi8(0, -1,
+                                                    3, -1,
+                                                    1, -1,
+                                                    4, -1,
+                                                    2, -1 ,
+                                                    5,-1,
+                                                    -1, -1,
+                                                    -1, -1) };
 
         #[rustfmt::skip]
-        let shuffle_hi = unsafe { _mm_setr_epi8(6, -1, //r0
-                                                    7, -1, //g0
-                                                    8, -1, //b0
-                                                    -1, -1, //a0
-                                                    9, -1 , //r1
-                                                    10,-1,//g1
-                                                    11, -1, // b1
-                                                    -1, -1) }; //a1
+        let shuffle_hi = unsafe { _mm_setr_epi8(6, -1,
+                                                    9, -1,
+                                                    7, -1,
+                                                    10, -1 ,
+                                                    8,-1,
+                                                    11, -1,
+                                                    -1, -1,
+                                                        -1, -1) };
 
         for x in 0..dst_width {
             let bounds = unsafe { approx_weights.bounds.get_unchecked(x) };
@@ -466,10 +458,8 @@ pub mod sse_rgb {
             while jx + 4 < bounds.size && x + 6 < src_width {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 unsafe {
-                    let weight0 = _mm_set1_epi32(ptr.read_unaligned() as i32);
-                    let weight1 = _mm_set1_epi32(ptr.add(1).read_unaligned() as i32);
-                    let weight2 = _mm_set1_epi32(ptr.add(2).read_unaligned() as i32);
-                    let weight3 = _mm_set1_epi32(ptr.add(3).read_unaligned() as i32);
+                    let weight01 = _mm_set1_epi32((ptr as *const i32).read_unaligned());
+                    let weight23 = _mm_set1_epi32((ptr as *const i32).add(2).read_unaligned());
                     let bounds_start = bounds.start + jx;
                     let src_ptr_0 = unsafe_source_ptr_0.add(bounds_start * CHANNELS);
 
@@ -477,8 +467,8 @@ pub mod sse_rgb {
                     let hi = _mm_shuffle_epi8(rgb_pixel, shuffle_hi);
                     let lo = _mm_shuffle_epi8(rgb_pixel, shuffle_lo);
 
-                    let acc = sse_weight_16_sum(store, lo, weight0, weight1);
-                    store = sse_weight_16_sum(acc, hi, weight2, weight3);
+                    store = _mm_add_epi32(store, _mm_madd_epi16(lo, weight01));
+                    store = _mm_add_epi32(store, _mm_madd_epi16(hi, weight23));
                 }
                 jx += 4;
             }
@@ -486,16 +476,11 @@ pub mod sse_rgb {
             while jx + 2 < bounds.size && x + 3 < src_width {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 unsafe {
-                    let weight0 = _mm_set1_epi32(ptr.read_unaligned() as i32);
-                    let weight1 = _mm_set1_epi32(ptr.add(1).read_unaligned() as i32);
-                    store = sse_convolve_u8::convolve_horizontal_parts_two_sse_rgb(
-                        bounds.start + jx,
-                        unsafe_source_ptr_0,
-                        weight0,
-                        weight1,
-                        store,
-                        shuffle_lo,
-                    );
+                    let weight0 = _mm_set1_epi32((ptr as *const i32).read_unaligned());
+                    let src_ptr = unsafe_source_ptr_0.add((bounds.start + jx) * 3);
+                    let rgb_pixel = _mm_loadu_si64(src_ptr);
+                    let lo = _mm_shuffle_epi8(rgb_pixel, shuffle_lo);
+                    store = _mm_add_epi32(store, _mm_madd_epi16(lo, weight0));
                 }
                 jx += 2;
             }
@@ -536,7 +521,7 @@ pub mod sse_rgb {
         }
     }
 
-    #[inline(always)]
+    #[inline]
     pub(crate) fn convolve_vertical_rgb_sse_row(
         total_width: usize,
         bounds: &FilterBounds,

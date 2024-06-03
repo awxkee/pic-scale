@@ -142,7 +142,7 @@ impl<'a> Scaler {
     pub fn resize_rgb_f32(
         &self,
         new_size: ImageSize,
-        store: ImageStore<'static, f32, 3>,
+        store: ImageStore<f32, 3>,
     ) -> ImageStore<f32, 3> {
         if self.function == Nearest {
             let mut allocated_store: Vec<f32> = vec![];
@@ -186,7 +186,7 @@ impl<'a> Scaler {
     pub fn resize_rgba_f32(
         &self,
         new_size: ImageSize,
-        store: ImageStore<'static, f32, 4>,
+        store: ImageStore<f32, 4>,
     ) -> ImageStore<f32, 4> {
         if self.function == Nearest {
             let mut allocated_store: Vec<f32> = vec![];
@@ -230,7 +230,7 @@ impl<'a> Scaler {
     pub fn resize_rgba(
         &self,
         new_size: ImageSize,
-        store: ImageStore<'static, u8, 4>,
+        store: ImageStore<u8, 4>,
     ) -> ImageStore<u8, 4> {
         if self.function == Nearest {
             let mut new_image = ImageStore::<u8, 4>::alloc(new_size.width, new_size.height);

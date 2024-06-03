@@ -75,13 +75,13 @@ fn convolve_horizontal_rgb_sse<'a>(
             .unwrap();
         pool.scope(|scope| {
             let mut yy = 0usize;
-            for y in (0..destination_height.saturating_sub(4)).step_by(4) {
+            while yy + 4 < destination_height {
                 let weights = arc_weights.clone();
                 scope.spawn(move |_| {
                     let unsafe_source_ptr_0 =
-                        unsafe { image_store.buffer.borrow().as_ptr().add(src_stride * y) };
+                        unsafe { image_store.buffer.borrow().as_ptr().add(src_stride * yy) };
                     let dst_ptr = unsafe_slice.mut_ptr();
-                    let unsafe_destination_ptr_0 = unsafe { dst_ptr.add(dst_stride * y) };
+                    let unsafe_destination_ptr_0 = unsafe { dst_ptr.add(dst_stride * yy) };
                     unsafe {
                         convolve_horizontal_rgb_sse_rows_4(
                             image_store.width,
@@ -94,7 +94,7 @@ fn convolve_horizontal_rgb_sse<'a>(
                         );
                     }
                 });
-                yy = y;
+                yy += 4;
             }
             for y in (yy..destination.height).step_by(4) {
                 let weights = arc_weights.clone();
