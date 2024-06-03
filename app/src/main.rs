@@ -7,7 +7,7 @@ use fast_image_resize::PixelType::U8x3;
 use image::{EncodableLayout, GenericImageView};
 use image::io::Reader as ImageReader;
 
-use image_scale::{ImageSize, ImageStore, ResamplingFunction, Scaler, ThreadingPolicy};
+use image_scale::{ImageSize, ImageStore, LabScaler, LinearScaler, ResamplingFunction, Scaler, ThreadingPolicy};
 
 fn main() {
     // test_fast_image();
@@ -21,11 +21,13 @@ fn main() {
 
     println!("{:?}", img.color());
 
+    let bytes = Vec::from(img.as_bytes());
+
     let start_time = Instant::now();
 
     let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
-    let store = ImageStore::<u8, 3>::new(Vec::from(img.as_bytes()), dimensions.0 as usize, dimensions.1 as usize);
+    let store = ImageStore::<u8, 3>::new(bytes, dimensions.0 as usize, dimensions.1 as usize);
     let resized = scaler.resize_rgb(ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2), store);
 
     let elapsed_time = start_time.elapsed();
@@ -35,7 +37,7 @@ fn main() {
     if resized.channels == 4 {
         image::save_buffer(
             "converted.png",
-            resized.buffer.as_bytes(),
+            resized.as_bytes(),
             resized.width as u32,
             resized.height as u32,
             image::ExtendedColorType::Rgba8,
@@ -44,7 +46,7 @@ fn main() {
     } else {
         image::save_buffer(
             "converted.jpg",
-            resized.buffer.as_bytes(),
+            resized.as_bytes(),
             resized.width as u32,
             resized.height as u32,
             image::ExtendedColorType::Rgb8,
@@ -54,17 +56,17 @@ fn main() {
 }
 
 fn test_fast_image() {
-    let img = ImageReader::open("./assets/asset.jpg")
+    let img = ImageReader::open("./assets/asset_5.png")
         .unwrap()
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
 
-    let start_time = Instant::now();
-
     let mut vc = Vec::from(img.as_bytes());
 
-    let pixel_type: PixelType = PixelType::U8x3;
+    let start_time = Instant::now();
+
+    let pixel_type: PixelType = PixelType::U8x4;
 
     let src_image = Image::from_slice_u8(
         dimensions.0,

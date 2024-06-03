@@ -6,6 +6,7 @@ pub mod neon_rgb {
 
     pub unsafe fn convolve_horizontal_rgb_neon_rows_4(
         dst_width: usize,
+        src_width: usize,
         approx_weights: &FilterWeights<i16>,
         unsafe_source_ptr_0: *const u8,
         src_stride: usize,
@@ -30,7 +31,7 @@ pub mod neon_rgb {
             let mut store_2 = zeros;
             let mut store_3 = zeros;
 
-            while jx + 4 < bounds.size && x + 6 < dst_width {
+            while jx + 4 < bounds.size && x + 6 < src_width {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 let bounds_start = bounds.start + jx;
                 unsafe {
@@ -82,7 +83,7 @@ pub mod neon_rgb {
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size && x + 3 < dst_width {
+            while jx + 2 < bounds.size && x + 3 < src_width {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 let bounds_start = bounds.start + jx;
                 unsafe {
@@ -214,6 +215,7 @@ pub mod neon_rgb {
     }
 
     pub unsafe fn convolve_horizontal_rgb_neon_row_one(
+        src_width: usize,
         dst_width: usize,
         approx_weights: &FilterWeights<i16>,
         unsafe_source_ptr_0: *const u8,
@@ -237,7 +239,7 @@ pub mod neon_rgb {
             let mut jx = 0usize;
             let mut store = zeros;
 
-            while jx + 4 < bounds.size && x + 6 < dst_width {
+            while jx + 4 < bounds.size && x + 6 < src_width {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 unsafe {
                     let weight0 = vdup_n_s16(ptr.read_unaligned());
@@ -258,7 +260,7 @@ pub mod neon_rgb {
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size && x + 3 < dst_width {
+            while jx + 2 < bounds.size && x + 3 < src_width {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 unsafe {
                     let weight0 = vdup_n_s16(ptr.read_unaligned());

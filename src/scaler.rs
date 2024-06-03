@@ -88,12 +88,16 @@ impl<'a> Scaler {
         );
     }
 
-    pub fn resize_rgb(&self, new_size: ImageSize, store: ImageStore<u8, 3>) -> ImageStore<u8, 3> {
+    pub fn resize_rgb(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<'static, u8, 3>,
+    ) -> ImageStore<u8, 3> {
         if self.function == Nearest {
             let mut allocated_store: Vec<u8> = vec![];
             allocated_store.resize(new_size.width * 3 * new_size.height, 0u8);
             resize_nearest::<u8, 3>(
-                &store.buffer,
+                &store.buffer.borrow(),
                 store.width,
                 store.height,
                 &mut allocated_store,
@@ -105,14 +109,13 @@ impl<'a> Scaler {
             return new_image;
         }
 
+        let start_time_filters = Instant::now();
         let vertical_filters = self.generate_weights(store.height, new_size.height);
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
+        let elapsed_filters = start_time_filters.elapsed();
 
         let start_time = Instant::now();
-        let mut allocated_store_vertical: Vec<u8> = vec![];
-        allocated_store_vertical.resize(store.width * 3 * new_size.height, 0u8);
-        let mut new_image_vertical =
-            ImageStore::<u8, 3>::new(allocated_store_vertical, store.width, new_size.height);
+        let mut new_image_vertical = ImageStore::<u8, 3>::alloc(store.width, new_size.height);
         store.convolve_vertical(
             vertical_filters,
             &mut new_image_vertical,
@@ -121,10 +124,7 @@ impl<'a> Scaler {
         let elapsed_vertical = start_time.elapsed();
 
         let start_time = Instant::now();
-        let mut allocated_store_horizontal: Vec<u8> = vec![];
-        allocated_store_horizontal.resize(new_size.width * 3 * new_size.height, 0u8);
-        let mut new_image_horizontal =
-            ImageStore::<u8, 3>::new(allocated_store_horizontal, new_size.width, new_size.height);
+        let mut new_image_horizontal = ImageStore::<u8, 3>::alloc(new_size.width, new_size.height);
         new_image_vertical.convolve_horizontal(
             horizontal_filters,
             &mut new_image_horizontal,
@@ -132,20 +132,23 @@ impl<'a> Scaler {
         );
         let elapsed_time = start_time.elapsed();
         println!("Vertical: {:.2?}", elapsed_vertical);
-        println!("Horizontal: {:.2?}", elapsed_time);
+        println!(
+            "Horizontal: {:.2?}, Filters {:.2?}",
+            elapsed_time, elapsed_filters
+        );
         new_image_horizontal
     }
 
     pub fn resize_rgb_f32(
         &self,
         new_size: ImageSize,
-        store: ImageStore<f32, 3>,
+        store: ImageStore<'static, f32, 3>,
     ) -> ImageStore<f32, 3> {
         if self.function == Nearest {
             let mut allocated_store: Vec<f32> = vec![];
             allocated_store.resize(new_size.width * 4 * new_size.height, 0f32);
             resize_nearest::<f32, 3>(
-                &store.buffer,
+                &store.buffer.borrow(),
                 store.width,
                 store.height,
                 &mut allocated_store,
@@ -183,13 +186,13 @@ impl<'a> Scaler {
     pub fn resize_rgba_f32(
         &self,
         new_size: ImageSize,
-        store: ImageStore<f32, 4>,
+        store: ImageStore<'static, f32, 4>,
     ) -> ImageStore<f32, 4> {
         if self.function == Nearest {
             let mut allocated_store: Vec<f32> = vec![];
             allocated_store.resize(new_size.width * 4 * new_size.height, 0f32);
             resize_nearest::<f32, 4>(
-                &store.buffer,
+                &store.buffer.borrow(),
                 store.width,
                 store.height,
                 &mut allocated_store,
@@ -224,26 +227,25 @@ impl<'a> Scaler {
         new_image_horizontal
     }
 
-    pub fn resize_rgba(&self, new_size: ImageSize, store: ImageStore<u8, 4>) -> ImageStore<u8, 4> {
+    pub fn resize_rgba(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<'static, u8, 4>,
+    ) -> ImageStore<u8, 4> {
         if self.function == Nearest {
-            let mut allocated_store: Vec<u8> = vec![];
-            allocated_store.resize(new_size.width * 4 * new_size.height, 0u8);
+            let mut new_image = ImageStore::<u8, 4>::alloc(new_size.width, new_size.height);
             resize_nearest::<u8, 4>(
-                &store.buffer,
+                &store.buffer.borrow(),
                 store.width,
                 store.height,
-                &mut allocated_store,
+                &mut new_image.buffer.borrow_mut(),
                 new_size.width,
                 new_size.height,
             );
-            let new_image =
-                ImageStore::<u8, 4>::new(allocated_store, new_size.width, new_size.height);
+            let new_image = ImageStore::<u8, 4>::alloc(new_size.width, new_size.height);
             return new_image;
         }
-        let mut allocated_store_vertical: Vec<u8> = vec![];
-        allocated_store_vertical.resize(store.width * 4 * new_size.height, 0u8);
-        let mut new_image_vertical =
-            ImageStore::<u8, 4>::new(allocated_store_vertical, store.width, new_size.height);
+        let mut new_image_vertical = ImageStore::<u8, 4>::alloc(store.width, new_size.height);
         let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
         store.convolve_vertical(
             vertical_filters,
@@ -251,10 +253,7 @@ impl<'a> Scaler {
             self.threading_policy,
         );
 
-        let mut allocated_store_horizontal: Vec<u8> = vec![];
-        allocated_store_horizontal.resize(new_size.width * 4 * new_size.height, 0u8);
-        let mut new_image_horizontal =
-            ImageStore::<u8, 4>::new(allocated_store_horizontal, new_size.width, new_size.height);
+        let mut new_image_horizontal = ImageStore::<u8, 4>::alloc(new_size.width, new_size.height);
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
         new_image_vertical.convolve_horizontal(
             horizontal_filters,

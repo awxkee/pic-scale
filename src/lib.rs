@@ -22,6 +22,7 @@ mod neon_simd_u8;
 mod threading_policy;
 mod unsafe_slice;
 mod neon_rgb_u8;
+mod sse_rgb_u8;
 
 pub use image_size::ImageSize;
 pub use image_store::ImageStore;

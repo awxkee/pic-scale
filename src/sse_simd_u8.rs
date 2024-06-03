@@ -19,7 +19,7 @@ pub mod sse_convolve_u8 {
     pub(crate) unsafe fn convolve_horizontal_parts_one_sse_rgb(
         start_x: usize,
         src: *const u8,
-        weight0: i16,
+        weight0: __m128i,
         store_0: __m128i,
     ) -> __m128i {
         const COMPONENTS: usize = 3;
@@ -27,10 +27,9 @@ pub mod sse_convolve_u8 {
         let vl = i32::from_le_bytes([*src_ptr, *src_ptr.add(1), *src_ptr.add(2), 0]);
         let m_vl = _mm_cvtsi32_si128(vl);
         let lo = _mm_cvtepu8_epi16(m_vl);
-
         let acc = _mm_add_epi32(
             store_0,
-            _mm_mullo_epi32(_mm_cvtepi16_epi32(lo), _mm_set1_epi32(weight0 as i32)),
+            _mm_mullo_epi32(_mm_cvtepi16_epi32(lo), weight0),
         );
         acc
     }
@@ -39,16 +38,15 @@ pub mod sse_convolve_u8 {
     pub(crate) unsafe fn convolve_horizontal_parts_two_sse_rgb(
         start_x: usize,
         src: *const u8,
-        weight0: i16,
-        weight1: i16,
+        weight0: __m128i,
+        weight1: __m128i,
         store_0: __m128i,
         shuffle: __m128i,
     ) -> __m128i {
         const COMPONENTS: usize = 3;
         let src_ptr = src.add(start_x * COMPONENTS);
-        let mut rgb_pixel = _mm_loadu_si64(src_ptr);
-        rgb_pixel = _mm_shuffle_epi8(rgb_pixel, shuffle);
-        let lo = _mm_cvtepu8_epi16(rgb_pixel);
+        let rgb_pixel = _mm_loadu_si64(src_ptr);
+        let lo = _mm_shuffle_epi8(rgb_pixel, shuffle);
         let acc = sse_weight_16_sum(store_0, lo, weight0, weight1);
         acc
     }
@@ -57,28 +55,8 @@ pub mod sse_convolve_u8 {
     pub(crate) unsafe fn sse_weight_16_sum(
         store: __m128i,
         rgba_16: __m128i,
-        weight0: i16,
-        weight1: i16,
-    ) -> __m128i {
-        let acc = _mm_add_epi32(
-            store,
-            _mm_madd_epi16(_mm_cvtepi16_epi32(rgba_16), _mm_set1_epi32(weight0 as i32)),
-        );
-        let acc = _mm_add_epi32(
-            acc,
-            _mm_madd_epi16(
-                _mm_unpackhi_epi16(rgba_16, _mm_setzero_si128()),
-                _mm_set1_epi32(weight1 as i32),
-            ),
-        );
-        acc
-    }
-
-    #[inline(always)]
-    pub(crate) unsafe fn sse_weight_sum(
-        store: __m128i,
-        rgba_16: __m128i,
         weight0: __m128i,
+        weight1: __m128i,
     ) -> __m128i {
         let acc = _mm_add_epi32(
             store,
@@ -88,34 +66,9 @@ pub mod sse_convolve_u8 {
             acc,
             _mm_madd_epi16(
                 _mm_unpackhi_epi16(rgba_16, _mm_setzero_si128()),
-                weight0,
+                weight1,
             ),
         );
-        acc
-    }
-
-    #[inline(always)]
-    pub(crate) unsafe fn convolve_horizontal_parts_4_sse_rgb(
-        start_x: usize,
-        src: *const u8,
-        weight0: i16,
-        weight1: i16,
-        weight2: i16,
-        weight3: i16,
-        store_0: __m128i,
-        shuffle: __m128i,
-    ) -> __m128i {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.add(start_x * COMPONENTS);
-        let zeros = _mm_setzero_si128();
-
-        let mut rgb_pixel = _mm_loadu_si128(src_ptr as *const __m128i);
-        rgb_pixel = _mm_shuffle_epi8(rgb_pixel, shuffle);
-        let hi = _mm_unpackhi_epi8(rgb_pixel, zeros);
-        let lo = _mm_cvtepu8_epi16(rgb_pixel);
-
-        let acc = sse_weight_16_sum(store_0, lo, weight0, weight1);
-        let acc = sse_weight_16_sum(acc, hi, weight2, weight3);
         acc
     }
 
@@ -252,13 +205,13 @@ pub mod sse_convolve_u8 {
 
         let item_0 = _mm_packus_epi16(low_16, high_16);
 
-        let dst_ptr = dst.add(px);
-        _mm_storeu_si128(dst_ptr as *mut __m128i, item_0);
-
         let low_16 = _mm_packs_epi32(_mm_srai_epi32::<12>(store_4), _mm_srai_epi32::<12>(store_5));
         let high_16 = _mm_packs_epi32(_mm_srai_epi32::<12>(store_6), _mm_srai_epi32::<12>(store_7));
 
         let item_1 = _mm_packus_epi16(low_16, high_16);
+
+        let dst_ptr = dst.add(px);
+        _mm_storeu_si128(dst_ptr as *mut __m128i, item_0);
 
         let dst_ptr = dst.add(px + 16);
         _mm_storeu_si128(dst_ptr as *mut __m128i, item_1);
@@ -268,10 +221,10 @@ pub mod sse_convolve_u8 {
     pub(crate) unsafe fn convolve_horizontal_parts_4_rgba_sse(
         start_x: usize,
         src: *const u8,
-        weight0: i16,
-        weight1: i16,
-        weight2: i16,
-        weight3: i16,
+        weight0: __m128i,
+        weight1: __m128i,
+        weight2: __m128i,
+        weight3: __m128i,
         store_0: __m128i,
     ) -> __m128i {
         const COMPONENTS: usize = 4;
@@ -284,19 +237,19 @@ pub mod sse_convolve_u8 {
 
         let acc = _mm_add_epi32(
             store_0,
-            _mm_madd_epi16(_mm_cvtepi16_epi32(lo), _mm_set1_epi32(weight0 as i32)),
+            _mm_madd_epi16(_mm_cvtepi16_epi32(lo), weight0),
         );
         let acc = _mm_add_epi32(
             acc,
-            _mm_madd_epi16(_mm_unpackhi_epi8(lo, zeros), _mm_set1_epi32(weight1 as i32)),
+            _mm_madd_epi16(_mm_unpackhi_epi8(lo, zeros), weight1),
         );
         let acc = _mm_add_epi32(
             acc,
-            _mm_madd_epi16(_mm_cvtepi16_epi32(hi), _mm_set1_epi32(weight2 as i32)),
+            _mm_madd_epi16(_mm_cvtepi16_epi32(hi), weight2),
         );
         let acc = _mm_add_epi32(
             acc,
-            _mm_madd_epi16(_mm_unpackhi_epi8(hi, zeros), _mm_set1_epi32(weight3 as i32)),
+            _mm_madd_epi16(_mm_unpackhi_epi8(hi, zeros), weight3),
         );
         acc
     }
@@ -306,7 +259,7 @@ pub mod sse_convolve_u8 {
     pub(crate) unsafe fn convolve_horizontal_parts_one_rgba_sse(
         start_x: usize,
         src: *const u8,
-        weight0: i16,
+        weight0: __m128i,
         store_0: __m128i,
     ) -> __m128i {
         const COMPONENTS: usize = 4;
@@ -318,7 +271,7 @@ pub mod sse_convolve_u8 {
 
         let acc = _mm_add_epi32(
             store_0,
-            _mm_madd_epi16(_mm_cvtepi16_epi32(lo), _mm_set1_epi32(weight0 as i32)),
+            _mm_madd_epi16(_mm_cvtepi16_epi32(lo), weight0),
         );
         acc
     }
