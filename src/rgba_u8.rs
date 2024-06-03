@@ -656,7 +656,7 @@ impl HorizontalConvolutionPass<u8, 4> for ImageStore<u8, 4> {
         {
             using_feature = AccelerationFeature::Neon;
         }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
         {
             if is_x86_feature_detected!("sse4.1") {
                 using_feature = AccelerationFeature::Sse;
@@ -691,7 +691,7 @@ impl VerticalConvolutionPass<u8, 4> for ImageStore<u8, 4> {
         {
             using_feature = AccelerationFeature::Neon;
         }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
         {
             if is_x86_feature_detected!("sse4.1") {
                 using_feature = AccelerationFeature::Sse;

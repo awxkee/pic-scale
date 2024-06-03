@@ -21,7 +21,130 @@ fn convolve_horizontal_rgba_f32_neon(
     let src_stride = image_store.width * image_store.channels;
     let dst_stride = destination.width * image_store.channels;
 
-    for _ in 0..destination.height {
+    let zeros = unsafe { vdupq_n_f32(0f32) };
+
+    let mut yy = 0usize;
+
+    while yy + 4 < destination.height {
+        let mut filter_offset = 0usize;
+
+        for x in 0..destination.width {
+            let bounds = unsafe { filter_weights.bounds.get_unchecked(x) };
+            let mut jx = 0usize;
+            let mut store_0 = zeros;
+            let mut store_1 = zeros;
+            let mut store_2 = zeros;
+            let mut store_3 = zeros;
+
+            while jx + 4 < bounds.size && x + 6 < destination.width {
+                let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
+                let weight0 = unsafe { ptr.read_unaligned() };
+                let weight1 = unsafe { ptr.add(1).read_unaligned() };
+                let weight2 = unsafe { ptr.add(2).read_unaligned() };
+                let weight3 = unsafe { ptr.add(3).read_unaligned() };
+                unsafe {
+                    store_0 = convolve_horizontal_parts_4_rgba_f32(
+                        bounds.start,
+                        unsafe_source_ptr_0,
+                        weight0,
+                        weight1,
+                        weight2,
+                        weight3,
+                        store_0,
+                    );
+                    store_1 = convolve_horizontal_parts_4_rgba_f32(
+                        bounds.start,
+                        unsafe_source_ptr_0.add(src_stride),
+                        weight0,
+                        weight1,
+                        weight2,
+                        weight3,
+                        store_1,
+                    );
+                    store_2 = convolve_horizontal_parts_4_rgba_f32(
+                        bounds.start,
+                        unsafe_source_ptr_0.add(src_stride * 2),
+                        weight0,
+                        weight1,
+                        weight2,
+                        weight3,
+                        store_2,
+                    );
+                    store_3 = convolve_horizontal_parts_4_rgba_f32(
+                        bounds.start,
+                        unsafe_source_ptr_0.add(src_stride * 3),
+                        weight0,
+                        weight1,
+                        weight2,
+                        weight3,
+                        store_3,
+                    );
+                }
+                jx += 4;
+            }
+            while jx < bounds.size {
+                let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
+                let weight0 = unsafe { ptr.read_unaligned() };
+                unsafe {
+                    store_0 = convolve_horizontal_parts_one_rgba_f32(
+                        bounds.start,
+                        unsafe_source_ptr_0,
+                        weight0,
+                        store_0,
+                    );
+                    store_1 = convolve_horizontal_parts_one_rgba_f32(
+                        bounds.start,
+                        unsafe_source_ptr_0.add(src_stride),
+                        weight0,
+                        store_1,
+                    );
+                    store_2 = convolve_horizontal_parts_one_rgba_f32(
+                        bounds.start,
+                        unsafe_source_ptr_0.add(src_stride * 2),
+                        weight0,
+                        store_2,
+                    );
+                    store_3 = convolve_horizontal_parts_one_rgba_f32(
+                        bounds.start,
+                        unsafe_source_ptr_0.add(src_stride * 3),
+                        weight0,
+                        store_3,
+                    );
+                }
+                jx += 1;
+            }
+
+            let px = x * image_store.channels;
+            let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px) };
+            unsafe {
+                vst1q_f32(dest_ptr, store_0);
+            }
+
+            let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px + dst_stride) };
+            unsafe {
+                vst1q_f32(dest_ptr, store_1);
+            }
+
+            let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px + dst_stride * 2) };
+            unsafe {
+                vst1q_f32(dest_ptr, store_2);
+            }
+
+            let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px + dst_stride * 3) };
+            unsafe {
+                vst1q_f32(dest_ptr, store_3);
+            }
+
+            filter_offset += filter_weights.aligned_size;
+        }
+
+        unsafe_source_ptr_0 = unsafe { unsafe_source_ptr_0.add(src_stride * 4) };
+        unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride * 4) };
+
+        yy += 4;
+    }
+
+    for _ in yy..destination.height {
         let mut filter_offset = 0usize;
 
         for x in 0..destination.width {
@@ -64,16 +187,8 @@ fn convolve_horizontal_rgba_f32_neon(
 
             let px = x * image_store.channels;
             let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px) };
-            if x + 2 < destination.width {
-                unsafe {
-                    vst1q_f32(dest_ptr, store);
-                }
-            } else {
-                unsafe {
-                    let mut transient: [f32; 4] = [0f32; 4];
-                    vst1q_f32(transient.as_mut_ptr(), store);
-                    std::ptr::copy_nonoverlapping(transient.as_ptr(), dest_ptr, 4);
-                }
+            unsafe {
+                vst1q_f32(dest_ptr, store);
             }
 
             filter_offset += filter_weights.aligned_size;
