@@ -215,13 +215,11 @@ pub mod neon_rgb {
     }
 
     pub unsafe fn convolve_horizontal_rgb_neon_row_one(
-        src_width: usize,
         dst_width: usize,
+        src_width: usize,
         approx_weights: &FilterWeights<i16>,
         unsafe_source_ptr_0: *const u8,
-        src_stride: usize,
         unsafe_destination_ptr_0: *mut u8,
-        dst_stride: usize,
     ) {
         const CHANNELS: usize = 3;
         let mut filter_offset = 0usize;

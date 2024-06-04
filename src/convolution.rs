@@ -1,8 +1,10 @@
-use crate::filter_weights::FilterWeights;
-use crate::threading_policy::ThreadingPolicy;
-use crate::ImageStore;
-use num_traits::FromPrimitive;
 use std::fmt::Debug;
+
+use num_traits::FromPrimitive;
+use rayon::ThreadPool;
+
+use crate::filter_weights::FilterWeights;
+use crate::ImageStore;
 
 pub trait HorizontalConvolutionPass<T, const N: usize>
 where
@@ -15,7 +17,7 @@ where
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStore<T, N>,
-        threading_policy: ThreadingPolicy,
+        pool: &Option<ThreadPool>,
     );
 }
 
@@ -30,6 +32,6 @@ where
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStore<T, N>,
-        threading_policy: ThreadingPolicy,
+        pool: &Option<ThreadPool>,
     );
 }

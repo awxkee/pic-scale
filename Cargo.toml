@@ -1,11 +1,21 @@
 workspace = { members = ["app"] }
 
 [package]
-name = "image-scale"
+name = "pic-scale"
 version = "0.1.0"
 edition = "2021"
+description = "High performance image scaling"
+readme = "README.md"
+keywords = ["lab", "hsv", "xyz", "luv", "hsl"]
+license = "Apache-2.0 OR BSD-3-Clause"
+authors = ["Radzivon Bartoshyk"]
+documentation = "https://github.com/awxkee/pic-scale"
+categories = ["multimedia::images", "multimedia::video"]
+homepage = "https://github.com/awxkee/pic-scale"
+repository = "https://github.com/awxkee/pic-scale"
+exclude = ["*.jpg"]
 
 [dependencies]
-colorutils-rs = "0.2.5"
+colorutils-rs = "0.2.9"
 num-traits = "0.2.19"
 rayon = "1.10.0"

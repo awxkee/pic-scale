@@ -7,19 +7,25 @@ pub mod neon_convolve_u8 {
     pub(crate) unsafe fn convolve_horizontal_parts_one_rgba(
         start_x: usize,
         src: *const u8,
-        weight0: i16,
+        weight0: int16x4_t,
         store_0: int32x4_t,
     ) -> int32x4_t {
         const COMPONENTS: usize = 4;
         let src_ptr = src.add(start_x * COMPONENTS);
+        let vl = u64::from_le_bytes([
+            *src_ptr,
+            0,
+            *src_ptr.add(1),
+            0,
+            *src_ptr.add(2),
+            0,
+            *src_ptr.add(3),
+            0,
+        ]);
+        let rgba_pixel = vcreate_u16(vl);
+        let lo = vreinterpret_s16_u16(rgba_pixel);
 
-        let mut transient: [u8; 8] = [0; 8];
-        std::ptr::copy_nonoverlapping(src_ptr, transient.as_mut_ptr(), 4);
-
-        let rgba_pixel = vld1_u8(transient.as_ptr());
-        let lo = vreinterpretq_s16_u16(vmovl_u8(rgba_pixel));
-
-        let acc = vmlal_s16(store_0, vget_low_s16(lo), vdup_n_s16(weight0));
+        let acc = vmlal_s16(store_0, lo, weight0);
         acc
     }
 
@@ -272,10 +278,10 @@ pub mod neon_convolve_u8 {
     pub(crate) unsafe fn convolve_horizontal_parts_4_rgba(
         start_x: usize,
         src: *const u8,
-        weight0: i16,
-        weight1: i16,
-        weight2: i16,
-        weight3: i16,
+        weight0: int16x4_t,
+        weight1: int16x8_t,
+        weight2: int16x4_t,
+        weight3: int16x8_t,
         store_0: int32x4_t,
     ) -> int32x4_t {
         const COMPONENTS: usize = 4;
@@ -286,12 +292,10 @@ pub mod neon_convolve_u8 {
         let hi = vreinterpretq_s16_u16(vmovl_high_u8(rgba_pixel));
         let lo = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(rgba_pixel)));
 
-        let acc = vmlal_high_s16(store_0, hi, vdupq_n_s16(weight3));
-        let acc = vmlal_s16(acc, vget_low_s16(hi), vdup_n_s16(weight2));
-        let acc = vmlal_high_s16(acc, lo, vdupq_n_s16(weight1));
-        let acc = vmlal_s16(acc, vget_low_s16(lo), vdup_n_s16(weight0));
+        let acc = vmlal_high_s16(store_0, hi, weight3);
+        let acc = vmlal_s16(acc, vget_low_s16(hi), weight2);
+        let acc = vmlal_high_s16(acc, lo, weight1);
+        let acc = vmlal_s16(acc, vget_low_s16(lo), weight0);
         acc
     }
-
-
 }

@@ -23,6 +23,7 @@ mod threading_policy;
 mod unsafe_slice;
 mod neon_rgb_u8;
 mod sse_rgb_u8;
+mod luv_scaler;
 
 pub use image_size::ImageSize;
 pub use image_store::ImageStore;
@@ -31,4 +32,6 @@ pub use linear_scaler::LinearScaler;
 pub use math::*;
 pub use sampler::*;
 pub use scaler::Scaler;
+pub use scaler::Scaling;
 pub use threading_policy::*;
+pub use luv_scaler::*;

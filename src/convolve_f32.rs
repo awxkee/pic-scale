@@ -208,8 +208,7 @@ pub(crate) unsafe fn convolve_horizontal_parts_one_rgb_f32(
     const COMPONENTS: usize = 3;
     let src_ptr = src.add(start_x * COMPONENTS);
 
-    let mut transient: [f32; 4] = [0f32; 4];
-    std::ptr::copy_nonoverlapping(src_ptr, transient.as_mut_ptr(), COMPONENTS);
+    let transient: [f32; 4] = [*src_ptr, *src_ptr.add(1), *src_ptr.add(2), 0f32];
     let mut rgb_pixel = vld1q_f32(transient.as_ptr());
 
     rgb_pixel = vmulq_f32(rgb_pixel, mask);
@@ -232,7 +231,7 @@ pub(crate) unsafe fn convolve_horizontal_parts_4_rgba_f32(
     const COMPONENTS: usize = 4;
     let src_ptr = src.add(start_x * COMPONENTS);
 
-    let rgb_pixel =  vld1q_f32_x4(src_ptr);
+    let rgb_pixel = vld1q_f32_x4(src_ptr);
 
     let acc = prefer_vfmaq_f32(store_0, rgb_pixel.0, vdupq_n_f32(weight0));
     let acc = prefer_vfmaq_f32(acc, rgb_pixel.1, vdupq_n_f32(weight1));

@@ -73,10 +73,42 @@ pub fn catmull_rom(x: f32) -> f32 {
     return bc_spline(x, 0f32, 0.5f32);
 }
 
-// Only for testing, fast_sinc using Taylor expansion are in use
+#[inline(always)]
+pub fn robidoux(x: f32) -> f32 {
+    return bc_spline(
+        x,
+        12f32 / (19f32 + 9f32 * std::f32::consts::SQRT_2),
+        13f32 / (58f32 + 216f32 * std::f32::consts::SQRT_2),
+    );
+}
+
+#[inline(always)]
+pub fn ewa_robidoux(x: f32) -> f32 {
+    return jinc(x as f64) as f32 * robidoux(x);
+}
+
+#[inline(always)]
+pub fn robidoux_sharp(x: f32) -> f32 {
+    return bc_spline(
+        x,
+        6f32 / (13f32 + 7f32 * std::f32::consts::SQRT_2),
+        7f32 / (2f32 + 12f32 * std::f32::consts::SQRT_2),
+    );
+}
+
+#[inline(always)]
+pub fn ewa_robidoux_sharp(x: f32) -> f32 {
+    jinc(x as f64) as f32 * robidoux_sharp(x)
+}
+
 #[allow(dead_code)]
 pub fn sinc(x: f32) -> f32 {
     return if x == 0.0 { 1f32 } else { x.sin() / x };
+}
+
+#[inline(always)]
+pub fn barlett(x: f32) -> f32 {
+    return (1.0 - x.abs()).max(0f32);
 }
 
 #[inline(always)]
@@ -146,7 +178,7 @@ pub fn bilinear(x: f32) -> f32 {
 
 #[inline(always)]
 pub fn hann(x: f32) -> f32 {
-    const LENGTH: f32 = 3.0f32;
+    const LENGTH: f32 = 2.0f32;
     const SIZE: f32 = LENGTH * 2f32;
     const SIZE_SCALE: f32 = 1f32 / SIZE;
     const PART: f32 = std::f32::consts::PI / SIZE;
@@ -183,6 +215,15 @@ fn welch(x: f32) -> f32 {
 }
 
 #[inline(always)]
+pub fn sphinx(x: f32) -> f32 {
+    if x.abs() < 1e-8 {
+        return 1f32;
+    }
+    let x = x * std::f32::consts::PI;
+    return 3.0 * (x.sin() - x * x.cos()) / (x * x * x);
+}
+
+#[inline(always)]
 fn hanning(x: f32) -> f32 {
     let x = x.abs();
     if x == 0.0f32 {
@@ -193,6 +234,11 @@ fn hanning(x: f32) -> f32 {
         let x = x * std::f32::consts::PI;
         0.5f32 + 0.5f32 * x.cos()
     }
+}
+
+#[inline(always)]
+fn ewa_hanning(x: f32) -> f32 {
+    jinc(x as f64) as f32 * hanning(x)
 }
 
 #[inline(always)]
@@ -230,7 +276,94 @@ pub(crate) fn quadric(x: f32) -> f32 {
     return 0f32;
 }
 
-#[derive(Copy, Clone, Default, Ord, PartialOrd, Eq, PartialEq)]
+#[inline(always)]
+pub(crate) fn ewa_quadric(x: f32) -> f32 {
+    jinc(x as f64) as f32 * quadric(x)
+}
+
+#[inline(always)]
+pub(crate) fn spline16(x: f32) -> f32 {
+    return if x < 1.0 {
+        ((x - 9.0 / 5.0) * x - 1.0 / 5.0) * x + 1.0
+    } else {
+        ((-1.0 / 3.0 * (x - 1f32) + 4.0 / 5.0) * (x - 1f32) - 7.0 / 15.0) * (x - 1f32)
+    };
+}
+
+#[inline(always)]
+pub(crate) fn spline36(x: f32) -> f32 {
+    return if x < 1.0 {
+        ((13.0 / 11.0 * x - 453.0 / 209.0) * x - 3.0 / 209.0) * x + 1.0
+    } else if x < 2.0 {
+        ((-6.0 / 11.0 * (x - 1f32) + 270.0 / 209.0) * (x - 1f32) - 156.0 / 209.0) * (x - 1f32)
+    } else {
+        ((1.0 / 11.0 * (x - 2f32) - 45.0 / 209.0) * (x - 2f32) + 26.0 / 209.0) * (x - 2f32)
+    };
+}
+
+#[inline(always)]
+pub(crate) fn spline64(x: f32) -> f32 {
+    return if x < 1.0 {
+        ((49.0 / 41.0 * x - 6387.0 / 2911.0) * x - 3.0 / 2911.0) * x + 1.0
+    } else if x < 2.0 {
+        ((-24.0 / 41.0 * (x - 1f32) + 4032.0 / 2911.0) * (x - 1f32) - 2328.0 / 2911.0) * (x - 1f32)
+    } else if x < 3.0 {
+        ((6.0 / 41.0 * (x - 2f32) - 1008.0 / 2911.0) * (x - 2f32) + 582.0 / 2911.0) * (x - 2f32)
+    } else {
+        ((-1.0 / 41.0 * (x - 3f32) + 168.0 / 2911.0) * (x - 3f32) - 97.0 / 2911.0) * (x - 3f32)
+    };
+}
+
+#[inline(always)]
+pub(crate) fn bessel_i0(x: f64) -> f64 {
+    let mut s = 1.0;
+    let y = x * x / 4.0;
+    let mut t = y;
+    let mut i = 2;
+    while t > 1e-12 {
+        s += t;
+        t *= y / (i * i) as f64;
+        i += 1;
+    }
+    return s;
+}
+
+#[inline(always)]
+pub(crate) fn bartlett_hann(x: f32) -> f32 {
+    let x = x.abs();
+    if x > 2f32 {
+        return 0f32;
+    }
+    const L: f32 = 2.0f32;
+    let fac = (x / (L - 1.0f32) - 0.5f32).abs();
+    let w = 0.62f32 - 0.4832 * fac + 0.38f32 * (2f32 * std::f32::consts::PI * fac).cos();
+    return w;
+}
+
+#[inline(always)]
+pub(crate) fn kaiser(x: f32) -> f32 {
+    if x > 1f32 {
+        return 0f32;
+    }
+    let i0a = 1.0f64 / bessel_i0(6.33f64);
+    return (bessel_i0(6.33f64 * (1.0 - x as f64 * x as f64).sqrt()) * i0a) as f32;
+}
+
+#[inline(always)]
+pub(crate) fn box_weight(_: f32) -> f32 {
+    1f32
+}
+
+#[inline(always)]
+pub(crate) fn bohman(x: f32) -> f32 {
+    if x < -1f32 || x > 1f32 {
+        return 0f32;
+    }
+    let dx = std::f32::consts::PI * x.abs();
+    return (1.0 - x.abs()) * dx.cos() + (1.0f32 / std::f32::consts::PI) * dx.sin();
+}
+
+#[derive(Debug, Copy, Clone, Default, Ord, PartialOrd, Eq, PartialEq)]
 pub enum ResamplingFunction {
     Bilinear,
     Nearest,
@@ -244,10 +377,25 @@ pub enum ResamplingFunction {
     Bicubic,
     Hamming,
     Hanning,
+    EwaHanning,
     Blackman,
     Welch,
     Quadric,
+    EwaQuadric,
     Gaussian,
+    Sphinx,
+    Barlett,
+    Robidoux,
+    EwaRobidoux,
+    RobidouxSharp,
+    EwaRobidouxSharp,
+    Spline16,
+    Spline36,
+    Spline64,
+    Kaiser,
+    BartlettHann,
+    Box,
+    Bohman,
     Lanczos2,
     Lanczos3,
     Lanczos4,
@@ -256,7 +404,7 @@ pub enum ResamplingFunction {
     Lanczos4Jinc,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct ResamplingFilter {
     pub function: fn(f32) -> f32,
     pub min_kernel_size: u32,
@@ -291,9 +439,24 @@ impl ResamplingFunction {
             ResamplingFunction::Lanczos2 => ResamplingFilter::new(lanczos2, 2),
             ResamplingFunction::Hamming => ResamplingFilter::new(hamming, 1),
             ResamplingFunction::Hanning => ResamplingFilter::new(hanning, 1),
+            ResamplingFunction::EwaHanning => ResamplingFilter::new(ewa_hanning, 1),
             ResamplingFunction::Welch => ResamplingFilter::new(welch, 1),
             ResamplingFunction::Quadric => ResamplingFilter::new(quadric, 1),
+            ResamplingFunction::EwaQuadric => ResamplingFilter::new(ewa_quadric, 1),
             ResamplingFunction::Gaussian => ResamplingFilter::new(gaussian, 2),
+            ResamplingFunction::Sphinx => ResamplingFilter::new(sphinx, 2),
+            ResamplingFunction::Barlett => ResamplingFilter::new(barlett, 1),
+            ResamplingFunction::Robidoux => ResamplingFilter::new(robidoux, 2),
+            ResamplingFunction::EwaRobidoux => ResamplingFilter::new(ewa_robidoux, 2),
+            ResamplingFunction::RobidouxSharp => ResamplingFilter::new(robidoux_sharp, 2),
+            ResamplingFunction::EwaRobidouxSharp => ResamplingFilter::new(ewa_robidoux_sharp, 2),
+            ResamplingFunction::Spline16 => ResamplingFilter::new(spline16, 2),
+            ResamplingFunction::Spline36 => ResamplingFilter::new(spline36, 2),
+            ResamplingFunction::Spline64 => ResamplingFilter::new(spline64, 2),
+            ResamplingFunction::Kaiser => ResamplingFilter::new(kaiser, 2),
+            ResamplingFunction::BartlettHann => ResamplingFilter::new(bartlett_hann, 2),
+            ResamplingFunction::Box => ResamplingFilter::new(box_weight, 1),
+            ResamplingFunction::Bohman => ResamplingFilter::new(bohman, 2),
             ResamplingFunction::Lanczos2Jinc => ResamplingFilter::new(lanczos2_jinc, 2),
             ResamplingFunction::Lanczos3Jinc => ResamplingFilter::new(lanczos3_jinc, 3),
             ResamplingFunction::Lanczos4Jinc => ResamplingFilter::new(lanczos4_jinc, 4),

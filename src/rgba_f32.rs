@@ -2,13 +2,16 @@
 use std::arch::aarch64::*;
 use std::sync::Arc;
 
+use rayon::ThreadPool;
+
 use crate::acceleration_feature::AccelerationFeature;
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::convolve_f32::*;
 use crate::filter_weights::FilterWeights;
-use crate::rgb_f32::convolve_vertical_native_f32;
-use crate::threading_policy::ThreadingPolicy;
-use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageStore;
+use crate::rgb_f32::convolve_vertical_native_f32;
+use crate::unsafe_slice::UnsafeSlice;
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 #[inline(always)]
@@ -19,8 +22,8 @@ fn convolve_horizontal_rgba_f32_neon(
 ) {
     let weights_ptr = filter_weights.weights.as_ptr();
 
-    let mut unsafe_source_ptr_0 = image_store.buffer.as_ptr();
-    let mut unsafe_destination_ptr_0 = destination.buffer.as_mut_ptr();
+    let mut unsafe_source_ptr_0 = image_store.buffer.borrow().as_ptr();
+    let mut unsafe_destination_ptr_0 = destination.buffer.borrow_mut().as_mut_ptr();
 
     let src_stride = image_store.width * image_store.channels;
     let dst_stride = destination.width * image_store.channels;
@@ -251,7 +254,7 @@ fn convolve_horizontal_rgba_f32_native(
     image_store: &ImageStore<f32, 4>,
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStore<f32, 4>,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
     let mut unsafe_source_ptr_0 = image_store.buffer.borrow().as_ptr();
     let mut unsafe_destination_ptr_0 = destination.buffer.borrow_mut().as_mut_ptr();
@@ -260,28 +263,11 @@ fn convolve_horizontal_rgba_f32_native(
     let dst_stride = destination.width * image_store.channels;
 
     let dst_width = destination.width;
-    let threads_count = threading_policy.get_threads_count(destination.get_size());
 
-    if threads_count == 1 {
-        for _ in 0..destination.height {
-            convolve_horizontal_rgb_native_row(
-                dst_width,
-                &filter_weights,
-                unsafe_source_ptr_0,
-                unsafe_destination_ptr_0,
-            );
-
-            unsafe_source_ptr_0 = unsafe { unsafe_source_ptr_0.add(src_stride) };
-            unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
-        }
-    } else {
+    if let Some(pool) = pool {
         let arc_weights = Arc::new(filter_weights);
         let borrowed = destination.buffer.borrow_mut();
         let unsafe_slice = UnsafeSlice::new(borrowed);
-        let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(threads_count)
-            .build()
-            .unwrap();
         pool.scope(|scope| {
             for y in 0..destination.height {
                 let weights = arc_weights.clone();
@@ -299,6 +285,18 @@ fn convolve_horizontal_rgba_f32_native(
                 });
             }
         });
+    } else {
+        for _ in 0..destination.height {
+            convolve_horizontal_rgb_native_row(
+                dst_width,
+                &filter_weights,
+                unsafe_source_ptr_0,
+                unsafe_destination_ptr_0,
+            );
+
+            unsafe_source_ptr_0 = unsafe { unsafe_source_ptr_0.add(src_stride) };
+            unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
+        }
     }
 }
 
@@ -308,8 +306,8 @@ fn convolve_vertical_rgba_f32_neon(
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStore<f32, 4>,
 ) {
-    let unsafe_source_ptr_0 = image_store.buffer.as_ptr();
-    let mut unsafe_destination_ptr_0 = destination.buffer.as_mut_ptr();
+    let unsafe_source_ptr_0 = image_store.buffer.borrow().as_ptr();
+    let mut unsafe_destination_ptr_0 = destination.buffer.borrow_mut().as_mut_ptr();
     let src_stride = image_store.width * image_store.channels;
     let mut filter_offset = 0usize;
     let dst_stride = destination.width * image_store.channels;
@@ -380,7 +378,7 @@ impl<'a> HorizontalConvolutionPass<f32, 4> for ImageStore<'a, f32, 4> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStore<f32, 4>,
-        threading_policy: ThreadingPolicy,
+        pool: &Option<ThreadPool>,
     ) {
         #[allow(unused_assignments)]
         #[allow(unused_mut)]
@@ -399,7 +397,7 @@ impl<'a> HorizontalConvolutionPass<f32, 4> for ImageStore<'a, f32, 4> {
                     self,
                     filter_weights,
                     destination,
-                    threading_policy,
+                    pool,
                 );
             }
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -413,7 +411,7 @@ impl<'a> VerticalConvolutionPass<f32, 4> for ImageStore<'a, f32, 4> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStore<f32, 4>,
-        threading_policy: ThreadingPolicy,
+        pool: &Option<ThreadPool>,
     ) {
         #[allow(unused_assignments)]
         #[allow(unused_mut)]
@@ -428,7 +426,7 @@ impl<'a> VerticalConvolutionPass<f32, 4> for ImageStore<'a, f32, 4> {
                 convolve_vertical_rgba_f32_neon(self, filter_weights, destination);
             }
             AccelerationFeature::Native => {
-                convolve_vertical_native_f32(self, filter_weights, destination, threading_policy);
+                convolve_vertical_native_f32(self, filter_weights, destination, pool);
             }
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             AccelerationFeature::Sse => {}

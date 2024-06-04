@@ -1,13 +1,14 @@
+use rayon::ThreadPool;
 use crate::ImageSize;
 
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum ThreadingPolicy {
     Single,
     Fixed(usize),
     Adaptive,
 }
 
-impl ThreadingPolicy {
+impl<'a> ThreadingPolicy {
     pub fn get_threads_count(&self, for_size: ImageSize) -> usize {
         match self {
             ThreadingPolicy::Single => 1,
@@ -18,5 +19,21 @@ impl ThreadingPolicy {
                 return (new_box_size / box_size).max(1).min(16);
             }
         }
+    }
+
+}
+
+impl<'a> ThreadingPolicy {
+    pub fn get_pool(&self, for_size: ImageSize) -> Option<ThreadPool> {
+        if *self == ThreadingPolicy::Single {
+            return None;
+        }
+        let threads_count = self.get_threads_count(for_size);
+        let shared_pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(threads_count)
+            .use_current_thread()
+            .build()
+            .unwrap();
+        return Some(shared_pool);
     }
 }

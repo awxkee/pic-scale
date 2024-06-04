@@ -1,3 +1,4 @@
+use rayon::ThreadPool;
 use std::sync::Arc;
 
 use crate::acceleration_feature::AccelerationFeature;
@@ -9,15 +10,14 @@ use crate::image_store::ImageStore;
 use crate::neon_rgb_u8::neon_rgb::*;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse_rgb_u8::sse_rgb::*;
-use crate::threading_policy::ThreadingPolicy;
 use crate::unsafe_slice::UnsafeSlice;
 
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-fn convolve_horizontal_rgb_sse<'a>(
+fn convolve_horizontal_rgb_sse(
     image_store: &ImageStore<u8, 3>,
     filter_weights: FilterWeights<f32>,
-    destination: &mut ImageStore<'a, u8, 3>,
-    threading_policy: ThreadingPolicy,
+    destination: &mut ImageStore<u8, 3>,
+    pool: &Option<ThreadPool>,
 ) {
     let approx_weights = filter_weights.numerical_approximation_i16::<12>(0);
 
@@ -27,52 +27,12 @@ fn convolve_horizontal_rgb_sse<'a>(
     let src_stride = image_store.width * image_store.channels;
     let dst_stride = destination.width * image_store.channels;
 
-    let size = destination.get_size();
-    let threads_count = threading_policy.get_threads_count(size);
-
-    if threads_count == 1 {
-        let mut yy = 0usize;
-
-        while yy + 4 < destination.height {
-            unsafe {
-                convolve_horizontal_rgb_sse_rows_4(
-                    image_store.width,
-                    destination.width,
-                    &approx_weights,
-                    unsafe_source_ptr_0,
-                    src_stride,
-                    unsafe_destination_ptr_0,
-                    dst_stride,
-                );
-            }
-            unsafe_source_ptr_0 = unsafe { unsafe_source_ptr_0.add(src_stride * 4) };
-            unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride * 4) };
-            yy += 4;
-        }
-
-        for _ in yy..destination.height {
-            unsafe {
-                convolve_horizontal_rgb_sse_row_one(
-                    image_store.width,
-                    destination.width,
-                    &approx_weights,
-                    unsafe_source_ptr_0,
-                    unsafe_destination_ptr_0,
-                );
-            }
-            unsafe_source_ptr_0 = unsafe { unsafe_source_ptr_0.add(src_stride) };
-            unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
-        }
-    } else {
+    if let Some(pool) = pool {
         let arc_weights = Arc::new(approx_weights);
         let borrowed = destination.buffer.borrow_mut();
         let unsafe_slice = UnsafeSlice::new(borrowed);
         let destination_height = destination.height;
         let dst_width = destination.width;
-        let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(threads_count)
-            .build()
-            .unwrap();
         pool.scope(|scope| {
             let mut yy = 0usize;
             while yy + 4 < destination_height {
@@ -115,6 +75,39 @@ fn convolve_horizontal_rgb_sse<'a>(
                 });
             }
         });
+    } else {
+        let mut yy = 0usize;
+
+        while yy + 4 < destination.height {
+            unsafe {
+                convolve_horizontal_rgb_sse_rows_4(
+                    image_store.width,
+                    destination.width,
+                    &approx_weights,
+                    unsafe_source_ptr_0,
+                    src_stride,
+                    unsafe_destination_ptr_0,
+                    dst_stride,
+                );
+            }
+            unsafe_source_ptr_0 = unsafe { unsafe_source_ptr_0.add(src_stride * 4) };
+            unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride * 4) };
+            yy += 4;
+        }
+
+        for _ in yy..destination.height {
+            unsafe {
+                convolve_horizontal_rgb_sse_row_one(
+                    image_store.width,
+                    destination.width,
+                    &approx_weights,
+                    unsafe_source_ptr_0,
+                    unsafe_destination_ptr_0,
+                );
+            }
+            unsafe_source_ptr_0 = unsafe { unsafe_source_ptr_0.add(src_stride) };
+            unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
+        }
     }
 }
 
@@ -123,26 +116,72 @@ fn convolve_horizontal_rgb_neon(
     image_store: &ImageStore<u8, 3>,
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStore<u8, 3>,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
     let approx_weights = filter_weights.numerical_approximation_i16::<12>(0);
 
-    let mut unsafe_source_ptr_0 = image_store.buffer.as_ptr();
-    let mut unsafe_destination_ptr_0 = destination.buffer.as_mut_ptr();
+    let mut unsafe_source_ptr_0 = image_store.buffer.borrow().as_ptr();
+    let mut unsafe_destination_ptr_0 = destination.buffer.borrow_mut().as_mut_ptr();
 
     let src_stride = image_store.width * image_store.channels;
     let dst_stride = destination.width * image_store.channels;
     let dst_width = destination.width;
+    let src_width = image_store.width;
 
-    let threads_count = threading_policy.get_threads_count(destination.get_size());
-
-    if threads_count == 1 {
+    if let Some(pool) = pool {
+        let arc_weights = Arc::new(approx_weights);
+        let borrowed = destination.buffer.borrow_mut();
+        let unsafe_slice = UnsafeSlice::new(borrowed);
+        pool.scope(|scope| {
+            let mut yy = 0usize;
+            for y in (0..destination.height.saturating_sub(4)).step_by(4) {
+                let weights = arc_weights.clone();
+                scope.spawn(move |_| {
+                    let unsafe_source_ptr_0 =
+                        unsafe { image_store.buffer.borrow().as_ptr().add(src_stride * y) };
+                    let dst_ptr = unsafe_slice.mut_ptr();
+                    let unsafe_destination_ptr_0 = unsafe { dst_ptr.add(dst_stride * y) };
+                    unsafe {
+                        convolve_horizontal_rgb_neon_rows_4(
+                            dst_width,
+                            src_width,
+                            &weights,
+                            unsafe_source_ptr_0,
+                            src_stride,
+                            unsafe_destination_ptr_0,
+                            dst_stride,
+                        );
+                    }
+                });
+                yy = y;
+            }
+            for y in (yy..destination.height).step_by(4) {
+                let weights = arc_weights.clone();
+                scope.spawn(move |_| {
+                    let unsafe_source_ptr_0 =
+                        unsafe { image_store.buffer.borrow().as_ptr().add(src_stride * y) };
+                    let dst_ptr = unsafe_slice.mut_ptr();
+                    let unsafe_destination_ptr_0 = unsafe { dst_ptr.add(dst_stride * y) };
+                    unsafe {
+                        convolve_horizontal_rgb_neon_row_one(
+                            dst_width,
+                            src_width,
+                            &weights,
+                            unsafe_source_ptr_0,
+                            unsafe_destination_ptr_0,
+                        );
+                    }
+                });
+            }
+        });
+    } else {
         let mut yy = 0usize;
 
         while yy + 4 < destination.height {
             unsafe {
                 convolve_horizontal_rgb_neon_rows_4(
                     dst_width,
+                    src_width,
                     &approx_weights,
                     unsafe_source_ptr_0,
                     src_stride,
@@ -160,65 +199,15 @@ fn convolve_horizontal_rgb_neon(
             unsafe {
                 convolve_horizontal_rgb_neon_row_one(
                     dst_width,
+                    src_width,
                     &approx_weights,
                     unsafe_source_ptr_0,
-                    src_stride,
                     unsafe_destination_ptr_0,
-                    dst_stride,
                 );
             }
             unsafe_source_ptr_0 = unsafe { unsafe_source_ptr_0.add(src_stride) };
             unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
         }
-    } else {
-        let arc_weights = Arc::new(approx_weights);
-        let unsafe_slice = UnsafeSlice::new(&mut destination.buffer);
-        let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(threads_count)
-            .build()
-            .unwrap();
-        pool.scope(|scope| {
-            let mut yy = 0usize;
-            for y in (0..destination.height.saturating_sub(4)).step_by(4) {
-                let weights = arc_weights.clone();
-                scope.spawn(move |_| {
-                    let unsafe_source_ptr_0 =
-                        unsafe { image_store.buffer.as_ptr().add(src_stride * y) };
-                    let dst_ptr = unsafe_slice.mut_ptr();
-                    let unsafe_destination_ptr_0 = unsafe { dst_ptr.add(dst_stride * y) };
-                    unsafe {
-                        convolve_horizontal_rgb_neon_rows_4(
-                            dst_width,
-                            &weights,
-                            unsafe_source_ptr_0,
-                            src_stride,
-                            unsafe_destination_ptr_0,
-                            dst_stride,
-                        );
-                    }
-                });
-                yy = y;
-            }
-            for y in (yy..destination.height).step_by(4) {
-                let weights = arc_weights.clone();
-                scope.spawn(move |_| {
-                    let unsafe_source_ptr_0 =
-                        unsafe { image_store.buffer.as_ptr().add(src_stride * y) };
-                    let dst_ptr = unsafe_slice.mut_ptr();
-                    let unsafe_destination_ptr_0 = unsafe { dst_ptr.add(dst_stride * y) };
-                    unsafe {
-                        convolve_horizontal_rgb_neon_row_one(
-                            dst_width,
-                            &weights,
-                            unsafe_source_ptr_0,
-                            src_stride,
-                            unsafe_destination_ptr_0,
-                            dst_stride,
-                        );
-                    }
-                });
-            }
-        });
     }
 }
 
@@ -265,7 +254,7 @@ fn convolve_horizontal_rgb_native(
     image_store: &ImageStore<u8, 3>,
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStore<u8, 3>,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
     let approx_weights = filter_weights.numerical_approximation_i16::<12>(0);
 
@@ -276,28 +265,10 @@ fn convolve_horizontal_rgb_native(
     let dst_stride = destination.width * image_store.channels;
     let dst_width = destination.width;
 
-    let threads_count = threading_policy.get_threads_count(destination.get_size());
-
-    if threads_count == 1 {
-        for _ in 0..destination.height {
-            convolve_horizontal_rgb_native_row(
-                destination.width,
-                &approx_weights,
-                unsafe_source_ptr_0,
-                unsafe_destination_ptr_0,
-            );
-
-            unsafe_source_ptr_0 = unsafe { unsafe_source_ptr_0.add(src_stride) };
-            unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
-        }
-    } else {
+    if let Some(pool) = pool {
         let arc_weights = Arc::new(approx_weights);
         let borrowed = destination.buffer.borrow_mut();
         let unsafe_slice = UnsafeSlice::new(borrowed);
-        let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(threads_count)
-            .build()
-            .unwrap();
         pool.scope(|scope| {
             for y in 0..destination.height {
                 let weights = arc_weights.clone();
@@ -315,6 +286,18 @@ fn convolve_horizontal_rgb_native(
                 });
             }
         });
+    } else {
+        for _ in 0..destination.height {
+            convolve_horizontal_rgb_native_row(
+                destination.width,
+                &approx_weights,
+                unsafe_source_ptr_0,
+                unsafe_destination_ptr_0,
+            );
+
+            unsafe_source_ptr_0 = unsafe { unsafe_source_ptr_0.add(src_stride) };
+            unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
+        }
     }
 }
 
@@ -323,7 +306,7 @@ pub(crate) fn convolve_vertical_rgb_sse_8<const COMPONENTS: usize>(
     image_store: &ImageStore<u8, COMPONENTS>,
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStore<u8, COMPONENTS>,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
     let approx_weights = filter_weights.numerical_approximation_i16::<12>(0);
     let unsafe_source_ptr_0 = image_store.buffer.borrow().as_ptr();
@@ -333,31 +316,10 @@ pub(crate) fn convolve_vertical_rgb_sse_8<const COMPONENTS: usize>(
     let dst_stride = destination.width * image_store.channels;
     let total_width = destination.width * image_store.channels;
 
-    let threads_count = threading_policy.get_threads_count(destination.get_size());
-
-    if threads_count == 1 {
-        for y in 0..destination.height {
-            let bounds = unsafe { approx_weights.bounds.get_unchecked(y) };
-            let weight_ptr = unsafe { approx_weights.weights.as_ptr().add(filter_offset) };
-            convolve_vertical_rgb_sse_row(
-                total_width,
-                &bounds,
-                unsafe_source_ptr_0,
-                unsafe_destination_ptr_0,
-                src_stride,
-                weight_ptr,
-            );
-            filter_offset += approx_weights.aligned_size;
-            unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
-        }
-    } else {
+    if let Some(pool) = pool {
         let arc_weights = Arc::new(approx_weights);
         let borrowed = destination.buffer.borrow_mut();
         let unsafe_slice = UnsafeSlice::new(borrowed);
-        let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(threads_count)
-            .build()
-            .unwrap();
         pool.scope(|scope| {
             for y in 0..destination.height {
                 let weights = arc_weights.clone();
@@ -379,28 +341,66 @@ pub(crate) fn convolve_vertical_rgb_sse_8<const COMPONENTS: usize>(
                 });
             }
         });
+    } else {
+        for y in 0..destination.height {
+            let bounds = unsafe { approx_weights.bounds.get_unchecked(y) };
+            let weight_ptr = unsafe { approx_weights.weights.as_ptr().add(filter_offset) };
+            convolve_vertical_rgb_sse_row(
+                total_width,
+                &bounds,
+                unsafe_source_ptr_0,
+                unsafe_destination_ptr_0,
+                src_stride,
+                weight_ptr,
+            );
+            filter_offset += approx_weights.aligned_size;
+            unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
+        }
     }
 }
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 #[inline(always)]
-fn convolve_vertical_rgb_neon(
-    image_store: &ImageStore<u8, 3>,
+pub(crate) fn convolve_vertical_rgb_neon<const CHANNELS: usize>(
+    image_store: &ImageStore<u8, CHANNELS>,
     filter_weights: FilterWeights<f32>,
-    destination: &mut ImageStore<u8, 3>,
-    threading_policy: ThreadingPolicy,
+    destination: &mut ImageStore<u8, CHANNELS>,
+    pool: &Option<ThreadPool>,
 ) {
     let approx_weights = filter_weights.numerical_approximation_i16::<12>(0);
-    let unsafe_source_ptr_0 = image_store.buffer.as_ptr();
-    let mut unsafe_destination_ptr_0 = destination.buffer.as_mut_ptr();
+    let unsafe_source_ptr_0 = image_store.buffer.borrow().as_ptr();
+    let mut unsafe_destination_ptr_0 = destination.buffer.borrow_mut().as_mut_ptr();
     let src_stride = image_store.width * image_store.channels;
     let mut filter_offset = 0usize;
     let dst_stride = destination.width * image_store.channels;
     let total_width = destination.width * image_store.channels;
 
-    let threads_count = threading_policy.get_threads_count(destination.get_size());
-
-    if threads_count == 1 {
+    if let Some(pool) = pool {
+        let arc_weights = Arc::new(approx_weights);
+        let borrowed = destination.buffer.borrow_mut();
+        let unsafe_slice = UnsafeSlice::new(borrowed);
+        pool.scope(|scope| {
+            for y in 0..destination.height {
+                let weights = arc_weights.clone();
+                scope.spawn(move |_| {
+                    let bounds = unsafe { weights.bounds.get_unchecked(y) };
+                    let weight_ptr =
+                        unsafe { weights.weights.as_ptr().add(weights.aligned_size * y) };
+                    let unsafe_source_ptr_0 = image_store.buffer.borrow().as_ptr();
+                    let dst_ptr = unsafe_slice.mut_ptr();
+                    let unsafe_destination_ptr_0 = unsafe { dst_ptr.add(dst_stride * y) };
+                    convolve_vertical_rgb_neon_row(
+                        total_width,
+                        bounds,
+                        unsafe_source_ptr_0,
+                        unsafe_destination_ptr_0,
+                        src_stride,
+                        weight_ptr,
+                    );
+                });
+            }
+        });
+    } else {
         for y in 0..destination.height {
             let bounds = unsafe { approx_weights.bounds.get_unchecked(y) };
             let weight_ptr = unsafe { approx_weights.weights.as_ptr().add(filter_offset) };
@@ -415,34 +415,6 @@ fn convolve_vertical_rgb_neon(
             filter_offset += approx_weights.aligned_size;
             unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
         }
-    } else {
-        let arc_weights = Arc::new(approx_weights);
-        let unsafe_slice = UnsafeSlice::new(&mut destination.buffer);
-        let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(threads_count)
-            .build()
-            .unwrap();
-        pool.scope(|scope| {
-            for y in 0..destination.height {
-                let weights = arc_weights.clone();
-                scope.spawn(move |_| {
-                    let bounds = unsafe { weights.bounds.get_unchecked(y) };
-                    let weight_ptr =
-                        unsafe { weights.weights.as_ptr().add(weights.aligned_size * y) };
-                    let unsafe_source_ptr_0 = image_store.buffer.as_ptr();
-                    let dst_ptr = unsafe_slice.mut_ptr();
-                    let unsafe_destination_ptr_0 = unsafe { dst_ptr.add(dst_stride * y) };
-                    convolve_vertical_rgb_neon_row(
-                        total_width,
-                        bounds,
-                        unsafe_source_ptr_0,
-                        unsafe_destination_ptr_0,
-                        src_stride,
-                        weight_ptr,
-                    );
-                });
-            }
-        });
     }
 }
 
@@ -510,43 +482,19 @@ pub(crate) fn convolve_vertical_rgb_native_8<'a, const COMPONENTS: usize>(
     image_store: &ImageStore<u8, COMPONENTS>,
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStore<'a, u8, COMPONENTS>,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
     let approx_weights = filter_weights.numerical_approximation_i16::<12>(0);
 
-    let threads_count = threading_policy.get_threads_count(destination.get_size());
     let src_stride = image_store.width * image_store.channels;
     let dst_stride = destination.width * image_store.channels;
 
     let dst_width = destination.width;
 
-    if threads_count == 1 {
-        let unsafe_source_ptr_0 = image_store.buffer.borrow().as_ptr();
-        let mut unsafe_destination_ptr_0 = destination.buffer.borrow_mut().as_mut_ptr();
-        let mut filter_offset = 0usize;
-        for y in 0..destination.height {
-            let bounds = unsafe { approx_weights.bounds.get_unchecked(y) };
-            let weight_ptr = unsafe { approx_weights.weights.as_ptr().add(filter_offset) };
-            convolve_vertical_rgb_native_row(
-                dst_width,
-                bounds,
-                unsafe_source_ptr_0,
-                unsafe_destination_ptr_0,
-                src_stride,
-                weight_ptr,
-            );
-
-            filter_offset += approx_weights.aligned_size;
-            unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
-        }
-    } else {
+    if let Some(pool) = pool {
         let arc_weights = Arc::new(approx_weights);
         let borrowed = destination.buffer.borrow_mut();
         let unsafe_slice = UnsafeSlice::new(borrowed);
-        let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(threads_count)
-            .build()
-            .unwrap();
         pool.scope(|scope| {
             for y in 0..destination.height {
                 let weights = arc_weights.clone();
@@ -568,6 +516,25 @@ pub(crate) fn convolve_vertical_rgb_native_8<'a, const COMPONENTS: usize>(
                 });
             }
         });
+    } else {
+        let unsafe_source_ptr_0 = image_store.buffer.borrow().as_ptr();
+        let mut unsafe_destination_ptr_0 = destination.buffer.borrow_mut().as_mut_ptr();
+        let mut filter_offset = 0usize;
+        for y in 0..destination.height {
+            let bounds = unsafe { approx_weights.bounds.get_unchecked(y) };
+            let weight_ptr = unsafe { approx_weights.weights.as_ptr().add(filter_offset) };
+            convolve_vertical_rgb_native_row(
+                dst_width,
+                bounds,
+                unsafe_source_ptr_0,
+                unsafe_destination_ptr_0,
+                src_stride,
+                weight_ptr,
+            );
+
+            filter_offset += approx_weights.aligned_size;
+            unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
+        }
     }
 }
 
@@ -576,7 +543,7 @@ impl<'a> HorizontalConvolutionPass<u8, 3> for ImageStore<'a, u8, 3> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStore<u8, 3>,
-        threading_policy: ThreadingPolicy,
+        pool: &Option<ThreadPool>,
     ) {
         #[allow(unused_assignments)]
         let mut using_feature = AccelerationFeature::Native;
@@ -596,14 +563,14 @@ impl<'a> HorizontalConvolutionPass<u8, 3> for ImageStore<'a, u8, 3> {
         match using_feature {
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             AccelerationFeature::Neon => {
-                convolve_horizontal_rgb_neon(self, filter_weights, destination, threading_policy);
+                convolve_horizontal_rgb_neon(self, filter_weights, destination, pool);
             }
             AccelerationFeature::Native => {
-                convolve_horizontal_rgb_native(self, filter_weights, destination, threading_policy);
+                convolve_horizontal_rgb_native(self, filter_weights, destination, pool);
             }
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             AccelerationFeature::Sse => {
-                convolve_horizontal_rgb_sse(self, filter_weights, destination, threading_policy);
+                convolve_horizontal_rgb_sse(self, filter_weights, destination, pool);
             }
         }
     }
@@ -614,7 +581,7 @@ impl<'a> VerticalConvolutionPass<u8, 3> for ImageStore<'a, u8, 3> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStore<u8, 3>,
-        threading_policy: ThreadingPolicy,
+        pool: &Option<ThreadPool>,
     ) {
         #[allow(unused_assignments)]
         let mut using_feature = AccelerationFeature::Native;
@@ -634,14 +601,14 @@ impl<'a> VerticalConvolutionPass<u8, 3> for ImageStore<'a, u8, 3> {
         match using_feature {
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             AccelerationFeature::Neon => {
-                convolve_vertical_rgb_neon(self, filter_weights, destination, threading_policy);
+                convolve_vertical_rgb_neon(self, filter_weights, destination, pool);
             }
             AccelerationFeature::Native => {
-                convolve_vertical_rgb_native_8(self, filter_weights, destination, threading_policy);
+                convolve_vertical_rgb_native_8(self, filter_weights, destination, pool);
             }
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             AccelerationFeature::Sse => {
-                convolve_vertical_rgb_sse_8(self, filter_weights, destination, threading_policy);
+                convolve_vertical_rgb_sse_8(self, filter_weights, destination, pool);
             }
         }
     }

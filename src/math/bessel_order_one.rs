@@ -4,7 +4,6 @@ fn get_high_word(x: f64) -> u32 {
     (x.to_bits() >> 32) as u32
 }
 
-
 fn common(ix: u32, x: f64, y1: bool, sign: bool) -> f64 {
     let z: f64;
     let mut s: f64;
@@ -20,11 +19,11 @@ fn common(ix: u32, x: f64, y1: bool, sign: bool) -> f64 {
      * cos(x-3pi/4) = (sin(x) - cos(x))/sqrt(2)
      * sin(x) +- cos(x) = -cos(2x)/(sin(x) -+ cos(x))
      */
-    s = (x).sin();
+    s = x.sin();
     if y1 {
         s = -s;
     }
-    c = (x).cos();
+    c = x.cos();
     cc = s - c;
     if ix < 0x7fe00000 {
         /* avoid overflow in 2*x */
@@ -45,7 +44,7 @@ fn common(ix: u32, x: f64, y1: bool, sign: bool) -> f64 {
     if sign {
         cc = -cc;
     }
-    return INVSQRTPI * cc / (x).sqrt();
+    return INVSQRTPI * cc / x.sqrt();
 }
 
 /* R0/S0 on [0,2] */
@@ -74,7 +73,7 @@ pub fn j1(x: f64) -> f64 {
     }
     if ix >= 0x40000000 {
         /* |x| >= 2 */
-        return common(ix, (x).abs(), false, sign);
+        return common(ix, x.abs(), false, sign);
     }
     if ix >= 0x38000000 {
         /* |x| >= 2**-127 */
