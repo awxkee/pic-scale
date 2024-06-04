@@ -10,7 +10,7 @@ use crate::image_store::ImageStore;
 use crate::neon_rgb_u8::neon_rgb::*;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse_rgb_u8::sse_rgb::*;
-use crate::support::ROUNDING_APPROX;
+use crate::support::{PRECISION, ROUNDING_APPROX};
 use crate::unsafe_slice::UnsafeSlice;
 
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -242,9 +242,9 @@ fn convolve_horizontal_rgb_native_row(
         let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px) };
 
         unsafe {
-            *dest_ptr = (sum_r >> 12).min(255).max(0) as u8;
-            *dest_ptr.add(1) = (sum_g >> 12).min(255).max(0) as u8;
-            *dest_ptr.add(2) = (sum_b >> 12).min(255).max(0) as u8;
+            *dest_ptr = (sum_r >> PRECISION).min(255).max(0) as u8;
+            *dest_ptr.add(1) = (sum_g >> PRECISION).min(255).max(0) as u8;
+            *dest_ptr.add(2) = (sum_b >> PRECISION).min(255).max(0) as u8;
         }
 
         filter_offset += filter_weights.aligned_size;
@@ -546,11 +546,10 @@ impl<'a> HorizontalConvolutionPass<u8, 3> for ImageStore<'a, u8, 3> {
         destination: &mut ImageStore<u8, 3>,
         pool: &Option<ThreadPool>,
     ) {
-        #[allow(unused_assignments)]
-        let mut using_feature = AccelerationFeature::Native;
+        let mut _using_feature = AccelerationFeature::Native;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            using_feature = AccelerationFeature::Neon;
+            _using_feature = AccelerationFeature::Neon;
         }
         #[cfg(all(
             any(target_arch = "x86_64", target_arch = "x86"),
@@ -558,10 +557,10 @@ impl<'a> HorizontalConvolutionPass<u8, 3> for ImageStore<'a, u8, 3> {
         ))]
         {
             if is_x86_feature_detected!("sse4.1") {
-                using_feature = AccelerationFeature::Sse;
+                _using_feature = AccelerationFeature::Sse;
             }
         }
-        match using_feature {
+        match _using_feature {
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             AccelerationFeature::Neon => {
                 convolve_horizontal_rgb_neon(self, filter_weights, destination, pool);
@@ -584,11 +583,10 @@ impl<'a> VerticalConvolutionPass<u8, 3> for ImageStore<'a, u8, 3> {
         destination: &mut ImageStore<u8, 3>,
         pool: &Option<ThreadPool>,
     ) {
-        #[allow(unused_assignments)]
-        let mut using_feature = AccelerationFeature::Native;
+        let mut _using_feature = AccelerationFeature::Native;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            using_feature = AccelerationFeature::Neon;
+            _using_feature = AccelerationFeature::Neon;
         }
         #[cfg(all(
             any(target_arch = "x86_64", target_arch = "x86"),
@@ -596,10 +594,10 @@ impl<'a> VerticalConvolutionPass<u8, 3> for ImageStore<'a, u8, 3> {
         ))]
         {
             if is_x86_feature_detected!("sse4.1") {
-                using_feature = AccelerationFeature::Sse;
+                _using_feature = AccelerationFeature::Sse;
             }
         }
-        match using_feature {
+        match _using_feature {
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             AccelerationFeature::Neon => {
                 convolve_vertical_rgb_neon(self, filter_weights, destination, pool);

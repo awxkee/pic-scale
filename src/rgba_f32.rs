@@ -8,7 +8,7 @@ use crate::acceleration_feature::AccelerationFeature;
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::convolve_f32::*;
-use crate::filter_weights::{FilterBounds, FilterWeights};
+use crate::filter_weights::*;
 use crate::rgb_f32::convolve_vertical_native_f32;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageStore;

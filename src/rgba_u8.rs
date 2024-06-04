@@ -237,58 +237,98 @@ fn convolve_horizontal_rgba_neon(
     }
 }
 
+fn convolve_horizontal_rgba_native_row(
+    dst_width: usize,
+    filter_weights: &FilterWeights<i16>,
+    unsafe_source_ptr_0: *const u8,
+    unsafe_destination_ptr_0: *mut u8,
+) {
+    const CHANNELS: usize = 4;
+    let mut filter_offset = 0usize;
+    let weights_ptr = filter_weights.weights.as_ptr();
+
+    for x in 0..dst_width {
+        let mut sum_r = ROUNDING_APPROX;
+        let mut sum_g = ROUNDING_APPROX;
+        let mut sum_b = ROUNDING_APPROX;
+        let mut sum_a = ROUNDING_APPROX;
+
+        let bounds = unsafe { filter_weights.bounds.get_unchecked(x) };
+        let start_x = bounds.start;
+        for j in 0..bounds.size {
+            let px = (start_x + j) * CHANNELS;
+            let weight = unsafe { weights_ptr.add(j + filter_offset).read_unaligned() } as i32;
+            let src = unsafe { unsafe_source_ptr_0.add(px) };
+            sum_r += unsafe { src.read_unaligned() } as i32 * weight;
+            sum_g += unsafe { src.add(1).read_unaligned() } as i32 * weight;
+            sum_b += unsafe { src.add(2).read_unaligned() } as i32 * weight;
+            sum_a += unsafe { src.add(3).read_unaligned() } as i32 * weight;
+        }
+
+        let px = x * CHANNELS;
+
+        let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px) };
+
+        unsafe {
+            *dest_ptr = (sum_r >> PRECISION).min(255).max(0) as u8;
+            *dest_ptr.add(1) = (sum_g >> PRECISION).min(255).max(0) as u8;
+            *dest_ptr.add(2) = (sum_b >> PRECISION).min(255).max(0) as u8;
+            *dest_ptr.add(3) = (sum_a >> PRECISION).min(255).max(0) as u8;
+        }
+
+        filter_offset += filter_weights.aligned_size;
+    }
+}
+
 fn convolve_horizontal_rgba_native(
     image_store: &ImageStore<u8, 4>,
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStore<u8, 4>,
+    _pool: &Option<ThreadPool>,
 ) {
     let approx_weights = filter_weights.numerical_approximation_i16::<12>(0);
-
-    let weights_ptr = approx_weights.weights.as_ptr();
 
     let mut unsafe_source_ptr_0 = image_store.buffer.borrow().as_ptr();
     let mut unsafe_destination_ptr_0 = destination.buffer.borrow_mut().as_mut_ptr();
 
+    let dst_width = destination.width;
+
     let src_stride = image_store.width * image_store.channels;
     let dst_stride = destination.width * image_store.channels;
 
-    for _ in 0..destination.height {
-        let mut filter_offset = 0usize;
-
-        for x in 0..destination.width {
-            let mut sum_r = ROUNDING_APPROX;
-            let mut sum_g = ROUNDING_APPROX;
-            let mut sum_b = ROUNDING_APPROX;
-            let mut sum_a = ROUNDING_APPROX;
-
-            let bounds = unsafe { approx_weights.bounds.get_unchecked(x) };
-            let start_x = bounds.start;
-            for j in 0..bounds.size {
-                let px = (start_x + j) * image_store.channels;
-                let weight = unsafe { weights_ptr.add(j + filter_offset).read_unaligned() } as i32;
-                let src = unsafe { unsafe_source_ptr_0.add(px) };
-                sum_r += unsafe { src.read_unaligned() } as i32 * weight;
-                sum_g += unsafe { src.add(1).read_unaligned() } as i32 * weight;
-                sum_b += unsafe { src.add(2).read_unaligned() } as i32 * weight;
-                sum_a += unsafe { src.add(3).read_unaligned() } as i32 * weight;
+    if let Some(pool) = _pool {
+        let arc_weights = Arc::new(approx_weights);
+        let borrowed = destination.buffer.borrow_mut();
+        let unsafe_slice = UnsafeSlice::new(borrowed);
+        pool.scope(|scope| {
+            for y in 0..destination.height {
+                let weights = arc_weights.clone();
+                scope.spawn(move |_| {
+                    let unsafe_source_ptr_0 =
+                        unsafe { image_store.buffer.borrow().as_ptr().add(src_stride * y) };
+                    let dst_ptr = unsafe_slice.mut_ptr();
+                    let unsafe_destination_ptr_0 = unsafe { dst_ptr.add(dst_stride * y) };
+                    convolve_horizontal_rgba_native_row(
+                        dst_width,
+                        &weights,
+                        unsafe_source_ptr_0,
+                        unsafe_destination_ptr_0,
+                    );
+                });
             }
+        });
+    } else {
+        for _ in 0..destination.height {
+            convolve_horizontal_rgba_native_row(
+                dst_width,
+                &approx_weights,
+                unsafe_source_ptr_0,
+                unsafe_destination_ptr_0,
+            );
 
-            let px = x * image_store.channels;
-
-            let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px) };
-
-            unsafe {
-                *dest_ptr = (sum_r >> PRECISION).min(255).max(0) as u8;
-                *dest_ptr.add(1) = (sum_g >> PRECISION).min(255).max(0) as u8;
-                *dest_ptr.add(2) = (sum_b >> PRECISION).min(255).max(0) as u8;
-                *dest_ptr.add(3) = (sum_a >> PRECISION).min(255).max(0) as u8;
-            }
-
-            filter_offset += approx_weights.aligned_size;
+            unsafe_source_ptr_0 = unsafe { unsafe_source_ptr_0.add(src_stride) };
+            unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
         }
-
-        unsafe_source_ptr_0 = unsafe { unsafe_source_ptr_0.add(src_stride) };
-        unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
     }
 }
 
@@ -297,14 +337,12 @@ impl<'a> HorizontalConvolutionPass<u8, 4> for ImageStore<'a, u8, 4> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStore<u8, 4>,
-        pool: &Option<ThreadPool>,
+        _pool: &Option<ThreadPool>,
     ) {
-        #[allow(unused_assignments)]
-        #[allow(unused_mut)]
-        let mut using_feature = AccelerationFeature::Native;
+        let mut _using_feature = AccelerationFeature::Native;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            using_feature = AccelerationFeature::Neon;
+            _using_feature = AccelerationFeature::Neon;
         }
         #[cfg(all(
             any(target_arch = "x86_64", target_arch = "x86"),
@@ -312,20 +350,20 @@ impl<'a> HorizontalConvolutionPass<u8, 4> for ImageStore<'a, u8, 4> {
         ))]
         {
             if is_x86_feature_detected!("sse4.1") {
-                using_feature = AccelerationFeature::Sse;
+                _using_feature = AccelerationFeature::Sse;
             }
         }
-        match using_feature {
+        match _using_feature {
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             AccelerationFeature::Neon => {
-                convolve_horizontal_rgba_neon(self, filter_weights, destination, pool);
+                convolve_horizontal_rgba_neon(self, filter_weights, destination, _pool);
             }
             AccelerationFeature::Native => {
-                convolve_horizontal_rgba_native(self, filter_weights, destination);
+                convolve_horizontal_rgba_native(self, filter_weights, destination, _pool);
             }
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             AccelerationFeature::Sse => {
-                convolve_horizontal_rgba_sse(self, filter_weights, destination, pool);
+                convolve_horizontal_rgba_sse(self, filter_weights, destination, _pool);
             }
         }
     }
@@ -338,12 +376,10 @@ impl<'a> VerticalConvolutionPass<u8, 4> for ImageStore<'a, u8, 4> {
         destination: &mut ImageStore<u8, 4>,
         pool: &Option<ThreadPool>,
     ) {
-        #[allow(unused_assignments)]
-        #[allow(unused_mut)]
-        let mut using_feature = AccelerationFeature::Native;
+        let mut _using_feature = AccelerationFeature::Native;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            using_feature = AccelerationFeature::Neon;
+            _using_feature = AccelerationFeature::Neon;
         }
         #[cfg(all(
             any(target_arch = "x86_64", target_arch = "x86"),
@@ -351,10 +387,10 @@ impl<'a> VerticalConvolutionPass<u8, 4> for ImageStore<'a, u8, 4> {
         ))]
         {
             if is_x86_feature_detected!("sse4.1") {
-                using_feature = AccelerationFeature::Sse;
+                _using_feature = AccelerationFeature::Sse;
             }
         }
-        match using_feature {
+        match _using_feature {
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             AccelerationFeature::Neon => {
                 convolve_vertical_rgb_neon(self, filter_weights, destination, pool);
