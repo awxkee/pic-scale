@@ -6,6 +6,7 @@ pub mod sse_convolve_u8 {
     use std::arch::x86::*;
     #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::*;
+    use crate::support::ROUNDING_APPROX;
 
     #[inline(always)]
     pub fn compress_i32(x: __m128i) -> __m128i {
@@ -57,10 +58,11 @@ pub mod sse_convolve_u8 {
         filter: *const i16,
         bounds: &FilterBounds,
     ) {
-        let mut store_0 = _mm_setzero_si128();
-        let mut store_1 = _mm_setzero_si128();
-        let mut store_2 = _mm_setzero_si128();
-        let mut store_3 = _mm_setzero_si128();
+        let vld = _mm_set1_epi32(ROUNDING_APPROX);
+        let mut store_0 = vld;
+        let mut store_1 = vld;
+        let mut store_2 = vld;
+        let mut store_3 = vld;
 
         let px = start_x;
 
@@ -115,14 +117,15 @@ pub mod sse_convolve_u8 {
         bounds: &FilterBounds,
     ) {
         let zeros = _mm_setzero_si128();
-        let mut store_0 = zeros;
-        let mut store_1 = zeros;
-        let mut store_2 = zeros;
-        let mut store_3 = zeros;
-        let mut store_4 = zeros;
-        let mut store_5 = zeros;
-        let mut store_6 = zeros;
-        let mut store_7 = zeros;
+        let vld = _mm_set1_epi32(ROUNDING_APPROX);
+        let mut store_0 = vld;
+        let mut store_1 = vld;
+        let mut store_2 = vld;
+        let mut store_3 = vld;
+        let mut store_4 = vld;
+        let mut store_5 = vld;
+        let mut store_6 = vld;
+        let mut store_7 = vld;
 
         let px = start_x;
 
@@ -259,8 +262,9 @@ pub mod sse_convolve_u8 {
         bounds: &FilterBounds,
         blend_length: usize,
     ) {
-        let mut store_0 = _mm_setzero_si128();
-        let mut store_1 = _mm_setzero_si128();
+        let vld = _mm_set1_epi32(ROUNDING_APPROX);
+        let mut store_0 = vld;
+        let mut store_1 = vld;
 
         let zeros = _mm_setzero_si128();
 

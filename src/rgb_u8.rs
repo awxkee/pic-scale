@@ -10,6 +10,7 @@ use crate::image_store::ImageStore;
 use crate::neon_rgb_u8::neon_rgb::*;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse_rgb_u8::sse_rgb::*;
+use crate::support::ROUNDING_APPROX;
 use crate::unsafe_slice::UnsafeSlice;
 
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -221,9 +222,9 @@ fn convolve_horizontal_rgb_native_row(
     let mut filter_offset = 0usize;
     let weights_ptr = filter_weights.weights.as_ptr();
     for x in 0..dst_width {
-        let mut sum_r = 0i32;
-        let mut sum_g = 0i32;
-        let mut sum_b = 0i32;
+        let mut sum_r = ROUNDING_APPROX;
+        let mut sum_g = ROUNDING_APPROX;
+        let mut sum_b = ROUNDING_APPROX;
 
         let bounds = unsafe { filter_weights.bounds.get_unchecked(x) };
         let start_x = bounds.start;

@@ -6,6 +6,7 @@ pub mod sse_rgb {
     use std::arch::x86::*;
     #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::*;
+    use crate::support::ROUNDING_APPROX;
 
     pub(crate) unsafe fn convolve_horizontal_rgba_sse_rows_4(
         dst_width: usize,
@@ -39,13 +40,15 @@ pub mod sse_rgb {
                                       11, -1,
                                       15, -1);
 
+        let vld = unsafe { _mm_set1_epi32(ROUNDING_APPROX) };
+
         for x in 0..dst_width {
             let bounds = unsafe { approx_weights.bounds.get_unchecked(x) };
             let mut jx = 0usize;
-            let mut store_0 = unsafe { _mm_setzero_si128() };
-            let mut store_1 = unsafe { _mm_setzero_si128() };
-            let mut store_2 = unsafe { _mm_setzero_si128() };
-            let mut store_3 = unsafe { _mm_setzero_si128() };
+            let mut store_0 = vld;
+            let mut store_1 = vld;
+            let mut store_2 = vld;
+            let mut store_3 = vld;
 
             while jx + 4 < bounds.size {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
@@ -222,10 +225,12 @@ pub mod sse_rgb {
                                       11, -1,
                                       15, -1);
 
+        let vld = unsafe { _mm_set1_epi32(ROUNDING_APPROX) };
+
         for x in 0..dst_width {
             let bounds = unsafe { approx_weights.bounds.get_unchecked(x) };
             let mut jx = 0usize;
-            let mut store = unsafe { _mm_setzero_si128() };
+            let mut store = vld;
 
             while jx + 4 < bounds.size {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
@@ -320,13 +325,15 @@ pub mod sse_rgb {
                                                 -1, -1,
                                                 -1, -1) };
 
+        let vld = unsafe { _mm_set1_epi32(ROUNDING_APPROX) };
+
         for x in 0..dst_width {
             let bounds = unsafe { approx_weights.bounds.get_unchecked(x) };
             let mut jx = 0usize;
-            let mut store_0 = unsafe { _mm_setzero_si128() };
-            let mut store_1 = unsafe { _mm_setzero_si128() };
-            let mut store_2 = unsafe { _mm_setzero_si128() };
-            let mut store_3 = unsafe { _mm_setzero_si128() };
+            let mut store_0 = vld;
+            let mut store_1 = vld;
+            let mut store_2 = vld;
+            let mut store_3 = vld;
 
             while jx + 4 < bounds.size && x + 6 < src_width {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };

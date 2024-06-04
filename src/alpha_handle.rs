@@ -56,7 +56,11 @@ pub unsafe fn neon_umpremultiply_alpha(v: uint8x16_t, a_values: uint8x16_t) -> u
     let hi_hi = vcvtaq_u32_f32(vmulq_f32(hi_hi, a_hi_ho));
     let lo = vcombine_u16(vmovn_u32(lo_lo), vmovn_u32(lo_hi));
     let hi = vcombine_u16(vmovn_u32(hi_lo), vmovn_u32(hi_hi));
-    vbslq_u8(zero_mask, vdupq_n_u8(0), vcombine_u8(vqmovn_u16(lo), vqmovn_u16(hi)))
+    vbslq_u8(
+        zero_mask,
+        vdupq_n_u8(0),
+        vcombine_u8(vqmovn_u16(lo), vqmovn_u16(hi)),
+    )
 }
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -189,7 +193,9 @@ pub fn premultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height: 
                 let px = _cx * 4;
                 let src_ptr = src.as_ptr().add(offset + px);
                 let mut pixel = vld4q_u8(src_ptr);
-
+                pixel.0 = neon_premultiply_alpha(pixel.0, pixel.3);
+                pixel.1 = neon_premultiply_alpha(pixel.1, pixel.3);
+                pixel.2 = neon_premultiply_alpha(pixel.2, pixel.3);
                 let dst_ptr = dst.as_mut_ptr().add(offset + px);
                 vst4q_u8(dst_ptr, pixel);
                 _cx += 16;

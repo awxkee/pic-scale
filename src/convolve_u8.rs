@@ -1,4 +1,5 @@
 use crate::filter_weights::FilterBounds;
+use crate::support::{PRECISION, ROUNDING_APPROX};
 
 #[inline(always)]
 #[allow(unused)]
@@ -11,7 +12,7 @@ pub(crate) unsafe fn convolve_vertical_part<const PART: usize, const CHANNELS: u
     filter: *const i16,
     bounds: &FilterBounds,
 ) {
-    let mut store: [[i32; CHANNELS]; PART] = [[0; CHANNELS]; PART];
+    let mut store: [[i32; CHANNELS]; PART] = [[ROUNDING_APPROX; CHANNELS]; PART];
 
     for j in 0..bounds.size {
         let py = start_y + j;
@@ -33,7 +34,7 @@ pub(crate) unsafe fn convolve_vertical_part<const PART: usize, const CHANNELS: u
         let dst_ptr = dst.add(px);
         for c in 0..CHANNELS {
             let vl = *(*store.get_unchecked_mut(x)).get_unchecked_mut(c);
-            let ck = vl >> 12;
+            let ck = vl >> PRECISION;
             *dst_ptr.add(c) = ck.max(0).min(255) as u8;
         }
     }

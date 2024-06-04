@@ -8,12 +8,15 @@ use fast_image_resize::{
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, GenericImageView};
 
-use pic_scale::{ImageSize, ImageStore, LabScaler, LinearScaler, LuvScaler, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
+use pic_scale::{
+    ImageSize, ImageStore, LabScaler, LinearScaler, LuvScaler, ResamplingFunction, Scaler, Scaling,
+    ThreadingPolicy,
+};
 
 fn main() {
-    test_fast_image();
+    // test_fast_image();
 
-    let img = ImageReader::open("./assets/nasa-4928x3279.png")
+    let img = ImageReader::open("./assets/asset_5.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -22,13 +25,14 @@ fn main() {
 
     let start_time = Instant::now();
 
-    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-    scaler.set_threading_policy(ThreadingPolicy::Single);
+    let mut scaler = LabScaler::new(ResamplingFunction::Lanczos3);
+    scaler.set_threading_policy(ThreadingPolicy::Adaptive);
     let store =
-        ImageStore::<u8, 3>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
-    let resized = scaler.resize_rgb(
+        ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
+    let resized = scaler.resize_rgba(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
         store,
+        false,
     );
 
     let elapsed_time = start_time.elapsed();
@@ -57,7 +61,7 @@ fn main() {
 }
 
 fn test_fast_image() {
-    let img = ImageReader::open("./assets/nasa-4928x3279.png")
+    let img = ImageReader::open("./assets/asset_5.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -67,7 +71,7 @@ fn test_fast_image() {
 
     let start_time = Instant::now();
 
-    let pixel_type: PixelType = PixelType::U8x3;
+    let pixel_type: PixelType = PixelType::U8x4;
 
     let src_image = Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
 
@@ -86,7 +90,9 @@ fn test_fast_image() {
         .resize(
             &src_image,
             &mut dst_image,
-            &ResizeOptions::new().resize_alg(ResizeAlg::Convolution(Lanczos3)).use_alpha(true),
+            &ResizeOptions::new()
+                .resize_alg(ResizeAlg::Convolution(Lanczos3))
+                .use_alpha(false),
         )
         .unwrap();
 

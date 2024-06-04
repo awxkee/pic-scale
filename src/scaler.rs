@@ -106,8 +106,7 @@ impl Scaling for Scaler {
 
     fn resize_rgb(&self, new_size: ImageSize, store: ImageStore<u8, 3>) -> ImageStore<u8, 3> {
         if self.function == Nearest {
-            let mut allocated_store: Vec<u8> = vec![];
-            allocated_store.resize(new_size.width * 3 * new_size.height, 0u8);
+            let mut allocated_store: Vec<u8> = vec![0u8; new_size.width * 3 * new_size.height];
             resize_nearest::<u8, 3>(
                 &store.buffer.borrow(),
                 store.width,
@@ -140,8 +139,7 @@ impl Scaling for Scaler {
 
     fn resize_rgb_f32(&self, new_size: ImageSize, store: ImageStore<f32, 3>) -> ImageStore<f32, 3> {
         if self.function == Nearest {
-            let mut allocated_store: Vec<f32> = vec![];
-            allocated_store.resize(new_size.width * 4 * new_size.height, 0f32);
+            let mut allocated_store: Vec<f32> = vec![0f32; new_size.width * 4 * new_size.height];
             resize_nearest::<f32, 3>(
                 &store.buffer.borrow(),
                 store.width,

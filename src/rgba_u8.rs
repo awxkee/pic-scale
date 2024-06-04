@@ -16,6 +16,7 @@ use crate::rgb_u8::*;
 use crate::sse_rgb_u8::sse_rgb::*;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageStore;
+use crate::support::ROUNDING_APPROX;
 
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 fn convolve_horizontal_rgba_sse(
@@ -130,7 +131,7 @@ pub unsafe fn convolve_horizontal_rgba_neon_row(
     for x in 0..dst_width {
         let bounds = unsafe { approx_weights.bounds.get_unchecked(x) };
         let mut jx = 0usize;
-        let mut store = unsafe { vdupq_n_s32(0i32) };
+        let mut store = unsafe { vdupq_n_s32(ROUNDING_APPROX) };
 
         while jx + 4 < bounds.size {
             let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
@@ -257,10 +258,10 @@ fn convolve_horizontal_rgba_native(
         let mut filter_offset = 0usize;
 
         for x in 0..destination.width {
-            let mut sum_r = 0i32;
-            let mut sum_g = 0i32;
-            let mut sum_b = 0i32;
-            let mut sum_a = 0i32;
+            let mut sum_r = ROUNDING_APPROX;
+            let mut sum_g = ROUNDING_APPROX;
+            let mut sum_b = ROUNDING_APPROX;
+            let mut sum_a = ROUNDING_APPROX;
 
             let bounds = unsafe { approx_weights.bounds.get_unchecked(x) };
             let start_x = bounds.start;

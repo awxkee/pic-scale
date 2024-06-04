@@ -3,6 +3,7 @@ pub mod neon_rgb {
     use crate::filter_weights::{FilterBounds, FilterWeights};
     use crate::neon_simd_u8::neon_convolve_u8;
     use std::arch::aarch64::*;
+    use crate::support::ROUNDING_APPROX;
 
     pub unsafe fn convolve_horizontal_rgb_neon_rows_4(
         dst_width: usize,
@@ -23,13 +24,14 @@ pub mod neon_rgb {
         let weights_ptr = approx_weights.weights.as_ptr();
         const CHANNELS: usize = 3;
         let zeros = vdupq_n_s32(0i32);
+        let init = vdupq_n_s32(ROUNDING_APPROX);
         for x in 0..dst_width {
             let bounds = unsafe { approx_weights.bounds.get_unchecked(x) };
             let mut jx = 0usize;
-            let mut store_0 = zeros;
-            let mut store_1 = zeros;
-            let mut store_2 = zeros;
-            let mut store_3 = zeros;
+            let mut store_0 = init;
+            let mut store_1 = init;
+            let mut store_2 = init;
+            let mut store_3 = init;
 
             while jx + 4 < bounds.size && x + 6 < src_width {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
@@ -235,7 +237,7 @@ pub mod neon_rgb {
         for x in 0..dst_width {
             let bounds = unsafe { approx_weights.bounds.get_unchecked(x) };
             let mut jx = 0usize;
-            let mut store = zeros;
+            let mut store = vdupq_n_s32(ROUNDING_APPROX);
 
             while jx + 4 < bounds.size && x + 6 < src_width {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };

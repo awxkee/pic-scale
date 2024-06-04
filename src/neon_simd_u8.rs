@@ -2,6 +2,7 @@
 pub mod neon_convolve_u8 {
     use crate::filter_weights::FilterBounds;
     use std::arch::aarch64::*;
+    use crate::support::ROUNDING_APPROX;
 
     #[inline(always)]
     pub(crate) unsafe fn convolve_horizontal_parts_one_rgba(
@@ -102,14 +103,15 @@ pub mod neon_convolve_u8 {
         filter: *const i16,
         bounds: &FilterBounds,
     ) {
-        let mut store_0 = vdupq_n_s32(0i32);
-        let mut store_1 = vdupq_n_s32(0i32);
-        let mut store_2 = vdupq_n_s32(0i32);
-        let mut store_3 = vdupq_n_s32(0i32);
-        let mut store_4 = vdupq_n_s32(0i32);
-        let mut store_5 = vdupq_n_s32(0i32);
-        let mut store_6 = vdupq_n_s32(0i32);
-        let mut store_7 = vdupq_n_s32(0i32);
+        let vld = vdupq_n_s32(ROUNDING_APPROX);
+        let mut store_0 = vld;
+        let mut store_1 = vld;
+        let mut store_2 = vld;
+        let mut store_3 = vld;
+        let mut store_4 = vld;
+        let mut store_5 = vld;
+        let mut store_6 = vld;
+        let mut store_7 = vld;
 
         let px = start_x;
 
@@ -178,10 +180,11 @@ pub mod neon_convolve_u8 {
         filter: *const i16,
         bounds: &FilterBounds,
     ) {
-        let mut store_0 = vdupq_n_s32(0i32);
-        let mut store_1 = vdupq_n_s32(0i32);
-        let mut store_2 = vdupq_n_s32(0i32);
-        let mut store_3 = vdupq_n_s32(0i32);
+        let vld = vdupq_n_s32(ROUNDING_APPROX);
+        let mut store_0 = vld;
+        let mut store_1 = vld;
+        let mut store_2 = vld;
+        let mut store_3 = vld;
 
         let px = start_x;
 
@@ -230,8 +233,9 @@ pub mod neon_convolve_u8 {
         bounds: &FilterBounds,
         blend_length: usize,
     ) {
-        let mut store_0 = vdupq_n_s32(0i32);
-        let mut store_1 = vdupq_n_s32(0i32);
+        let vld = vdupq_n_s32(ROUNDING_APPROX);
+        let mut store_0 = vld;
+        let mut store_1 = vld;
 
         let px = start_x;
 

@@ -19,6 +19,13 @@ Example comparison time for downscale RGB 4928x3279 image in two times for x86_6
 | pic-scale |  26.13   |
 | fir sse   |  26.84   |
 
+M3 Pro. NEON
+
+|           | Lanczos3 |
+|-----------|:--------:|
+| pic-scale |  23.04   |
+| fir sse   |  37.00   |
+
 Example comparison time for downscale RGBA 4928x3279 image in two times for x86_64 SSE with premultiplying alpha.
 
 |           | Lanczos3 |
@@ -26,12 +33,26 @@ Example comparison time for downscale RGBA 4928x3279 image in two times for x86_
 | pic-scale |  42.35   |
 | fir sse   |  42.96   |
 
+M3 Pro. NEON
+
+|           | Lanczos3 |
+|-----------|:--------:|
+| pic-scale |  47.45   |
+| fir sse   |  53.81   |
+
 Example comparison time for downscale RGBA 4928x3279 image in two times for x86_64 SSE without premultiplying alpha.
 
 |           | Lanczos3 |
 |-----------|:--------:|
 | pic-scale |  26.92   |
 | fir sse   |  38.30   |
+
+M3 Pro. NEON
+
+|           | Lanczos3 |
+|-----------|:--------:|
+| pic-scale |  38.75   |
+| fir sse   |  45.79   |
 
 #### Example integration with `image` crate
 

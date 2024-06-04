@@ -27,6 +27,7 @@ mod luv_scaler;
 mod sse_rgb_f32;
 mod alpha_handle;
 mod sse_utils;
+mod support;
 
 pub use image_size::ImageSize;
 pub use image_store::ImageStore;
