@@ -4,9 +4,10 @@ use crate::image_size::ImageSize;
 use crate::image_store::ImageStore;
 use crate::nearest_sampler::resize_nearest;
 use crate::threading_policy::ThreadingPolicy;
-use crate::ResamplingFunction::Nearest;
+use crate::ResamplingFunction::{Blackman, Nearest};
 use crate::{ResamplingFilter, ResamplingFunction};
 use std::time::Instant;
+use crate::sampler::blackman;
 
 #[derive(Copy, Clone)]
 pub struct Scaler {
@@ -32,15 +33,68 @@ impl<'a> Scaler {
         let scale = (in_size as f32 / out_size as f32).max(1f32);
         let filter_base_size = self.resampling_filter.min_kernel_size as f32;
         let resampling_function = self.resampling_filter.function;
+        // if self.function == Blackman {
+        //     // Kernel size must be always odd
+        //     let base_size = (filter_base_size * scale).round() as usize;
+        //     let kernel_size = base_size * 2 + 1usize;
+        //     let filter_radius = base_size as i32;
+        //     let mut weights: Vec<f32> = vec![];
+        //     weights.resize(kernel_size * out_size, 0f32);
+        //     let mut local_filters = vec![];
+        //     local_filters.resize(kernel_size, 0f32);
+        //     let mut filter_position = 0usize;
+        //
+        //     let mut bounds: Vec<FilterBounds> = vec![];
+        //     bounds.resize(out_size, FilterBounds::new(0, 0));
+        //     for i in 0..out_size {
+        //         let center_x = ((i as f32 + 0.5f32) * scale).min(in_size as f32);
+        //         let mut weights_sum: f32 = 0f32;
+        //         let mut local_filter_iteration = 0usize;
+        //
+        //         let start = (center_x - filter_radius as f32).floor().max(0f32) as usize;
+        //         let end = ((center_x + filter_radius as f32).ceil().min(in_size as f32) as usize)
+        //             .min(start + kernel_size);
+        //
+        //         let center = center_x - 0.5f32;
+        //
+        //         let size = end - start;
+        //
+        //         for k in start..end {
+        //             let dx = k as f32 - center;
+        //             let weight = blackman(dx, size as f32);
+        //             weights_sum += weight;
+        //             local_filters[local_filter_iteration] = weight;
+        //             local_filter_iteration += 1;
+        //         }
+        //
+        //         bounds[i] = FilterBounds::new(start, size);
+        //
+        //         if weights_sum != 0f32 {
+        //             let recpeq = 1f32 / weights_sum;
+        //             for i in 0..size {
+        //                 weights[filter_position + i] = local_filters[i] * recpeq;
+        //             }
+        //         }
+        //
+        //         filter_position += kernel_size;
+        //     }
+        //
+        //     return FilterWeights::<f32>::new(
+        //         weights,
+        //         kernel_size,
+        //         kernel_size,
+        //         out_size,
+        //         filter_radius,
+        //         bounds,
+        //     );
+        // }
         // Kernel size must be always odd
         let base_size = (filter_base_size * scale).round() as usize;
         let kernel_size = base_size * 2 + 1usize;
         let filter_radius = base_size as i32;
         let filter_scale = 1f32 / scale;
-        let mut weights: Vec<f32> = vec![];
-        weights.resize(kernel_size * out_size, 0f32);
-        let mut local_filters = vec![];
-        local_filters.resize(kernel_size, 0f32);
+        let mut weights: Vec<f32> = vec![0f32; kernel_size * out_size];
+        let mut local_filters = vec![0f32; kernel_size];
         let mut filter_position = 0usize;
 
         let mut bounds: Vec<FilterBounds> = vec![];

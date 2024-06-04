@@ -27,10 +27,7 @@ pub mod sse_convolve_u8 {
         let vl = i32::from_le_bytes([*src_ptr, *src_ptr.add(1), *src_ptr.add(2), 0]);
         let m_vl = _mm_cvtsi32_si128(vl);
         let lo = _mm_cvtepu8_epi16(m_vl);
-        let acc = _mm_add_epi32(
-            store_0,
-            _mm_mullo_epi32(_mm_cvtepi16_epi32(lo), weight0),
-        );
+        let acc = _mm_add_epi32(store_0, _mm_mullo_epi32(_mm_cvtepi16_epi32(lo), weight0));
         acc
     }
 
@@ -232,43 +229,6 @@ pub mod sse_convolve_u8 {
         _mm_storeu_si128(dst_ptr as *mut __m128i, rgb);
     }
 
-    #[inline(always)]
-    pub(crate) unsafe fn convolve_horizontal_parts_4_rgba_sse(
-        start_x: usize,
-        src: *const u8,
-        weight0: __m128i,
-        weight1: __m128i,
-        weight2: __m128i,
-        weight3: __m128i,
-        store_0: __m128i,
-    ) -> __m128i {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.add(start_x * COMPONENTS);
-
-        let rgb_pixel = _mm_loadu_si128(src_ptr as *const __m128i);
-        let zeros = _mm_setzero_si128();
-        let hi = _mm_unpackhi_epi8(rgb_pixel, zeros);
-        let lo = _mm_cvtepu8_epi16(rgb_pixel);
-
-        let acc = _mm_add_epi32(
-            store_0,
-            _mm_madd_epi16(_mm_cvtepi16_epi32(lo), weight0),
-        );
-        let acc = _mm_add_epi32(
-            acc,
-            _mm_madd_epi16(_mm_unpackhi_epi8(lo, zeros), weight1),
-        );
-        let acc = _mm_add_epi32(
-            acc,
-            _mm_madd_epi16(_mm_cvtepi16_epi32(hi), weight2),
-        );
-        let acc = _mm_add_epi32(
-            acc,
-            _mm_madd_epi16(_mm_unpackhi_epi8(hi, zeros), weight3),
-        );
-        acc
-    }
-
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     #[inline(always)]
     pub(crate) unsafe fn convolve_horizontal_parts_one_rgba_sse(
@@ -284,10 +244,7 @@ pub mod sse_convolve_u8 {
         let rgba_pixel = _mm_cvtsi32_si128(*src_ptr_32);
         let lo = _mm_cvtepu8_epi16(rgba_pixel);
 
-        let acc = _mm_add_epi32(
-            store_0,
-            _mm_madd_epi16(_mm_cvtepi16_epi32(lo), weight0),
-        );
+        let acc = _mm_add_epi32(store_0, _mm_madd_epi16(_mm_cvtepi16_epi32(lo), weight0));
         acc
     }
 
@@ -342,11 +299,14 @@ pub mod sse_convolve_u8 {
         let dst_ptr = dst.add(px);
         if USE_BLENDING {
             let mut transient: [u8; 8] = [0; 8];
-            _mm_storeu_si128(transient.as_mut_ptr() as *mut __m128i, item);
+            std::ptr::copy_nonoverlapping(
+                &item as *const _ as *const u8,
+                transient.as_mut_ptr(),
+                8,
+            );
             std::ptr::copy_nonoverlapping(transient.as_ptr(), dst_ptr, blend_length);
         } else {
             std::ptr::copy_nonoverlapping(&item as *const _ as *const u8, dst_ptr, 8);
         }
     }
-
 }
