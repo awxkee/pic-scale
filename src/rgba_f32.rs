@@ -300,6 +300,7 @@ fn convolve_horizontal_rgba_f32_native(
     }
 }
 
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 #[inline(always)]
 fn convolve_vertical_rgb_native_row(
     total_width: usize,

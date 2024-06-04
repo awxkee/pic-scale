@@ -8,6 +8,27 @@ Supported only NEON and SSE.
 
 This library provides for you some conveniences to scale in different color spaces.
 
+#### Example integration with `image` crate
+
+```rust
+let img = ImageReader::open("./assets/asset.png")
+    .unwrap()
+    .decode()
+    .unwrap();
+let dimensions = img.dimensions();
+let mut bytes = Vec::from(img.as_bytes());
+
+let mut scaler = LinearScaler::new(ResamplingFunction::Lanczos3);
+scaler.set_threading_policy(ThreadingPolicy::Adaptive);
+let store =
+    ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
+let resized = scaler.resize_rgba(
+    ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
+    store,
+    true
+);
+```
+
 ### Performance
 
 Faster or comparable to `fast-image-resize`, when implemented equal SIMD and pixel type.
@@ -53,27 +74,6 @@ M3 Pro. NEON
 |-----------|:--------:|
 | pic-scale |  38.75   |
 | fir sse   |  45.79   |
-
-#### Example integration with `image` crate
-
-```rust
-let img = ImageReader::open("./assets/asset.png")
-    .unwrap()
-    .decode()
-    .unwrap();
-let dimensions = img.dimensions();
-let mut bytes = Vec::from(img.as_bytes());
-
-let mut scaler = LinearScaler::new(ResamplingFunction::Lanczos3);
-scaler.set_threading_policy(ThreadingPolicy::Adaptive);
-let store =
-    ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
-let resized = scaler.resize_rgba(
-    ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-    store,
-    true
-);
-```
 
 #### Example in sRGB
 

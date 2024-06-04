@@ -1,7 +1,5 @@
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use std::arch::aarch64::*;
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
 use std::sync::Arc;
 
 use rayon::ThreadPool;
@@ -14,9 +12,9 @@ use crate::neon_simd_u8::*;
 use crate::rgb_u8::*;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse_rgb_u8::sse_rgb::*;
+use crate::support::{PRECISION, ROUNDING_APPROX};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageStore;
-use crate::support::ROUNDING_APPROX;
 
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 fn convolve_horizontal_rgba_sse(
@@ -280,10 +278,10 @@ fn convolve_horizontal_rgba_native(
             let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px) };
 
             unsafe {
-                *dest_ptr = (sum_r >> 12).min(255).max(0) as u8;
-                *dest_ptr.add(1) = (sum_g >> 12).min(255).max(0) as u8;
-                *dest_ptr.add(2) = (sum_b >> 12).min(255).max(0) as u8;
-                *dest_ptr.add(3) = (sum_a >> 12).min(255).max(0) as u8;
+                *dest_ptr = (sum_r >> PRECISION).min(255).max(0) as u8;
+                *dest_ptr.add(1) = (sum_g >> PRECISION).min(255).max(0) as u8;
+                *dest_ptr.add(2) = (sum_b >> PRECISION).min(255).max(0) as u8;
+                *dest_ptr.add(3) = (sum_a >> PRECISION).min(255).max(0) as u8;
             }
 
             filter_offset += approx_weights.aligned_size;
