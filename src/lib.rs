@@ -24,6 +24,9 @@ mod unsafe_slice;
 mod neon_rgb_u8;
 mod sse_rgb_u8;
 mod luv_scaler;
+mod sse_rgb_f32;
+mod alpha_handle;
+mod sse_utils;
 
 pub use image_size::ImageSize;
 pub use image_store::ImageStore;

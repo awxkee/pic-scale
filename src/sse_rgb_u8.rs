@@ -2,6 +2,9 @@
 pub mod sse_rgb {
     use crate::filter_weights::{FilterBounds, FilterWeights};
     use crate::sse_simd_u8::sse_convolve_u8;
+    #[cfg(target_arch = "x86")]
+    use std::arch::x86::*;
+    #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::*;
 
     pub(crate) unsafe fn convolve_horizontal_rgba_sse_rows_4(

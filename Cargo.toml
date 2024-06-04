@@ -13,7 +13,7 @@ documentation = "https://github.com/awxkee/pic-scale"
 categories = ["multimedia::images", "multimedia::video"]
 homepage = "https://github.com/awxkee/pic-scale"
 repository = "https://github.com/awxkee/pic-scale"
-exclude = ["*.jpg"]
+exclude = ["*.jpg", "/assets"]
 
 [dependencies]
 colorutils-rs = "0.2.9"

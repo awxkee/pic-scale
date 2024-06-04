@@ -1,3 +1,4 @@
+use crate::alpha_handle::{premultiply_alpha_rgba, unpremultiply_alpha_rgba};
 use crate::ImageSize;
 use num_traits::FromPrimitive;
 use std::fmt::Debug;
@@ -91,5 +92,19 @@ where
             width,
             height,
         }
+    }
+}
+
+impl<'a> ImageStore<'a, u8, 4> {
+    pub fn unpremultiply_alpha(&self, into: &mut ImageStore<u8, 4>) {
+        let dst = into.buffer.borrow_mut();
+        let src = self.buffer.borrow();
+        unpremultiply_alpha_rgba(dst, src, self.width, self.height);
+    }
+
+    pub fn premultiply_alpha(&self, into: &mut ImageStore<u8, 4>) {
+        let dst = into.buffer.borrow_mut();
+        let src = self.buffer.borrow();
+        premultiply_alpha_rgba(dst, src, self.width, self.height);
     }
 }

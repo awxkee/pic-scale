@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::image_size::ImageSize;
@@ -23,7 +21,12 @@ pub trait Scaling {
 
     fn resize_rgb_f32(&self, new_size: ImageSize, store: ImageStore<f32, 3>) -> ImageStore<f32, 3>;
 
-    fn resize_rgba(&self, new_size: ImageSize, store: ImageStore<u8, 4>) -> ImageStore<u8, 4>;
+    fn resize_rgba(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<u8, 4>,
+        is_alpha_premultiplied: bool,
+    ) -> ImageStore<u8, 4>;
 
     fn resize_rgba_f32(&self, new_size: ImageSize, store: ImageStore<f32, 4>)
         -> ImageStore<f32, 4>;
@@ -117,33 +120,20 @@ impl Scaling for Scaler {
                 ImageStore::<u8, 3>::new(allocated_store, new_size.width, new_size.height);
             return new_image;
         }
-
-        let start_time_filters = Instant::now();
         let vertical_filters = self.generate_weights(store.height, new_size.height);
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
-        let elapsed_filters = start_time_filters.elapsed();
 
         let pool = self
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
 
-        let start_time = Instant::now();
         let mut new_image_vertical = ImageStore::<u8, 3>::alloc(store.width, new_size.height);
         store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
-        let elapsed_vertical = start_time.elapsed();
-
-        let start_time = Instant::now();
         let mut new_image_horizontal = ImageStore::<u8, 3>::alloc(new_size.width, new_size.height);
         new_image_vertical.convolve_horizontal(
             horizontal_filters,
             &mut new_image_horizontal,
             &pool,
-        );
-        let elapsed_time = start_time.elapsed();
-        println!("Vertical: {:.2?}", elapsed_vertical);
-        println!(
-            "Horizontal: {:.2?}, Filters {:.2?}",
-            elapsed_time, elapsed_filters
         );
         new_image_horizontal
     }
@@ -234,18 +224,34 @@ impl Scaling for Scaler {
         new_image_horizontal
     }
 
-    fn resize_rgba(&self, new_size: ImageSize, store: ImageStore<u8, 4>) -> ImageStore<u8, 4> {
+    fn resize_rgba(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<u8, 4>,
+        is_alpha_premultiplied: bool,
+    ) -> ImageStore<u8, 4> {
+        let mut src_store = store;
+        if is_alpha_premultiplied {
+            let mut premultiplied_store = ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
+            src_store.unpremultiply_alpha(&mut premultiplied_store);
+            src_store = premultiplied_store;
+        }
         if self.function == Nearest {
             let mut new_image = ImageStore::<u8, 4>::alloc(new_size.width, new_size.height);
             resize_nearest::<u8, 4>(
-                &store.buffer.borrow(),
-                store.width,
-                store.height,
+                &src_store.buffer.borrow(),
+                src_store.width,
+                src_store.height,
                 &mut new_image.buffer.borrow_mut(),
                 new_size.width,
                 new_size.height,
             );
             let new_image = ImageStore::<u8, 4>::alloc(new_size.width, new_size.height);
+            if is_alpha_premultiplied {
+                let mut premultiplied_store = ImageStore::<u8, 4>::alloc(new_image.width, new_image.height);
+                new_image.premultiply_alpha(&mut premultiplied_store);
+                return premultiplied_store;
+            }
             return new_image;
         }
 
@@ -253,18 +259,22 @@ impl Scaling for Scaler {
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
 
-        let mut new_image_vertical = ImageStore::<u8, 4>::alloc(store.width, new_size.height);
-        let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
-        store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+        let mut new_image_vertical = ImageStore::<u8, 4>::alloc(src_store.width, new_size.height);
+        let vertical_filters = self.generate_weights(src_store.height, new_image_vertical.height);
+        src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
 
         let mut new_image_horizontal = ImageStore::<u8, 4>::alloc(new_size.width, new_size.height);
-        let horizontal_filters = self.generate_weights(store.width, new_size.width);
+        let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
         new_image_vertical.convolve_horizontal(
             horizontal_filters,
             &mut new_image_horizontal,
             &pool,
         );
-
+        if is_alpha_premultiplied {
+            let mut premultiplied_store = ImageStore::<u8, 4>::alloc(new_image_horizontal.width, new_image_horizontal.height);
+            new_image_horizontal.premultiply_alpha(&mut premultiplied_store);
+            return premultiplied_store;
+        }
         new_image_horizontal
     }
 }

@@ -8,25 +8,21 @@ use fast_image_resize::{
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, GenericImageView};
 
-use pic_scale::{ImageSize, ImageStore, LinearScaler, LuvScaler, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
+use pic_scale::{ImageSize, ImageStore, LabScaler, LinearScaler, LuvScaler, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
 
 fn main() {
-    // test_fast_image();
+    test_fast_image();
 
-    let img = ImageReader::open("./assets/asset_middle.jpg")
+    let img = ImageReader::open("./assets/nasa-4928x3279.png")
         .unwrap()
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
-    println!("dimensions {:?}", img.dimensions());
-
-    println!("{:?}", img.color());
-
     let mut bytes = Vec::from(img.as_bytes());
 
     let start_time = Instant::now();
 
-    let mut scaler = LinearScaler::new(ResamplingFunction::Lanczos4);
+    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
     let store =
         ImageStore::<u8, 3>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
@@ -61,7 +57,7 @@ fn main() {
 }
 
 fn test_fast_image() {
-    let img = ImageReader::open("./assets/asset_5.png")
+    let img = ImageReader::open("./assets/nasa-4928x3279.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -71,7 +67,7 @@ fn test_fast_image() {
 
     let start_time = Instant::now();
 
-    let pixel_type: PixelType = PixelType::U8x4;
+    let pixel_type: PixelType = PixelType::U8x3;
 
     let src_image = Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
 
@@ -90,7 +86,7 @@ fn test_fast_image() {
         .resize(
             &src_image,
             &mut dst_image,
-            &ResizeOptions::new().resize_alg(ResizeAlg::Convolution(Lanczos3)),
+            &ResizeOptions::new().resize_alg(ResizeAlg::Convolution(Lanczos3)).use_alpha(true),
         )
         .unwrap();
 

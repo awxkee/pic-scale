@@ -90,10 +90,22 @@ impl Scaling for LabScaler {
         &self,
         new_size: ImageSize,
         store: ImageStore<u8, 4>,
+        is_alpha_premultiplied: bool,
     ) -> ImageStore<u8, 4> {
-        let lab_store = Self::rgba_to_laba(store);
+        let mut src_store = store;
+        if is_alpha_premultiplied {
+            let mut premultiplied_store = ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
+            src_store.unpremultiply_alpha(&mut premultiplied_store);
+            src_store = premultiplied_store;
+        }
+        let lab_store = Self::rgba_to_laba(src_store);
         let new_store = self.scaler.resize_rgba_f32(new_size, lab_store);
         let rgba_store = Self::laba_to_srgba(new_store);
+        if is_alpha_premultiplied {
+            let mut premultiplied_store = ImageStore::<u8, 4>::alloc(rgba_store.width, rgba_store.height);
+            rgba_store.premultiply_alpha(&mut premultiplied_store);
+            return premultiplied_store;
+        }
         return rgba_store;
     }
 

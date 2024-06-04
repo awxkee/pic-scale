@@ -9,6 +9,8 @@ use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_f32::*;
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::image_store::ImageStore;
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+use crate::sse_rgb_f32::sse_convolve_f32::*;
 use crate::unsafe_slice::UnsafeSlice;
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -400,6 +402,142 @@ fn convolve_vertical_neon(
     }
 }
 
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[inline(always)]
+fn convolve_horizontal_rgb_sse_row(
+    total_width: usize,
+    src_stride: usize,
+    bounds: &FilterBounds,
+    weight_ptr: *const f32,
+    unsafe_source_ptr_0: *const f32,
+    unsafe_destination_ptr_0: *mut f32,
+) {
+    let mut cx = 0usize;
+
+    while cx + 16 < total_width {
+        unsafe {
+            convolve_vertical_part_sse_16_f32(
+                bounds.start,
+                cx,
+                unsafe_source_ptr_0,
+                src_stride,
+                unsafe_destination_ptr_0,
+                weight_ptr,
+                bounds,
+            );
+        }
+
+        cx += 16;
+    }
+
+    while cx + 8 < total_width {
+        unsafe {
+            convolve_vertical_part_sse_8_f32(
+                bounds.start,
+                cx,
+                unsafe_source_ptr_0,
+                src_stride,
+                unsafe_destination_ptr_0,
+                weight_ptr,
+                bounds,
+            );
+        }
+
+        cx += 8;
+    }
+
+    while cx + 4 < total_width {
+        unsafe {
+            convolve_vertical_part_sse_4_f32(
+                bounds.start,
+                cx,
+                unsafe_source_ptr_0,
+                src_stride,
+                unsafe_destination_ptr_0,
+                weight_ptr,
+                bounds,
+            );
+        }
+
+        cx += 4;
+    }
+
+    while cx < total_width {
+        unsafe {
+            convolve_vertical_part_sse_f32(
+                bounds.start,
+                cx,
+                unsafe_source_ptr_0,
+                src_stride,
+                unsafe_destination_ptr_0,
+                weight_ptr,
+                bounds,
+            );
+        }
+        cx += 1;
+    }
+}
+
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+pub(crate) fn convolve_vertical_sse_rgb_f32<const COMPONENTS: usize>(
+    image_store: &ImageStore<f32, COMPONENTS>,
+    filter_weights: FilterWeights<f32>,
+    destination: &mut ImageStore<f32, COMPONENTS>,
+    pool: &Option<ThreadPool>,
+) {
+    let unsafe_source_ptr_0 = image_store.buffer.borrow().as_ptr();
+    let mut unsafe_destination_ptr_0 = destination.buffer.borrow_mut().as_mut_ptr();
+    let src_stride = image_store.width * image_store.channels;
+    let dst_stride = destination.width * image_store.channels;
+    let total_width = destination.width * image_store.channels;
+
+    if let Some(pool) = pool {
+        let arc_weights = Arc::new(filter_weights);
+        let borrowed = destination.buffer.borrow_mut();
+        let unsafe_slice = UnsafeSlice::new(borrowed);
+        pool.scope(|scope| {
+            for y in 0..destination.height {
+                let weights = arc_weights.clone();
+                scope.spawn(move |_| {
+                    let unsafe_source_ptr_0 = image_store.buffer.borrow().as_ptr();
+                    let dst_ptr = unsafe_slice.mut_ptr();
+                    let unsafe_destination_ptr_0 = unsafe { dst_ptr.add(dst_stride * y) };
+                    let filter_offset = y * weights.aligned_size;
+                    let bounds = unsafe { weights.bounds.get_unchecked(y) };
+                    let weight_ptr = unsafe { weights.weights.as_ptr().add(filter_offset) };
+                    convolve_horizontal_rgb_sse_row(
+                        total_width,
+                        src_stride,
+                        &bounds,
+                        weight_ptr,
+                        unsafe_source_ptr_0,
+                        unsafe_destination_ptr_0,
+                    );
+
+                });
+            }
+        });
+    } else {
+        let mut filter_offset = 0usize;
+        for y in 0..destination.height {
+            let bounds = unsafe { filter_weights.bounds.get_unchecked(y) };
+            let weight_ptr = unsafe { filter_weights.weights.as_ptr().add(filter_offset) };
+
+            convolve_horizontal_rgb_sse_row(
+                total_width,
+                src_stride,
+                &bounds,
+                weight_ptr,
+                unsafe_source_ptr_0,
+                unsafe_destination_ptr_0,
+            );
+
+            filter_offset += filter_weights.aligned_size;
+            unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
+        }
+    }
+}
+
 #[inline(always)]
 fn convolve_vertical_rgb_native_row_f32<const COMPONENTS: usize>(
     dst_width: usize,
@@ -563,6 +701,15 @@ impl<'a> VerticalConvolutionPass<f32, 3> for ImageStore<'a, f32, 3> {
         {
             using_feature = AccelerationFeature::Neon;
         }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
+        {
+            if is_x86_feature_detected!("sse4.1") {
+                using_feature = AccelerationFeature::Sse;
+            }
+        }
         match using_feature {
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             AccelerationFeature::Neon => {
@@ -572,7 +719,9 @@ impl<'a> VerticalConvolutionPass<f32, 3> for ImageStore<'a, f32, 3> {
                 convolve_vertical_native_f32(self, filter_weights, destination, pool);
             }
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            AccelerationFeature::Sse => {}
+            AccelerationFeature::Sse => {
+                convolve_vertical_sse_rgb_f32(self, filter_weights, destination, pool);
+            }
         }
     }
 }

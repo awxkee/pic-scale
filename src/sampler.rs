@@ -249,6 +249,7 @@ pub(crate) fn blackman_window(x: f32) -> f32 {
 
 #[inline(always)]
 pub(crate) fn blackman(x: f32) -> f32 {
+    let x = x.abs();
     if x < 2.0f32 {
         sinc(x) * blackman_window(x / 2f32)
     } else {
@@ -257,10 +258,20 @@ pub(crate) fn blackman(x: f32) -> f32 {
 }
 
 #[inline(always)]
+pub(crate) fn ewa_blackman(x: f32) -> f32 {
+    let x = x.abs();
+    if x < 2.0f32 {
+        jinc(x as f64) as f32 * blackman_window(x / 2f32)
+    } else {
+        0f32
+    }
+}
+
+#[inline(always)]
 pub(crate) fn gaussian(x: f32) -> f32 {
-    let sigma: f32 = 0.3f32;
+    let sigma: f32 = 0.35f32;
     let pi = std::f32::consts::PI;
-    let mut den = 2f32 * sigma;
+    let mut den = 2f32 * sigma * sigma;
     den *= den;
     return (1f32 / ((2f32 * pi).sqrt() * sigma)) * (-x / den).exp();
 }
@@ -379,6 +390,7 @@ pub enum ResamplingFunction {
     Hanning,
     EwaHanning,
     Blackman,
+    EwaBlackman,
     Welch,
     Quadric,
     EwaQuadric,
@@ -461,6 +473,7 @@ impl ResamplingFunction {
             ResamplingFunction::Lanczos3Jinc => ResamplingFilter::new(lanczos3_jinc, 3),
             ResamplingFunction::Lanczos4Jinc => ResamplingFilter::new(lanczos4_jinc, 4),
             ResamplingFunction::Blackman => ResamplingFilter::new(blackman, 2),
+            ResamplingFunction::EwaBlackman => ResamplingFilter::new(ewa_blackman, 2),
         };
     }
 }

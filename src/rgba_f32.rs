@@ -420,6 +420,15 @@ impl<'a> VerticalConvolutionPass<f32, 4> for ImageStore<'a, f32, 4> {
         {
             using_feature = AccelerationFeature::Neon;
         }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
+        {
+            if is_x86_feature_detected!("sse4.1") {
+                using_feature = AccelerationFeature::Sse;
+            }
+        }
         match using_feature {
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             AccelerationFeature::Neon => {
@@ -429,7 +438,9 @@ impl<'a> VerticalConvolutionPass<f32, 4> for ImageStore<'a, f32, 4> {
                 convolve_vertical_native_f32(self, filter_weights, destination, pool);
             }
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            AccelerationFeature::Sse => {}
+            AccelerationFeature::Sse => {
+                crate::rgb_f32::convolve_vertical_sse_rgb_f32(self, filter_weights, destination, pool);
+            }
         }
     }
 }

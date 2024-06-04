@@ -1,0 +1,135 @@
+# Image scaling library in Rust
+
+Rust image scale in different color spaces using SIMD and multithreading.
+
+Supported only NEON and SSE.
+
+### Colorspace
+
+This library provides for you some conveniences to scale in different color spaces.
+
+### Performance
+
+Faster or comparable to `fast-image-resize`, when implemented equal SIMD and pixel type.
+
+Example comparison time for downscale RGB 4928x3279 image in two times for x86_64 SSE.
+
+|           | Lanczos3 |
+|-----------|:--------:|
+| pic-scale |  26.13   |
+| fir sse   |  26.84   |
+
+Example comparison time for downscale RGBA 4928x3279 image in two times for x86_64 SSE with premultiplying alpha.
+
+|           | Lanczos3 |
+|-----------|:--------:|
+| pic-scale |  42.35   |
+| fir sse   |  42.96   |
+
+Example comparison time for downscale RGBA 4928x3279 image in two times for x86_64 SSE without premultiplying alpha.
+
+|           | Lanczos3 |
+|-----------|:--------:|
+| pic-scale |  26.92   |
+| fir sse   |  38.30   |
+
+#### Example integration with `image` crate
+
+```rust
+let img = ImageReader::open("./assets/asset.png")
+    .unwrap()
+    .decode()
+    .unwrap();
+let dimensions = img.dimensions();
+let mut bytes = Vec::from(img.as_bytes());
+
+let mut scaler = LinearScaler::new(ResamplingFunction::Lanczos3);
+scaler.set_threading_policy(ThreadingPolicy::Adaptive);
+let store =
+    ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
+let resized = scaler.resize_rgba(
+    ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
+    store,
+    true
+);
+```
+
+#### Example in sRGB
+
+In common, you should not downsize an image in sRGB colorspace, however if speed is more preferable than more proper scale you may omit linearizing 
+
+```rust
+let mut scaler = Scaler::new(ResamplingFunction::Hermite);
+scaler.set_threading_policy(ThreadingPolicy::Single);
+let store =
+    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height);
+let resized = scaler.resize_rgba(
+    ImageSize::new(new_width, new_height),
+    store,
+    true
+);
+```
+
+#### Example in linear
+
+At the moment only sRGB transfer function is supported. This is also good optimized path so it is reasonably fast.
+
+```rust
+let mut scaler = LinearScaler::new(ResamplingFunction::Lanczos3);
+scaler.set_threading_policy(ThreadingPolicy::Single);
+let store =
+    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height);
+let resized = scaler.resize_rgba(
+    ImageSize::new(new_width, new_height),
+    store,
+    true
+);
+```
+
+#### Example in CIE L\*a\*b
+```rust
+let mut scaler = LabScaler::new(ResamplingFunction::Hermite);
+scaler.set_threading_policy(ThreadingPolicy::Single);
+let store =
+    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height);
+let resized = scaler.resize_rgba(
+    ImageSize::new(new_width, new_height),
+    store,
+    true
+);
+```
+
+#### Example in CIE L\*u\*v
+```rust
+let mut scaler = LuvScaler::new(ResamplingFunction::Hermite);
+scaler.set_threading_policy(ThreadingPolicy::Single);
+let store =
+    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height);
+let resized = scaler.resize_rgba(
+    ImageSize::new(new_width, new_height),
+    store,
+    true
+);
+```
+
+#### Resampling filters
+
+Over 30 resampling filters is supported.
+
+```rust
+Bilinear,
+Nearest,
+Cubic,
+MitchellNetravalli,
+CatmullRom,
+Hermite,
+BSpline,
+Hann,
+Bicubic,
+Hamming,
+Hanning,
+EwaHanning,
+Blackman,
+EwaBlackman,
+```
+And others
