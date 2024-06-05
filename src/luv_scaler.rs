@@ -5,7 +5,7 @@
  * // license that can be found in the LICENSE file.
  */
 
-use colorutils_rs::{Luv, Rgb};
+use colorutils_rs::{luv_to_rgb, luv_with_alpha_to_rgba, rgb_to_luv, rgba_to_luv_with_alpha};
 
 use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
 
@@ -21,80 +21,31 @@ impl LuvScaler {
         }
     }
 
-    fn rgbx_to_luv<const CHANNELS: usize>(
-        &self,
-        store: ImageStore<u8, CHANNELS>,
-    ) -> ImageStore<f32, CHANNELS> {
-        let mut new_store = ImageStore::<f32, CHANNELS>::alloc(store.width, store.height);
-        let mut src_offset = 0usize;
-        let mut dst_offset = 0usize;
-        let src_buffer = store.buffer.borrow();
-        let dst_buffer = new_store.buffer.borrow_mut();
-        for _ in 0..store.height {
-            for x in 0..store.width {
-                let px = x * CHANNELS;
-                let r = *unsafe { src_buffer.get_unchecked(src_offset + px) };
-                let g = *unsafe { src_buffer.get_unchecked(src_offset + px + 1) };
-                let b = *unsafe { src_buffer.get_unchecked(src_offset + px + 2) };
-
-                let rgb = Rgb::new(r, g, b);
-                let luv = rgb.to_luv();
-                unsafe {
-                    *dst_buffer.get_unchecked_mut(dst_offset + px) = luv.l;
-                    *dst_buffer.get_unchecked_mut(dst_offset + px + 1) = luv.u;
-                    *dst_buffer.get_unchecked_mut(dst_offset + px + 2) = luv.v;
-                }
-                if CHANNELS == 4 {
-                    let a = *unsafe { src_buffer.get_unchecked(src_offset + px + 3) };
-                    let a_f = a as f32 * (1f32 / 255f32);
-                    unsafe {
-                        *dst_buffer.get_unchecked_mut(dst_offset + px + 3) = a_f;
-                    }
-                }
-            }
-
-            src_offset += store.width * CHANNELS;
-            dst_offset += new_store.width * CHANNELS;
-        }
-        new_store
+    fn rgba_to_laba(store: ImageStore<u8, 4>) -> ImageStore<f32, 4> {
+        let mut new_store = ImageStore::<f32, 4>::alloc(store.width, store.height);
+        let lab_stride = store.width as u32 * 4u32 * std::mem::size_of::<f32>() as u32;
+        rgba_to_luv_with_alpha(
+            &store.buffer.borrow(),
+            store.width as u32 * 4u32,
+            &mut new_store.buffer.borrow_mut(),
+            lab_stride,
+            store.width as u32,
+            store.height as u32,
+        );
+        return new_store;
     }
 
-    fn luv_to_rgbx<const CHANNELS: usize>(
-        &self,
-        store: ImageStore<f32, CHANNELS>,
-    ) -> ImageStore<u8, CHANNELS> {
-        let mut new_store = ImageStore::<u8, CHANNELS>::alloc(store.width, store.height);
-        let mut src_offset = 0usize;
-        let mut dst_offset = 0usize;
-        let src_buffer = store.buffer.borrow();
-        let dst_buffer = new_store.buffer.borrow_mut();
-        for _ in 0..store.height {
-            for x in 0..store.width {
-                let px = x * CHANNELS;
-                let l = *unsafe { src_buffer.get_unchecked(src_offset + px) };
-                let u = *unsafe { src_buffer.get_unchecked(src_offset + px + 1) };
-                let v = *unsafe { src_buffer.get_unchecked(src_offset + px + 2) };
-
-                let luv = Luv::new(l, u, v);
-                let rgb = luv.to_rgb();
-                unsafe {
-                    *dst_buffer.get_unchecked_mut(dst_offset + px) = rgb.r;
-                    *dst_buffer.get_unchecked_mut(dst_offset + px + 1) = rgb.g;
-                    *dst_buffer.get_unchecked_mut(dst_offset + px + 2) = rgb.b;
-                }
-                if CHANNELS == 4 {
-                    let a = *unsafe { src_buffer.get_unchecked(src_offset + px + 3) };
-                    let a_f = a * 255f32;
-                    unsafe {
-                        *dst_buffer.get_unchecked_mut(dst_offset + px + 3) = a_f as u8;
-                    }
-                }
-            }
-
-            src_offset += store.width * CHANNELS;
-            dst_offset += new_store.width * CHANNELS;
-        }
-        new_store
+    fn laba_to_srgba(store: ImageStore<f32, 4>) -> ImageStore<u8, 4> {
+        let mut new_store = ImageStore::<u8, 4>::alloc(store.width, store.height);
+        luv_with_alpha_to_rgba(
+            &store.buffer.borrow(),
+            store.width as u32 * 4u32 * std::mem::size_of::<f32>() as u32,
+            &mut new_store.buffer.borrow_mut(),
+            store.width as u32 * 4u32,
+            store.width as u32,
+            store.height as u32,
+        );
+        return new_store;
     }
 }
 
@@ -104,10 +55,31 @@ impl Scaling for LuvScaler {
     }
 
     fn resize_rgb(&self, new_size: ImageSize, store: ImageStore<u8, 3>) -> ImageStore<u8, 3> {
-        let luv_image = self.rgbx_to_luv(store);
-        let new_store = self.scaler.resize_rgb_f32(new_size, luv_image);
-        let unorm_image = self.luv_to_rgbx(new_store);
-        unorm_image
+        const COMPONENTS: usize = 3;
+        let mut lab_store = ImageStore::<f32, COMPONENTS>::alloc(store.width, store.height);
+        let lab_stride =
+            lab_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<f32>() as u32;
+        rgb_to_luv(
+            &store.buffer.borrow(),
+            store.width as u32 * COMPONENTS as u32,
+            &mut lab_store.buffer.borrow_mut(),
+            lab_stride,
+            lab_store.width as u32,
+            lab_store.height as u32,
+        );
+        let new_store = self.scaler.resize_rgb_f32(new_size, lab_store);
+        let mut new_u8_store = ImageStore::<u8, COMPONENTS>::alloc(new_size.width, new_size.height);
+        let new_lab_stride =
+            new_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<f32>() as u32;
+        luv_to_rgb(
+            &new_store.buffer.borrow(),
+            new_lab_stride,
+            &mut new_u8_store.buffer.borrow_mut(),
+            new_u8_store.width as u32 * COMPONENTS as u32,
+            new_store.width as u32,
+            new_store.height as u32,
+        );
+        return new_u8_store;
     }
 
     fn resize_rgb_f32(&self, new_size: ImageSize, store: ImageStore<f32, 3>) -> ImageStore<f32, 3> {
@@ -127,16 +99,16 @@ impl Scaling for LuvScaler {
             src_store.unpremultiply_alpha(&mut premultiplied_store);
             src_store = premultiplied_store;
         }
-        let luv_image = self.rgbx_to_luv(src_store);
-        let new_store = self.scaler.resize_rgba_f32(new_size, luv_image);
-        let unorm_image = self.luv_to_rgbx(new_store);
+        let lab_store = Self::rgba_to_laba(src_store);
+        let new_store = self.scaler.resize_rgba_f32(new_size, lab_store);
+        let rgba_store = Self::laba_to_srgba(new_store);
         if is_alpha_premultiplied {
             let mut premultiplied_store =
-                ImageStore::<u8, 4>::alloc(unorm_image.width, unorm_image.height);
-            unorm_image.premultiply_alpha(&mut premultiplied_store);
+                ImageStore::<u8, 4>::alloc(rgba_store.width, rgba_store.height);
+            rgba_store.premultiply_alpha(&mut premultiplied_store);
             return premultiplied_store;
         }
-        return unorm_image;
+        return rgba_store;
     }
 
     fn resize_rgba_f32(

@@ -149,8 +149,6 @@ Hann,
 Bicubic,
 Hamming,
 Hanning,
-EwaHanning,
 Blackman,
-EwaBlackman,
 ```
 And others
