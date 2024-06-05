@@ -1,3 +1,4 @@
+use std::fmt::format;
 use std::time::Instant;
 
 use fast_image_resize::images::Image;
@@ -22,7 +23,7 @@ fn main() {
 
     let start_time = Instant::now();
 
-    let mut scaler = Scaler::new(ResamplingFunction::Cubic);
+    let mut scaler = Scaler::new(ResamplingFunction::Hanning);
     scaler.set_threading_policy(ThreadingPolicy::Adaptive);
     let store =
         ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
@@ -44,7 +45,7 @@ fn main() {
             resized.height as u32,
             image::ExtendedColorType::Rgba8,
         )
-        .unwrap();
+            .unwrap();
     } else {
         image::save_buffer(
             "converted.jpg",
@@ -53,8 +54,44 @@ fn main() {
             resized.height as u32,
             image::ExtendedColorType::Rgb8,
         )
-        .unwrap();
+            .unwrap();
     }
+
+    // for i in 0..37 {
+    //     let mut scaler = Scaler::new(i.into());
+    //     scaler.set_threading_policy(ThreadingPolicy::Adaptive);
+    //     let store =
+    //         ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
+    //     let resized = scaler.resize_rgba(
+    //         ImageSize::new(dimensions.0 as usize / 3, dimensions.1 as usize / 3),
+    //         store,
+    //         true,
+    //     );
+    //
+    //     let elapsed_time = start_time.elapsed();
+    //     // Print the elapsed time in milliseconds
+    //     println!("Scaler: {:.2?}", elapsed_time);
+    //
+    //     if resized.channels == 4 {
+    //         image::save_buffer(
+    //             format!("converted_{}.png", i),
+    //             resized.as_bytes(),
+    //             resized.width as u32,
+    //             resized.height as u32,
+    //             image::ExtendedColorType::Rgba8,
+    //         )
+    //             .unwrap();
+    //     } else {
+    //         image::save_buffer(
+    //             format!("converted_{}.jpg", i),
+    //             resized.as_bytes(),
+    //             resized.width as u32,
+    //             resized.height as u32,
+    //             image::ExtendedColorType::Rgb8,
+    //         )
+    //             .unwrap();
+    //     }
+    // }
 }
 
 fn test_fast_image() {

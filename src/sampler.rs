@@ -90,22 +90,12 @@ pub fn robidoux(x: f32) -> f32 {
 }
 
 #[inline(always)]
-pub fn ewa_robidoux(x: f32) -> f32 {
-    return jinc(x as f64) as f32 * robidoux(x);
-}
-
-#[inline(always)]
 pub fn robidoux_sharp(x: f32) -> f32 {
     return bc_spline(
         x,
         6f32 / (13f32 + 7f32 * std::f32::consts::SQRT_2),
         7f32 / (2f32 + 12f32 * std::f32::consts::SQRT_2),
     );
-}
-
-#[inline(always)]
-pub fn ewa_robidoux_sharp(x: f32) -> f32 {
-    jinc(x as f64) as f32 * robidoux_sharp(x)
 }
 
 #[allow(dead_code)]
@@ -247,11 +237,6 @@ fn hanning(x: f32) -> f32 {
 }
 
 #[inline(always)]
-fn ewa_hanning(x: f32) -> f32 {
-    jinc(x as f64) as f32 * hanning(x)
-}
-
-#[inline(always)]
 pub(crate) fn blackman_window(x: f32) -> f32 {
     let pi = std::f32::consts::PI;
     0.42f32 - 0.49656062f32 * (2f32 * pi * x).cos() + 0.07684867f32 * (4f32 * pi * x).cos()
@@ -262,16 +247,6 @@ pub(crate) fn blackman(x: f32) -> f32 {
     let x = x.abs();
     if x < 2.0f32 {
         sinc(x) * blackman_window(x / 2f32)
-    } else {
-        0f32
-    }
-}
-
-#[inline(always)]
-pub(crate) fn ewa_blackman(x: f32) -> f32 {
-    let x = x.abs();
-    if x < 2.0f32 {
-        jinc(x as f64) as f32 * blackman_window(x / 2f32)
     } else {
         0f32
     }
@@ -295,11 +270,6 @@ pub(crate) fn quadric(x: f32) -> f32 {
         return 0.5f32 * t * t;
     }
     return 0f32;
-}
-
-#[inline(always)]
-pub(crate) fn ewa_quadric(x: f32) -> f32 {
-    jinc(x as f64) as f32 * quadric(x)
 }
 
 #[inline(always)]
@@ -398,19 +368,14 @@ pub enum ResamplingFunction {
     Bicubic,
     Hamming,
     Hanning,
-    EwaHanning,
     Blackman,
-    EwaBlackman,
     Welch,
     Quadric,
-    EwaQuadric,
     Gaussian,
     Sphinx,
     Bartlett,
     Robidoux,
-    EwaRobidoux,
     RobidouxSharp,
-    EwaRobidouxSharp,
     Spline16,
     Spline36,
     Spline64,
@@ -440,32 +405,27 @@ impl From<u32> for ResamplingFunction {
             8 => ResamplingFunction::Bicubic,
             9 => ResamplingFunction::Hamming,
             10 => ResamplingFunction::Hanning,
-            11 => ResamplingFunction::EwaHanning,
-            12 => ResamplingFunction::Blackman,
-            13 => ResamplingFunction::EwaBlackman,
-            14 => ResamplingFunction::Welch,
-            15 => ResamplingFunction::Quadric,
-            16 => ResamplingFunction::EwaQuadric,
-            17 => ResamplingFunction::Gaussian,
-            18 => ResamplingFunction::Sphinx,
-            19 => ResamplingFunction::Bartlett,
-            20 => ResamplingFunction::Robidoux,
-            21 => ResamplingFunction::EwaRobidoux,
-            22 => ResamplingFunction::RobidouxSharp,
-            23 => ResamplingFunction::EwaRobidouxSharp,
-            24 => ResamplingFunction::Spline16,
-            25 => ResamplingFunction::Spline36,
-            26 => ResamplingFunction::Spline64,
-            27 => ResamplingFunction::Kaiser,
-            28 => ResamplingFunction::BartlettHann,
-            29 => ResamplingFunction::Box,
-            30 => ResamplingFunction::Bohman,
-            31 => ResamplingFunction::Lanczos2,
-            32 => ResamplingFunction::Lanczos3,
-            33 => ResamplingFunction::Lanczos4,
-            34 => ResamplingFunction::Lanczos2Jinc,
-            35 => ResamplingFunction::Lanczos3Jinc,
-            36 => ResamplingFunction::Lanczos4Jinc,
+            11 => ResamplingFunction::Blackman,
+            12 => ResamplingFunction::Welch,
+            13 => ResamplingFunction::Quadric,
+            14 => ResamplingFunction::Gaussian,
+            15 => ResamplingFunction::Sphinx,
+            16 => ResamplingFunction::Bartlett,
+            17 => ResamplingFunction::Robidoux,
+            18 => ResamplingFunction::RobidouxSharp,
+            19 => ResamplingFunction::Spline16,
+            20 => ResamplingFunction::Spline36,
+            21 => ResamplingFunction::Spline64,
+            22 => ResamplingFunction::Kaiser,
+            23 => ResamplingFunction::BartlettHann,
+            24 => ResamplingFunction::Box,
+            25 => ResamplingFunction::Bohman,
+            26 => ResamplingFunction::Lanczos2,
+            27 => ResamplingFunction::Lanczos3,
+            28 => ResamplingFunction::Lanczos4,
+            29 => ResamplingFunction::Lanczos2Jinc,
+            30 => ResamplingFunction::Lanczos3Jinc,
+            31 => ResamplingFunction::Lanczos4Jinc,
             _ => ResamplingFunction::Bilinear,
         }
     }
@@ -506,17 +466,13 @@ impl ResamplingFunction {
             ResamplingFunction::Lanczos2 => ResamplingFilter::new(lanczos2, 2),
             ResamplingFunction::Hamming => ResamplingFilter::new(hamming, 1),
             ResamplingFunction::Hanning => ResamplingFilter::new(hanning, 1),
-            ResamplingFunction::EwaHanning => ResamplingFilter::new(ewa_hanning, 1),
             ResamplingFunction::Welch => ResamplingFilter::new(welch, 1),
             ResamplingFunction::Quadric => ResamplingFilter::new(quadric, 1),
-            ResamplingFunction::EwaQuadric => ResamplingFilter::new(ewa_quadric, 1),
             ResamplingFunction::Gaussian => ResamplingFilter::new(gaussian, 2),
             ResamplingFunction::Sphinx => ResamplingFilter::new(sphinx, 2),
             ResamplingFunction::Bartlett => ResamplingFilter::new(bartlett, 1),
             ResamplingFunction::Robidoux => ResamplingFilter::new(robidoux, 2),
-            ResamplingFunction::EwaRobidoux => ResamplingFilter::new(ewa_robidoux, 2),
             ResamplingFunction::RobidouxSharp => ResamplingFilter::new(robidoux_sharp, 2),
-            ResamplingFunction::EwaRobidouxSharp => ResamplingFilter::new(ewa_robidoux_sharp, 2),
             ResamplingFunction::Spline16 => ResamplingFilter::new(spline16, 2),
             ResamplingFunction::Spline36 => ResamplingFilter::new(spline36, 2),
             ResamplingFunction::Spline64 => ResamplingFilter::new(spline64, 2),
@@ -528,7 +484,6 @@ impl ResamplingFunction {
             ResamplingFunction::Lanczos3Jinc => ResamplingFilter::new(lanczos3_jinc, 3),
             ResamplingFunction::Lanczos4Jinc => ResamplingFilter::new(lanczos4_jinc, 4),
             ResamplingFunction::Blackman => ResamplingFilter::new(blackman, 2),
-            ResamplingFunction::EwaBlackman => ResamplingFilter::new(ewa_blackman, 2),
         };
     }
 }

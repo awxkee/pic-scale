@@ -250,7 +250,6 @@ impl Scaling for Scaler {
                 new_size.width,
                 new_size.height,
             );
-            let new_image = ImageStore::<u8, 4>::alloc(new_size.width, new_size.height);
             if is_alpha_premultiplied {
                 let mut premultiplied_store = ImageStore::<u8, 4>::alloc(new_image.width, new_image.height);
                 new_image.premultiply_alpha(&mut premultiplied_store);
