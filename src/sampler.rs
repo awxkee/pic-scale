@@ -114,8 +114,11 @@ pub fn sinc(x: f32) -> f32 {
 }
 
 #[inline(always)]
-pub fn barlett(x: f32) -> f32 {
-    return (1.0 - x.abs()).max(0f32);
+pub fn bartlett(x: f32) -> f32 {
+    if x >= 0f32 && x <= 1f32 {
+        return 2f32 * x;
+    }
+    return 2f32 - 2f32 * x;
 }
 
 #[inline(always)]
@@ -403,7 +406,7 @@ pub enum ResamplingFunction {
     EwaQuadric,
     Gaussian,
     Sphinx,
-    Barlett,
+    Bartlett,
     Robidoux,
     EwaRobidoux,
     RobidouxSharp,
@@ -464,7 +467,7 @@ impl ResamplingFunction {
             ResamplingFunction::EwaQuadric => ResamplingFilter::new(ewa_quadric, 1),
             ResamplingFunction::Gaussian => ResamplingFilter::new(gaussian, 2),
             ResamplingFunction::Sphinx => ResamplingFilter::new(sphinx, 2),
-            ResamplingFunction::Barlett => ResamplingFilter::new(barlett, 1),
+            ResamplingFunction::Bartlett => ResamplingFilter::new(bartlett, 1),
             ResamplingFunction::Robidoux => ResamplingFilter::new(robidoux, 2),
             ResamplingFunction::EwaRobidoux => ResamplingFilter::new(ewa_robidoux, 2),
             ResamplingFunction::RobidouxSharp => ResamplingFilter::new(robidoux_sharp, 2),

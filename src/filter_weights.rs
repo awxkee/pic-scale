@@ -16,7 +16,7 @@ pub struct FilterWeights<T> {
     pub coeffs_size: i32,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct FilterBounds {
     pub start: usize,
     pub size: usize,

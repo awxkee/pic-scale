@@ -50,7 +50,7 @@ fn convolve_horizontal_rgba_f32_neon(
             let mut store_2 = zeros;
             let mut store_3 = zeros;
 
-            while jx + 4 < bounds.size && x + 6 < destination.width {
+            while jx + 4 < bounds.size {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 let weight0 = unsafe { ptr.read_unaligned() };
                 let weight1 = unsafe { ptr.add(1).read_unaligned() };

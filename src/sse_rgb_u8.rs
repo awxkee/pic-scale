@@ -342,6 +342,7 @@ pub mod sse_rgb {
             let mut store_2 = vld;
             let mut store_3 = vld;
 
+            // Will make step in 4 items however since it is RGB it is necessary to make a safe offset
             while jx + 4 < bounds.size && bounds.start + jx + 6 < src_width {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 unsafe {

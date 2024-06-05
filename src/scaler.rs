@@ -171,8 +171,7 @@ impl Scaling for Scaler {
         let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
         store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
 
-        let mut allocated_store_horizontal: Vec<f32> = vec![];
-        allocated_store_horizontal.resize(new_size.width * 3 * new_size.height, 0f32);
+        let allocated_store_horizontal: Vec<f32> = vec![0f32; new_size.width * 3 * new_size.height];
         let mut new_image_horizontal =
             ImageStore::<f32, 3>::new(allocated_store_horizontal, new_size.width, new_size.height);
         let horizontal_filters = self.generate_weights(store.width, new_size.width);

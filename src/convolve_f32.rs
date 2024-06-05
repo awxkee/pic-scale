@@ -210,15 +210,12 @@ pub(crate) unsafe fn convolve_horizontal_parts_one_rgb_f32(
     src: *const f32,
     weight0: float32x4_t,
     store_0: float32x4_t,
-    mask: float32x4_t,
 ) -> float32x4_t {
     const COMPONENTS: usize = 3;
     let src_ptr = src.add(start_x * COMPONENTS);
 
     let transient: [f32; 4] = [*src_ptr, *src_ptr.add(1), *src_ptr.add(2), 0f32];
-    let mut rgb_pixel = vld1q_f32(transient.as_ptr());
-
-    rgb_pixel = vmulq_f32(rgb_pixel, mask);
+    let rgb_pixel = vld1q_f32(transient.as_ptr());
 
     let acc = prefer_vfmaq_f32(store_0, rgb_pixel, weight0);
     acc

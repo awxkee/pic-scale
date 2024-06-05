@@ -34,8 +34,6 @@ fn convolve_horizontal_neon(
     let dst_width = destination.width;
     let src_width = image_store.width;
 
-    let mut yy = 0usize;
-
     if let Some(pool) = pool {
         let arc_weights = Arc::new(filter_weights);
         let borrowed = destination.buffer.borrow_mut();
@@ -82,6 +80,7 @@ fn convolve_horizontal_neon(
             }
         });
     } else {
+        let mut yy = 0usize;
         while yy + 4 < destination.height {
             unsafe {
                 neon_convolve_floats::convolve_horizontal_rgb_neon_rows_4(

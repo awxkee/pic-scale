@@ -22,10 +22,8 @@ pub mod neon_convolve_floats {
         unsafe_destination_ptr_0: *mut f32,
         dst_stride: usize,
     ) {
-        const CHANNELS: usize = 4;
+        const CHANNELS: usize = 3;
         let mut filter_offset = 0usize;
-
-        let mask = unsafe { vld1q_f32([1f32, 1f32, 1f32, 0f32].as_ptr()) };
 
         let zeros = unsafe { vdupq_n_f32(0f32) };
 
@@ -39,7 +37,7 @@ pub mod neon_convolve_floats {
             let mut store_2 = zeros;
             let mut store_3 = zeros;
 
-            while jx + 4 < bounds.size && bounds.start + jx + 4 < src_width {
+            while jx + 4 < bounds.size && bounds.start + jx + 6 < src_width {
                 let bounds_start = bounds.start + jx;
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 unsafe {
@@ -90,34 +88,31 @@ pub mod neon_convolve_floats {
             while jx < bounds.size {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 unsafe {
+                    let bounds_start = bounds.start + jx;
                     let weight0 = vdupq_n_f32(ptr.read_unaligned());
                     store_0 = convolve_horizontal_parts_one_rgb_f32(
-                        bounds.start + jx,
+                        bounds_start,
                         unsafe_source_ptr_0,
                         weight0,
                         store_0,
-                        mask,
                     );
                     store_1 = convolve_horizontal_parts_one_rgb_f32(
-                        bounds.start + jx,
+                        bounds_start,
                         unsafe_source_ptr_0.add(src_stride),
                         weight0,
                         store_1,
-                        mask,
                     );
                     store_2 = convolve_horizontal_parts_one_rgb_f32(
-                        bounds.start + jx,
+                        bounds_start,
                         unsafe_source_ptr_0.add(src_stride * 2),
                         weight0,
                         store_2,
-                        mask,
                     );
                     store_3 = convolve_horizontal_parts_one_rgb_f32(
-                        bounds.start + jx,
+                        bounds_start,
                         unsafe_source_ptr_0.add(src_stride * 3),
                         weight0,
                         store_3,
-                        mask,
                     );
                 }
                 jx += 1;
@@ -174,8 +169,7 @@ pub mod neon_convolve_floats {
         unsafe_source_ptr_0: *const f32,
         unsafe_destination_ptr_0: *mut f32,
     ) {
-        const CHANNELS: usize = 4;
-        let mask = unsafe { vld1q_f32([1f32, 1f32, 1f32, 0f32].as_ptr()) };
+        const CHANNELS: usize = 3;
         let weights_ptr = filter_weights.weights.as_ptr();
         let mut filter_offset = 0usize;
 
@@ -214,7 +208,6 @@ pub mod neon_convolve_floats {
                         unsafe_source_ptr_0,
                         weight0,
                         store,
-                        mask,
                     );
                 }
                 jx += 1;
