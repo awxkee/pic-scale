@@ -1,3 +1,10 @@
+/*
+ * // Copyright (c) the Radzivon Bartoshyk. All rights reserved.
+ * //
+ * // Use of this source code is governed by a BSD-style
+ * // license that can be found in the LICENSE file.
+ */
+
 const INVSQRTPI: f64 = 5.64189583547756279280e-01; /* 0x3FE20DD7, 0x50429B6D */
 #[inline]
 fn get_high_word(x: f64) -> u32 {

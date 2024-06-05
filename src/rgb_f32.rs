@@ -1,17 +1,21 @@
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use std::arch::aarch64::*;
-use std::sync::Arc;
-
-use rayon::ThreadPool;
+/*
+ * // Copyright (c) the Radzivon Bartoshyk. All rights reserved.
+ * //
+ * // Use of this source code is governed by a BSD-style
+ * // license that can be found in the LICENSE file.
+ */
 
 use crate::acceleration_feature::AccelerationFeature;
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_f32::*;
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::image_store::ImageStore;
+use crate::neon_rgb_f32::neon_convolve_floats;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse_rgb_f32::sse_convolve_f32::*;
 use crate::unsafe_slice::UnsafeSlice;
+use rayon::ThreadPool;
+use std::sync::Arc;
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 #[inline(always)]
@@ -19,224 +23,93 @@ fn convolve_horizontal_neon(
     image_store: &ImageStore<f32, 3>,
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStore<f32, 3>,
+    pool: &Option<ThreadPool>,
 ) {
-    let weights_ptr = filter_weights.weights.as_ptr();
-
     let mut unsafe_source_ptr_0 = image_store.buffer.borrow().as_ptr();
     let mut unsafe_destination_ptr_0 = destination.buffer.borrow_mut().as_mut_ptr();
 
     let src_stride = image_store.width * image_store.channels;
     let dst_stride = destination.width * image_store.channels;
-
-    let mask = unsafe { vld1q_f32([1f32, 1f32, 1f32, 0f32].as_ptr()) };
+    let dst_width = destination.width;
+    let src_width = image_store.width;
 
     let mut yy = 0usize;
 
-    let zeros = unsafe { vdupq_n_f32(0f32) };
-
-    while yy + 4 < destination.height {
-        let mut filter_offset = 0usize;
-
-        for x in 0..destination.width {
-            let bounds = unsafe { filter_weights.bounds.get_unchecked(x) };
-            let mut jx = 0usize;
-            let mut store_0 = zeros;
-            let mut store_1 = zeros;
-            let mut store_2 = zeros;
-            let mut store_3 = zeros;
-
-            while jx + 4 < bounds.size && x + 6 < destination.width {
-                let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
-                let weight0 = unsafe { ptr.read_unaligned() };
-                let weight1 = unsafe { ptr.add(1).read_unaligned() };
-                let weight2 = unsafe { ptr.add(2).read_unaligned() };
-                let weight3 = unsafe { ptr.add(3).read_unaligned() };
-                unsafe {
-                    store_0 = convolve_horizontal_parts_4_rgb_f32(
-                        bounds.start + jx,
-                        unsafe_source_ptr_0,
-                        weight0,
-                        weight1,
-                        weight2,
-                        weight3,
-                        store_0,
-                    );
-                    store_1 = convolve_horizontal_parts_4_rgb_f32(
-                        bounds.start + jx,
-                        unsafe_source_ptr_0.add(src_stride),
-                        weight0,
-                        weight1,
-                        weight2,
-                        weight3,
-                        store_1,
-                    );
-                    store_2 = convolve_horizontal_parts_4_rgb_f32(
-                        bounds.start + jx,
-                        unsafe_source_ptr_0.add(src_stride * 2),
-                        weight0,
-                        weight1,
-                        weight2,
-                        weight3,
-                        store_2,
-                    );
-                    store_3 = convolve_horizontal_parts_4_rgb_f32(
-                        bounds.start + jx,
-                        unsafe_source_ptr_0.add(src_stride * 3),
-                        weight0,
-                        weight1,
-                        weight2,
-                        weight3,
-                        store_3,
-                    );
-                }
-                jx += 4;
+    if let Some(pool) = pool {
+        let arc_weights = Arc::new(filter_weights);
+        let borrowed = destination.buffer.borrow_mut();
+        let unsafe_slice = UnsafeSlice::new(borrowed);
+        pool.scope(|scope| {
+            let mut yy = 0usize;
+            for y in (0..destination.height.saturating_sub(4)).step_by(4) {
+                let weights = arc_weights.clone();
+                scope.spawn(move |_| {
+                    let unsafe_source_ptr_0 =
+                        unsafe { image_store.buffer.borrow().as_ptr().add(src_stride * y) };
+                    let dst_ptr = unsafe_slice.mut_ptr();
+                    let unsafe_destination_ptr_0 = unsafe { dst_ptr.add(dst_stride * y) };
+                    unsafe {
+                        neon_convolve_floats::convolve_horizontal_rgb_neon_rows_4(
+                            dst_width,
+                            src_width,
+                            &weights,
+                            unsafe_source_ptr_0,
+                            src_stride,
+                            unsafe_destination_ptr_0,
+                            dst_stride,
+                        );
+                    }
+                });
+                yy = y;
             }
-
-            while jx < bounds.size {
-                let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
-                let weight0 = unsafe { ptr.read_unaligned() };
-                unsafe {
-                    store_0 = convolve_horizontal_parts_one_rgb_f32(
-                        bounds.start + jx,
-                        unsafe_source_ptr_0,
-                        weight0,
-                        store_0,
-                        mask,
-                    );
-                    store_1 = convolve_horizontal_parts_one_rgb_f32(
-                        bounds.start + jx,
-                        unsafe_source_ptr_0.add(src_stride),
-                        weight0,
-                        store_1,
-                        mask,
-                    );
-                    store_2 = convolve_horizontal_parts_one_rgb_f32(
-                        bounds.start + jx,
-                        unsafe_source_ptr_0.add(src_stride * 2),
-                        weight0,
-                        store_2,
-                        mask,
-                    );
-                    store_3 = convolve_horizontal_parts_one_rgb_f32(
-                        bounds.start + jx,
-                        unsafe_source_ptr_0.add(src_stride * 3),
-                        weight0,
-                        store_3,
-                        mask,
-                    );
-                }
-                jx += 1;
+            for y in (yy..destination.height).step_by(4) {
+                let weights = arc_weights.clone();
+                scope.spawn(move |_| {
+                    let unsafe_source_ptr_0 =
+                        unsafe { image_store.buffer.borrow().as_ptr().add(src_stride * y) };
+                    let dst_ptr = unsafe_slice.mut_ptr();
+                    let unsafe_destination_ptr_0 = unsafe { dst_ptr.add(dst_stride * y) };
+                    unsafe {
+                        neon_convolve_floats::convolve_horizontal_rgb_neon_row_one(
+                            dst_width,
+                            &weights,
+                            unsafe_source_ptr_0,
+                            unsafe_destination_ptr_0,
+                        );
+                    }
+                });
             }
-
-            let px = x * image_store.channels;
-            let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px) };
+        });
+    } else {
+        while yy + 4 < destination.height {
             unsafe {
-                let l1 = vgetq_lane_f32::<0>(store_0);
-                let l2 = vgetq_lane_f32::<1>(store_0);
-                let l3 = vgetq_lane_f32::<2>(store_0);
-                *dest_ptr = l1;
-                *dest_ptr.add(1) = l2;
-                *dest_ptr.add(2) = l3;
+                neon_convolve_floats::convolve_horizontal_rgb_neon_rows_4(
+                    dst_width,
+                    src_width,
+                    &filter_weights,
+                    unsafe_source_ptr_0,
+                    src_stride,
+                    unsafe_destination_ptr_0,
+                    dst_stride,
+                );
             }
-
-            let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px + dst_stride) };
-            unsafe {
-                let l1 = vgetq_lane_f32::<0>(store_1);
-                let l2 = vgetq_lane_f32::<1>(store_1);
-                let l3 = vgetq_lane_f32::<2>(store_1);
-                *dest_ptr = l1;
-                *dest_ptr.add(1) = l2;
-                *dest_ptr.add(2) = l3;
-            }
-
-            let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px + dst_stride * 2) };
-            unsafe {
-                let l1 = vgetq_lane_f32::<0>(store_2);
-                let l2 = vgetq_lane_f32::<1>(store_2);
-                let l3 = vgetq_lane_f32::<2>(store_2);
-                *dest_ptr = l1;
-                *dest_ptr.add(1) = l2;
-                *dest_ptr.add(2) = l3;
-            }
-
-            let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px + dst_stride * 3) };
-            unsafe {
-                let l1 = vgetq_lane_f32::<0>(store_3);
-                let l2 = vgetq_lane_f32::<1>(store_3);
-                let l3 = vgetq_lane_f32::<2>(store_3);
-                *dest_ptr = l1;
-                *dest_ptr.add(1) = l2;
-                *dest_ptr.add(2) = l3;
-            }
-
-            filter_offset += filter_weights.aligned_size;
+            unsafe_source_ptr_0 = unsafe { unsafe_source_ptr_0.add(src_stride * 4) };
+            unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride * 4) };
+            yy += 4;
         }
 
-        unsafe_source_ptr_0 = unsafe { unsafe_source_ptr_0.add(src_stride * 4) };
-        unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride * 4) };
-
-        yy += 4;
-    }
-
-    for _ in yy..destination.height {
-        let mut filter_offset = 0usize;
-
-        for x in 0..destination.width {
-            let bounds = unsafe { filter_weights.bounds.get_unchecked(x) };
-            let mut jx = 0usize;
-            let mut store = unsafe { vdupq_n_f32(0f32) };
-
-            while jx + 4 < bounds.size && x + 6 < destination.width {
-                let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
-                let weight0 = unsafe { ptr.read_unaligned() };
-                let weight1 = unsafe { ptr.add(1).read_unaligned() };
-                let weight2 = unsafe { ptr.add(2).read_unaligned() };
-                let weight3 = unsafe { ptr.add(3).read_unaligned() };
-                unsafe {
-                    store = convolve_horizontal_parts_4_rgb_f32(
-                        bounds.start + jx,
-                        unsafe_source_ptr_0,
-                        weight0,
-                        weight1,
-                        weight2,
-                        weight3,
-                        store,
-                    );
-                }
-                jx += 4;
-            }
-
-            while jx < bounds.size {
-                let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
-                let weight0 = unsafe { ptr.read_unaligned() };
-                unsafe {
-                    store = convolve_horizontal_parts_one_rgb_f32(
-                        bounds.start + jx,
-                        unsafe_source_ptr_0,
-                        weight0,
-                        store,
-                        mask,
-                    );
-                }
-                jx += 1;
-            }
-
-            let px = x * image_store.channels;
-            let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px) };
+        for _ in yy..destination.height {
             unsafe {
-                let l1 = vgetq_lane_f32::<0>(store);
-                let l2 = vgetq_lane_f32::<1>(store);
-                let l3 = vgetq_lane_f32::<2>(store);
-                *dest_ptr = l1;
-                *dest_ptr.add(1) = l2;
-                *dest_ptr.add(2) = l3;
+                neon_convolve_floats::convolve_horizontal_rgb_neon_row_one(
+                    dst_width,
+                    &filter_weights,
+                    unsafe_source_ptr_0,
+                    unsafe_destination_ptr_0,
+                );
             }
-
-            filter_offset += filter_weights.aligned_size;
+            unsafe_source_ptr_0 = unsafe { unsafe_source_ptr_0.add(src_stride) };
+            unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
         }
-
-        unsafe_source_ptr_0 = unsafe { unsafe_source_ptr_0.add(src_stride) };
-        unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
     }
 }
 
@@ -331,10 +204,73 @@ fn convolve_horizontal_native(
 }
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[inline(always)]
+fn convolve_vertical_rgb_native_row(
+    total_width: usize,
+    src_stride: usize,
+    unsafe_source_ptr_0: *const f32,
+    unsafe_destination_ptr_0: *mut f32,
+    weight_ptr: *const f32,
+    bounds: &FilterBounds,
+) {
+    let mut cx = 0usize;
+
+    while cx + 16 < total_width {
+        unsafe {
+            convolve_vertical_part_neon_16_f32(
+                bounds.start,
+                cx,
+                unsafe_source_ptr_0,
+                src_stride,
+                unsafe_destination_ptr_0,
+                weight_ptr,
+                bounds,
+            );
+        }
+
+        cx += 16;
+    }
+    while cx + 8 < total_width {
+        unsafe {
+            convolve_vertical_part_neon_8_f32::<false>(
+                bounds.start,
+                cx,
+                unsafe_source_ptr_0,
+                src_stride,
+                unsafe_destination_ptr_0,
+                weight_ptr,
+                bounds,
+                8,
+            );
+        }
+
+        cx += 8;
+    }
+
+    let left = total_width - cx;
+
+    if left > 0 {
+        unsafe {
+            convolve_vertical_part_neon_8_f32::<true>(
+                bounds.start,
+                cx,
+                unsafe_source_ptr_0,
+                src_stride,
+                unsafe_destination_ptr_0,
+                weight_ptr,
+                bounds,
+                left,
+            );
+        }
+    }
+}
+
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 fn convolve_vertical_neon(
     image_store: &ImageStore<f32, 3>,
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStore<f32, 3>,
+    pool: &Option<ThreadPool>,
 ) {
     let unsafe_source_ptr_0 = image_store.buffer.borrow().as_ptr();
     let mut unsafe_destination_ptr_0 = destination.buffer.borrow_mut().as_mut_ptr();
@@ -343,62 +279,47 @@ fn convolve_vertical_neon(
     let dst_stride = destination.width * image_store.channels;
     let total_width = destination.width * image_store.channels;
 
-    for y in 0..destination.height {
-        let mut cx = 0usize;
-        let bounds = unsafe { filter_weights.bounds.get_unchecked(y) };
-        let weight_ptr = unsafe { filter_weights.weights.as_ptr().add(filter_offset) };
-
-        while cx + 16 < total_width {
-            unsafe {
-                convolve_vertical_part_neon_16_f32(
-                    bounds.start,
-                    cx,
-                    unsafe_source_ptr_0,
-                    src_stride,
-                    unsafe_destination_ptr_0,
-                    weight_ptr,
-                    bounds,
-                );
+    if let Some(pool) = pool {
+        let arc_weights = Arc::new(filter_weights);
+        let borrowed = destination.buffer.borrow_mut();
+        let unsafe_slice = UnsafeSlice::new(borrowed);
+        pool.scope(|scope| {
+            for y in 0..destination.height {
+                let weights = arc_weights.clone();
+                scope.spawn(move |_| {
+                    let unsafe_source_ptr_0 = image_store.buffer.borrow().as_ptr();
+                    let dst_ptr = unsafe_slice.mut_ptr();
+                    let unsafe_destination_ptr_0 = unsafe { dst_ptr.add(dst_stride * y) };
+                    let bounds = unsafe { weights.bounds.get_unchecked(y) };
+                    let weight_ptr = unsafe { weights.weights.as_ptr().add(filter_offset) };
+                    convolve_vertical_rgb_native_row(
+                        total_width,
+                        src_stride,
+                        unsafe_source_ptr_0,
+                        unsafe_destination_ptr_0,
+                        weight_ptr,
+                        bounds,
+                    );
+                });
             }
+        });
+    } else {
+        for y in 0..destination.height {
+            let bounds = unsafe { filter_weights.bounds.get_unchecked(y) };
+            let weight_ptr = unsafe { filter_weights.weights.as_ptr().add(filter_offset) };
 
-            cx += 16;
+            convolve_vertical_rgb_native_row(
+                total_width,
+                src_stride,
+                unsafe_source_ptr_0,
+                unsafe_destination_ptr_0,
+                weight_ptr,
+                bounds,
+            );
+
+            filter_offset += filter_weights.aligned_size;
+            unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
         }
-        while cx + 8 < total_width {
-            unsafe {
-                convolve_vertical_part_neon_8_f32::<false>(
-                    bounds.start,
-                    cx,
-                    unsafe_source_ptr_0,
-                    src_stride,
-                    unsafe_destination_ptr_0,
-                    weight_ptr,
-                    bounds,
-                    8,
-                );
-            }
-
-            cx += 8;
-        }
-
-        let left = total_width - cx;
-
-        if left > 0 {
-            unsafe {
-                convolve_vertical_part_neon_8_f32::<true>(
-                    bounds.start,
-                    cx,
-                    unsafe_source_ptr_0,
-                    src_stride,
-                    unsafe_destination_ptr_0,
-                    weight_ptr,
-                    bounds,
-                    left,
-                );
-            }
-        }
-
-        filter_offset += filter_weights.aligned_size;
-        unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
     }
 }
 
@@ -513,7 +434,6 @@ pub(crate) fn convolve_vertical_sse_rgb_f32<const COMPONENTS: usize>(
                         unsafe_source_ptr_0,
                         unsafe_destination_ptr_0,
                     );
-
                 });
             }
         });
@@ -676,7 +596,7 @@ impl<'a> HorizontalConvolutionPass<f32, 3> for ImageStore<'a, f32, 3> {
         match using_feature {
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             AccelerationFeature::Neon => {
-                convolve_horizontal_neon(self, filter_weights, destination);
+                convolve_horizontal_neon(self, filter_weights, destination, pool);
             }
             AccelerationFeature::Native => {
                 convolve_horizontal_native(self, filter_weights, destination, pool);
@@ -713,7 +633,7 @@ impl<'a> VerticalConvolutionPass<f32, 3> for ImageStore<'a, f32, 3> {
         match using_feature {
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             AccelerationFeature::Neon => {
-                convolve_vertical_neon(self, filter_weights, destination);
+                convolve_vertical_neon(self, filter_weights, destination, pool);
             }
             AccelerationFeature::Native => {
                 convolve_vertical_native_f32(self, filter_weights, destination, pool);

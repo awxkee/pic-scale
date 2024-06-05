@@ -1,3 +1,10 @@
+/*
+ * // Copyright (c) the Radzivon Bartoshyk. All rights reserved.
+ * //
+ * // Use of this source code is governed by a BSD-style
+ * // license that can be found in the LICENSE file.
+ */
+
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 pub mod neon_rgb {
     use crate::filter_weights::{FilterBounds, FilterWeights};
@@ -33,9 +40,9 @@ pub mod neon_rgb {
             let mut store_2 = init;
             let mut store_3 = init;
 
-            while jx + 4 < bounds.size && x + 6 < src_width {
-                let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
+            while jx + 4 < bounds.size && bounds.start + jx + 6 < src_width {
                 let bounds_start = bounds.start + jx;
+                let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 unsafe {
                     let weight0 = vdup_n_s16(ptr.read_unaligned());
                     let weight1 = vdupq_n_s16(ptr.add(1).read_unaligned());
@@ -85,7 +92,7 @@ pub mod neon_rgb {
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size && x + 3 < src_width {
+            while jx + 2 < bounds.size && bounds.start + jx + 3 < src_width {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 let bounds_start = bounds.start + jx;
                 unsafe {
@@ -239,7 +246,8 @@ pub mod neon_rgb {
             let mut jx = 0usize;
             let mut store = vdupq_n_s32(ROUNDING_APPROX);
 
-            while jx + 4 < bounds.size && x + 6 < src_width {
+            while jx + 4 < bounds.size && bounds.start + jx + 6 < src_width {
+                let bounds_start = bounds.start + jx;
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 unsafe {
                     let weight0 = vdup_n_s16(ptr.read_unaligned());
@@ -247,7 +255,7 @@ pub mod neon_rgb {
                     let weight2 = vdup_n_s16(ptr.add(2).read_unaligned());
                     let weight3 = vdupq_n_s16(ptr.add(3).read_unaligned());
                     store = neon_convolve_u8::convolve_horizontal_parts_4_rgb(
-                        bounds.start + jx,
+                        bounds_start,
                         unsafe_source_ptr_0,
                         weight0,
                         weight1,
@@ -260,13 +268,14 @@ pub mod neon_rgb {
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size && x + 3 < src_width {
+            while jx + 2 < bounds.size && bounds.start + jx + 3 < src_width {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
+                let bounds_start = bounds.start + jx;
                 unsafe {
                     let weight0 = vdup_n_s16(ptr.read_unaligned());
                     let weight1 = vdupq_n_s16(ptr.add(1).read_unaligned());
                     store = neon_convolve_u8::convolve_horizontal_parts_2_rgb(
-                        bounds.start + jx,
+                        bounds_start,
                         unsafe_source_ptr_0,
                         weight0,
                         weight1,

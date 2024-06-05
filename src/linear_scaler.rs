@@ -1,10 +1,16 @@
+/*
+ * // Copyright (c) the Radzivon Bartoshyk. All rights reserved.
+ * //
+ * // Use of this source code is governed by a BSD-style
+ * // license that can be found in the LICENSE file.
+ */
+
 use colorutils_rs::{
-    linear_u8_to_rgb, linear_u8_to_rgba, rgb_to_linear_u8,
-    rgba_to_linear_u8, TransferFunction,
+    linear_u8_to_rgb, linear_u8_to_rgba, rgb_to_linear_u8, rgba_to_linear_u8, TransferFunction,
 };
 
-use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, ThreadingPolicy};
 use crate::scaler::Scaling;
+use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, ThreadingPolicy};
 
 #[derive(Debug, Copy, Clone)]
 pub struct LinearScaler {
@@ -52,11 +58,17 @@ impl<'a> LinearScaler {
         gamma_store
     }
 
-    pub fn resize_rgba(&self, new_size: ImageSize, store: ImageStore<u8, 4>, is_alpha_premultiplied: bool) -> ImageStore<u8, 4> {
+    pub fn resize_rgba(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<u8, 4>,
+        is_alpha_premultiplied: bool,
+    ) -> ImageStore<u8, 4> {
         const CHANNELS: usize = 4;
         let mut src_store = store;
         if is_alpha_premultiplied {
-            let mut premultiplied_store = ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
+            let mut premultiplied_store =
+                ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
             src_store.unpremultiply_alpha(&mut premultiplied_store);
             src_store = premultiplied_store;
         }
@@ -84,7 +96,8 @@ impl<'a> LinearScaler {
             self.transfer_function,
         );
         if is_alpha_premultiplied {
-            let mut premultiplied_store = ImageStore::<u8, 4>::alloc(gamma_store.width, gamma_store.height);
+            let mut premultiplied_store =
+                ImageStore::<u8, 4>::alloc(gamma_store.width, gamma_store.height);
             gamma_store.premultiply_alpha(&mut premultiplied_store);
             return premultiplied_store;
         }

@@ -2,14 +2,17 @@ use crate::alpha_handle::{premultiply_alpha_rgba, unpremultiply_alpha_rgba};
 use crate::ImageSize;
 use num_traits::FromPrimitive;
 use std::fmt::Debug;
+/*
+ * // Copyright (c) the Radzivon Bartoshyk. All rights reserved.
+ * //
+ * // Use of this source code is governed by a BSD-style
+ * // license that can be found in the LICENSE file.
+ */
 
 #[derive(Debug)]
 pub struct ImageStore<'a, T, const N: usize>
 where
-    T: FromPrimitive,
-    T: Clone,
-    T: Copy,
-    T: Debug,
+    T: FromPrimitive + Clone + Copy + Debug,
 {
     pub(crate) buffer: BufferStore<'a, T>,
     pub channels: usize,
@@ -41,11 +44,7 @@ impl<'a, T: Copy + Debug> BufferStore<'a, T> {
 
 impl<T, const N: usize> ImageStore<'static, T, N>
 where
-    T: FromPrimitive,
-    T: Clone,
-    T: Copy,
-    T: Debug,
-    T: Default,
+    T: FromPrimitive + Clone + Copy + Debug + Default,
 {
     pub fn new(slice_ref: Vec<T>, width: usize, height: usize) -> ImageStore<'static, T, N> {
         ImageStore::<T, N> {
@@ -69,10 +68,7 @@ where
 
 impl<'a, T, const N: usize> ImageStore<'a, T, N>
 where
-    T: FromPrimitive,
-    T: Clone,
-    T: Copy,
-    T: Debug,
+    T: FromPrimitive + Clone + Copy + Debug,
 {
     pub fn get_size(&self) -> ImageSize {
         ImageSize::new(self.width, self.height)

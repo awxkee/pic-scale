@@ -1,3 +1,10 @@
+/*
+ * // Copyright (c) the Radzivon Bartoshyk. All rights reserved.
+ * //
+ * // Use of this source code is governed by a BSD-style
+ * // license that can be found in the LICENSE file.
+ */
+
 pub fn resize_nearest<T, const CHANNELS: usize>(
     src: &[T],
     src_width: usize,

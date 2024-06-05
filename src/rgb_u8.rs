@@ -1,3 +1,10 @@
+/*
+ * // Copyright (c) the Radzivon Bartoshyk. All rights reserved.
+ * //
+ * // Use of this source code is governed by a BSD-style
+ * // license that can be found in the LICENSE file.
+ */
+
 use rayon::ThreadPool;
 use std::sync::Arc;
 
@@ -177,7 +184,6 @@ fn convolve_horizontal_rgb_neon(
         });
     } else {
         let mut yy = 0usize;
-
         while yy + 4 < destination.height {
             unsafe {
                 convolve_horizontal_rgb_neon_rows_4(

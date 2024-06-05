@@ -1,3 +1,10 @@
+/*
+ * // Copyright (c) the Radzivon Bartoshyk. All rights reserved.
+ * //
+ * // Use of this source code is governed by a BSD-style
+ * // license that can be found in the LICENSE file.
+ */
+
 use crate::filter_weights::FilterBounds;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use std::arch::aarch64::*;
@@ -170,10 +177,10 @@ pub unsafe fn vtransposeq_f32(matrix: float32x4x4_t) -> float32x4x4_t {
 pub(crate) unsafe fn convolve_horizontal_parts_4_rgb_f32(
     start_x: usize,
     src: *const f32,
-    weight0: f32,
-    weight1: f32,
-    weight2: f32,
-    weight3: f32,
+    weight0: float32x4_t,
+    weight1: float32x4_t,
+    weight2: float32x4_t,
+    weight3: float32x4_t,
     store_0: float32x4_t,
 ) -> float32x4_t {
     const COMPONENTS: usize = 3;
@@ -189,10 +196,10 @@ pub(crate) unsafe fn convolve_horizontal_parts_4_rgb_f32(
     );
     let rgb_pixel = vtransposeq_f32(rgb_pixel);
 
-    let acc = prefer_vfmaq_f32(store_0, rgb_pixel.0, vdupq_n_f32(weight0));
-    let acc = prefer_vfmaq_f32(acc, rgb_pixel.1, vdupq_n_f32(weight1));
-    let acc = prefer_vfmaq_f32(acc, rgb_pixel.2, vdupq_n_f32(weight2));
-    let acc = prefer_vfmaq_f32(acc, rgb_pixel.3, vdupq_n_f32(weight3));
+    let acc = prefer_vfmaq_f32(store_0, rgb_pixel.0, weight0);
+    let acc = prefer_vfmaq_f32(acc, rgb_pixel.1, weight1);
+    let acc = prefer_vfmaq_f32(acc, rgb_pixel.2, weight2);
+    let acc = prefer_vfmaq_f32(acc, rgb_pixel.3, weight3);
     acc
 }
 
@@ -201,7 +208,7 @@ pub(crate) unsafe fn convolve_horizontal_parts_4_rgb_f32(
 pub(crate) unsafe fn convolve_horizontal_parts_one_rgb_f32(
     start_x: usize,
     src: *const f32,
-    weight0: f32,
+    weight0: float32x4_t,
     store_0: float32x4_t,
     mask: float32x4_t,
 ) -> float32x4_t {
@@ -213,7 +220,7 @@ pub(crate) unsafe fn convolve_horizontal_parts_one_rgb_f32(
 
     rgb_pixel = vmulq_f32(rgb_pixel, mask);
 
-    let acc = prefer_vfmaq_f32(store_0, rgb_pixel, vdupq_n_f32(weight0));
+    let acc = prefer_vfmaq_f32(store_0, rgb_pixel, weight0);
     acc
 }
 

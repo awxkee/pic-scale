@@ -1,3 +1,9 @@
+/*
+ * // Copyright (c) the Radzivon Bartoshyk. All rights reserved.
+ * //
+ * // Use of this source code is governed by a BSD-style
+ * // license that can be found in the LICENSE file.
+ */
 
 mod chunking;
 mod convolution;
@@ -28,6 +34,7 @@ mod sse_rgb_f32;
 mod alpha_handle;
 mod sse_utils;
 mod support;
+mod neon_rgb_f32;
 
 pub use image_size::ImageSize;
 pub use image_store::ImageStore;

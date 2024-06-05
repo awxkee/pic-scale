@@ -1,7 +1,14 @@
+/*
+ * // Copyright (c) the Radzivon Bartoshyk. All rights reserved.
+ * //
+ * // Use of this source code is governed by a BSD-style
+ * // license that can be found in the LICENSE file.
+ */
+
 use colorutils_rs::{lab_to_srgb, lab_with_alpha_to_rgba, rgb_to_lab, rgba_to_lab_with_alpha};
 
-use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, ThreadingPolicy};
 use crate::scaler::Scaling;
+use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, ThreadingPolicy};
 
 #[derive(Copy, Clone)]
 pub struct LabScaler {
@@ -41,11 +48,9 @@ impl LabScaler {
         );
         return new_store;
     }
-
 }
 
 impl Scaling for LabScaler {
-
     fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy) {
         self.scaler.threading_policy = threading_policy;
     }
@@ -82,7 +87,11 @@ impl Scaling for LabScaler {
         self.scaler.resize_rgb_f32(new_size, store)
     }
 
-    fn resize_rgba_f32(&self, new_size: ImageSize, store: ImageStore<f32, 4>) -> ImageStore<f32, 4> {
+    fn resize_rgba_f32(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<f32, 4>,
+    ) -> ImageStore<f32, 4> {
         self.scaler.resize_rgba_f32(new_size, store)
     }
 
@@ -94,7 +103,8 @@ impl Scaling for LabScaler {
     ) -> ImageStore<u8, 4> {
         let mut src_store = store;
         if is_alpha_premultiplied {
-            let mut premultiplied_store = ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
+            let mut premultiplied_store =
+                ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
             src_store.unpremultiply_alpha(&mut premultiplied_store);
             src_store = premultiplied_store;
         }
@@ -102,11 +112,11 @@ impl Scaling for LabScaler {
         let new_store = self.scaler.resize_rgba_f32(new_size, lab_store);
         let rgba_store = Self::laba_to_srgba(new_store);
         if is_alpha_premultiplied {
-            let mut premultiplied_store = ImageStore::<u8, 4>::alloc(rgba_store.width, rgba_store.height);
+            let mut premultiplied_store =
+                ImageStore::<u8, 4>::alloc(rgba_store.width, rgba_store.height);
             rgba_store.premultiply_alpha(&mut premultiplied_store);
             return premultiplied_store;
         }
         return rgba_store;
     }
-
 }

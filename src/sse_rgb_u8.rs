@@ -1,3 +1,10 @@
+/*
+ * // Copyright (c) the Radzivon Bartoshyk. All rights reserved.
+ * //
+ * // Use of this source code is governed by a BSD-style
+ * // license that can be found in the LICENSE file.
+ */
+
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 pub mod sse_rgb {
     use crate::filter_weights::{FilterBounds, FilterWeights};
@@ -335,7 +342,7 @@ pub mod sse_rgb {
             let mut store_2 = vld;
             let mut store_3 = vld;
 
-            while jx + 4 < bounds.size && x + 6 < src_width {
+            while jx + 4 < bounds.size && bounds.start + jx + 6 < src_width {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 unsafe {
                     let weight01 = _mm_set1_epi32((ptr as *const i32).read_unaligned());
@@ -378,7 +385,7 @@ pub mod sse_rgb {
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size && x + 3 < src_width {
+            while jx + 2 < bounds.size && bounds.start + jx + 3 < src_width {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 unsafe {
                     let bounds_start = bounds.start + jx;

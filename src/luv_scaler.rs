@@ -1,3 +1,10 @@
+/*
+ * // Copyright (c) the Radzivon Bartoshyk. All rights reserved.
+ * //
+ * // Use of this source code is governed by a BSD-style
+ * // license that can be found in the LICENSE file.
+ */
+
 use colorutils_rs::{Luv, Rgb};
 
 use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
@@ -14,7 +21,8 @@ impl LuvScaler {
         }
     }
 
-    fn rgbx_to_luv<const CHANNELS: usize>(&self,
+    fn rgbx_to_luv<const CHANNELS: usize>(
+        &self,
         store: ImageStore<u8, CHANNELS>,
     ) -> ImageStore<f32, CHANNELS> {
         let mut new_store = ImageStore::<f32, CHANNELS>::alloc(store.width, store.height);
@@ -30,11 +38,11 @@ impl LuvScaler {
                 let b = *unsafe { src_buffer.get_unchecked(src_offset + px + 2) };
 
                 let rgb = Rgb::new(r, g, b);
-                let rgb_f = rgb.to_luv();
+                let luv = rgb.to_luv();
                 unsafe {
-                    *dst_buffer.get_unchecked_mut(dst_offset + px) = rgb_f.l;
-                    *dst_buffer.get_unchecked_mut(dst_offset + px + 1) = rgb_f.u;
-                    *dst_buffer.get_unchecked_mut(dst_offset + px + 2) = rgb_f.v;
+                    *dst_buffer.get_unchecked_mut(dst_offset + px) = luv.l;
+                    *dst_buffer.get_unchecked_mut(dst_offset + px + 1) = luv.u;
+                    *dst_buffer.get_unchecked_mut(dst_offset + px + 2) = luv.v;
                 }
                 if CHANNELS == 4 {
                     let a = *unsafe { src_buffer.get_unchecked(src_offset + px + 3) };
@@ -51,7 +59,8 @@ impl LuvScaler {
         new_store
     }
 
-    fn luv_to_rgbx<const CHANNELS: usize>(&self,
+    fn luv_to_rgbx<const CHANNELS: usize>(
+        &self,
         store: ImageStore<f32, CHANNELS>,
     ) -> ImageStore<u8, CHANNELS> {
         let mut new_store = ImageStore::<u8, CHANNELS>::alloc(store.width, store.height);
@@ -62,16 +71,16 @@ impl LuvScaler {
         for _ in 0..store.height {
             for x in 0..store.width {
                 let px = x * CHANNELS;
-                let r = *unsafe { src_buffer.get_unchecked(src_offset + px) };
-                let g = *unsafe { src_buffer.get_unchecked(src_offset + px + 1) };
-                let b = *unsafe { src_buffer.get_unchecked(src_offset + px + 2) };
+                let l = *unsafe { src_buffer.get_unchecked(src_offset + px) };
+                let u = *unsafe { src_buffer.get_unchecked(src_offset + px + 1) };
+                let v = *unsafe { src_buffer.get_unchecked(src_offset + px + 2) };
 
-                let luv = Luv::new(r, g, b);
-                let rgb_f = luv.to_rgb();
+                let luv = Luv::new(l, u, v);
+                let rgb = luv.to_rgb();
                 unsafe {
-                    *dst_buffer.get_unchecked_mut(dst_offset + px) = rgb_f.r;
-                    *dst_buffer.get_unchecked_mut(dst_offset + px + 1) = rgb_f.g;
-                    *dst_buffer.get_unchecked_mut(dst_offset + px + 2) = rgb_f.b;
+                    *dst_buffer.get_unchecked_mut(dst_offset + px) = rgb.r;
+                    *dst_buffer.get_unchecked_mut(dst_offset + px + 1) = rgb.g;
+                    *dst_buffer.get_unchecked_mut(dst_offset + px + 2) = rgb.b;
                 }
                 if CHANNELS == 4 {
                     let a = *unsafe { src_buffer.get_unchecked(src_offset + px + 3) };
@@ -105,10 +114,16 @@ impl Scaling for LuvScaler {
         self.scaler.resize_rgb_f32(new_size, store)
     }
 
-    fn resize_rgba(&self, new_size: ImageSize, store: ImageStore<u8, 4>, is_alpha_premultiplied: bool) -> ImageStore<u8, 4> {
+    fn resize_rgba(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<u8, 4>,
+        is_alpha_premultiplied: bool,
+    ) -> ImageStore<u8, 4> {
         let mut src_store = store;
         if is_alpha_premultiplied {
-            let mut premultiplied_store = ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
+            let mut premultiplied_store =
+                ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
             src_store.unpremultiply_alpha(&mut premultiplied_store);
             src_store = premultiplied_store;
         }
@@ -116,7 +131,8 @@ impl Scaling for LuvScaler {
         let new_store = self.scaler.resize_rgba_f32(new_size, luv_image);
         let unorm_image = self.luv_to_rgbx(new_store);
         if is_alpha_premultiplied {
-            let mut premultiplied_store = ImageStore::<u8, 4>::alloc(unorm_image.width, unorm_image.height);
+            let mut premultiplied_store =
+                ImageStore::<u8, 4>::alloc(unorm_image.width, unorm_image.height);
             unorm_image.premultiply_alpha(&mut premultiplied_store);
             return premultiplied_store;
         }
