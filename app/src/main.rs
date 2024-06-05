@@ -1,19 +1,19 @@
 use std::time::Instant;
 
+use fast_image_resize::images::Image;
+use fast_image_resize::FilterType::Lanczos3;
 use fast_image_resize::{
     CpuExtensions, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
-use fast_image_resize::FilterType::Lanczos3;
-use fast_image_resize::images::Image;
-use image::{EncodableLayout, GenericImageView};
 use image::io::Reader as ImageReader;
+use image::{EncodableLayout, GenericImageView};
 
 use pic_scale::{ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
 
 fn main() {
     // test_fast_image();
 
-    let img = ImageReader::open("./assets/asset_middle.jpg")
+    let img = ImageReader::open("./assets/beach_horizon.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -22,13 +22,14 @@ fn main() {
 
     let start_time = Instant::now();
 
-    let mut scaler = Scaler::new(ResamplingFunction::Bartlett);
-    scaler.set_threading_policy(ThreadingPolicy::Single);
+    let mut scaler = Scaler::new(ResamplingFunction::Cubic);
+    scaler.set_threading_policy(ThreadingPolicy::Adaptive);
     let store =
-        ImageStore::<u8, 3>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
-    let resized = scaler.resize_rgb(
-        ImageSize::new(dimensions.0 as usize / 1, dimensions.1 as usize / 1),
+        ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
+    let resized = scaler.resize_rgba(
+        ImageSize::new(dimensions.0 as usize / 3, dimensions.1 as usize / 3),
         store,
+        true,
     );
 
     let elapsed_time = start_time.elapsed();

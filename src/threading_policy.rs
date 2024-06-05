@@ -6,6 +6,7 @@
  */
 
 use rayon::ThreadPool;
+
 use crate::ImageSize;
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -27,7 +28,6 @@ impl<'a> ThreadingPolicy {
             }
         }
     }
-
 }
 
 impl<'a> ThreadingPolicy {
@@ -36,11 +36,12 @@ impl<'a> ThreadingPolicy {
             return None;
         }
         let threads_count = self.get_threads_count(for_size);
-        let shared_pool = rayon::ThreadPoolBuilder::new()
+        return match rayon::ThreadPoolBuilder::new()
             .num_threads(threads_count)
-            .use_current_thread()
             .build()
-            .unwrap();
-        return Some(shared_pool);
+        {
+            Ok(pool) => Some(pool),
+            Err(_) => None,
+        };
     }
 }
