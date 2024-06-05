@@ -18,19 +18,22 @@ pub struct LinearScaler {
     pub(crate) transfer_function: TransferFunction,
 }
 
-impl<'a> LinearScaler {
+impl LinearScaler {
     pub fn new(filter: ResamplingFunction) -> Self {
         LinearScaler {
             scaler: Scaler::new(filter),
             transfer_function: TransferFunction::Srgb,
         }
     }
+}
 
-    pub fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy) {
+impl<'a> Scaling for LinearScaler {
+
+    fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy) {
         self.scaler.threading_policy = threading_policy;
     }
 
-    pub fn resize_rgb(&self, new_size: ImageSize, store: ImageStore<u8, 3>) -> ImageStore<u8, 3> {
+    fn resize_rgb(&self, new_size: ImageSize, store: ImageStore<u8, 3>) -> ImageStore<u8, 3> {
         const CHANNELS: usize = 3;
         let mut linear_store = ImageStore::<u8, CHANNELS>::alloc(store.width, store.height);
         rgb_to_linear_u8(
@@ -58,7 +61,11 @@ impl<'a> LinearScaler {
         gamma_store
     }
 
-    pub fn resize_rgba(
+    fn resize_rgb_f32(&self, new_size: ImageSize, store: ImageStore<f32, 3>) -> ImageStore<f32, 3> {
+        self.scaler.resize_rgb_f32(new_size, store)
+    }
+
+    fn resize_rgba(
         &self,
         new_size: ImageSize,
         store: ImageStore<u8, 4>,
@@ -102,5 +109,9 @@ impl<'a> LinearScaler {
             return premultiplied_store;
         }
         gamma_store
+    }
+
+    fn resize_rgba_f32(&self, new_size: ImageSize, store: ImageStore<f32, 4>) -> ImageStore<f32, 4> {
+        self.scaler.resize_rgba_f32(new_size, store)
     }
 }
