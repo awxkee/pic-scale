@@ -10,6 +10,7 @@ use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_f32::*;
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::image_store::ImageStore;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon_rgb_f32::neon_convolve_floats;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse_rgb_f32::sse_convolve_f32::*;
