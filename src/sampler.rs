@@ -426,6 +426,51 @@ pub enum ResamplingFunction {
     Lanczos4Jinc,
 }
 
+impl From<u32> for ResamplingFunction {
+    fn from(value: u32) -> Self {
+        match value {
+            0 => ResamplingFunction::Bilinear,
+            1 => ResamplingFunction::Nearest,
+            2 => ResamplingFunction::Cubic,
+            3 => ResamplingFunction::MitchellNetravalli,
+            4 => ResamplingFunction::CatmullRom,
+            5 => ResamplingFunction::Hermite,
+            6 => ResamplingFunction::BSpline,
+            7 => ResamplingFunction::Hann,
+            8 => ResamplingFunction::Bicubic,
+            9 => ResamplingFunction::Hamming,
+            10 => ResamplingFunction::Hanning,
+            11 => ResamplingFunction::EwaHanning,
+            12 => ResamplingFunction::Blackman,
+            13 => ResamplingFunction::EwaBlackman,
+            14 => ResamplingFunction::Welch,
+            15 => ResamplingFunction::Quadric,
+            16 => ResamplingFunction::EwaQuadric,
+            17 => ResamplingFunction::Gaussian,
+            18 => ResamplingFunction::Sphinx,
+            19 => ResamplingFunction::Bartlett,
+            20 => ResamplingFunction::Robidoux,
+            21 => ResamplingFunction::EwaRobidoux,
+            22 => ResamplingFunction::RobidouxSharp,
+            23 => ResamplingFunction::EwaRobidouxSharp,
+            24 => ResamplingFunction::Spline16,
+            25 => ResamplingFunction::Spline36,
+            26 => ResamplingFunction::Spline64,
+            27 => ResamplingFunction::Kaiser,
+            28 => ResamplingFunction::BartlettHann,
+            29 => ResamplingFunction::Box,
+            30 => ResamplingFunction::Bohman,
+            31 => ResamplingFunction::Lanczos2,
+            32 => ResamplingFunction::Lanczos3,
+            33 => ResamplingFunction::Lanczos4,
+            34 => ResamplingFunction::Lanczos2Jinc,
+            35 => ResamplingFunction::Lanczos3Jinc,
+            36 => ResamplingFunction::Lanczos4Jinc,
+            _ => ResamplingFunction::Bilinear,
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct ResamplingFilter {
     pub function: fn(f32) -> f32,
