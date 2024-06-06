@@ -13,7 +13,7 @@ use pic_scale::{ImageSize, ImageStore, LuvScaler, ResamplingFunction, Scaling, T
 fn main() {
     // test_fast_image();
 
-    let img = ImageReader::open("./assets/asset_middle.jpg")
+    let img = ImageReader::open("./assets/asset_5.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -22,13 +22,13 @@ fn main() {
 
     let start_time = Instant::now();
 
-    let mut scaler = LuvScaler::new(ResamplingFunction::Hanning);
+    let mut scaler = LuvScaler::new(ResamplingFunction::EwaQuadric);
     scaler.set_threading_policy(ThreadingPolicy::Single);
     let store =
-        ImageStore::<u8, 3>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
-    let resized = scaler.resize_rgb(
-        ImageSize::new(dimensions.0 as usize / 3, dimensions.1 as usize / 3),
-        store,
+        ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
+    let resized = scaler.resize_rgba(
+        ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+        store, true,
     );
 
     let elapsed_time = start_time.elapsed();

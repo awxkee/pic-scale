@@ -77,18 +77,38 @@ impl Scaler {
                 let dx = k as f32 - center;
                 let weight = resampling_function(dx * filter_scale);
                 weights_sum += weight;
-                local_filters[local_filter_iteration] = weight;
+                unsafe {
+                    *local_filters.get_unchecked_mut(local_filter_iteration) = weight;
+                }
                 local_filter_iteration += 1;
+            }
+
+            const ALPHA: f32 = 0.7f32;
+            if self.resampling_filter.is_ewa && !local_filters.is_empty() {
+                weights_sum = unsafe { *local_filters.get_unchecked(0) };
+                for j in 1..local_filter_iteration {
+                    let new_weight = ALPHA * unsafe { *local_filters.get_unchecked(j) }
+                        + (1f32 - ALPHA) * unsafe { *local_filters.get_unchecked(j - 1) };
+                    unsafe {
+                        *local_filters.get_unchecked_mut(j) = new_weight;
+                    }
+                    weights_sum += new_weight;
+                }
             }
 
             let size = end - start;
 
-            bounds[i] = FilterBounds::new(start, size);
+            unsafe {
+                *bounds.get_unchecked_mut(i) = FilterBounds::new(start, size);
+            }
 
             if weights_sum != 0f32 {
                 let recpeq = 1f32 / weights_sum;
                 for i in 0..size {
-                    weights[filter_position + i] = local_filters[i] * recpeq;
+                    unsafe {
+                        *weights.get_unchecked_mut(filter_position + i) =
+                            *local_filters.get_unchecked(i) * recpeq;
+                    }
                 }
             }
 
@@ -236,7 +256,8 @@ impl Scaling for Scaler {
     ) -> ImageStore<u8, 4> {
         let mut src_store = store;
         if is_alpha_premultiplied {
-            let mut premultiplied_store = ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
+            let mut premultiplied_store =
+                ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
             src_store.unpremultiply_alpha(&mut premultiplied_store);
             src_store = premultiplied_store;
         }
@@ -251,7 +272,8 @@ impl Scaling for Scaler {
                 new_size.height,
             );
             if is_alpha_premultiplied {
-                let mut premultiplied_store = ImageStore::<u8, 4>::alloc(new_image.width, new_image.height);
+                let mut premultiplied_store =
+                    ImageStore::<u8, 4>::alloc(new_image.width, new_image.height);
                 new_image.premultiply_alpha(&mut premultiplied_store);
                 return premultiplied_store;
             }
@@ -274,7 +296,8 @@ impl Scaling for Scaler {
             &pool,
         );
         if is_alpha_premultiplied {
-            let mut premultiplied_store = ImageStore::<u8, 4>::alloc(new_image_horizontal.width, new_image_horizontal.height);
+            let mut premultiplied_store =
+                ImageStore::<u8, 4>::alloc(new_image_horizontal.width, new_image_horizontal.height);
             new_image_horizontal.premultiply_alpha(&mut premultiplied_store);
             return premultiplied_store;
         }
