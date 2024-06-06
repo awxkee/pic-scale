@@ -114,6 +114,102 @@ fn convolve_horizontal_rgba_f32_neon(
     }
 }
 
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[inline(always)]
+fn convolve_horizontal_rgba_f32_sse(
+    image_store: &ImageStore<f32, 4>,
+    filter_weights: FilterWeights<f32>,
+    destination: &mut ImageStore<f32, 4>,
+    pool: &Option<ThreadPool>,
+) {
+    let mut unsafe_source_ptr_0 = image_store.buffer.borrow().as_ptr();
+    let mut unsafe_destination_ptr_0 = destination.buffer.borrow_mut().as_mut_ptr();
+
+    let src_stride = image_store.width * image_store.channels;
+    let dst_stride = destination.width * image_store.channels;
+    let dst_width = destination.width;
+
+    if let Some(pool) = pool {
+        let arc_weights = Arc::new(filter_weights);
+        let borrowed = destination.buffer.borrow_mut();
+        let unsafe_slice = UnsafeSlice::new(borrowed);
+        pool.scope(|scope| {
+            let mut yy = 0usize;
+            for y in (0..destination.height.saturating_sub(4)).step_by(4) {
+                let weights = arc_weights.clone();
+                scope.spawn(move |_| {
+                    let unsafe_source_ptr_0 =
+                        unsafe { image_store.buffer.borrow().as_ptr().add(src_stride * y) };
+                    let dst_ptr = unsafe_slice.mut_ptr();
+                    let unsafe_destination_ptr_0 = unsafe { dst_ptr.add(dst_stride * y) };
+                    unsafe {
+                        crate::sse_rgb_f32::sse_convolve_f32::convolve_horizontal_rgba_sse_rows_4(
+                            dst_width,
+                            &weights,
+                            unsafe_source_ptr_0,
+                            src_stride,
+                            unsafe_destination_ptr_0,
+                            dst_stride,
+                        );
+                    }
+                });
+                yy = y;
+            }
+            for y in (yy..destination.height).step_by(4) {
+                let weights = arc_weights.clone();
+                scope.spawn(move |_| {
+                    let unsafe_source_ptr_0 =
+                        unsafe { image_store.buffer.borrow().as_ptr().add(src_stride * y) };
+                    let dst_ptr = unsafe_slice.mut_ptr();
+                    let unsafe_destination_ptr_0 = unsafe { dst_ptr.add(dst_stride * y) };
+                    unsafe {
+                        crate::sse_rgb_f32::sse_convolve_f32::convolve_horizontal_rgba_sse_row_one(
+                            dst_width,
+                            &weights,
+                            unsafe_source_ptr_0,
+                            unsafe_destination_ptr_0,
+                        );
+                    }
+                });
+            }
+        });
+    } else {
+        let mut yy = 0usize;
+
+        while yy + 4 < destination.height {
+            unsafe {
+                crate::sse_rgb_f32::sse_convolve_f32::convolve_horizontal_rgba_sse_rows_4(
+                    dst_width,
+                    &filter_weights,
+                    unsafe_source_ptr_0,
+                    src_stride,
+                    unsafe_destination_ptr_0,
+                    dst_stride,
+                );
+            }
+
+            unsafe_source_ptr_0 = unsafe { unsafe_source_ptr_0.add(src_stride * 4) };
+            unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride * 4) };
+
+            yy += 4;
+        }
+
+        for _ in yy..destination.height {
+            unsafe {
+                crate::sse_rgb_f32::sse_convolve_f32::convolve_horizontal_rgba_sse_row_one(
+                    dst_width,
+                    &filter_weights,
+                    unsafe_source_ptr_0,
+                    unsafe_destination_ptr_0,
+                );
+            }
+
+            unsafe_source_ptr_0 = unsafe { unsafe_source_ptr_0.add(src_stride) };
+            unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
+        }
+    }
+}
+
 #[inline(always)]
 fn convolve_horizontal_rgb_native_row(
     dst_width: usize,
@@ -345,6 +441,15 @@ impl<'a> HorizontalConvolutionPass<f32, 4> for ImageStore<'a, f32, 4> {
         {
             using_feature = AccelerationFeature::Neon;
         }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
+        {
+            if is_x86_feature_detected!("sse4.1") {
+                using_feature = AccelerationFeature::Sse;
+            }
+        }
         match using_feature {
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             AccelerationFeature::Neon => {
@@ -354,7 +459,9 @@ impl<'a> HorizontalConvolutionPass<f32, 4> for ImageStore<'a, f32, 4> {
                 convolve_horizontal_rgba_f32_native(self, filter_weights, destination, pool);
             }
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            AccelerationFeature::Sse => {}
+            AccelerationFeature::Sse => {
+                convolve_horizontal_rgba_f32_sse(self, filter_weights, destination, pool);
+            }
         }
     }
 }

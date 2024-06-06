@@ -22,12 +22,12 @@ fn main() {
 
     let start_time = Instant::now();
 
-    let mut scaler = LuvScaler::new(ResamplingFunction::Bilinear);
+    let mut scaler = LuvScaler::new(ResamplingFunction::HaasnSoft);
     scaler.set_threading_policy(ThreadingPolicy::Single);
     let store =
         ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
     let resized = scaler.resize_rgba(
-        ImageSize::new(400, 600),
+        ImageSize::new(700, 500),
         store, true,
     );
 
