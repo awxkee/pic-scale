@@ -51,7 +51,8 @@ impl Scaler {
     pub(crate) fn generate_weights(&self, in_size: usize, out_size: usize) -> FilterWeights<f32> {
         let scale = (in_size as f32 / out_size as f32).max(1f32);
         let filter_base_size = self.resampling_filter.min_kernel_size as f32;
-        let resampling_function = self.resampling_filter.function;
+        let resampling_function = self.resampling_filter.kernel;
+        let window_func = self.resampling_filter.window;
         let base_size = (filter_base_size * scale).round() as usize;
         // Kernel size must be always odd
         let kernel_size = base_size * 2 + 1usize;
@@ -60,6 +61,16 @@ impl Scaler {
         let mut weights: Vec<f32> = vec![0f32; kernel_size * out_size];
         let mut local_filters = vec![0f32; kernel_size];
         let mut filter_position = 0usize;
+        let blur_scale = match window_func {
+            None => 1f32,
+            Some(window) => {
+                if window.blur > 0f32 {
+                    1f32 / window.blur
+                } else {
+                    0f32
+                }
+            }
+        };
 
         let mut bounds: Vec<FilterBounds> = vec![FilterBounds::new(0, 0); out_size];
         for i in 0..out_size {
@@ -75,7 +86,30 @@ impl Scaler {
 
             for k in start..end {
                 let dx = k as f32 - center;
-                let weight = resampling_function(dx * filter_scale);
+                let weight;
+                if let Some(resampling_window) = window_func {
+                    let mut x = dx.abs();
+                    x = if resampling_window.blur > 0f32 {
+                        x * blur_scale
+                    } else {
+                        x
+                    };
+                    x = if x <= resampling_window.taper {
+                        0f32
+                    } else {
+                        (x - resampling_window.taper) / (1f32 - resampling_window.taper)
+                    };
+                    let window_producer = resampling_window.window;
+                    let x_kernel_scaled = x * filter_scale;
+                    let window = if x < resampling_window.window_size {
+                        window_producer(x_kernel_scaled * resampling_window.window_size)
+                    } else {
+                        0f32
+                    };
+                    weight = window * resampling_function(x_kernel_scaled);
+                } else {
+                    weight = resampling_function(dx * filter_scale);
+                }
                 weights_sum += weight;
                 unsafe {
                     *local_filters.get_unchecked_mut(local_filter_iteration) = weight;

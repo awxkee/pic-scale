@@ -315,6 +315,18 @@ fn qone(x: f64) -> f64 {
     return (0.375 + r / s) / x;
 }
 
+#[inline]
 pub fn jinc(x: f64) -> f64 {
+    if x == 0f64 {
+        return 0f64;
+    }
     j1(x) / x
+}
+
+#[inline]
+pub fn jinc_f32(x: f32) -> f32 {
+    if x == 0f32 {
+        return 0f32;
+    }
+    (j1(x as f64) / x as f64) as f32
 }

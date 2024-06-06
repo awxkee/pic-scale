@@ -5,7 +5,7 @@
  * // license that can be found in the LICENSE file.
  */
 
-use crate::jinc;
+use crate::{jinc, jinc_f32};
 
 #[inline(always)]
 pub fn bc_spline(d: f32, b: f32, c: f32) -> f32 {
@@ -396,6 +396,12 @@ pub enum ResamplingFunction {
     Lanczos3Jinc,
     Lanczos4Jinc,
     EwaLanczos3Jinc,
+    Ginseng,
+    EwaGinseng,
+    EwaLanczosSharp,
+    EwaLanczos4Sharpest,
+    EwaLanczosSoft,
+    HaasnSoft,
 }
 
 impl From<u32> for ResamplingFunction {
@@ -439,27 +445,71 @@ impl From<u32> for ResamplingFunction {
             35 => ResamplingFunction::EwaQuadric,
             36 => ResamplingFunction::EwaRobidouxSharp,
             37 => ResamplingFunction::EwaLanczos3Jinc,
+            38 => ResamplingFunction::Ginseng,
+            39 => ResamplingFunction::EwaGinseng,
+            40 => ResamplingFunction::EwaLanczosSharp,
+            41 => ResamplingFunction::EwaLanczos4Sharpest,
+            42 => ResamplingFunction::EwaLanczosSoft,
+            43 => ResamplingFunction::HaasnSoft,
             _ => ResamplingFunction::Bilinear,
         }
     }
 }
 
 #[derive(Debug, Copy, Clone)]
+pub struct ResamplingWindow {
+    pub(crate) window: fn(f32) -> f32,
+    pub(crate) window_size: f32,
+    pub(crate) blur: f32,
+    pub(crate) taper: f32,
+}
+
+impl ResamplingWindow {
+    fn new(window: fn(f32) -> f32, window_size: f32, blur: f32, taper: f32) -> ResamplingWindow {
+        ResamplingWindow {
+            window,
+            window_size,
+            blur,
+            taper,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
 pub struct ResamplingFilter {
-    pub function: fn(f32) -> f32,
+    pub kernel: fn(f32) -> f32,
+    pub window: Option<ResamplingWindow>,
     pub min_kernel_size: f32,
     pub is_ewa: bool,
 }
 
 impl ResamplingFilter {
-    fn new(func: fn(f32) -> f32, min_kernel_size: f32, is_ewa: bool) -> ResamplingFilter {
+    fn new(kernel: fn(f32) -> f32, min_kernel_size: f32, is_ewa: bool) -> ResamplingFilter {
         ResamplingFilter {
-            function: func,
+            kernel,
+            window: None,
+            min_kernel_size,
+            is_ewa,
+        }
+    }
+
+    fn new_with_window(
+        kernel: fn(f32) -> f32,
+        window: ResamplingWindow,
+        min_kernel_size: f32,
+        is_ewa: bool,
+    ) -> ResamplingFilter {
+        ResamplingFilter {
+            kernel,
+            window: Some(window),
             min_kernel_size,
             is_ewa,
         }
     }
 }
+
+const JINC_R3: f32 = 3.2383154841662362f32;
+const JINC_R4: f32 = 4.2410628637960699f32;
 
 impl ResamplingFunction {
     pub fn get_resampling_filter(&self) -> ResamplingFilter {
@@ -483,7 +533,12 @@ impl ResamplingFunction {
             ResamplingFunction::Lanczos2 => ResamplingFilter::new(lanczos2, 2f32, false),
             ResamplingFunction::Hamming => ResamplingFilter::new(hamming, 1f32, false),
             ResamplingFunction::Hanning => ResamplingFilter::new(hanning, 1f32, false),
-            ResamplingFunction::EwaHanning => ResamplingFilter::new(hanning, 1f32, true),
+            ResamplingFunction::EwaHanning => ResamplingFilter::new_with_window(
+                jinc_f32,
+                ResamplingWindow::new(hanning, 1f32, 0f32, 0f32),
+                1f32,
+                true,
+            ),
             ResamplingFunction::Welch => ResamplingFilter::new(welch, 1f32, false),
             ResamplingFunction::Quadric => ResamplingFilter::new(quadric, 1.5f32, false),
             ResamplingFunction::EwaQuadric => ResamplingFilter::new(quadric, 1.5f32, true),
@@ -493,7 +548,9 @@ impl ResamplingFunction {
             ResamplingFunction::Robidoux => ResamplingFilter::new(robidoux, 2f32, false),
             ResamplingFunction::EwaRobidoux => ResamplingFilter::new(robidoux, 2f32, true),
             ResamplingFunction::RobidouxSharp => ResamplingFilter::new(robidoux_sharp, 2f32, false),
-            ResamplingFunction::EwaRobidouxSharp => ResamplingFilter::new(robidoux_sharp, 2f32, true),
+            ResamplingFunction::EwaRobidouxSharp => {
+                ResamplingFilter::new(robidoux_sharp, 2f32, true)
+            }
             ResamplingFunction::Spline16 => ResamplingFilter::new(spline16, 2f32, false),
             ResamplingFunction::Spline36 => ResamplingFilter::new(spline36, 2f32, false),
             ResamplingFunction::Spline64 => ResamplingFilter::new(spline64, 2f32, false),
@@ -507,6 +564,42 @@ impl ResamplingFunction {
             ResamplingFunction::Lanczos4Jinc => ResamplingFilter::new(lanczos4_jinc, 4f32, false),
             ResamplingFunction::Blackman => ResamplingFilter::new(blackman, 2f32, false),
             ResamplingFunction::EwaBlackman => ResamplingFilter::new(blackman, 2f32, true),
+            ResamplingFunction::Ginseng => ResamplingFilter::new_with_window(
+                sinc,
+                ResamplingWindow::new(jinc_f32, 3f32, 1f32, 0f32),
+                3f32,
+                false,
+            ),
+            ResamplingFunction::EwaGinseng => ResamplingFilter::new_with_window(
+                sinc,
+                ResamplingWindow::new(jinc_f32, JINC_R3, 1f32, 0f32),
+                3f32,
+                true,
+            ),
+            ResamplingFunction::EwaLanczosSharp => ResamplingFilter::new_with_window(
+                jinc_f32,
+                ResamplingWindow::new(jinc_f32, JINC_R3, 0.9812505837223707f32, 0f32),
+                3f32,
+                true,
+            ),
+            ResamplingFunction::EwaLanczos4Sharpest => ResamplingFilter::new_with_window(
+                jinc_f32,
+                ResamplingWindow::new(jinc_f32, JINC_R4, 0.8845120932605005f32, 0f32),
+                4f32,
+                true,
+            ),
+            ResamplingFunction::EwaLanczosSoft => ResamplingFilter::new_with_window(
+                jinc_f32,
+                ResamplingWindow::new(jinc_f32, JINC_R3, 1.0164667662867047f32, 0f32),
+                3f32,
+                true,
+            ),
+            ResamplingFunction::HaasnSoft => ResamplingFilter::new_with_window(
+                jinc_f32,
+                ResamplingWindow::new(hanning, 3f32, 1.11f32, 0f32),
+                3f32,
+                false,
+            ),
         };
     }
 }
