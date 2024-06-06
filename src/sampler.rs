@@ -552,8 +552,8 @@ impl ResamplingFunction {
                 ResamplingFilter::new(robidoux_sharp, 2f32, true)
             }
             ResamplingFunction::Spline16 => ResamplingFilter::new(spline16, 2f32, false),
-            ResamplingFunction::Spline36 => ResamplingFilter::new(spline36, 2f32, false),
-            ResamplingFunction::Spline64 => ResamplingFilter::new(spline64, 2f32, false),
+            ResamplingFunction::Spline36 => ResamplingFilter::new(spline36, 4f32, false),
+            ResamplingFunction::Spline64 => ResamplingFilter::new(spline64, 6f32, false),
             ResamplingFunction::Kaiser => ResamplingFilter::new(kaiser, 2f32, false),
             ResamplingFunction::BartlettHann => ResamplingFilter::new(bartlett_hann, 2f32, false),
             ResamplingFunction::Box => ResamplingFilter::new(box_weight, 0.5f32, false),
