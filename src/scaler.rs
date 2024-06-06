@@ -49,15 +49,16 @@ impl Scaler {
     }
 
     pub(crate) fn generate_weights(&self, in_size: usize, out_size: usize) -> FilterWeights<f32> {
-        let scale = (in_size as f32 / out_size as f32).max(1f32);
-        let filter_base_size = self.resampling_filter.min_kernel_size as f32;
+        let scale = in_size as f32 / out_size as f32;
+        let filter_scale_cutoff = scale.max(1f32);
+        let filter_base_size = self.resampling_filter.min_kernel_size;
         let resampling_function = self.resampling_filter.kernel;
         let window_func = self.resampling_filter.window;
-        let base_size = (filter_base_size * scale).round() as usize;
+        let base_size = (filter_base_size * filter_scale_cutoff).round() as usize;
         // Kernel size must be always odd
         let kernel_size = base_size * 2 + 1usize;
         let filter_radius = base_size as i32;
-        let filter_scale = 1f32 / scale;
+        let filter_scale = 1f32 / filter_scale_cutoff;
         let mut weights: Vec<f32> = vec![0f32; kernel_size * out_size];
         let mut local_filters = vec![0f32; kernel_size];
         let mut filter_position = 0usize;

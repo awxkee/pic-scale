@@ -8,12 +8,12 @@ use fast_image_resize::images::Image;
 use image::{EncodableLayout, GenericImageView};
 use image::io::Reader as ImageReader;
 
-use pic_scale::{ImageSize, ImageStore, LuvScaler, ResamplingFunction, Scaling, ThreadingPolicy};
+use pic_scale::{ImageSize, ImageStore, LuvScaler, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
 
 fn main() {
     // test_fast_image();
 
-    let img = ImageReader::open("./assets/asset_5.png")
+    let img = ImageReader::open("./assets/beach_horizon.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -22,13 +22,13 @@ fn main() {
 
     let start_time = Instant::now();
 
-    let mut scaler = LuvScaler::new(ResamplingFunction::EwaLanczos4Sharpest);
+    let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
     scaler.set_threading_policy(ThreadingPolicy::Single);
     let store =
-        ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
-    let resized = scaler.resize_rgba(
-        ImageSize::new(dimensions.0 as usize / 2usize, dimensions.1 as usize / 2usize),
-        store, true,
+        ImageStore::<u8, 3>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
+    let resized = scaler.resize_rgb(
+        ImageSize::new(400, 600),
+        store,
     );
 
     let elapsed_time = start_time.elapsed();
