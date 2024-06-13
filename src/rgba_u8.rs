@@ -180,7 +180,7 @@ pub unsafe fn convolve_horizontal_rgba_neon_row(
         let value = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8)) };
         let dest_ptr_32 = dest_ptr as *mut u32;
         unsafe {
-            *dest_ptr_32 = value;
+            dest_ptr_32.write_unaligned(value);
         }
 
         filter_offset += approx_weights.aligned_size;
@@ -277,10 +277,10 @@ fn convolve_horizontal_rgba_native_row(
         let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px) };
 
         unsafe {
-            *dest_ptr = (sum_r >> PRECISION).min(255).max(0) as u8;
-            *dest_ptr.add(1) = (sum_g >> PRECISION).min(255).max(0) as u8;
-            *dest_ptr.add(2) = (sum_b >> PRECISION).min(255).max(0) as u8;
-            *dest_ptr.add(3) = (sum_a >> PRECISION).min(255).max(0) as u8;
+            dest_ptr.write_unaligned((sum_r >> PRECISION).min(255).max(0) as u8);
+            dest_ptr.add(1).write_unaligned((sum_g >> PRECISION).min(255).max(0) as u8);
+            dest_ptr.add(2).write_unaligned((sum_b >> PRECISION).min(255).max(0) as u8);
+            dest_ptr.add(3).write_unaligned((sum_a >> PRECISION).min(255).max(0) as u8);
         }
 
         filter_offset += filter_weights.aligned_size;

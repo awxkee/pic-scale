@@ -9,11 +9,11 @@
 pub mod sse_rgb {
     use crate::filter_weights::{FilterBounds, FilterWeights};
     use crate::sse_simd_u8::sse_convolve_u8;
+    use crate::support::ROUNDING_APPROX;
     #[cfg(target_arch = "x86")]
     use std::arch::x86::*;
     #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::*;
-    use crate::support::ROUNDING_APPROX;
 
     pub(crate) unsafe fn convolve_horizontal_rgba_sse_rows_4(
         dst_width: usize,
@@ -102,7 +102,7 @@ pub mod sse_rgb {
 
             while jx + 2 < bounds.size {
                 unsafe {
-                    let ptr =  weights_ptr.add(jx + filter_offset);
+                    let ptr = weights_ptr.add(jx + filter_offset);
                     let bounds_start = bounds.start + jx;
 
                     let weight01 = _mm_set1_epi32((ptr as *const i32).read_unaligned());
@@ -165,7 +165,7 @@ pub mod sse_rgb {
             let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px) };
             let dest_ptr_32 = dest_ptr as *mut i32;
             unsafe {
-                *dest_ptr_32 = pixel;
+                dest_ptr_32.write_unaligned(pixel);
             }
 
             let store_16_8 = sse_convolve_u8::compress_i32(store_1);
@@ -175,7 +175,7 @@ pub mod sse_rgb {
             let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px + dst_stride) };
             let dest_ptr_32 = dest_ptr as *mut i32;
             unsafe {
-                *dest_ptr_32 = pixel;
+                dest_ptr_32.write_unaligned(pixel);
             }
 
             let store_16_8 = sse_convolve_u8::compress_i32(store_2);
@@ -185,7 +185,7 @@ pub mod sse_rgb {
             let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px + dst_stride * 2) };
             let dest_ptr_32 = dest_ptr as *mut i32;
             unsafe {
-                *dest_ptr_32 = pixel;
+                dest_ptr_32.write_unaligned(pixel);
             }
 
             let store_16_8 = sse_convolve_u8::compress_i32(store_3);
@@ -195,7 +195,7 @@ pub mod sse_rgb {
             let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px + dst_stride * 3) };
             let dest_ptr_32 = dest_ptr as *mut i32;
             unsafe {
-                *dest_ptr_32 = pixel;
+                dest_ptr_32.write_unaligned(pixel);
             }
 
             filter_offset += approx_weights.aligned_size;
@@ -292,7 +292,7 @@ pub mod sse_rgb {
             let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px) };
             let dest_ptr_32 = dest_ptr as *mut i32;
             unsafe {
-                *dest_ptr_32 = pixel;
+                dest_ptr_32.write_unaligned(pixel);
             }
 
             filter_offset += approx_weights.aligned_size;
@@ -347,7 +347,7 @@ pub mod sse_rgb {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 unsafe {
                     let weight01 = _mm_set1_epi32((ptr as *const i32).read_unaligned());
-                    let weight23 = _mm_set1_epi32((ptr.add(2) as* const i32).read_unaligned());
+                    let weight23 = _mm_set1_epi32((ptr.add(2) as *const i32).read_unaligned());
                     let bounds_start = bounds.start + jx;
 
                     let src_ptr_0 = unsafe_source_ptr_0.add(bounds_start * CHANNES);
@@ -463,9 +463,9 @@ pub mod sse_rgb {
             let element = unsafe { _mm_extract_epi32::<0>(store_0_8) };
             let bytes = element.to_le_bytes();
             unsafe {
-                *dest_ptr = bytes[0];
-                *dest_ptr.add(1) = bytes[1];
-                *dest_ptr.add(2) = bytes[2];
+                dest_ptr.write_unaligned(bytes[0]);
+                dest_ptr.add(1).write_unaligned(bytes[1]);
+                dest_ptr.add(2).write_unaligned(bytes[2]);
             }
 
             let store_1_8 = sse_convolve_u8::compress_i32(store_1);
@@ -476,9 +476,9 @@ pub mod sse_rgb {
             let element = unsafe { _mm_extract_epi32::<0>(store_1_8) };
             let bytes = element.to_le_bytes();
             unsafe {
-                *dest_ptr = bytes[0];
-                *dest_ptr.add(1) = bytes[1];
-                *dest_ptr.add(2) = bytes[2];
+                dest_ptr.write_unaligned(bytes[0]);
+                dest_ptr.add(1).write_unaligned(bytes[1]);
+                dest_ptr.add(2).write_unaligned(bytes[2]);
             }
 
             let store_2_8 = sse_convolve_u8::compress_i32(store_2);
@@ -489,9 +489,9 @@ pub mod sse_rgb {
             let element = unsafe { _mm_extract_epi32::<0>(store_2_8) };
             let bytes = element.to_le_bytes();
             unsafe {
-                *dest_ptr = bytes[0];
-                *dest_ptr.add(1) = bytes[1];
-                *dest_ptr.add(2) = bytes[2];
+                dest_ptr.write_unaligned(bytes[0]);
+                dest_ptr.add(1).write_unaligned(bytes[1]);
+                dest_ptr.add(2).write_unaligned(bytes[2]);
             }
 
             let store_3_8 = sse_convolve_u8::compress_i32(store_3);
@@ -502,9 +502,9 @@ pub mod sse_rgb {
             let element = unsafe { _mm_extract_epi32::<0>(store_3_8) };
             let bytes = element.to_le_bytes();
             unsafe {
-                *dest_ptr = bytes[0];
-                *dest_ptr.add(1) = bytes[1];
-                *dest_ptr.add(2) = bytes[2];
+                dest_ptr.write_unaligned(bytes[0]);
+                dest_ptr.add(1).write_unaligned(bytes[1]);
+                dest_ptr.add(2).write_unaligned(bytes[2]);
             }
 
             filter_offset += approx_weights.aligned_size;
@@ -551,7 +551,7 @@ pub mod sse_rgb {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 unsafe {
                     let weight01 = _mm_set1_epi32((ptr as *const i32).read_unaligned());
-                    let weight23 = _mm_set1_epi32((ptr.add(2) as* const i32).read_unaligned());
+                    let weight23 = _mm_set1_epi32((ptr.add(2) as *const i32).read_unaligned());
                     let bounds_start = bounds.start + jx;
                     let src_ptr_0 = unsafe_source_ptr_0.add(bounds_start * CHANNELS);
 
@@ -599,14 +599,14 @@ pub mod sse_rgb {
             let element = unsafe { _mm_extract_epi32::<0>(store_16_8) };
             let bytes = element.to_le_bytes();
             unsafe {
-                *dest_ptr = bytes[0];
-                *dest_ptr.add(1) = bytes[1];
-                *dest_ptr.add(2) = bytes[2];
+                dest_ptr.write_unaligned(bytes[0]);
+                dest_ptr.add(1).write_unaligned(bytes[1]);
+                dest_ptr.add(2).write_unaligned(bytes[2]);
             }
             unsafe {
-                *dest_ptr = bytes[0];
-                *dest_ptr.add(1) = bytes[1];
-                *dest_ptr.add(2) = bytes[2];
+                dest_ptr.write_unaligned(bytes[0]);
+                dest_ptr.add(1).write_unaligned(bytes[1]);
+                dest_ptr.add(2).write_unaligned(bytes[2]);
             }
 
             filter_offset += approx_weights.aligned_size;

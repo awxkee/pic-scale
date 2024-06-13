@@ -8,7 +8,7 @@ use fast_image_resize::images::Image;
 use image::{EncodableLayout, GenericImageView};
 use image::io::Reader as ImageReader;
 
-use pic_scale::{ImageSize, ImageStore, LuvScaler, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
+use pic_scale::{ImageSize, ImageStore, LinearScaler, LuvScaler, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
 
 fn main() {
     // test_fast_image();
@@ -22,13 +22,13 @@ fn main() {
 
     let start_time = Instant::now();
 
-    let mut scaler = LuvScaler::new(ResamplingFunction::HaasnSoft);
+    let mut scaler = LinearScaler::new(ResamplingFunction::Spline64);
     scaler.set_threading_policy(ThreadingPolicy::Single);
     let store =
         ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
     let resized = scaler.resize_rgba(
-        ImageSize::new(700, 500),
-        store, true,
+        ImageSize::new(dimensions.0 as usize / 4 , dimensions.1 as usize / 4),
+        store,true,
     );
 
     let elapsed_time = start_time.elapsed();

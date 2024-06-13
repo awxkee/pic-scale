@@ -23,7 +23,7 @@ pub(crate) unsafe fn convolve_vertical_part<const PART: usize, const CHANNELS: u
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = *unsafe { filter.add(j) } as i32;
+        let weight = unsafe { filter.add(j).read_unaligned() } as i32;
         let src_ptr = src.add(src_stride * py);
         for x in 0..PART {
             let px = (start_x + x) * CHANNELS;
@@ -31,7 +31,7 @@ pub(crate) unsafe fn convolve_vertical_part<const PART: usize, const CHANNELS: u
             for c in 0..CHANNELS {
                 let store_p = store.get_unchecked_mut(x);
                 let store_v = store_p.get_unchecked_mut(c);
-                *store_v += unsafe { *s_ptr.add(c) } as i32 * weight;
+                *store_v += unsafe { s_ptr.add(c).read_unaligned() } as i32 * weight;
             }
         }
     }
@@ -42,7 +42,7 @@ pub(crate) unsafe fn convolve_vertical_part<const PART: usize, const CHANNELS: u
         for c in 0..CHANNELS {
             let vl = *(*store.get_unchecked_mut(x)).get_unchecked_mut(c);
             let ck = vl >> PRECISION;
-            *dst_ptr.add(c) = ck.max(0).min(255) as u8;
+            dst_ptr.add(c).write_unaligned(ck.max(0).min(255) as u8);
         }
     }
 }

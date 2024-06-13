@@ -307,9 +307,9 @@ pub mod neon_convolve_floats {
                 let l1 = vgetq_lane_f32::<0>(store_0);
                 let l2 = vgetq_lane_f32::<1>(store_0);
                 let l3 = vgetq_lane_f32::<2>(store_0);
-                *dest_ptr = l1;
-                *dest_ptr.add(1) = l2;
-                *dest_ptr.add(2) = l3;
+                dest_ptr.write_unaligned(l1);
+                dest_ptr.add(1).write_unaligned(l2);
+                dest_ptr.add(2).write_unaligned(l3);
             }
 
             let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px + dst_stride) };
@@ -317,9 +317,9 @@ pub mod neon_convolve_floats {
                 let l1 = vgetq_lane_f32::<0>(store_1);
                 let l2 = vgetq_lane_f32::<1>(store_1);
                 let l3 = vgetq_lane_f32::<2>(store_1);
-                *dest_ptr = l1;
-                *dest_ptr.add(1) = l2;
-                *dest_ptr.add(2) = l3;
+                dest_ptr.write_unaligned(l1);
+                dest_ptr.add(1).write_unaligned(l2);
+                dest_ptr.add(2).write_unaligned(l3);
             }
 
             let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px + dst_stride * 2) };
@@ -327,9 +327,9 @@ pub mod neon_convolve_floats {
                 let l1 = vgetq_lane_f32::<0>(store_2);
                 let l2 = vgetq_lane_f32::<1>(store_2);
                 let l3 = vgetq_lane_f32::<2>(store_2);
-                *dest_ptr = l1;
-                *dest_ptr.add(1) = l2;
-                *dest_ptr.add(2) = l3;
+                dest_ptr.write_unaligned(l1);
+                dest_ptr.add(1).write_unaligned(l2);
+                dest_ptr.add(2).write_unaligned(l3);
             }
 
             let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px + dst_stride * 3) };
@@ -337,9 +337,9 @@ pub mod neon_convolve_floats {
                 let l1 = vgetq_lane_f32::<0>(store_3);
                 let l2 = vgetq_lane_f32::<1>(store_3);
                 let l3 = vgetq_lane_f32::<2>(store_3);
-                *dest_ptr = l1;
-                *dest_ptr.add(1) = l2;
-                *dest_ptr.add(2) = l3;
+                dest_ptr.write_unaligned(l1);
+                dest_ptr.add(1).write_unaligned(l2);
+                dest_ptr.add(2).write_unaligned(l3);
             }
 
             filter_offset += filter_weights.aligned_size;
@@ -402,9 +402,9 @@ pub mod neon_convolve_floats {
                 let l1 = vgetq_lane_f32::<0>(store);
                 let l2 = vgetq_lane_f32::<1>(store);
                 let l3 = vgetq_lane_f32::<2>(store);
-                *dest_ptr = l1;
-                *dest_ptr.add(1) = l2;
-                *dest_ptr.add(2) = l3;
+                dest_ptr.write_unaligned(l1);
+                dest_ptr.add(1).write_unaligned(l2);
+                dest_ptr.add(2).write_unaligned(l3);
             }
 
             filter_offset += filter_weights.aligned_size;

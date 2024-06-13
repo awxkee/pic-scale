@@ -244,10 +244,10 @@ fn convolve_horizontal_rgb_native_row(
         let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px) };
 
         unsafe {
-            *dest_ptr = sum_r;
-            *dest_ptr.add(1) = sum_g;
-            *dest_ptr.add(2) = sum_b;
-            *dest_ptr.add(3) = sum_a;
+            dest_ptr.write_unaligned(sum_r);
+            dest_ptr.add(1).write_unaligned(sum_g);
+            dest_ptr.add(2).write_unaligned(sum_b);
+            dest_ptr.add(3).write_unaligned(sum_a);
         }
 
         filter_offset += filter_weights.aligned_size;

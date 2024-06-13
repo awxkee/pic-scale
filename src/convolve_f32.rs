@@ -50,7 +50,7 @@ pub(crate) unsafe fn convolve_vertical_part_f32<const PART: usize, const CHANNEL
             for c in 0..CHANNELS {
                 let store_p = store.get_unchecked_mut(x);
                 let store_v = store_p.get_unchecked_mut(c);
-                *store_v += unsafe { *s_ptr.add(c) } * weight;
+                *store_v += unsafe { s_ptr.add(c).read_unaligned() } * weight;
             }
         }
     }
@@ -60,7 +60,7 @@ pub(crate) unsafe fn convolve_vertical_part_f32<const PART: usize, const CHANNEL
         let dst_ptr = dst.add(px);
         for c in 0..CHANNELS {
             let vl = *(*store.get_unchecked_mut(x)).get_unchecked_mut(c);
-            *dst_ptr.add(c) = vl;
+            dst_ptr.add(c).write_unaligned(vl);
         }
     }
 }
@@ -123,7 +123,7 @@ pub(crate) unsafe fn convolve_vertical_part_neon_8_f32<const USE_BLENDING: bool>
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = *unsafe { filter.add(j) };
+        let weight = unsafe { filter.add(j).read_unaligned() };
         let v_weight = vdupq_n_f32(weight);
         let src_ptr = src.add(src_stride * py);
 
@@ -214,7 +214,12 @@ pub(crate) unsafe fn convolve_horizontal_parts_one_rgb_f32(
     const COMPONENTS: usize = 3;
     let src_ptr = src.add(start_x * COMPONENTS);
 
-    let transient: [f32; 4] = [*src_ptr, *src_ptr.add(1), *src_ptr.add(2), 0f32];
+    let transient: [f32; 4] = [
+        src_ptr.read_unaligned(),
+        src_ptr.add(1).read_unaligned(),
+        src_ptr.add(2).read_unaligned(),
+        0f32,
+    ];
     let rgb_pixel = vld1q_f32(transient.as_ptr());
 
     let acc = prefer_vfmaq_f32(store_0, rgb_pixel, weight0);

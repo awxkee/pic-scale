@@ -175,9 +175,9 @@ pub mod neon_rgb {
             unsafe {
                 let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
                 let bytes = pixel.to_le_bytes();
-                *dest_ptr = bytes[0];
-                *dest_ptr.add(1) = bytes[1];
-                *dest_ptr.add(2) = bytes[2];
+                dest_ptr.write_unaligned(bytes[0]);
+                dest_ptr.add(1).write_unaligned(bytes[1]);
+                dest_ptr.add(2).write_unaligned(bytes[2]);
             }
 
             let store_16 = unsafe { vqshrun_n_s32::<12>(vmaxq_s32(store_1, zeros)) };
@@ -188,9 +188,9 @@ pub mod neon_rgb {
             unsafe {
                 let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
                 let bytes = pixel.to_le_bytes();
-                *dest_ptr = bytes[0];
-                *dest_ptr.add(1) = bytes[1];
-                *dest_ptr.add(2) = bytes[2];
+                dest_ptr.write_unaligned(bytes[0]);
+                dest_ptr.add(1).write_unaligned(bytes[1]);
+                dest_ptr.add(2).write_unaligned(bytes[2]);
             }
 
             let store_16 = unsafe { vqshrun_n_s32::<12>(vmaxq_s32(store_2, zeros)) };
@@ -201,9 +201,9 @@ pub mod neon_rgb {
             unsafe {
                 let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
                 let bytes = pixel.to_le_bytes();
-                *dest_ptr = bytes[0];
-                *dest_ptr.add(1) = bytes[1];
-                *dest_ptr.add(2) = bytes[2];
+                dest_ptr.write_unaligned(bytes[0]);
+                dest_ptr.add(1).write_unaligned(bytes[1]);
+                dest_ptr.add(2).write_unaligned(bytes[2]);
             }
 
             let store_16 = unsafe { vqshrun_n_s32::<12>(vmaxq_s32(store_3, zeros)) };
@@ -214,9 +214,9 @@ pub mod neon_rgb {
             unsafe {
                 let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
                 let bytes = pixel.to_le_bytes();
-                *dest_ptr = bytes[0];
-                *dest_ptr.add(1) = bytes[1];
-                *dest_ptr.add(2) = bytes[2];
+                dest_ptr.write_unaligned(bytes[0]);
+                dest_ptr.add(1).write_unaligned(bytes[1]);
+                dest_ptr.add(2).write_unaligned(bytes[2]);
             }
 
             filter_offset += approx_weights.aligned_size;
@@ -308,9 +308,9 @@ pub mod neon_rgb {
             unsafe {
                 let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
                 let bytes = pixel.to_le_bytes();
-                *dest_ptr = bytes[0];
-                *dest_ptr.add(1) = bytes[1];
-                *dest_ptr.add(2) = bytes[2];
+                dest_ptr.write_unaligned(bytes[0]);
+                dest_ptr.add(1).write_unaligned(bytes[1]);
+                dest_ptr.add(2).write_unaligned(bytes[2]);
             }
 
             filter_offset += approx_weights.aligned_size;

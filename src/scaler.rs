@@ -50,7 +50,11 @@ impl Scaler {
 
     pub(crate) fn generate_weights(&self, in_size: usize, out_size: usize) -> FilterWeights<f32> {
         let scale = in_size as f32 / out_size as f32;
-        let filter_scale_cutoff = scale.max(1f32);
+        let is_resizable_kernel = self.resampling_filter.is_resizable_kernel;
+        let filter_scale_cutoff = match is_resizable_kernel {
+            true => scale.max(1f32),
+            false => 1f32,
+        };
         let filter_base_size = self.resampling_filter.min_kernel_size;
         let resampling_function = self.resampling_filter.kernel;
         let window_func = self.resampling_filter.window;

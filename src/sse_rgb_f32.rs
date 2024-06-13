@@ -254,7 +254,7 @@ pub mod sse_convolve_f32 {
 
         for j in 0..bounds.size {
             let py = start_y + j;
-            let weight = *unsafe { filter.add(j) };
+            let weight = unsafe { filter.add(j).read_unaligned() };
             let v_weight = _mm_set1_ps(weight);
             let src_ptr = src.add(src_stride * py);
 
@@ -295,7 +295,7 @@ pub mod sse_convolve_f32 {
 
         for j in 0..bounds.size {
             let py = start_y + j;
-            let weight = *unsafe { filter.add(j) };
+            let weight = unsafe { filter.add(j).read_unaligned() };
             let v_weight = _mm_set1_ps(weight);
             let src_ptr = src.add(src_stride * py);
 
@@ -329,7 +329,7 @@ pub mod sse_convolve_f32 {
 
         for j in 0..bounds.size {
             let py = start_y + j;
-            let weight = *unsafe { filter.add(j) };
+            let weight = unsafe { filter.add(j).read_unaligned() };
             let v_weight = _mm_set1_ps(weight);
             let src_ptr = src.add(src_stride * py);
 
@@ -360,18 +360,18 @@ pub mod sse_convolve_f32 {
 
         for j in 0..bounds.size {
             let py = start_y + j;
-            let weight = *unsafe { filter.add(j) };
+            let weight = unsafe { filter.add(j).read_unaligned() };
             let v_weight = _mm_set1_ps(weight);
             let src_ptr = src.add(src_stride * py);
 
             let s_ptr = src_ptr.add(px);
-            let item_row_0 = _mm_set1_ps(*s_ptr);
+            let item_row_0 = _mm_set1_ps(s_ptr.read_unaligned());
 
             store_0 = _mm_prefer_fma_ps(store_0, item_row_0, v_weight);
         }
 
         let dst_ptr = dst.add(px);
-        *dst_ptr = f32::from_bits(_mm_extract_ps::<0>(store_0) as u32);
+        dst_ptr.write_unaligned(f32::from_bits(_mm_extract_ps::<0>(store_0) as u32));
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]

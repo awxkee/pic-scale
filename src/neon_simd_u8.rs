@@ -8,8 +8,8 @@
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 pub mod neon_convolve_u8 {
     use crate::filter_weights::FilterBounds;
-    use std::arch::aarch64::*;
     use crate::support::ROUNDING_APPROX;
+    use std::arch::aarch64::*;
 
     #[inline(always)]
     pub(crate) unsafe fn convolve_horizontal_parts_one_rgba(
@@ -21,13 +21,13 @@ pub mod neon_convolve_u8 {
         const COMPONENTS: usize = 4;
         let src_ptr = src.add(start_x * COMPONENTS);
         let vl = u64::from_le_bytes([
-            *src_ptr,
+            src_ptr.read_unaligned(),
             0,
-            *src_ptr.add(1),
+            src_ptr.add(1).read_unaligned(),
             0,
-            *src_ptr.add(2),
+            src_ptr.add(2).read_unaligned(),
             0,
-            *src_ptr.add(3),
+            src_ptr.add(3).read_unaligned(),
             0,
         ]);
         let rgba_pixel = vcreate_u16(vl);
@@ -46,7 +46,16 @@ pub mod neon_convolve_u8 {
     ) -> int32x4_t {
         const COMPONENTS: usize = 3;
         let src_ptr = src.add(start_x * COMPONENTS);
-        let vl = u64::from_le_bytes([*src_ptr, 0, *src_ptr.add(1), 0, *src_ptr.add(2), 0, 0, 0]);
+        let vl = u64::from_le_bytes([
+            src_ptr.read_unaligned(),
+            0,
+            src_ptr.add(1).read_unaligned(),
+            0,
+            src_ptr.add(2).read_unaligned(),
+            0,
+            0,
+            0,
+        ]);
         let rgb_pixel = vcreate_u16(vl);
         let lo = vreinterpret_s16_u16(rgb_pixel);
         let acc = vmlal_s16(store_0, lo, weight0);
@@ -124,7 +133,7 @@ pub mod neon_convolve_u8 {
 
         for j in 0..bounds.size {
             let py = start_y + j;
-            let weight = *unsafe { filter.add(j) };
+            let weight = unsafe { filter.add(j).read_unaligned() };
             let v_weight = vdupq_n_s16(weight);
             let src_ptr = src.add(src_stride * py);
 
@@ -197,7 +206,7 @@ pub mod neon_convolve_u8 {
 
         for j in 0..bounds.size {
             let py = start_y + j;
-            let weight = *unsafe { filter.add(j) };
+            let weight = unsafe { filter.add(j).read_unaligned() };
             let v_weight = vdupq_n_s16(weight);
             let src_ptr = src.add(src_stride * py);
 
@@ -248,7 +257,7 @@ pub mod neon_convolve_u8 {
 
         for j in 0..bounds.size {
             let py = start_y + j;
-            let weight = *unsafe { filter.add(j) };
+            let weight = unsafe { filter.add(j).read_unaligned() };
             let v_weight = vdupq_n_s16(weight);
             let src_ptr = src.add(src_stride * py);
 

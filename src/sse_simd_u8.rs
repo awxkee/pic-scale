@@ -9,11 +9,11 @@
 pub mod sse_convolve_u8 {
 
     use crate::filter_weights::FilterBounds;
+    use crate::support::ROUNDING_APPROX;
     #[cfg(target_arch = "x86")]
     use std::arch::x86::*;
     #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::*;
-    use crate::support::ROUNDING_APPROX;
 
     #[inline(always)]
     pub fn compress_i32(x: __m128i) -> __m128i {
@@ -32,7 +32,12 @@ pub mod sse_convolve_u8 {
     ) -> __m128i {
         const COMPONENTS: usize = 3;
         let src_ptr = src.add(start_x * COMPONENTS);
-        let vl = i32::from_le_bytes([*src_ptr, *src_ptr.add(1), *src_ptr.add(2), 0]);
+        let vl = i32::from_le_bytes([
+            src_ptr.read_unaligned(),
+            src_ptr.add(1).read_unaligned(),
+            src_ptr.add(2).read_unaligned(),
+            0,
+        ]);
         let m_vl = _mm_cvtsi32_si128(vl);
         let lo = _mm_cvtepu8_epi16(m_vl);
         let acc = _mm_add_epi32(store_0, _mm_mullo_epi32(_mm_cvtepi16_epi32(lo), weight0));
@@ -77,7 +82,7 @@ pub mod sse_convolve_u8 {
 
         for j in 0..bounds.size {
             let py = start_y + j;
-            let weight = *unsafe { filter.add(j) };
+            let weight = unsafe { filter.add(j).read_unaligned() };
             let v_weight = _mm_set1_epi32(weight as i32);
             let src_ptr = src.add(src_stride * py);
 
@@ -182,7 +187,7 @@ pub mod sse_convolve_u8 {
 
         for j in jj..bounds.size {
             let py = start_y + j;
-            let weight = *unsafe { filter.add(j) };
+            let weight = unsafe { filter.add(j).read_unaligned() };
             let v_weight = _mm_set1_epi32(weight as i32);
             let src_ptr = src.add(src_stride * py);
 
@@ -251,7 +256,7 @@ pub mod sse_convolve_u8 {
         let src_ptr = src.add(start_x * COMPONENTS);
 
         let src_ptr_32 = src_ptr as *const i32;
-        let rgba_pixel = _mm_cvtsi32_si128(*src_ptr_32);
+        let rgba_pixel = _mm_cvtsi32_si128(src_ptr_32.read_unaligned());
         let lo = _mm_cvtepu8_epi16(rgba_pixel);
 
         let acc = _mm_add_epi32(store_0, _mm_madd_epi16(_mm_cvtepi16_epi32(lo), weight0));
@@ -279,7 +284,7 @@ pub mod sse_convolve_u8 {
 
         for j in 0..bounds.size {
             let py = start_y + j;
-            let weight = *unsafe { filter.add(j) };
+            let weight = unsafe { filter.add(j).read_unaligned() };
             let v_weight = _mm_set1_epi32(weight as i32);
             let src_ptr = src.add(src_stride * py);
 

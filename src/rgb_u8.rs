@@ -248,9 +248,13 @@ fn convolve_horizontal_rgb_native_row(
         let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px) };
 
         unsafe {
-            *dest_ptr = (sum_r >> PRECISION).min(255).max(0) as u8;
-            *dest_ptr.add(1) = (sum_g >> PRECISION).min(255).max(0) as u8;
-            *dest_ptr.add(2) = (sum_b >> PRECISION).min(255).max(0) as u8;
+            dest_ptr.write_unaligned((sum_r >> PRECISION).min(255).max(0) as u8);
+            dest_ptr
+                .add(1)
+                .write_unaligned((sum_g >> PRECISION).min(255).max(0) as u8);
+            dest_ptr
+                .add(2)
+                .write_unaligned((sum_b >> PRECISION).min(255).max(0) as u8);
         }
 
         filter_offset += filter_weights.aligned_size;

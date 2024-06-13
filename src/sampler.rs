@@ -481,6 +481,7 @@ pub struct ResamplingFilter {
     pub window: Option<ResamplingWindow>,
     pub min_kernel_size: f32,
     pub is_ewa: bool,
+    pub is_resizable_kernel: bool,
 }
 
 impl ResamplingFilter {
@@ -490,6 +491,7 @@ impl ResamplingFilter {
             window: None,
             min_kernel_size,
             is_ewa,
+            is_resizable_kernel: false,
         }
     }
 
@@ -504,6 +506,21 @@ impl ResamplingFilter {
             window: Some(window),
             min_kernel_size,
             is_ewa,
+            is_resizable_kernel: false,
+        }
+    }
+
+    fn new_with_fixed_kernel(
+        kernel: fn(f32) -> f32,
+        min_kernel_size: f32,
+        is_ewa: bool,
+    ) -> ResamplingFilter {
+        ResamplingFilter {
+            kernel,
+            window: None,
+            min_kernel_size,
+            is_ewa,
+            is_resizable_kernel: true,
         }
     }
 }
@@ -551,9 +568,15 @@ impl ResamplingFunction {
             ResamplingFunction::EwaRobidouxSharp => {
                 ResamplingFilter::new(robidoux_sharp, 2f32, true)
             }
-            ResamplingFunction::Spline16 => ResamplingFilter::new(spline16, 2f32, false),
-            ResamplingFunction::Spline36 => ResamplingFilter::new(spline36, 4f32, false),
-            ResamplingFunction::Spline64 => ResamplingFilter::new(spline64, 6f32, false),
+            ResamplingFunction::Spline16 => {
+                ResamplingFilter::new_with_fixed_kernel(spline16, 2f32, false)
+            }
+            ResamplingFunction::Spline36 => {
+                ResamplingFilter::new_with_fixed_kernel(spline36, 4f32, false)
+            }
+            ResamplingFunction::Spline64 => {
+                ResamplingFilter::new_with_fixed_kernel(spline64, 6f32, false)
+            }
             ResamplingFunction::Kaiser => ResamplingFilter::new(kaiser, 2f32, false),
             ResamplingFunction::BartlettHann => ResamplingFilter::new(bartlett_hann, 2f32, false),
             ResamplingFunction::Box => ResamplingFilter::new(box_weight, 0.5f32, false),
