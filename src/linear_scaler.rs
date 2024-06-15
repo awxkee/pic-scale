@@ -13,6 +13,7 @@ use crate::scaler::Scaling;
 use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, ThreadingPolicy};
 
 #[derive(Debug, Copy, Clone)]
+/// Linearize image, scale and then convert it back
 pub struct LinearScaler {
     pub(crate) scaler: Scaler,
     pub(crate) transfer_function: TransferFunction,

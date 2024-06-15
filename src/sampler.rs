@@ -506,7 +506,7 @@ impl ResamplingFilter {
             window: Some(window),
             min_kernel_size,
             is_ewa,
-            is_resizable_kernel: false,
+            is_resizable_kernel: true,
         }
     }
 

@@ -10,6 +10,7 @@ use colorutils_rs::{luv_to_rgb, luv_with_alpha_to_rgba, rgb_to_luv, rgba_to_luv_
 use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
 
 #[derive(Debug, Copy, Clone)]
+/// Converts image to CIE LUV components scales it and convert back
 pub struct LuvScaler {
     pub(crate) scaler: Scaler,
 }

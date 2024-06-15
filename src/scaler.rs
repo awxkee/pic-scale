@@ -24,22 +24,24 @@ pub struct Scaler {
 pub trait Scaling {
     fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy);
 
+    /// Performs rescaling for RGB, channel order does not matter
     fn resize_rgb(&self, new_size: ImageSize, store: ImageStore<u8, 3>) -> ImageStore<u8, 3>;
-
+    /// Performs rescaling for RGB f32, channel order does not matter
     fn resize_rgb_f32(&self, new_size: ImageSize, store: ImageStore<f32, 3>) -> ImageStore<f32, 3>;
-
+    /// Performs rescaling for RGBA, for pre-multiplying alpha, converting to LUV, LAB alpha must be last channel
     fn resize_rgba(
         &self,
         new_size: ImageSize,
         store: ImageStore<u8, 4>,
         is_alpha_premultiplied: bool,
     ) -> ImageStore<u8, 4>;
-
+    /// Performs rescaling for RGBA f32
     fn resize_rgba_f32(&self, new_size: ImageSize, store: ImageStore<f32, 4>)
         -> ImageStore<f32, 4>;
 }
 
 impl Scaler {
+    /// Creates new Scaler instance with corresponding filter
     pub fn new(filter: ResamplingFunction) -> Self {
         Scaler {
             resampling_filter: filter.get_resampling_filter(),

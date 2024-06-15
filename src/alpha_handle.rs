@@ -388,7 +388,10 @@ pub fn unpremultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height
     for _ in 0..height {
         let mut _cx = 0usize;
 
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "avx2"
+        ))]
         if _has_avx2 {
             unsafe {
                 while _cx + 32 < width {
@@ -417,7 +420,10 @@ pub fn unpremultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height
             }
         }
 
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
         if _has_sse {
             unsafe {
                 while _cx + 16 < width {
