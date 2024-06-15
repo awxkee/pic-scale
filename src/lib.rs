@@ -37,6 +37,7 @@ mod support;
 mod neon_rgb_f32;
 mod avx2_utils;
 mod sigmoidal_scaler;
+mod xyz_scaler;
 
 pub use image_size::ImageSize;
 pub use image_store::ImageStore;
@@ -49,3 +50,4 @@ pub use scaler::Scaling;
 pub use threading_policy::*;
 pub use luv_scaler::*;
 pub use sigmoidal_scaler::SigmoidalScaler;
+pub use xyz_scaler::XYZScaler;

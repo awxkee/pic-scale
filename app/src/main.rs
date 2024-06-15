@@ -8,12 +8,12 @@ use fast_image_resize::images::Image;
 use image::{EncodableLayout, GenericImageView};
 use image::io::Reader as ImageReader;
 
-use pic_scale::{ImageSize, ImageStore, LabScaler, LinearScaler, LuvScaler, ResamplingFunction, Scaler, Scaling, SigmoidalScaler, ThreadingPolicy};
+use pic_scale::{ImageSize, ImageStore, LabScaler, LinearScaler, LuvScaler, ResamplingFunction, Scaler, Scaling, SigmoidalScaler, ThreadingPolicy, XYZScaler};
 
 fn main() {
     // test_fast_image();
 
-    let img = ImageReader::open("./assets/asset.jpg")
+    let img = ImageReader::open("./assets/beach_horizon.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -22,12 +22,12 @@ fn main() {
 
     let start_time = Instant::now();
 
-    let mut scaler = SigmoidalScaler::new(ResamplingFunction::EwaLanczos4Sharpest);
+    let mut scaler = LuvScaler::new(ResamplingFunction::EwaLanczos4Sharpest);
     scaler.set_threading_policy(ThreadingPolicy::Single);
     let store =
         ImageStore::<u8, 3>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
     let resized = scaler.resize_rgb(
-        ImageSize::new(dimensions.0 as usize * 2 , dimensions.1 as usize * 2),
+        ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
         store,
     );
 
@@ -46,7 +46,7 @@ fn main() {
             .unwrap();
     } else {
         image::save_buffer(
-            "converted.jpg",
+            "converted_luv.jpg",
             resized.as_bytes(),
             resized.width as u32,
             resized.height as u32,
