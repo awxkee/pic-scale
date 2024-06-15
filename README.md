@@ -136,6 +136,19 @@ let resized = scaler.resize_rgba(
 );
 ```
 
+#### Example in CIE XYZ colorspace
+```rust
+let mut scaler = XYZScale::new(ResamplingFunction::Hermite);
+scaler.set_threading_policy(ThreadingPolicy::Single);
+let store =
+    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height);
+let resized = scaler.resize_rgba(
+    ImageSize::new(new_width, new_height),
+    store,
+    true
+);
+```
+
 #### Example in Sigmoidal colorspace
 ```rust
 let mut scaler = SigmoidalScaler::new(ResamplingFunction::Hermite);
