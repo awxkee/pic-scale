@@ -17,7 +17,7 @@ use pic_scale::{
 fn main() {
     // test_fast_image();
 
-    let img = ImageReader::open("./assets/asset.jpg")
+    let img = ImageReader::open("./assets/beach_horizon.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -26,10 +26,7 @@ fn main() {
 
     let start_time = Instant::now();
 
-    let mut scaler = LinearScaler::new_with_transfer(
-        ResamplingFunction::Lagrange2,
-        TransferFunction::Gamma2p8,
-    );
+    let mut scaler = LabScaler::new(ResamplingFunction::Lagrange3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
     let store =
         ImageStore::<u8, 3>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);

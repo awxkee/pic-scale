@@ -495,6 +495,8 @@ impl From<u32> for ResamplingFunction {
             43 => ResamplingFunction::HaasnSoft,
             44 => ResamplingFunction::Lagrange2,
             45 => ResamplingFunction::Lagrange3,
+            46 => ResamplingFunction::Lanczos6,
+            47 => ResamplingFunction::Lanczos6Jinc,
             _ => ResamplingFunction::Bilinear,
         }
     }
