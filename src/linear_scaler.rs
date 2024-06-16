@@ -13,23 +13,34 @@ use crate::scaler::Scaling;
 use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, ThreadingPolicy};
 
 #[derive(Debug, Copy, Clone)]
-/// Linearize image, scale and then convert it back
-pub struct LinearScaler {
+/// Linearize image into u8, scale and then convert it back. It's much faster than scale in f32, however involves some precision loss
+pub struct LinearApproxScaler {
     pub(crate) scaler: Scaler,
     pub(crate) transfer_function: TransferFunction,
 }
 
-impl LinearScaler {
+impl LinearApproxScaler {
+    /// Creates new instance with sRGB transfer function
     pub fn new(filter: ResamplingFunction) -> Self {
-        LinearScaler {
+        LinearApproxScaler {
             scaler: Scaler::new(filter),
             transfer_function: TransferFunction::Srgb,
         }
     }
+
+    /// Creates new instance with provided transfer function
+    pub fn new_with_transfer(
+        filter: ResamplingFunction,
+        transfer_function: TransferFunction,
+    ) -> Self {
+        LinearApproxScaler {
+            scaler: Scaler::new(filter),
+            transfer_function,
+        }
+    }
 }
 
-impl<'a> Scaling for LinearScaler {
-
+impl<'a> Scaling for LinearApproxScaler {
     fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy) {
         self.scaler.threading_policy = threading_policy;
     }
@@ -112,7 +123,11 @@ impl<'a> Scaling for LinearScaler {
         gamma_store
     }
 
-    fn resize_rgba_f32(&self, new_size: ImageSize, store: ImageStore<f32, 4>) -> ImageStore<f32, 4> {
+    fn resize_rgba_f32(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<f32, 4>,
+    ) -> ImageStore<f32, 4> {
         self.scaler.resize_rgba_f32(new_size, store)
     }
 }

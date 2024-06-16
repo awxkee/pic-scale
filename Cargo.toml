@@ -2,7 +2,7 @@ workspace = { members = ["app"] }
 
 [package]
 name = "pic-scale"
-version = "0.1.10"
+version = "0.1.11"
 edition = "2021"
 description = "High performance image scaling"
 readme = "README.md"
@@ -16,6 +16,6 @@ repository = "https://github.com/awxkee/pic-scale"
 exclude = ["*.jpg", "/assets"]
 
 [dependencies]
-colorutils-rs = "0.4.2"
+colorutils-rs = "0.4.5"
 num-traits = "0.2.19"
 rayon = "1.10.0"

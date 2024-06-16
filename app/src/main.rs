@@ -8,7 +8,7 @@ use fast_image_resize::images::Image;
 use image::{EncodableLayout, GenericImageView};
 use image::io::Reader as ImageReader;
 
-use pic_scale::{ImageSize, ImageStore, LabScaler, LinearScaler, LuvScaler, ResamplingFunction, Scaler, Scaling, SigmoidalScaler, ThreadingPolicy, XYZScaler};
+use pic_scale::{ImageSize, ImageStore, LabScaler, LinearScaler, LinearApproxScaler, LuvScaler, ResamplingFunction, Scaler, Scaling, SigmoidalScaler, ThreadingPolicy, XYZScaler, TransferFunction};
 
 fn main() {
     // test_fast_image();
@@ -22,7 +22,7 @@ fn main() {
 
     let start_time = Instant::now();
 
-    let mut scaler = LuvScaler::new(ResamplingFunction::EwaLanczos4Sharpest);
+    let mut scaler = LinearScaler::new_with_transfer(ResamplingFunction::EwaLanczos4Sharpest, TransferFunction::Gamma2p8);
     scaler.set_threading_policy(ThreadingPolicy::Single);
     let store =
         ImageStore::<u8, 3>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
@@ -46,7 +46,7 @@ fn main() {
             .unwrap();
     } else {
         image::save_buffer(
-            "converted_luv.jpg",
+            "converted_xyz.jpg",
             resized.as_bytes(),
             resized.width as u32,
             resized.height as u32,

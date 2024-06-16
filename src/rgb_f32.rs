@@ -61,7 +61,7 @@ fn convolve_horizontal_neon(
                 });
                 yy = y;
             }
-            for y in (yy..destination.height).step_by(4) {
+            for y in yy..destination.height {
                 let weights = arc_weights.clone();
                 scope.spawn(move |_| {
                     let unsafe_source_ptr_0 =
@@ -586,14 +586,12 @@ impl<'a> HorizontalConvolutionPass<f32, 3> for ImageStore<'a, f32, 3> {
         destination: &mut ImageStore<f32, 3>,
         pool: &Option<ThreadPool>,
     ) {
-        #[allow(unused_assignments)]
-        #[allow(unused_mut)]
-        let mut using_feature = AccelerationFeature::Native;
+        let mut _using_feature = AccelerationFeature::Native;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            using_feature = AccelerationFeature::Neon;
+            _using_feature = AccelerationFeature::Neon;
         }
-        match using_feature {
+        match _using_feature {
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             AccelerationFeature::Neon => {
                 convolve_horizontal_neon(self, filter_weights, destination, pool);
