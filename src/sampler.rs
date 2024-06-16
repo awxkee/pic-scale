@@ -143,6 +143,12 @@ pub fn lanczos4_jinc(x: f32) -> f32 {
 }
 
 #[inline(always)]
+pub fn lanczos6_jinc(x: f32) -> f32 {
+    const A: f32 = 6f32;
+    lanczos_jinc(x, A)
+}
+
+#[inline(always)]
 pub fn lanczos_sinc(x: f32, a: f32) -> f32 {
     let scale_a: f32 = 1f32 / a;
     if x.abs() < a {
@@ -161,6 +167,12 @@ pub fn lanczos3(x: f32) -> f32 {
 #[inline(always)]
 pub fn lanczos4(x: f32) -> f32 {
     const A: f32 = 4f32;
+    lanczos_sinc(x, A)
+}
+
+#[inline(always)]
+pub fn lanczos6(x: f32) -> f32 {
+    const A: f32 = 6f32;
     lanczos_sinc(x, A)
 }
 
@@ -321,6 +333,32 @@ pub(crate) fn bessel_i0(x: f64) -> f64 {
 }
 
 #[inline(always)]
+pub(crate) fn lagrange(x: f32, support: usize) -> f32 {
+    if x > support as f32 {
+        return 0f32;
+    }
+    let order = (2.0f32 * support as f32) as usize;
+    let n = (support as f32 + x) as usize;
+    let mut value = 1.0f32;
+    for i in 0..order {
+        if i != n {
+            value *= (n as f32 - i as f32 - x) / (n as f32 - i as f32);
+        }
+    }
+    return value;
+}
+
+#[inline(always)]
+pub(crate) fn lagrange2(x: f32) -> f32 {
+    lagrange(x, 2)
+}
+
+#[inline(always)]
+pub(crate) fn lagrange3(x: f32) -> f32 {
+    lagrange(x, 3)
+}
+
+#[inline(always)]
 pub(crate) fn bartlett_hann(x: f32) -> f32 {
     let x = x.abs();
     if x > 2f32 {
@@ -402,6 +440,10 @@ pub enum ResamplingFunction {
     EwaLanczos4Sharpest,
     EwaLanczosSoft,
     HaasnSoft,
+    Lagrange2,
+    Lagrange3,
+    Lanczos6,
+    Lanczos6Jinc,
 }
 
 impl From<u32> for ResamplingFunction {
@@ -451,6 +493,8 @@ impl From<u32> for ResamplingFunction {
             41 => ResamplingFunction::EwaLanczos4Sharpest,
             42 => ResamplingFunction::EwaLanczosSoft,
             43 => ResamplingFunction::HaasnSoft,
+            44 => ResamplingFunction::Lagrange2,
+            45 => ResamplingFunction::Lagrange3,
             _ => ResamplingFunction::Bilinear,
         }
     }
@@ -623,6 +667,10 @@ impl ResamplingFunction {
                 3f32,
                 false,
             ),
+            ResamplingFunction::Lagrange2 => ResamplingFilter::new(lagrange2, 2f32, false),
+            ResamplingFunction::Lagrange3 => ResamplingFilter::new(lagrange3, 3f32, false),
+            ResamplingFunction::Lanczos6Jinc => ResamplingFilter::new(lanczos6_jinc, 6f32, false),
+            ResamplingFunction::Lanczos6 => ResamplingFilter::new(lanczos6, 6f32, false),
         };
     }
 }

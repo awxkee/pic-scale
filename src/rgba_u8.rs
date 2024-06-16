@@ -278,9 +278,15 @@ fn convolve_horizontal_rgba_native_row(
 
         unsafe {
             dest_ptr.write_unaligned((sum_r >> PRECISION).min(255).max(0) as u8);
-            dest_ptr.add(1).write_unaligned((sum_g >> PRECISION).min(255).max(0) as u8);
-            dest_ptr.add(2).write_unaligned((sum_b >> PRECISION).min(255).max(0) as u8);
-            dest_ptr.add(3).write_unaligned((sum_a >> PRECISION).min(255).max(0) as u8);
+            dest_ptr
+                .add(1)
+                .write_unaligned((sum_g >> PRECISION).min(255).max(0) as u8);
+            dest_ptr
+                .add(2)
+                .write_unaligned((sum_b >> PRECISION).min(255).max(0) as u8);
+            dest_ptr
+                .add(3)
+                .write_unaligned((sum_a >> PRECISION).min(255).max(0) as u8);
         }
 
         filter_offset += filter_weights.aligned_size;

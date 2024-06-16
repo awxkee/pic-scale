@@ -1,19 +1,23 @@
 use std::time::Instant;
 
+use fast_image_resize::images::Image;
+use fast_image_resize::FilterType::Lanczos3;
 use fast_image_resize::{
     CpuExtensions, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
-use fast_image_resize::FilterType::Lanczos3;
-use fast_image_resize::images::Image;
-use image::{EncodableLayout, GenericImageView};
 use image::io::Reader as ImageReader;
+use image::{EncodableLayout, GenericImageView};
 
-use pic_scale::{ImageSize, ImageStore, LabScaler, LinearScaler, LinearApproxScaler, LuvScaler, ResamplingFunction, Scaler, Scaling, SigmoidalScaler, ThreadingPolicy, XYZScaler, TransferFunction};
+use pic_scale::{
+    ImageSize, ImageStore, LabScaler, LinearApproxScaler, LinearScaler, LuvScaler,
+    ResamplingFunction, Scaler, Scaling, SigmoidalScaler, ThreadingPolicy, TransferFunction,
+    XYZScaler,
+};
 
 fn main() {
     // test_fast_image();
 
-    let img = ImageReader::open("./assets/beach_horizon.jpg")
+    let img = ImageReader::open("./assets/asset.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -22,7 +26,10 @@ fn main() {
 
     let start_time = Instant::now();
 
-    let mut scaler = LinearScaler::new_with_transfer(ResamplingFunction::EwaLanczos4Sharpest, TransferFunction::Gamma2p8);
+    let mut scaler = LinearScaler::new_with_transfer(
+        ResamplingFunction::Lagrange2,
+        TransferFunction::Gamma2p8,
+    );
     scaler.set_threading_policy(ThreadingPolicy::Single);
     let store =
         ImageStore::<u8, 3>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
@@ -43,7 +50,7 @@ fn main() {
             resized.height as u32,
             image::ExtendedColorType::Rgba8,
         )
-            .unwrap();
+        .unwrap();
     } else {
         image::save_buffer(
             "converted_xyz.jpg",
@@ -52,7 +59,7 @@ fn main() {
             resized.height as u32,
             image::ExtendedColorType::Rgb8,
         )
-            .unwrap();
+        .unwrap();
     }
 
     // for i in 0..37 {

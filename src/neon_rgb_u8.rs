@@ -9,8 +9,8 @@
 pub mod neon_rgb {
     use crate::filter_weights::{FilterBounds, FilterWeights};
     use crate::neon_simd_u8::neon_convolve_u8;
-    use std::arch::aarch64::*;
     use crate::support::ROUNDING_APPROX;
+    use std::arch::aarch64::*;
 
     pub unsafe fn convolve_horizontal_rgb_neon_rows_4(
         dst_width: usize,
@@ -22,7 +22,7 @@ pub mod neon_rgb {
         dst_stride: usize,
     ) {
         let shuf_table_1: [u8; 8] = [0, 1, 2, 255, 3, 4, 5, 255];
-        let shuffle_1 =  vld1_u8(shuf_table_1.as_ptr());
+        let shuffle_1 = vld1_u8(shuf_table_1.as_ptr());
         let shuf_table_2: [u8; 8] = [6, 7, 8, 255, 9, 10, 11, 255];
         let shuffle_2 = vld1_u8(shuf_table_2.as_ptr());
         let shuffle = vcombine_u8(shuffle_1, shuffle_2);
@@ -236,7 +236,7 @@ pub mod neon_rgb {
         let weights_ptr = approx_weights.weights.as_ptr();
 
         let shuf_table_1: [u8; 8] = [0, 1, 2, 255, 3, 4, 5, 255];
-        let shuffle_1 =  vld1_u8(shuf_table_1.as_ptr());
+        let shuffle_1 = vld1_u8(shuf_table_1.as_ptr());
         let shuf_table_2: [u8; 8] = [6, 7, 8, 255, 9, 10, 11, 255];
         let shuffle_2 = vld1_u8(shuf_table_2.as_ptr());
         let shuffle = vcombine_u8(shuffle_1, shuffle_2);
@@ -315,7 +315,6 @@ pub mod neon_rgb {
 
             filter_offset += approx_weights.aligned_size;
         }
-
     }
 
     #[inline(always)]
@@ -393,5 +392,4 @@ pub mod neon_rgb {
             }
         }
     }
-
 }

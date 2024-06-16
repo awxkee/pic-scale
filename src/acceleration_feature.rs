@@ -15,5 +15,5 @@ pub(crate) enum AccelerationFeature {
     #[allow(dead_code)]
     Sse,
     #[allow(dead_code)]
-    Native
+    Native,
 }

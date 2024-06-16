@@ -37,7 +37,7 @@ pub mod sse_convolve_f32 {
         let acc = _mm_prefer_fma_ps(acc, rgb_pixel_3, weight3);
         acc
     }
-    
+
     #[inline(always)]
     pub(crate) unsafe fn convolve_horizontal_parts_one_rgba_f32(
         start_x: usize,
@@ -233,7 +233,7 @@ pub mod sse_convolve_f32 {
             filter_offset += filter_weights.aligned_size;
         }
     }
-    
+
     #[allow(unused)]
     #[inline(always)]
     pub(crate) unsafe fn convolve_vertical_part_sse_16_f32(
@@ -389,5 +389,4 @@ pub mod sse_convolve_f32 {
     pub unsafe fn _mm_prefer_fma_ps(a: __m128, b: __m128, c: __m128) -> __m128 {
         return _mm_fmadd_ps(b, c, a);
     }
-
 }

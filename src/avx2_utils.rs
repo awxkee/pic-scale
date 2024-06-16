@@ -128,4 +128,3 @@ pub unsafe fn avx2_pack_s32(s_1: __m256i, s_2: __m256i) -> __m256i {
     const MASK: i32 = shuffle(3, 1, 2, 0);
     return _mm256_permute4x64_epi64::<MASK>(packed);
 }
-
