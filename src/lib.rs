@@ -39,6 +39,7 @@ mod support;
 mod threading_policy;
 mod unsafe_slice;
 mod xyz_scaler;
+mod lch_scaler;
 
 pub use colorutils_rs::TransferFunction;
 pub use image_size::ImageSize;
@@ -54,3 +55,4 @@ pub use scaler::Scaling;
 pub use sigmoidal_scaler::SigmoidalScaler;
 pub use threading_policy::*;
 pub use xyz_scaler::XYZScaler;
+pub use lch_scaler::LChScaler;

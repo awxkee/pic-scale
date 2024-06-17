@@ -95,9 +95,9 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "bitstream-io"
-version = "2.4.1"
+version = "2.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eac55ccd165b210af261b1812cf29a0b9e6303b480ff0df603c037129ff357fe"
+checksum = "415f8399438eb5e4b2f73ed3152a3448b98149dda642a957ee704e1daa5cf1d8"
 
 [[package]]
 name = "built"
@@ -164,9 +164,9 @@ checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 
 [[package]]
 name = "colorutils-rs"
-version = "0.4.6"
+version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0aba8a8f9e67c261effb0a9654de50edbac52652df28d2c87605cfd5e3b257b7"
+checksum = "3261d108c421af6596bd4f5e28ffcc045c4e95340e6281e3aec0fab4cea161ff"
 dependencies = [
  "half",
 ]
@@ -587,7 +587,7 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "pic-scale"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "colorutils-rs",
  "num-traits",

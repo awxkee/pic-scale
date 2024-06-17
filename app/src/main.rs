@@ -8,11 +8,7 @@ use fast_image_resize::{
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, GenericImageView};
 
-use pic_scale::{
-    ImageSize, ImageStore, LabScaler, LinearApproxScaler, LinearScaler, LuvScaler,
-    ResamplingFunction, Scaler, Scaling, SigmoidalScaler, ThreadingPolicy, TransferFunction,
-    XYZScaler,
-};
+use pic_scale::{ImageSize, ImageStore, LabScaler, LChScaler, LinearApproxScaler, LinearScaler, LuvScaler, ResamplingFunction, Scaler, Scaling, SigmoidalScaler, ThreadingPolicy, TransferFunction, XYZScaler};
 
 fn main() {
     // test_fast_image();
@@ -26,12 +22,12 @@ fn main() {
 
     let start_time = Instant::now();
 
-    let mut scaler = LabScaler::new(ResamplingFunction::Lagrange3);
+    let mut scaler = LChScaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
     let store =
         ImageStore::<u8, 3>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
     let resized = scaler.resize_rgb(
-        ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+        ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
         store,
     );
 
@@ -50,7 +46,7 @@ fn main() {
         .unwrap();
     } else {
         image::save_buffer(
-            "converted_xyz.jpg",
+            "converted_lch.jpg",
             resized.as_bytes(),
             resized.width as u32,
             resized.height as u32,

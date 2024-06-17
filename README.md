@@ -7,7 +7,7 @@ Supported only NEON and SSE.
 ### Colorspace
 
 This library provides for you some conveniences to scale in different color spaces.
-Prebuilt options for CIE L\*a\*b, CIE L\*u\*v, Linear, Sigmoidal available. Those transformations also very efficients.
+Prebuilt options for CIE L\*a\*b, CIE L\*u\*v, CIE L\*c\*h, Linear, Sigmoidal available. Those transformations also very efficients.
 Whether downscaling is preferred in linear colorspace, LAB/LUV and sigmoidal also provides very good results.
 Up scaling might be done in LAB/LUB and simoidized components and also efficient in sRGB.
 
