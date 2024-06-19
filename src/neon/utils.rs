@@ -5,6 +5,8 @@
  * // license that can be found in the LICENSE file.
  */
 
+use std::arch::aarch64::{float32x4_t, vfmaq_f32};
+
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 pub mod neon_convolve_u8 {
     use crate::filter_weights::FilterBounds;
@@ -102,6 +104,25 @@ pub mod neon_convolve_u8 {
 
         let mut rgb_pixel = vld1_u8(src_ptr);
         rgb_pixel = vtbl1_u8(rgb_pixel, shuffle);
+        let wide = vreinterpretq_s16_u16(vmovl_u8(rgb_pixel));
+
+        let acc = vmlal_high_s16(store_0, wide, weight1);
+        let acc = vmlal_s16(acc, vget_low_s16(wide), weight0);
+        acc
+    }
+
+    #[inline(always)]
+    pub(crate) unsafe fn convolve_horizontal_parts_2_rgba(
+        start_x: usize,
+        src: *const u8,
+        weight0: int16x4_t,
+        weight1: int16x8_t,
+        store_0: int32x4_t,
+    ) -> int32x4_t {
+        const COMPONENTS: usize = 4;
+        let src_ptr = src.add(start_x * COMPONENTS);
+
+        let rgb_pixel = vld1_u8(src_ptr);
         let wide = vreinterpretq_s16_u16(vmovl_u8(rgb_pixel));
 
         let acc = vmlal_high_s16(store_0, wide, weight1);
@@ -317,5 +338,21 @@ pub mod neon_convolve_u8 {
         let acc = vmlal_high_s16(acc, lo, weight1);
         let acc = vmlal_s16(acc, vget_low_s16(lo), weight0);
         acc
+    }
+}
+
+#[inline(always)]
+pub(crate) unsafe fn prefer_vfmaq_f32(
+    a: float32x4_t,
+    b: float32x4_t,
+    c: float32x4_t,
+) -> float32x4_t {
+    #[cfg(target_arch = "aarch64")]
+    {
+        return vfmaq_f32(a, b, c);
+    }
+    #[cfg(target_arch = "arm")]
+    {
+        return vmlaq_f32(a, b, c);
     }
 }

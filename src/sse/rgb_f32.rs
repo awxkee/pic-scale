@@ -52,34 +52,35 @@ pub mod sse_convolve_f32 {
         acc
     }
 
-    pub unsafe fn convolve_horizontal_rgba_sse_rows_4(
+    pub(crate) fn convolve_horizontal_rgba_sse_rows_4_f32(
         dst_width: usize,
+        _: usize,
         filter_weights: &FilterWeights<f32>,
         unsafe_source_ptr_0: *const f32,
         src_stride: usize,
         unsafe_destination_ptr_0: *mut f32,
         dst_stride: usize,
     ) {
-        const CHANNELS: usize = 4;
-        let mut filter_offset = 0usize;
-        let zeros = unsafe { _mm_setzero_ps() };
-        let weights_ptr = filter_weights.weights.as_ptr();
+        unsafe {
+            const CHANNELS: usize = 4;
+            let mut filter_offset = 0usize;
+            let zeros = _mm_setzero_ps();
+            let weights_ptr = filter_weights.weights.as_ptr();
 
-        for x in 0..dst_width {
-            let bounds = unsafe { filter_weights.bounds.get_unchecked(x) };
-            let mut jx = 0usize;
-            let mut store_0 = zeros;
-            let mut store_1 = zeros;
-            let mut store_2 = zeros;
-            let mut store_3 = zeros;
+            for x in 0..dst_width {
+                let bounds = filter_weights.bounds.get_unchecked(x);
+                let mut jx = 0usize;
+                let mut store_0 = zeros;
+                let mut store_1 = zeros;
+                let mut store_2 = zeros;
+                let mut store_3 = zeros;
 
-            while jx + 4 < bounds.size {
-                let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
-                let weight0 = unsafe { _mm_set1_ps(ptr.read_unaligned()) };
-                let weight1 = unsafe { _mm_set1_ps(ptr.add(1).read_unaligned()) };
-                let weight2 = unsafe { _mm_set1_ps(ptr.add(2).read_unaligned()) };
-                let weight3 = unsafe { _mm_set1_ps(ptr.add(3).read_unaligned()) };
-                unsafe {
+                while jx + 4 < bounds.size {
+                    let ptr = weights_ptr.add(jx + filter_offset);
+                    let weight0 = _mm_set1_ps(ptr.read_unaligned());
+                    let weight1 = _mm_set1_ps(ptr.add(1).read_unaligned());
+                    let weight2 = _mm_set1_ps(ptr.add(2).read_unaligned());
+                    let weight3 = _mm_set1_ps(ptr.add(3).read_unaligned());
                     store_0 = convolve_horizontal_parts_4_rgba_f32(
                         bounds.start,
                         unsafe_source_ptr_0,
@@ -116,13 +117,11 @@ pub mod sse_convolve_f32 {
                         weight3,
                         store_3,
                     );
+                    jx += 4;
                 }
-                jx += 4;
-            }
-            while jx < bounds.size {
-                let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
-                let weight0 = unsafe { _mm_set1_ps(ptr.read_unaligned()) };
-                unsafe {
+                while jx < bounds.size {
+                    let ptr = weights_ptr.add(jx + filter_offset);
+                    let weight0 = _mm_set1_ps(ptr.read_unaligned());
                     store_0 = convolve_horizontal_parts_one_rgba_f32(
                         bounds.start,
                         unsafe_source_ptr_0,
@@ -147,57 +146,50 @@ pub mod sse_convolve_f32 {
                         weight0,
                         store_3,
                     );
+                    jx += 1;
                 }
-                jx += 1;
-            }
 
-            let px = x * CHANNELS;
-            let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px) };
-            unsafe {
+                let px = x * CHANNELS;
+                let dest_ptr = unsafe_destination_ptr_0.add(px);
                 _mm_storeu_ps(dest_ptr, store_0);
-            }
 
-            let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px + dst_stride) };
-            unsafe {
+                let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride);
                 _mm_storeu_ps(dest_ptr, store_1);
-            }
 
-            let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px + dst_stride * 2) };
-            unsafe {
+                let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 2);
                 _mm_storeu_ps(dest_ptr, store_2);
-            }
 
-            let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px + dst_stride * 3) };
-            unsafe {
+                let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 3);
                 _mm_storeu_ps(dest_ptr, store_3);
-            }
 
-            filter_offset += filter_weights.aligned_size;
+                filter_offset += filter_weights.aligned_size;
+            }
         }
     }
 
-    pub unsafe fn convolve_horizontal_rgba_sse_row_one(
+    pub fn convolve_horizontal_rgba_sse_row_one_f32(
         dst_width: usize,
+        _: usize,
         filter_weights: &FilterWeights<f32>,
         unsafe_source_ptr_0: *const f32,
         unsafe_destination_ptr_0: *mut f32,
     ) {
-        const CHANNELS: usize = 4;
-        let mut filter_offset = 0usize;
-        let weights_ptr = filter_weights.weights.as_ptr();
+        unsafe {
+            const CHANNELS: usize = 4;
+            let mut filter_offset = 0usize;
+            let weights_ptr = filter_weights.weights.as_ptr();
 
-        for x in 0..dst_width {
-            let bounds = unsafe { filter_weights.bounds.get_unchecked(x) };
-            let mut jx = 0usize;
-            let mut store = unsafe { _mm_setzero_ps() };
+            for x in 0..dst_width {
+                let bounds = filter_weights.bounds.get_unchecked(x);
+                let mut jx = 0usize;
+                let mut store = _mm_setzero_ps();
 
-            while jx + 4 < bounds.size {
-                let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
-                let weight0 = unsafe { _mm_set1_ps(ptr.read_unaligned()) };
-                let weight1 = unsafe { _mm_set1_ps(ptr.add(1).read_unaligned()) };
-                let weight2 = unsafe { _mm_set1_ps(ptr.add(2).read_unaligned()) };
-                let weight3 = unsafe { _mm_set1_ps(ptr.add(3).read_unaligned()) };
-                unsafe {
+                while jx + 4 < bounds.size {
+                    let ptr = weights_ptr.add(jx + filter_offset);
+                    let weight0 = _mm_set1_ps(ptr.read_unaligned());
+                    let weight1 = _mm_set1_ps(ptr.add(1).read_unaligned());
+                    let weight2 = _mm_set1_ps(ptr.add(2).read_unaligned());
+                    let weight3 = _mm_set1_ps(ptr.add(3).read_unaligned());
                     store = convolve_horizontal_parts_4_rgba_f32(
                         bounds.start,
                         unsafe_source_ptr_0,
@@ -207,30 +199,26 @@ pub mod sse_convolve_f32 {
                         weight3,
                         store,
                     );
+                    jx += 4;
                 }
-                jx += 4;
-            }
-            while jx < bounds.size {
-                let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
-                let weight0 = unsafe { _mm_set1_ps(ptr.read_unaligned()) };
-                unsafe {
+                while jx < bounds.size {
+                    let ptr = weights_ptr.add(jx + filter_offset);
+                    let weight0 = _mm_set1_ps(ptr.read_unaligned());
                     store = convolve_horizontal_parts_one_rgba_f32(
                         bounds.start,
                         unsafe_source_ptr_0,
                         weight0,
                         store,
                     );
+                    jx += 1;
                 }
-                jx += 1;
-            }
 
-            let px = x * CHANNELS;
-            let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px) };
-            unsafe {
+                let px = x * CHANNELS;
+                let dest_ptr = unsafe_destination_ptr_0.add(px);
                 _mm_storeu_ps(dest_ptr, store);
-            }
 
-            filter_offset += filter_weights.aligned_size;
+                filter_offset += filter_weights.aligned_size;
+            }
         }
     }
 
@@ -374,7 +362,81 @@ pub mod sse_convolve_f32 {
         dst_ptr.write_unaligned(f32::from_bits(_mm_extract_ps::<0>(store_0) as u32));
     }
 
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    #[inline(always)]
+    pub(crate) fn convolve_vertical_rgb_sse_row_f32(
+        dst_width: usize,
+        bounds: &FilterBounds,
+        unsafe_source_ptr_0: *const f32,
+        unsafe_destination_ptr_0: *mut f32,
+        src_stride: usize,
+        weight_ptr: *const f32,
+    ) {
+        let mut cx = 0usize;
+
+        while cx + 16 < dst_width {
+            unsafe {
+                convolve_vertical_part_sse_16_f32(
+                    bounds.start,
+                    cx,
+                    unsafe_source_ptr_0,
+                    src_stride,
+                    unsafe_destination_ptr_0,
+                    weight_ptr,
+                    bounds,
+                );
+            }
+
+            cx += 16;
+        }
+
+        while cx + 8 < dst_width {
+            unsafe {
+                convolve_vertical_part_sse_8_f32(
+                    bounds.start,
+                    cx,
+                    unsafe_source_ptr_0,
+                    src_stride,
+                    unsafe_destination_ptr_0,
+                    weight_ptr,
+                    bounds,
+                );
+            }
+
+            cx += 8;
+        }
+
+        while cx + 4 < dst_width {
+            unsafe {
+                convolve_vertical_part_sse_4_f32(
+                    bounds.start,
+                    cx,
+                    unsafe_source_ptr_0,
+                    src_stride,
+                    unsafe_destination_ptr_0,
+                    weight_ptr,
+                    bounds,
+                );
+            }
+
+            cx += 4;
+        }
+
+        while cx < dst_width {
+            unsafe {
+                convolve_vertical_part_sse_f32(
+                    bounds.start,
+                    cx,
+                    unsafe_source_ptr_0,
+                    src_stride,
+                    unsafe_destination_ptr_0,
+                    weight_ptr,
+                    bounds,
+                );
+            }
+            cx += 1;
+        }
+    }
+
     #[cfg(not(target_feature = "fma"))]
     #[inline]
     #[allow(dead_code)]
@@ -382,7 +444,6 @@ pub mod sse_convolve_f32 {
         return _mm_add_ps(_mm_mul_ps(b, c), a);
     }
 
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     #[cfg(target_feature = "fma")]
     #[inline]
     #[allow(dead_code)]

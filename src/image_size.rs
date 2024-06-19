@@ -5,7 +5,7 @@
  * // license that can be found in the LICENSE file.
  */
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct ImageSize {
     pub width: usize,
     pub height: usize,

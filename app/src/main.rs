@@ -8,26 +8,38 @@ use fast_image_resize::{
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, GenericImageView};
 
-use pic_scale::{ImageSize, ImageStore, LabScaler, LChScaler, LinearApproxScaler, LinearScaler, LuvScaler, ResamplingFunction, Scaler, Scaling, SigmoidalScaler, ThreadingPolicy, TransferFunction, XYZScaler};
+use pic_scale::{
+    ImageSize, ImageStore, LinearScaler, ResamplingFunction, Scaler, Scaling, ThreadingPolicy,
+};
 
 fn main() {
     // test_fast_image();
 
-    let img = ImageReader::open("./assets/beach_horizon.jpg")
+    let img = ImageReader::open("./assets/asset.jpg")
         .unwrap()
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
     let mut bytes = Vec::from(img.as_bytes());
 
+    let mut scaler = LinearScaler::new(ResamplingFunction::Lagrange3);
+    scaler.set_threading_policy(ThreadingPolicy::Single);
+    // let store =
+    //     ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
+    // let resized = scaler.resize_rgba(
+    //     ImageSize::new(dimensions.0 as usize / 3, dimensions.1 as usize / 3),
+    //     store,
+    //     false,
+    // );
+
+    let mut f_store: Vec<f32> = bytes.iter().map(|&x| x as f32 * (1f32 / 255f32)).collect();
+
     let start_time = Instant::now();
 
-    let mut scaler = LChScaler::new(ResamplingFunction::Lanczos3);
-    scaler.set_threading_policy(ThreadingPolicy::Single);
     let store =
-        ImageStore::<u8, 3>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
-    let resized = scaler.resize_rgb(
-        ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
+        ImageStore::<f32, 3>::from_slice(&mut f_store, dimensions.0 as usize, dimensions.1 as usize);
+    let resized = scaler.resize_rgb_f32(
+        ImageSize::new(dimensions.0 as usize / 3, dimensions.1 as usize / 3),
         store,
     );
 
@@ -35,10 +47,13 @@ fn main() {
     // Print the elapsed time in milliseconds
     println!("Scaler: {:.2?}", elapsed_time);
 
+    let j_store: Vec<u8> = resized.as_bytes().iter().map(|&x| (x * 255f32) as u8).collect();
+    let dst = j_store;
+
     if resized.channels == 4 {
         image::save_buffer(
             "converted.png",
-            resized.as_bytes(),
+            &dst,
             resized.width as u32,
             resized.height as u32,
             image::ExtendedColorType::Rgba8,
@@ -46,8 +61,8 @@ fn main() {
         .unwrap();
     } else {
         image::save_buffer(
-            "converted_lch.jpg",
-            resized.as_bytes(),
+            "converted.jpg",
+            &dst,
             resized.width as u32,
             resized.height as u32,
             image::ExtendedColorType::Rgb8,

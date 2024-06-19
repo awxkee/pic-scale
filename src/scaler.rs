@@ -28,7 +28,7 @@ pub trait Scaling {
     fn resize_rgb(&self, new_size: ImageSize, store: ImageStore<u8, 3>) -> ImageStore<u8, 3>;
     /// Performs rescaling for RGB f32, channel order does not matter
     fn resize_rgb_f32(&self, new_size: ImageSize, store: ImageStore<f32, 3>) -> ImageStore<f32, 3>;
-    /// Performs rescaling for RGBA, for pre-multiplying alpha, converting to LUV, LAB alpha must be last channel
+    /// Performs rescaling for RGBA, for pre-multiplying alpha, converting to LUV or LAB alpha must be last channel
     fn resize_rgba(
         &self,
         new_size: ImageSize,

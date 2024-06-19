@@ -7,6 +7,7 @@
 
 use crate::chunking::chunked;
 
+#[derive(Debug, Clone)]
 pub struct FilterWeights<T> {
     pub weights: Vec<T>,
     pub bounds: Vec<FilterBounds>,
@@ -16,7 +17,7 @@ pub struct FilterWeights<T> {
     pub coeffs_size: i32,
 }
 
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct FilterBounds {
     pub start: usize,
     pub size: usize,

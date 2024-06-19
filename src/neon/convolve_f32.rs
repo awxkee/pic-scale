@@ -1,73 +1,8 @@
-/*
- * // Copyright (c) the Radzivon Bartoshyk. All rights reserved.
- * //
- * // Use of this source code is governed by a BSD-style
- * // license that can be found in the LICENSE file.
- */
-
 use crate::filter_weights::FilterBounds;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::neon::utils::prefer_vfmaq_f32;
 use std::arch::aarch64::*;
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-#[inline(always)]
-#[allow(dead_code)]
-pub(crate) unsafe fn prefer_vfmaq_f32(
-    a: float32x4_t,
-    b: float32x4_t,
-    c: float32x4_t,
-) -> float32x4_t {
-    #[cfg(target_arch = "aarch64")]
-    {
-        return vfmaq_f32(a, b, c);
-    }
-    #[cfg(target_arch = "arm")]
-    {
-        return vmlaq_f32(a, b, c);
-    }
-}
-
-#[inline(always)]
 #[allow(unused)]
-pub(crate) unsafe fn convolve_vertical_part_f32<const PART: usize, const CHANNELS: usize>(
-    start_y: usize,
-    start_x: usize,
-    src: *const f32,
-    src_stride: usize,
-    dst: *mut f32,
-    filter: *const f32,
-    bounds: &FilterBounds,
-) {
-    let mut store: [[f32; CHANNELS]; PART] = [[0f32; CHANNELS]; PART];
-
-    for j in 0..bounds.size {
-        let py = start_y + j;
-        let weight = *unsafe { filter.add(j) };
-        let src_ptr = src.add(src_stride * py);
-        for x in 0..PART {
-            let px = (start_x + x) * CHANNELS;
-            let s_ptr = src_ptr.add(px);
-            for c in 0..CHANNELS {
-                let store_p = store.get_unchecked_mut(x);
-                let store_v = store_p.get_unchecked_mut(c);
-                *store_v += unsafe { s_ptr.add(c).read_unaligned() } * weight;
-            }
-        }
-    }
-
-    for x in 0..PART {
-        let px = (start_x + x) * CHANNELS;
-        let dst_ptr = dst.add(px);
-        for c in 0..CHANNELS {
-            let vl = *(*store.get_unchecked_mut(x)).get_unchecked_mut(c);
-            dst_ptr.add(c).write_unaligned(vl);
-        }
-    }
-}
-
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-#[allow(unused)]
-#[inline(always)]
 pub(crate) unsafe fn convolve_vertical_part_neon_16_f32(
     start_y: usize,
     start_x: usize,
@@ -86,7 +21,7 @@ pub(crate) unsafe fn convolve_vertical_part_neon_16_f32(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = *unsafe { filter.add(j) };
+        let weight = unsafe { filter.add(j).read_unaligned() };
         let v_weight = vdupq_n_f32(weight);
         let src_ptr = src.add(src_stride * py);
 
@@ -104,7 +39,6 @@ pub(crate) unsafe fn convolve_vertical_part_neon_16_f32(
     vst1q_f32_x4(dst_ptr, f_set);
 }
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 #[inline(always)]
 pub(crate) unsafe fn convolve_vertical_part_neon_8_f32<const USE_BLENDING: bool>(
     start_y: usize,
@@ -152,7 +86,6 @@ pub(crate) unsafe fn convolve_vertical_part_neon_8_f32<const USE_BLENDING: bool>
     }
 }
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 #[inline(always)]
 pub unsafe fn vtransposeq_f32(matrix: float32x4x4_t) -> float32x4x4_t {
     let row0 = matrix.0;
@@ -172,7 +105,6 @@ pub unsafe fn vtransposeq_f32(matrix: float32x4x4_t) -> float32x4x4_t {
     return r;
 }
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 #[inline(always)]
 pub(crate) unsafe fn convolve_horizontal_parts_4_rgb_f32(
     start_x: usize,
@@ -203,7 +135,6 @@ pub(crate) unsafe fn convolve_horizontal_parts_4_rgb_f32(
     acc
 }
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 #[inline(always)]
 pub(crate) unsafe fn convolve_horizontal_parts_one_rgb_f32(
     start_x: usize,
@@ -226,7 +157,6 @@ pub(crate) unsafe fn convolve_horizontal_parts_one_rgb_f32(
     acc
 }
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 #[inline(always)]
 pub(crate) unsafe fn convolve_horizontal_parts_4_rgba_f32(
     start_x: usize,
@@ -249,7 +179,6 @@ pub(crate) unsafe fn convolve_horizontal_parts_4_rgba_f32(
     acc
 }
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 #[inline(always)]
 pub(crate) unsafe fn convolve_horizontal_parts_one_rgba_f32(
     start_x: usize,

@@ -5,10 +5,7 @@
  * // license that can be found in the LICENSE file.
  */
 
-use colorutils_rs::{
-    lch_to_rgb, lch_with_alpha_to_rgba,
-    rgb_to_lch, rgba_to_lch_with_alpha,
-};
+use colorutils_rs::{lch_to_rgb, lch_with_alpha_to_rgba, rgb_to_lch, rgba_to_lch_with_alpha};
 
 use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
 
