@@ -28,7 +28,10 @@ mod rgba_f32;
 mod rgba_u8;
 mod sampler;
 mod scaler;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
 mod sse;
 mod support;
 mod threading_policy;
