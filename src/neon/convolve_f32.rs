@@ -1,3 +1,10 @@
+/*
+ * // Copyright (c) the Radzivon Bartoshyk. All rights reserved.
+ * //
+ * // Use of this source code is governed by a BSD-style
+ * // license that can be found in the LICENSE file.
+ */
+
 use crate::filter_weights::FilterBounds;
 use crate::neon::utils::prefer_vfmaq_f32;
 use std::arch::aarch64::*;

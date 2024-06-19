@@ -1,3 +1,10 @@
+/*
+ * // Copyright (c) the Radzivon Bartoshyk. All rights reserved.
+ * //
+ * // Use of this source code is governed by a BSD-style
+ * // license that can be found in the LICENSE file.
+ */
+
 use crate::filter_weights::FilterWeights;
 use crate::sse::_mm_prefer_fma_ps;
 #[cfg(target_arch = "x86")]

@@ -407,7 +407,8 @@ pub fn unpremultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height
             unsafe {
                 while _cx + 32 < width {
                     let px = _cx * 4;
-                    let src_ptr = src.as_ptr().add(offset + px);
+                    let pixel_offset = offset + px;
+                    let src_ptr = src.as_ptr().add(pixel_offset);
                     let rgba0 = _mm256_loadu_si256(src_ptr as *const __m256i);
                     let rgba1 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
                     let rgba2 = _mm256_loadu_si256(src_ptr.add(64) as *const __m256i);
@@ -420,7 +421,7 @@ pub fn unpremultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height
 
                     let (rgba0, rgba1, rgba2, rgba3) = avx2_interleave_rgba(rrr, ggg, bbb, aaa);
 
-                    let dst_ptr = dst.as_mut_ptr().add(offset + px);
+                    let dst_ptr = dst.as_mut_ptr().add(pixel_offset);
                     _mm256_storeu_si256(dst_ptr as *mut __m256i, rgba0);
                     _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, rgba1);
                     _mm256_storeu_si256(dst_ptr.add(64) as *mut __m256i, rgba2);
@@ -439,7 +440,8 @@ pub fn unpremultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height
             unsafe {
                 while _cx + 16 < width {
                     let px = _cx * 4;
-                    let src_ptr = src.as_ptr().add(offset + px);
+                    let pixel_offset = offset + px;
+                    let src_ptr = src.as_ptr().add(pixel_offset);
                     let rgba0 = _mm_loadu_si128(src_ptr as *const __m128i);
                     let rgba1 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
                     let rgba2 = _mm_loadu_si128(src_ptr.add(32) as *const __m128i);
@@ -467,12 +469,13 @@ pub fn unpremultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height
         unsafe {
             while _cx + 16 < width {
                 let px = _cx * 4;
-                let src_ptr = src.as_ptr().add(offset + px);
+                let pixel_offset = offset + px;
+                let src_ptr = src.as_ptr().add(pixel_offset);
                 let mut pixel = vld4q_u8(src_ptr);
                 pixel.0 = neon_umpremultiply_alpha(pixel.0, pixel.3);
                 pixel.1 = neon_umpremultiply_alpha(pixel.1, pixel.3);
                 pixel.2 = neon_umpremultiply_alpha(pixel.2, pixel.3);
-                let dst_ptr = dst.as_mut_ptr().add(offset + px);
+                let dst_ptr = dst.as_mut_ptr().add(pixel_offset);
                 vst4q_u8(dst_ptr, pixel);
                 _cx += 16;
             }
@@ -480,10 +483,11 @@ pub fn unpremultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height
 
         for x in _cx..width {
             let px = x * 4;
-            let mut r = *unsafe { src.get_unchecked(offset + px) } as i32;
-            let mut g = *unsafe { src.get_unchecked(offset + px + 1) } as i32;
-            let mut b = *unsafe { src.get_unchecked(offset + px + 2) } as i32;
-            let a = *unsafe { src.get_unchecked(offset + px + 3) } as i32;
+            let pixel_offset = offset + px;
+            let mut r = *unsafe { src.get_unchecked(pixel_offset) } as i32;
+            let mut g = *unsafe { src.get_unchecked(pixel_offset + 1) } as i32;
+            let mut b = *unsafe { src.get_unchecked(pixel_offset + 2) } as i32;
+            let a = *unsafe { src.get_unchecked(pixel_offset + 3) } as i32;
             if a != 0 {
                 r *= 255;
                 g *= 255;
@@ -497,10 +501,10 @@ pub fn unpremultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height
                 b = 0;
             }
             unsafe {
-                *dst.get_unchecked_mut(offset + px) = r as u8;
-                *dst.get_unchecked_mut(offset + px + 1) = g as u8;
-                *dst.get_unchecked_mut(offset + px + 2) = b as u8;
-                *dst.get_unchecked_mut(offset + px + 3) = a as u8;
+                *dst.get_unchecked_mut(pixel_offset) = r as u8;
+                *dst.get_unchecked_mut(pixel_offset + 1) = g as u8;
+                *dst.get_unchecked_mut(pixel_offset + 2) = b as u8;
+                *dst.get_unchecked_mut(pixel_offset + 3) = a as u8;
             }
         }
 

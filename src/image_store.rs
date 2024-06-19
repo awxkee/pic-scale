@@ -1,13 +1,14 @@
-use crate::alpha_handle::{premultiply_alpha_rgba, unpremultiply_alpha_rgba};
-use crate::ImageSize;
-use num_traits::FromPrimitive;
-use std::fmt::Debug;
 /*
  * // Copyright (c) the Radzivon Bartoshyk. All rights reserved.
  * //
  * // Use of this source code is governed by a BSD-style
  * // license that can be found in the LICENSE file.
  */
+
+use crate::alpha_handle::{premultiply_alpha_rgba, unpremultiply_alpha_rgba};
+use crate::ImageSize;
+use num_traits::FromPrimitive;
+use std::fmt::Debug;
 
 #[derive(Debug)]
 pub struct ImageStore<'a, T, const N: usize>

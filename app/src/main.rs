@@ -15,7 +15,7 @@ use pic_scale::{
 fn main() {
     // test_fast_image();
 
-    let img = ImageReader::open("./assets/asset.jpg")
+    let img = ImageReader::open("./assets/nasa-4928x3279.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -32,16 +32,16 @@ fn main() {
     //     false,
     // );
 
-    // let mut f_store: Vec<f32> = bytes.iter().map(|&x| x as f32 * (1f32 / 255f32)).collect();
+    let mut f_store: Vec<f32> = bytes.iter().map(|&x| x as f32 * (1f32 / 255f32)).collect();
 
     let start_time = Instant::now();
 
-    let store = ImageStore::<u8, 3>::from_slice(
-        &mut bytes,
+    let store = ImageStore::<f32, 3>::from_slice(
+        &mut f_store,
         dimensions.0 as usize,
         dimensions.1 as usize,
     );
-    let resized = scaler.resize_rgb(
+    let resized = scaler.resize_rgb_f32(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
         store,
     );
@@ -50,12 +50,12 @@ fn main() {
     // Print the elapsed time in milliseconds
     println!("Scaler: {:.2?}", elapsed_time);
 
-    // let j_store: Vec<u8> = resized
-    //     .as_bytes()
-    //     .iter()
-    //     .map(|&x| (x * 255f32) as u8)
-    //     .collect();
-    let dst = resized.as_bytes();
+    let j_store: Vec<u8> = resized
+        .as_bytes()
+        .iter()
+        .map(|&x| (x * 255f32) as u8)
+        .collect();
+    let dst = j_store;
 
     if resized.channels == 4 {
         image::save_buffer(
@@ -115,7 +115,7 @@ fn main() {
 }
 
 fn test_fast_image() {
-    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
+    let img = ImageReader::open("./assets/nasa-4928x3279.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -125,7 +125,7 @@ fn test_fast_image() {
 
     let start_time = Instant::now();
 
-    let pixel_type: PixelType = PixelType::U8x4;
+    let pixel_type: PixelType = PixelType::U8x3;
 
     let src_image = Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
 

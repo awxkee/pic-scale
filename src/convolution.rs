@@ -6,7 +6,6 @@
  */
 
 use std::fmt::Debug;
-
 use num_traits::FromPrimitive;
 use rayon::ThreadPool;
 

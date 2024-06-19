@@ -13,7 +13,7 @@ pub(crate) enum AccelerationFeature {
     Neon,
     #[cfg(all(
         any(target_arch = "x86_64", target_arch = "x86"),
-        target_feature = "see4.1"
+        target_feature = "sse4.1"
     ))]
     Sse,
     #[allow(dead_code)]

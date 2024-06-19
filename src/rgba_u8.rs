@@ -8,9 +8,7 @@
 use rayon::ThreadPool;
 
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
-use crate::convolve_naive_u8::{
-    convolve_horizontal_rgba_native_4_row, convolve_horizontal_rgba_native_row,
-};
+use crate::convolve_naive_u8::*;
 use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertical_dispatch_u8};
 use crate::filter_weights::{FilterBounds, FilterWeights};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]

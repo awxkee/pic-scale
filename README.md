@@ -47,8 +47,8 @@ M3 Pro. NEON
 
 |           | Lanczos3 |
 |-----------|:--------:|
-| pic-scale |  23.04   |
-| fir sse   |  37.00   |
+| pic-scale |  14.54   |
+| fir sse   |  36.69   |
 
 Example comparison time for downscale RGBA 4928x3279 image in two times for x86_64 SSE with premultiplying alpha.
 
@@ -61,8 +61,8 @@ M3 Pro. NEON
 
 |           | Lanczos3 |
 |-----------|:--------:|
-| pic-scale |  47.45   |
-| fir sse   |  53.81   |
+| pic-scale |  28.70   |
+| fir sse   |  50.43   |
 
 Example comparison time for downscale RGBA 4928x3279 image in two times for x86_64 SSE without premultiplying alpha.
 
@@ -75,8 +75,8 @@ M3 Pro. NEON
 
 |           | Lanczos3 |
 |-----------|:--------:|
-| pic-scale |  38.75   |
-| fir sse   |  45.79   |
+| pic-scale |  16.46   |
+| fir sse   |  39.84   |
 
 #### Example in sRGB
 
@@ -161,6 +161,20 @@ let resized = scaler.resize_rgba(
     true
 );
 ```
+
+#### Example in LCh colorspace
+```rust
+let mut scaler = LChScaler::new(ResamplingFunction::Hermite);
+scaler.set_threading_policy(ThreadingPolicy::Single);
+let store =
+    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height);
+let resized = scaler.resize_rgba(
+    ImageSize::new(new_width, new_height),
+    store,
+    true
+);
+```
+
 
 #### Resampling filters
 
