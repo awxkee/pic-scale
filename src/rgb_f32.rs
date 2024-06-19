@@ -14,8 +14,11 @@ use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::image_store::ImageStore;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::*;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::sse::sse_convolve_f32::convolve_vertical_rgb_sse_row_f32;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
+use crate::sse::*;
 
 #[inline(always)]
 pub(crate) fn convolve_vertical_rgb_native_row_f32<const COMPONENTS: usize>(
@@ -94,16 +97,16 @@ impl<'a> HorizontalConvolutionPass<f32, 3> for ImageStore<'a, f32, 3> {
             _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rows_4_f32);
             _dispatcher_row = convolve_horizontal_rgb_neon_row_one_f32;
         }
-        // #[cfg(all(
-        //     any(target_arch = "x86_64", target_arch = "x86"),
-        //     target_feature = "sse4.1"
-        // ))]
-        // {
-        //     if is_x86_feature_detected!("sse4.1") {
-        //         _dispatcher_4_rows = Some(convolve_horizontal_rgba_sse_rows_4_f32);
-        //         _dispatcher_row = convolve_horizontal_rgb_sse_row_f32;
-        //     }
-        // }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
+        {
+            if is_x86_feature_detected!("sse4.1") {
+                _dispatcher_4_rows = Some(convolve_horizontal_rgb_sse_rows_4_f32);
+                _dispatcher_row = convolve_horizontal_rgb_sse_row_one_f32;
+            }
+        }
         convolve_horizontal_dispatch_f32(
             self,
             filter_weights,
@@ -134,7 +137,7 @@ impl<'a> VerticalConvolutionPass<f32, 3> for ImageStore<'a, f32, 3> {
         ))]
         {
             if is_x86_feature_detected!("sse4.1") {
-                _dispatcher = convolve_vertical_rgb_sse_row_f32;
+                _dispatcher = convolve_vertical_rgb_sse_row_f32::<3>;
             }
         }
         convolve_vertical_dispatch_f32(self, filter_weights, destination, pool, _dispatcher);

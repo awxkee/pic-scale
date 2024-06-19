@@ -3,17 +3,21 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "avx2"
+))]
 #[inline(always)]
-#[allow(dead_code)]
 pub const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
     // Checked: we want to reinterpret the bits
     ((z << 6) | (y << 4) | (x << 2) | w) as i32
 }
 
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "avx2"
+))]
 #[inline(always)]
-#[allow(dead_code)]
 pub unsafe fn _mm256_select_si256(
     mask: __m256i,
     true_vals: __m256i,
@@ -25,16 +29,20 @@ pub unsafe fn _mm256_select_si256(
     )
 }
 
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "avx2"
+))]
 #[inline(always)]
-#[allow(dead_code)]
 pub unsafe fn _mm256_selecti_ps(mask: __m256i, true_vals: __m256, false_vals: __m256) -> __m256 {
     _mm256_blendv_ps(false_vals, true_vals, _mm256_castsi256_ps(mask))
 }
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "avx2"
+))]
 #[inline(always)]
-#[allow(dead_code)]
 pub unsafe fn avx2_div_by255(v: __m256i) -> __m256i {
     let rounding = _mm256_set1_epi16(1 << 7);
     let x = _mm256_adds_epi16(v, rounding);
@@ -85,9 +93,11 @@ pub unsafe fn avx2_deinterleave_rgba(
     (b0, g0, r0, a0)
 }
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "avx2"
+))]
 #[inline(always)]
-#[allow(dead_code)]
 pub unsafe fn avx2_interleave_rgba(
     r: __m256i,
     g: __m256i,
@@ -111,18 +121,22 @@ pub unsafe fn avx2_interleave_rgba(
     (rgba0, rgba1, rgba2, rgba3)
 }
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "avx2"
+))]
 #[inline(always)]
-#[allow(dead_code)]
 pub unsafe fn avx2_pack_u16(s_1: __m256i, s_2: __m256i) -> __m256i {
     let packed = _mm256_packus_epi16(s_1, s_2);
     const MASK: i32 = shuffle(3, 1, 2, 0);
     return _mm256_permute4x64_epi64::<MASK>(packed);
 }
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "avx2"
+))]
 #[inline(always)]
-#[allow(dead_code)]
 pub unsafe fn avx2_pack_s32(s_1: __m256i, s_2: __m256i) -> __m256i {
     let packed = _mm256_packs_epi32(s_1, s_2);
     const MASK: i32 = shuffle(3, 1, 2, 0);

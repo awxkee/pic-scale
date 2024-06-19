@@ -5,10 +5,16 @@
  * // license that can be found in the LICENSE file.
  */
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "avx2"
+))]
 use crate::avx2_utils::*;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-use crate::sse_utils::*;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
+use crate::sse::*;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use std::arch::aarch64::*;
 #[cfg(target_arch = "x86")]
@@ -128,9 +134,11 @@ pub unsafe fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
     _mm_select_si128(is_zero_mask, _mm_setzero_si128(), _mm_packus_epi16(lo, hi))
 }
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "avx2"
+))]
 #[inline(always)]
-#[allow(dead_code)]
 pub unsafe fn avx2_unpremultiply_row(x: __m256i, a: __m256i) -> __m256i {
     let zeros = _mm256_setzero_si256();
     let lo = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(x));
@@ -215,7 +223,10 @@ pub fn premultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height: 
     for _ in 0..height {
         let mut _cx = 0usize;
 
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "avx2"
+        ))]
         if _has_avx2 {
             unsafe {
                 while _cx + 32 < width {

@@ -72,7 +72,9 @@ pub(crate) fn convolve_horizontal_dispatch_f32<const CHANNELS: usize>(
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStore<f32, CHANNELS>,
     pool: &Option<ThreadPool>,
-    dispatcher_4_rows: Option<fn(usize, usize, &FilterWeights<f32>, *const f32, usize, *mut f32, usize)>,
+    dispatcher_4_rows: Option<
+        fn(usize, usize, &FilterWeights<f32>, *const f32, usize, *mut f32, usize),
+    >,
     dispatcher_row: fn(usize, usize, &FilterWeights<f32>, *const f32, *mut f32),
 ) {
     let mut unsafe_source_ptr_0 = image_store.buffer.borrow().as_ptr();

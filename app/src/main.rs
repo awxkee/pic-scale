@@ -22,7 +22,7 @@ fn main() {
     let dimensions = img.dimensions();
     let mut bytes = Vec::from(img.as_bytes());
 
-    let mut scaler = LinearScaler::new(ResamplingFunction::Lagrange3);
+    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
     // let store =
     //     ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
@@ -32,14 +32,17 @@ fn main() {
     //     false,
     // );
 
-    let mut f_store: Vec<f32> = bytes.iter().map(|&x| x as f32 * (1f32 / 255f32)).collect();
+    // let mut f_store: Vec<f32> = bytes.iter().map(|&x| x as f32 * (1f32 / 255f32)).collect();
 
     let start_time = Instant::now();
 
-    let store =
-        ImageStore::<f32, 3>::from_slice(&mut f_store, dimensions.0 as usize, dimensions.1 as usize);
-    let resized = scaler.resize_rgb_f32(
-        ImageSize::new(dimensions.0 as usize / 3, dimensions.1 as usize / 3),
+    let store = ImageStore::<u8, 3>::from_slice(
+        &mut bytes,
+        dimensions.0 as usize,
+        dimensions.1 as usize,
+    );
+    let resized = scaler.resize_rgb(
+        ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
         store,
     );
 
@@ -47,8 +50,12 @@ fn main() {
     // Print the elapsed time in milliseconds
     println!("Scaler: {:.2?}", elapsed_time);
 
-    let j_store: Vec<u8> = resized.as_bytes().iter().map(|&x| (x * 255f32) as u8).collect();
-    let dst = j_store;
+    // let j_store: Vec<u8> = resized
+    //     .as_bytes()
+    //     .iter()
+    //     .map(|&x| (x * 255f32) as u8)
+    //     .collect();
+    let dst = resized.as_bytes();
 
     if resized.channels == 4 {
         image::save_buffer(
@@ -108,7 +115,7 @@ fn main() {
 }
 
 fn test_fast_image() {
-    let img = ImageReader::open("./assets/asset_5.png")
+    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
         .unwrap()
         .decode()
         .unwrap();

@@ -12,13 +12,14 @@ use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::image_store::ImageStore;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::*;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
 use crate::sse::sse_rgb::{
     convolve_horizontal_rgb_sse_row_one, convolve_horizontal_rgb_sse_rows_4,
     convolve_vertical_rgb_sse_row,
 };
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::sse::*;
 use rayon::ThreadPool;
 
 #[inline(always)]
@@ -144,7 +145,7 @@ impl<'a> VerticalConvolutionPass<u8, 3> for ImageStore<'a, u8, 3> {
         ))]
         {
             if is_x86_feature_detected!("sse4.1") {
-                _dispatcher = convolve_vertical_rgb_sse_row;
+                _dispatcher = convolve_vertical_rgb_sse_row::<3>;
             }
         }
         convolve_vertical_dispatch_u8(self, filter_weights, destination, pool, _dispatcher);
