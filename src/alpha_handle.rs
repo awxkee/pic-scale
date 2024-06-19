@@ -273,7 +273,10 @@ pub fn premultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height: 
             }
         }
 
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
         if _has_sse {
             unsafe {
                 let zeros = _mm_setzero_si128();
