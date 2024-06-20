@@ -34,9 +34,7 @@ let resized = scaler.resize_rgba(
 
 ### Performance
 
-Faster or comparable to `fast-image-resize`, when implemented equal SIMD and pixel type.
-
-Example comparison time for downscale RGB 4928x3279 image in two times for x86_64 SSE.
+Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 image in two times for x86_64 SSE.
 
 |           | Lanczos3 |
 |-----------|:--------:|
