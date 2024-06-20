@@ -49,8 +49,9 @@ pub fn convolve_horizontal_rgba_sse_row_one_f32(
                 let weight1 = _mm_set1_ps(ptr.add(1).read_unaligned());
                 let weight2 = _mm_set1_ps(ptr.add(2).read_unaligned());
                 let weight3 = _mm_set1_ps(ptr.add(3).read_unaligned());
+                let filter_start = jx + bounds.start;
                 store = convolve_horizontal_parts_4_rgba_f32(
-                    bounds.start,
+                    filter_start,
                     unsafe_source_ptr_0,
                     weight0,
                     weight1,
@@ -63,8 +64,9 @@ pub fn convolve_horizontal_rgba_sse_row_one_f32(
             while jx < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let weight0 = _mm_set1_ps(ptr.read_unaligned());
+                let filter_start = jx + bounds.start;
                 store = convolve_horizontal_parts_one_rgba_f32(
-                    bounds.start,
+                    filter_start,
                     unsafe_source_ptr_0,
                     weight0,
                     store,
