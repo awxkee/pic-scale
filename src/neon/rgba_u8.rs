@@ -214,8 +214,9 @@ pub fn convolve_horizontal_rgba_neon_row(
                 let weight1 = vdupq_n_s16(ptr.add(1).read_unaligned());
                 let weight2 = vdup_n_s16(ptr.add(2).read_unaligned());
                 let weight3 = vdupq_n_s16(ptr.add(3).read_unaligned());
+                let bounds_start = bounds.start + jx;
                 store = convolve_horizontal_parts_4_rgba(
-                    bounds.start + jx,
+                    bounds_start,
                     unsafe_source_ptr_0,
                     weight0,
                     weight1,
@@ -244,8 +245,9 @@ pub fn convolve_horizontal_rgba_neon_row(
             while jx < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let weight0 = vdup_n_s16(ptr.read_unaligned());
+                let bounds_start = bounds.start + jx;
                 store = convolve_horizontal_parts_one_rgba(
-                    bounds.start + jx,
+                    bounds_start,
                     unsafe_source_ptr_0,
                     weight0,
                     store,
