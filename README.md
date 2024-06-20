@@ -38,8 +38,8 @@ Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 ima
 
 |           | Lanczos3 |
 |-----------|:--------:|
-| pic-scale |  19.16   |
-| fir sse   |  26.84   |
+| pic-scale |  38.73   |
+| fir sse   |  36.94   |
 
 M3 Pro. NEON
 
@@ -52,8 +52,8 @@ Example comparison time for downscale RGBA 4928x3279 image in two times for x86_
 
 |           | Lanczos3 |
 |-----------|:--------:|
-| pic-scale |  33.64   |
-| fir sse   |  40.33   |
+| pic-scale |  35.51   |
+| fir sse   |  30.87   |
 
 M3 Pro. NEON
 
@@ -66,8 +66,8 @@ Example comparison time for downscale RGBA 4928x3279 image in two times for x86_
 
 |           | Lanczos3 |
 |-----------|:--------:|
-| pic-scale |  18.80   |
-| fir sse   |  30.30   |
+| pic-scale |  24.00   |
+| fir sse   |  23.13   |
 
 M3 Pro. NEON
 
