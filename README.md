@@ -45,7 +45,7 @@ M3 Pro. NEON
 
 |           | Lanczos3 |
 |-----------|:--------:|
-| pic-scale |  14.54   |
+| pic-scale |  27.58   |
 | fir sse   |  36.69   |
 
 Example comparison time for downscale RGBA 4928x3279 image in two times for x86_64 SSE with premultiplying alpha.
@@ -59,8 +59,8 @@ M3 Pro. NEON
 
 |           | Lanczos3 |
 |-----------|:--------:|
-| pic-scale |  28.70   |
-| fir sse   |  50.43   |
+| pic-scale |  26.24   |
+| fir sse   |  31.43   |
 
 Example comparison time for downscale RGBA 4928x3279 image in two times for x86_64 SSE without premultiplying alpha.
 
@@ -73,8 +73,8 @@ M3 Pro. NEON
 
 |           | Lanczos3 |
 |-----------|:--------:|
-| pic-scale |  16.46   |
-| fir sse   |  39.84   |
+| pic-scale |  18.89   |
+| fir sse   |  25.82   |
 
 #### Example in sRGB
 

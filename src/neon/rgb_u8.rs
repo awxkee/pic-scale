@@ -9,7 +9,7 @@
 pub mod neon_rgb {
     use crate::filter_weights::{FilterBounds, FilterWeights};
     use crate::neon::utils::neon_convolve_u8;
-    use crate::support::ROUNDING_APPROX;
+    use crate::support::{PRECISION, ROUNDING_APPROX};
     use std::arch::aarch64::*;
 
     pub fn convolve_horizontal_rgb_neon_rows_4(
@@ -162,7 +162,7 @@ pub mod neon_rgb {
                     jx += 1;
                 }
 
-                let store_16 = vqshrun_n_s32::<12>(vmaxq_s32(store_0, zeros));
+                let store_16 = vqshrun_n_s32::<PRECISION>(vmaxq_s32(store_0, zeros));
                 let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
 
                 let px = x * CHANNELS;
@@ -173,7 +173,7 @@ pub mod neon_rgb {
                 dest_ptr.add(1).write_unaligned(bytes[1]);
                 dest_ptr.add(2).write_unaligned(bytes[2]);
 
-                let store_16 = vqshrun_n_s32::<12>(vmaxq_s32(store_1, zeros));
+                let store_16 = vqshrun_n_s32::<PRECISION>(vmaxq_s32(store_1, zeros));
                 let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
 
                 let px = x * CHANNELS;
@@ -185,7 +185,7 @@ pub mod neon_rgb {
                 dest_ptr.add(1).write_unaligned(bytes[1]);
                 dest_ptr.add(2).write_unaligned(bytes[2]);
 
-                let store_16 = vqshrun_n_s32::<12>(vmaxq_s32(store_2, zeros));
+                let store_16 = vqshrun_n_s32::<PRECISION>(vmaxq_s32(store_2, zeros));
                 let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
 
                 let px = x * CHANNELS;
@@ -196,7 +196,7 @@ pub mod neon_rgb {
                 dest_ptr.add(1).write_unaligned(bytes[1]);
                 dest_ptr.add(2).write_unaligned(bytes[2]);
 
-                let store_16 = vqshrun_n_s32::<12>(vmaxq_s32(store_3, zeros));
+                let store_16 = vqshrun_n_s32::<PRECISION>(vmaxq_s32(store_3, zeros));
                 let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
 
                 let px = x * CHANNELS;
@@ -284,7 +284,7 @@ pub mod neon_rgb {
                     jx += 1;
                 }
 
-                let store_16 = vqshrun_n_s32::<12>(vmaxq_s32(store, zeros));
+                let store_16 = vqshrun_n_s32::<PRECISION>(vmaxq_s32(store, zeros));
                 let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
 
                 let px = x * CHANNELS;

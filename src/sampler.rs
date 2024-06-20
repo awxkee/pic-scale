@@ -537,7 +537,7 @@ impl ResamplingFilter {
             window: None,
             min_kernel_size,
             is_ewa,
-            is_resizable_kernel: false,
+            is_resizable_kernel: true,
         }
     }
 
@@ -566,7 +566,7 @@ impl ResamplingFilter {
             window: None,
             min_kernel_size,
             is_ewa,
-            is_resizable_kernel: true,
+            is_resizable_kernel: false,
         }
     }
 }
@@ -674,26 +674,5 @@ impl ResamplingFunction {
             ResamplingFunction::Lanczos6Jinc => ResamplingFilter::new(lanczos6_jinc, 6f32, false),
             ResamplingFunction::Lanczos6 => ResamplingFilter::new(lanczos6, 6f32, false),
         };
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    extern crate test;
-
-    use test::Bencher;
-
-    use crate::sinc;
-
-    use super::*;
-
-    #[bench]
-    fn bench_sinc(b: &mut Bencher) {
-        b.iter(|| {
-            for i in 1..100000 {
-                let rebased = i as f32 / 100000f32;
-                _ = sinc(rebased);
-            }
-        });
     }
 }

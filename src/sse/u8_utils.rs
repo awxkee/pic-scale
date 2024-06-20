@@ -9,7 +9,7 @@
 pub mod sse_convolve_u8 {
 
     use crate::filter_weights::FilterBounds;
-    use crate::support::ROUNDING_APPROX;
+    use crate::support::{PRECISION, ROUNDING_APPROX};
     #[cfg(target_arch = "x86")]
     use std::arch::x86::*;
     #[cfg(target_arch = "x86_64")]
@@ -17,7 +17,8 @@ pub mod sse_convolve_u8 {
 
     #[inline(always)]
     pub fn compress_i32(x: __m128i) -> __m128i {
-        let store_32 = unsafe { _mm_srai_epi32::<12>(_mm_max_epi32(x, _mm_setzero_si128())) };
+        let store_32 =
+            unsafe { _mm_srai_epi32::<PRECISION>(_mm_max_epi32(x, _mm_setzero_si128())) };
         let store_16 = unsafe { _mm_packus_epi32(store_32, store_32) };
         let store_16_8 = unsafe { _mm_packus_epi16(store_16, store_16) };
         store_16_8
@@ -109,8 +110,14 @@ pub mod sse_convolve_u8 {
         store_2 = _mm_max_epi32(store_2, zeros);
         store_3 = _mm_max_epi32(store_3, zeros);
 
-        let low_16 = _mm_packs_epi32(_mm_srai_epi32::<12>(store_0), _mm_srai_epi32::<12>(store_1));
-        let high_16 = _mm_packs_epi32(_mm_srai_epi32::<12>(store_2), _mm_srai_epi32::<12>(store_3));
+        let low_16 = _mm_packs_epi32(
+            _mm_srai_epi32::<PRECISION>(store_0),
+            _mm_srai_epi32::<PRECISION>(store_1),
+        );
+        let high_16 = _mm_packs_epi32(
+            _mm_srai_epi32::<PRECISION>(store_2),
+            _mm_srai_epi32::<PRECISION>(store_3),
+        );
 
         let item = _mm_packus_epi16(low_16, high_16);
 
@@ -220,14 +227,14 @@ pub mod sse_convolve_u8 {
             store_7 = _mm_add_epi32(store_7, _mm_madd_epi16(pix, v_weight));
         }
 
-        store_0 = _mm_srai_epi32::<12>(store_0);
-        store_1 = _mm_srai_epi32::<12>(store_1);
-        store_2 = _mm_srai_epi32::<12>(store_2);
-        store_3 = _mm_srai_epi32::<12>(store_3);
-        store_4 = _mm_srai_epi32::<12>(store_4);
-        store_5 = _mm_srai_epi32::<12>(store_5);
-        store_6 = _mm_srai_epi32::<12>(store_6);
-        store_7 = _mm_srai_epi32::<12>(store_7);
+        store_0 = _mm_srai_epi32::<PRECISION>(store_0);
+        store_1 = _mm_srai_epi32::<PRECISION>(store_1);
+        store_2 = _mm_srai_epi32::<PRECISION>(store_2);
+        store_3 = _mm_srai_epi32::<PRECISION>(store_3);
+        store_4 = _mm_srai_epi32::<PRECISION>(store_4);
+        store_5 = _mm_srai_epi32::<PRECISION>(store_5);
+        store_6 = _mm_srai_epi32::<PRECISION>(store_6);
+        store_7 = _mm_srai_epi32::<PRECISION>(store_7);
 
         let rgb0 = _mm_packs_epi32(store_0, store_1);
         let rgb2 = _mm_packs_epi32(store_2, store_3);
@@ -308,7 +315,10 @@ pub mod sse_convolve_u8 {
         store_0 = _mm_max_epi32(store_0, zeros);
         store_1 = _mm_max_epi32(store_1, zeros);
 
-        let low_16 = _mm_packus_epi32(_mm_srai_epi32::<12>(store_0), _mm_srai_epi32::<12>(store_1));
+        let low_16 = _mm_packus_epi32(
+            _mm_srai_epi32::<PRECISION>(store_0),
+            _mm_srai_epi32::<PRECISION>(store_1),
+        );
 
         let item = _mm_packus_epi16(low_16, low_16);
 

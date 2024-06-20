@@ -10,7 +10,7 @@ use std::arch::aarch64::{float32x4_t, vfmaq_f32};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 pub mod neon_convolve_u8 {
     use crate::filter_weights::FilterBounds;
-    use crate::support::ROUNDING_APPROX;
+    use crate::support::{PRECISION, ROUNDING_APPROX};
     use std::arch::aarch64::*;
 
     #[inline(always)]
@@ -191,13 +191,25 @@ pub mod neon_convolve_u8 {
         store_6 = vmaxq_s32(store_6, zeros);
         store_7 = vmaxq_s32(store_7, zeros);
 
-        let low_16 = vcombine_u16(vqshrun_n_s32::<12>(store_0), vqshrun_n_s32::<12>(store_1));
-        let high_16 = vcombine_u16(vqshrun_n_s32::<12>(store_2), vqshrun_n_s32::<12>(store_3));
+        let low_16 = vcombine_u16(
+            vqshrun_n_s32::<PRECISION>(store_0),
+            vqshrun_n_s32::<PRECISION>(store_1),
+        );
+        let high_16 = vcombine_u16(
+            vqshrun_n_s32::<PRECISION>(store_2),
+            vqshrun_n_s32::<PRECISION>(store_3),
+        );
 
         let item_0 = vcombine_u8(vqmovn_u16(low_16), vqmovn_u16(high_16));
 
-        let low_16 = vcombine_u16(vqshrun_n_s32::<12>(store_4), vqshrun_n_s32::<12>(store_5));
-        let high_16 = vcombine_u16(vqshrun_n_s32::<12>(store_6), vqshrun_n_s32::<12>(store_7));
+        let low_16 = vcombine_u16(
+            vqshrun_n_s32::<PRECISION>(store_4),
+            vqshrun_n_s32::<PRECISION>(store_5),
+        );
+        let high_16 = vcombine_u16(
+            vqshrun_n_s32::<PRECISION>(store_6),
+            vqshrun_n_s32::<PRECISION>(store_7),
+        );
 
         let item_1 = vcombine_u8(vqmovn_u16(low_16), vqmovn_u16(high_16));
 
@@ -250,8 +262,14 @@ pub mod neon_convolve_u8 {
         store_2 = vmaxq_s32(store_2, zeros);
         store_3 = vmaxq_s32(store_3, zeros);
 
-        let low_16 = vcombine_u16(vqshrun_n_s32::<12>(store_0), vqshrun_n_s32::<12>(store_1));
-        let high_16 = vcombine_u16(vqshrun_n_s32::<12>(store_2), vqshrun_n_s32::<12>(store_3));
+        let low_16 = vcombine_u16(
+            vqshrun_n_s32::<PRECISION>(store_0),
+            vqshrun_n_s32::<PRECISION>(store_1),
+        );
+        let high_16 = vcombine_u16(
+            vqshrun_n_s32::<PRECISION>(store_2),
+            vqshrun_n_s32::<PRECISION>(store_3),
+        );
 
         let item = vcombine_u8(vqmovn_u16(low_16), vqmovn_u16(high_16));
 
@@ -301,7 +319,10 @@ pub mod neon_convolve_u8 {
         store_0 = vmaxq_s32(store_0, zeros);
         store_1 = vmaxq_s32(store_1, zeros);
 
-        let low_16 = vcombine_u16(vqshrun_n_s32::<12>(store_0), vqshrun_n_s32::<12>(store_1));
+        let low_16 = vcombine_u16(
+            vqshrun_n_s32::<PRECISION>(store_0),
+            vqshrun_n_s32::<PRECISION>(store_1),
+        );
 
         let item = vqmovn_u16(low_16);
 

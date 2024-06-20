@@ -5,9 +5,9 @@
  * // license that can be found in the LICENSE file.
  */
 
-use std::fmt::Debug;
 use num_traits::FromPrimitive;
 use rayon::ThreadPool;
+use std::fmt::Debug;
 
 use crate::filter_weights::FilterWeights;
 use crate::ImageStore;
