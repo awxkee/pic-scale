@@ -147,15 +147,16 @@ pub(crate) fn convolve_horizontal_rgba_sse_rows_4_f32(
             let mut store_1 = zeros;
             let mut store_2 = zeros;
             let mut store_3 = zeros;
-
             while jx + 4 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let weight0 = _mm_set1_ps(ptr.read_unaligned());
                 let weight1 = _mm_set1_ps(ptr.add(1).read_unaligned());
                 let weight2 = _mm_set1_ps(ptr.add(2).read_unaligned());
                 let weight3 = _mm_set1_ps(ptr.add(3).read_unaligned());
+                let filter_start = jx + bounds.start;
+
                 store_0 = convolve_horizontal_parts_4_rgba_f32(
-                    bounds.start,
+                    filter_start,
                     unsafe_source_ptr_0,
                     weight0,
                     weight1,
@@ -164,7 +165,7 @@ pub(crate) fn convolve_horizontal_rgba_sse_rows_4_f32(
                     store_0,
                 );
                 store_1 = convolve_horizontal_parts_4_rgba_f32(
-                    bounds.start,
+                    filter_start,
                     unsafe_source_ptr_0.add(src_stride),
                     weight0,
                     weight1,
@@ -173,7 +174,7 @@ pub(crate) fn convolve_horizontal_rgba_sse_rows_4_f32(
                     store_1,
                 );
                 store_2 = convolve_horizontal_parts_4_rgba_f32(
-                    bounds.start,
+                    filter_start,
                     unsafe_source_ptr_0.add(src_stride * 2),
                     weight0,
                     weight1,
@@ -182,7 +183,7 @@ pub(crate) fn convolve_horizontal_rgba_sse_rows_4_f32(
                     store_2,
                 );
                 store_3 = convolve_horizontal_parts_4_rgba_f32(
-                    bounds.start,
+                    filter_start,
                     unsafe_source_ptr_0.add(src_stride * 3),
                     weight0,
                     weight1,
@@ -197,29 +198,30 @@ pub(crate) fn convolve_horizontal_rgba_sse_rows_4_f32(
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let weight0 = _mm_set1_ps(ptr.read_unaligned());
                 let weight1 = _mm_set1_ps(ptr.add(1).read_unaligned());
+                let filter_start = jx + bounds.start;
                 store_0 = convolve_horizontal_parts_2_rgba_f32(
-                    bounds.start,
+                    filter_start,
                     unsafe_source_ptr_0,
                     weight0,
                     weight1,
                     store_0,
                 );
                 store_1 = convolve_horizontal_parts_2_rgba_f32(
-                    bounds.start,
+                    filter_start,
                     unsafe_source_ptr_0.add(src_stride),
                     weight0,
                     weight1,
                     store_1,
                 );
                 store_2 = convolve_horizontal_parts_2_rgba_f32(
-                    bounds.start,
+                    filter_start,
                     unsafe_source_ptr_0.add(src_stride * 2),
                     weight0,
                     weight1,
                     store_2,
                 );
                 store_3 = convolve_horizontal_parts_2_rgba_f32(
-                    bounds.start,
+                    filter_start,
                     unsafe_source_ptr_0.add(src_stride * 3),
                     weight0,
                     weight1,
@@ -230,27 +232,28 @@ pub(crate) fn convolve_horizontal_rgba_sse_rows_4_f32(
 
             while jx < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
+                let filter_start = jx + bounds.start;
                 let weight0 = _mm_set1_ps(ptr.read_unaligned());
                 store_0 = convolve_horizontal_parts_one_rgba_f32(
-                    bounds.start,
+                    filter_start,
                     unsafe_source_ptr_0,
                     weight0,
                     store_0,
                 );
                 store_1 = convolve_horizontal_parts_one_rgba_f32(
-                    bounds.start,
+                    filter_start,
                     unsafe_source_ptr_0.add(src_stride),
                     weight0,
                     store_1,
                 );
                 store_2 = convolve_horizontal_parts_one_rgba_f32(
-                    bounds.start,
+                    filter_start,
                     unsafe_source_ptr_0.add(src_stride * 2),
                     weight0,
                     store_2,
                 );
                 store_3 = convolve_horizontal_parts_one_rgba_f32(
-                    bounds.start,
+                    filter_start,
                     unsafe_source_ptr_0.add(src_stride * 3),
                     weight0,
                     store_3,
