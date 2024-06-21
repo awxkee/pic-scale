@@ -6,7 +6,10 @@
  */
 
 use crate::filter_weights::FilterWeights;
-use crate::neon::{convolve_horizontal_parts_4_rgba_f32, convolve_horizontal_parts_one_rgba_f32};
+use crate::neon::convolve_f32::{
+    convolve_horizontal_parts_2_rgba_f32, convolve_horizontal_parts_4_rgba_f32,
+    convolve_horizontal_parts_one_rgba_f32,
+};
 use std::arch::aarch64::*;
 
 pub fn convolve_horizontal_rgba_neon_row_one(
@@ -29,10 +32,10 @@ pub fn convolve_horizontal_rgba_neon_row_one(
             while jx + 4 < bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = ptr.read_unaligned();
-                let weight1 = ptr.add(1).read_unaligned();
-                let weight2 = ptr.add(2).read_unaligned();
-                let weight3 = ptr.add(3).read_unaligned();
+                let weight0 = vdupq_n_f32(ptr.read_unaligned());
+                let weight1 = vdupq_n_f32(ptr.add(1).read_unaligned());
+                let weight2 = vdupq_n_f32(ptr.add(2).read_unaligned());
+                let weight3 = vdupq_n_f32(ptr.add(3).read_unaligned());
                 store = convolve_horizontal_parts_4_rgba_f32(
                     bounds_start,
                     unsafe_source_ptr_0,
@@ -44,10 +47,26 @@ pub fn convolve_horizontal_rgba_neon_row_one(
                 );
                 jx += 4;
             }
+
+            while jx + 2 < bounds.size {
+                let bounds_start = bounds.start + jx;
+                let ptr = weights_ptr.add(jx + filter_offset);
+                let weight0 = vdupq_n_f32(ptr.read_unaligned());
+                let weight1 = vdupq_n_f32(ptr.add(1).read_unaligned());
+                store = convolve_horizontal_parts_2_rgba_f32(
+                    bounds_start,
+                    unsafe_source_ptr_0,
+                    weight0,
+                    weight1,
+                    store,
+                );
+                jx += 2;
+            }
+
             while jx < bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = ptr.read_unaligned();
+                let weight0 = vdupq_n_f32(ptr.read_unaligned());
                 store = convolve_horizontal_parts_one_rgba_f32(
                     bounds_start,
                     unsafe_source_ptr_0,
@@ -91,10 +110,10 @@ pub fn convolve_horizontal_rgba_neon_rows_4(
 
             while jx + 4 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = ptr.read_unaligned();
-                let weight1 = ptr.add(1).read_unaligned();
-                let weight2 = ptr.add(2).read_unaligned();
-                let weight3 = ptr.add(3).read_unaligned();
+                let weight0 = vdupq_n_f32(ptr.read_unaligned());
+                let weight1 = vdupq_n_f32(ptr.add(1).read_unaligned());
+                let weight2 = vdupq_n_f32(ptr.add(2).read_unaligned());
+                let weight3 = vdupq_n_f32(ptr.add(3).read_unaligned());
                 let bounds_start = bounds.start + jx;
                 store_0 = convolve_horizontal_parts_4_rgba_f32(
                     bounds_start,
@@ -134,9 +153,46 @@ pub fn convolve_horizontal_rgba_neon_rows_4(
                 );
                 jx += 4;
             }
+
+            while jx + 2 < bounds.size {
+                let ptr = weights_ptr.add(jx + filter_offset);
+                let weight0 = vdupq_n_f32(ptr.read_unaligned());
+                let weight1 = vdupq_n_f32(ptr.add(1).read_unaligned());
+                let bounds_start = bounds.start + jx;
+                store_0 = convolve_horizontal_parts_2_rgba_f32(
+                    bounds_start,
+                    unsafe_source_ptr_0,
+                    weight0,
+                    weight1,
+                    store_0,
+                );
+                store_1 = convolve_horizontal_parts_2_rgba_f32(
+                    bounds_start,
+                    unsafe_source_ptr_0.add(src_stride),
+                    weight0,
+                    weight1,
+                    store_1,
+                );
+                store_2 = convolve_horizontal_parts_2_rgba_f32(
+                    bounds_start,
+                    unsafe_source_ptr_0.add(src_stride * 2),
+                    weight0,
+                    weight1,
+                    store_2,
+                );
+                store_3 = convolve_horizontal_parts_2_rgba_f32(
+                    bounds_start,
+                    unsafe_source_ptr_0.add(src_stride * 3),
+                    weight0,
+                    weight1,
+                    store_3,
+                );
+                jx += 2;
+            }
+
             while jx < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = ptr.read_unaligned();
+                let weight0 = vdupq_n_f32(ptr.read_unaligned());
                 let bounds_start = bounds.start + jx;
                 store_0 = convolve_horizontal_parts_one_rgba_f32(
                     bounds_start,

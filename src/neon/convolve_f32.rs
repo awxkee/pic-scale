@@ -94,25 +94,6 @@ pub(crate) unsafe fn convolve_vertical_part_neon_8_f32<const USE_BLENDING: bool>
 }
 
 #[inline(always)]
-pub unsafe fn vtransposeq_f32(matrix: float32x4x4_t) -> float32x4x4_t {
-    let row0 = matrix.0;
-    let row1 = matrix.1;
-    let row2 = matrix.2;
-    let row3 = matrix.3;
-
-    let row01 = vtrnq_f32(row0, row1);
-    let row23 = vtrnq_f32(row2, row3);
-
-    let r = float32x4x4_t(
-        vcombine_f32(vget_low_f32(row01.0), vget_low_f32(row23.0)),
-        vcombine_f32(vget_low_f32(row01.1), vget_low_f32(row23.1)),
-        vcombine_f32(vget_high_f32(row01.0), vget_high_f32(row23.0)),
-        vcombine_f32(vget_high_f32(row01.1), vget_high_f32(row23.1)),
-    );
-    return r;
-}
-
-#[inline(always)]
 pub(crate) unsafe fn convolve_horizontal_parts_4_rgb_f32(
     start_x: usize,
     src: *const f32,
@@ -125,20 +106,54 @@ pub(crate) unsafe fn convolve_horizontal_parts_4_rgb_f32(
     const COMPONENTS: usize = 3;
     let src_ptr = src.add(start_x * COMPONENTS);
 
-    let rgb_pixel_3 = vld3q_f32(src_ptr);
-
-    let rgb_pixel = float32x4x4_t(
-        rgb_pixel_3.0,
-        rgb_pixel_3.1,
-        rgb_pixel_3.2,
-        vdupq_n_f32(0f32),
+    let mut rgb_pixel_0 = vld1q_f32(src_ptr);
+    rgb_pixel_0 = vsetq_lane_f32::<3>(0f32, rgb_pixel_0);
+    let mut rgb_pixel_1 = vld1q_f32(src_ptr.add(3));
+    rgb_pixel_1 = vsetq_lane_f32::<3>(0f32, rgb_pixel_1);
+    let mut rgb_pixel_2 = vld1q_f32(src_ptr.add(6));
+    rgb_pixel_2 = vsetq_lane_f32::<3>(0f32, rgb_pixel_2);
+    let rgb_pixel_3 = vld1q_f32(
+        [
+            src_ptr.add(9).read_unaligned(),
+            src_ptr.add(10).read_unaligned(),
+            src_ptr.add(11).read_unaligned(),
+            0f32,
+        ]
+        .as_ptr(),
     );
-    let rgb_pixel = vtransposeq_f32(rgb_pixel);
 
-    let acc = prefer_vfmaq_f32(store_0, rgb_pixel.0, weight0);
-    let acc = prefer_vfmaq_f32(acc, rgb_pixel.1, weight1);
-    let acc = prefer_vfmaq_f32(acc, rgb_pixel.2, weight2);
-    let acc = prefer_vfmaq_f32(acc, rgb_pixel.3, weight3);
+    let acc = prefer_vfmaq_f32(store_0, rgb_pixel_0, weight0);
+    let acc = prefer_vfmaq_f32(acc, rgb_pixel_1, weight1);
+    let acc = prefer_vfmaq_f32(acc, rgb_pixel_2, weight2);
+    let acc = prefer_vfmaq_f32(acc, rgb_pixel_3, weight3);
+    acc
+}
+
+#[inline(always)]
+pub(crate) unsafe fn convolve_horizontal_parts_2_rgb_f32(
+    start_x: usize,
+    src: *const f32,
+    weight0: float32x4_t,
+    weight1: float32x4_t,
+    store_0: float32x4_t,
+) -> float32x4_t {
+    const COMPONENTS: usize = 3;
+    let src_ptr = src.add(start_x * COMPONENTS);
+
+    let mut rgb_pixel_0 = vld1q_f32(src_ptr);
+    rgb_pixel_0 = vsetq_lane_f32::<3>(0f32, rgb_pixel_0);
+    let rgb_pixel_1 = vld1q_f32(
+        [
+            src_ptr.add(3).read_unaligned(),
+            src_ptr.add(4).read_unaligned(),
+            src_ptr.add(5).read_unaligned(),
+            0f32,
+        ]
+        .as_ptr(),
+    );
+
+    let acc = prefer_vfmaq_f32(store_0, rgb_pixel_0, weight0);
+    let acc = prefer_vfmaq_f32(acc, rgb_pixel_1, weight1);
     acc
 }
 
@@ -168,10 +183,10 @@ pub(crate) unsafe fn convolve_horizontal_parts_one_rgb_f32(
 pub(crate) unsafe fn convolve_horizontal_parts_4_rgba_f32(
     start_x: usize,
     src: *const f32,
-    weight0: f32,
-    weight1: f32,
-    weight2: f32,
-    weight3: f32,
+    weight0: float32x4_t,
+    weight1: float32x4_t,
+    weight2: float32x4_t,
+    weight3: float32x4_t,
     store_0: float32x4_t,
 ) -> float32x4_t {
     const COMPONENTS: usize = 4;
@@ -179,10 +194,28 @@ pub(crate) unsafe fn convolve_horizontal_parts_4_rgba_f32(
 
     let rgb_pixel = vld1q_f32_x4(src_ptr);
 
-    let acc = prefer_vfmaq_f32(store_0, rgb_pixel.0, vdupq_n_f32(weight0));
-    let acc = prefer_vfmaq_f32(acc, rgb_pixel.1, vdupq_n_f32(weight1));
-    let acc = prefer_vfmaq_f32(acc, rgb_pixel.2, vdupq_n_f32(weight2));
-    let acc = prefer_vfmaq_f32(acc, rgb_pixel.3, vdupq_n_f32(weight3));
+    let acc = prefer_vfmaq_f32(store_0, rgb_pixel.0, weight0);
+    let acc = prefer_vfmaq_f32(acc, rgb_pixel.1, weight1);
+    let acc = prefer_vfmaq_f32(acc, rgb_pixel.2, weight2);
+    let acc = prefer_vfmaq_f32(acc, rgb_pixel.3, weight3);
+    acc
+}
+
+#[inline(always)]
+pub(crate) unsafe fn convolve_horizontal_parts_2_rgba_f32(
+    start_x: usize,
+    src: *const f32,
+    weight0: float32x4_t,
+    weight1: float32x4_t,
+    store_0: float32x4_t,
+) -> float32x4_t {
+    const COMPONENTS: usize = 4;
+    let src_ptr = src.add(start_x * COMPONENTS);
+
+    let rgb_pixel = vld1q_f32_x2(src_ptr);
+
+    let acc = prefer_vfmaq_f32(store_0, rgb_pixel.0, weight0);
+    let acc = prefer_vfmaq_f32(acc, rgb_pixel.1, weight1);
     acc
 }
 
@@ -190,12 +223,12 @@ pub(crate) unsafe fn convolve_horizontal_parts_4_rgba_f32(
 pub(crate) unsafe fn convolve_horizontal_parts_one_rgba_f32(
     start_x: usize,
     src: *const f32,
-    weight0: f32,
+    weight0: float32x4_t,
     store_0: float32x4_t,
 ) -> float32x4_t {
     const COMPONENTS: usize = 4;
     let src_ptr = src.add(start_x * COMPONENTS);
     let rgb_pixel = vld1q_f32(src_ptr);
-    let acc = prefer_vfmaq_f32(store_0, rgb_pixel, vdupq_n_f32(weight0));
+    let acc = prefer_vfmaq_f32(store_0, rgb_pixel, weight0);
     acc
 }

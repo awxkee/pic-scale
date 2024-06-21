@@ -8,12 +8,11 @@
 mod convolve_f32;
 mod rgb_f32;
 mod rgb_u8;
+mod rgba_f32;
 mod rgba_u8;
 mod utils;
-mod rgba_f32;
 
-pub use convolve_f32::*;
 pub use rgb_f32::neon_convolve_floats::*;
 pub use rgb_u8::neon_rgb::*;
-pub use rgba_u8::*;
 pub use rgba_f32::*;
+pub use rgba_u8::*;

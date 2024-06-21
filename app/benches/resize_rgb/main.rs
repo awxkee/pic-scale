@@ -7,7 +7,7 @@ use image::GenericImageView;
 use pic_scale::{ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    let img = ImageReader::open("assets/asset.jpg")
+    let img = ImageReader::open("../assets/asset.jpg")
         .unwrap()
         .decode()
         .unwrap();

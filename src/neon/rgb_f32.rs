@@ -8,12 +8,16 @@
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 pub mod neon_convolve_floats {
     use crate::filter_weights::{FilterBounds, FilterWeights};
-    use crate::neon::*;
+    use crate::neon::convolve_f32::{
+        convolve_horizontal_parts_2_rgb_f32, convolve_horizontal_parts_4_rgb_f32,
+        convolve_horizontal_parts_one_rgb_f32, convolve_vertical_part_neon_16_f32,
+        convolve_vertical_part_neon_8_f32,
+    };
     use std::arch::aarch64::*;
 
     pub fn convolve_horizontal_rgb_neon_rows_4_f32(
         dst_width: usize,
-        src_width: usize,
+        _: usize,
         filter_weights: &FilterWeights<f32>,
         unsafe_source_ptr_0: *const f32,
         src_stride: usize,
@@ -36,7 +40,7 @@ pub mod neon_convolve_floats {
                 let mut store_2 = zeros;
                 let mut store_3 = zeros;
 
-                while jx + 4 < bounds.size && bounds.start + jx + 6 < src_width {
+                while jx + 4 < bounds.size {
                     let bounds_start = bounds.start + jx;
                     let ptr = weights_ptr.add(jx + filter_offset);
                     let weight0 = vdupq_n_f32(ptr.read_unaligned());
@@ -80,6 +84,42 @@ pub mod neon_convolve_floats {
                         store_3,
                     );
                     jx += 4;
+                }
+
+                while jx + 2 < bounds.size {
+                    let bounds_start = bounds.start + jx;
+                    let ptr = weights_ptr.add(jx + filter_offset);
+                    let weight0 = vdupq_n_f32(ptr.read_unaligned());
+                    let weight1 = vdupq_n_f32(ptr.add(1).read_unaligned());
+                    store_0 = convolve_horizontal_parts_2_rgb_f32(
+                        bounds_start,
+                        unsafe_source_ptr_0,
+                        weight0,
+                        weight1,
+                        store_0,
+                    );
+                    store_1 = convolve_horizontal_parts_2_rgb_f32(
+                        bounds_start,
+                        unsafe_source_ptr_0.add(src_stride),
+                        weight0,
+                        weight1,
+                        store_1,
+                    );
+                    store_2 = convolve_horizontal_parts_2_rgb_f32(
+                        bounds_start,
+                        unsafe_source_ptr_0.add(src_stride * 2),
+                        weight0,
+                        weight1,
+                        store_2,
+                    );
+                    store_3 = convolve_horizontal_parts_2_rgb_f32(
+                        bounds_start,
+                        unsafe_source_ptr_0.add(src_stride * 3),
+                        weight0,
+                        weight1,
+                        store_3,
+                    );
+                    jx += 2;
                 }
 
                 while jx < bounds.size {
@@ -153,7 +193,7 @@ pub mod neon_convolve_floats {
 
     pub fn convolve_horizontal_rgb_neon_row_one_f32(
         dst_width: usize,
-        src_width: usize,
+        _: usize,
         filter_weights: &FilterWeights<f32>,
         unsafe_source_ptr_0: *const f32,
         unsafe_destination_ptr_0: *mut f32,
@@ -168,7 +208,7 @@ pub mod neon_convolve_floats {
                 let mut jx = 0usize;
                 let mut store = vdupq_n_f32(0f32);
 
-                while jx + 4 < bounds.size && bounds.start + jx + 6 < src_width {
+                while jx + 4 < bounds.size {
                     let bounds_start = bounds.start + jx;
                     let ptr = weights_ptr.add(jx + filter_offset);
                     let weight0 = vdupq_n_f32(ptr.read_unaligned());
@@ -185,6 +225,21 @@ pub mod neon_convolve_floats {
                         store,
                     );
                     jx += 4;
+                }
+
+                while jx + 2 < bounds.size {
+                    let bounds_start = bounds.start + jx;
+                    let ptr = weights_ptr.add(jx + filter_offset);
+                    let weight0 = vdupq_n_f32(ptr.read_unaligned());
+                    let weight1 = vdupq_n_f32(ptr.add(1).read_unaligned());
+                    store = convolve_horizontal_parts_2_rgb_f32(
+                        bounds_start,
+                        unsafe_source_ptr_0,
+                        weight0,
+                        weight1,
+                        store,
+                    );
+                    jx += 2;
                 }
 
                 while jx < bounds.size {

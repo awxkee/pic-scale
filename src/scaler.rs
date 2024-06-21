@@ -86,7 +86,8 @@ impl Scaler {
             let mut local_filter_iteration = 0usize;
 
             let start = (center_x - filter_radius).floor().max(0f32) as usize;
-            let end = ((center_x + filter_radius).ceil().min(in_size as f32) as usize).min(start + kernel_size);
+            let end = ((center_x + filter_radius).ceil().min(in_size as f32) as usize)
+                .min(start + kernel_size);
 
             let center = center_x - 0.5f32;
 
@@ -244,51 +245,6 @@ impl Scaling for Scaler {
         new_image_horizontal
     }
 
-    fn resize_rgba_f32(
-        &self,
-        new_size: ImageSize,
-        store: ImageStore<f32, 4>,
-    ) -> ImageStore<f32, 4> {
-        if self.function == Nearest {
-            let mut allocated_store: Vec<f32> = vec![];
-            allocated_store.resize(new_size.width * 4 * new_size.height, 0f32);
-            resize_nearest::<f32, 4>(
-                &store.buffer.borrow(),
-                store.width,
-                store.height,
-                &mut allocated_store,
-                new_size.width,
-                new_size.height,
-            );
-            let new_image =
-                ImageStore::<f32, 4>::new(allocated_store, new_size.width, new_size.height);
-            return new_image;
-        }
-
-        let pool = self
-            .threading_policy
-            .get_pool(ImageSize::new(new_size.width, new_size.height));
-
-        let mut allocated_store_vertical: Vec<f32> = vec![];
-        allocated_store_vertical.resize(store.width * 4 * new_size.height, 0f32);
-        let mut new_image_vertical =
-            ImageStore::<f32, 4>::new(allocated_store_vertical, store.width, new_size.height);
-        let horizontal_filters = self.generate_weights(store.width, new_size.width);
-        let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
-        store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
-
-        let mut allocated_store_horizontal: Vec<f32> = vec![];
-        allocated_store_horizontal.resize(new_size.width * 4 * new_size.height, 0f32);
-        let mut new_image_horizontal =
-            ImageStore::<f32, 4>::new(allocated_store_horizontal, new_size.width, new_size.height);
-        new_image_vertical.convolve_horizontal(
-            horizontal_filters,
-            &mut new_image_horizontal,
-            &pool,
-        );
-        new_image_horizontal
-    }
-
     fn resize_rgba(
         &self,
         new_size: ImageSize,
@@ -342,6 +298,51 @@ impl Scaling for Scaler {
             new_image_horizontal.premultiply_alpha(&mut premultiplied_store);
             return premultiplied_store;
         }
+        new_image_horizontal
+    }
+
+    fn resize_rgba_f32(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<f32, 4>,
+    ) -> ImageStore<f32, 4> {
+        if self.function == Nearest {
+            let mut allocated_store: Vec<f32> = vec![];
+            allocated_store.resize(new_size.width * 4 * new_size.height, 0f32);
+            resize_nearest::<f32, 4>(
+                &store.buffer.borrow(),
+                store.width,
+                store.height,
+                &mut allocated_store,
+                new_size.width,
+                new_size.height,
+            );
+            let new_image =
+                ImageStore::<f32, 4>::new(allocated_store, new_size.width, new_size.height);
+            return new_image;
+        }
+
+        let pool = self
+            .threading_policy
+            .get_pool(ImageSize::new(new_size.width, new_size.height));
+
+        let mut allocated_store_vertical: Vec<f32> = vec![];
+        allocated_store_vertical.resize(store.width * 4 * new_size.height, 0f32);
+        let mut new_image_vertical =
+            ImageStore::<f32, 4>::new(allocated_store_vertical, store.width, new_size.height);
+        let horizontal_filters = self.generate_weights(store.width, new_size.width);
+        let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
+        store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+
+        let mut allocated_store_horizontal: Vec<f32> = vec![];
+        allocated_store_horizontal.resize(new_size.width * 4 * new_size.height, 0f32);
+        let mut new_image_horizontal =
+            ImageStore::<f32, 4>::new(allocated_store_horizontal, new_size.width, new_size.height);
+        new_image_vertical.convolve_horizontal(
+            horizontal_filters,
+            &mut new_image_horizontal,
+            &pool,
+        );
         new_image_horizontal
     }
 }
