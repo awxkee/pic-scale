@@ -1,12 +1,35 @@
 /*
- * // Copyright (c) the Radzivon Bartoshyk. All rights reserved.
- * //
- * // Use of this source code is governed by a BSD-style
- * // license that can be found in the LICENSE file.
+ * Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *
+ * 1.  Redistributions of source code must retain the above copyright notice, this
+ * list of conditions and the following disclaimer.
+ *
+ * 2.  Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ *
+ * 3.  Neither the name of the copyright holder nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 use crate::filter_weights::{FilterBounds, FilterWeights};
-use crate::support::{PRECISION, ROUNDING_APPROX};
+use crate::saturate_narrow::SaturateNarrow;
+use crate::support::ROUNDING_APPROX;
 
 #[inline(always)]
 pub(crate) unsafe fn convolve_vertical_part<const PART: usize, const CHANNELS: usize>(
@@ -40,12 +63,47 @@ pub(crate) unsafe fn convolve_vertical_part<const PART: usize, const CHANNELS: u
         let dst_ptr = dst.add(px);
         for c in 0..CHANNELS {
             let vl = *(*store.get_unchecked_mut(x)).get_unchecked_mut(c);
-            let ck = vl >> PRECISION;
-            dst_ptr.add(c).write_unaligned(ck.max(0).min(255) as u8);
+            dst_ptr.add(c).write_unaligned(vl.saturate_narrow());
         }
     }
 }
 
+/**
+    Routine
+**/
+
+macro_rules! make_naive_sum {
+    ($sum_r:expr, $sum_g:expr, $sum_b:expr, $sum_a:expr, $weight: expr,
+        $src:expr, $channels:expr) => {{
+        $sum_r += unsafe { $src.read_unaligned() } as i32 * $weight;
+        if $channels > 1 {
+            $sum_g += unsafe { $src.add(1).read_unaligned() } as i32 * $weight;
+        }
+        if $channels > 2 {
+            $sum_b += unsafe { $src.add(2).read_unaligned() } as i32 * $weight;
+        }
+        if $channels == 4 {
+            $sum_a += unsafe { $src.add(3).read_unaligned() } as i32 * $weight;
+        }
+    }};
+}
+
+macro_rules! write_out_pixels {
+    ($sum_r:expr, $sum_g:expr, $sum_b:expr, $sum_a:expr, $dst:expr, $channels:expr) => {{
+        unsafe {
+            $dst.write_unaligned($sum_r.saturate_narrow());
+            if $channels > 1 {
+                $dst.add(1).write_unaligned($sum_g.saturate_narrow());
+            }
+            if $channels > 2 {
+                $dst.add(2).write_unaligned($sum_b.saturate_narrow());
+            }
+            if $channels == 4 {
+                $dst.add(3).write_unaligned($sum_a.saturate_narrow());
+            }
+        }
+    }};
+}
 pub(crate) fn convolve_horizontal_rgba_native_row<const CHANNELS: usize>(
     dst_width: usize,
     _: usize,
@@ -68,40 +126,14 @@ pub(crate) fn convolve_horizontal_rgba_native_row<const CHANNELS: usize>(
             let px = (start_x + j) * CHANNELS;
             let weight = unsafe { weights_ptr.add(j + filter_offset).read_unaligned() } as i32;
             let src = unsafe { unsafe_source_ptr_0.add(px) };
-            sum_r += unsafe { src.read_unaligned() } as i32 * weight;
-            if CHANNELS > 1 {
-                sum_g += unsafe { src.add(1).read_unaligned() } as i32 * weight;
-            }
-            if CHANNELS > 2 {
-                sum_b += unsafe { src.add(2).read_unaligned() } as i32 * weight;
-            }
-            if CHANNELS == 4 {
-                sum_a += unsafe { src.add(3).read_unaligned() } as i32 * weight;
-            }
+            make_naive_sum!(sum_r, sum_g, sum_b, sum_a, weight, src, CHANNELS);
         }
 
         let px = x * CHANNELS;
 
         let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px) };
 
-        unsafe {
-            dest_ptr.write_unaligned((sum_r >> PRECISION).min(255).max(0) as u8);
-            if CHANNELS > 1 {
-                dest_ptr
-                    .add(1)
-                    .write_unaligned((sum_g >> PRECISION).min(255).max(0) as u8);
-            }
-            if CHANNELS > 2 {
-                dest_ptr
-                    .add(2)
-                    .write_unaligned((sum_b >> PRECISION).min(255).max(0) as u8);
-            }
-            if CHANNELS == 4 {
-                dest_ptr
-                    .add(3)
-                    .write_unaligned((sum_a >> PRECISION).min(255).max(0) as u8);
-            }
-        }
+        write_out_pixels!(sum_r, sum_g, sum_b, sum_a, dest_ptr, CHANNELS);
 
         filter_offset += filter_weights.aligned_size;
     }
@@ -156,52 +188,16 @@ pub(crate) fn convolve_horizontal_rgba_native_4_row<const CHANNELS: usize>(
                 let weight = weights_ptr.add(j + filter_offset).read_unaligned() as i32;
 
                 let src0 = src_row0.add(px);
-                sum_r_0 += src0.read_unaligned() as i32 * weight;
-                if CHANNELS > 1 {
-                    sum_g_0 += src0.add(1).read_unaligned() as i32 * weight;
-                }
-                if CHANNELS > 2 {
-                    sum_b_0 += src0.add(2).read_unaligned() as i32 * weight;
-                }
-                if CHANNELS == 4 {
-                    sum_a_0 += src0.add(3).read_unaligned() as i32 * weight;
-                }
+                make_naive_sum!(sum_r_0, sum_g_0, sum_b_0, sum_a_0, weight, src0, CHANNELS);
 
                 let src1 = src_row1.add(px);
-                sum_r_1 += src1.read_unaligned() as i32 * weight;
-                if CHANNELS > 1 {
-                    sum_g_1 += src1.add(1).read_unaligned() as i32 * weight;
-                }
-                if CHANNELS > 2 {
-                    sum_b_1 += src1.add(2).read_unaligned() as i32 * weight;
-                }
-                if CHANNELS == 4 {
-                    sum_a_1 += src1.add(3).read_unaligned() as i32 * weight;
-                }
+                make_naive_sum!(sum_r_1, sum_g_1, sum_b_1, sum_a_1, weight, src1, CHANNELS);
 
                 let src2 = src_row2.add(px);
-                sum_r_2 += src2.read_unaligned() as i32 * weight;
-                if CHANNELS > 1 {
-                    sum_g_2 += src2.add(1).read_unaligned() as i32 * weight;
-                }
-                if CHANNELS > 2 {
-                    sum_b_2 += src2.add(2).read_unaligned() as i32 * weight;
-                }
-                if CHANNELS == 4 {
-                    sum_a_2 += src2.add(3).read_unaligned() as i32 * weight;
-                }
+                make_naive_sum!(sum_r_2, sum_g_2, sum_b_2, sum_a_2, weight, src2, CHANNELS);
 
                 let src3 = src_row3.add(px);
-                sum_r_3 += src3.read_unaligned() as i32 * weight;
-                if CHANNELS > 1 {
-                    sum_g_3 += src3.add(1).read_unaligned() as i32 * weight;
-                }
-                if CHANNELS > 2 {
-                    sum_b_3 += src3.add(2).read_unaligned() as i32 * weight;
-                }
-                if CHANNELS == 4 {
-                    sum_a_3 += src3.add(3).read_unaligned() as i32 * weight;
-                }
+                make_naive_sum!(sum_r_3, sum_g_3, sum_b_3, sum_a_3, weight, src3, CHANNELS);
             }
 
             let px = x * CHANNELS;
@@ -211,73 +207,10 @@ pub(crate) fn convolve_horizontal_rgba_native_4_row<const CHANNELS: usize>(
             let dest_ptr_2 = dst_row2.add(px);
             let dest_ptr_3 = dst_row3.add(px);
 
-            dest_ptr_0.write_unaligned((sum_r_0 >> PRECISION).min(255).max(0) as u8);
-            if CHANNELS > 1 {
-                dest_ptr_0
-                    .add(1)
-                    .write_unaligned((sum_g_0 >> PRECISION).min(255).max(0) as u8);
-            }
-            if CHANNELS > 2 {
-                dest_ptr_0
-                    .add(2)
-                    .write_unaligned((sum_b_0 >> PRECISION).min(255).max(0) as u8);
-            }
-            if CHANNELS == 4 {
-                dest_ptr_0
-                    .add(3)
-                    .write_unaligned((sum_a_0 >> PRECISION).min(255).max(0) as u8);
-            }
-
-            dest_ptr_1.write_unaligned((sum_r_1 >> PRECISION).min(255).max(0) as u8);
-            if CHANNELS > 1 {
-                dest_ptr_1
-                    .add(1)
-                    .write_unaligned((sum_g_1 >> PRECISION).min(255).max(0) as u8);
-            }
-            if CHANNELS > 2 {
-                dest_ptr_1
-                    .add(2)
-                    .write_unaligned((sum_b_1 >> PRECISION).min(255).max(0) as u8);
-            }
-            if CHANNELS == 4 {
-                dest_ptr_1
-                    .add(3)
-                    .write_unaligned((sum_a_1 >> PRECISION).min(255).max(0) as u8);
-            }
-
-            dest_ptr_2.write_unaligned((sum_r_2 >> PRECISION).min(255).max(0) as u8);
-            if CHANNELS > 1 {
-                dest_ptr_2
-                    .add(1)
-                    .write_unaligned((sum_g_2 >> PRECISION).min(255).max(0) as u8);
-            }
-            if CHANNELS > 2 {
-                dest_ptr_2
-                    .add(2)
-                    .write_unaligned((sum_b_2 >> PRECISION).min(255).max(0) as u8);
-            }
-            if CHANNELS == 4 {
-                dest_ptr_2
-                    .add(3)
-                    .write_unaligned((sum_a_2 >> PRECISION).min(255).max(0) as u8);
-            }
-
-            dest_ptr_3.write_unaligned((sum_r_3 >> PRECISION).min(255).max(0) as u8);
-            if CHANNELS > 1 {
-                dest_ptr_3
-                    .add(1)
-                    .write_unaligned((sum_g_3 >> PRECISION).min(255).max(0) as u8);
-            }
-            if CHANNELS > 2 {
-                dest_ptr_3
-                    .add(2)
-                    .write_unaligned((sum_b_3 >> PRECISION).min(255).max(0) as u8);
-            }
-            if CHANNELS == 4 {
-                dest_ptr_3
-                    .add(3)
-                    .write_unaligned((sum_a_3 >> PRECISION).min(255).max(0) as u8);
-            }
+            write_out_pixels!(sum_r_0, sum_g_0, sum_b_0, sum_a_0, dest_ptr_0, CHANNELS);
+            write_out_pixels!(sum_r_1, sum_g_1, sum_b_1, sum_a_1, dest_ptr_1, CHANNELS);
+            write_out_pixels!(sum_r_2, sum_g_2, sum_b_2, sum_a_2, dest_ptr_2, CHANNELS);
+            write_out_pixels!(sum_r_3, sum_g_3, sum_b_3, sum_a_3, dest_ptr_3, CHANNELS);
 
             filter_offset += filter_weights.aligned_size;
         }

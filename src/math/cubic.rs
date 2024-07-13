@@ -27,43 +27,65 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-pub fn resize_nearest<T, const CHANNELS: usize>(
-    src: &[T],
-    src_width: usize,
-    src_height: usize,
-    dst: &mut [T],
-    dst_width: usize,
-    dst_height: usize,
-) where
-    T: Copy,
+use num_traits::{AsPrimitive, Signed};
+use std::ops::{Add, Div, Mul, Neg, Sub};
+
+#[inline(always)]
+pub fn cubic_spline<
+    V: Copy
+        + Mul<Output = V>
+        + Add<Output = V>
+        + Neg<Output = V>
+        + Sub<Output = V>
+        + PartialOrd
+        + PartialEq
+        + Div<Output = V>
+        + 'static,
+>(
+    d: V,
+) -> V
+where
+    f32: AsPrimitive<V>,
 {
-    let x_scale = src_width as f32 / dst_width as f32;
-    let y_scale = src_height as f32 / dst_height as f32;
-
-    let clip_width = src_width as f32 - 1f32;
-    let clip_height = src_height as f32 - 1f32;
-
-    let dst_stride = dst_width * CHANNELS;
-    let src_stride = src_width * CHANNELS;
-
-    let mut dst_offset = 0usize;
-
-    for y in 0..dst_height {
-        for x in 0..dst_width {
-            let src_x = (x as f32 * x_scale + 0.5f32).min(clip_width).max(0f32) as usize;
-            let src_y = (y as f32 * y_scale + 0.5f32).min(clip_height).max(0f32) as usize;
-            let src_offset_y = src_y * src_stride;
-            let src_px = src_x * CHANNELS;
-            let dst_px = x * CHANNELS;
-            unsafe {
-                std::ptr::copy_nonoverlapping(
-                    src.as_ptr().add(src_offset_y + src_px),
-                    dst.as_mut_ptr().add(dst_offset + dst_px),
-                    CHANNELS,
-                );
-            }
-        }
-
-        dst_offset += dst_stride;
+    let mut x = d;
+    if x < 0f32.as_() {
+        x = -x;
     }
+    if x < 1f32.as_() {
+        return (4f32.as_() + x * x * (3f32.as_() * x - 6f32.as_())) * (1f32.as_() / 6f32.as_());
+    } else if x < 2f32.as_() {
+        return (8f32.as_() + x * (-12f32.as_() + x * (6f32.as_() - x)))
+            * (1f32.as_() / 6f32.as_());
+    }
+    return 0f32.as_();
+}
+
+#[inline(always)]
+pub fn bicubic_spline<
+    V: Copy
+        + Mul<Output = V>
+        + Sub<Output = V>
+        + Add<Output = V>
+        + 'static
+        + Neg<Output = V>
+        + Signed
+        + PartialOrd,
+>(
+    d: V,
+) -> V
+where
+    f32: AsPrimitive<V>,
+{
+    let x = d;
+    let a = -0.5.as_();
+    let modulo = x.abs();
+    if modulo >= 2f32.as_() {
+        return 0f32.as_();
+    }
+    let floatd = modulo * modulo;
+    let triplet = floatd * modulo;
+    if modulo <= 1f32.as_() {
+        return (a + 2f32.as_()) * triplet - (a + 3f32.as_()) * floatd + 1f32.as_();
+    }
+    return a * triplet - 5f32.as_() * a * floatd + 8f32.as_() * a * modulo - 4f32.as_() * a;
 }

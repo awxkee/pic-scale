@@ -27,43 +27,39 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-pub fn resize_nearest<T, const CHANNELS: usize>(
-    src: &[T],
-    src_width: usize,
-    src_height: usize,
-    dst: &mut [T],
-    dst_width: usize,
-    dst_height: usize,
-) where
-    T: Copy,
+use crate::math::consts::ConstPI;
+use num_traits::{AsPrimitive, Float};
+use std::ops::{Mul, Sub};
+
+#[inline(always)]
+pub(crate) fn bartlett<V: Copy + Sub<Output = V> + Mul<Output = V> + 'static + PartialOrd>(
+    x: V,
+) -> V
+where
+    f32: AsPrimitive<V>,
 {
-    let x_scale = src_width as f32 / dst_width as f32;
-    let y_scale = src_height as f32 / dst_height as f32;
-
-    let clip_width = src_width as f32 - 1f32;
-    let clip_height = src_height as f32 - 1f32;
-
-    let dst_stride = dst_width * CHANNELS;
-    let src_stride = src_width * CHANNELS;
-
-    let mut dst_offset = 0usize;
-
-    for y in 0..dst_height {
-        for x in 0..dst_width {
-            let src_x = (x as f32 * x_scale + 0.5f32).min(clip_width).max(0f32) as usize;
-            let src_y = (y as f32 * y_scale + 0.5f32).min(clip_height).max(0f32) as usize;
-            let src_offset_y = src_y * src_stride;
-            let src_px = src_x * CHANNELS;
-            let dst_px = x * CHANNELS;
-            unsafe {
-                std::ptr::copy_nonoverlapping(
-                    src.as_ptr().add(src_offset_y + src_px),
-                    dst.as_mut_ptr().add(dst_offset + dst_px),
-                    CHANNELS,
-                );
-            }
-        }
-
-        dst_offset += dst_stride;
+    if x >= 0f32.as_() && x <= 1f32.as_() {
+        return 2f32.as_() * x;
     }
+    return 2f32.as_() - 2f32.as_() * x;
+}
+
+#[inline(always)]
+pub(crate) fn bartlett_hann<
+    V: Copy + Sub<Output = V> + Mul<Output = V> + Float + ConstPI + 'static,
+>(
+    x: V,
+) -> V
+where
+    f32: AsPrimitive<V>,
+{
+    let x = x.abs();
+    if x > 2f32.as_() {
+        return 0f32.as_();
+    }
+    let l = 2.0f32.as_();
+    let fac = (x / (l - 1.0f32.as_()) - 0.5f32.as_()).abs();
+    let w = 0.62f32.as_() - 0.4832.as_() * fac
+        + 0.38f32.as_() * (2f32.as_() * V::const_pi() * fac).cos();
+    return w;
 }

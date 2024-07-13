@@ -27,43 +27,80 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-pub fn resize_nearest<T, const CHANNELS: usize>(
-    src: &[T],
-    src_width: usize,
-    src_height: usize,
-    dst: &mut [T],
-    dst_width: usize,
-    dst_height: usize,
-) where
-    T: Copy,
+use num_traits::AsPrimitive;
+use std::ops::{Add, Div, Mul, MulAssign, Sub};
+
+#[inline(always)]
+pub(crate) fn lagrange<
+    V: Copy
+        + PartialEq
+        + PartialOrd
+        + AsPrimitive<usize>
+        + Mul<Output = V>
+        + Add<Output = V>
+        + Sub<Output = V>
+        + Div<Output = V>
+        + MulAssign,
+>(
+    x: V,
+    support: usize,
+) -> V
+where
+    f32: AsPrimitive<V>,
+    usize: AsPrimitive<V>,
 {
-    let x_scale = src_width as f32 / dst_width as f32;
-    let y_scale = src_height as f32 / dst_height as f32;
-
-    let clip_width = src_width as f32 - 1f32;
-    let clip_height = src_height as f32 - 1f32;
-
-    let dst_stride = dst_width * CHANNELS;
-    let src_stride = src_width * CHANNELS;
-
-    let mut dst_offset = 0usize;
-
-    for y in 0..dst_height {
-        for x in 0..dst_width {
-            let src_x = (x as f32 * x_scale + 0.5f32).min(clip_width).max(0f32) as usize;
-            let src_y = (y as f32 * y_scale + 0.5f32).min(clip_height).max(0f32) as usize;
-            let src_offset_y = src_y * src_stride;
-            let src_px = src_x * CHANNELS;
-            let dst_px = x * CHANNELS;
-            unsafe {
-                std::ptr::copy_nonoverlapping(
-                    src.as_ptr().add(src_offset_y + src_px),
-                    dst.as_mut_ptr().add(dst_offset + dst_px),
-                    CHANNELS,
-                );
-            }
-        }
-
-        dst_offset += dst_stride;
+    if x > support.as_() {
+        return 0f32.as_();
     }
+    let order = (2.0f32.as_() * support.as_()).as_();
+    let n = (support.as_() + x).as_();
+    let mut value = 1.0f32.as_();
+    for i in 0..order {
+        if i != n {
+            value *= (n.as_() - i.as_() - x) / (n.as_() - i.as_());
+        }
+    }
+    return value;
+}
+
+#[inline(always)]
+pub(crate) fn lagrange2<
+    V: Copy
+        + PartialEq
+        + PartialOrd
+        + AsPrimitive<usize>
+        + Mul<Output = V>
+        + Add<Output = V>
+        + Sub<Output = V>
+        + Div<Output = V>
+        + MulAssign,
+>(
+    x: V,
+) -> V
+where
+    f32: AsPrimitive<V>,
+    usize: AsPrimitive<V>,
+{
+    lagrange(x, 2)
+}
+
+#[inline(always)]
+pub(crate) fn lagrange3<
+    V: Copy
+        + PartialEq
+        + PartialOrd
+        + AsPrimitive<usize>
+        + Mul<Output = V>
+        + Add<Output = V>
+        + Sub<Output = V>
+        + Div<Output = V>
+        + MulAssign,
+>(
+    x: V,
+) -> V
+where
+    f32: AsPrimitive<V>,
+    usize: AsPrimitive<V>,
+{
+    lagrange(x, 3)
 }

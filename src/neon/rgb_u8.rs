@@ -1,16 +1,38 @@
 /*
- * // Copyright (c) the Radzivon Bartoshyk. All rights reserved.
- * //
- * // Use of this source code is governed by a BSD-style
- * // license that can be found in the LICENSE file.
+ * Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *
+ * 1.  Redistributions of source code must retain the above copyright notice, this
+ * list of conditions and the following disclaimer.
+ *
+ * 2.  Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ *
+ * 3.  Neither the name of the copyright holder nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 pub mod neon_rgb {
     use crate::filter_weights::{FilterBounds, FilterWeights};
-    use crate::neon::utils::neon_convolve_u8;
     use crate::support::{PRECISION, ROUNDING_APPROX};
     use std::arch::aarch64::*;
+    use crate::neon::utils::{convolve_horizontal_parts_2_rgb, convolve_horizontal_parts_4_rgb, convolve_horizontal_parts_one_rgb, convolve_vertical_part_neon_16, convolve_vertical_part_neon_32, convolve_vertical_part_neon_8};
 
     pub fn convolve_horizontal_rgb_neon_rows_4(
         dst_width: usize,
@@ -48,7 +70,7 @@ pub mod neon_rgb {
                     let weight1 = vdupq_n_s16(ptr.add(1).read_unaligned());
                     let weight2 = vdup_n_s16(ptr.add(2).read_unaligned());
                     let weight3 = vdupq_n_s16(ptr.add(3).read_unaligned());
-                    store_0 = neon_convolve_u8::convolve_horizontal_parts_4_rgb(
+                    store_0 = convolve_horizontal_parts_4_rgb(
                         bounds_start,
                         unsafe_source_ptr_0,
                         weight0,
@@ -58,7 +80,7 @@ pub mod neon_rgb {
                         store_0,
                         shuffle,
                     );
-                    store_1 = neon_convolve_u8::convolve_horizontal_parts_4_rgb(
+                    store_1 = convolve_horizontal_parts_4_rgb(
                         bounds_start,
                         unsafe_source_ptr_0.add(src_stride),
                         weight0,
@@ -68,7 +90,7 @@ pub mod neon_rgb {
                         store_1,
                         shuffle,
                     );
-                    store_2 = neon_convolve_u8::convolve_horizontal_parts_4_rgb(
+                    store_2 = convolve_horizontal_parts_4_rgb(
                         bounds_start,
                         unsafe_source_ptr_0.add(src_stride * 2),
                         weight0,
@@ -78,7 +100,7 @@ pub mod neon_rgb {
                         store_2,
                         shuffle,
                     );
-                    store_3 = neon_convolve_u8::convolve_horizontal_parts_4_rgb(
+                    store_3 = convolve_horizontal_parts_4_rgb(
                         bounds_start,
                         unsafe_source_ptr_0.add(src_stride * 3),
                         weight0,
@@ -96,7 +118,7 @@ pub mod neon_rgb {
                     let bounds_start = bounds.start + jx;
                     let weight0 = vdup_n_s16(ptr.read_unaligned());
                     let weight1 = vdupq_n_s16(ptr.add(1).read_unaligned());
-                    store_0 = neon_convolve_u8::convolve_horizontal_parts_2_rgb(
+                    store_0 = convolve_horizontal_parts_2_rgb(
                         bounds_start,
                         unsafe_source_ptr_0,
                         weight0,
@@ -104,7 +126,7 @@ pub mod neon_rgb {
                         store_0,
                         shuffle_1,
                     );
-                    store_1 = neon_convolve_u8::convolve_horizontal_parts_2_rgb(
+                    store_1 = convolve_horizontal_parts_2_rgb(
                         bounds_start,
                         unsafe_source_ptr_0.add(src_stride),
                         weight0,
@@ -112,7 +134,7 @@ pub mod neon_rgb {
                         store_1,
                         shuffle_1,
                     );
-                    store_2 = neon_convolve_u8::convolve_horizontal_parts_2_rgb(
+                    store_2 = convolve_horizontal_parts_2_rgb(
                         bounds_start,
                         unsafe_source_ptr_0.add(src_stride * 2),
                         weight0,
@@ -120,7 +142,7 @@ pub mod neon_rgb {
                         store_2,
                         shuffle_1,
                     );
-                    store_3 = neon_convolve_u8::convolve_horizontal_parts_2_rgb(
+                    store_3 = convolve_horizontal_parts_2_rgb(
                         bounds_start,
                         unsafe_source_ptr_0.add(src_stride * 3),
                         weight0,
@@ -135,25 +157,25 @@ pub mod neon_rgb {
                     let ptr = weights_ptr.add(jx + filter_offset);
                     let bounds_start = bounds.start + jx;
                     let weight0 = vdup_n_s16(ptr.read_unaligned());
-                    store_0 = neon_convolve_u8::convolve_horizontal_parts_one_rgb(
+                    store_0 = convolve_horizontal_parts_one_rgb(
                         bounds_start,
                         unsafe_source_ptr_0,
                         weight0,
                         store_0,
                     );
-                    store_1 = neon_convolve_u8::convolve_horizontal_parts_one_rgb(
+                    store_1 = convolve_horizontal_parts_one_rgb(
                         bounds_start,
                         unsafe_source_ptr_0.add(src_stride),
                         weight0,
                         store_1,
                     );
-                    store_2 = neon_convolve_u8::convolve_horizontal_parts_one_rgb(
+                    store_2 = convolve_horizontal_parts_one_rgb(
                         bounds_start,
                         unsafe_source_ptr_0.add(src_stride * 2),
                         weight0,
                         store_2,
                     );
-                    store_3 = neon_convolve_u8::convolve_horizontal_parts_one_rgb(
+                    store_3 = convolve_horizontal_parts_one_rgb(
                         bounds_start,
                         unsafe_source_ptr_0.add(src_stride * 3),
                         weight0,
@@ -243,7 +265,7 @@ pub mod neon_rgb {
                     let weight1 = vdupq_n_s16(ptr.add(1).read_unaligned());
                     let weight2 = vdup_n_s16(ptr.add(2).read_unaligned());
                     let weight3 = vdupq_n_s16(ptr.add(3).read_unaligned());
-                    store = neon_convolve_u8::convolve_horizontal_parts_4_rgb(
+                    store = convolve_horizontal_parts_4_rgb(
                         bounds_start,
                         unsafe_source_ptr_0,
                         weight0,
@@ -261,7 +283,7 @@ pub mod neon_rgb {
                     let bounds_start = bounds.start + jx;
                     let weight0 = vdup_n_s16(ptr.read_unaligned());
                     let weight1 = vdupq_n_s16(ptr.add(1).read_unaligned());
-                    store = neon_convolve_u8::convolve_horizontal_parts_2_rgb(
+                    store = convolve_horizontal_parts_2_rgb(
                         bounds_start,
                         unsafe_source_ptr_0,
                         weight0,
@@ -275,7 +297,7 @@ pub mod neon_rgb {
                 while jx < bounds.size {
                     let ptr = weights_ptr.add(jx + filter_offset);
                     let weight0 = vdup_n_s16(ptr.read_unaligned());
-                    store = neon_convolve_u8::convolve_horizontal_parts_one_rgb(
+                    store = convolve_horizontal_parts_one_rgb(
                         bounds.start + jx,
                         unsafe_source_ptr_0,
                         weight0,
@@ -313,7 +335,7 @@ pub mod neon_rgb {
         let dst_width = width * CHANNELS;
         while cx + 32 < dst_width {
             unsafe {
-                neon_convolve_u8::convolve_vertical_part_neon_32(
+                convolve_vertical_part_neon_32(
                     bounds.start,
                     cx,
                     unsafe_source_ptr_0,
@@ -329,7 +351,7 @@ pub mod neon_rgb {
 
         while cx + 16 < dst_width {
             unsafe {
-                neon_convolve_u8::convolve_vertical_part_neon_16(
+                convolve_vertical_part_neon_16(
                     bounds.start,
                     cx,
                     unsafe_source_ptr_0,
@@ -345,7 +367,7 @@ pub mod neon_rgb {
 
         while cx + 8 < dst_width {
             unsafe {
-                neon_convolve_u8::convolve_vertical_part_neon_8::<false>(
+                convolve_vertical_part_neon_8::<false>(
                     bounds.start,
                     cx,
                     unsafe_source_ptr_0,
@@ -363,7 +385,7 @@ pub mod neon_rgb {
         let left = dst_width - cx;
         if left > 0 {
             unsafe {
-                neon_convolve_u8::convolve_vertical_part_neon_8::<true>(
+                convolve_vertical_part_neon_8::<true>(
                     bounds.start,
                     cx,
                     unsafe_source_ptr_0,

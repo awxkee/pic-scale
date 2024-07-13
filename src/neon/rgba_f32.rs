@@ -1,16 +1,93 @@
 /*
- * // Copyright (c) the Radzivon Bartoshyk. All rights reserved.
- * //
- * // Use of this source code is governed by a BSD-style
- * // license that can be found in the LICENSE file.
+ * Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *
+ * 1.  Redistributions of source code must retain the above copyright notice, this
+ * list of conditions and the following disclaimer.
+ *
+ * 2.  Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ *
+ * 3.  Neither the name of the copyright holder nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 use crate::filter_weights::FilterWeights;
-use crate::neon::convolve_f32::{
-    convolve_horizontal_parts_2_rgba_f32, convolve_horizontal_parts_4_rgba_f32,
-    convolve_horizontal_parts_one_rgba_f32,
-};
+use crate::neon::utils::prefer_vfmaq_f32;
 use std::arch::aarch64::*;
+
+macro_rules! conv_horiz_rgba_8_f32 {
+    ($start_x: expr, $src: expr, $set1: expr, $set2: expr, $store: expr) => {{
+        const COMPONENTS: usize = 4;
+        let src_ptr = $src.add($start_x * COMPONENTS);
+
+        let rgb_pixel0 = vld1q_f32_x4(src_ptr);
+        let rgb_pixel1 = vld1q_f32_x4(src_ptr.add(16));
+
+        let mut acc = prefer_vfmaq_f32($store, rgb_pixel0.0, $set1.0);
+        acc = prefer_vfmaq_f32(acc, rgb_pixel0.1, $set1.1);
+        acc = prefer_vfmaq_f32(acc, rgb_pixel0.2, $set1.2);
+        acc = prefer_vfmaq_f32(acc, rgb_pixel0.3, $set1.3);
+        acc = prefer_vfmaq_f32(acc, rgb_pixel1.0, $set2.0);
+        acc = prefer_vfmaq_f32(acc, rgb_pixel1.1, $set2.1);
+        acc = prefer_vfmaq_f32(acc, rgb_pixel1.2, $set2.2);
+        acc = prefer_vfmaq_f32(acc, rgb_pixel1.3, $set2.3);
+        acc
+    }};
+}
+
+macro_rules! conv_horiz_rgba_4_f32 {
+    ($start_x: expr, $src: expr, $set1: expr,  $store: expr) => {{
+        const COMPONENTS: usize = 4;
+        let src_ptr = $src.add($start_x * COMPONENTS);
+
+        let rgb_pixel = vld1q_f32_x4(src_ptr);
+
+        let acc = prefer_vfmaq_f32($store, rgb_pixel.0, $set1.0);
+        let acc = prefer_vfmaq_f32(acc, rgb_pixel.1, $set1.1);
+        let acc = prefer_vfmaq_f32(acc, rgb_pixel.2, $set1.2);
+        let acc = prefer_vfmaq_f32(acc, rgb_pixel.3, $set1.3);
+        acc
+    }};
+}
+
+macro_rules! conv_horiz_rgba_2_f32 {
+    ($start_x: expr, $src: expr, $set: expr,  $store: expr) => {{
+        const COMPONENTS: usize = 4;
+        let src_ptr = $src.add($start_x * COMPONENTS);
+
+        let rgb_pixel = vld1q_f32_x2(src_ptr);
+
+        let mut acc = prefer_vfmaq_f32($store, rgb_pixel.0, $set.0);
+        acc = prefer_vfmaq_f32(acc, rgb_pixel.1, $set.1);
+        acc
+    }};
+}
+
+macro_rules! conv_horiz_rgba_1_f32 {
+    ($start_x: expr, $src: expr, $set: expr,  $store: expr) => {{
+        const COMPONENTS: usize = 4;
+        let src_ptr = $src.add($start_x * COMPONENTS);
+        let rgb_pixel = vld1q_f32(src_ptr);
+        let acc = prefer_vfmaq_f32($store, rgb_pixel, $set);
+        acc
+    }};
+}
 
 pub fn convolve_horizontal_rgba_neon_row_one(
     dst_width: usize,
@@ -32,19 +109,13 @@ pub fn convolve_horizontal_rgba_neon_row_one(
             while jx + 4 < bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = vdupq_n_f32(ptr.read_unaligned());
-                let weight1 = vdupq_n_f32(ptr.add(1).read_unaligned());
-                let weight2 = vdupq_n_f32(ptr.add(2).read_unaligned());
-                let weight3 = vdupq_n_f32(ptr.add(3).read_unaligned());
-                store = convolve_horizontal_parts_4_rgba_f32(
-                    bounds_start,
-                    unsafe_source_ptr_0,
-                    weight0,
-                    weight1,
-                    weight2,
-                    weight3,
-                    store,
-                );
+                let read_weights = vld1q_f32(ptr);
+                let w0 = vdupq_n_f32(vgetq_lane_f32::<0>(read_weights));
+                let w1 = vdupq_n_f32(vgetq_lane_f32::<1>(read_weights));
+                let w2 = vdupq_n_f32(vgetq_lane_f32::<2>(read_weights));
+                let w3 = vdupq_n_f32(vgetq_lane_f32::<3>(read_weights));
+                let set1 = (w0, w1, w2, w3);
+                store = conv_horiz_rgba_4_f32!(bounds_start, unsafe_source_ptr_0, set1, store);
                 jx += 4;
             }
 
@@ -53,13 +124,8 @@ pub fn convolve_horizontal_rgba_neon_row_one(
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let weight0 = vdupq_n_f32(ptr.read_unaligned());
                 let weight1 = vdupq_n_f32(ptr.add(1).read_unaligned());
-                store = convolve_horizontal_parts_2_rgba_f32(
-                    bounds_start,
-                    unsafe_source_ptr_0,
-                    weight0,
-                    weight1,
-                    store,
-                );
+                let set = (weight0, weight1);
+                store = conv_horiz_rgba_2_f32!(bounds_start, unsafe_source_ptr_0, set, store);
                 jx += 2;
             }
 
@@ -67,12 +133,7 @@ pub fn convolve_horizontal_rgba_neon_row_one(
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let weight0 = vdupq_n_f32(ptr.read_unaligned());
-                store = convolve_horizontal_parts_one_rgba_f32(
-                    bounds_start,
-                    unsafe_source_ptr_0,
-                    weight0,
-                    store,
-                );
+                store = conv_horiz_rgba_1_f32!(bounds_start, unsafe_source_ptr_0, weight0, store);
                 jx += 1;
             }
 
@@ -108,49 +169,47 @@ pub fn convolve_horizontal_rgba_neon_rows_4(
             let mut store_2 = zeros;
             let mut store_3 = zeros;
 
+            while jx + 8 < bounds.size {
+                let ptr = weights_ptr.add(jx + filter_offset);
+                let read_weights = vld1q_f32_x2(ptr);
+                let w0 = vdupq_n_f32(vgetq_lane_f32::<0>(read_weights.0));
+                let w1 = vdupq_n_f32(vgetq_lane_f32::<1>(read_weights.0));
+                let w2 = vdupq_n_f32(vgetq_lane_f32::<2>(read_weights.0));
+                let w3 = vdupq_n_f32(vgetq_lane_f32::<3>(read_weights.0));
+                let w4 = vdupq_n_f32(vgetq_lane_f32::<0>(read_weights.1));
+                let w5 = vdupq_n_f32(vgetq_lane_f32::<1>(read_weights.1));
+                let w6 = vdupq_n_f32(vgetq_lane_f32::<2>(read_weights.1));
+                let w7 = vdupq_n_f32(vgetq_lane_f32::<3>(read_weights.1));
+                let set1 = (w0, w1, w2, w3);
+                let set2 = (w4, w5, w6, w7);
+                let bounds_start = bounds.start + jx;
+                store_0 =
+                    conv_horiz_rgba_8_f32!(bounds_start, unsafe_source_ptr_0, set1, set2, store_0);
+                let s_ptr_1 = unsafe_source_ptr_0.add(src_stride);
+                store_1 = conv_horiz_rgba_8_f32!(bounds_start, s_ptr_1, set1, set2, store_1);
+                let s_ptr2 = unsafe_source_ptr_0.add(src_stride * 2);
+                store_2 = conv_horiz_rgba_8_f32!(bounds_start, s_ptr2, set1, set2, store_2);
+                let s_ptr3 = unsafe_source_ptr_0.add(src_stride * 3);
+                store_3 = conv_horiz_rgba_8_f32!(bounds_start, s_ptr3, set1, set2, store_3);
+                jx += 8;
+            }
+
             while jx + 4 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = vdupq_n_f32(ptr.read_unaligned());
-                let weight1 = vdupq_n_f32(ptr.add(1).read_unaligned());
-                let weight2 = vdupq_n_f32(ptr.add(2).read_unaligned());
-                let weight3 = vdupq_n_f32(ptr.add(3).read_unaligned());
+                let read_weights = vld1q_f32(ptr);
+                let w0 = vdupq_n_f32(vgetq_lane_f32::<0>(read_weights));
+                let w1 = vdupq_n_f32(vgetq_lane_f32::<1>(read_weights));
+                let w2 = vdupq_n_f32(vgetq_lane_f32::<2>(read_weights));
+                let w3 = vdupq_n_f32(vgetq_lane_f32::<3>(read_weights));
+                let set1 = (w0, w1, w2, w3);
                 let bounds_start = bounds.start + jx;
-                store_0 = convolve_horizontal_parts_4_rgba_f32(
-                    bounds_start,
-                    unsafe_source_ptr_0,
-                    weight0,
-                    weight1,
-                    weight2,
-                    weight3,
-                    store_0,
-                );
-                store_1 = convolve_horizontal_parts_4_rgba_f32(
-                    bounds_start,
-                    unsafe_source_ptr_0.add(src_stride),
-                    weight0,
-                    weight1,
-                    weight2,
-                    weight3,
-                    store_1,
-                );
-                store_2 = convolve_horizontal_parts_4_rgba_f32(
-                    bounds_start,
-                    unsafe_source_ptr_0.add(src_stride * 2),
-                    weight0,
-                    weight1,
-                    weight2,
-                    weight3,
-                    store_2,
-                );
-                store_3 = convolve_horizontal_parts_4_rgba_f32(
-                    bounds_start,
-                    unsafe_source_ptr_0.add(src_stride * 3),
-                    weight0,
-                    weight1,
-                    weight2,
-                    weight3,
-                    store_3,
-                );
+                store_0 = conv_horiz_rgba_4_f32!(bounds_start, unsafe_source_ptr_0, set1, store_0);
+                let s_ptr_1 = unsafe_source_ptr_0.add(src_stride);
+                store_1 = conv_horiz_rgba_4_f32!(bounds_start, s_ptr_1, set1, store_1);
+                let s_ptr2 = unsafe_source_ptr_0.add(src_stride * 2);
+                store_2 = conv_horiz_rgba_4_f32!(bounds_start, s_ptr2, set1, store_2);
+                let s_ptr3 = unsafe_source_ptr_0.add(src_stride * 3);
+                store_3 = conv_horiz_rgba_4_f32!(bounds_start, s_ptr3, set1, store_3);
                 jx += 4;
             }
 
@@ -158,35 +217,15 @@ pub fn convolve_horizontal_rgba_neon_rows_4(
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let weight0 = vdupq_n_f32(ptr.read_unaligned());
                 let weight1 = vdupq_n_f32(ptr.add(1).read_unaligned());
+                let set = (weight0, weight1);
                 let bounds_start = bounds.start + jx;
-                store_0 = convolve_horizontal_parts_2_rgba_f32(
-                    bounds_start,
-                    unsafe_source_ptr_0,
-                    weight0,
-                    weight1,
-                    store_0,
-                );
-                store_1 = convolve_horizontal_parts_2_rgba_f32(
-                    bounds_start,
-                    unsafe_source_ptr_0.add(src_stride),
-                    weight0,
-                    weight1,
-                    store_1,
-                );
-                store_2 = convolve_horizontal_parts_2_rgba_f32(
-                    bounds_start,
-                    unsafe_source_ptr_0.add(src_stride * 2),
-                    weight0,
-                    weight1,
-                    store_2,
-                );
-                store_3 = convolve_horizontal_parts_2_rgba_f32(
-                    bounds_start,
-                    unsafe_source_ptr_0.add(src_stride * 3),
-                    weight0,
-                    weight1,
-                    store_3,
-                );
+                store_0 = conv_horiz_rgba_2_f32!(bounds_start, unsafe_source_ptr_0, set, store_0);
+                let ptr_1 = unsafe_source_ptr_0.add(src_stride);
+                store_1 = conv_horiz_rgba_2_f32!(bounds_start, ptr_1, set, store_1);
+                let ptr_2 = unsafe_source_ptr_0.add(src_stride * 2);
+                store_2 = conv_horiz_rgba_2_f32!(bounds_start, ptr_2, set, store_2);
+                let ptr_3 = unsafe_source_ptr_0.add(src_stride * 3);
+                store_3 = conv_horiz_rgba_2_f32!(bounds_start, ptr_3, set, store_3);
                 jx += 2;
             }
 
@@ -194,30 +233,14 @@ pub fn convolve_horizontal_rgba_neon_rows_4(
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let weight0 = vdupq_n_f32(ptr.read_unaligned());
                 let bounds_start = bounds.start + jx;
-                store_0 = convolve_horizontal_parts_one_rgba_f32(
-                    bounds_start,
-                    unsafe_source_ptr_0,
-                    weight0,
-                    store_0,
-                );
-                store_1 = convolve_horizontal_parts_one_rgba_f32(
-                    bounds_start,
-                    unsafe_source_ptr_0.add(src_stride),
-                    weight0,
-                    store_1,
-                );
-                store_2 = convolve_horizontal_parts_one_rgba_f32(
-                    bounds_start,
-                    unsafe_source_ptr_0.add(src_stride * 2),
-                    weight0,
-                    store_2,
-                );
-                store_3 = convolve_horizontal_parts_one_rgba_f32(
-                    bounds_start,
-                    unsafe_source_ptr_0.add(src_stride * 3),
-                    weight0,
-                    store_3,
-                );
+                store_0 =
+                    conv_horiz_rgba_1_f32!(bounds_start, unsafe_source_ptr_0, weight0, store_0);
+                let ptr_1 = unsafe_source_ptr_0.add(src_stride);
+                store_1 = conv_horiz_rgba_1_f32!(bounds_start, ptr_1, weight0, store_1);
+                let ptr_2 = unsafe_source_ptr_0.add(src_stride * 2);
+                store_2 = conv_horiz_rgba_1_f32!(bounds_start, ptr_2, weight0, store_2);
+                let ptr_3 = unsafe_source_ptr_0.add(src_stride * 3);
+                store_3 = conv_horiz_rgba_1_f32!(bounds_start, ptr_3, weight0, store_3);
                 jx += 1;
             }
 

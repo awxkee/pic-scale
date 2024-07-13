@@ -23,7 +23,7 @@ fn main() {
     let dimensions = img.dimensions();
     let mut bytes = Vec::from(img.as_bytes());
 
-    let mut scaler = LChScaler::new(ResamplingFunction::RobidouxSharp);
+    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
     // let store =
     //     ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
@@ -42,8 +42,7 @@ fn main() {
 
     let resized = scaler.resize_rgba(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-        store,
-        true,
+        store, true,
     );
 
     let elapsed_time = start_time.elapsed();
