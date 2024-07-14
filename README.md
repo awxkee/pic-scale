@@ -38,7 +38,7 @@ Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 ima
 
 |           | Lanczos3 |
 |-----------|:--------:|
-| pic-scale |  38.73   |
+| pic-scale |  27.87   |
 | fir sse   |  36.94   |
 
 M3 Pro. NEON
@@ -59,7 +59,7 @@ M3 Pro. NEON
 
 |           | Lanczos3 |
 |-----------|:--------:|
-| pic-scale |  26.24   |
+| pic-scale |  25.46   |
 | fir sse   |  31.43   |
 
 Example comparison time for downscale RGBA 4928x3279 image in two times for x86_64 SSE without premultiplying alpha.
@@ -73,7 +73,7 @@ M3 Pro. NEON
 
 |           | Lanczos3 |
 |-----------|:--------:|
-| pic-scale |  18.89   |
+| pic-scale |  17.41   |
 | fir sse   |  25.82   |
 
 #### Example in sRGB

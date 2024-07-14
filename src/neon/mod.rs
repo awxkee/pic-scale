@@ -34,9 +34,14 @@ mod rgba_f32;
 mod rgba_u8;
 mod utils;
 mod vertical_f32;
+mod vertical_u8;
+mod alpha;
 
 pub use rgb_f32::*;
 pub use vertical_f32::convolve_vertical_rgb_neon_row_f32;
-pub use rgb_u8::neon_rgb::*;
+pub use vertical_u8::convolve_vertical_rgb_neon_row;
+pub use rgb_u8::*;
 pub use rgba_f32::*;
 pub use rgba_u8::*;
+pub use alpha::neon_unpremultiply_alpha_rgba;
+pub use alpha::neon_premultiply_alpha_rgba;
