@@ -35,11 +35,11 @@ mod colors;
 mod convolution;
 mod convolve_naive_f32;
 mod convolve_naive_u8;
-#[cfg(feature = "use_half")]
+#[cfg(feature = "half")]
 mod dispatch_group_f16;
 mod dispatch_group_f32;
 mod dispatch_group_u8;
-#[cfg(feature = "use_half")]
+#[cfg(feature = "half")]
 mod f16;
 mod filter_weights;
 mod image_size;
@@ -55,7 +55,7 @@ mod rgba_u8;
 mod sampler;
 mod saturate_narrow;
 mod scaler;
-#[cfg(feature = "use_half")]
+#[cfg(feature = "half")]
 mod scaler_f16;
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
