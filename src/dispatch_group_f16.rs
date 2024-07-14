@@ -142,7 +142,7 @@ pub(crate) fn convolve_horizontal_dispatch_f16<const CHANNELS: usize>(
                     yy = y;
                 }
             }
-            for y in (yy..destination.height).step_by(4) {
+            for y in yy..destination.height {
                 let weights = arc_weights.clone();
                 scope.spawn(move |_| {
                     let unsafe_source_ptr_0 =

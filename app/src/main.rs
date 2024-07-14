@@ -5,6 +5,7 @@ use fast_image_resize::FilterType::Lanczos3;
 use fast_image_resize::{
     CpuExtensions, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
+use half::f16;
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, GenericImageView};
 
@@ -16,7 +17,7 @@ use pic_scale::{
 fn main() {
     // test_fast_image();
 
-    let img = ImageReader::open("./assets/beach_horizon.jpg")
+    let img = ImageReader::open("./assets/asset_5.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -33,16 +34,15 @@ fn main() {
     //     false,
     // );
 
-    // let mut f_store: Vec<f32> = bytes.iter().map(|&x| x as f32 * (1f32 / 255f32)).collect();
     //
     let start_time = Instant::now();
 
     let store =
-        ImageStore::<u8, 3>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
+        ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
 
-    let resized = scaler.resize_rgb(
-        ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-        store,
+    let resized = scaler.resize_rgba(
+        ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+        store, true,
     );
 
     let elapsed_time = start_time.elapsed();
