@@ -28,7 +28,7 @@
  */
 
 use crate::filter_weights::FilterBounds;
-use crate::neon::utils::{prefer_vfmaq_f32};
+use crate::neon::utils::prefer_vfmaq_f32;
 use std::arch::aarch64::*;
 
 #[inline(always)]

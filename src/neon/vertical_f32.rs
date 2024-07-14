@@ -168,7 +168,6 @@ macro_rules! conv_vertical_part_neon_48_f32 {
     }};
 }
 
-#[inline(always)]
 pub fn convolve_vertical_rgb_neon_row_f32<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,

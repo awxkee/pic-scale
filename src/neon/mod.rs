@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+mod alpha;
 mod convolve_f32;
 mod rgb_f32;
 mod rgb_u8;
@@ -35,13 +36,12 @@ mod rgba_u8;
 mod utils;
 mod vertical_f32;
 mod vertical_u8;
-mod alpha;
 
+pub use alpha::neon_premultiply_alpha_rgba;
+pub use alpha::neon_unpremultiply_alpha_rgba;
 pub use rgb_f32::*;
-pub use vertical_f32::convolve_vertical_rgb_neon_row_f32;
-pub use vertical_u8::convolve_vertical_rgb_neon_row;
 pub use rgb_u8::*;
 pub use rgba_f32::*;
 pub use rgba_u8::*;
-pub use alpha::neon_unpremultiply_alpha_rgba;
-pub use alpha::neon_premultiply_alpha_rgba;
+pub use vertical_f32::convolve_vertical_rgb_neon_row_f32;
+pub use vertical_u8::convolve_vertical_rgb_neon_row;

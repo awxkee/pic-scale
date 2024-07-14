@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-pub fn resize_nearest<T, const CHANNELS: usize>(
+pub fn resize_nearest<T: Copy, const CHANNELS: usize>(
     src: &[T],
     src_width: usize,
     src_height: usize,

@@ -26,19 +26,25 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 use crate::filter_weights::{FilterBounds, FilterWeights};
+use num_traits::AsPrimitive;
 
 #[inline(always)]
-pub(crate) unsafe fn convolve_vertical_part_f32<const PART: usize, const CHANNELS: usize>(
+pub(crate) unsafe fn convolve_vertical_part_f32<
+    T: Copy + 'static + AsPrimitive<f32>,
+    const PART: usize,
+    const CHANNELS: usize,
+>(
     start_y: usize,
     start_x: usize,
-    src: *const f32,
+    src: *const T,
     src_stride: usize,
-    dst: *mut f32,
+    dst: *mut T,
     filter: *const f32,
     bounds: &FilterBounds,
-) {
+) where
+    f32: AsPrimitive<T>,
+{
     let mut store: [[f32; CHANNELS]; PART] = [[0f32; CHANNELS]; PART];
 
     for j in 0..bounds.size {
@@ -51,7 +57,7 @@ pub(crate) unsafe fn convolve_vertical_part_f32<const PART: usize, const CHANNEL
             for c in 0..CHANNELS {
                 let store_p = store.get_unchecked_mut(x);
                 let store_v = store_p.get_unchecked_mut(c);
-                *store_v += unsafe { s_ptr.add(c).read_unaligned() } * weight;
+                *store_v += unsafe { s_ptr.add(c).read_unaligned().as_() } * weight;
             }
         }
     }
@@ -61,7 +67,7 @@ pub(crate) unsafe fn convolve_vertical_part_f32<const PART: usize, const CHANNEL
         let dst_ptr = dst.add(px);
         for c in 0..CHANNELS {
             let vl = *(*store.get_unchecked_mut(x)).get_unchecked_mut(c);
-            dst_ptr.add(c).write_unaligned(vl);
+            dst_ptr.add(c).write_unaligned(vl.as_());
         }
     }
 }
@@ -69,42 +75,47 @@ pub(crate) unsafe fn convolve_vertical_part_f32<const PART: usize, const CHANNEL
 macro_rules! make_naive_sum {
     ($sum_r:expr, $sum_g:expr, $sum_b:expr, $sum_a:expr, $weight: expr,
         $src:expr, $channels:expr) => {{
-        $sum_r += $src.read_unaligned() * $weight;
+        $sum_r += $src.read_unaligned().as_() * $weight;
         if $channels > 1 {
-            $sum_g += $src.add(1).read_unaligned() * $weight;
+            $sum_g += $src.add(1).read_unaligned().as_() * $weight;
         }
         if $channels > 2 {
-            $sum_b += $src.add(2).read_unaligned() * $weight;
+            $sum_b += $src.add(2).read_unaligned().as_() * $weight;
         }
         if $channels == 4 {
-            $sum_a += $src.add(3).read_unaligned() * $weight;
+            $sum_a += $src.add(3).read_unaligned().as_() * $weight;
         }
     }};
 }
 
 macro_rules! write_out_pixels {
     ($sum_r:expr, $sum_g:expr, $sum_b:expr, $sum_a:expr, $dst:expr, $channels:expr) => {{
-        $dst.write_unaligned($sum_r);
+        $dst.write_unaligned($sum_r.as_());
         if $channels > 1 {
-            $dst.add(1).write_unaligned($sum_g);
+            $dst.add(1).write_unaligned($sum_g.as_());
         }
         if $channels > 2 {
-            $dst.add(2).write_unaligned($sum_b);
+            $dst.add(2).write_unaligned($sum_b.as_());
         }
         if $channels == 4 {
-            $dst.add(3).write_unaligned($sum_a);
+            $dst.add(3).write_unaligned($sum_a.as_());
         }
     }};
 }
 
 #[inline(always)]
-pub(crate) fn convolve_horizontal_rgb_native_row<const CHANNELS: usize>(
+pub(crate) fn convolve_horizontal_rgb_native_row<
+    T: Copy + 'static + AsPrimitive<f32>,
+    const CHANNELS: usize,
+>(
     dst_width: usize,
     _: usize,
     filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f32,
-    unsafe_destination_ptr_0: *mut f32,
-) {
+    unsafe_source_ptr_0: *const T,
+    unsafe_destination_ptr_0: *mut T,
+) where
+    f32: AsPrimitive<T>,
+{
     unsafe {
         let weights_ptr = filter_weights.weights.as_ptr();
         let mut filter_offset = 0usize;
@@ -134,15 +145,20 @@ pub(crate) fn convolve_horizontal_rgb_native_row<const CHANNELS: usize>(
 }
 
 #[allow(unused)]
-pub(crate) fn convolve_horizontal_rgba_4_row_f32<const CHANNELS: usize>(
+pub(crate) fn convolve_horizontal_rgba_4_row_f32<
+    T: Copy + 'static + AsPrimitive<f32>,
+    const CHANNELS: usize,
+>(
     dst_width: usize,
     _: usize,
     filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f32,
+    unsafe_source_ptr_0: *const T,
     src_stride: usize,
-    unsafe_destination_ptr_0: *mut f32,
+    unsafe_destination_ptr_0: *mut T,
     dst_stride: usize,
-) {
+) where
+    f32: AsPrimitive<T>,
+{
     unsafe {
         let mut filter_offset = 0usize;
         let weights_ptr = filter_weights.weights.as_ptr();

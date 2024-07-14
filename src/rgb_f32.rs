@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+use num_traits::AsPrimitive;
 use rayon::ThreadPool;
 
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
@@ -43,18 +43,23 @@ use crate::neon::*;
 use crate::sse::*;
 
 #[inline(always)]
-pub(crate) fn convolve_vertical_rgb_native_row_f32<const COMPONENTS: usize>(
+pub(crate) fn convolve_vertical_rgb_native_row_f32<
+    T: Copy + 'static + AsPrimitive<f32>,
+    const COMPONENTS: usize,
+>(
     dst_width: usize,
     bounds: &FilterBounds,
-    unsafe_source_ptr_0: *const f32,
-    unsafe_destination_ptr_0: *mut f32,
+    unsafe_source_ptr_0: *const T,
+    unsafe_destination_ptr_0: *mut T,
     src_stride: usize,
     weight_ptr: *const f32,
-) {
+) where
+    f32: AsPrimitive<T>,
+{
     let mut cx = 0usize;
     while cx + 12 < dst_width {
         unsafe {
-            convolve_vertical_part_f32::<12, COMPONENTS>(
+            convolve_vertical_part_f32::<T, 12, COMPONENTS>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -70,7 +75,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_f32<const COMPONENTS: usize>(
 
     while cx + 8 < dst_width {
         unsafe {
-            convolve_vertical_part_f32::<8, COMPONENTS>(
+            convolve_vertical_part_f32::<T, 8, COMPONENTS>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -86,7 +91,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_f32<const COMPONENTS: usize>(
 
     while cx < dst_width {
         unsafe {
-            convolve_vertical_part_f32::<1, COMPONENTS>(
+            convolve_vertical_part_f32::<T, 1, COMPONENTS>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -111,9 +116,9 @@ impl<'a> HorizontalConvolutionPass<f32, 3> for ImageStore<'a, f32, 3> {
     ) {
         let mut _dispatcher_4_rows: Option<
             fn(usize, usize, &FilterWeights<f32>, *const f32, usize, *mut f32, usize),
-        > = Some(convolve_horizontal_rgba_4_row_f32::<3>);
+        > = Some(convolve_horizontal_rgba_4_row_f32::<f32, 3>);
         let mut _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, *const f32, *mut f32) =
-            convolve_horizontal_rgb_native_row::<3>;
+            convolve_horizontal_rgb_native_row::<f32, 3>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rows_4_f32);
@@ -148,7 +153,7 @@ impl<'a> VerticalConvolutionPass<f32, 3> for ImageStore<'a, f32, 3> {
         pool: &Option<ThreadPool>,
     ) {
         let mut _dispatcher: fn(usize, &FilterBounds, *const f32, *mut f32, usize, *const f32) =
-            convolve_vertical_rgb_native_row_f32::<3>;
+            convolve_vertical_rgb_native_row_f32::<f32, 3>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             _dispatcher = convolve_vertical_rgb_neon_row_f32::<3>;

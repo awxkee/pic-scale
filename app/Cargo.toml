@@ -5,8 +5,9 @@ edition = "2021"
 
 [dependencies]
 image = "0.25.1"
-pic-scale = { path = ".." }
+pic-scale = { path = "..", features = ["use_half"] }
 fast_image_resize = "4.0.0"
+half = { version = "2.4.1", default-features = true }
 
 [dev-dependencies]
 criterion = "0.5.1"
