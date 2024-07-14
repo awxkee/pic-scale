@@ -329,8 +329,7 @@ impl Scaling for Scaler {
         store: ImageStore<f32, 4>,
     ) -> ImageStore<f32, 4> {
         if self.function == Nearest {
-            let mut allocated_store: Vec<f32> = vec![];
-            allocated_store.resize(new_size.width * 4 * new_size.height, 0f32);
+            let mut allocated_store: Vec<f32> = vec![0f32; new_size.width * 4 * new_size.height];
             resize_nearest::<f32, 4>(
                 &store.buffer.borrow(),
                 store.width,
@@ -377,8 +376,7 @@ impl Scaler {
         store: ImageStore<f32, 1>,
     ) -> ImageStore<f32, 1> {
         if self.function == Nearest {
-            let mut allocated_store: Vec<f32> = vec![];
-            allocated_store.resize(new_size.width * 1 * new_size.height, 0f32);
+            let mut allocated_store: Vec<f32> = vec![0f32; new_size.width * 1 * new_size.height];
             resize_nearest::<f32, 1>(
                 &store.buffer.borrow(),
                 store.width,

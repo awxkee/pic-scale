@@ -46,7 +46,7 @@ impl<'a> HorizontalConvolutionPass<u8, 1> for ImageStore<'a, u8, 1> {
             fn(usize, usize, &FilterWeights<i16>, *const u8, usize, *mut u8, usize),
         > = None;
         let _dispatcher_1_row: fn(usize, usize, &FilterWeights<i16>, *const u8, *mut u8) =
-            convolve_horizontal_rgba_native_row::<1>;
+            convolve_horizontal_rgba_native_row::<u8, i32, 1>;
         convolve_horizontal_dispatch_u8(
             self,
             filter_weights,

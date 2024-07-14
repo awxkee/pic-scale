@@ -39,3 +39,10 @@ impl SaturateNarrow<u8> for i32 {
         (self >> PRECISION).max(0).min(255) as u8
     }
 }
+
+impl SaturateNarrow<u8> for i64 {
+    #[inline(always)]
+    fn saturate_narrow(self) -> u8 {
+        (self >> PRECISION).max(0).min(255) as u8
+    }
+}

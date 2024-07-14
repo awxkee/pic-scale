@@ -58,7 +58,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_u8<const COMPONENTS: usize>(
 
     while cx + 64 < total_width {
         unsafe {
-            convolve_vertical_part::<64>(
+            convolve_vertical_part::<u8, i32, 64>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -74,7 +74,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_u8<const COMPONENTS: usize>(
 
     while cx + 48 < total_width {
         unsafe {
-            convolve_vertical_part::<48>(
+            convolve_vertical_part::<u8, i32, 48>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -90,7 +90,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_u8<const COMPONENTS: usize>(
 
     while cx + 36 < total_width {
         unsafe {
-            convolve_vertical_part::<36>(
+            convolve_vertical_part::<u8, i32, 36>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -106,7 +106,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_u8<const COMPONENTS: usize>(
 
     while cx + 24 < total_width {
         unsafe {
-            convolve_vertical_part::<24>(
+            convolve_vertical_part::<u8, i32, 24>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -122,7 +122,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_u8<const COMPONENTS: usize>(
 
     while cx + 12 < total_width {
         unsafe {
-            convolve_vertical_part::<12>(
+            convolve_vertical_part::<u8, i32, 12>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -138,7 +138,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_u8<const COMPONENTS: usize>(
 
     while cx + 8 < total_width {
         unsafe {
-            convolve_vertical_part::<8>(
+            convolve_vertical_part::<u8, i32, 8>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -154,7 +154,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_u8<const COMPONENTS: usize>(
 
     while cx < total_width {
         unsafe {
-            convolve_vertical_part::<1>(
+            convolve_vertical_part::<u8, i32, 1>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -178,9 +178,9 @@ impl<'a> HorizontalConvolutionPass<u8, 3> for ImageStore<'a, u8, 3> {
     ) {
         let mut _dispatcher_4_rows: Option<
             fn(usize, usize, &FilterWeights<i16>, *const u8, usize, *mut u8, usize),
-        > = None;
+        > = Some(convolve_horizontal_rgba_native_4_row::<u8, i32, 3>);
         let mut _dispatcher_1_row: fn(usize, usize, &FilterWeights<i16>, *const u8, *mut u8) =
-            convolve_horizontal_rgba_native_row::<3>;
+            convolve_horizontal_rgba_native_row::<u8, i32, 3>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rows_4);
@@ -191,7 +191,6 @@ impl<'a> HorizontalConvolutionPass<u8, 3> for ImageStore<'a, u8, 3> {
             target_feature = "sse4.1"
         ))]
         {
-            _dispatcher_4_rows = Some(convolve_horizontal_rgba_native_4_row::<3>);
             if is_x86_feature_detected!("sse4.1") {
                 _dispatcher_4_rows = Some(convolve_horizontal_rgb_sse_rows_4);
                 _dispatcher_1_row = convolve_horizontal_rgb_sse_row_one;

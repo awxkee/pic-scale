@@ -55,9 +55,9 @@ impl<'a> HorizontalConvolutionPass<u8, 4> for ImageStore<'a, u8, 4> {
     ) {
         let mut _dispatcher_4_rows: Option<
             fn(usize, usize, &FilterWeights<i16>, *const u8, usize, *mut u8, usize),
-        > = None;
+        > = Some(convolve_horizontal_rgba_native_4_row::<u8, i32, 4>);
         let mut _dispatcher_1_row: fn(usize, usize, &FilterWeights<i16>, *const u8, *mut u8) =
-            convolve_horizontal_rgba_native_row::<4>;
+            convolve_horizontal_rgba_native_row::<u8, i32, 4>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             _dispatcher_4_rows = Some(convolve_horizontal_rgba_neon_rows_4_u8);
@@ -68,7 +68,7 @@ impl<'a> HorizontalConvolutionPass<u8, 4> for ImageStore<'a, u8, 4> {
             target_feature = "sse4.1"
         ))]
         {
-            _dispatcher_4_rows = Some(convolve_horizontal_rgba_native_4_row::<4>);
+            _dispatcher_4_rows = Some(convolve_horizontal_rgba_native_4_row::<u8, i32, 4>);
             if is_x86_feature_detected!("sse4.1") {
                 _dispatcher_4_rows = Some(convolve_horizontal_rgba_sse_rows_4);
                 _dispatcher_1_row = convolve_horizontal_rgba_sse_rows_one;
