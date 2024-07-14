@@ -42,7 +42,6 @@ use crate::neon::*;
 ))]
 use crate::sse::*;
 
-#[inline(always)]
 pub(crate) fn convolve_vertical_rgb_native_row_f32<
     T: Copy + 'static + AsPrimitive<f32>,
     const COMPONENTS: usize,
@@ -57,9 +56,60 @@ pub(crate) fn convolve_vertical_rgb_native_row_f32<
     f32: AsPrimitive<T>,
 {
     let mut cx = 0usize;
-    while cx + 12 < dst_width {
+
+    let total_width = dst_width * COMPONENTS;
+
+    while cx + 64 < total_width {
         unsafe {
-            convolve_vertical_part_f32::<T, 12, COMPONENTS>(
+            convolve_vertical_part_f32::<T, 64>(
+                bounds.start,
+                cx,
+                unsafe_source_ptr_0,
+                src_stride,
+                unsafe_destination_ptr_0,
+                weight_ptr,
+                bounds,
+            );
+        }
+
+        cx += 64;
+    }
+
+    while cx + 32 < total_width {
+        unsafe {
+            convolve_vertical_part_f32::<T, 32>(
+                bounds.start,
+                cx,
+                unsafe_source_ptr_0,
+                src_stride,
+                unsafe_destination_ptr_0,
+                weight_ptr,
+                bounds,
+            );
+        }
+
+        cx += 32;
+    }
+
+    while cx + 24 < total_width {
+        unsafe {
+            convolve_vertical_part_f32::<T, 24>(
+                bounds.start,
+                cx,
+                unsafe_source_ptr_0,
+                src_stride,
+                unsafe_destination_ptr_0,
+                weight_ptr,
+                bounds,
+            );
+        }
+
+        cx += 24;
+    }
+
+    while cx + 12 < total_width {
+        unsafe {
+            convolve_vertical_part_f32::<T, 12>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -73,9 +123,9 @@ pub(crate) fn convolve_vertical_rgb_native_row_f32<
         cx += 12;
     }
 
-    while cx + 8 < dst_width {
+    while cx + 8 < total_width {
         unsafe {
-            convolve_vertical_part_f32::<T, 8, COMPONENTS>(
+            convolve_vertical_part_f32::<T, 8>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -89,9 +139,9 @@ pub(crate) fn convolve_vertical_rgb_native_row_f32<
         cx += 8;
     }
 
-    while cx < dst_width {
+    while cx < total_width {
         unsafe {
-            convolve_vertical_part_f32::<T, 1, COMPONENTS>(
+            convolve_vertical_part_f32::<T, 1>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -107,7 +157,6 @@ pub(crate) fn convolve_vertical_rgb_native_row_f32<
 }
 
 impl<'a> HorizontalConvolutionPass<f32, 3> for ImageStore<'a, f32, 3> {
-    #[inline(always)]
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,

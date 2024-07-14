@@ -44,7 +44,6 @@ use crate::sse::sse_rgb::{
 };
 use rayon::ThreadPool;
 
-#[inline(always)]
 pub(crate) fn convolve_vertical_rgb_native_row_u8<const COMPONENTS: usize>(
     dst_width: usize,
     bounds: &FilterBounds,
@@ -55,9 +54,75 @@ pub(crate) fn convolve_vertical_rgb_native_row_u8<const COMPONENTS: usize>(
 ) {
     let mut cx = 0usize;
 
-    while cx + 12 < dst_width {
+    let total_width = COMPONENTS * dst_width;
+
+    while cx + 64 < total_width {
         unsafe {
-            convolve_vertical_part::<12, COMPONENTS>(
+            convolve_vertical_part::<64>(
+                bounds.start,
+                cx,
+                unsafe_source_ptr_0,
+                src_stride,
+                unsafe_destination_ptr_0,
+                weight_ptr,
+                bounds,
+            );
+        }
+
+        cx += 64;
+    }
+
+    while cx + 48 < total_width {
+        unsafe {
+            convolve_vertical_part::<48>(
+                bounds.start,
+                cx,
+                unsafe_source_ptr_0,
+                src_stride,
+                unsafe_destination_ptr_0,
+                weight_ptr,
+                bounds,
+            );
+        }
+
+        cx += 48;
+    }
+
+    while cx + 36 < total_width {
+        unsafe {
+            convolve_vertical_part::<36>(
+                bounds.start,
+                cx,
+                unsafe_source_ptr_0,
+                src_stride,
+                unsafe_destination_ptr_0,
+                weight_ptr,
+                bounds,
+            );
+        }
+
+        cx += 36;
+    }
+
+    while cx + 24 < total_width {
+        unsafe {
+            convolve_vertical_part::<24>(
+                bounds.start,
+                cx,
+                unsafe_source_ptr_0,
+                src_stride,
+                unsafe_destination_ptr_0,
+                weight_ptr,
+                bounds,
+            );
+        }
+
+        cx += 24;
+    }
+
+    while cx + 12 < total_width {
+        unsafe {
+            convolve_vertical_part::<12>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -71,9 +136,9 @@ pub(crate) fn convolve_vertical_rgb_native_row_u8<const COMPONENTS: usize>(
         cx += 12;
     }
 
-    while cx + 8 < dst_width {
+    while cx + 8 < total_width {
         unsafe {
-            convolve_vertical_part::<8, COMPONENTS>(
+            convolve_vertical_part::<8>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -87,9 +152,9 @@ pub(crate) fn convolve_vertical_rgb_native_row_u8<const COMPONENTS: usize>(
         cx += 8;
     }
 
-    while cx < dst_width {
+    while cx < total_width {
         unsafe {
-            convolve_vertical_part::<1, COMPONENTS>(
+            convolve_vertical_part::<1>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,

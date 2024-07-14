@@ -50,7 +50,6 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    //
     c.bench_function("Fast image resize RGBA with alpha: Lanczos 3", |b| {
         b.iter(|| {
             let mut vc = Vec::from(img.as_bytes());

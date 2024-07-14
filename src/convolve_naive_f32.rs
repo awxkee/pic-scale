@@ -29,11 +29,9 @@
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use num_traits::AsPrimitive;
 
-#[inline(always)]
 pub(crate) unsafe fn convolve_vertical_part_f32<
     T: Copy + 'static + AsPrimitive<f32>,
-    const PART: usize,
-    const CHANNELS: usize,
+    const BUFFER_SIZE: usize,
 >(
     start_y: usize,
     start_x: usize,
@@ -45,30 +43,25 @@ pub(crate) unsafe fn convolve_vertical_part_f32<
 ) where
     f32: AsPrimitive<T>,
 {
-    let mut store: [[f32; CHANNELS]; PART] = [[0f32; CHANNELS]; PART];
+    let mut store: [f32; BUFFER_SIZE] = [0f32; BUFFER_SIZE];
 
     for j in 0..bounds.size {
         let py = start_y + j;
         let weight = unsafe { filter.add(j).read_unaligned() };
         let src_ptr = src.add(src_stride * py);
-        for x in 0..PART {
-            let px = (start_x + x) * CHANNELS;
+        for x in 0..BUFFER_SIZE {
+            let px = start_x + x;
             let s_ptr = src_ptr.add(px);
-            for c in 0..CHANNELS {
-                let store_p = store.get_unchecked_mut(x);
-                let store_v = store_p.get_unchecked_mut(c);
-                *store_v += unsafe { s_ptr.add(c).read_unaligned().as_() } * weight;
-            }
+            let store_p = store.get_unchecked_mut(x);
+            *store_p += unsafe { s_ptr.read_unaligned().as_() } * weight;
         }
     }
 
-    for x in 0..PART {
-        let px = (start_x + x) * CHANNELS;
+    for x in 0..BUFFER_SIZE {
+        let px = start_x + x;
         let dst_ptr = dst.add(px);
-        for c in 0..CHANNELS {
-            let vl = *(*store.get_unchecked_mut(x)).get_unchecked_mut(c);
-            dst_ptr.add(c).write_unaligned(vl.as_());
-        }
+        let vl = *store.get_unchecked_mut(x);
+        dst_ptr.write_unaligned(vl.as_());
     }
 }
 

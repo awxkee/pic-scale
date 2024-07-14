@@ -59,6 +59,7 @@ where
 }
 
 #[derive(Debug, Copy, Clone, Default, Ord, PartialOrd, Eq, PartialEq)]
+/// Describes resampling function that will be used
 pub enum ResamplingFunction {
     Bilinear,
     Nearest,

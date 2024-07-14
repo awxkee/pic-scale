@@ -42,7 +42,6 @@ use crate::rgb_f32::convolve_vertical_rgb_native_row_f32;
 use crate::ImageStore;
 
 impl<'a> HorizontalConvolutionPass<f16, 4> for ImageStore<'a, f16, 4> {
-    #[inline(always)]
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,
@@ -79,7 +78,6 @@ impl<'a> VerticalConvolutionPass<f16, 4> for ImageStore<'a, f16, 4> {
 }
 
 impl<'a> HorizontalConvolutionPass<f16, 3> for ImageStore<'a, f16, 3> {
-    #[inline(always)]
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,
@@ -111,6 +109,42 @@ impl<'a> VerticalConvolutionPass<f16, 3> for ImageStore<'a, f16, 3> {
     ) {
         let _dispatcher: fn(usize, &FilterBounds, *const f16, *mut f16, usize, *const f32) =
             convolve_vertical_rgb_native_row_f32::<f16, 3>;
+        convolve_vertical_dispatch_f16(self, filter_weights, destination, pool, _dispatcher);
+    }
+}
+
+impl<'a> HorizontalConvolutionPass<f16, 1> for ImageStore<'a, f16, 1> {
+    fn convolve_horizontal(
+        &self,
+        filter_weights: FilterWeights<f32>,
+        destination: &mut ImageStore<f16, 1>,
+        pool: &Option<ThreadPool>,
+    ) {
+        let _dispatcher_4_rows: Option<
+            fn(usize, usize, &FilterWeights<f32>, *const f16, usize, *mut f16, usize),
+        > = Some(convolve_horizontal_rgba_4_row_f32::<f16, 1>);
+        let _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, *const f16, *mut f16) =
+            convolve_horizontal_rgb_native_row::<f16, 1>;
+        convolve_horizontal_dispatch_f16(
+            self,
+            filter_weights,
+            destination,
+            pool,
+            _dispatcher_4_rows,
+            _dispatcher_row,
+        );
+    }
+}
+
+impl<'a> VerticalConvolutionPass<f16, 1> for ImageStore<'a, f16, 1> {
+    fn convolve_vertical(
+        &self,
+        filter_weights: FilterWeights<f32>,
+        destination: &mut ImageStore<f16, 1>,
+        pool: &Option<ThreadPool>,
+    ) {
+        let _dispatcher: fn(usize, &FilterBounds, *const f16, *mut f16, usize, *const f32) =
+            convolve_vertical_rgb_native_row_f32::<f16, 1>;
         convolve_vertical_dispatch_f16(self, filter_weights, destination, pool, _dispatcher);
     }
 }

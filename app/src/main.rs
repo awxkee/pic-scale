@@ -37,12 +37,28 @@ fn main() {
     //
     let start_time = Instant::now();
 
-    let store =
-        ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
+    let mut f16_slice: Vec<f16> = bytes
+        .iter()
+        .map(|&x| f16::from_f32(x as f32 / 255f32))
+        .collect();
 
-    let resized = scaler.resize_rgba(
-        ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
-        store, true,
+    // let store =
+    //     ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
+    //
+    // let resized = scaler.resize_rgba(
+    //     ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+    //     store, true,
+    // );
+
+    let store = ImageStore::<f16, 4>::from_slice(
+        &mut f16_slice,
+        dimensions.0 as usize,
+        dimensions.1 as usize,
+    );
+
+    let resized = scaler.resize_rgba_f16(
+        ImageSize::new(dimensions.0 as usize / 1, dimensions.1 as usize / 1),
+        store,
     );
 
     let elapsed_time = start_time.elapsed();
@@ -54,7 +70,12 @@ fn main() {
     //     .iter()
     //     .map(|&x| (x * 255f32) as u8)
     //     .collect();
-    let dst = resized.as_bytes();
+    // let dst = resized.as_bytes();
+    let dst: Vec<u8> = resized
+        .as_bytes()
+        .iter()
+        .map(|&x| (x.to_f32() * 255f32).min(255f32) as u8)
+        .collect();
 
     if resized.channels == 4 {
         image::save_buffer(

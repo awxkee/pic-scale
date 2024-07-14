@@ -48,6 +48,8 @@ mod math;
 mod nearest_sampler;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 mod neon;
+mod plane_f32;
+mod plane_u8;
 mod rgb_f32;
 mod rgb_u8;
 mod rgba_f32;

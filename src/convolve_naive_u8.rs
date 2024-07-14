@@ -31,8 +31,8 @@ use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::saturate_narrow::SaturateNarrow;
 use crate::support::ROUNDING_APPROX;
 
-#[inline(always)]
-pub(crate) unsafe fn convolve_vertical_part<const PART: usize, const CHANNELS: usize>(
+#[inline]
+pub(crate) unsafe fn convolve_vertical_part<const BUFFER_SIZE: usize>(
     start_y: usize,
     start_x: usize,
     src: *const u8,
@@ -41,30 +41,26 @@ pub(crate) unsafe fn convolve_vertical_part<const PART: usize, const CHANNELS: u
     filter: *const i16,
     bounds: &FilterBounds,
 ) {
-    let mut store: [[i32; CHANNELS]; PART] = [[ROUNDING_APPROX; CHANNELS]; PART];
+    let mut store: [i32; BUFFER_SIZE] = [ROUNDING_APPROX; BUFFER_SIZE];
 
     for j in 0..bounds.size {
         let py = start_y + j;
         let weight = unsafe { filter.add(j).read_unaligned() } as i32;
         let src_ptr = src.add(src_stride * py);
-        for x in 0..PART {
-            let px = (start_x + x) * CHANNELS;
+        for x in 0..BUFFER_SIZE {
+            let px = start_x + x;
             let s_ptr = src_ptr.add(px);
-            for c in 0..CHANNELS {
-                let store_p = store.get_unchecked_mut(x);
-                let store_v = store_p.get_unchecked_mut(c);
-                *store_v += unsafe { s_ptr.add(c).read_unaligned() } as i32 * weight;
-            }
+
+            let store_p = store.get_unchecked_mut(x);
+            *store_p += unsafe { s_ptr.read_unaligned() } as i32 * weight;
         }
     }
 
-    for x in 0..PART {
-        let px = (start_x + x) * CHANNELS;
+    for x in 0..BUFFER_SIZE {
+        let px = start_x + x;
         let dst_ptr = dst.add(px);
-        for c in 0..CHANNELS {
-            let vl = *(*store.get_unchecked_mut(x)).get_unchecked_mut(c);
-            dst_ptr.add(c).write_unaligned(vl.saturate_narrow());
-        }
+        let vl = *store.get_unchecked_mut(x);
+        dst_ptr.write_unaligned(vl.saturate_narrow());
     }
 }
 

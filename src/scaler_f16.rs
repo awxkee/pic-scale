@@ -35,6 +35,7 @@ use half::f16;
 
 // f16
 impl Scaler {
+    /// Resize f16 RGBA image
     pub fn resize_rgba_f16(
         &self,
         new_size: ImageSize,
@@ -80,6 +81,7 @@ impl Scaler {
         new_image_horizontal
     }
 
+    /// Resize f16 RGB image
     pub fn resize_rgb_f16(
         &self,
         new_size: ImageSize,
@@ -87,7 +89,7 @@ impl Scaler {
     ) -> ImageStore<f16, 3> {
         if self.function == Nearest {
             let mut allocated_store: Vec<f16> =
-                vec![f16::from_f32(0.); new_size.width * 4 * new_size.height];
+                vec![f16::from_f32(0.); new_size.width * 3 * new_size.height];
             resize_nearest::<f16, 3>(
                 &store.buffer.borrow(),
                 store.width,
@@ -116,6 +118,52 @@ impl Scaler {
             vec![f16::from_f32(0.); new_size.width * 3 * new_size.height];
         let mut new_image_horizontal =
             ImageStore::<f16, 3>::new(allocated_store_horizontal, new_size.width, new_size.height);
+        let horizontal_filters = self.generate_weights(store.width, new_size.width);
+        new_image_vertical.convolve_horizontal(
+            horizontal_filters,
+            &mut new_image_horizontal,
+            &pool,
+        );
+        new_image_horizontal
+    }
+
+    /// Resize f16 plane
+    pub fn resize_plane_f16(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<f16, 1>,
+    ) -> ImageStore<f16, 1> {
+        if self.function == Nearest {
+            let mut allocated_store: Vec<f16> =
+                vec![f16::from_f32(0.); new_size.width * new_size.height];
+            resize_nearest::<f16, 1>(
+                &store.buffer.borrow(),
+                store.width,
+                store.height,
+                &mut allocated_store,
+                new_size.width,
+                new_size.height,
+            );
+            let new_image =
+                ImageStore::<f16, 1>::new(allocated_store, new_size.width, new_size.height);
+            return new_image;
+        }
+
+        let pool = self
+            .threading_policy
+            .get_pool(ImageSize::new(new_size.width, new_size.height));
+
+        let allocated_store_vertical: Vec<f16> =
+            vec![f16::from_f32(0.); store.width * 1 * new_size.height];
+        let mut new_image_vertical =
+            ImageStore::<f16, 1>::new(allocated_store_vertical, store.width, new_size.height);
+        let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
+        store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+
+        let allocated_store_horizontal: Vec<f16> =
+            vec![f16::from_f32(0.); new_size.width * 1 * new_size.height];
+        let mut new_image_horizontal =
+            ImageStore::<f16, 1>::new(allocated_store_horizontal, new_size.width, new_size.height);
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
         new_image_vertical.convolve_horizontal(
             horizontal_filters,

@@ -368,3 +368,87 @@ impl Scaling for Scaler {
         new_image_horizontal
     }
 }
+
+impl Scaler {
+    /// Performs rescaling for f32 plane
+    pub fn resize_plane_f32(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<f32, 1>,
+    ) -> ImageStore<f32, 1> {
+        if self.function == Nearest {
+            let mut allocated_store: Vec<f32> = vec![];
+            allocated_store.resize(new_size.width * 1 * new_size.height, 0f32);
+            resize_nearest::<f32, 1>(
+                &store.buffer.borrow(),
+                store.width,
+                store.height,
+                &mut allocated_store,
+                new_size.width,
+                new_size.height,
+            );
+            let new_image =
+                ImageStore::<f32, 1>::new(allocated_store, new_size.width, new_size.height);
+            return new_image;
+        }
+
+        let pool = self
+            .threading_policy
+            .get_pool(ImageSize::new(new_size.width, new_size.height));
+
+        let mut allocated_store_vertical: Vec<f32> = vec![];
+        allocated_store_vertical.resize(store.width * new_size.height, 0f32);
+        let mut new_image_vertical =
+            ImageStore::<f32, 1>::new(allocated_store_vertical, store.width, new_size.height);
+        let horizontal_filters = self.generate_weights(store.width, new_size.width);
+        let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
+        store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+
+        let mut allocated_store_horizontal: Vec<f32> = vec![];
+        allocated_store_horizontal.resize(new_size.width * new_size.height, 0f32);
+        let mut new_image_horizontal =
+            ImageStore::<f32, 1>::new(allocated_store_horizontal, new_size.width, new_size.height);
+        new_image_vertical.convolve_horizontal(
+            horizontal_filters,
+            &mut new_image_horizontal,
+            &pool,
+        );
+        new_image_horizontal
+    }
+}
+
+impl Scaler {
+    /// Performs rescaling for u8 plane
+    pub fn resize_plane(&self, new_size: ImageSize, store: ImageStore<u8, 1>) -> ImageStore<u8, 1> {
+        if self.function == Nearest {
+            let mut allocated_store: Vec<u8> = vec![0u8; new_size.width * new_size.height];
+            resize_nearest::<u8, 1>(
+                &store.buffer.borrow(),
+                store.width,
+                store.height,
+                &mut allocated_store,
+                new_size.width,
+                new_size.height,
+            );
+            let new_image =
+                ImageStore::<u8, 1>::new(allocated_store, new_size.width, new_size.height);
+            return new_image;
+        }
+        let vertical_filters = self.generate_weights(store.height, new_size.height);
+        let horizontal_filters = self.generate_weights(store.width, new_size.width);
+
+        let pool = self
+            .threading_policy
+            .get_pool(ImageSize::new(new_size.width, new_size.height));
+
+        let mut new_image_vertical = ImageStore::<u8, 1>::alloc(store.width, new_size.height);
+        store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+        let mut new_image_horizontal = ImageStore::<u8, 1>::alloc(new_size.width, new_size.height);
+        new_image_vertical.convolve_horizontal(
+            horizontal_filters,
+            &mut new_image_horizontal,
+            &pool,
+        );
+        new_image_horizontal
+    }
+}
