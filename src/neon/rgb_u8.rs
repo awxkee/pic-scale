@@ -106,6 +106,19 @@ macro_rules! conv_horiz_rgba_1_u8 {
     }};
 }
 
+macro_rules! write_accumulator_u8 {
+    ($store: expr, $dst: expr) => {{
+        let zeros = vdupq_n_s32(0i32);
+        let store_16 = vqshrun_n_s32::<PRECISION>(vmaxq_s32($store, zeros));
+        let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
+        let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
+        let bytes = pixel.to_le_bytes();
+        $dst.write_unaligned(bytes[0]);
+        $dst.add(1).write_unaligned(bytes[1]);
+        $dst.add(2).write_unaligned(bytes[2]);
+    }};
+}
+
 pub fn convolve_horizontal_rgb_neon_rows_4(
     dst_width: usize,
     src_width: usize,
@@ -127,7 +140,6 @@ pub fn convolve_horizontal_rgb_neon_rows_4(
         let mut filter_offset = 0usize;
         let weights_ptr = approx_weights.weights.as_ptr();
         const CHANNELS: usize = 3;
-        let zeros = vdupq_n_s32(0i32);
         let init = vdupq_n_s32(ROUNDING_APPROX);
         for x in 0..dst_width {
             let bounds = approx_weights.bounds.get_unchecked(x);
@@ -209,50 +221,21 @@ pub fn convolve_horizontal_rgb_neon_rows_4(
                 jx += 1;
             }
 
-            let store_16 = vqshrun_n_s32::<PRECISION>(vmaxq_s32(store_0, zeros));
-            let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
-
             let px = x * CHANNELS;
             let dest_ptr = unsafe_destination_ptr_0.add(px);
-            let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
-            let bytes = pixel.to_le_bytes();
-            dest_ptr.write_unaligned(bytes[0]);
-            dest_ptr.add(1).write_unaligned(bytes[1]);
-            dest_ptr.add(2).write_unaligned(bytes[2]);
-
-            let store_16 = vqshrun_n_s32::<PRECISION>(vmaxq_s32(store_1, zeros));
-            let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
+            write_accumulator_u8!(store_0, dest_ptr);
 
             let px = x * CHANNELS;
             let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride);
-
-            let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
-            let bytes = pixel.to_le_bytes();
-            dest_ptr.write_unaligned(bytes[0]);
-            dest_ptr.add(1).write_unaligned(bytes[1]);
-            dest_ptr.add(2).write_unaligned(bytes[2]);
-
-            let store_16 = vqshrun_n_s32::<PRECISION>(vmaxq_s32(store_2, zeros));
-            let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
+            write_accumulator_u8!(store_1, dest_ptr);
 
             let px = x * CHANNELS;
             let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 2);
-            let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
-            let bytes = pixel.to_le_bytes();
-            dest_ptr.write_unaligned(bytes[0]);
-            dest_ptr.add(1).write_unaligned(bytes[1]);
-            dest_ptr.add(2).write_unaligned(bytes[2]);
-
-            let store_16 = vqshrun_n_s32::<PRECISION>(vmaxq_s32(store_3, zeros));
-            let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
+            write_accumulator_u8!(store_2, dest_ptr);
 
             let px = x * CHANNELS;
             let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 3);
-            let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
-            let bytes = pixel.to_le_bytes();
-            dest_ptr.write_unaligned(bytes[0]);
-            dest_ptr.add(1).write_unaligned(bytes[1]);
-            dest_ptr.add(2).write_unaligned(bytes[2]);
+            write_accumulator_u8!(store_3, dest_ptr);
 
             filter_offset += approx_weights.aligned_size;
         }
@@ -269,7 +252,6 @@ pub fn convolve_horizontal_rgb_neon_row_one(
     unsafe {
         const CHANNELS: usize = 3;
         let mut filter_offset = 0usize;
-        let zeros = vdupq_n_s32(0i32);
         let weights_ptr = approx_weights.weights.as_ptr();
 
         let shuf_table_1: [u8; 8] = [0, 1, 2, 255, 3, 4, 5, 255];
@@ -312,16 +294,9 @@ pub fn convolve_horizontal_rgb_neon_row_one(
                 jx += 1;
             }
 
-            let store_16 = vqshrun_n_s32::<PRECISION>(vmaxq_s32(store, zeros));
-            let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
-
             let px = x * CHANNELS;
             let dest_ptr = unsafe_destination_ptr_0.add(px);
-            let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
-            let bytes = pixel.to_le_bytes();
-            dest_ptr.write_unaligned(bytes[0]);
-            dest_ptr.add(1).write_unaligned(bytes[1]);
-            dest_ptr.add(2).write_unaligned(bytes[2]);
+            write_accumulator_u8!(store, dest_ptr);
 
             filter_offset += approx_weights.aligned_size;
         }

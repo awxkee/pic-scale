@@ -368,7 +368,6 @@ pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f32(
     }
 }
 
-#[allow(unused)]
 #[inline(always)]
 pub(crate) unsafe fn convolve_vertical_part_sse_16_f32(
     start_y: usize,
@@ -411,7 +410,6 @@ pub(crate) unsafe fn convolve_vertical_part_sse_16_f32(
     _mm_storeu_ps(dst_ptr.add(12), store_3);
 }
 
-#[allow(unused)]
 #[inline(always)]
 pub(crate) unsafe fn convolve_vertical_part_sse_8_f32(
     start_y: usize,
@@ -446,7 +444,6 @@ pub(crate) unsafe fn convolve_vertical_part_sse_8_f32(
     _mm_storeu_ps(dst_ptr.add(4), store_1);
 }
 
-#[allow(unused)]
 #[inline(always)]
 pub(crate) unsafe fn convolve_vertical_part_sse_4_f32(
     start_y: usize,
@@ -477,7 +474,6 @@ pub(crate) unsafe fn convolve_vertical_part_sse_4_f32(
     _mm_storeu_ps(dst_ptr, store_0);
 }
 
-#[allow(unused)]
 #[inline(always)]
 pub(crate) unsafe fn convolve_vertical_part_sse_f32(
     start_y: usize,

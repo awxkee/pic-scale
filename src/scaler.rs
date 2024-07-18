@@ -26,6 +26,8 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use std::fmt::Debug;
+
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::image_size::ImageSize;
@@ -347,16 +349,14 @@ impl Scaling for Scaler {
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
 
-        let mut allocated_store_vertical: Vec<f32> = vec![];
-        allocated_store_vertical.resize(store.width * 4 * new_size.height, 0f32);
+        let allocated_store_vertical: Vec<f32> = vec![0f32; store.width * 4 * new_size.height];
         let mut new_image_vertical =
             ImageStore::<f32, 4>::new(allocated_store_vertical, store.width, new_size.height);
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
         let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
         store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
 
-        let mut allocated_store_horizontal: Vec<f32> = vec![];
-        allocated_store_horizontal.resize(new_size.width * 4 * new_size.height, 0f32);
+        let allocated_store_horizontal: Vec<f32> = vec![0f32; new_size.width * 4 * new_size.height];
         let mut new_image_horizontal =
             ImageStore::<f32, 4>::new(allocated_store_horizontal, new_size.width, new_size.height);
         new_image_vertical.convolve_horizontal(
@@ -394,16 +394,14 @@ impl Scaler {
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
 
-        let mut allocated_store_vertical: Vec<f32> = vec![];
-        allocated_store_vertical.resize(store.width * new_size.height, 0f32);
+        let allocated_store_vertical: Vec<f32> = vec![0f32; store.width * new_size.height];
         let mut new_image_vertical =
             ImageStore::<f32, 1>::new(allocated_store_vertical, store.width, new_size.height);
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
         let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
         store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
 
-        let mut allocated_store_horizontal: Vec<f32> = vec![];
-        allocated_store_horizontal.resize(new_size.width * new_size.height, 0f32);
+        let allocated_store_horizontal: Vec<f32> = vec![0f32; new_size.width * new_size.height];
         let mut new_image_horizontal =
             ImageStore::<f32, 1>::new(allocated_store_horizontal, new_size.width, new_size.height);
         new_image_vertical.convolve_horizontal(

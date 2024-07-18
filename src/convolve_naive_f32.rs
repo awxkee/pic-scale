@@ -137,7 +137,6 @@ pub(crate) fn convolve_horizontal_rgb_native_row<
     }
 }
 
-#[allow(unused)]
 pub(crate) fn convolve_horizontal_rgba_4_row_f32<
     T: Copy + 'static + AsPrimitive<f32>,
     const CHANNELS: usize,

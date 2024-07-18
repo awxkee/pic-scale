@@ -1,17 +1,16 @@
 use std::time::Instant;
 
-use fast_image_resize::images::Image;
-use fast_image_resize::FilterType::Lanczos3;
 use fast_image_resize::{
     CpuExtensions, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
-use half::f16;
-use image::io::Reader as ImageReader;
+use fast_image_resize::FilterType::Lanczos3;
+use fast_image_resize::images::Image;
 use image::{EncodableLayout, GenericImageView};
+use image::io::Reader as ImageReader;
 
 use pic_scale::{
-    ImageSize, ImageStore, LChScaler, LabScaler, LinearScaler, ResamplingFunction, Scaler, Scaling,
-    ThreadingPolicy, TransferFunction, XYZScaler,
+    ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling,
+    ThreadingPolicy,
 };
 
 fn main() {

@@ -26,7 +26,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_naive_u8::*;
 use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertical_dispatch_u8};
@@ -34,6 +33,7 @@ use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::image_store::ImageStore;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::*;
+use crate::saturate_narrow::SaturateNarrow;
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
@@ -42,23 +42,34 @@ use crate::sse::sse_rgb::{
     convolve_horizontal_rgb_sse_row_one, convolve_horizontal_rgb_sse_rows_4,
     convolve_vertical_rgb_sse_row,
 };
+use num_traits::AsPrimitive;
 use rayon::ThreadPool;
+use std::ops::{AddAssign, Mul};
 
-pub(crate) fn convolve_vertical_rgb_native_row_u8<const COMPONENTS: usize>(
+/// # Generics
+/// `T` - template buffer type
+/// `J` - accumulator type
+pub(crate) fn convolve_vertical_rgb_native_row_u8<
+    T: Copy + 'static + AsPrimitive<J>,
+    J: Copy + 'static + AsPrimitive<T> + Mul<Output = J> + AddAssign + SaturateNarrow<T>,
+    const COMPONENTS: usize,
+>(
     dst_width: usize,
     bounds: &FilterBounds,
-    unsafe_source_ptr_0: *const u8,
-    unsafe_destination_ptr_0: *mut u8,
+    unsafe_source_ptr_0: *const T,
+    unsafe_destination_ptr_0: *mut T,
     src_stride: usize,
     weight_ptr: *const i16,
-) {
+)  where
+    i32: AsPrimitive<J>,
+    i16: AsPrimitive<J>, {
     let mut cx = 0usize;
 
     let total_width = COMPONENTS * dst_width;
 
     while cx + 64 < total_width {
         unsafe {
-            convolve_vertical_part::<u8, i32, 64>(
+            convolve_vertical_part::<T, J, 64>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -74,7 +85,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_u8<const COMPONENTS: usize>(
 
     while cx + 48 < total_width {
         unsafe {
-            convolve_vertical_part::<u8, i32, 48>(
+            convolve_vertical_part::<T, J, 48>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -90,7 +101,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_u8<const COMPONENTS: usize>(
 
     while cx + 36 < total_width {
         unsafe {
-            convolve_vertical_part::<u8, i32, 36>(
+            convolve_vertical_part::<T, J, 36>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -106,7 +117,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_u8<const COMPONENTS: usize>(
 
     while cx + 24 < total_width {
         unsafe {
-            convolve_vertical_part::<u8, i32, 24>(
+            convolve_vertical_part::<T, J, 24>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -122,7 +133,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_u8<const COMPONENTS: usize>(
 
     while cx + 12 < total_width {
         unsafe {
-            convolve_vertical_part::<u8, i32, 12>(
+            convolve_vertical_part::<T, J, 12>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -138,7 +149,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_u8<const COMPONENTS: usize>(
 
     while cx + 8 < total_width {
         unsafe {
-            convolve_vertical_part::<u8, i32, 8>(
+            convolve_vertical_part::<T, J, 8>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -154,7 +165,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_u8<const COMPONENTS: usize>(
 
     while cx < total_width {
         unsafe {
-            convolve_vertical_part::<u8, i32, 1>(
+            convolve_vertical_part::<T, J, 1>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -221,7 +232,7 @@ impl<'a> VerticalConvolutionPass<u8, 3> for ImageStore<'a, u8, 3> {
             unsafe_destination_ptr_0: *mut u8,
             src_stride: usize,
             weight_ptr: *const i16,
-        ) = convolve_vertical_rgb_native_row_u8::<3>;
+        ) = convolve_vertical_rgb_native_row_u8::<u8, i32, 3>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             _dispatcher = convolve_vertical_rgb_neon_row::<3>;

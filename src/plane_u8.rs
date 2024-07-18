@@ -72,7 +72,7 @@ impl<'a> VerticalConvolutionPass<u8, 1> for ImageStore<'a, u8, 1> {
             unsafe_destination_ptr_0: *mut u8,
             src_stride: usize,
             weight_ptr: *const i16,
-        ) = convolve_vertical_rgb_native_row_u8::<1>;
+        ) = convolve_vertical_rgb_native_row_u8::<u8, i32, 1>;
         convolve_vertical_dispatch_u8(self, filter_weights, destination, pool, _dispatcher);
     }
 }
