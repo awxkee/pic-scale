@@ -351,9 +351,9 @@ checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 
 [[package]]
 name = "erydanos"
-version = "0.2.7"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bce71bbe27b7d7ba0cdb8f461f3a724a147d78406097ce5bf1fdb9a8c663dcaa"
+checksum = "42eda2ac7c5feaf463341f675f8a2c3dd0148cf33d2da44511c46cd1e1955f9b"
 dependencies = [
  "num-traits",
 ]
