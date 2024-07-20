@@ -72,6 +72,7 @@ pub use colors::LChScaler;
 pub use colors::LabScaler;
 pub use colors::LinearApproxScaler;
 pub use colors::LinearScaler;
+pub use colors::OklabScaler;
 pub use colors::SigmoidalScaler;
 pub use colors::XYZScaler;
 pub use colors::*;

@@ -160,9 +160,9 @@ checksum = "37b2a672a2cb129a2e41c10b1224bb368f9f37a2b16b612598138befd7b37eb5"
 
 [[package]]
 name = "cc"
-version = "1.1.5"
+version = "1.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "324c74f2155653c90b04f25b2a47a8a631360cb908f92a772695f430c7e31052"
+checksum = "2aba8f4e9906c7ce3c73463f62a7f0c65183ada1a2d47e397cc8810827f9694f"
 dependencies = [
  "jobserver",
  "libc",
@@ -244,9 +244,9 @@ checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 
 [[package]]
 name = "colorutils-rs"
-version = "0.4.14"
+version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fbc26d57d76cbe03b9ff05b6065311f6a68735ad1dec16741db7d0519faedd6"
+checksum = "24dd0b9389fd1728eda8ce2b3d91c47f6ba9df86acf04136d4f418a5d5cf6851"
 dependencies = [
  "erydanos",
  "half",
@@ -351,9 +351,9 @@ checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 
 [[package]]
 name = "erydanos"
-version = "0.2.8"
+version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42eda2ac7c5feaf463341f675f8a2c3dd0148cf33d2da44511c46cd1e1955f9b"
+checksum = "7698f0188aee8ace013304cf8604616f6ad8ea6c9647b025a3cebd6bea5a8acb"
 dependencies = [
  "num-traits",
 ]
@@ -376,9 +376,9 @@ dependencies = [
 
 [[package]]
 name = "fast_image_resize"
-version = "4.1.0"
+version = "4.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89a06940fe3bab6e93dc275bb8a67cc833b70f4078124e7e7f7352f5c8470e63"
+checksum = "81cd2f79218cdfe398519739df6872a6f5747ca08e1f4fd3179f4b053a0b05f9"
 dependencies = [
  "cfg-if",
  "document-features",
@@ -768,7 +768,7 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "pic-scale"
-version = "0.1.20"
+version = "0.1.21"
 dependencies = [
  "colorutils-rs",
  "half",
@@ -1408,9 +1408,9 @@ checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 
 [[package]]
 name = "winnow"
-version = "0.6.13"
+version = "0.6.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59b5e5f6c299a3c7890b876a2a587f3115162487e704907d9b6cd29473052ba1"
+checksum = "374ec40a2d767a3c1b4972d9475ecd557356637be906f2cb3f7fe17a6eb5e22f"
 dependencies = [
  "memchr",
 ]

@@ -60,9 +60,10 @@ pub(crate) fn convolve_vertical_rgb_native_row_u8<
     unsafe_destination_ptr_0: *mut T,
     src_stride: usize,
     weight_ptr: *const i16,
-)  where
+) where
     i32: AsPrimitive<J>,
-    i16: AsPrimitive<J>, {
+    i16: AsPrimitive<J>,
+{
     let mut cx = 0usize;
 
     let total_width = COMPONENTS * dst_width;

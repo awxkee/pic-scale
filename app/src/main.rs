@@ -1,16 +1,16 @@
 use std::time::Instant;
 
+use fast_image_resize::images::Image;
+use fast_image_resize::FilterType::Lanczos3;
 use fast_image_resize::{
     CpuExtensions, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
-use fast_image_resize::FilterType::Lanczos3;
-use fast_image_resize::images::Image;
-use image::{EncodableLayout, GenericImageView};
 use image::io::Reader as ImageReader;
+use image::{EncodableLayout, GenericImageView};
 
 use pic_scale::{
-    ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling,
-    ThreadingPolicy,
+    ImageSize, ImageStore, OklabScaler, ResamplingFunction, Scaler, Scaling, ThreadingPolicy,
+    TransferFunction,
 };
 
 fn main() {
@@ -23,7 +23,7 @@ fn main() {
     let dimensions = img.dimensions();
     let mut bytes = Vec::from(img.as_bytes());
 
-    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    let mut scaler = OklabScaler::new(ResamplingFunction::Lanczos3, TransferFunction::Gamma2p8);
     scaler.set_threading_policy(ThreadingPolicy::Adaptive);
     // let store =
     //     ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
@@ -40,7 +40,7 @@ fn main() {
         ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
 
     let resized = scaler.resize_rgba(
-        ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+        ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
         store,
         true,
     );

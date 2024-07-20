@@ -7,7 +7,7 @@ Supported only NEON and SSE.
 ### Colorspace
 
 This library provides for you some conveniences to scale in different color spaces.
-Prebuilt options for CIE L\*a\*b, CIE L\*u\*v, CIE L\*c\*h, Linear, Sigmoidal available. Those transformations also very efficients.
+Prebuilt options for CIE L\*a\*b, CIE L\*u\*v, CIE L\*c\*h, Linear, Sigmoidal, Oklab available. Those transformations also very efficients.
 Whether downscaling is preferred in linear colorspace, LAB/LUV and sigmoidal also provides very good results.
 Up scaling might be done in LAB/LUB and simoidized components and also efficient in sRGB.
 
@@ -173,6 +173,18 @@ let resized = scaler.resize_rgba(
 );
 ```
 
+#### Example in Oklab colorspace
+```rust
+let mut scaler = OklabScaler::new(ResamplingFunction::Hermite);
+scaler.set_threading_policy(ThreadingPolicy::Single);
+let store =
+    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height);
+let resized = scaler.resize_rgba(
+    ImageSize::new(new_width, new_height),
+    store,
+    true
+);
+```
 
 #### Resampling filters
 
