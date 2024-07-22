@@ -5,23 +5,27 @@ use fast_image_resize::FilterType::Lanczos3;
 use fast_image_resize::{
     CpuExtensions, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
+use half::f16;
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, GenericImageView};
 
-use pic_scale::{ImageSize, ImageStore, JzazbzScaler, OklabScaler, ResamplingFunction, Scaler, Scaling, ThreadingPolicy, TransferFunction};
+use pic_scale::{
+    ImageSize, ImageStore, JzazbzScaler, OklabScaler, ResamplingFunction, Scaler, Scaling,
+    ThreadingPolicy, TransferFunction,
+};
 
 fn main() {
     // test_fast_image();
 
-    let img = ImageReader::open("./assets/asset_5.png")
+    let img = ImageReader::open("./assets/asset.jpg")
         .unwrap()
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
     let mut bytes = Vec::from(img.as_bytes());
 
-    let mut scaler = JzazbzScaler::new(ResamplingFunction::Lanczos3,200., TransferFunction::Srgb);
-    scaler.set_threading_policy(ThreadingPolicy::Adaptive);
+    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    scaler.set_threading_policy(ThreadingPolicy::Single);
     // let store =
     //     ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
     // let resized = scaler.resize_rgba(
@@ -31,27 +35,35 @@ fn main() {
     // );
 
     //
+
+    let mut f16_bytes: Vec<f16> = bytes
+        .iter()
+        .map(|&x| f16::from_f32(x as f32 / 255f32))
+        .collect();
+
     let start_time = Instant::now();
 
-    let store =
-        ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
+    let store = ImageStore::<f16, 3>::from_slice(
+        &mut f16_bytes,
+        dimensions.0 as usize,
+        dimensions.1 as usize,
+    );
 
-    let resized = scaler.resize_rgba(
-        ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+    let resized = scaler.resize_rgb_f16(
+        ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
         store,
-        true,
     );
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
     println!("Scaler: {:.2?}", elapsed_time);
 
-    // let j_store: Vec<u8> = resized
-    //     .as_bytes()
-    //     .iter()
-    //     .map(|&x| (x * 255f32) as u8)
-    //     .collect();
-    let dst = resized.as_bytes();
+    let dst: Vec<u8> = resized
+        .as_bytes()
+        .iter()
+        .map(|&x| (x.to_f32() * 255f32) as u8)
+        .collect();
+    // let dst = resized.as_bytes();
 
     if resized.channels == 4 {
         image::save_buffer(

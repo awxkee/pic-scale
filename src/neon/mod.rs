@@ -28,20 +28,40 @@
  */
 
 mod alpha;
+#[cfg(all(feature = "half"))]
+mod convolve_f16;
 mod convolve_f32;
+#[cfg(all(feature = "half"))]
+mod f16_utils;
+mod rgb_f16;
 mod rgb_f32;
 mod rgb_u8;
+mod rgba_f16;
 mod rgba_f32;
 mod rgba_u8;
 mod utils;
+#[cfg(all(feature = "half"))]
+mod vertical_f16;
 mod vertical_f32;
 mod vertical_u8;
 
 pub use alpha::neon_premultiply_alpha_rgba;
 pub use alpha::neon_unpremultiply_alpha_rgba;
+#[cfg(all(feature = "half"))]
+pub use f16_utils::*;
+#[cfg(all(feature = "half"))]
+pub use rgb_f16::{
+    convolve_horizontal_rgb_neon_row_one_f16, convolve_horizontal_rgb_neon_rows_4_f16,
+};
 pub use rgb_f32::*;
 pub use rgb_u8::*;
+#[cfg(all(feature = "half"))]
+pub use rgba_f16::convolve_horizontal_rgba_neon_row_one_f16;
+#[cfg(all(feature = "half"))]
+pub use rgba_f16::convolve_horizontal_rgba_neon_rows_4_f16;
 pub use rgba_f32::*;
 pub use rgba_u8::*;
+#[cfg(all(feature = "half"))]
+pub use vertical_f16::convolve_vertical_rgb_neon_row_f16;
 pub use vertical_f32::convolve_vertical_rgb_neon_row_f32;
 pub use vertical_u8::convolve_vertical_rgb_neon_row;

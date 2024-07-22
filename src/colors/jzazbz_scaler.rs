@@ -26,7 +26,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use colorutils_rs::{jzazbz_to_rgb, jzazbz_to_rgba, rgb_to_jzazbz, rgba_to_jzazbz, TransferFunction};
+use colorutils_rs::{
+    jzazbz_to_rgb, jzazbz_to_rgba, rgb_to_jzazbz, rgba_to_jzazbz, TransferFunction,
+};
 
 use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
 
@@ -42,7 +44,11 @@ impl JzazbzScaler {
     /// # Arguments
     /// - `transfer_function` - Transfer function to move into linear colorspace and back
     /// - `display_luminance` - Display luminance for *Jzazbz*
-    pub fn new(filter: ResamplingFunction, display_luminance: f32, transfer_function: TransferFunction) -> Self {
+    pub fn new(
+        filter: ResamplingFunction,
+        display_luminance: f32,
+        transfer_function: TransferFunction,
+    ) -> Self {
         JzazbzScaler {
             scaler: Scaler::new(filter),
             transfer_function,
