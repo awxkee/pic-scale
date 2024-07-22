@@ -33,9 +33,11 @@ mod convolve_f16;
 mod convolve_f32;
 #[cfg(all(feature = "half"))]
 mod f16_utils;
+#[cfg(all(feature = "half"))]
 mod rgb_f16;
 mod rgb_f32;
 mod rgb_u8;
+#[cfg(all(feature = "half"))]
 mod rgba_f16;
 mod rgba_f32;
 mod rgba_u8;
