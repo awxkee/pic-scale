@@ -8,10 +8,7 @@ use fast_image_resize::{
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, GenericImageView};
 
-use pic_scale::{
-    ImageSize, ImageStore, OklabScaler, ResamplingFunction, Scaler, Scaling, ThreadingPolicy,
-    TransferFunction,
-};
+use pic_scale::{ImageSize, ImageStore, JzazbzScaler, OklabScaler, ResamplingFunction, Scaler, Scaling, ThreadingPolicy, TransferFunction};
 
 fn main() {
     // test_fast_image();
@@ -23,7 +20,7 @@ fn main() {
     let dimensions = img.dimensions();
     let mut bytes = Vec::from(img.as_bytes());
 
-    let mut scaler = OklabScaler::new(ResamplingFunction::Lanczos3, TransferFunction::Gamma2p8);
+    let mut scaler = JzazbzScaler::new(ResamplingFunction::Lanczos3,200., TransferFunction::Srgb);
     scaler.set_threading_policy(ThreadingPolicy::Adaptive);
     // let store =
     //     ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);

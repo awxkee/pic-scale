@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+mod jzazbz_scaler;
 mod lab_scaler;
 mod lch_scaler;
 mod linear_precise_scaler;
@@ -36,6 +37,7 @@ mod oklab_scaler;
 mod sigmoidal_scaler;
 mod xyz_scaler;
 
+pub use jzazbz_scaler::JzazbzScaler;
 pub use lab_scaler::*;
 pub use lch_scaler::*;
 pub use linear_precise_scaler::*;

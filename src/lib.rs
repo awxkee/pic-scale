@@ -68,6 +68,7 @@ mod support;
 mod threading_policy;
 mod unsafe_slice;
 
+pub use colors::JzazbzScaler;
 pub use colors::LChScaler;
 pub use colors::LabScaler;
 pub use colors::LinearApproxScaler;
