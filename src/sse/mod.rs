@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+mod plane_f32;
 mod rgb_f32;
 mod rgb_u8;
 mod rgba_f32;
@@ -37,6 +38,8 @@ mod utils;
 mod vertical_f16;
 mod vertical_u8;
 
+pub use plane_f32::convolve_horizontal_plane_sse_row_one;
+pub use plane_f32::convolve_horizontal_plane_sse_rows_4;
 pub use rgb_f32::*;
 pub use rgb_u8::*;
 pub use rgba_f32::*;

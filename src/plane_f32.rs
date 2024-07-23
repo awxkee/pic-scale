@@ -43,7 +43,10 @@ use crate::rgb_f32::convolve_vertical_rgb_native_row_f32;
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 ))]
-use crate::sse::convolve_vertical_rgb_sse_row_f32;
+use crate::sse::{
+    convolve_horizontal_plane_sse_row_one, convolve_horizontal_plane_sse_rows_4,
+    convolve_vertical_rgb_sse_row_f32,
+};
 use crate::ImageStore;
 use rayon::ThreadPool;
 
@@ -64,6 +67,16 @@ impl<'a> HorizontalConvolutionPass<f32, 1> for ImageStore<'a, f32, 1> {
         {
             _dispatcher_4_rows = Some(convolve_horizontal_plane_neon_rows_4);
             _dispatcher_row = convolve_horizontal_plane_neon_row_one;
+        }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
+        {
+            if is_x86_feature_detected!("sse4.1") {
+                _dispatcher_4_rows = Some(convolve_horizontal_plane_sse_rows_4);
+                _dispatcher_row = convolve_horizontal_plane_sse_row_one;
+            }
         }
         convolve_horizontal_dispatch_f32(
             self,

@@ -99,3 +99,13 @@ pub unsafe fn sse_interleave_rgba(
     let rgba_1_hi = _mm_unpackhi_epi16(rg_hi, ba_hi);
     (rgba_0_lo, rgba_0_hi, rgba_1_lo, rgba_1_hi)
 }
+
+/// Sums all lanes in float32
+#[inline(always)]
+pub unsafe fn _mm_hsum_ps(v: __m128) -> f32 {
+    let mut shuf = _mm_movehdup_ps(v);
+    let mut sums = _mm_add_ps(v, shuf);
+    shuf = _mm_movehl_ps(shuf, sums);
+    sums = _mm_add_ss(sums, shuf);
+    return _mm_cvtss_f32(sums);
+}
