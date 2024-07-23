@@ -1,3 +1,6 @@
+mod merge;
+mod split;
+
 use std::time::Instant;
 
 use fast_image_resize::images::Image;
@@ -9,6 +12,8 @@ use half::f16;
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, GenericImageView};
 
+use crate::merge::merge_channels_3;
+use crate::split::split_channels_3;
 use pic_scale::{
     ImageSize, ImageStore, JzazbzScaler, OklabScaler, ResamplingFunction, Scaler, Scaling,
     ThreadingPolicy, TransferFunction,
@@ -39,26 +44,61 @@ fn main() {
 
     let start_time = Instant::now();
 
-    let store = ImageStore::<f32, 3>::from_slice(
-        &mut f16_bytes,
+    let mut rec1 = vec![0f32; dimensions.0 as usize * dimensions.1 as usize];
+    let mut rec2 = vec![0f32; dimensions.0 as usize * dimensions.1 as usize];
+    let mut rec3 = vec![0f32; dimensions.0 as usize * dimensions.1 as usize];
+
+    split_channels_3(
+        &f16_bytes,
         dimensions.0 as usize,
         dimensions.1 as usize,
+        &mut rec1,
+        &mut rec2,
+        &mut rec3,
     );
 
-    let resized = scaler.resize_rgb_f32(
+    let store =
+        ImageStore::<f32, 1>::from_slice(&mut rec1, dimensions.0 as usize, dimensions.1 as usize);
+
+    let resized = scaler.resize_plane_f32(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
         store,
+    );
+    rec1 = Vec::from(resized.as_bytes());
+
+    let store =
+        ImageStore::<f32, 1>::from_slice(&mut rec2, dimensions.0 as usize, dimensions.1 as usize);
+
+    let resized = scaler.resize_plane_f32(
+        ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
+        store,
+    );
+    rec2 = Vec::from(resized.as_bytes());
+
+    let store =
+        ImageStore::<f32, 1>::from_slice(&mut rec3, dimensions.0 as usize, dimensions.1 as usize);
+
+    let resized = scaler.resize_plane_f32(
+        ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
+        store,
+    );
+    rec3 = Vec::from(resized.as_bytes());
+
+    let mut resized_data: Vec<f32> = vec![0f32; resized.width * resized.height * 3];
+    merge_channels_3(
+        &mut resized_data,
+        resized.width,
+        resized.height,
+        &rec1,
+        &rec2,
+        &rec3,
     );
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
     println!("Scaler: {:.2?}", elapsed_time);
 
-    let dst: Vec<u8> = resized
-        .as_bytes()
-        .iter()
-        .map(|&x| (x * 255f32) as u8)
-        .collect();
+    let dst: Vec<u8> = resized_data.iter().map(|&x| (x * 255f32) as u8).collect();
     // let dst = resized.as_bytes();
 
     if resized.channels == 4 {

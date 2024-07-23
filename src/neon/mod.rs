@@ -33,6 +33,7 @@ mod convolve_f16;
 mod convolve_f32;
 #[cfg(all(feature = "half"))]
 mod f16_utils;
+mod plane_f32;
 #[cfg(all(feature = "half"))]
 mod rgb_f16;
 mod rgb_f32;
@@ -51,6 +52,8 @@ pub use alpha::neon_premultiply_alpha_rgba;
 pub use alpha::neon_unpremultiply_alpha_rgba;
 #[cfg(all(feature = "half"))]
 pub use f16_utils::*;
+pub use plane_f32::convolve_horizontal_plane_neon_row_one;
+pub use plane_f32::convolve_horizontal_plane_neon_rows_4;
 #[cfg(all(feature = "half"))]
 pub use rgb_f16::{
     convolve_horizontal_rgb_neon_row_one_f16, convolve_horizontal_rgb_neon_rows_4_f16,
