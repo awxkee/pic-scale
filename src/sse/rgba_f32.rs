@@ -28,7 +28,8 @@
  */
 
 use crate::filter_weights::FilterWeights;
-use crate::sse::_mm_prefer_fma_ps;
+use crate::load_4_weights;
+use crate::sse::{_mm_prefer_fma_ps, shuffle};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -67,10 +68,7 @@ pub fn convolve_horizontal_rgba_sse_row_one_f32(
 
             while jx + 4 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = _mm_set1_ps(ptr.read_unaligned());
-                let weight1 = _mm_set1_ps(ptr.add(1).read_unaligned());
-                let weight2 = _mm_set1_ps(ptr.add(2).read_unaligned());
-                let weight3 = _mm_set1_ps(ptr.add(3).read_unaligned());
+                let (weight0, weight1, weight2, weight3) = load_4_weights!(ptr);
                 let filter_start = jx + bounds.start;
                 store = convolve_horizontal_parts_4_rgba_f32(
                     filter_start,
@@ -173,10 +171,7 @@ pub(crate) fn convolve_horizontal_rgba_sse_rows_4_f32(
             let mut store_3 = zeros;
             while jx + 4 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = _mm_set1_ps(ptr.read_unaligned());
-                let weight1 = _mm_set1_ps(ptr.add(1).read_unaligned());
-                let weight2 = _mm_set1_ps(ptr.add(2).read_unaligned());
-                let weight3 = _mm_set1_ps(ptr.add(3).read_unaligned());
+                let (weight0, weight1, weight2, weight3) = load_4_weights!(ptr);
                 let filter_start = jx + bounds.start;
 
                 store_0 = convolve_horizontal_parts_4_rgba_f32(

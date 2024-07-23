@@ -40,9 +40,13 @@ use crate::rgb_u8::*;
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 ))]
+use crate::sse::convolve_vertical_rgb_sse_row;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
 use crate::sse::sse_rgb::{
     convolve_horizontal_rgba_sse_rows_4, convolve_horizontal_rgba_sse_rows_one,
-    convolve_vertical_rgb_sse_row,
 };
 use crate::ImageStore;
 

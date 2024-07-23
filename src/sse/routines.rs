@@ -27,25 +27,18 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-mod rgb_f32;
-mod rgb_u8;
-mod rgba_f32;
-mod routines;
-mod u8_utils;
-mod utils;
-#[cfg(all(feature = "half", target_feature = "f16c"))]
-mod vertical_f16;
-mod vertical_u8;
-
-pub use rgb_f32::*;
-pub use rgb_u8::*;
-pub use rgba_f32::*;
-pub use u8_utils::*;
-pub use utils::*;
-#[cfg(all(feature = "half", target_feature = "f16c"))]
-pub use vertical_f16::convolve_vertical_rgb_sse_row_f16;
-pub use vertical_u8::convolve_vertical_rgb_sse_row;
-
-pub const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
-    ((z << 6) | (y << 4) | (x << 2) | w) as i32
+#[macro_export]
+macro_rules! load_4_weights {
+    ($src_ptr: expr) => {{
+        let weight = _mm_loadu_ps($src_ptr);
+        const SHUFFLE_0: i32 = shuffle(0, 0, 0, 0);
+        let weight0 = _mm_shuffle_ps::<SHUFFLE_0>(weight, weight);
+        const SHUFFLE_1: i32 = shuffle(1, 1, 1, 1);
+        let weight1 = _mm_shuffle_ps::<SHUFFLE_1>(weight, weight);
+        const SHUFFLE_2: i32 = shuffle(2, 2, 2, 2);
+        let weight2 = _mm_shuffle_ps::<SHUFFLE_2>(weight, weight);
+        const SHUFFLE_3: i32 = shuffle(3, 3, 3, 3);
+        let weight3 = _mm_shuffle_ps::<SHUFFLE_3>(weight, weight);
+        (weight0, weight1, weight2, weight3)
+    }};
 }

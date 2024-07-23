@@ -28,7 +28,8 @@
  */
 
 use crate::filter_weights::{FilterBounds, FilterWeights};
-use crate::sse::_mm_prefer_fma_ps;
+use crate::load_4_weights;
+use crate::sse::{_mm_prefer_fma_ps, shuffle};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -47,7 +48,7 @@ pub(crate) unsafe fn convolve_horizontal_parts_4_rgb_f32(
     const COMPONENTS: usize = 3;
     let src_ptr = src.add(start_x * COMPONENTS);
     let zeros = _mm_setzero_ps();
-    let mask = _mm_setr_ps(1f32, 1f32, 1f32, 0f32);
+    let mask = _mm_castsi128_ps(_mm_setr_epi32(-1, -1, -1, 0));
 
     let rgb_pixel_0 = _mm_blendv_ps(zeros, _mm_loadu_ps(src_ptr), mask);
     let rgb_pixel_1 = _mm_blendv_ps(zeros, _mm_loadu_ps(src_ptr.add(3)), mask);
@@ -77,9 +78,10 @@ pub(crate) unsafe fn convolve_horizontal_parts_2_rgb_f32(
     const COMPONENTS: usize = 3;
     let src_ptr = src.add(start_x * COMPONENTS);
     let zeros = _mm_setzero_ps();
-    let mask = _mm_setr_ps(1f32, 1f32, 1f32, 0f32);
+    let mask = _mm_setr_epi32(-1, -1, -1, 0);
 
-    let rgb_pixel_0 = _mm_blendv_ps(zeros, _mm_loadu_ps(src_ptr), mask);
+    let orig1 = _mm_loadu_ps(src_ptr);
+    let rgb_pixel_0 = _mm_blendv_ps(zeros, orig1, _mm_castsi128_ps(mask));
     let rgb_pixel_1 = _mm_setr_ps(
         src_ptr.add(3).read_unaligned(),
         src_ptr.add(4).read_unaligned(),
@@ -87,8 +89,8 @@ pub(crate) unsafe fn convolve_horizontal_parts_2_rgb_f32(
         0f32,
     );
 
-    let acc = _mm_prefer_fma_ps(store_0, rgb_pixel_0, weight0);
-    let acc = _mm_prefer_fma_ps(acc, rgb_pixel_1, weight1);
+    let mut acc = _mm_prefer_fma_ps(store_0, rgb_pixel_0, weight0);
+    acc = _mm_prefer_fma_ps(acc, rgb_pixel_1, weight1);
     acc
 }
 
@@ -130,10 +132,7 @@ pub fn convolve_horizontal_rgb_sse_row_one_f32(
 
             while jx + 4 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = _mm_set1_ps(ptr.read_unaligned());
-                let weight1 = _mm_set1_ps(ptr.add(1).read_unaligned());
-                let weight2 = _mm_set1_ps(ptr.add(2).read_unaligned());
-                let weight3 = _mm_set1_ps(ptr.add(3).read_unaligned());
+                let (weight0, weight1, weight2, weight3) = load_4_weights!(ptr);
                 let filter_start = jx + bounds.start;
                 store = convolve_horizontal_parts_4_rgb_f32(
                     filter_start,
@@ -215,10 +214,7 @@ pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f32(
 
             while jx + 4 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = _mm_set1_ps(ptr.read_unaligned());
-                let weight1 = _mm_set1_ps(ptr.add(1).read_unaligned());
-                let weight2 = _mm_set1_ps(ptr.add(2).read_unaligned());
-                let weight3 = _mm_set1_ps(ptr.add(3).read_unaligned());
+                let (weight0, weight1, weight2, weight3) = load_4_weights!(ptr);
                 let filter_start = jx + bounds.start;
                 store_0 = convolve_horizontal_parts_4_rgb_f32(
                     filter_start,

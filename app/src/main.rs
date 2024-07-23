@@ -16,7 +16,6 @@ use pic_scale::{
 
 fn main() {
     // test_fast_image();
-
     let img = ImageReader::open("./assets/asset.jpg")
         .unwrap()
         .decode()
@@ -36,20 +35,17 @@ fn main() {
 
     //
 
-    let mut f16_bytes: Vec<f16> = bytes
-        .iter()
-        .map(|&x| f16::from_f32(x as f32 / 255f32))
-        .collect();
+    let mut f16_bytes: Vec<f32> = bytes.iter().map(|&x| x as f32 / 255f32).collect();
 
     let start_time = Instant::now();
 
-    let store = ImageStore::<f16, 3>::from_slice(
+    let store = ImageStore::<f32, 3>::from_slice(
         &mut f16_bytes,
         dimensions.0 as usize,
         dimensions.1 as usize,
     );
 
-    let resized = scaler.resize_rgb_f16(
+    let resized = scaler.resize_rgb_f32(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
         store,
     );
@@ -61,7 +57,7 @@ fn main() {
     let dst: Vec<u8> = resized
         .as_bytes()
         .iter()
-        .map(|&x| (x.to_f32() * 255f32) as u8)
+        .map(|&x| (x * 255f32) as u8)
         .collect();
     // let dst = resized.as_bytes();
 

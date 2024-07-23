@@ -29,13 +29,17 @@
 
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 pub mod sse_rgb {
-    use crate::filter_weights::{FilterBounds, FilterWeights};
-    use crate::sse::sse_convolve_u8;
-    use crate::support::ROUNDING_APPROX;
     #[cfg(target_arch = "x86")]
     use std::arch::x86::*;
     #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::*;
+
+    use crate::filter_weights::FilterWeights;
+    use crate::sse::{
+        compress_i32, convolve_horizontal_parts_one_rgba_sse,
+        convolve_horizontal_parts_one_sse_rgb, convolve_horizontal_parts_two_sse_rgb,
+    };
+    use crate::support::ROUNDING_APPROX;
 
     pub(crate) fn convolve_horizontal_rgba_sse_rows_4(
         dst_width: usize,
@@ -150,25 +154,25 @@ pub mod sse_rgb {
                     let ptr = weights_ptr.add(jx + filter_offset);
                     let weight0 = _mm_set1_epi32(ptr.read_unaligned() as i32);
                     let start_bounds = bounds.start + jx;
-                    store_0 = sse_convolve_u8::convolve_horizontal_parts_one_rgba_sse(
+                    store_0 = convolve_horizontal_parts_one_rgba_sse(
                         start_bounds,
                         unsafe_source_ptr_0,
                         weight0,
                         store_0,
                     );
-                    store_1 = sse_convolve_u8::convolve_horizontal_parts_one_rgba_sse(
+                    store_1 = convolve_horizontal_parts_one_rgba_sse(
                         start_bounds,
                         unsafe_source_ptr_0.add(src_stride),
                         weight0,
                         store_1,
                     );
-                    store_2 = sse_convolve_u8::convolve_horizontal_parts_one_rgba_sse(
+                    store_2 = convolve_horizontal_parts_one_rgba_sse(
                         start_bounds,
                         unsafe_source_ptr_0.add(src_stride * 2),
                         weight0,
                         store_2,
                     );
-                    store_3 = sse_convolve_u8::convolve_horizontal_parts_one_rgba_sse(
+                    store_3 = convolve_horizontal_parts_one_rgba_sse(
                         start_bounds,
                         unsafe_source_ptr_0.add(src_stride * 3),
                         weight0,
@@ -176,7 +180,7 @@ pub mod sse_rgb {
                     );
                     jx += 1;
                 }
-                let store_16_8 = sse_convolve_u8::compress_i32(store_0);
+                let store_16_8 = compress_i32(store_0);
                 let pixel = _mm_extract_epi32::<0>(store_16_8);
 
                 let px = x * CHANNELS;
@@ -184,7 +188,7 @@ pub mod sse_rgb {
                 let dest_ptr_32 = dest_ptr as *mut i32;
                 dest_ptr_32.write_unaligned(pixel);
 
-                let store_16_8 = sse_convolve_u8::compress_i32(store_1);
+                let store_16_8 = compress_i32(store_1);
                 let pixel = _mm_extract_epi32::<0>(store_16_8);
 
                 let px = x * CHANNELS;
@@ -192,7 +196,7 @@ pub mod sse_rgb {
                 let dest_ptr_32 = dest_ptr as *mut i32;
                 dest_ptr_32.write_unaligned(pixel);
 
-                let store_16_8 = sse_convolve_u8::compress_i32(store_2);
+                let store_16_8 = compress_i32(store_2);
                 let pixel = _mm_extract_epi32::<0>(store_16_8);
 
                 let px = x * CHANNELS;
@@ -200,7 +204,7 @@ pub mod sse_rgb {
                 let dest_ptr_32 = dest_ptr as *mut i32;
                 dest_ptr_32.write_unaligned(pixel);
 
-                let store_16_8 = sse_convolve_u8::compress_i32(store_3);
+                let store_16_8 = compress_i32(store_3);
                 let pixel = _mm_extract_epi32::<0>(store_16_8);
 
                 let px = x * CHANNELS;
@@ -283,7 +287,7 @@ pub mod sse_rgb {
                 while jx < bounds.size {
                     let ptr = weights_ptr.add(jx + filter_offset);
                     let weight0 = _mm_set1_epi32(ptr.read_unaligned() as i32);
-                    store = sse_convolve_u8::convolve_horizontal_parts_one_rgba_sse(
+                    store = convolve_horizontal_parts_one_rgba_sse(
                         bounds.start + jx,
                         unsafe_source_ptr_0,
                         weight0,
@@ -292,7 +296,7 @@ pub mod sse_rgb {
                     jx += 1;
                 }
 
-                let store_16_8 = sse_convolve_u8::compress_i32(store);
+                let store_16_8 = compress_i32(store);
                 let pixel = _mm_extract_epi32::<0>(store_16_8);
 
                 let px = x * CHANNELS;
@@ -395,28 +399,28 @@ pub mod sse_rgb {
                     let ptr = weights_ptr.add(jx + filter_offset);
                     let bounds_start = bounds.start + jx;
                     let weight01 = _mm_set1_epi32((ptr as *const i32).read_unaligned());
-                    store_0 = sse_convolve_u8::convolve_horizontal_parts_two_sse_rgb(
+                    store_0 = convolve_horizontal_parts_two_sse_rgb(
                         bounds_start,
                         unsafe_source_ptr_0,
                         weight01,
                         store_0,
                         shuffle_lo,
                     );
-                    store_1 = sse_convolve_u8::convolve_horizontal_parts_two_sse_rgb(
+                    store_1 = convolve_horizontal_parts_two_sse_rgb(
                         bounds_start,
                         unsafe_source_ptr_0.add(src_stride),
                         weight01,
                         store_1,
                         shuffle_lo,
                     );
-                    store_2 = sse_convolve_u8::convolve_horizontal_parts_two_sse_rgb(
+                    store_2 = convolve_horizontal_parts_two_sse_rgb(
                         bounds_start,
                         unsafe_source_ptr_0.add(src_stride * 2),
                         weight01,
                         store_2,
                         shuffle_lo,
                     );
-                    store_3 = sse_convolve_u8::convolve_horizontal_parts_two_sse_rgb(
+                    store_3 = convolve_horizontal_parts_two_sse_rgb(
                         bounds_start,
                         unsafe_source_ptr_0.add(src_stride * 3),
                         weight01,
@@ -430,25 +434,25 @@ pub mod sse_rgb {
                     let ptr = weights_ptr.add(jx + filter_offset);
                     let bounds_start = bounds.start + jx;
                     let weight0 = _mm_set1_epi32(ptr.read_unaligned() as i32);
-                    store_0 = sse_convolve_u8::convolve_horizontal_parts_one_sse_rgb(
+                    store_0 = convolve_horizontal_parts_one_sse_rgb(
                         bounds_start,
                         unsafe_source_ptr_0,
                         weight0,
                         store_0,
                     );
-                    store_1 = sse_convolve_u8::convolve_horizontal_parts_one_sse_rgb(
+                    store_1 = convolve_horizontal_parts_one_sse_rgb(
                         bounds_start,
                         unsafe_source_ptr_0.add(src_stride),
                         weight0,
                         store_1,
                     );
-                    store_2 = sse_convolve_u8::convolve_horizontal_parts_one_sse_rgb(
+                    store_2 = convolve_horizontal_parts_one_sse_rgb(
                         bounds_start,
                         unsafe_source_ptr_0.add(src_stride * 2),
                         weight0,
                         store_2,
                     );
-                    store_3 = sse_convolve_u8::convolve_horizontal_parts_one_sse_rgb(
+                    store_3 = convolve_horizontal_parts_one_sse_rgb(
                         bounds_start,
                         unsafe_source_ptr_0.add(src_stride * 3),
                         weight0,
@@ -456,7 +460,7 @@ pub mod sse_rgb {
                     );
                     jx += 1;
                 }
-                let store_0_8 = sse_convolve_u8::compress_i32(store_0);
+                let store_0_8 = compress_i32(store_0);
 
                 let px = x * CHANNES;
                 let dest_ptr = unsafe_destination_ptr_0.add(px);
@@ -467,7 +471,7 @@ pub mod sse_rgb {
                 dest_ptr.add(1).write_unaligned(bytes[1]);
                 dest_ptr.add(2).write_unaligned(bytes[2]);
 
-                let store_1_8 = sse_convolve_u8::compress_i32(store_1);
+                let store_1_8 = compress_i32(store_1);
 
                 let px = x * CHANNES;
                 let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride);
@@ -478,7 +482,7 @@ pub mod sse_rgb {
                 dest_ptr.add(1).write_unaligned(bytes[1]);
                 dest_ptr.add(2).write_unaligned(bytes[2]);
 
-                let store_2_8 = sse_convolve_u8::compress_i32(store_2);
+                let store_2_8 = compress_i32(store_2);
 
                 let px = x * CHANNES;
                 let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 2);
@@ -489,7 +493,7 @@ pub mod sse_rgb {
                 dest_ptr.add(1).write_unaligned(bytes[1]);
                 dest_ptr.add(2).write_unaligned(bytes[2]);
 
-                let store_3_8 = sse_convolve_u8::compress_i32(store_3);
+                let store_3_8 = compress_i32(store_3);
 
                 let px = x * CHANNES;
                 let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 3);
@@ -575,7 +579,7 @@ pub mod sse_rgb {
                 let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
                 unsafe {
                     let weight0 = _mm_set1_epi32(ptr.read_unaligned() as i32);
-                    store = sse_convolve_u8::convolve_horizontal_parts_one_sse_rgb(
+                    store = convolve_horizontal_parts_one_sse_rgb(
                         bounds.start + jx,
                         unsafe_source_ptr_0,
                         weight0,
@@ -585,7 +589,7 @@ pub mod sse_rgb {
                 jx += 1;
             }
 
-            let store_16_8 = sse_convolve_u8::compress_i32(store);
+            let store_16_8 = compress_i32(store);
 
             let px = x * CHANNELS;
             let dest_ptr = unsafe { unsafe_destination_ptr_0.add(px) };
@@ -604,84 +608,6 @@ pub mod sse_rgb {
             }
 
             filter_offset += approx_weights.aligned_size;
-        }
-    }
-
-    #[inline]
-    pub(crate) fn convolve_vertical_rgb_sse_row<const CHANNELS: usize>(
-        width: usize,
-        bounds: &FilterBounds,
-        unsafe_source_ptr_0: *const u8,
-        unsafe_destination_ptr_0: *mut u8,
-        src_stride: usize,
-        weight_ptr: *const i16,
-    ) {
-        let mut cx = 0usize;
-        let total_width = width * CHANNELS;
-
-        while cx + 32 < total_width {
-            unsafe {
-                sse_convolve_u8::convolve_vertical_part_sse_32(
-                    bounds.start,
-                    cx,
-                    unsafe_source_ptr_0,
-                    src_stride,
-                    unsafe_destination_ptr_0,
-                    weight_ptr,
-                    bounds,
-                );
-            }
-
-            cx += 32;
-        }
-
-        while cx + 16 < total_width {
-            unsafe {
-                sse_convolve_u8::convolve_vertical_part_sse_16(
-                    bounds.start,
-                    cx,
-                    unsafe_source_ptr_0,
-                    src_stride,
-                    unsafe_destination_ptr_0,
-                    weight_ptr,
-                    bounds,
-                );
-            }
-
-            cx += 16;
-        }
-
-        while cx + 8 < total_width {
-            unsafe {
-                sse_convolve_u8::convolve_vertical_part_sse_8::<false>(
-                    bounds.start,
-                    cx,
-                    unsafe_source_ptr_0,
-                    src_stride,
-                    unsafe_destination_ptr_0,
-                    weight_ptr,
-                    bounds,
-                    8,
-                );
-            }
-
-            cx += 8;
-        }
-
-        let left = total_width - cx;
-        if left > 0 {
-            unsafe {
-                sse_convolve_u8::convolve_vertical_part_sse_8::<true>(
-                    bounds.start,
-                    cx,
-                    unsafe_source_ptr_0,
-                    src_stride,
-                    unsafe_destination_ptr_0,
-                    weight_ptr,
-                    bounds,
-                    left,
-                );
-            }
         }
     }
 }
