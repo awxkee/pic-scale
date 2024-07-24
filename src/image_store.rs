@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+#[cfg(all(feature = "half"))]
 use crate::alpha_handle_f16::{premultiply_alpha_rgba_f16, unpremultiply_alpha_rgba_f16};
 use crate::alpha_handle_f32::{premultiply_alpha_rgba_f32, unpremultiply_alpha_rgba_f32};
 use crate::alpha_handle_u8::{premultiply_alpha_rgba, unpremultiply_alpha_rgba};
@@ -144,6 +144,7 @@ impl<'a> ImageStore<'a, f32, 4> {
     }
 }
 
+#[cfg(all(feature = "half"))]
 impl<'a> ImageStore<'a, half::f16, 4> {
     pub fn unpremultiply_alpha(&self, into: &mut ImageStore<half::f16, 4>) {
         let dst = into.buffer.borrow_mut();
