@@ -45,6 +45,43 @@ pub unsafe fn _mm_prefer_fma_ps(a: __m128, b: __m128, c: __m128) -> __m128 {
 }
 
 #[inline(always)]
+pub unsafe fn sse_deinterleave_rgba_ps(
+    v0: __m128,
+    v1: __m128,
+    v2: __m128,
+    v3: __m128,
+) -> (__m128, __m128, __m128, __m128) {
+    let t02lo = _mm_unpacklo_ps(v0, v2);
+    let t13lo = _mm_unpacklo_ps(v1, v3);
+    let t02hi = _mm_unpackhi_ps(v0, v2);
+    let t13hi = _mm_unpackhi_ps(v1, v3);
+    let a = _mm_unpacklo_ps(t02lo, t13lo);
+    let b = _mm_unpackhi_ps(t02lo, t13lo);
+    let c = _mm_unpacklo_ps(t02hi, t13hi);
+    let d = _mm_unpackhi_ps(t02hi, t13hi);
+    (a, b, c, d)
+}
+
+#[inline(always)]
+pub unsafe fn sse_interleave_rgba_ps(
+    v0: __m128,
+    v1: __m128,
+    v2: __m128,
+    v3: __m128,
+) -> (__m128, __m128, __m128, __m128) {
+    let u0 = _mm_unpacklo_ps(v0, v2);
+    let u1 = _mm_unpacklo_ps(v1, v3);
+    let u2 = _mm_unpackhi_ps(v0, v2);
+    let u3 = _mm_unpackhi_ps(v1, v3);
+    let j0 = _mm_unpacklo_ps(u0, u1);
+    let j2 = _mm_unpacklo_ps(u2, u3);
+    let j1 = _mm_unpackhi_ps(u0, u1);
+    let j3 = _mm_unpackhi_ps(u2, u3);
+
+    (j0, j1, j2, j3)
+}
+
+#[inline(always)]
 pub unsafe fn sse_deinterleave_rgba(
     rgba0: __m128i,
     rgba1: __m128i,
@@ -108,4 +145,52 @@ pub unsafe fn _mm_hsum_ps(v: __m128) -> f32 {
     shuf = _mm_movehl_ps(shuf, sums);
     sums = _mm_add_ss(sums, shuf);
     return _mm_cvtss_f32(sums);
+}
+
+#[inline(always)]
+#[allow(dead_code)]
+pub unsafe fn sse_deinterleave_rgba_epi16(
+    rgba0: __m128i,
+    rgba1: __m128i,
+    rgba2: __m128i,
+    rgba3: __m128i,
+) -> (__m128i, __m128i, __m128i, __m128i) {
+    let v0 = _mm_unpacklo_epi16(rgba0, rgba2); // a0 a4 b0 b4 ...
+    let v1 = _mm_unpackhi_epi16(rgba0, rgba2); // a1 a5 b1 b5 ...
+    let v2 = _mm_unpacklo_epi16(rgba1, rgba3); // a2 a6 b2 b6 ...
+    let v3 = _mm_unpackhi_epi16(rgba1, rgba3); // a3 a7 b3 b7 ...
+
+    let u0 = _mm_unpacklo_epi16(v0, v2); // a0 a2 a4 a6 ...
+    let u1 = _mm_unpacklo_epi16(v1, v3); // a1 a3 a5 a7 ...
+    let u2 = _mm_unpackhi_epi16(v0, v2); // c0 c2 c4 c6 ...
+    let u3 = _mm_unpackhi_epi16(v1, v3); // c1 c3 c5 c7 ...
+
+    let a = _mm_unpacklo_epi16(u0, u1);
+    let b = _mm_unpackhi_epi16(u0, u1);
+    let c = _mm_unpacklo_epi16(u2, u3);
+    let d = _mm_unpackhi_epi16(u2, u3);
+    (a, b, c, d)
+}
+
+#[inline(always)]
+#[allow(dead_code)]
+pub unsafe fn sse_interleave_rgba_epi16(
+    a: __m128i,
+    b: __m128i,
+    c: __m128i,
+    d: __m128i,
+) -> (__m128i, __m128i, __m128i, __m128i) {
+    // b0 b1 b2 b3 ....
+    // c0 c1 c2 c3 ....
+    // d0 d1 d2 d3 ....
+    let u0 = _mm_unpacklo_epi16(a, c); // a0 c0 a1 c1 ...
+    let u1 = _mm_unpackhi_epi16(a, c); // a4 c4 a5 c5 ...
+    let u2 = _mm_unpacklo_epi16(b, d); // b0 d0 b1 d1 ...
+    let u3 = _mm_unpackhi_epi16(b, d); // b4 d4 b5 d5 ...
+
+    let v0 = _mm_unpacklo_epi16(u0, u2); // a0 b0 c0 d0 ...
+    let v1 = _mm_unpackhi_epi16(u0, u2); // a2 b2 c2 d2 ...
+    let v2 = _mm_unpacklo_epi16(u1, u3); // a4 b4 c4 d4 ...
+    let v3 = _mm_unpackhi_epi16(u1, u3); // a6 b6 c6 d6 ...
+    (v0, v1, v2, v3)
 }

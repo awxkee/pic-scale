@@ -95,10 +95,6 @@ impl<'a> Scaling for LinearApproxScaler {
         gamma_store
     }
 
-    fn resize_rgb_f32(&self, new_size: ImageSize, store: ImageStore<f32, 3>) -> ImageStore<f32, 3> {
-        self.scaler.resize_rgb_f32(new_size, store)
-    }
-
     fn resize_rgba(
         &self,
         new_size: ImageSize,
@@ -143,13 +139,5 @@ impl<'a> Scaling for LinearApproxScaler {
             return premultiplied_store;
         }
         gamma_store
-    }
-
-    fn resize_rgba_f32(
-        &self,
-        new_size: ImageSize,
-        store: ImageStore<f32, 4>,
-    ) -> ImageStore<f32, 4> {
-        self.scaler.resize_rgba_f32(new_size, store)
     }
 }

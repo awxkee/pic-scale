@@ -28,7 +28,10 @@
  */
 
 mod acceleration_feature;
-mod alpha_handle;
+#[cfg(all(feature = "half"))]
+mod alpha_handle_f16;
+mod alpha_handle_f32;
+mod alpha_handle_u8;
 mod avx2_utils;
 mod chunking;
 mod colors;
@@ -84,4 +87,5 @@ pub use math::*;
 pub use sampler::*;
 pub use scaler::Scaler;
 pub use scaler::Scaling;
+pub use scaler::ScalingF32;
 pub use threading_policy::*;

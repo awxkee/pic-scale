@@ -29,7 +29,7 @@
 
 use colorutils_rs::{lab_to_srgb, lab_with_alpha_to_rgba, rgb_to_lab, rgba_to_lab_with_alpha};
 
-use crate::scaler::Scaling;
+use crate::scaler::{Scaling, ScalingF32};
 use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, ThreadingPolicy};
 
 #[derive(Debug, Copy, Clone)]
@@ -106,10 +106,6 @@ impl Scaling for LabScaler {
         return new_u8_store;
     }
 
-    fn resize_rgb_f32(&self, new_size: ImageSize, store: ImageStore<f32, 3>) -> ImageStore<f32, 3> {
-        self.scaler.resize_rgb_f32(new_size, store)
-    }
-
     fn resize_rgba(
         &self,
         new_size: ImageSize,
@@ -124,7 +120,7 @@ impl Scaling for LabScaler {
             src_store = premultiplied_store;
         }
         let lab_store = Self::rgba_to_laba(src_store);
-        let new_store = self.scaler.resize_rgba_f32(new_size, lab_store);
+        let new_store = self.scaler.resize_rgba_f32(new_size, lab_store, false);
         let rgba_store = Self::laba_to_srgba(new_store);
         if is_alpha_premultiplied {
             let mut premultiplied_store =
@@ -133,13 +129,5 @@ impl Scaling for LabScaler {
             return premultiplied_store;
         }
         return rgba_store;
-    }
-
-    fn resize_rgba_f32(
-        &self,
-        new_size: ImageSize,
-        store: ImageStore<f32, 4>,
-    ) -> ImageStore<f32, 4> {
-        self.scaler.resize_rgba_f32(new_size, store)
     }
 }

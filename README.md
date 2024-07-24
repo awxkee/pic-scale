@@ -11,7 +11,7 @@ Prebuilt options for CIE L\*a\*b, CIE L\*u\*v, CIE L\*c\*h, Linear, Sigmoidal, O
 Whether downscaling is preferred in linear colorspace, LAB/LUV and sigmoidal also provides very good results.
 Up scaling might be done in LAB/LUB and simoidized components and also efficient in sRGB.
 
-Also has relatively good f16 support.
+Have good f16 (binary float16) support.
 
 #### Example integration with `image` crate
 
@@ -32,6 +32,7 @@ let resized = scaler.resize_rgba(
     store,
     true
 );
+let resized_image = resized.as_bytes();
 ```
 
 ### Performance

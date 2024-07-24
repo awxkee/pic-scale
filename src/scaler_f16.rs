@@ -40,20 +40,37 @@ impl Scaler {
         &self,
         new_size: ImageSize,
         store: ImageStore<f16, 4>,
+        is_alpha_premultiplied: bool,
     ) -> ImageStore<f16, 4> {
+        let mut src_store = store;
+        if is_alpha_premultiplied {
+            let mut premultiplied_store =
+                ImageStore::<f16, 4>::alloc(src_store.width, src_store.height);
+            src_store.unpremultiply_alpha(&mut premultiplied_store);
+            src_store = premultiplied_store;
+        }
+
         if self.function == Nearest {
             let mut allocated_store: Vec<f16> =
                 vec![f16::from_f32(0.); new_size.width * 4 * new_size.height];
             resize_nearest::<f16, 4>(
-                &store.buffer.borrow(),
-                store.width,
-                store.height,
+                &src_store.buffer.borrow(),
+                src_store.width,
+                src_store.height,
                 &mut allocated_store,
                 new_size.width,
                 new_size.height,
             );
             let new_image =
                 ImageStore::<f16, 4>::new(allocated_store, new_size.width, new_size.height);
+
+            if is_alpha_premultiplied {
+                let mut premultiplied_store =
+                    ImageStore::<f16, 4>::alloc(new_image.width, new_image.height);
+                new_image.premultiply_alpha(&mut premultiplied_store);
+                return premultiplied_store;
+            }
+
             return new_image;
         }
 
@@ -61,16 +78,16 @@ impl Scaler {
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
 
-        let mut allocated_store_vertical: Vec<f16> = vec![];
-        allocated_store_vertical.resize(store.width * 4 * new_size.height, f16::from_f32(0.));
+        let allocated_store_vertical: Vec<f16> =
+            vec![f16::from_f32(0.); src_store.width * 4 * new_size.height];
         let mut new_image_vertical =
-            ImageStore::<f16, 4>::new(allocated_store_vertical, store.width, new_size.height);
-        let horizontal_filters = self.generate_weights(store.width, new_size.width);
-        let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
-        store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+            ImageStore::<f16, 4>::new(allocated_store_vertical, src_store.width, new_size.height);
+        let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
+        let vertical_filters = self.generate_weights(src_store.height, new_image_vertical.height);
+        src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
 
-        let mut allocated_store_horizontal: Vec<f16> = vec![];
-        allocated_store_horizontal.resize(new_size.width * 4 * new_size.height, f16::from_f32(0.));
+        let allocated_store_horizontal: Vec<f16> =
+            vec![f16::from_f32(0.); new_size.width * 4 * new_size.height];
         let mut new_image_horizontal =
             ImageStore::<f16, 4>::new(allocated_store_horizontal, new_size.width, new_size.height);
         new_image_vertical.convolve_horizontal(
@@ -78,6 +95,16 @@ impl Scaler {
             &mut new_image_horizontal,
             &pool,
         );
+
+        if is_alpha_premultiplied {
+            let mut premultiplied_store = ImageStore::<f16, 4>::alloc(
+                new_image_horizontal.width,
+                new_image_horizontal.height,
+            );
+            new_image_horizontal.premultiply_alpha(&mut premultiplied_store);
+            return premultiplied_store;
+        }
+
         new_image_horizontal
     }
 

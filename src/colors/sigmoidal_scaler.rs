@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+use crate::scaler::ScalingF32;
 use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
 use colorutils_rs::{rgb_to_sigmoidal, rgba_to_sigmoidal, sigmoidal_to_rgb, sigmoidal_to_rgba};
 
@@ -104,10 +105,6 @@ impl Scaling for SigmoidalScaler {
         return new_u8_store;
     }
 
-    fn resize_rgb_f32(&self, new_size: ImageSize, store: ImageStore<f32, 3>) -> ImageStore<f32, 3> {
-        self.scaler.resize_rgb_f32(new_size, store)
-    }
-
     fn resize_rgba(
         &self,
         new_size: ImageSize,
@@ -122,7 +119,7 @@ impl Scaling for SigmoidalScaler {
             src_store = premultiplied_store;
         }
         let lab_store = Self::rgba_to_sigmoidal(src_store);
-        let new_store = self.scaler.resize_rgba_f32(new_size, lab_store);
+        let new_store = self.scaler.resize_rgba_f32(new_size, lab_store, false);
         let rgba_store = Self::sigmoidal_to_rgba(new_store);
         if is_alpha_premultiplied {
             let mut premultiplied_store =
@@ -131,13 +128,5 @@ impl Scaling for SigmoidalScaler {
             return premultiplied_store;
         }
         return rgba_store;
-    }
-
-    fn resize_rgba_f32(
-        &self,
-        new_size: ImageSize,
-        store: ImageStore<f32, 4>,
-    ) -> ImageStore<f32, 4> {
-        self.scaler.resize_rgba_f32(new_size, store)
     }
 }

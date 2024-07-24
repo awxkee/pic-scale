@@ -27,7 +27,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-mod alpha;
+mod alpha_f16;
+mod alpha_f32;
+mod alpha_u8;
 #[cfg(all(feature = "half"))]
 mod convolve_f16;
 mod convolve_f32;
@@ -48,8 +50,12 @@ mod vertical_f16;
 mod vertical_f32;
 mod vertical_u8;
 
-pub use alpha::neon_premultiply_alpha_rgba;
-pub use alpha::neon_unpremultiply_alpha_rgba;
+#[cfg(all(feature = "half"))]
+pub use alpha_f16::{neon_premultiply_alpha_rgba_f16, neon_unpremultiply_alpha_rgba_f16};
+pub use alpha_f32::neon_premultiply_alpha_rgba_f32;
+pub use alpha_f32::neon_unpremultiply_alpha_rgba_f32;
+pub use alpha_u8::neon_premultiply_alpha_rgba;
+pub use alpha_u8::neon_unpremultiply_alpha_rgba;
 #[cfg(all(feature = "half"))]
 pub use f16_utils::*;
 pub use plane_f32::convolve_horizontal_plane_neon_row_one;

@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::scaler::Scaling;
+use crate::scaler::{Scaling, ScalingF32};
 use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, ThreadingPolicy};
 use colorutils_rs::{
     linear_to_rgb, linear_to_rgba, rgb_to_linear, rgba_to_linear, TransferFunction,
@@ -126,10 +126,6 @@ impl Scaling for LinearScaler {
         return new_u8_store;
     }
 
-    fn resize_rgb_f32(&self, new_size: ImageSize, store: ImageStore<f32, 3>) -> ImageStore<f32, 3> {
-        self.scaler.resize_rgb_f32(new_size, store)
-    }
-
     fn resize_rgba(
         &self,
         new_size: ImageSize,
@@ -144,7 +140,7 @@ impl Scaling for LinearScaler {
             src_store = premultiplied_store;
         }
         let lab_store = self.rgba_to_linear(src_store);
-        let new_store = self.scaler.resize_rgba_f32(new_size, lab_store);
+        let new_store = self.scaler.resize_rgba_f32(new_size, lab_store, false);
         let rgba_store = self.linear_to_rgba(new_store);
         if is_alpha_premultiplied {
             let mut premultiplied_store =
@@ -153,13 +149,5 @@ impl Scaling for LinearScaler {
             return premultiplied_store;
         }
         return rgba_store;
-    }
-
-    fn resize_rgba_f32(
-        &self,
-        new_size: ImageSize,
-        store: ImageStore<f32, 4>,
-    ) -> ImageStore<f32, 4> {
-        self.scaler.resize_rgba_f32(new_size, store)
     }
 }

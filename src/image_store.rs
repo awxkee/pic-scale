@@ -27,7 +27,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::alpha_handle::{premultiply_alpha_rgba, unpremultiply_alpha_rgba};
+use crate::alpha_handle_f16::{premultiply_alpha_rgba_f16, unpremultiply_alpha_rgba_f16};
+use crate::alpha_handle_f32::{premultiply_alpha_rgba_f32, unpremultiply_alpha_rgba_f32};
+use crate::alpha_handle_u8::{premultiply_alpha_rgba, unpremultiply_alpha_rgba};
 use crate::ImageSize;
 use num_traits::FromPrimitive;
 use std::fmt::Debug;
@@ -125,5 +127,33 @@ impl<'a> ImageStore<'a, u8, 4> {
         let dst = into.buffer.borrow_mut();
         let src = self.buffer.borrow();
         premultiply_alpha_rgba(dst, src, self.width, self.height);
+    }
+}
+
+impl<'a> ImageStore<'a, f32, 4> {
+    pub fn unpremultiply_alpha(&self, into: &mut ImageStore<f32, 4>) {
+        let dst = into.buffer.borrow_mut();
+        let src = self.buffer.borrow();
+        unpremultiply_alpha_rgba_f32(dst, src, self.width, self.height);
+    }
+
+    pub fn premultiply_alpha(&self, into: &mut ImageStore<f32, 4>) {
+        let dst = into.buffer.borrow_mut();
+        let src = self.buffer.borrow();
+        premultiply_alpha_rgba_f32(dst, src, self.width, self.height);
+    }
+}
+
+impl<'a> ImageStore<'a, half::f16, 4> {
+    pub fn unpremultiply_alpha(&self, into: &mut ImageStore<half::f16, 4>) {
+        let dst = into.buffer.borrow_mut();
+        let src = self.buffer.borrow();
+        unpremultiply_alpha_rgba_f16(dst, src, self.width, self.height);
+    }
+
+    pub fn premultiply_alpha(&self, into: &mut ImageStore<half::f16, 4>) {
+        let dst = into.buffer.borrow_mut();
+        let src = self.buffer.borrow();
+        premultiply_alpha_rgba_f16(dst, src, self.width, self.height);
     }
 }

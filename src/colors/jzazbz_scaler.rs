@@ -30,6 +30,7 @@ use colorutils_rs::{
     jzazbz_to_rgb, jzazbz_to_rgba, rgb_to_jzazbz, rgba_to_jzazbz, TransferFunction,
 };
 
+use crate::scaler::ScalingF32;
 use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
 
 #[derive(Debug, Copy, Clone)]
@@ -125,11 +126,6 @@ impl Scaling for JzazbzScaler {
         return new_u8_store;
     }
 
-    /// f32 generally is not implemented, only expecting Oklab as an input
-    fn resize_rgb_f32(&self, new_size: ImageSize, store: ImageStore<f32, 3>) -> ImageStore<f32, 3> {
-        self.scaler.resize_rgb_f32(new_size, store)
-    }
-
     fn resize_rgba(
         &self,
         new_size: ImageSize,
@@ -144,7 +140,7 @@ impl Scaling for JzazbzScaler {
             src_store = premultiplied_store;
         }
         let lab_store = self.rgba_to_laba(src_store);
-        let new_store = self.scaler.resize_rgba_f32(new_size, lab_store);
+        let new_store = self.scaler.resize_rgba_f32(new_size, lab_store, false);
         let rgba_store = self.laba_to_srgba(new_store);
         if is_alpha_premultiplied {
             let mut premultiplied_store =
@@ -153,14 +149,5 @@ impl Scaling for JzazbzScaler {
             return premultiplied_store;
         }
         return rgba_store;
-    }
-
-    /// f32 generally is not implemented, only expecting Oklab as an input
-    fn resize_rgba_f32(
-        &self,
-        new_size: ImageSize,
-        store: ImageStore<f32, 4>,
-    ) -> ImageStore<f32, 4> {
-        self.scaler.resize_rgba_f32(new_size, store)
     }
 }

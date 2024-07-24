@@ -27,6 +27,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#[cfg(all(feature = "half", target_feature = "f16c"))]
+mod alpha_f16;
+mod alpha_f32;
+mod alpha_u8;
 mod plane_f32;
 mod rgb_f32;
 mod rgb_u8;
@@ -38,6 +42,12 @@ mod utils;
 mod vertical_f16;
 mod vertical_u8;
 
+#[cfg(all(feature = "half", target_feature = "f16c"))]
+pub use alpha_f16::{sse_premultiply_alpha_rgba_f16, sse_unpremultiply_alpha_rgba_f16};
+pub use alpha_f32::sse_premultiply_alpha_rgba_f32;
+pub use alpha_f32::sse_unpremultiply_alpha_rgba_f32;
+pub use alpha_u8::sse_premultiply_alpha_rgba;
+pub use alpha_u8::sse_unpremultiply_alpha_rgba;
 pub use plane_f32::convolve_horizontal_plane_sse_row_one;
 pub use plane_f32::convolve_horizontal_plane_sse_rows_4;
 pub use rgb_f32::*;

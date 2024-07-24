@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::{premultiply_pixel, unpremultiply_pixel};
 use std::arch::aarch64::*;
 
 #[inline(always)]
@@ -70,57 +70,6 @@ macro_rules! unpremultiply_vec {
         let lo = vcombine_u16(vmovn_u32(lo_lo), vmovn_u32(lo_hi));
         let hi = vcombine_u16(vmovn_u32(hi_lo), vmovn_u32(hi_hi));
         vandq_u8(vcombine_u8(vqmovn_u16(lo), vqmovn_u16(hi)), zero_mask)
-    }};
-}
-
-macro_rules! unpremultiply_pixel {
-    ($dst: expr, $src: expr, $pixel_offset: expr) => {{
-        let mut r = *unsafe { $src.get_unchecked($pixel_offset) } as i32;
-        let mut g = *unsafe { $src.get_unchecked($pixel_offset + 1) } as i32;
-        let mut b = *unsafe { $src.get_unchecked($pixel_offset + 2) } as i32;
-        let a = *unsafe { $src.get_unchecked($pixel_offset + 3) } as i32;
-        if a != 0 {
-            r = ((r * 255) / a).min(255).max(0);
-            g = ((g * 255) / a).min(255).max(0);
-            b = ((b * 255) / a).min(255).max(0);
-        } else {
-            r = 0;
-            g = 0;
-            b = 0;
-        }
-        unsafe {
-            *$dst.get_unchecked_mut($pixel_offset) = r as u8;
-            *$dst.get_unchecked_mut($pixel_offset + 1) = g as u8;
-            *$dst.get_unchecked_mut($pixel_offset + 2) = b as u8;
-            *$dst.get_unchecked_mut($pixel_offset + 3) = a as u8;
-        }
-    }};
-}
-
-macro_rules! premultiply_pixel {
-    ($dst: expr, $src: expr, $pixel_offset: expr) => {{
-        let mut r = *unsafe { $src.get_unchecked($pixel_offset) } as u32;
-        let mut g = *unsafe { $src.get_unchecked($pixel_offset + 1) } as u32;
-        let mut b = *unsafe { $src.get_unchecked($pixel_offset + 2) } as u32;
-        let a = *unsafe { $src.get_unchecked($pixel_offset + 3) } as u32;
-        if a != 0 {
-            r *= a;
-            g *= a;
-            b *= a;
-            r /= 255;
-            g /= 255;
-            b /= 255;
-        } else {
-            r = 0;
-            g = 0;
-            b = 0;
-        }
-        unsafe {
-            *$dst.get_unchecked_mut($pixel_offset) = r as u8;
-            *$dst.get_unchecked_mut($pixel_offset + 1) = g as u8;
-            *$dst.get_unchecked_mut($pixel_offset + 2) = b as u8;
-            *$dst.get_unchecked_mut($pixel_offset + 3) = a as u8;
-        }
     }};
 }
 
