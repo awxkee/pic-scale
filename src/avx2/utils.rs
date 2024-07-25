@@ -153,6 +153,63 @@ pub unsafe fn avx_interleave_rgba_epi32(
 }
 
 #[inline(always)]
+pub unsafe fn avx_interleave_rgba_epi16(
+    a: __m256i,
+    b: __m256i,
+    c: __m256i,
+    d: __m256i,
+) -> (__m256i, __m256i, __m256i, __m256i) {
+    let bg0 = _mm256_unpacklo_epi16(a, b);
+    let bg1 = _mm256_unpackhi_epi16(a, b);
+    let ra0 = _mm256_unpacklo_epi16(c, d);
+    let ra1 = _mm256_unpackhi_epi16(c, d);
+
+    let bgra0_ = _mm256_unpacklo_epi32(bg0, ra0);
+    let bgra1_ = _mm256_unpackhi_epi32(bg0, ra0);
+    let bgra2_ = _mm256_unpacklo_epi32(bg1, ra1);
+    let bgra3_ = _mm256_unpackhi_epi32(bg1, ra1);
+
+    let bgra0 = _mm256_permute2x128_si256::<32>(bgra0_, bgra1_);
+    let bgra2 = _mm256_permute2x128_si256::<49>(bgra0_, bgra1_);
+    let bgra1 = _mm256_permute2x128_si256::<32>(bgra2_, bgra3_);
+    let bgra3 = _mm256_permute2x128_si256::<49>(bgra2_, bgra3_);
+    (bgra0, bgra1, bgra2, bgra3)
+}
+
+#[inline(always)]
+pub unsafe fn avx_deinterleave_rgba_epi16(
+    a: __m256i,
+    b: __m256i,
+    c: __m256i,
+    d: __m256i,
+) -> (__m256i, __m256i, __m256i, __m256i) {
+    let sh = _mm256_setr_epi8(
+        0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15, 0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12,
+        13, 6, 7, 14, 15,
+    );
+    let p0 = _mm256_shuffle_epi8(a, sh);
+    let p1 = _mm256_shuffle_epi8(b, sh);
+    let p2 = _mm256_shuffle_epi8(c, sh);
+    let p3 = _mm256_shuffle_epi8(d, sh);
+
+    let p01l = _mm256_unpacklo_epi32(p0, p1);
+    let p01h = _mm256_unpackhi_epi32(p0, p1);
+    let p23l = _mm256_unpacklo_epi32(p2, p3);
+    let p23h = _mm256_unpackhi_epi32(p2, p3);
+
+    let pll = _mm256_permute2x128_si256::<32>(p01l, p23l);
+    let plh = _mm256_permute2x128_si256::<49>(p01l, p23l);
+    let phl = _mm256_permute2x128_si256::<32>(p01h, p23h);
+    let phh = _mm256_permute2x128_si256::<49>(p01h, p23h);
+
+    let b0 = _mm256_unpacklo_epi32(pll, plh);
+    let g0 = _mm256_unpackhi_epi32(pll, plh);
+    let r0 = _mm256_unpacklo_epi32(phl, phh);
+    let a0 = _mm256_unpackhi_epi32(phl, phh);
+    (b0, g0, r0, a0)
+}
+
+#[inline(always)]
 pub unsafe fn avx_deinterleave_rgba_ps(
     p0: __m256,
     p1: __m256,
@@ -230,4 +287,18 @@ pub unsafe fn avx2_pack_s32(s_1: __m256i, s_2: __m256i) -> __m256i {
     let packed = _mm256_packs_epi32(s_1, s_2);
     const MASK: i32 = shuffle(3, 1, 2, 0);
     return _mm256_permute4x64_epi64::<MASK>(packed);
+}
+
+#[inline(always)]
+#[allow(dead_code)]
+pub unsafe fn avx_combine_ps(lo: __m128, hi: __m128) -> __m256 {
+    _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(lo), hi)
+}
+
+#[inline(always)]
+pub unsafe fn avx_combine_epi(lo: __m128i, hi: __m128i) -> __m256i {
+    _mm256_castps_si256(_mm256_insertf128_ps::<1>(
+        _mm256_castps128_ps256(_mm_castsi128_ps(lo)),
+        _mm_castsi128_ps(hi),
+    ))
 }

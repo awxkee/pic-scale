@@ -26,6 +26,11 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    all(target_feature = "avx2", target_feature = "f16c")
+))]
+use crate::avx2::{avx_premultiply_alpha_rgba_f16, avx_unpremultiply_alpha_rgba_f16};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{neon_premultiply_alpha_rgba_f16, neon_unpremultiply_alpha_rgba_f16};
 #[cfg(all(
@@ -136,7 +141,18 @@ pub fn premultiply_alpha_rgba_f16(
         all(target_feature = "sse4.1", target_feature = "f16c")
     ))]
     {
-        _dispatcher = sse_premultiply_alpha_rgba_f16;
+        if is_x86_feature_detected!("sse4.1") {
+            _dispatcher = sse_premultiply_alpha_rgba_f16;
+        }
+    }
+    #[cfg(all(
+        any(target_arch = "x86_64", target_arch = "x86"),
+        all(target_feature = "avx2", target_feature = "f16c")
+    ))]
+    {
+        if is_x86_feature_detected!("avx2") {
+            _dispatcher = avx_premultiply_alpha_rgba_f16;
+        }
     }
     _dispatcher(dst, src, width, height);
 }
@@ -158,7 +174,18 @@ pub fn unpremultiply_alpha_rgba_f16(
         all(target_feature = "sse4.1", target_feature = "f16c")
     ))]
     {
-        _dispatcher = sse_unpremultiply_alpha_rgba_f16;
+        if is_x86_feature_detected!("sse4.1") {
+            _dispatcher = sse_unpremultiply_alpha_rgba_f16;
+        }
+    }
+    #[cfg(all(
+        any(target_arch = "x86_64", target_arch = "x86"),
+        all(target_feature = "avx2", target_feature = "f16c")
+    ))]
+    {
+        if is_x86_feature_detected!("avx2") {
+            _dispatcher = avx_unpremultiply_alpha_rgba_f16;
+        }
     }
     _dispatcher(dst, src, width, height);
 }
