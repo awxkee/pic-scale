@@ -3,6 +3,7 @@ mod alpha_f16;
 mod alpha_f32;
 mod alpha_u8;
 pub mod utils;
+#[cfg(all(feature = "half", target_feature = "f16c"))]
 mod vertical_f16;
 mod vertical_f32;
 mod vertical_u8;
