@@ -165,6 +165,7 @@ pub unsafe fn avx_interleave_rgba_epi32(
 }
 
 #[inline(always)]
+#[allow(dead_code)]
 pub unsafe fn avx_interleave_rgba_epi16(
     a: __m256i,
     b: __m256i,
@@ -189,6 +190,7 @@ pub unsafe fn avx_interleave_rgba_epi16(
 }
 
 #[inline(always)]
+#[allow(dead_code)]
 pub unsafe fn avx_deinterleave_rgba_epi16(
     a: __m256i,
     b: __m256i,
@@ -308,6 +310,7 @@ pub unsafe fn avx_combine_ps(lo: __m128, hi: __m128) -> __m256 {
 }
 
 #[inline(always)]
+#[allow(dead_code)]
 pub unsafe fn avx_combine_epi(lo: __m128i, hi: __m128i) -> __m256i {
     _mm256_castps_si256(_mm256_insertf128_ps::<1>(
         _mm256_castps128_ps256(_mm_castsi128_ps(lo)),
