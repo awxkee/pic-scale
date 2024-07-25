@@ -179,7 +179,7 @@ macro_rules! consume_16_u8 {
 }
 
 macro_rules! consume_u8_8 {
-    ($start_y: expr,$start_x: expr, $src: expr, $src_stride: expr, $dst: expr, $filter: expr, $bounds: expr, $blend_length: expr) => {{
+    ($start_y: expr,$start_x: expr, $src: expr, $src_stride: expr, $dst: expr, $filter: expr, $bounds: expr) => {{
         let vld = vdupq_n_s32(ROUNDING_APPROX);
         let mut store_0 = vld;
         let mut store_1 = vld;
@@ -193,13 +193,7 @@ macro_rules! consume_u8_8 {
             let src_ptr = $src.add($src_stride * py);
 
             let s_ptr = src_ptr.add(px);
-            let item_row = if $blend_length != 8 {
-                let mut transient: [u8; 8] = [0; 8];
-                std::ptr::copy_nonoverlapping(s_ptr, transient.as_mut_ptr(), $blend_length);
-                vld1_u8(transient.as_ptr())
-            } else {
-                vld1_u8(s_ptr)
-            };
+            let item_row = vld1_u8(s_ptr);
 
             let low = vreinterpretq_s16_u16(vmovl_u8(item_row));
             store_0 = vmlal_s16(store_0, vget_low_s16(low), vget_low_s16(v_weight));
@@ -219,13 +213,43 @@ macro_rules! consume_u8_8 {
         let item = vqmovn_u16(low_16);
 
         let dst_ptr = $dst.add(px);
-        if $blend_length != 8 {
-            let mut transient: [u8; 8] = [0; 8];
-            vst1_u8(transient.as_mut_ptr(), item);
-            std::ptr::copy_nonoverlapping(transient.as_ptr(), dst_ptr, $blend_length);
-        } else {
-            vst1_u8(dst_ptr, item);
+        vst1_u8(dst_ptr, item);
+    }};
+}
+
+macro_rules! consume_u8_1 {
+    ($start_y: expr,$start_x: expr, $src: expr, $src_stride: expr, $dst: expr, $filter: expr, $bounds: expr) => {{
+        let vld = vdupq_n_s32(ROUNDING_APPROX);
+        let mut store = vld;
+
+        let px = $start_x;
+
+        for j in 0..$bounds.size {
+            let py = $start_y + j;
+            let weight = $filter.add(j).read_unaligned();
+            let v_weight = vdupq_n_s16(weight);
+            let src_ptr = $src.add($src_stride * py);
+
+            let s_ptr = src_ptr.add(px);
+            let item_row = vld1_dup_u8(s_ptr);
+
+            let low = vreinterpretq_s16_u16(vmovl_u8(item_row));
+            store = vmlal_s16(store, vget_low_s16(low), vget_low_s16(v_weight));
         }
+
+        let zeros = vdupq_n_s32(0);
+
+        store = vmaxq_s32(store, zeros);
+
+        let shrinked_store = vqshrun_n_s32::<PRECISION>(store);
+
+        let low_16 = vcombine_u16(shrinked_store, shrinked_store);
+
+        let item = vqmovn_u16(low_16);
+
+        let dst_ptr = $dst.add(px);
+        let value = vget_lane_u8::<0>(item);
+        dst_ptr.write_unaligned(value);
     }};
 }
 
@@ -298,27 +322,25 @@ pub fn convolve_vertical_rgb_neon_row<const CHANNELS: usize>(
                 src_stride,
                 unsafe_destination_ptr_0,
                 weight_ptr,
-                bounds,
-                8
+                bounds
             );
         }
 
         cx += 8;
     }
 
-    let left = dst_width - cx;
-    if left > 0 {
+    while cx + 1 < dst_width {
         unsafe {
-            consume_u8_8!(
+            consume_u8_1!(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
                 src_stride,
                 unsafe_destination_ptr_0,
                 weight_ptr,
-                bounds,
-                left
+                bounds
             );
         }
+        cx += 1;
     }
 }
