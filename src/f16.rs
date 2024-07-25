@@ -29,8 +29,6 @@
 
 // RGBA
 
-use half::f16;
-use rayon::ThreadPool;
 use crate::avx2::convolve_vertical_avx_row_f16;
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_naive_f32::{
@@ -51,6 +49,8 @@ use crate::rgb_f32::convolve_vertical_rgb_native_row_f32;
 ))]
 use crate::sse::convolve_vertical_rgb_sse_row_f16;
 use crate::ImageStore;
+use half::f16;
+use rayon::ThreadPool;
 
 impl<'a> HorizontalConvolutionPass<f16, 4> for ImageStore<'a, f16, 4> {
     fn convolve_horizontal(

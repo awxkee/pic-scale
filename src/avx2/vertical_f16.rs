@@ -56,7 +56,11 @@ unsafe fn convolve_vertical_part_avx_f16(
         let s_ptr = src_ptr.add(px);
         let item_row_0 = _mm256_set1_epi16(s_ptr.read_unaligned().to_bits() as i16);
 
-        store_0 = _mm256_fma_ps(store_0, _mm256_cvtph_ps(_mm256_castsi256_si128(item_row_0)), v_weight);
+        store_0 = _mm256_fma_ps(
+            store_0,
+            _mm256_cvtph_ps(_mm256_castsi256_si128(item_row_0)),
+            v_weight,
+        );
     }
 
     let dst_ptr = dst.add(px);

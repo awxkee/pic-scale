@@ -21,7 +21,7 @@ use pic_scale::{
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/asset_4.png")
+    let img = ImageReader::open("./assets/asset_5.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -31,19 +31,16 @@ fn main() {
     let mut scaler = Scaler::new(ResamplingFunction::EwaRobidoux);
     scaler.set_threading_policy(ThreadingPolicy::Single);
     let start_time = Instant::now();
+    //
+    // let mut converted_bytes: Vec<f32> = bytes
+    //     .iter()
+    //     .map(|&x| x as f32 / 255f32)
+    //     .collect();
 
-    let mut converted_bytes: Vec<f32> = bytes
-        .iter()
-        .map(|&x| x as f32 / 255f32)
-        .collect();
-
-    let store = ImageStore::<f32, 4>::from_slice(
-        &mut converted_bytes,
-        dimensions.0 as usize,
-        dimensions.1 as usize,
-    );
-    let resized = scaler.resize_rgba_f32(
-        ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
+    let store =
+        ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
+    let resized = scaler.resize_rgba(
+        ImageSize::new(dimensions.0 as usize / 3, dimensions.1 as usize / 3),
         store,
         true,
     );
@@ -55,11 +52,13 @@ fn main() {
     println!("Scaler: {:.2?}", elapsed_time);
 
     // let dst: Vec<u8> = res.iter().map(|&x| (x * 255f32) as u8).collect();
-    let dst: Vec<u8> = resized
-        .as_bytes()
-        .iter()
-        .map(|&x| (x * 255f32) as u8)
-        .collect();
+    // let dst: Vec<u8> = resized
+    //     .as_bytes()
+    //     .iter()
+    //     .map(|&x| (x * 255f32) as u8)
+    //     .collect();\
+
+    let dst = resized.as_bytes();
 
     if resized.channels == 4 {
         image::save_buffer(

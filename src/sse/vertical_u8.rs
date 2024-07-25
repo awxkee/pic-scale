@@ -34,7 +34,6 @@ use std::arch::x86_64::*;
 use crate::filter_weights::FilterBounds;
 use crate::support::{PRECISION, ROUNDING_APPROX};
 
-#[inline]
 pub(crate) unsafe fn convolve_vertical_part_sse_32(
     start_y: usize,
     start_x: usize,
@@ -160,7 +159,6 @@ pub(crate) unsafe fn convolve_vertical_part_sse_32(
     _mm_storeu_si128(dst_ptr as *mut __m128i, rgb);
 }
 
-#[inline(always)]
 pub(crate) unsafe fn convolve_vertical_part_sse_16(
     start_y: usize,
     start_x: usize,
@@ -189,19 +187,17 @@ pub(crate) unsafe fn convolve_vertical_part_sse_16(
         let s_ptr = src_ptr.add(px);
         let item_row = _mm_loadu_si128(s_ptr as *const __m128i);
 
-        let low = _mm_cvtepu8_epi16(item_row);
-        let high = _mm_unpackhi_epi8(item_row, zeros);
+        let interleaved = _mm_unpacklo_epi8(item_row, zeros);
+        let pix = _mm_unpacklo_epi8(interleaved, zeros);
+        store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(pix, v_weight));
+        let pix = _mm_unpackhi_epi8(interleaved, zeros);
+        store_1 = _mm_add_epi32(store_1, _mm_madd_epi16(pix, v_weight));
 
-        store_0 = _mm_add_epi32(store_0, _mm_mullo_epi32(_mm_cvtepi16_epi32(low), v_weight));
-        store_1 = _mm_add_epi32(
-            store_1,
-            _mm_mullo_epi32(_mm_unpackhi_epi16(low, zeros), v_weight),
-        );
-        store_2 = _mm_add_epi32(store_2, _mm_mullo_epi32(_mm_cvtepi16_epi32(high), v_weight));
-        store_3 = _mm_add_epi32(
-            store_3,
-            _mm_mullo_epi32(_mm_unpackhi_epi16(high, zeros), v_weight),
-        );
+        let interleaved = _mm_unpackhi_epi8(item_row, zeros);
+        let pix = _mm_unpacklo_epi8(interleaved, zeros);
+        store_2 = _mm_add_epi32(store_2, _mm_madd_epi16(pix, v_weight));
+        let pix = _mm_unpackhi_epi8(interleaved, zeros);
+        store_3 = _mm_add_epi32(store_3, _mm_madd_epi16(pix, v_weight));
     }
 
     store_0 = _mm_max_epi32(store_0, zeros);
@@ -224,8 +220,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_16(
     _mm_storeu_si128(dst_ptr as *mut __m128i, item);
 }
 
-#[inline(always)]
-pub(crate) unsafe fn convolve_vertical_part_sse_8<const USE_BLENDING: bool>(
+pub(crate) unsafe fn convolve_vertical_part_sse_8(
     start_y: usize,
     start_x: usize,
     src: *const u8,
@@ -233,7 +228,6 @@ pub(crate) unsafe fn convolve_vertical_part_sse_8<const USE_BLENDING: bool>(
     dst: *mut u8,
     filter: *const i16,
     bounds: &FilterBounds,
-    blend_length: usize,
 ) {
     let vld = _mm_set1_epi32(ROUNDING_APPROX);
     let mut store_0 = vld;
@@ -250,13 +244,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_8<const USE_BLENDING: bool>(
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
-        let item_row = if USE_BLENDING {
-            let mut transient: [u8; 8] = [0; 8];
-            std::ptr::copy_nonoverlapping(s_ptr, transient.as_mut_ptr(), blend_length);
-            _mm_loadu_si64(transient.as_ptr())
-        } else {
-            _mm_loadu_si64(s_ptr)
-        };
+        let item_row = _mm_loadu_si64(s_ptr);
 
         let low = _mm_cvtepu8_epi16(item_row);
         store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(_mm_cvtepi16_epi32(low), v_weight));
@@ -277,17 +265,51 @@ pub(crate) unsafe fn convolve_vertical_part_sse_8<const USE_BLENDING: bool>(
     let item = _mm_packus_epi16(low_16, low_16);
 
     let dst_ptr = dst.add(px);
-    if USE_BLENDING {
-        let mut transient: [u8; 8] = [0; 8];
-        std::ptr::copy_nonoverlapping(&item as *const _ as *const u8, transient.as_mut_ptr(), 8);
-        std::ptr::copy_nonoverlapping(transient.as_ptr(), dst_ptr, blend_length);
-    } else {
-        std::ptr::copy_nonoverlapping(&item as *const _ as *const u8, dst_ptr, 8);
+    std::ptr::copy_nonoverlapping(&item as *const _ as *const u8, dst_ptr, 8);
+}
+
+pub(crate) unsafe fn convolve_vertical_part_sse(
+    start_y: usize,
+    start_x: usize,
+    src: *const u8,
+    src_stride: usize,
+    dst: *mut u8,
+    filter: *const i16,
+    bounds: &FilterBounds,
+) {
+    let vld = _mm_set1_epi32(ROUNDING_APPROX);
+    let mut store = vld;
+
+    let zeros = _mm_setzero_si128();
+
+    let px = start_x;
+
+    for j in 0..bounds.size {
+        let py = start_y + j;
+        let weight = unsafe { filter.add(j).read_unaligned() };
+        let v_weight = _mm_set1_epi32(weight as i32);
+        let src_ptr = src.add(src_stride * py);
+
+        let s_ptr = src_ptr.add(px);
+        let item_row = _mm_setr_epi32(s_ptr.read_unaligned() as i32, 0, 0, 0);
+
+        store = _mm_add_epi32(store, _mm_mullo_epi32(item_row, v_weight));
     }
+
+    store = _mm_max_epi32(store, zeros);
+
+    let vegi = _mm_srai_epi32::<PRECISION>(store);
+
+    let low_16 = _mm_packus_epi32(vegi, vegi);
+
+    let item = _mm_packus_epi16(low_16, low_16);
+
+    let dst_ptr = dst.add(px);
+    dst_ptr.write_unaligned(_mm_extract_epi8::<0>(item) as u8);
 }
 
 #[inline]
-pub fn convolve_vertical_rgb_sse_row<const CHANNELS: usize>(
+pub fn convolve_vertical_sse_row<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,
     unsafe_source_ptr_0: *const u8,
@@ -332,7 +354,7 @@ pub fn convolve_vertical_rgb_sse_row<const CHANNELS: usize>(
 
     while cx + 8 < total_width {
         unsafe {
-            convolve_vertical_part_sse_8::<false>(
+            convolve_vertical_part_sse_8(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -340,17 +362,15 @@ pub fn convolve_vertical_rgb_sse_row<const CHANNELS: usize>(
                 unsafe_destination_ptr_0,
                 weight_ptr,
                 bounds,
-                8,
             );
         }
 
         cx += 8;
     }
 
-    let left = total_width - cx;
-    if left > 0 {
+    while cx + 1 < total_width {
         unsafe {
-            convolve_vertical_part_sse_8::<true>(
+            convolve_vertical_part_sse(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -358,8 +378,9 @@ pub fn convolve_vertical_rgb_sse_row<const CHANNELS: usize>(
                 unsafe_destination_ptr_0,
                 weight_ptr,
                 bounds,
-                left,
             );
         }
+
+        cx += 1;
     }
 }

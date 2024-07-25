@@ -26,6 +26,11 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "avx2"
+))]
+use crate::avx2::convolve_vertical_avx_row;
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_naive_u8::*;
 use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertical_dispatch_u8};
@@ -38,7 +43,7 @@ use crate::saturate_narrow::SaturateNarrow;
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 ))]
-use crate::sse::convolve_vertical_rgb_sse_row;
+use crate::sse::convolve_vertical_sse_row;
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
@@ -248,7 +253,16 @@ impl<'a> VerticalConvolutionPass<u8, 3> for ImageStore<'a, u8, 3> {
         ))]
         {
             if is_x86_feature_detected!("sse4.1") {
-                _dispatcher = convolve_vertical_rgb_sse_row::<3>;
+                _dispatcher = convolve_vertical_sse_row::<3>;
+            }
+        }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "avx2"
+        ))]
+        {
+            if is_x86_feature_detected!("avx2") {
+                _dispatcher = convolve_vertical_avx_row::<3>;
             }
         }
         convolve_vertical_dispatch_u8(self, filter_weights, destination, pool, _dispatcher);

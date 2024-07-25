@@ -27,8 +27,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use rayon::ThreadPool;
-
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "avx2"
+))]
+use crate::avx2::convolve_vertical_avx_row;
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_naive_u8::*;
 use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertical_dispatch_u8};
@@ -40,7 +43,7 @@ use crate::rgb_u8::*;
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 ))]
-use crate::sse::convolve_vertical_rgb_sse_row;
+use crate::sse::convolve_vertical_sse_row;
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
@@ -49,6 +52,7 @@ use crate::sse::sse_rgb::{
     convolve_horizontal_rgba_sse_rows_4, convolve_horizontal_rgba_sse_rows_one,
 };
 use crate::ImageStore;
+use rayon::ThreadPool;
 
 impl<'a> HorizontalConvolutionPass<u8, 4> for ImageStore<'a, u8, 4> {
     fn convolve_horizontal(
@@ -114,7 +118,16 @@ impl<'a> VerticalConvolutionPass<u8, 4> for ImageStore<'a, u8, 4> {
         ))]
         {
             if is_x86_feature_detected!("sse4.1") {
-                _dispatcher = convolve_vertical_rgb_sse_row::<4>;
+                _dispatcher = convolve_vertical_sse_row::<4>;
+            }
+        }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "avx2"
+        ))]
+        {
+            if is_x86_feature_detected!("avx2") {
+                _dispatcher = convolve_vertical_avx_row::<4>;
             }
         }
         convolve_vertical_dispatch_u8(self, filter_weights, destination, pool, _dispatcher);
