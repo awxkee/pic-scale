@@ -29,6 +29,10 @@
 
 // RGBA
 
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    all(target_feature = "avx2", target_feature = "f16c")
+))]
 use crate::avx2::convolve_vertical_avx_row_f16;
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_naive_f32::{
