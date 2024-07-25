@@ -32,7 +32,11 @@ mod acceleration_feature;
 mod alpha_handle_f16;
 mod alpha_handle_f32;
 mod alpha_handle_u8;
-mod avx2_utils;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "avx2"
+))]
+mod avx2;
 mod chunking;
 mod colors;
 mod convolution;

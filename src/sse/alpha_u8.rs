@@ -27,13 +27,20 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::alpha_handle_u8::_mm_select_si128;
 use crate::sse::{sse_deinterleave_rgba, sse_interleave_rgba};
 use crate::{premultiply_pixel, unpremultiply_pixel};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
+
+#[inline(always)]
+pub unsafe fn _mm_select_si128(mask: __m128i, true_vals: __m128i, false_vals: __m128i) -> __m128i {
+    _mm_or_si128(
+        _mm_and_si128(mask, true_vals),
+        _mm_andnot_si128(mask, false_vals),
+    )
+}
 
 #[inline(always)]
 pub unsafe fn sse_div_by255(v: __m128i) -> __m128i {
