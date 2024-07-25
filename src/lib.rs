@@ -27,7 +27,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-mod acceleration_feature;
 #[cfg(all(feature = "half"))]
 mod alpha_handle_f16;
 mod alpha_handle_f32;

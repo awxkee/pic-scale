@@ -32,6 +32,19 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
+#[cfg(not(target_feature = "fma"))]
+#[inline]
+pub unsafe fn _mm256_fma_ps(a: __m256, b: __m256, c: __m256) -> __m256 {
+    return _mm256_add_ps(_mm256_mul_ps(b, c), a);
+}
+
+#[cfg(target_feature = "fma")]
+#[inline]
+pub unsafe fn _mm256_fma_ps(a: __m256, b: __m256, c: __m256) -> __m256 {
+    return _mm256_fmadd_ps(b, c, a);
+}
+
+
 #[inline(always)]
 pub const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
     ((z << 6) | (y << 4) | (x << 2) | w) as i32

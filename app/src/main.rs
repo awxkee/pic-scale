@@ -32,17 +32,17 @@ fn main() {
     scaler.set_threading_policy(ThreadingPolicy::Single);
     let start_time = Instant::now();
 
-    let mut converted_bytes: Vec<f16> = bytes
+    let mut converted_bytes: Vec<f32> = bytes
         .iter()
-        .map(|&x| f16::from_f32(x as f32 / 255f32))
+        .map(|&x| x as f32 / 255f32)
         .collect();
 
-    let store = ImageStore::<f16, 4>::from_slice(
+    let store = ImageStore::<f32, 4>::from_slice(
         &mut converted_bytes,
         dimensions.0 as usize,
         dimensions.1 as usize,
     );
-    let resized = scaler.resize_rgba_f16(
+    let resized = scaler.resize_rgba_f32(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
         store,
         true,
@@ -58,7 +58,7 @@ fn main() {
     let dst: Vec<u8> = resized
         .as_bytes()
         .iter()
-        .map(|&x| (x.to_f32() * 255f32) as u8)
+        .map(|&x| (x * 255f32) as u8)
         .collect();
 
     if resized.channels == 4 {

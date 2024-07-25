@@ -57,9 +57,9 @@ pub fn avx_unpremultiply_alpha_rgba_f32(dst: &mut [f32], src: &[f32], width: usi
                 let pixel_offset = offset + px;
                 let src_ptr = src.as_ptr().add(pixel_offset);
                 let rgba0 = _mm256_loadu_ps(src_ptr);
-                let rgba1 = _mm256_loadu_ps(src_ptr.add(4));
-                let rgba2 = _mm256_loadu_ps(src_ptr.add(8));
-                let rgba3 = _mm256_loadu_ps(src_ptr.add(12));
+                let rgba1 = _mm256_loadu_ps(src_ptr.add(8));
+                let rgba2 = _mm256_loadu_ps(src_ptr.add(16));
+                let rgba3 = _mm256_loadu_ps(src_ptr.add(24));
 
                 let (rrr, ggg, bbb, aaa) = avx_deinterleave_rgba_ps(rgba0, rgba1, rgba2, rgba3);
 
@@ -71,9 +71,9 @@ pub fn avx_unpremultiply_alpha_rgba_f32(dst: &mut [f32], src: &[f32], width: usi
 
                 let dst_ptr = dst.as_mut_ptr().add(offset + px);
                 _mm256_storeu_ps(dst_ptr, rgba0);
-                _mm256_storeu_ps(dst_ptr.add(4), rgba1);
-                _mm256_storeu_ps(dst_ptr.add(8), rgba2);
-                _mm256_storeu_ps(dst_ptr.add(12), rgba3);
+                _mm256_storeu_ps(dst_ptr.add(8), rgba1);
+                _mm256_storeu_ps(dst_ptr.add(16), rgba2);
+                _mm256_storeu_ps(dst_ptr.add(24), rgba3);
 
                 _cx += 8;
             }

@@ -31,7 +31,7 @@
 
 use half::f16;
 use rayon::ThreadPool;
-
+use crate::avx2::convolve_vertical_avx_row_f16;
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_naive_f32::{
     convolve_horizontal_rgb_native_row, convolve_horizontal_rgba_4_row_f32,
@@ -100,6 +100,13 @@ impl<'a> VerticalConvolutionPass<f16, 4> for ImageStore<'a, f16, 4> {
         {
             _dispatcher = convolve_vertical_rgb_sse_row_f16::<4>;
         }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            all(target_feature = "avx2", target_feature = "f16c")
+        ))]
+        {
+            _dispatcher = convolve_vertical_avx_row_f16::<4>;
+        }
         convolve_vertical_dispatch_f16(self, filter_weights, destination, pool, _dispatcher);
     }
 }
@@ -152,6 +159,13 @@ impl<'a> VerticalConvolutionPass<f16, 3> for ImageStore<'a, f16, 3> {
         {
             _dispatcher = convolve_vertical_rgb_sse_row_f16::<3>;
         }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            all(target_feature = "avx2", target_feature = "f16c")
+        ))]
+        {
+            _dispatcher = convolve_vertical_avx_row_f16::<3>;
+        }
         convolve_vertical_dispatch_f16(self, filter_weights, destination, pool, _dispatcher);
     }
 }
@@ -198,6 +212,13 @@ impl<'a> VerticalConvolutionPass<f16, 1> for ImageStore<'a, f16, 1> {
         ))]
         {
             _dispatcher = convolve_vertical_rgb_sse_row_f16::<1>;
+        }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            all(target_feature = "avx2", target_feature = "f16c")
+        ))]
+        {
+            _dispatcher = convolve_vertical_avx_row_f16::<1>;
         }
         convolve_vertical_dispatch_f16(self, filter_weights, destination, pool, _dispatcher);
     }
