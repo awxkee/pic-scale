@@ -35,6 +35,8 @@ use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_naive_u8::convolve_horizontal_rgba_native_row;
 use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertical_dispatch_u8};
 use crate::filter_weights::{FilterBounds, FilterWeights};
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::neon::convolve_vertical_rgb_neon_row;
 use crate::rgb_u8::convolve_vertical_rgb_native_row_u8;
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
@@ -82,6 +84,10 @@ impl<'a> VerticalConvolutionPass<u8, 1> for ImageStore<'a, u8, 1> {
             src_stride: usize,
             weight_ptr: *const i16,
         ) = convolve_vertical_rgb_native_row_u8::<u8, i32, 1>;
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            _dispatcher = convolve_vertical_rgb_neon_row::<1>;
+        }
         #[cfg(all(
             any(target_arch = "x86_64", target_arch = "x86"),
             target_feature = "sse4.1"
