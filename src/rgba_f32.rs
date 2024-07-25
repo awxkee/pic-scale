@@ -27,8 +27,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use rayon::ThreadPool;
-
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "avx2"
+))]
+use crate::avx2::convolve_vertical_avx_row_f32;
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_naive_f32::{
     convolve_horizontal_rgb_native_row, convolve_horizontal_rgba_4_row_f32,
@@ -44,6 +47,7 @@ use crate::rgb_f32::convolve_vertical_rgb_native_row_f32;
 ))]
 use crate::sse::*;
 use crate::ImageStore;
+use rayon::ThreadPool;
 
 impl<'a> HorizontalConvolutionPass<f32, 4> for ImageStore<'a, f32, 4> {
     fn convolve_horizontal(
@@ -103,6 +107,15 @@ impl<'a> VerticalConvolutionPass<f32, 4> for ImageStore<'a, f32, 4> {
         {
             if is_x86_feature_detected!("sse4.1") {
                 _dispatcher = convolve_vertical_rgb_sse_row_f32::<4>;
+            }
+        }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "avx2"
+        ))]
+        {
+            if is_x86_feature_detected!("avx2") {
+                _dispatcher = convolve_vertical_avx_row_f32::<4>;
             }
         }
         convolve_vertical_dispatch_f32(self, filter_weights, destination, pool, _dispatcher);

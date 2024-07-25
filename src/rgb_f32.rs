@@ -26,9 +26,11 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use num_traits::AsPrimitive;
-use rayon::ThreadPool;
-
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "avx2"
+))]
+use crate::avx2::convolve_vertical_avx_row_f32;
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_naive_f32::*;
 use crate::dispatch_group_f32::{convolve_horizontal_dispatch_f32, convolve_vertical_dispatch_f32};
@@ -41,6 +43,8 @@ use crate::neon::*;
     target_feature = "sse4.1"
 ))]
 use crate::sse::*;
+use num_traits::AsPrimitive;
+use rayon::ThreadPool;
 
 pub(crate) fn convolve_vertical_rgb_native_row_f32<
     T: Copy + 'static + AsPrimitive<f32>,
@@ -214,6 +218,15 @@ impl<'a> VerticalConvolutionPass<f32, 3> for ImageStore<'a, f32, 3> {
         {
             if is_x86_feature_detected!("sse4.1") {
                 _dispatcher = convolve_vertical_rgb_sse_row_f32::<3>;
+            }
+        }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "avx2"
+        ))]
+        {
+            if is_x86_feature_detected!("avx2") {
+                _dispatcher = convolve_vertical_avx_row_f32::<3>;
             }
         }
         convolve_vertical_dispatch_f32(self, filter_weights, destination, pool, _dispatcher);
