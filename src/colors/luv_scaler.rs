@@ -33,7 +33,7 @@ use crate::scaler::ScalingF32;
 use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
 
 #[derive(Debug, Copy, Clone)]
-/// Converts image to CIE LUV components scales it and convert back
+/// Converts image to *CIE LUV* components scales it and convert back
 pub struct LuvScaler {
     pub(crate) scaler: Scaler,
 }

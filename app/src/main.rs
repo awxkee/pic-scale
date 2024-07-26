@@ -21,7 +21,7 @@ use pic_scale::{
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/asset_5.png")
+    let img = ImageReader::open("./assets/asset.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -37,12 +37,47 @@ fn main() {
     //     .map(|&x| x as f32 / 255f32)
     //     .collect();
 
+    let mut r_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];
+    let mut g_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];
+    let mut b_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];
+    split_channels_3(
+        &bytes,
+        dimensions.0 as usize,
+        dimensions.1 as usize,
+        &mut r_chan,
+        &mut g_chan,
+        &mut b_chan,
+    );
+
     let store =
-        ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
-    let resized = scaler.resize_rgba(
-        ImageSize::new(dimensions.0 as usize / 3, dimensions.1 as usize / 3),
+        ImageStore::<u8, 1>::from_slice(&mut r_chan, dimensions.0 as usize, dimensions.1 as usize);
+    let resized = scaler.resize_plane(
+        ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
         store,
-        true,
+    );
+
+    let store1 =
+        ImageStore::<u8, 1>::from_slice(&mut g_chan, dimensions.0 as usize, dimensions.1 as usize);
+    let resized1 = scaler.resize_plane(
+        ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
+        store1,
+    );
+
+    let store2 =
+        ImageStore::<u8, 1>::from_slice(&mut b_chan, dimensions.0 as usize, dimensions.1 as usize);
+    let resized2 = scaler.resize_plane(
+        ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
+        store2,
+    );
+
+    let mut dst = vec![0u8; resized.width * resized.height * 3];
+    merge_channels_3(
+        &mut dst,
+        resized.width,
+        resized.height,
+        &resized.as_bytes(),
+        &resized1.as_bytes(),
+        &resized2.as_bytes(),
     );
 
     //
@@ -58,7 +93,7 @@ fn main() {
     //     .map(|&x| (x * 255f32) as u8)
     //     .collect();\
 
-    let dst = resized.as_bytes();
+    // let dst = resized.as_bytes();
 
     if resized.channels == 4 {
         image::save_buffer(

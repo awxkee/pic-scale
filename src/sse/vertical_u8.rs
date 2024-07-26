@@ -368,7 +368,7 @@ pub fn convolve_vertical_sse_row<const CHANNELS: usize>(
         cx += 8;
     }
 
-    while cx + 1 < total_width {
+    while cx < total_width {
         unsafe {
             convolve_vertical_part_sse(
                 bounds.start,

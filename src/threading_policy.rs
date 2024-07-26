@@ -31,10 +31,15 @@ use rayon::ThreadPool;
 
 use crate::ImageSize;
 
+#[repr(C)]
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+/// Declares thread policy usage
 pub enum ThreadingPolicy {
+    /// Will use only one current thread
     Single,
+    /// Spawn provided threads count
     Fixed(usize),
+    /// Computes adaptive thread count between 1...12 for given image bounds
     Adaptive,
 }
 

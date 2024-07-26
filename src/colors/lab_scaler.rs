@@ -33,7 +33,7 @@ use crate::scaler::{Scaling, ScalingF32};
 use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, ThreadingPolicy};
 
 #[derive(Debug, Copy, Clone)]
-/// Converts image to CIE LAB components scales it and convert back
+/// Converts image to *CIE LAB* components scales it and convert back
 pub struct LabScaler {
     pub(crate) scaler: Scaler,
 }

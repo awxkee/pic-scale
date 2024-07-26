@@ -218,7 +218,7 @@ macro_rules! consume_u8_8 {
 }
 
 macro_rules! consume_u8_1 {
-    ($start_y: expr,$start_x: expr, $src: expr, $src_stride: expr, $dst: expr, $filter: expr, $bounds: expr) => {{
+    ($start_y: expr, $start_x: expr, $src: expr, $src_stride: expr, $dst: expr, $filter: expr, $bounds: expr) => {{
         let vld = vdupq_n_s32(ROUNDING_APPROX);
         let mut store = vld;
 
@@ -329,7 +329,7 @@ pub fn convolve_vertical_rgb_neon_row<const CHANNELS: usize>(
         cx += 8;
     }
 
-    while cx + 1 < dst_width {
+    while cx < dst_width {
         unsafe {
             consume_u8_1!(
                 bounds.start,

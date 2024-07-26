@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+use crate::sse::shuffle;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -193,4 +194,20 @@ pub unsafe fn sse_interleave_rgba_epi16(
     let v2 = _mm_unpacklo_epi16(u1, u3); // a4 b4 c4 d4 ...
     let v3 = _mm_unpackhi_epi16(u1, u3); // a6 b6 c6 d6 ...
     (v0, v1, v2, v3)
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_hsum_epi32(x: __m128i) -> i32 {
+    const FIRST_MASK: i32 = shuffle(1, 0, 3, 2);
+    let hi64 = _mm_shuffle_epi32::<FIRST_MASK>(x);
+    let sum64 = _mm_add_epi32(hi64, x);
+    const SM: i32 = shuffle(1, 0, 3, 2);
+    let hi32 = _mm_shufflelo_epi16::<SM>(sum64);
+    let sum32 = _mm_add_epi32(sum64, hi32);
+    return _mm_cvtsi128_si32(sum32);
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_muladd_epi32(a: __m128i, b: __m128i, c: __m128i) -> __m128i {
+    _mm_add_epi32(a, _mm_mullo_epi32(b, c))
 }

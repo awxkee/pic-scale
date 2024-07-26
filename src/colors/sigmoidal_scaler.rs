@@ -32,7 +32,7 @@ use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, Threadin
 use colorutils_rs::{rgb_to_sigmoidal, rgba_to_sigmoidal, sigmoidal_to_rgb, sigmoidal_to_rgba};
 
 #[derive(Debug, Copy, Clone)]
-/// Converts image to sigmoidized components scales it and convert back
+/// Converts image to *sigmoidized* components scales it and convert back
 pub struct SigmoidalScaler {
     pub(crate) scaler: Scaler,
 }

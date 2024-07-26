@@ -37,12 +37,19 @@ use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertica
 use crate::filter_weights::{FilterBounds, FilterWeights};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::convolve_vertical_rgb_neon_row;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::neon::{convolve_horizontal_plane_neon_row, convolve_horizontal_plane_neon_rows_4_u8};
 use crate::rgb_u8::convolve_vertical_rgb_native_row_u8;
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 ))]
-use crate::sse::convolve_vertical_sse_row;
+use crate::sse::convolve_horizontal_plane_sse_row;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
+use crate::sse::{convolve_horizontal_plane_sse_rows_4_u8, convolve_vertical_sse_row};
 use crate::ImageStore;
 use rayon::ThreadPool;
 
@@ -53,11 +60,26 @@ impl<'a> HorizontalConvolutionPass<u8, 1> for ImageStore<'a, u8, 1> {
         destination: &mut ImageStore<u8, 1>,
         _pool: &Option<ThreadPool>,
     ) {
-        let _dispatcher_4_rows: Option<
+        let mut _dispatcher_4_rows: Option<
             fn(usize, usize, &FilterWeights<i16>, *const u8, usize, *mut u8, usize),
         > = None;
-        let _dispatcher_1_row: fn(usize, usize, &FilterWeights<i16>, *const u8, *mut u8) =
+        let mut _dispatcher_1_row: fn(usize, usize, &FilterWeights<i16>, *const u8, *mut u8) =
             convolve_horizontal_rgba_native_row::<u8, i32, 1>;
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            _dispatcher_4_rows = Some(convolve_horizontal_plane_neon_rows_4_u8);
+            _dispatcher_1_row = convolve_horizontal_plane_neon_row;
+        }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
+        {
+            if is_x86_feature_detected!("sse4.1") {
+                _dispatcher_4_rows = Some(convolve_horizontal_plane_sse_rows_4_u8);
+                _dispatcher_1_row = convolve_horizontal_plane_sse_row;
+            }
+        }
         convolve_horizontal_dispatch_u8(
             self,
             filter_weights,
