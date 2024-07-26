@@ -32,6 +32,13 @@
     target_feature = "avx2"
 ))]
 use crate::avx2::convolve_vertical_avx_row_f32;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "avx2"
+))]
+use crate::avx2::{
+    convolve_horizontal_rgba_avx_row_one_f32, convolve_horizontal_rgba_avx_rows_4_f32,
+};
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_naive_f32::{
     convolve_horizontal_rgb_native_row, convolve_horizontal_rgba_4_row_f32,
@@ -74,6 +81,16 @@ impl<'a> HorizontalConvolutionPass<f32, 4> for ImageStore<'a, f32, 4> {
             if is_x86_feature_detected!("sse4.1") {
                 _dispatcher_4_rows = Some(convolve_horizontal_rgba_sse_rows_4_f32);
                 _dispatcher_row = convolve_horizontal_rgba_sse_row_one_f32;
+            }
+        }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "avx2"
+        ))]
+        {
+            if is_x86_feature_detected!("avx2") {
+                _dispatcher_4_rows = Some(convolve_horizontal_rgba_avx_rows_4_f32);
+                _dispatcher_row = convolve_horizontal_rgba_avx_row_one_f32;
             }
         }
         convolve_horizontal_dispatch_f32(
