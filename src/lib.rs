@@ -30,6 +30,7 @@
 #[cfg(all(feature = "half"))]
 mod alpha_handle_f16;
 mod alpha_handle_f32;
+mod alpha_handle_u16;
 mod alpha_handle_u8;
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
@@ -40,10 +41,12 @@ mod chunking;
 mod colors;
 mod convolution;
 mod convolve_naive_f32;
+mod convolve_naive_u16;
 mod convolve_naive_u8;
 #[cfg(feature = "half")]
 mod dispatch_group_f16;
 mod dispatch_group_f32;
+mod dispatch_group_u16;
 mod dispatch_group_u8;
 #[cfg(feature = "half")]
 mod f16;
@@ -55,10 +58,13 @@ mod nearest_sampler;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 mod neon;
 mod plane_f32;
+mod plane_u16;
 mod plane_u8;
 mod rgb_f32;
+mod rgb_u16;
 mod rgb_u8;
 mod rgba_f32;
+mod rgba_u16;
 mod rgba_u8;
 mod sampler;
 mod saturate_narrow;
@@ -91,4 +97,5 @@ pub use sampler::*;
 pub use scaler::Scaler;
 pub use scaler::Scaling;
 pub use scaler::ScalingF32;
+pub use scaler::ScalingU16;
 pub use threading_policy::*;

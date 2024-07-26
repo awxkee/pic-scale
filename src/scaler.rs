@@ -63,13 +63,41 @@ pub trait Scaling {
 pub trait ScalingF32 {
     /// Performs rescaling for RGB f32, channel order does not matter
     fn resize_rgb_f32(&self, new_size: ImageSize, store: ImageStore<f32, 3>) -> ImageStore<f32, 3>;
-    /// Performs rescaling for RGBA f32
+
+    /// Performs rescaling for RGBA f32, alpha expected to be last
     fn resize_rgba_f32(
         &self,
         new_size: ImageSize,
         store: ImageStore<f32, 4>,
         is_alpha_premultiplied: bool,
     ) -> ImageStore<f32, 4>;
+}
+
+pub trait ScalingU16 {
+    /// Performs rescaling for Planar u16, channel order does not matter
+    fn resize_plane_u16(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<u16, 1>,
+        bit_depth: usize,
+    ) -> ImageStore<u16, 1>;
+
+    /// Performs rescaling for RGB, channel order does not matter
+    fn resize_rgb_u16(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<u16, 3>,
+        bit_depth: usize,
+    ) -> ImageStore<u16, 3>;
+
+    /// Performs rescaling for RGBA, for pre-multiplying alpha should be last
+    fn resize_rgba_u16(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<u16, 4>,
+        is_alpha_premultiplied: bool,
+        bit_depth: usize,
+    ) -> ImageStore<u16, 4>;
 }
 
 impl Scaler {
@@ -476,6 +504,166 @@ impl Scaler {
         let mut new_image_vertical = ImageStore::<u8, 1>::alloc(store.width, new_size.height);
         store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
         let mut new_image_horizontal = ImageStore::<u8, 1>::alloc(new_size.width, new_size.height);
+        new_image_vertical.convolve_horizontal(
+            horizontal_filters,
+            &mut new_image_horizontal,
+            &pool,
+        );
+        new_image_horizontal
+    }
+}
+
+impl ScalingU16 for Scaler {
+    fn resize_rgb_u16(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<u16, 3>,
+        bit_depth: usize,
+    ) -> ImageStore<u16, 3> {
+        if self.function == Nearest {
+            let mut allocated_store: Vec<u16> = vec![0u16; new_size.width * 3 * new_size.height];
+            resize_nearest::<u16, 3>(
+                &store.buffer.borrow(),
+                store.width,
+                store.height,
+                &mut allocated_store,
+                new_size.width,
+                new_size.height,
+            );
+            let mut new_image =
+                ImageStore::<u16, 3>::new(allocated_store, new_size.width, new_size.height);
+            new_image.bit_depth = bit_depth;
+            return new_image;
+        }
+        let vertical_filters = self.generate_weights(store.height, new_size.height);
+        let horizontal_filters = self.generate_weights(store.width, new_size.width);
+
+        let pool = self
+            .threading_policy
+            .get_pool(ImageSize::new(new_size.width, new_size.height));
+
+        let mut copied_store = store;
+
+        let mut new_image_vertical =
+            ImageStore::<u16, 3>::alloc(copied_store.width, new_size.height);
+        new_image_vertical.bit_depth = bit_depth;
+        copied_store.bit_depth = bit_depth;
+        copied_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+        let mut new_image_horizontal = ImageStore::<u16, 3>::alloc(new_size.width, new_size.height);
+        new_image_horizontal.bit_depth = bit_depth;
+        new_image_vertical.convolve_horizontal(
+            horizontal_filters,
+            &mut new_image_horizontal,
+            &pool,
+        );
+        new_image_horizontal
+    }
+
+    fn resize_rgba_u16(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<u16, 4>,
+        is_alpha_premultiplied: bool,
+        bit_depth: usize,
+    ) -> ImageStore<u16, 4> {
+        let mut src_store = store;
+        if is_alpha_premultiplied {
+            let mut premultiplied_store =
+                ImageStore::<u16, 4>::alloc(src_store.width, src_store.height);
+            src_store.bit_depth = bit_depth;
+            premultiplied_store.bit_depth = bit_depth;
+            src_store.unpremultiply_alpha(&mut premultiplied_store);
+            src_store = premultiplied_store;
+        }
+        if self.function == Nearest {
+            let mut new_image = ImageStore::<u16, 4>::alloc(new_size.width, new_size.height);
+            resize_nearest::<u16, 4>(
+                &src_store.buffer.borrow(),
+                src_store.width,
+                src_store.height,
+                &mut new_image.buffer.borrow_mut(),
+                new_size.width,
+                new_size.height,
+            );
+            new_image.bit_depth = bit_depth;
+            if is_alpha_premultiplied {
+                let mut premultiplied_store =
+                    ImageStore::<u16, 4>::alloc(new_image.width, new_image.height);
+                premultiplied_store.bit_depth = bit_depth;
+                new_image.premultiply_alpha(&mut premultiplied_store);
+                return premultiplied_store;
+            }
+            return new_image;
+        }
+
+        let pool = self
+            .threading_policy
+            .get_pool(ImageSize::new(new_size.width, new_size.height));
+
+        let mut new_image_vertical = ImageStore::<u16, 4>::alloc(src_store.width, new_size.height);
+        let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
+        let vertical_filters = self.generate_weights(src_store.height, new_image_vertical.height);
+        src_store.bit_depth = bit_depth;
+        new_image_vertical.bit_depth = bit_depth;
+        src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+
+        let mut new_image_horizontal = ImageStore::<u16, 4>::alloc(new_size.width, new_size.height);
+        new_image_horizontal.bit_depth = bit_depth;
+        new_image_vertical.convolve_horizontal(
+            horizontal_filters,
+            &mut new_image_horizontal,
+            &pool,
+        );
+        if is_alpha_premultiplied {
+            let mut premultiplied_store = ImageStore::<u16, 4>::alloc(
+                new_image_horizontal.width,
+                new_image_horizontal.height,
+            );
+            premultiplied_store.bit_depth = bit_depth;
+            new_image_horizontal.premultiply_alpha(&mut premultiplied_store);
+            return premultiplied_store;
+        }
+        new_image_horizontal
+    }
+
+    /// Performs rescaling for u16 plane
+    fn resize_plane_u16(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<u16, 1>,
+        bit_depth: usize,
+    ) -> ImageStore<u16, 1> {
+        if self.function == Nearest {
+            let mut allocated_store: Vec<u16> = vec![0u16; new_size.width * new_size.height];
+            resize_nearest::<u16, 1>(
+                &store.buffer.borrow(),
+                store.width,
+                store.height,
+                &mut allocated_store,
+                new_size.width,
+                new_size.height,
+            );
+            let mut new_image =
+                ImageStore::<u16, 1>::new(allocated_store, new_size.width, new_size.height);
+            new_image.bit_depth = bit_depth;
+            return new_image;
+        }
+        let vertical_filters = self.generate_weights(store.height, new_size.height);
+        let horizontal_filters = self.generate_weights(store.width, new_size.width);
+
+        let pool = self
+            .threading_policy
+            .get_pool(ImageSize::new(new_size.width, new_size.height));
+
+        let mut copied_store = store;
+        copied_store.bit_depth = bit_depth;
+
+        let mut new_image_vertical =
+            ImageStore::<u16, 1>::alloc(copied_store.width, new_size.height);
+        new_image_vertical.bit_depth = bit_depth;
+        copied_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+        let mut new_image_horizontal = ImageStore::<u16, 1>::alloc(new_size.width, new_size.height);
+        new_image_horizontal.bit_depth = bit_depth;
         new_image_vertical.convolve_horizontal(
             horizontal_filters,
             &mut new_image_horizontal,

@@ -29,6 +29,7 @@
 #[cfg(all(feature = "half"))]
 use crate::alpha_handle_f16::{premultiply_alpha_rgba_f16, unpremultiply_alpha_rgba_f16};
 use crate::alpha_handle_f32::{premultiply_alpha_rgba_f32, unpremultiply_alpha_rgba_f32};
+use crate::alpha_handle_u16::{premultiply_alpha_rgba_u16, unpremultiply_alpha_rgba_u16};
 use crate::alpha_handle_u8::{premultiply_alpha_rgba, unpremultiply_alpha_rgba};
 use crate::ImageSize;
 use num_traits::FromPrimitive;
@@ -49,9 +50,14 @@ where
     T: FromPrimitive + Clone + Copy + Debug,
 {
     pub(crate) buffer: BufferStore<'a, T>,
+    /// Channels in the image
     pub channels: usize,
+    /// Image width
     pub width: usize,
+    /// Image height
     pub height: usize,
+    /// This is private field, currently used only for u16, will be automatically passed from upper func
+    pub(crate) bit_depth: usize,
 }
 
 #[derive(Debug)]
@@ -86,6 +92,7 @@ where
             channels: N,
             width,
             height,
+            bit_depth: 0,
         }
     }
 
@@ -96,6 +103,7 @@ where
             channels: N,
             width,
             height,
+            bit_depth: 0,
         }
     }
 }
@@ -121,6 +129,7 @@ where
             channels: N,
             width,
             height,
+            bit_depth: 0,
         }
     }
 }
@@ -136,6 +145,20 @@ impl<'a> ImageStore<'a, u8, 4> {
         let dst = into.buffer.borrow_mut();
         let src = self.buffer.borrow();
         premultiply_alpha_rgba(dst, src, self.width, self.height);
+    }
+}
+
+impl<'a> ImageStore<'a, u16, 4> {
+    pub fn unpremultiply_alpha(&self, into: &mut ImageStore<u16, 4>) {
+        let dst = into.buffer.borrow_mut();
+        let src = self.buffer.borrow();
+        unpremultiply_alpha_rgba_u16(dst, src, self.width, self.height, self.bit_depth);
+    }
+
+    pub fn premultiply_alpha(&self, into: &mut ImageStore<u16, 4>) {
+        let dst = into.buffer.borrow_mut();
+        let src = self.buffer.borrow();
+        premultiply_alpha_rgba_u16(dst, src, self.width, self.height, self.bit_depth);
     }
 }
 
