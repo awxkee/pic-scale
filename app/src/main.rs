@@ -16,7 +16,7 @@ use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
 use pic_scale::{
     ImageSize, ImageStore, JzazbzScaler, OklabScaler, ResamplingFunction, Scaler, Scaling,
-    ScalingF32, ThreadingPolicy, TransferFunction,
+    ScalingF32, ScalingU16, ThreadingPolicy, TransferFunction,
 };
 
 fn main() {
@@ -32,17 +32,18 @@ fn main() {
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
     //
-    let mut converted_bytes: Vec<f32> = bytes.iter().map(|&x| x as f32 / 255f32).collect();
+    let mut converted_bytes: Vec<u16> = bytes.iter().map(|&x| x as u16 >> 2).collect();
 
     let start_time = Instant::now();
-    let store = ImageStore::<f32, 4>::from_slice(
+    let store = ImageStore::<u16, 4>::from_slice(
         &mut converted_bytes,
         dimensions.0 as usize,
         dimensions.1 as usize,
     );
-    let resized = scaler.resize_rgba_f32(
+    let resized = scaler.resize_rgba_u16(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
         store,
+        10,
         true,
     );
 
@@ -96,11 +97,7 @@ fn main() {
     println!("Scaler: {:.2?}", elapsed_time);
 
     // let dst: Vec<u8> = res.iter().map(|&x| (x * 255f32) as u8).collect();
-    let dst: Vec<u8> = resized
-        .as_bytes()
-        .iter()
-        .map(|&x| (x * 255f32) as u8)
-        .collect();
+    let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x << 2) as u8).collect();
 
     // let dst = resized.as_bytes();
 

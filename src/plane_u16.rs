@@ -36,6 +36,8 @@ use crate::convolve_naive_u16::{
 };
 use crate::dispatch_group_u16::{convolve_horizontal_dispatch_u16, convolve_vertical_dispatch_u16};
 use crate::filter_weights::{FilterBounds, FilterWeights};
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::neon::convolve_vertical_rgb_neon_row_u16;
 use crate::ImageStore;
 
 impl<'a> HorizontalConvolutionPass<u16, 1> for ImageStore<'a, u16, 1> {
@@ -68,7 +70,7 @@ impl<'a> VerticalConvolutionPass<u16, 1> for ImageStore<'a, u16, 1> {
         destination: &mut ImageStore<u16, 1>,
         pool: &Option<ThreadPool>,
     ) {
-        let _dispatcher: fn(
+        let mut _dispatcher: fn(
             dst_width: usize,
             bounds: &FilterBounds,
             unsafe_source_ptr_0: *const u16,
@@ -77,6 +79,10 @@ impl<'a> VerticalConvolutionPass<u16, 1> for ImageStore<'a, u16, 1> {
             weight_ptr: *const i16,
             usize,
         ) = convolve_vertical_rgb_native_row_u16::<1>;
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            _dispatcher = convolve_vertical_rgb_neon_row_u16::<1>;
+        }
         convolve_vertical_dispatch_u16(self, filter_weights, destination, pool, _dispatcher);
     }
 }

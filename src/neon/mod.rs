@@ -49,6 +49,7 @@ mod utils;
 #[cfg(all(feature = "half"))]
 mod vertical_f16;
 mod vertical_f32;
+mod vertical_u16;
 mod vertical_u8;
 
 #[cfg(all(feature = "half"))]
@@ -77,4 +78,5 @@ pub use rgba_u8::*;
 #[cfg(all(feature = "half"))]
 pub use vertical_f16::convolve_vertical_rgb_neon_row_f16;
 pub use vertical_f32::convolve_vertical_rgb_neon_row_f32;
+pub use vertical_u16::convolve_vertical_rgb_neon_row_u16;
 pub use vertical_u8::convolve_vertical_rgb_neon_row;

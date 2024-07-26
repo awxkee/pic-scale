@@ -75,6 +75,14 @@ pub trait ScalingF32 {
 
 pub trait ScalingU16 {
     /// Performs rescaling for Planar u16, channel order does not matter
+    ///
+    /// # Arguments
+    /// `new_size` - New image size
+    /// `store` - original image store
+    /// `bit_depth` - image bit depth, this is required for u16 image
+    ///
+    /// # Panics
+    /// Panic if bit depth < 1 or bit depth > 16
     fn resize_plane_u16(
         &self,
         new_size: ImageSize,
@@ -83,6 +91,15 @@ pub trait ScalingU16 {
     ) -> ImageStore<u16, 1>;
 
     /// Performs rescaling for RGB, channel order does not matter
+
+    ///
+    /// # Arguments
+    /// `new_size` - New image size
+    /// `store` - original image store
+    /// `bit_depth` - image bit depth, this is required for u16 image
+    ///
+    /// # Panics
+    /// Panic if bit depth < 1 or bit depth > 16
     fn resize_rgb_u16(
         &self,
         new_size: ImageSize,
@@ -91,12 +108,21 @@ pub trait ScalingU16 {
     ) -> ImageStore<u16, 3>;
 
     /// Performs rescaling for RGBA, for pre-multiplying alpha should be last
+    ///
+    /// # Arguments
+    /// `new_size` - New image size
+    /// `store` - original image store
+    /// `bit_depth` - image bit depth, this is required for u16 image
+    /// `is_alpha_premultiplied` - flags is alpha is premultiplied
+    ///
+    /// # Panics
+    /// Panic if bit depth < 1 or bit depth > 16
     fn resize_rgba_u16(
         &self,
         new_size: ImageSize,
         store: ImageStore<u16, 4>,
-        is_alpha_premultiplied: bool,
         bit_depth: usize,
+        is_alpha_premultiplied: bool,
     ) -> ImageStore<u16, 4>;
 }
 
@@ -559,12 +585,22 @@ impl ScalingU16 for Scaler {
         new_image_horizontal
     }
 
+    /// Resizes u16 image
+    ///
+    /// # Arguments
+    /// `new_size` - New image size
+    /// `store` - original image store
+    /// `bit_depth` - image bit depth, this is required for u16 image
+    /// `is_alpha_premultiplied` - flags is alpha is premultiplied
+    ///
+    /// # Panics
+    /// Panic if bit depth < 1 or bit depth > 16
     fn resize_rgba_u16(
         &self,
         new_size: ImageSize,
         store: ImageStore<u16, 4>,
-        is_alpha_premultiplied: bool,
         bit_depth: usize,
+        is_alpha_premultiplied: bool,
     ) -> ImageStore<u16, 4> {
         let mut src_store = store;
         if is_alpha_premultiplied {
