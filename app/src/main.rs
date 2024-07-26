@@ -21,64 +21,76 @@ use pic_scale::{
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/asset.jpg")
+    let img = ImageReader::open("./assets/asset_5.png")
         .unwrap()
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
     let mut bytes = Vec::from(img.as_bytes());
 
-    let mut scaler = Scaler::new(ResamplingFunction::EwaRobidoux);
+    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
-    let start_time = Instant::now();
-    //
-    // let mut converted_bytes: Vec<f32> = bytes
-    //     .iter()
-    //     .map(|&x| x as f32 / 255f32)
-    //     .collect();
 
-    let mut r_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];
-    let mut g_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];
-    let mut b_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];
-    split_channels_3(
-        &bytes,
+    //
+    let mut converted_bytes: Vec<f16> = bytes
+        .iter()
+        .map(|&x| f16::from_f32(x as f32 / 255f32))
+        .collect();
+
+    let start_time = Instant::now();
+    let store = ImageStore::<f16, 4>::from_slice(
+        &mut converted_bytes,
         dimensions.0 as usize,
         dimensions.1 as usize,
-        &mut r_chan,
-        &mut g_chan,
-        &mut b_chan,
     );
-
-    let store =
-        ImageStore::<u8, 1>::from_slice(&mut r_chan, dimensions.0 as usize, dimensions.1 as usize);
-    let resized = scaler.resize_plane(
+    let resized = scaler.resize_rgba_f16(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
         store,
+        true,
     );
 
-    let store1 =
-        ImageStore::<u8, 1>::from_slice(&mut g_chan, dimensions.0 as usize, dimensions.1 as usize);
-    let resized1 = scaler.resize_plane(
-        ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-        store1,
-    );
-
-    let store2 =
-        ImageStore::<u8, 1>::from_slice(&mut b_chan, dimensions.0 as usize, dimensions.1 as usize);
-    let resized2 = scaler.resize_plane(
-        ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-        store2,
-    );
-
-    let mut dst = vec![0u8; resized.width * resized.height * 3];
-    merge_channels_3(
-        &mut dst,
-        resized.width,
-        resized.height,
-        &resized.as_bytes(),
-        &resized1.as_bytes(),
-        &resized2.as_bytes(),
-    );
+    // let mut r_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];
+    // let mut g_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];
+    // let mut b_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];
+    // split_channels_3(
+    //     &bytes,
+    //     dimensions.0 as usize,
+    //     dimensions.1 as usize,
+    //     &mut r_chan,
+    //     &mut g_chan,
+    //     &mut b_chan,
+    // );
+    //
+    // let store =
+    //     ImageStore::<u8, 1>::from_slice(&mut r_chan, dimensions.0 as usize, dimensions.1 as usize);
+    // let resized = scaler.resize_plane(
+    //     ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
+    //     store,
+    // );
+    //
+    // let store1 =
+    //     ImageStore::<u8, 1>::from_slice(&mut g_chan, dimensions.0 as usize, dimensions.1 as usize);
+    // let resized1 = scaler.resize_plane(
+    //     ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
+    //     store1,
+    // );
+    //
+    // let store2 =
+    //     ImageStore::<u8, 1>::from_slice(&mut b_chan, dimensions.0 as usize, dimensions.1 as usize);
+    // let resized2 = scaler.resize_plane(
+    //     ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
+    //     store2,
+    // );
+    //
+    // let mut dst = vec![0u8; resized.width * resized.height * 3];
+    // merge_channels_3(
+    //     &mut dst,
+    //     resized.width,
+    //     resized.height,
+    //     &resized.as_bytes(),
+    //     &resized1.as_bytes(),
+    //     &resized2.as_bytes(),
+    // );
 
     //
 
@@ -87,11 +99,11 @@ fn main() {
     println!("Scaler: {:.2?}", elapsed_time);
 
     // let dst: Vec<u8> = res.iter().map(|&x| (x * 255f32) as u8).collect();
-    // let dst: Vec<u8> = resized
-    //     .as_bytes()
-    //     .iter()
-    //     .map(|&x| (x * 255f32) as u8)
-    //     .collect();\
+    let dst: Vec<u8> = resized
+        .as_bytes()
+        .iter()
+        .map(|&x| (x.to_f32() * 255f32) as u8)
+        .collect();
 
     // let dst = resized.as_bytes();
 

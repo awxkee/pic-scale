@@ -2,13 +2,14 @@
 
 Rust image scale in different color spaces using SIMD and multithreading.
 
-Supported only NEON, SSE, AVX-2.
+Supported NEON, SSE, AVX-2.
 
 ### Colorspace
 
-This library provides for you some conveniences to scale in different color spaces.
-Prebuilt options for CIE L\*a\*b, CIE L\*u\*v, CIE L\*c\*h, Linear, Sigmoidal, Oklab, Jzazbz available. Those transformations also very efficients.
-Whether downscaling is preferred in linear colorspace, XYZ provides very good results.
+This library provides for you some conveniences to scale in different color spaces.\
+Prebuilt options for CIE L\*a\*b, CIE L\*u\*v, CIE L\*c\*h, Linear, Sigmoidal, Oklab, Jzazbz available. \
+Those transformations also very efficients.
+Prefer downscale in linear colorspace or XYZ.\
 Up scaling might be done in LAB/LUB and simoidized components and also efficient in sRGB.
 
 Have good f16 (binary float16) support.

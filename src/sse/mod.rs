@@ -35,6 +35,8 @@ mod plane_f32;
 mod plane_u8;
 mod rgb_f32;
 mod rgb_u8;
+#[cfg(all(feature = "half", target_feature = "f16c"))]
+mod rgba_f16;
 mod rgba_f32;
 mod routines;
 mod u8_utils;
@@ -54,6 +56,10 @@ pub use plane_f32::convolve_horizontal_plane_sse_rows_4;
 pub use plane_u8::{convolve_horizontal_plane_sse_row, convolve_horizontal_plane_sse_rows_4_u8};
 pub use rgb_f32::*;
 pub use rgb_u8::*;
+#[cfg(all(feature = "half", target_feature = "f16c"))]
+pub use rgba_f16::{
+    convolve_horizontal_rgba_sse_row_one_f16, convolve_horizontal_rgba_sse_rows_4_f16,
+};
 pub use rgba_f32::*;
 pub use u8_utils::*;
 pub use utils::*;

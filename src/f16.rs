@@ -33,7 +33,12 @@
     any(target_arch = "x86_64", target_arch = "x86"),
     all(target_feature = "avx2", target_feature = "f16c")
 ))]
-use crate::avx2::convolve_vertical_avx_row_f16;
+use crate::avx2::convolve_horizontal_rgba_avx_row_one_f16;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    all(target_feature = "avx2", target_feature = "f16c")
+))]
+use crate::avx2::{convolve_horizontal_rgba_avx_rows_4_f16, convolve_vertical_avx_row_f16};
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_naive_f32::{
     convolve_horizontal_rgb_native_row, convolve_horizontal_rgba_4_row_f32,
@@ -52,6 +57,13 @@ use crate::rgb_f32::convolve_vertical_rgb_native_row_f32;
     all(target_feature = "sse4.1", target_feature = "f16c")
 ))]
 use crate::sse::convolve_vertical_rgb_sse_row_f16;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    all(target_feature = "sse4.1", target_feature = "f16c")
+))]
+use crate::sse::{
+    convolve_horizontal_rgba_sse_row_one_f16, convolve_horizontal_rgba_sse_rows_4_f16,
+};
 use crate::ImageStore;
 use half::f16;
 use rayon::ThreadPool;
@@ -72,6 +84,22 @@ impl<'a> HorizontalConvolutionPass<f16, 4> for ImageStore<'a, f16, 4> {
         {
             _dispatcher_4_rows = Some(convolve_horizontal_rgba_neon_rows_4_f16);
             _dispatcher_row = convolve_horizontal_rgba_neon_row_one_f16;
+        }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            all(target_feature = "sse4.1", target_feature = "f16c")
+        ))]
+        {
+            _dispatcher_4_rows = Some(convolve_horizontal_rgba_sse_rows_4_f16);
+            _dispatcher_row = convolve_horizontal_rgba_sse_row_one_f16;
+        }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            all(target_feature = "avx2", target_feature = "f16c")
+        ))]
+        {
+            _dispatcher_4_rows = Some(convolve_horizontal_rgba_avx_rows_4_f16);
+            _dispatcher_row = convolve_horizontal_rgba_avx_row_one_f16;
         }
         convolve_horizontal_dispatch_f16(
             self,
