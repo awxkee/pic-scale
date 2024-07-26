@@ -220,7 +220,6 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u8(
             let store_16 = vqshrun_n_s32::<PRECISION>(vmaxq_s32(store_1, zeros));
             let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
 
-            let px = x * CHANNELS;
             let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride);
             let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
             let dest_ptr_32 = dest_ptr as *mut u32;
@@ -229,7 +228,6 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u8(
             let store_16 = vqshrun_n_s32::<PRECISION>(vmaxq_s32(store_2, zeros));
             let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
 
-            let px = x * CHANNELS;
             let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 2);
             let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
             let dest_ptr_32 = dest_ptr as *mut u32;
@@ -238,7 +236,6 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u8(
             let store_16 = vqshrun_n_s32::<PRECISION>(vmaxq_s32(store_3, zeros));
             let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
 
-            let px = x * CHANNELS;
             let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 3);
             let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
             let dest_ptr_32 = dest_ptr as *mut u32;

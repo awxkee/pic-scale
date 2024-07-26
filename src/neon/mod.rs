@@ -44,6 +44,7 @@ mod rgb_u8;
 #[cfg(all(feature = "half"))]
 mod rgba_f16;
 mod rgba_f32;
+mod rgba_u16;
 mod rgba_u8;
 mod utils;
 #[cfg(all(feature = "half"))]
@@ -74,6 +75,9 @@ pub use rgba_f16::convolve_horizontal_rgba_neon_row_one_f16;
 #[cfg(all(feature = "half"))]
 pub use rgba_f16::convolve_horizontal_rgba_neon_rows_4_f16;
 pub use rgba_f32::*;
+pub use rgba_u16::{
+    convolve_horizontal_rgba_neon_row_u16, convolve_horizontal_rgba_neon_rows_4_u16,
+};
 pub use rgba_u8::*;
 #[cfg(all(feature = "half"))]
 pub use vertical_f16::convolve_vertical_rgb_neon_row_f16;

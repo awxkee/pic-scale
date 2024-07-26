@@ -225,15 +225,12 @@ pub fn convolve_horizontal_rgb_neon_rows_4(
             let dest_ptr = unsafe_destination_ptr_0.add(px);
             write_accumulator_u8!(store_0, dest_ptr);
 
-            let px = x * CHANNELS;
             let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride);
             write_accumulator_u8!(store_1, dest_ptr);
 
-            let px = x * CHANNELS;
             let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 2);
             write_accumulator_u8!(store_2, dest_ptr);
 
-            let px = x * CHANNELS;
             let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 3);
             write_accumulator_u8!(store_3, dest_ptr);
 
