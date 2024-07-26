@@ -35,6 +35,15 @@ use num_traits::FromPrimitive;
 use std::fmt::Debug;
 
 #[derive(Debug)]
+/// Holds an image
+///
+/// # Arguments
+/// `N` - count of channels
+///
+/// # Examples
+/// ImageStore<u8, 4> - represents RGBA
+/// ImageStore<u8, 3> - represents RGB
+/// ImageStore<f32, 3> - represents RGB in f32 and etc
 pub struct ImageStore<'a, T, const N: usize>
 where
     T: FromPrimitive + Clone + Copy + Debug,

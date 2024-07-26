@@ -26,6 +26,7 @@ let mut bytes = Vec::from(img.as_bytes());
 
 let mut scaler = LinearScaler::new(ResamplingFunction::Lanczos3);
 scaler.set_threading_policy(ThreadingPolicy::Adaptive);
+// ImageStore::<u8, 4> - (u8, 4) represents RGBA, (u8, 3) - RGB etc
 let store =
     ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
 let resized = scaler.resize_rgba(
