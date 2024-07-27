@@ -37,6 +37,36 @@ let resized = scaler.resize_rgba(
 let resized_image = resized.as_bytes();
 ```
 
+### Fastest path with SIMD
+
+Despite all implementation are fast, not all the paths are implemented using SIMD, so some paths are slower
+
+`~` - Partially implemented
+
+|                 | NEON | SSE | AVX |
+|-----------------|------|-----|-----|
+| RGBA (8 bit)    | x    | x   | ~   |
+| RGB (8 bit)     | x    | x   | ~   |
+| Plane (8 bit)   | x    | x   | ~   |
+| RGBA (8+ bit)   | x    | x   | -   |
+| RGB (8+ bit)    | x    | x   | -   |
+| Plane (10+ bit) | -    | -   | -   |
+| RGBA (f32)      | x    | x   | x   |
+| RGB (f32)       | x    | x   | ~   |
+| Plane (f32)     | x    | x   | ~   |
+| RGBA (f16)      | x    | x   | x   |
+| RGB (f16)       | ~    | ~   | ~   |
+| Plane (f16)     | ~    | ~   | ~   |
+
+#### Target features
+
+`fma`, `sse4.1`, `sse4.2`, `avx2`, `neon`, `f16c` optional target features are available, enable it when compiling on supported platform to get full features
+
+#### To enable full support of *f16* `half` feature should be used, and `f16c` enabled when targeting x86 platforms.
+#### For NEON `f16` feature, target feature `neon` should be activated and platform and target platform expected to be `aarch64`.
+
+Even when `half` feature activated but platform do not support or features not enabled for `f16` speed will be slow
+
 ### Performance
 
 Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 image in two times for x86_64 SSE.
@@ -81,7 +111,6 @@ M3 Pro. NEON
 | pic-scale |  17.41   |
 | fir sse   |  25.82   |
 
-
 Example comparison time for downscale RGBA 4928x3279 10 bit image in two times for *NEON* with premultiplying alpha.
 
 |           | Lanczos3 |
@@ -96,6 +125,19 @@ RGBA 4928x3279 10 bit downscale without premultiplying alpha *NEON*
 | pic-scale |  45.09   |
 | fir sse   |  73.82   |
 
+Example comparison time for downscale RGBA 4928x3279 10 bit image in two times for *SSE* with premultiplying alpha.
+
+|           | Lanczos3 |
+|-----------|:--------:|
+| pic-scale |  156.90  |
+| fir sse   |  150.65  |
+
+RGBA 4928x3279 10 bit downscale without premultiplying alpha *SSE*
+
+|           | Lanczos3 |
+|-----------|:--------:|
+| pic-scale |  107.82  |
+| fir sse   |  113.51  |
 
 #### Example in sRGB
 

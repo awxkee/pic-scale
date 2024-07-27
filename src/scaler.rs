@@ -561,6 +561,11 @@ impl ScalingU16 for Scaler {
             new_image.bit_depth = bit_depth;
             return new_image;
         }
+
+        if bit_depth < 1 || bit_depth > 16 {
+            panic!("Bit depth must be in [1, 16] but got {}", bit_depth);
+        }
+
         let vertical_filters = self.generate_weights(store.height, new_size.height);
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
 
@@ -632,6 +637,10 @@ impl ScalingU16 for Scaler {
             return new_image;
         }
 
+        if bit_depth < 1 || bit_depth > 16 {
+            panic!("Bit depth must be in [1, 16] but got {}", bit_depth);
+        }
+
         let pool = self
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
@@ -684,6 +693,11 @@ impl ScalingU16 for Scaler {
             new_image.bit_depth = bit_depth;
             return new_image;
         }
+
+        if bit_depth < 1 || bit_depth > 16 {
+            panic!("Bit depth must be in [1, 16] but got {}", bit_depth);
+        }
+
         let vertical_filters = self.generate_weights(store.height, new_size.height);
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
 

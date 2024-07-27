@@ -206,7 +206,7 @@ fn test_fast_image() {
             &mut dst_image,
             &ResizeOptions::new()
                 .resize_alg(ResizeAlg::Convolution(Lanczos3))
-                .use_alpha(false),
+                .use_alpha(true),
         )
         .unwrap();
 
