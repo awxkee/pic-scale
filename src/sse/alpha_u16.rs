@@ -18,8 +18,16 @@ pub unsafe fn sse_unpremultiply_row_u16(
     let lo = _mm_cvtepu16_epi32(x);
     let hi = _mm_unpackhi_epi16(x, zeros);
 
-    let new_lo = _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(lo), a_lo_f));
-    let new_hi = _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(hi), a_hi_f));
+    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+
+    let new_lo = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(
+        _mm_cvtepi32_ps(lo),
+        a_lo_f,
+    )));
+    let new_hi = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(
+        _mm_cvtepi32_ps(hi),
+        a_hi_f,
+    )));
 
     let pixel = _mm_packs_epi32(new_lo, new_hi);
     _mm_select_si128(is_zero_mask, x, pixel)

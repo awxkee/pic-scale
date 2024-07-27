@@ -75,10 +75,12 @@ pub unsafe fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
     let a_hi_lo = _mm_rcp_ps(_mm_cvtepi32_ps(_mm_cvtepi16_epi32(a_hi)));
     let a_hi_hi = _mm_rcp_ps(_mm_cvtepi32_ps(_mm_unpackhi_epi16(a_hi, zeros)));
 
-    let lo_lo = _mm_cvtps_epi32(_mm_mul_ps(lo_lo, a_lo_lo));
-    let lo_hi = _mm_cvtps_epi32(_mm_mul_ps(lo_hi, a_lo_hi));
-    let hi_lo = _mm_cvtps_epi32(_mm_mul_ps(hi_lo, a_hi_lo));
-    let hi_hi = _mm_cvtps_epi32(_mm_mul_ps(hi_hi, a_hi_hi));
+    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+
+    let lo_lo = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(lo_lo, a_lo_lo)));
+    let lo_hi = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(lo_hi, a_lo_hi)));
+    let hi_lo = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(hi_lo, a_hi_lo)));
+    let hi_hi = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(hi_hi, a_hi_hi)));
 
     let lo = _mm_packs_epi32(lo_lo, lo_hi);
     let hi = _mm_packs_epi32(hi_lo, hi_hi);
