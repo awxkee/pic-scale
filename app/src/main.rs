@@ -21,7 +21,7 @@ use pic_scale::{
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/asset_5.png")
+    let img = ImageReader::open("./assets/beach_horizon.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -34,14 +34,14 @@ fn main() {
     //
 
     let start_time = Instant::now();
-    let store = ImageStore::<u8, 4>::from_slice(
+    let store = ImageStore::<u8, 3>::from_slice(
         &mut bytes,
         dimensions.0 as usize,
         dimensions.1 as usize,
     );
-    let resized = scaler.resize_rgba(
+    let resized = scaler.resize_rgb(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-        store, false,
+        store,
     );
 
     // let mut r_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];

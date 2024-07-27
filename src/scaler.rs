@@ -272,7 +272,7 @@ impl Scaling for Scaler {
             );
             let new_image =
                 ImageStore::<u8, 3>::new(allocated_store, new_size.width, new_size.height);
-            return new_image;
+            return new_image.unwrap();
         }
         let vertical_filters = self.generate_weights(store.height, new_size.height);
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
@@ -352,7 +352,7 @@ impl Scaling for Scaler {
 impl ScalingF32 for Scaler {
     fn resize_rgb_f32(&self, new_size: ImageSize, store: ImageStore<f32, 3>) -> ImageStore<f32, 3> {
         if self.function == Nearest {
-            let mut allocated_store: Vec<f32> = vec![0f32; new_size.width * 4 * new_size.height];
+            let mut allocated_store: Vec<f32> = vec![0f32; new_size.width * 3 * new_size.height];
             resize_nearest::<f32, 3>(
                 &store.buffer.borrow(),
                 store.width,
@@ -363,7 +363,7 @@ impl ScalingF32 for Scaler {
             );
             let new_image =
                 ImageStore::<f32, 3>::new(allocated_store, new_size.width, new_size.height);
-            return new_image;
+            return new_image.unwrap();
         }
 
         let pool = self
@@ -372,13 +372,15 @@ impl ScalingF32 for Scaler {
 
         let allocated_store_vertical: Vec<f32> = vec![0f32; store.width * 3 * new_size.height];
         let mut new_image_vertical =
-            ImageStore::<f32, 3>::new(allocated_store_vertical, store.width, new_size.height);
+            ImageStore::<f32, 3>::new(allocated_store_vertical, store.width, new_size.height)
+                .unwrap();
         let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
         store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
 
         let allocated_store_horizontal: Vec<f32> = vec![0f32; new_size.width * 3 * new_size.height];
         let mut new_image_horizontal =
-            ImageStore::<f32, 3>::new(allocated_store_horizontal, new_size.width, new_size.height);
+            ImageStore::<f32, 3>::new(allocated_store_horizontal, new_size.width, new_size.height)
+                .unwrap();
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
         new_image_vertical.convolve_horizontal(
             horizontal_filters,
@@ -413,7 +415,8 @@ impl ScalingF32 for Scaler {
                 new_size.height,
             );
             let new_image =
-                ImageStore::<f32, 4>::new(allocated_store, new_size.width, new_size.height);
+                ImageStore::<f32, 4>::new(allocated_store, new_size.width, new_size.height)
+                    .unwrap();
 
             if is_alpha_premultiplied {
                 let mut premultiplied_store =
@@ -431,14 +434,16 @@ impl ScalingF32 for Scaler {
 
         let allocated_store_vertical: Vec<f32> = vec![0f32; src_store.width * 4 * new_size.height];
         let mut new_image_vertical =
-            ImageStore::<f32, 4>::new(allocated_store_vertical, src_store.width, new_size.height);
+            ImageStore::<f32, 4>::new(allocated_store_vertical, src_store.width, new_size.height)
+                .unwrap();
         let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
         let vertical_filters = self.generate_weights(src_store.height, new_image_vertical.height);
         src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
 
         let allocated_store_horizontal: Vec<f32> = vec![0f32; new_size.width * 4 * new_size.height];
         let mut new_image_horizontal =
-            ImageStore::<f32, 4>::new(allocated_store_horizontal, new_size.width, new_size.height);
+            ImageStore::<f32, 4>::new(allocated_store_horizontal, new_size.width, new_size.height)
+                .unwrap();
         new_image_vertical.convolve_horizontal(
             horizontal_filters,
             &mut new_image_horizontal,
@@ -476,7 +481,8 @@ impl Scaler {
                 new_size.height,
             );
             let new_image =
-                ImageStore::<f32, 1>::new(allocated_store, new_size.width, new_size.height);
+                ImageStore::<f32, 1>::new(allocated_store, new_size.width, new_size.height)
+                    .unwrap();
             return new_image;
         }
 
@@ -486,14 +492,16 @@ impl Scaler {
 
         let allocated_store_vertical: Vec<f32> = vec![0f32; store.width * new_size.height];
         let mut new_image_vertical =
-            ImageStore::<f32, 1>::new(allocated_store_vertical, store.width, new_size.height);
+            ImageStore::<f32, 1>::new(allocated_store_vertical, store.width, new_size.height)
+                .unwrap();
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
         let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
         store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
 
         let allocated_store_horizontal: Vec<f32> = vec![0f32; new_size.width * new_size.height];
         let mut new_image_horizontal =
-            ImageStore::<f32, 1>::new(allocated_store_horizontal, new_size.width, new_size.height);
+            ImageStore::<f32, 1>::new(allocated_store_horizontal, new_size.width, new_size.height)
+                .unwrap();
         new_image_vertical.convolve_horizontal(
             horizontal_filters,
             &mut new_image_horizontal,
@@ -517,7 +525,7 @@ impl Scaler {
                 new_size.height,
             );
             let new_image =
-                ImageStore::<u8, 1>::new(allocated_store, new_size.width, new_size.height);
+                ImageStore::<u8, 1>::new(allocated_store, new_size.width, new_size.height).unwrap();
             return new_image;
         }
         let vertical_filters = self.generate_weights(store.height, new_size.height);
@@ -557,7 +565,8 @@ impl ScalingU16 for Scaler {
                 new_size.height,
             );
             let mut new_image =
-                ImageStore::<u16, 3>::new(allocated_store, new_size.width, new_size.height);
+                ImageStore::<u16, 3>::new(allocated_store, new_size.width, new_size.height)
+                    .unwrap();
             new_image.bit_depth = bit_depth;
             return new_image;
         }
@@ -689,7 +698,8 @@ impl ScalingU16 for Scaler {
                 new_size.height,
             );
             let mut new_image =
-                ImageStore::<u16, 1>::new(allocated_store, new_size.width, new_size.height);
+                ImageStore::<u16, 1>::new(allocated_store, new_size.width, new_size.height)
+                    .unwrap();
             new_image.bit_depth = bit_depth;
             return new_image;
         }

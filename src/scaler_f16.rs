@@ -62,7 +62,8 @@ impl Scaler {
                 new_size.height,
             );
             let new_image =
-                ImageStore::<f16, 4>::new(allocated_store, new_size.width, new_size.height);
+                ImageStore::<f16, 4>::new(allocated_store, new_size.width, new_size.height)
+                    .unwrap();
 
             if is_alpha_premultiplied {
                 let mut premultiplied_store =
@@ -81,7 +82,8 @@ impl Scaler {
         let allocated_store_vertical: Vec<f16> =
             vec![f16::from_f32(0.); src_store.width * 4 * new_size.height];
         let mut new_image_vertical =
-            ImageStore::<f16, 4>::new(allocated_store_vertical, src_store.width, new_size.height);
+            ImageStore::<f16, 4>::new(allocated_store_vertical, src_store.width, new_size.height)
+                .unwrap();
         let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
         let vertical_filters = self.generate_weights(src_store.height, new_image_vertical.height);
         src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
@@ -89,7 +91,8 @@ impl Scaler {
         let allocated_store_horizontal: Vec<f16> =
             vec![f16::from_f32(0.); new_size.width * 4 * new_size.height];
         let mut new_image_horizontal =
-            ImageStore::<f16, 4>::new(allocated_store_horizontal, new_size.width, new_size.height);
+            ImageStore::<f16, 4>::new(allocated_store_horizontal, new_size.width, new_size.height)
+                .unwrap();
         new_image_vertical.convolve_horizontal(
             horizontal_filters,
             &mut new_image_horizontal,
@@ -126,7 +129,8 @@ impl Scaler {
                 new_size.height,
             );
             let new_image =
-                ImageStore::<f16, 3>::new(allocated_store, new_size.width, new_size.height);
+                ImageStore::<f16, 3>::new(allocated_store, new_size.width, new_size.height)
+                    .unwrap();
             return new_image;
         }
 
@@ -137,14 +141,16 @@ impl Scaler {
         let allocated_store_vertical: Vec<f16> =
             vec![f16::from_f32(0.); store.width * 3 * new_size.height];
         let mut new_image_vertical =
-            ImageStore::<f16, 3>::new(allocated_store_vertical, store.width, new_size.height);
+            ImageStore::<f16, 3>::new(allocated_store_vertical, store.width, new_size.height)
+                .unwrap();
         let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
         store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
 
         let allocated_store_horizontal: Vec<f16> =
             vec![f16::from_f32(0.); new_size.width * 3 * new_size.height];
         let mut new_image_horizontal =
-            ImageStore::<f16, 3>::new(allocated_store_horizontal, new_size.width, new_size.height);
+            ImageStore::<f16, 3>::new(allocated_store_horizontal, new_size.width, new_size.height)
+                .unwrap();
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
         new_image_vertical.convolve_horizontal(
             horizontal_filters,
@@ -172,7 +178,8 @@ impl Scaler {
                 new_size.height,
             );
             let new_image =
-                ImageStore::<f16, 1>::new(allocated_store, new_size.width, new_size.height);
+                ImageStore::<f16, 1>::new(allocated_store, new_size.width, new_size.height)
+                    .unwrap();
             return new_image;
         }
 
@@ -183,14 +190,16 @@ impl Scaler {
         let allocated_store_vertical: Vec<f16> =
             vec![f16::from_f32(0.); store.width * 1 * new_size.height];
         let mut new_image_vertical =
-            ImageStore::<f16, 1>::new(allocated_store_vertical, store.width, new_size.height);
+            ImageStore::<f16, 1>::new(allocated_store_vertical, store.width, new_size.height)
+                .unwrap();
         let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
         store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
 
         let allocated_store_horizontal: Vec<f16> =
             vec![f16::from_f32(0.); new_size.width * 1 * new_size.height];
         let mut new_image_horizontal =
-            ImageStore::<f16, 1>::new(allocated_store_horizontal, new_size.width, new_size.height);
+            ImageStore::<f16, 1>::new(allocated_store_horizontal, new_size.width, new_size.height)
+                .unwrap();
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
         new_image_vertical.convolve_horizontal(
             horizontal_filters,

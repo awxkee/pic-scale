@@ -86,14 +86,29 @@ impl<T, const N: usize> ImageStore<'static, T, N>
 where
     T: FromPrimitive + Clone + Copy + Debug + Default,
 {
-    pub fn new(slice_ref: Vec<T>, width: usize, height: usize) -> ImageStore<'static, T, N> {
-        ImageStore::<T, N> {
+    pub fn new(
+        slice_ref: Vec<T>,
+        width: usize,
+        height: usize,
+    ) -> Result<ImageStore<'static, T, N>, String> {
+        let expected_size = width * height * N;
+        if slice_ref.len() != width * height * N {
+            return Err(format!(
+                "Image buffer len expected to be {} (w({})*h({})*channels({}) but received {}",
+                expected_size,
+                width,
+                height,
+                N,
+                slice_ref.len()
+            ));
+        }
+        Ok(ImageStore::<T, N> {
             buffer: BufferStore::Owned(slice_ref),
             channels: N,
             width,
             height,
             bit_depth: 0,
-        }
+        })
     }
 
     pub fn alloc(width: usize, height: usize) -> ImageStore<'static, T, N> {

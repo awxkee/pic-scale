@@ -28,7 +28,7 @@ let mut scaler = LinearScaler::new(ResamplingFunction::Lanczos3);
 scaler.set_threading_policy(ThreadingPolicy::Adaptive);
 // ImageStore::<u8, 4> - (u8, 4) represents RGBA, (u8, 3) - RGB etc
 let store =
-    ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize);
+    ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
 let resized = scaler.resize_rgba(
     ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
     store,
@@ -161,7 +161,7 @@ In common, you should not downsize an image in sRGB colorspace, however if speed
 let mut scaler = Scaler::new(ResamplingFunction::Hermite);
 scaler.set_threading_policy(ThreadingPolicy::Single);
 let store =
-    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height);
+    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height).unwrap();
 let resized = scaler.resize_rgba(
     ImageSize::new(new_width, new_height),
     store,
@@ -177,7 +177,7 @@ At the moment only sRGB transfer function is supported. This is also good optimi
 let mut scaler = LinearScaler::new(ResamplingFunction::Lanczos3);
 scaler.set_threading_policy(ThreadingPolicy::Single);
 let store =
-    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height);
+    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height).unwrap();
 let resized = scaler.resize_rgba(
     ImageSize::new(new_width, new_height),
     store,
@@ -190,7 +190,7 @@ let resized = scaler.resize_rgba(
 let mut scaler = LabScaler::new(ResamplingFunction::Hermite);
 scaler.set_threading_policy(ThreadingPolicy::Single);
 let store =
-    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height);
+    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height).unwrap();
 let resized = scaler.resize_rgba(
     ImageSize::new(new_width, new_height),
     store,
@@ -203,7 +203,7 @@ let resized = scaler.resize_rgba(
 let mut scaler = LuvScaler::new(ResamplingFunction::Hermite);
 scaler.set_threading_policy(ThreadingPolicy::Single);
 let store =
-    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height);
+    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height).unwrap();
 let resized = scaler.resize_rgba(
     ImageSize::new(new_width, new_height),
     store,
@@ -216,7 +216,7 @@ let resized = scaler.resize_rgba(
 let mut scaler = XYZScale::new(ResamplingFunction::Hermite);
 scaler.set_threading_policy(ThreadingPolicy::Single);
 let store =
-    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height);
+    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height).unwrap();
 let resized = scaler.resize_rgba(
     ImageSize::new(new_width, new_height),
     store,
@@ -229,7 +229,7 @@ let resized = scaler.resize_rgba(
 let mut scaler = SigmoidalScaler::new(ResamplingFunction::Hermite);
 scaler.set_threading_policy(ThreadingPolicy::Single);
 let store =
-    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height);
+    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height).unwrap();
 let resized = scaler.resize_rgba(
     ImageSize::new(new_width, new_height),
     store,
@@ -242,7 +242,7 @@ let resized = scaler.resize_rgba(
 let mut scaler = LChScaler::new(ResamplingFunction::Hermite);
 scaler.set_threading_policy(ThreadingPolicy::Single);
 let store =
-    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height);
+    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height).unwrap();
 let resized = scaler.resize_rgba(
     ImageSize::new(new_width, new_height),
     store,
@@ -255,7 +255,7 @@ let resized = scaler.resize_rgba(
 let mut scaler = OklabScaler::new(ResamplingFunction::Hermite);
 scaler.set_threading_policy(ThreadingPolicy::Single);
 let store =
-    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height);
+    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height).unwrap();
 let resized = scaler.resize_rgba(
     ImageSize::new(new_width, new_height),
     store,
