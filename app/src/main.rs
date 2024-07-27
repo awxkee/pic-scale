@@ -28,22 +28,19 @@ fn main() {
     let dimensions = img.dimensions();
     let mut bytes = Vec::from(img.as_bytes());
 
-    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    let mut scaler = OklabScaler::new(ResamplingFunction::Lanczos3, TransferFunction::Srgb);
     scaler.set_threading_policy(ThreadingPolicy::Adaptive);
 
     //
 
-    let mut cvt: Vec<u16> = bytes.as_bytes().iter().map(|&x| (x as u16) << 2).collect();
-
     let start_time = Instant::now();
-    let store = ImageStore::<u16, 4>::from_slice(
-        &mut cvt,
-        dimensions.0 as usize,
-        dimensions.1 as usize,
-    ).unwrap();
-    let resized = scaler.resize_rgba_u16(
+    let store =
+        ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize)
+            .unwrap();
+    let resized = scaler.resize_rgba(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-        store, 10, true,
+        store,
+        true,
     );
 
     // let mut r_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];
@@ -97,9 +94,9 @@ fn main() {
 
     // let dst: Vec<u8> = res.iter().map(|&x| (x * 255f32) as u8).collect();
 
-    let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 2) as u8).collect();
+    // let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 2) as u8).collect();
     //
-    // let dst = resized.as_bytes();
+    let dst = resized.as_bytes();
 
     if resized.channels == 4 {
         image::save_buffer(
@@ -212,7 +209,7 @@ fn test_fast_image() {
     // Print the elapsed time in milliseconds
     println!("Fast image resize: {:.2?}", elapsed_time);
 
-    let converted_16 = dst_image.buffer();// Vec::from(u8_to_u16(dst_image.buffer()));
+    let converted_16 = dst_image.buffer(); // Vec::from(u8_to_u16(dst_image.buffer()));
 
     let dst: Vec<u8> = converted_16.iter().map(|&x| (x >> 2) as u8).collect();
 

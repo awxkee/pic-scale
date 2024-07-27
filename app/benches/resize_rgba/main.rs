@@ -4,7 +4,9 @@ use fast_image_resize::FilterType::Lanczos3;
 use fast_image_resize::{CpuExtensions, PixelType, ResizeAlg, ResizeOptions, Resizer};
 use image::io::Reader as ImageReader;
 use image::GenericImageView;
-use pic_scale::{ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ScalingF32, ThreadingPolicy};
+use pic_scale::{
+    ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ScalingF32, ThreadingPolicy,
+};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let img = ImageReader::open("../assets/asset_5.png")
@@ -45,7 +47,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             );
             _ = scaler.resize_rgba_f32(
                 ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-                store, true);
+                store,
+                true,
+            );
         })
     });
 

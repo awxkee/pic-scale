@@ -33,7 +33,6 @@ mod alpha_u16;
 mod alpha_u8;
 #[cfg(all(feature = "half"))]
 mod convolve_f16;
-mod convolve_f32;
 #[cfg(all(feature = "half"))]
 mod f16_utils;
 mod plane_f32;
