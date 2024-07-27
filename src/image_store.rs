@@ -94,7 +94,7 @@ where
         let expected_size = width * height * N;
         if slice_ref.len() != width * height * N {
             return Err(format!(
-                "Image buffer len expected to be {} (w({})*h({})*channels({}) but received {}",
+                "Image buffer len expected to be {} [w({})*h({})*channels({})] but received {}",
                 expected_size,
                 width,
                 height,
@@ -138,14 +138,29 @@ where
         }
     }
 
-    pub fn from_slice(slice_ref: &'a mut [T], width: usize, height: usize) -> ImageStore<T, N> {
-        ImageStore::<T, N> {
+    pub fn from_slice(
+        slice_ref: &'a mut [T],
+        width: usize,
+        height: usize,
+    ) -> Result<ImageStore<T, N>, String> {
+        let expected_size = width * height * N;
+        if slice_ref.len() != width * height * N {
+            return Err(format!(
+                "Image buffer len expected to be {} [w({})*h({})*channels({})] but received {}",
+                expected_size,
+                width,
+                height,
+                N,
+                slice_ref.len()
+            ));
+        }
+        Ok(ImageStore::<T, N> {
             buffer: BufferStore::Borrowed(slice_ref),
             channels: N,
             width,
             height,
             bit_depth: 0,
-        }
+        })
     }
 }
 

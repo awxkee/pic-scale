@@ -21,7 +21,7 @@ use pic_scale::{
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/beach_horizon.jpg")
+    let img = ImageReader::open("./assets/asset_5.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -33,15 +33,17 @@ fn main() {
 
     //
 
+    let mut cvt: Vec<u16> = bytes.as_bytes().iter().map(|&x| (x as u16) << 2).collect();
+
     let start_time = Instant::now();
-    let store = ImageStore::<u8, 3>::from_slice(
-        &mut bytes,
+    let store = ImageStore::<u16, 4>::from_slice(
+        &mut cvt,
         dimensions.0 as usize,
         dimensions.1 as usize,
-    );
-    let resized = scaler.resize_rgb(
+    ).unwrap();
+    let resized = scaler.resize_rgba_u16(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-        store,
+        store, 10, true,
     );
 
     // let mut r_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];
@@ -95,9 +97,9 @@ fn main() {
 
     // let dst: Vec<u8> = res.iter().map(|&x| (x * 255f32) as u8).collect();
 
-    // let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 2) as u8).collect();
-
-    let dst = resized.as_bytes();
+    let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 2) as u8).collect();
+    //
+    // let dst = resized.as_bytes();
 
     if resized.channels == 4 {
         image::save_buffer(

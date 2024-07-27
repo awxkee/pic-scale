@@ -48,13 +48,13 @@ macro_rules! unpremultiply_pixel {
         let mut b = *unsafe { $src.get_unchecked($pixel_offset + 2) } as i32;
         let a = *unsafe { $src.get_unchecked($pixel_offset + 3) } as i32;
         if a != 0 {
-            r = ((r * 255) / a).min(255).max(0);
-            g = ((g * 255) / a).min(255).max(0);
-            b = ((b * 255) / a).min(255).max(0);
+            r = (r * 255) / a;
+            g = (g * 255) / a;
+            b = (b * 255) / a;
         } else {
-            r = 0;
-            g = 0;
-            b = 0;
+            r = r;
+            g = g;
+            b = b;
         }
         unsafe {
             *$dst.get_unchecked_mut($pixel_offset) = r as u8;
