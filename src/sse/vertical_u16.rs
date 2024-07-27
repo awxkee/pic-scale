@@ -26,9 +26,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::avx2::utils::shuffle;
+
 use crate::filter_weights::FilterBounds;
-use crate::sse::{_mm_packus_epi64, _mm_srai_epi64x};
+use crate::sse::{_mm_packus_epi64, _mm_srai_epi64x, shuffle};
 use crate::support::{PRECISION, ROUNDING_APPROX};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
