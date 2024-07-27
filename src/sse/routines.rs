@@ -44,6 +44,23 @@ macro_rules! load_4_weights {
 }
 
 #[macro_export]
+macro_rules! load_4_weights_epi32 {
+    ($src_ptr: expr) => {{
+        let weight = _mm_cvtepi16_epi32(_mm_loadu_si64($src_ptr as *const u8));
+        const SHUFFLE_0: i32 = shuffle(0, 0, 0, 0);
+        let weight0 = _mm_shuffle_epi32::<SHUFFLE_0>(weight);
+        const SHUFFLE_1: i32 = shuffle(1, 1, 1, 1);
+        let weight1 = _mm_shuffle_epi32::<SHUFFLE_1>(weight);
+        const SHUFFLE_2: i32 = shuffle(2, 2, 2, 2);
+        let weight2 = _mm_shuffle_epi32::<SHUFFLE_2>(weight);
+        const SHUFFLE_3: i32 = shuffle(3, 3, 3, 3);
+        let weight3 = _mm_shuffle_epi32::<SHUFFLE_3>(weight);
+        (weight0, weight1, weight2, weight3)
+    }};
+}
+
+
+#[macro_export]
 macro_rules! load_4_weights_group_2_avx {
     ($src_ptr: expr) => {{
         let weight = _mm_loadu_ps($src_ptr);
