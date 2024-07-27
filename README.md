@@ -49,7 +49,7 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 | RGB (8 bit)    | x    | x   | ~   |
 | Plane (8 bit)  | x    | x   | ~   |
 | RGBA (8+ bit)  | x    | x   | -   |
-| RGB (8+ bit)   | x    | -   | -   |
+| RGB (8+ bit)   | x    | x   | -   |
 | Plane (8+ bit) | -    | -   | -   |
 | RGBA (f32)     | x    | x   | x   |
 | RGB (f32)      | x    | x   | ~   |
@@ -139,12 +139,19 @@ RGBA 4928x3279 10 bit downscale without premultiplying alpha *SSE*
 | pic-scale |  107.82  |
 | fir sse   |  113.51  |
 
-Example comparison time for downscale RGB 4000x6000 10 bit image in two times for *NEON* with premultiplying alpha.
+Example comparison time for downscale RGB 4000x6000 10 bit image in two times using *NEON*.
 
 |           | Lanczos3 |
 |-----------|:--------:|
 | pic-scale |  56.89   |
 | fir sse   |  100.36  |
+
+Example comparison time for downscale RGB 4000x6000 10 bit image in two times using *SSE*.
+
+|           | Lanczos3 |
+|-----------|:--------:|
+| pic-scale |  138.75  |
+| fir sse   |  125.85  |
 
 #### Example in sRGB
 

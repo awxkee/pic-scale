@@ -20,7 +20,7 @@ use pic_scale::{
 };
 
 fn main() {
-    test_fast_image();
+    // test_fast_image();
     let img = ImageReader::open("./assets/beach_horizon.jpg")
         .unwrap()
         .decode()
