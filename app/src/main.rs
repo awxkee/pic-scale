@@ -158,6 +158,20 @@ fn main() {
     // }
 }
 
+fn u16_to_u8(u16_buffer: &[u16]) -> &[u8] {
+    let len = u16_buffer.len() * 2;
+    unsafe {
+        std::slice::from_raw_parts(u16_buffer.as_ptr() as *const u8, len)
+    }
+}
+
+fn u8_to_u16(u8_buffer: &[u8]) -> &[u16] {
+    let len = u8_buffer.len() / 2;
+    unsafe {
+        std::slice::from_raw_parts(u8_buffer.as_ptr() as *const u16, len)
+    }
+}
+
 fn test_fast_image() {
     let img = ImageReader::open("./assets/asset_5.png")
         .unwrap()
@@ -167,11 +181,17 @@ fn test_fast_image() {
 
     let mut vc = Vec::from(img.as_bytes());
 
+    let mut converted_bytes: Vec<u16> = vc.iter().map(|&x| x as u16 >> 2).collect();
+
+    let mut chokidar = Vec::from(u16_to_u8(&converted_bytes));
+
     let start_time = Instant::now();
 
-    let pixel_type: PixelType = PixelType::U8x4;
+    let pixel_type: PixelType = PixelType::U16x4;
 
-    let src_image = Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
+    let src_image = unsafe {
+        Image::from_vec_u8(dimensions.0, dimensions.1, chokidar, pixel_type).unwrap()
+    };
 
     let mut dst_image = Image::new(dimensions.0 / 2, dimensions.1 / 2, pixel_type);
 
@@ -198,10 +218,14 @@ fn test_fast_image() {
     // Print the elapsed time in milliseconds
     println!("Fast image resize: {:.2?}", elapsed_time);
 
+    let converted_16 = Vec::from(u8_to_u16(dst_image.buffer()));
+
+    let dst: Vec<u8> = converted_16.iter().map(|&x| (x << 2) as u8).collect();
+
     if pixel_type == PixelType::U8x3 {
         image::save_buffer(
             "fast_image.jpg",
-            dst_image.buffer(),
+            &dst,
             dst_image.width() as u32,
             dst_image.height() as u32,
             image::ExtendedColorType::Rgb8,
@@ -210,7 +234,7 @@ fn test_fast_image() {
     } else {
         image::save_buffer(
             "fast_image.png",
-            dst_image.buffer(),
+            &dst,
             dst_image.width() as u32,
             dst_image.height() as u32,
             image::ExtendedColorType::Rgba8,

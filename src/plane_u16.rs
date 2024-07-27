@@ -38,6 +38,11 @@ use crate::dispatch_group_u16::{convolve_horizontal_dispatch_u16, convolve_verti
 use crate::filter_weights::{FilterBounds, FilterWeights};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::convolve_vertical_rgb_neon_row_u16;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
+use crate::sse::convolve_vertical_rgb_sse_row_u16;
 use crate::ImageStore;
 
 impl<'a> HorizontalConvolutionPass<u16, 1> for ImageStore<'a, u16, 1> {
@@ -82,6 +87,15 @@ impl<'a> VerticalConvolutionPass<u16, 1> for ImageStore<'a, u16, 1> {
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             _dispatcher = convolve_vertical_rgb_neon_row_u16::<1>;
+        }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
+        {
+            if is_x86_feature_detected!("sse4.1") {
+                _dispatcher = convolve_vertical_rgb_sse_row_u16::<1>;
+            }
         }
         convolve_vertical_dispatch_u16(self, filter_weights, destination, pool, _dispatcher);
     }

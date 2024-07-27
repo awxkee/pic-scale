@@ -43,6 +43,7 @@ mod u8_utils;
 mod utils;
 #[cfg(all(feature = "half", target_feature = "f16c"))]
 mod vertical_f16;
+mod vertical_u16;
 mod vertical_u8;
 
 #[cfg(all(feature = "half", target_feature = "f16c"))]
@@ -65,6 +66,7 @@ pub use u8_utils::*;
 pub use utils::*;
 #[cfg(all(feature = "half", target_feature = "f16c"))]
 pub use vertical_f16::convolve_vertical_rgb_sse_row_f16;
+pub use vertical_u16::convolve_vertical_rgb_sse_row_u16;
 pub use vertical_u8::convolve_vertical_sse_row;
 
 pub const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
