@@ -55,7 +55,7 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 | RGB (f32)      | x    | x   | ~   |
 | Plane (f32)    | x    | x   | ~   |
 | RGBA (f16)     | x    | x   | x   |
-| RGB (f16)      | ~    | ~   | ~   |
+| RGB (f16)      | x    | ~   | ~   |
 | Plane (f16)    | ~    | ~   | ~   |
 
 #### Target features
@@ -63,76 +63,76 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 `fma`, `sse4.1`, `sse4.2`, `avx2`, `neon`, `f16c` optional target features are available, enable it when compiling on supported platform to get full features
 
 #### To enable full support of *f16* `half` feature should be used, and `f16c` enabled when targeting x86 platforms.
-#### For NEON `f16` feature, target feature `neon` should be activated and platform and target platform expected to be `aarch64`.
+#### For NEON `f16` feature, target feature `neon` should be activated and target platform expected to be `aarch64`.
 
 Even when `half` feature activated but platform do not support or features not enabled for `f16` speed will be slow
 
 ### Performance
 
-Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 image in two times for x86_64 SSE.
+Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 image in two times using x86_64 *SSE*.
 
 |           | Lanczos3 |
 |-----------|:--------:|
 | pic-scale |  27.87   |
 | fir sse   |  36.94   |
 
-M3 Pro. NEON
+Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 image in two times using *NEON*.
 
 |           | Lanczos3 |
 |-----------|:--------:|
-| pic-scale |  27.58   |
+| pic-scale |  27.31   |
 | fir sse   |  36.69   |
 
-Example comparison time for downscale RGBA 4928x3279 image in two times for x86_64 SSE with premultiplying alpha.
+Example comparison time for downscale RGBA 4928x3279 image in two times using x86_64 *SSE* with premultiplying alpha.
 
 |           | Lanczos3 |
 |-----------|:--------:|
 | pic-scale |  35.51   |
 | fir sse   |  30.87   |
 
-M3 Pro. NEON
+Example comparison time for downscale RGBA 4928x3279 image in two times using *NEON* with premultiplying alpha.
 
 |           | Lanczos3 |
 |-----------|:--------:|
-| pic-scale |  25.46   |
-| fir sse   |  31.43   |
+| pic-scale |  43.46   |
+| fir sse   |  54.66   |
 
-Example comparison time for downscale RGBA 4928x3279 image in two times for x86_64 SSE without premultiplying alpha.
+Example comparison time for downscale RGBA 4928x3279 image in two times using *SSE* without premultiplying alpha.
 
 |           | Lanczos3 |
 |-----------|:--------:|
 | pic-scale |  24.00   |
 | fir sse   |  23.13   |
 
-M3 Pro. NEON
+Example comparison time for downscale RGBA 4928x3279 image in two times using *NEON* without premultiplying alpha.
 
 |           | Lanczos3 |
 |-----------|:--------:|
-| pic-scale |  17.41   |
-| fir sse   |  25.82   |
+| pic-scale |  29.54   |
+| fir sse   |  44.54   |
 
-Example comparison time for downscale RGBA 4928x3279 10 bit image in two times for *NEON* with premultiplying alpha.
+Example comparison time for downscale RGBA 4928x3279 10 bit image in two times using *NEON* with premultiplying alpha.
 
 |           | Lanczos3 |
 |-----------|:--------:|
 | pic-scale |  62.44   |
 | fir sse   |  91.08   |
 
-RGBA 4928x3279 10 bit downscale without premultiplying alpha *NEON*
+RGBA 4928x3279 10 bit downscale without premultiplying alpha using *NEON*
 
 |           | Lanczos3 |
 |-----------|:--------:|
 | pic-scale |  45.09   |
 | fir sse   |  73.82   |
 
-Example comparison time for downscale RGBA 4928x3279 10 bit image in two times for *SSE* with premultiplying alpha.
+Example comparison time for downscale RGBA 4928x3279 10 bit image in two times using *SSE* with premultiplying alpha.
 
 |           | Lanczos3 |
 |-----------|:--------:|
 | pic-scale |  156.90  |
 | fir sse   |  150.65  |
 
-RGBA 4928x3279 10 bit downscale without premultiplying alpha *SSE*
+RGBA 4928x3279 10 bit downscale without premultiplying alpha using *SSE*
 
 |           | Lanczos3 |
 |-----------|:--------:|
