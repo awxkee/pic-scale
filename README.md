@@ -43,20 +43,20 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 
 `~` - Partially implemented
 
-|                 | NEON | SSE | AVX |
-|-----------------|------|-----|-----|
-| RGBA (8 bit)    | x    | x   | ~   |
-| RGB (8 bit)     | x    | x   | ~   |
-| Plane (8 bit)   | x    | x   | ~   |
-| RGBA (8+ bit)   | x    | x   | -   |
-| RGB (8+ bit)    | x    | x   | -   |
-| Plane (10+ bit) | -    | -   | -   |
-| RGBA (f32)      | x    | x   | x   |
-| RGB (f32)       | x    | x   | ~   |
-| Plane (f32)     | x    | x   | ~   |
-| RGBA (f16)      | x    | x   | x   |
-| RGB (f16)       | ~    | ~   | ~   |
-| Plane (f16)     | ~    | ~   | ~   |
+|                | NEON | SSE | AVX |
+|----------------|------|-----|-----|
+| RGBA (8 bit)   | x    | x   | ~   |
+| RGB (8 bit)    | x    | x   | ~   |
+| Plane (8 bit)  | x    | x   | ~   |
+| RGBA (8+ bit)  | x    | x   | -   |
+| RGB (8+ bit)   | x    | -   | -   |
+| Plane (8+ bit) | -    | -   | -   |
+| RGBA (f32)     | x    | x   | x   |
+| RGB (f32)      | x    | x   | ~   |
+| Plane (f32)    | x    | x   | ~   |
+| RGBA (f16)     | x    | x   | x   |
+| RGB (f16)      | ~    | ~   | ~   |
+| Plane (f16)    | ~    | ~   | ~   |
 
 #### Target features
 
@@ -138,6 +138,13 @@ RGBA 4928x3279 10 bit downscale without premultiplying alpha *SSE*
 |-----------|:--------:|
 | pic-scale |  107.82  |
 | fir sse   |  113.51  |
+
+Example comparison time for downscale RGB 4000x6000 10 bit image in two times for *NEON* with premultiplying alpha.
+
+|           | Lanczos3 |
+|-----------|:--------:|
+| pic-scale |  56.89   |
+| fir sse   |  100.36  |
 
 #### Example in sRGB
 

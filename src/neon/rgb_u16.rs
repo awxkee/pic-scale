@@ -28,6 +28,7 @@
  */
 
 use crate::filter_weights::FilterWeights;
+use crate::neon::utils::vsave3_u16;
 use crate::support::PRECISION;
 use crate::support::ROUNDING_APPROX;
 use std::arch::aarch64::*;
@@ -42,11 +43,15 @@ unsafe fn consume_u16_4(
     weight3: int32x4_t,
     store_0: int64x2_t,
     store_1: int64x2_t,
+    shuffle_table: uint8x16_t,
 ) -> (int64x2_t, int64x2_t) {
-    const COMPONENTS: usize = 4;
+    const COMPONENTS: usize = 3;
     let src_ptr = src.add(start_x * COMPONENTS);
-    let pixel_0 = vld1q_u16(src_ptr);
-    let pixel_1 = vld1q_u16(src_ptr.add(8));
+    let mut pixel_0 = vld1q_u16(src_ptr);
+    let mut pixel_1 = vld1q_u16(src_ptr.add(6));
+
+    pixel_0 = vreinterpretq_u16_u8(vqtbl1q_u8(vreinterpretq_u8_u16(pixel_0), shuffle_table));
+    pixel_1 = vreinterpretq_u16_u8(vqtbl1q_u8(vreinterpretq_u8_u16(pixel_1), shuffle_table));
 
     let pixel_low_0 = vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(pixel_0)));
     let pixel_high_0 = vreinterpretq_s32_u32(vmovl_high_u16(pixel_0));
@@ -76,10 +81,13 @@ unsafe fn consume_u16_2(
     weight1: int32x4_t,
     store_0: int64x2_t,
     store_1: int64x2_t,
+    shuffle_table: uint8x16_t,
 ) -> (int64x2_t, int64x2_t) {
-    const COMPONENTS: usize = 4;
+    const COMPONENTS: usize = 3;
     let src_ptr = src.add(start_x * COMPONENTS);
-    let pixel = vld1q_u16(src_ptr);
+    let mut pixel = vld1q_u16(src_ptr);
+
+    pixel = vreinterpretq_u16_u8(vqtbl1q_u8(vreinterpretq_u8_u16(pixel), shuffle_table));
 
     let pixel_low = vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(pixel)));
     let pixel_high = vreinterpretq_s32_u32(vmovl_high_u16(pixel));
@@ -99,18 +107,24 @@ unsafe fn consume_u16_1(
     store_0: int64x2_t,
     store_1: int64x2_t,
 ) -> (int64x2_t, int64x2_t) {
-    const COMPONENTS: usize = 4;
+    const COMPONENTS: usize = 3;
     let src_ptr = src.add(start_x * COMPONENTS);
-    let pixel = vreinterpretq_s32_u32(vmovl_u16(vld1_u16(src_ptr)));
+    let transient_store = [
+        src_ptr.read_unaligned(),
+        src_ptr.add(1).read_unaligned(),
+        src_ptr.add(2).read_unaligned(),
+        0u16,
+    ];
+    let pixel = vreinterpretq_s32_u32(vmovl_u16(vld1_u16(transient_store.as_ptr())));
 
     let acc0 = vmlal_s32(store_0, vget_low_s32(pixel), vget_low_s32(weight));
     let acc1 = vmlal_high_s32(store_1, pixel, weight);
     (acc0, acc1)
 }
 
-pub fn convolve_horizontal_rgba_neon_rows_4_u16(
+pub fn convolve_horizontal_rgb_neon_rows_4_u16(
     dst_width: usize,
-    _: usize,
+    src_width: usize,
     approx_weights: &FilterWeights<i16>,
     unsafe_source_ptr_0: *const u16,
     src_stride: usize,
@@ -122,10 +136,16 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u16(
     unsafe {
         let mut filter_offset = 0usize;
         let weights_ptr = approx_weights.weights.as_ptr();
-        const CHANNELS: usize = 4;
+        const CHANNELS: usize = 3;
+
         let zeros = vdupq_n_s32(0i32);
         let v_max_colors = vdupq_n_s32(max_colors);
         let init = vdupq_n_s64(ROUNDING_APPROX as i64);
+
+        #[rustfmt::skip]
+        let shuffle_table_v1_lo:[u8; 16] = [0, 1, 2, 3, 4, 5, u8::MAX, u8::MAX, 6, 7, 8, 9, 10, 11, u8::MAX, u8::MAX];
+        let v_shuffle_table_2 = vld1q_u8(shuffle_table_v1_lo.as_ptr());
+
         for x in 0..dst_width {
             let bounds = approx_weights.bounds.get_unchecked(x);
             let mut jx = 0usize;
@@ -138,7 +158,7 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u16(
             let mut store_6 = init;
             let mut store_7 = init;
 
-            while jx + 4 < bounds.size {
+            while jx + 4 < bounds.size && bounds.start + jx + 5 < src_width {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let bounds_start = bounds.start + jx;
                 let weight0 = vdupq_n_s32(ptr.read_unaligned() as i32);
@@ -155,6 +175,7 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u16(
                     weight3,
                     store_0,
                     store_1,
+                    v_shuffle_table_2,
                 );
                 let ptr_1 = unsafe_source_ptr_0.add(src_stride);
                 (store_2, store_3) = consume_u16_4(
@@ -166,6 +187,7 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u16(
                     weight3,
                     store_2,
                     store_3,
+                    v_shuffle_table_2,
                 );
                 let ptr_2 = unsafe_source_ptr_0.add(src_stride * 2);
                 (store_4, store_5) = consume_u16_4(
@@ -177,6 +199,7 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u16(
                     weight3,
                     store_4,
                     store_5,
+                    v_shuffle_table_2,
                 );
                 let ptr_3 = unsafe_source_ptr_0.add(src_stride * 3);
                 (store_6, store_7) = consume_u16_4(
@@ -188,27 +211,56 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u16(
                     weight3,
                     store_6,
                     store_7,
+                    v_shuffle_table_2,
                 );
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 < bounds.size && bounds.start + jx + 3 < src_width {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let bounds_start = bounds.start + jx;
                 let weight0 = vdupq_n_s32(ptr.read_unaligned() as i32);
                 let weight1 = vdupq_n_s32(ptr.add(1).read_unaligned() as i32);
                 let ptr_0 = unsafe_source_ptr_0;
-                (store_0, store_1) =
-                    consume_u16_2(bounds_start, ptr_0, weight0, weight1, store_0, store_1);
+                (store_0, store_1) = consume_u16_2(
+                    bounds_start,
+                    ptr_0,
+                    weight0,
+                    weight1,
+                    store_0,
+                    store_1,
+                    v_shuffle_table_2,
+                );
                 let ptr_1 = unsafe_source_ptr_0.add(src_stride);
-                (store_2, store_3) =
-                    consume_u16_2(bounds_start, ptr_1, weight0, weight1, store_2, store_3);
+                (store_2, store_3) = consume_u16_2(
+                    bounds_start,
+                    ptr_1,
+                    weight0,
+                    weight1,
+                    store_2,
+                    store_3,
+                    v_shuffle_table_2,
+                );
                 let ptr_2 = unsafe_source_ptr_0.add(src_stride * 2);
-                (store_4, store_5) =
-                    consume_u16_2(bounds_start, ptr_2, weight0, weight1, store_4, store_5);
+                (store_4, store_5) = consume_u16_2(
+                    bounds_start,
+                    ptr_2,
+                    weight0,
+                    weight1,
+                    store_4,
+                    store_5,
+                    v_shuffle_table_2,
+                );
                 let ptr_3 = unsafe_source_ptr_0.add(src_stride * 3);
-                (store_6, store_7) =
-                    consume_u16_2(bounds_start, ptr_3, weight0, weight1, store_6, store_7);
+                (store_6, store_7) = consume_u16_2(
+                    bounds_start,
+                    ptr_3,
+                    weight0,
+                    weight1,
+                    store_6,
+                    store_7,
+                    v_shuffle_table_2,
+                );
                 jx += 2;
             }
 
@@ -246,7 +298,7 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u16(
 
             let dest_ptr = unsafe_destination_ptr_0.add(px);
             let dest_ptr_32 = dest_ptr;
-            vst1_u16(dest_ptr_32, store_16);
+            vsave3_u16(dest_ptr_32, store_16);
 
             let store_u32 = vreinterpretq_u32_s32(vminq_s32(
                 vmaxq_s32(vcombine_s32(new_store_2, new_store_3), zeros),
@@ -256,7 +308,7 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u16(
 
             let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride);
             let dest_ptr_32 = dest_ptr;
-            vst1_u16(dest_ptr_32, store_16);
+            vsave3_u16(dest_ptr_32, store_16);
 
             let store_u32 = vreinterpretq_u32_s32(vminq_s32(
                 vmaxq_s32(vcombine_s32(new_store_4, new_store_5), zeros),
@@ -266,7 +318,7 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u16(
 
             let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 2);
             let dest_ptr_32 = dest_ptr;
-            vst1_u16(dest_ptr_32, store_16);
+            vsave3_u16(dest_ptr_32, store_16);
 
             let store_u32 = vreinterpretq_u32_s32(vminq_s32(
                 vmaxq_s32(vcombine_s32(new_store_6, new_store_7), zeros),
@@ -276,16 +328,16 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u16(
 
             let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 3);
             let dest_ptr_32 = dest_ptr;
-            vst1_u16(dest_ptr_32, store_16);
+            vsave3_u16(dest_ptr_32, store_16);
 
             filter_offset += approx_weights.aligned_size;
         }
     }
 }
 
-pub fn convolve_horizontal_rgba_neon_row_u16(
+pub fn convolve_horizontal_rgb_neon_row_u16(
     dst_width: usize,
-    _: usize,
+    src_width: usize,
     filter_weights: &FilterWeights<i16>,
     unsafe_source_ptr_0: *const u16,
     unsafe_destination_ptr_0: *mut u16,
@@ -293,7 +345,7 @@ pub fn convolve_horizontal_rgba_neon_row_u16(
 ) {
     let max_colors = 2i32.pow(bit_depth as u32) - 1i32;
     unsafe {
-        const CHANNELS: usize = 4;
+        const CHANNELS: usize = 3;
         let mut filter_offset = 0usize;
 
         let weights_ptr = filter_weights.weights.as_ptr();
@@ -301,13 +353,17 @@ pub fn convolve_horizontal_rgba_neon_row_u16(
         let v_max_colors = vdupq_n_s32(max_colors);
         let zeros = vdupq_n_s32(0);
 
+        #[rustfmt::skip]
+        let shuffle_table_v1_lo:[u8; 16] = [0, 1, 2, 3, 4, 5, u8::MAX, u8::MAX, 6, 7, 8, 9, 10, 11, u8::MAX, u8::MAX];
+        let v_shuffle_table_2 = vld1q_u8(shuffle_table_v1_lo.as_ptr());
+
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);
             let mut jx = 0usize;
             let mut store0 = vdupq_n_s64(ROUNDING_APPROX as i64);
             let mut store1 = vdupq_n_s64(ROUNDING_APPROX as i64);
 
-            while jx + 4 < bounds.size {
+            while jx + 4 < bounds.size && bounds.start + jx + 5 < src_width {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let weight0 = vdupq_n_s32(ptr.read_unaligned() as i32);
                 let weight1 = vdupq_n_s32(ptr.add(1).read_unaligned() as i32);
@@ -323,11 +379,12 @@ pub fn convolve_horizontal_rgba_neon_row_u16(
                     weight3,
                     store0,
                     store1,
+                    v_shuffle_table_2,
                 );
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 < bounds.size && bounds.start + jx + 3 < src_width {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let weight0 = vdupq_n_s32(ptr.read_unaligned() as i32);
                 let weight1 = vdupq_n_s32(ptr.add(1).read_unaligned() as i32);
@@ -339,6 +396,7 @@ pub fn convolve_horizontal_rgba_neon_row_u16(
                     weight1,
                     store0,
                     store1,
+                    v_shuffle_table_2,
                 );
                 jx += 2;
             }
@@ -365,7 +423,7 @@ pub fn convolve_horizontal_rgba_neon_row_u16(
 
             let dest_ptr = unsafe_destination_ptr_0.add(px);
             let dest_ptr_32 = dest_ptr;
-            vst1_u16(dest_ptr_32, store_16);
+            vsave3_u16(dest_ptr_32, store_16);
 
             filter_offset += filter_weights.aligned_size;
         }

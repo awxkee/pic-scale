@@ -41,6 +41,7 @@ mod plane_u8;
 #[cfg(all(feature = "half"))]
 mod rgb_f16;
 mod rgb_f32;
+mod rgb_u16;
 mod rgb_u8;
 #[cfg(all(feature = "half"))]
 mod rgba_f16;
@@ -71,6 +72,7 @@ pub use rgb_f16::{
     convolve_horizontal_rgb_neon_row_one_f16, convolve_horizontal_rgb_neon_rows_4_f16,
 };
 pub use rgb_f32::*;
+pub use rgb_u16::{convolve_horizontal_rgb_neon_row_u16, convolve_horizontal_rgb_neon_rows_4_u16};
 pub use rgb_u8::*;
 #[cfg(all(feature = "half"))]
 pub use rgba_f16::convolve_horizontal_rgba_neon_row_one_f16;

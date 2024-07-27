@@ -20,8 +20,8 @@ use pic_scale::{
 };
 
 fn main() {
-    // test_fast_image();
-    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
+    test_fast_image();
+    let img = ImageReader::open("./assets/beach_horizon.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -35,16 +35,15 @@ fn main() {
     let mut converted_bytes: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 2).collect();
 
     let start_time = Instant::now();
-    let store = ImageStore::<u16, 4>::from_slice(
+    let store = ImageStore::<u16, 3>::from_slice(
         &mut converted_bytes,
         dimensions.0 as usize,
         dimensions.1 as usize,
     );
-    let resized = scaler.resize_rgba_u16(
+    let resized = scaler.resize_rgb_u16(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
         store,
         10,
-        true,
     );
 
     // let mut r_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];
@@ -170,7 +169,7 @@ fn u8_to_u16(u8_buffer: &[u8]) -> &[u16] {
 }
 
 fn test_fast_image() {
-    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
+    let img = ImageReader::open("./assets/beach_horizon.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -184,7 +183,7 @@ fn test_fast_image() {
 
     let start_time = Instant::now();
 
-    let pixel_type: PixelType = PixelType::U16x4;
+    let pixel_type: PixelType = PixelType::U16x3;
 
     let src_image =
         unsafe { Image::from_vec_u8(dimensions.0, dimensions.1, chokidar, pixel_type).unwrap() };
@@ -206,7 +205,7 @@ fn test_fast_image() {
             &mut dst_image,
             &ResizeOptions::new()
                 .resize_alg(ResizeAlg::Convolution(Lanczos3))
-                .use_alpha(true),
+                .use_alpha(false),
         )
         .unwrap();
 
@@ -218,7 +217,7 @@ fn test_fast_image() {
 
     let dst: Vec<u8> = converted_16.iter().map(|&x| (x >> 2) as u8).collect();
 
-    if pixel_type == PixelType::U8x3 {
+    if pixel_type == PixelType::U8x3 || pixel_type == PixelType::U16x3 {
         image::save_buffer(
             "fast_image.jpg",
             &dst,
