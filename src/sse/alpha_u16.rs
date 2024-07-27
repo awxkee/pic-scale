@@ -13,20 +13,13 @@ pub unsafe fn sse_unpremultiply_row_u16(
     is_zero_mask: __m128i,
     a_lo_f: __m128,
     a_hi_f: __m128,
-    max_colors: __m128,
 ) -> __m128i {
     let zeros = _mm_setzero_si128();
     let lo = _mm_cvtepu16_epi32(x);
     let hi = _mm_unpackhi_epi16(x, zeros);
 
-    let new_lo = _mm_cvtps_epi32(_mm_mul_ps(
-        _mm_mul_ps(_mm_cvtepi32_ps(lo), a_lo_f),
-        max_colors,
-    ));
-    let new_hi = _mm_cvtps_epi32(_mm_mul_ps(
-        _mm_mul_ps(_mm_cvtepi32_ps(hi), a_hi_f),
-        max_colors,
-    ));
+    let new_lo = _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(lo), a_lo_f));
+    let new_hi = _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(hi), a_hi_f));
 
     let pixel = _mm_packs_epi32(new_lo, new_hi);
     _mm_select_si128(is_zero_mask, x, pixel)
@@ -60,18 +53,21 @@ pub fn unpremultiply_alpha_sse_rgba_u16(
                 let (rrrr, gggg, bbbb, aaaa) = sse_deinterleave_rgba_epi16(row0, row1, row2, row3);
 
                 let is_zero_mask = _mm_cmpeq_epi16(aaaa, _mm_setzero_si128());
-                let a_lo_f = _mm_rcp_ps(_mm_cvtepi32_ps(_mm_cvtepu16_epi32(aaaa)));
-                let a_hi_f = _mm_rcp_ps(_mm_cvtepi32_ps(_mm_unpackhi_epi16(
-                    aaaa,
-                    _mm_setzero_si128(),
-                )));
+                let a_lo_f = _mm_mul_ps(
+                    _mm_rcp_ps(_mm_cvtepi32_ps(_mm_cvtepu16_epi32(aaaa))),
+                    v_max_colors,
+                );
+                let a_hi_f = _mm_mul_ps(
+                    _mm_rcp_ps(_mm_cvtepi32_ps(_mm_unpackhi_epi16(
+                        aaaa,
+                        _mm_setzero_si128(),
+                    ))),
+                    v_max_colors,
+                );
 
-                let new_rrrr =
-                    sse_unpremultiply_row_u16(rrrr, is_zero_mask, a_lo_f, a_hi_f, v_max_colors);
-                let new_gggg =
-                    sse_unpremultiply_row_u16(gggg, is_zero_mask, a_lo_f, a_hi_f, v_max_colors);
-                let new_bbbb =
-                    sse_unpremultiply_row_u16(bbbb, is_zero_mask, a_lo_f, a_hi_f, v_max_colors);
+                let new_rrrr = sse_unpremultiply_row_u16(rrrr, is_zero_mask, a_lo_f, a_hi_f);
+                let new_gggg = sse_unpremultiply_row_u16(gggg, is_zero_mask, a_lo_f, a_hi_f);
+                let new_bbbb = sse_unpremultiply_row_u16(bbbb, is_zero_mask, a_lo_f, a_hi_f);
 
                 let (rgba0, rgba1, rgba2, rgba3) =
                     sse_interleave_rgba_epi16(new_rrrr, new_gggg, new_bbbb, aaaa);

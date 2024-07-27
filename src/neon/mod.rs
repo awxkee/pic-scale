@@ -29,6 +29,7 @@
 #[cfg(all(feature = "half"))]
 mod alpha_f16;
 mod alpha_f32;
+mod alpha_u16;
 mod alpha_u8;
 #[cfg(all(feature = "half"))]
 mod convolve_f16;
@@ -57,6 +58,7 @@ mod vertical_u8;
 pub use alpha_f16::{neon_premultiply_alpha_rgba_f16, neon_unpremultiply_alpha_rgba_f16};
 pub use alpha_f32::neon_premultiply_alpha_rgba_f32;
 pub use alpha_f32::neon_unpremultiply_alpha_rgba_f32;
+pub use alpha_u16::{neon_premultiply_alpha_rgba_u16, neon_unpremultiply_alpha_rgba_u16};
 pub use alpha_u8::neon_premultiply_alpha_rgba;
 pub use alpha_u8::neon_unpremultiply_alpha_rgba;
 #[cfg(all(feature = "half"))]

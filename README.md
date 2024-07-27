@@ -81,6 +81,22 @@ M3 Pro. NEON
 | pic-scale |  17.41   |
 | fir sse   |  25.82   |
 
+
+Example comparison time for downscale RGBA 4928x3279 10 bit image in two times for *NEON* with premultiplying alpha.
+
+|           | Lanczos3 |
+|-----------|:--------:|
+| pic-scale |  62.44   |
+| fir sse   |  91.08   |
+
+RGBA 4928x3279 10 bit downscale without premultiplying alpha *NEON*
+
+|           | Lanczos3 |
+|-----------|:--------:|
+| pic-scale |  45.09   |
+| fir sse   |  73.82   |
+
+
 #### Example in sRGB
 
 In common, you should not downsize an image in sRGB colorspace, however if speed is more preferable than more proper scale you may omit linearizing 

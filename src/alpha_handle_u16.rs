@@ -27,6 +27,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::neon::{neon_premultiply_alpha_rgba_u16, neon_unpremultiply_alpha_rgba_u16};
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
@@ -138,6 +140,10 @@ pub fn premultiply_alpha_rgba_u16(
     {
         _dispatcher = premultiply_alpha_sse_rgba_u16;
     }
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    {
+        _dispatcher = neon_premultiply_alpha_rgba_u16;
+    }
     _dispatcher(dst, src, width, height, bit_depth);
 }
 
@@ -156,6 +162,10 @@ pub fn unpremultiply_alpha_rgba_u16(
     ))]
     {
         _dispatcher = unpremultiply_alpha_sse_rgba_u16;
+    }
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    {
+        _dispatcher = neon_unpremultiply_alpha_rgba_u16;
     }
     _dispatcher(dst, src, width, height, bit_depth);
 }

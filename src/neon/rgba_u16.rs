@@ -33,6 +33,42 @@ use crate::support::ROUNDING_APPROX;
 use std::arch::aarch64::*;
 
 #[inline(always)]
+pub unsafe fn consume_u16_4(
+    start_x: usize,
+    src: *const u16,
+    weight0: int32x4_t,
+    weight1: int32x4_t,
+    weight2: int32x4_t,
+    weight3: int32x4_t,
+    store_0: int64x2_t,
+    store_1: int64x2_t,
+) -> (int64x2_t, int64x2_t) {
+    const COMPONENTS: usize = 4;
+    let src_ptr = src.add(start_x * COMPONENTS);
+    let pixel_0 = vld1q_u16(src_ptr);
+    let pixel_1 = vld1q_u16(src_ptr.add(8));
+
+    let pixel_low_0 = vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(pixel_0)));
+    let pixel_high_0 = vreinterpretq_s32_u32(vmovl_high_u16(pixel_0));
+
+    let pixel_low_1 = vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(pixel_1)));
+    let pixel_high_1 = vreinterpretq_s32_u32(vmovl_high_u16(pixel_1));
+
+    let mut acc0 = vmlal_s32(store_0, vget_low_s32(pixel_low_0), vget_low_s32(weight0));
+    let mut acc1 = vmlal_high_s32(store_1, pixel_low_0, weight0);
+    acc0 = vmlal_s32(acc0, vget_low_s32(pixel_high_0), vget_low_s32(weight1));
+    acc1 = vmlal_high_s32(acc1, pixel_high_0, weight1);
+
+    acc0 = vmlal_s32(acc0, vget_low_s32(pixel_low_1), vget_low_s32(weight2));
+    acc1 = vmlal_high_s32(acc1, pixel_low_1, weight2);
+
+    acc0 = vmlal_s32(acc0, vget_low_s32(pixel_high_1), vget_low_s32(weight3));
+    acc1 = vmlal_high_s32(acc1, pixel_high_1, weight3);
+
+    (acc0, acc1)
+}
+
+#[inline(always)]
 pub unsafe fn consume_u16_2(
     start_x: usize,
     src: *const u16,
@@ -102,6 +138,60 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u16(
             let mut store_6 = init;
             let mut store_7 = init;
 
+            while jx + 4 < bounds.size {
+                let ptr = weights_ptr.add(jx + filter_offset);
+                let bounds_start = bounds.start + jx;
+                let weight0 = vdupq_n_s32(ptr.read_unaligned() as i32);
+                let weight1 = vdupq_n_s32(ptr.add(1).read_unaligned() as i32);
+                let weight2 = vdupq_n_s32(ptr.add(2).read_unaligned() as i32);
+                let weight3 = vdupq_n_s32(ptr.add(3).read_unaligned() as i32);
+                let ptr_0 = unsafe_source_ptr_0;
+                (store_0, store_1) = consume_u16_4(
+                    bounds_start,
+                    ptr_0,
+                    weight0,
+                    weight1,
+                    weight2,
+                    weight3,
+                    store_0,
+                    store_1,
+                );
+                let ptr_1 = unsafe_source_ptr_0.add(src_stride);
+                (store_2, store_3) = consume_u16_4(
+                    bounds_start,
+                    ptr_1,
+                    weight0,
+                    weight1,
+                    weight2,
+                    weight3,
+                    store_2,
+                    store_3,
+                );
+                let ptr_2 = unsafe_source_ptr_0.add(src_stride * 2);
+                (store_4, store_5) = consume_u16_4(
+                    bounds_start,
+                    ptr_2,
+                    weight0,
+                    weight1,
+                    weight2,
+                    weight3,
+                    store_4,
+                    store_5,
+                );
+                let ptr_3 = unsafe_source_ptr_0.add(src_stride * 3);
+                (store_6, store_7) = consume_u16_4(
+                    bounds_start,
+                    ptr_3,
+                    weight0,
+                    weight1,
+                    weight2,
+                    weight3,
+                    store_6,
+                    store_7,
+                );
+                jx += 4;
+            }
+
             while jx + 2 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let bounds_start = bounds.start + jx;
@@ -141,6 +231,12 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u16(
 
             let new_store_0 = vqshrn_n_s64::<PRECISION>(store_0);
             let new_store_1 = vqshrn_n_s64::<PRECISION>(store_1);
+            let new_store_2 = vqshrn_n_s64::<PRECISION>(store_2);
+            let new_store_3 = vqshrn_n_s64::<PRECISION>(store_3);
+            let new_store_4 = vqshrn_n_s64::<PRECISION>(store_4);
+            let new_store_5 = vqshrn_n_s64::<PRECISION>(store_5);
+            let new_store_6 = vqshrn_n_s64::<PRECISION>(store_6);
+            let new_store_7 = vqshrn_n_s64::<PRECISION>(store_7);
 
             let store_u32 = vreinterpretq_u32_s32(vminq_s32(
                 vmaxq_s32(vcombine_s32(new_store_0, new_store_1), zeros),
@@ -152,11 +248,8 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u16(
             let dest_ptr_32 = dest_ptr;
             vst1_u16(dest_ptr_32, store_16);
 
-            let new_store_0 = vqshrn_n_s64::<PRECISION>(store_2);
-            let new_store_1 = vqshrn_n_s64::<PRECISION>(store_3);
-
             let store_u32 = vreinterpretq_u32_s32(vminq_s32(
-                vmaxq_s32(vcombine_s32(new_store_0, new_store_1), zeros),
+                vmaxq_s32(vcombine_s32(new_store_2, new_store_3), zeros),
                 v_max_colors,
             ));
             let store_16 = vmovn_u32(store_u32);
@@ -165,11 +258,8 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u16(
             let dest_ptr_32 = dest_ptr;
             vst1_u16(dest_ptr_32, store_16);
 
-            let new_store_0 = vqshrn_n_s64::<PRECISION>(store_4);
-            let new_store_1 = vqshrn_n_s64::<PRECISION>(store_5);
-
             let store_u32 = vreinterpretq_u32_s32(vminq_s32(
-                vmaxq_s32(vcombine_s32(new_store_0, new_store_1), zeros),
+                vmaxq_s32(vcombine_s32(new_store_4, new_store_5), zeros),
                 v_max_colors,
             ));
             let store_16 = vmovn_u32(store_u32);
@@ -178,11 +268,8 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u16(
             let dest_ptr_32 = dest_ptr;
             vst1_u16(dest_ptr_32, store_16);
 
-            let new_store_0 = vqshrn_n_s64::<PRECISION>(store_6);
-            let new_store_1 = vqshrn_n_s64::<PRECISION>(store_7);
-
             let store_u32 = vreinterpretq_u32_s32(vminq_s32(
-                vmaxq_s32(vcombine_s32(new_store_0, new_store_1), zeros),
+                vmaxq_s32(vcombine_s32(new_store_6, new_store_7), zeros),
                 v_max_colors,
             ));
             let store_16 = vmovn_u32(store_u32);
@@ -219,6 +306,26 @@ pub fn convolve_horizontal_rgba_neon_row_u16(
             let mut jx = 0usize;
             let mut store0 = vdupq_n_s64(ROUNDING_APPROX as i64);
             let mut store1 = vdupq_n_s64(ROUNDING_APPROX as i64);
+
+            while jx + 4 < bounds.size {
+                let ptr = weights_ptr.add(jx + filter_offset);
+                let weight0 = vdupq_n_s32(ptr.read_unaligned() as i32);
+                let weight1 = vdupq_n_s32(ptr.add(1).read_unaligned() as i32);
+                let weight2 = vdupq_n_s32(ptr.add(2).read_unaligned() as i32);
+                let weight3 = vdupq_n_s32(ptr.add(3).read_unaligned() as i32);
+                let bounds_start = bounds.start + jx;
+                (store0, store1) = consume_u16_4(
+                    bounds_start,
+                    unsafe_source_ptr_0,
+                    weight0,
+                    weight1,
+                    weight2,
+                    weight3,
+                    store0,
+                    store1,
+                );
+                jx += 4;
+            }
 
             while jx + 2 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
