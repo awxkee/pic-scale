@@ -27,6 +27,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
+use crate::sse::{premultiply_alpha_sse_rgba_u16, unpremultiply_alpha_sse_rgba_u16};
 
 #[macro_export]
 macro_rules! unpremultiply_pixel_u16 {
@@ -126,6 +131,13 @@ pub fn premultiply_alpha_rgba_u16(
     bit_depth: usize,
 ) {
     let mut _dispatcher: fn(&mut [u16], &[u16], usize, usize, usize) = premultiply_alpha_rgba_impl;
+    #[cfg(all(
+        any(target_arch = "x86_64", target_arch = "x86"),
+        target_feature = "sse4.1"
+    ))]
+    {
+        _dispatcher = premultiply_alpha_sse_rgba_u16;
+    }
     _dispatcher(dst, src, width, height, bit_depth);
 }
 
@@ -138,5 +150,12 @@ pub fn unpremultiply_alpha_rgba_u16(
 ) {
     let mut _dispatcher: fn(&mut [u16], &[u16], usize, usize, usize) =
         unpremultiply_alpha_rgba_impl;
+    #[cfg(all(
+        any(target_arch = "x86_64", target_arch = "x86"),
+        target_feature = "sse4.1"
+    ))]
+    {
+        _dispatcher = unpremultiply_alpha_sse_rgba_u16;
+    }
     _dispatcher(dst, src, width, height, bit_depth);
 }

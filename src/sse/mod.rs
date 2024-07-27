@@ -30,6 +30,7 @@
 #[cfg(all(feature = "half", target_feature = "f16c"))]
 mod alpha_f16;
 mod alpha_f32;
+mod alpha_u16;
 mod alpha_u8;
 mod plane_f32;
 mod plane_u8;
@@ -38,6 +39,7 @@ mod rgb_u8;
 #[cfg(all(feature = "half", target_feature = "f16c"))]
 mod rgba_f16;
 mod rgba_f32;
+mod rgba_u16;
 mod routines;
 mod u8_utils;
 mod utils;
@@ -45,12 +47,12 @@ mod utils;
 mod vertical_f16;
 mod vertical_u16;
 mod vertical_u8;
-mod rgba_u16;
 
 #[cfg(all(feature = "half", target_feature = "f16c"))]
 pub use alpha_f16::{sse_premultiply_alpha_rgba_f16, sse_unpremultiply_alpha_rgba_f16};
 pub use alpha_f32::sse_premultiply_alpha_rgba_f32;
 pub use alpha_f32::sse_unpremultiply_alpha_rgba_f32;
+pub use alpha_u16::{premultiply_alpha_sse_rgba_u16, unpremultiply_alpha_sse_rgba_u16};
 pub use alpha_u8::sse_premultiply_alpha_rgba;
 pub use alpha_u8::sse_unpremultiply_alpha_rgba;
 pub use plane_f32::convolve_horizontal_plane_sse_row_one;
@@ -63,13 +65,13 @@ pub use rgba_f16::{
     convolve_horizontal_rgba_sse_row_one_f16, convolve_horizontal_rgba_sse_rows_4_f16,
 };
 pub use rgba_f32::*;
+pub use rgba_u16::{convolve_horizontal_rgba_sse_row_u16, convolve_horizontal_rgba_sse_rows_4_u16};
 pub use u8_utils::*;
 pub use utils::*;
 #[cfg(all(feature = "half", target_feature = "f16c"))]
 pub use vertical_f16::convolve_vertical_rgb_sse_row_f16;
 pub use vertical_u16::convolve_vertical_rgb_sse_row_u16;
 pub use vertical_u8::convolve_vertical_sse_row;
-pub use rgba_u16::{convolve_horizontal_rgba_sse_row_u16, convolve_horizontal_rgba_sse_rows_4_u16};
 
 pub const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
     ((z << 6) | (y << 4) | (x << 2) | w) as i32

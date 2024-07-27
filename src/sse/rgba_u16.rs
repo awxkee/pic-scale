@@ -318,7 +318,6 @@ pub fn convolve_horizontal_rgba_sse_rows_4_u16(
                 8,
             );
 
-
             let store_u32 = _mm_min_epi32(
                 _mm_max_epi32(_mm_packus_epi64(new_store_4, new_store_5), zeros),
                 v_max_colors,

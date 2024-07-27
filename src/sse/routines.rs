@@ -59,7 +59,6 @@ macro_rules! load_4_weights_epi32 {
     }};
 }
 
-
 #[macro_export]
 macro_rules! load_4_weights_group_2_avx {
     ($src_ptr: expr) => {{

@@ -160,16 +160,12 @@ fn main() {
 
 fn u16_to_u8(u16_buffer: &[u16]) -> &[u8] {
     let len = u16_buffer.len() * 2;
-    unsafe {
-        std::slice::from_raw_parts(u16_buffer.as_ptr() as *const u8, len)
-    }
+    unsafe { std::slice::from_raw_parts(u16_buffer.as_ptr() as *const u8, len) }
 }
 
 fn u8_to_u16(u8_buffer: &[u8]) -> &[u16] {
     let len = u8_buffer.len() / 2;
-    unsafe {
-        std::slice::from_raw_parts(u8_buffer.as_ptr() as *const u16, len)
-    }
+    unsafe { std::slice::from_raw_parts(u8_buffer.as_ptr() as *const u16, len) }
 }
 
 fn test_fast_image() {
@@ -189,9 +185,8 @@ fn test_fast_image() {
 
     let pixel_type: PixelType = PixelType::U16x4;
 
-    let src_image = unsafe {
-        Image::from_vec_u8(dimensions.0, dimensions.1, chokidar, pixel_type).unwrap()
-    };
+    let src_image =
+        unsafe { Image::from_vec_u8(dimensions.0, dimensions.1, chokidar, pixel_type).unwrap() };
 
     let mut dst_image = Image::new(dimensions.0 / 2, dimensions.1 / 2, pixel_type);
 
@@ -210,7 +205,7 @@ fn test_fast_image() {
             &mut dst_image,
             &ResizeOptions::new()
                 .resize_alg(ResizeAlg::Convolution(Lanczos3))
-                .use_alpha(false),
+                .use_alpha(true),
         )
         .unwrap();
 

@@ -46,12 +46,12 @@ use crate::neon::{
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 ))]
-use crate::sse::{convolve_horizontal_rgba_sse_row_u16, convolve_horizontal_rgba_sse_rows_4_u16};
+use crate::sse::convolve_vertical_rgb_sse_row_u16;
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 ))]
-use crate::sse::convolve_vertical_rgb_sse_row_u16;
+use crate::sse::{convolve_horizontal_rgba_sse_row_u16, convolve_horizontal_rgba_sse_rows_4_u16};
 use crate::ImageStore;
 
 impl<'a> HorizontalConvolutionPass<u16, 4> for ImageStore<'a, u16, 4> {
