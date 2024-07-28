@@ -24,7 +24,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &mut copied,
                 dimensions.0 as usize,
                 dimensions.1 as usize,
-            );
+            )
+            .unwrap();
             _ = scaler.resize_rgba(
                 ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
                 store,
@@ -36,19 +37,20 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let f32_image: Vec<f32> = src_bytes.iter().map(|&x| x as f32 / 255f32).collect();
 
     c.bench_function("Pic scale RGBA with alpha f32: Lanczos 3", |b| {
+        let mut copied: Vec<f32> = Vec::from(f32_image.clone());
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
             scaler.set_threading_policy(ThreadingPolicy::Single);
-            let mut copied: Vec<f32> = f32_image.iter().map(|&x| x).collect();
             let store = ImageStore::<f32, 4>::from_slice(
                 &mut copied,
                 dimensions.0 as usize,
                 dimensions.1 as usize,
-            );
+            )
+            .unwrap();
             _ = scaler.resize_rgba_f32(
                 ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
                 store,
-                true,
+                false,
             );
         })
     });
@@ -91,7 +93,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &mut copied,
                 dimensions.0 as usize,
                 dimensions.1 as usize,
-            );
+            )
+            .unwrap();
             _ = scaler.resize_rgba(
                 ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
                 store,

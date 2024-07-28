@@ -25,7 +25,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &mut copied,
                 dimensions.0 as usize,
                 dimensions.1 as usize,
-            );
+            )
+            .unwrap();
             _ = scaler.resize_rgb(
                 ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
                 store,
@@ -44,7 +45,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &mut copied,
                 dimensions.0 as usize,
                 dimensions.1 as usize,
-            );
+            )
+            .unwrap();
             _ = scaler.resize_rgb_f32(
                 ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
                 store,

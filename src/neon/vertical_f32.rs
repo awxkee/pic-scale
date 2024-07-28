@@ -27,7 +27,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter_weights::FilterBounds;
-use crate::neon::convolve_f32::convolve_vertical_part_neon_8_f32;
 use crate::neon::utils::prefer_vfmaq_f32;
 use std::arch::aarch64::*;
 
@@ -165,6 +164,100 @@ macro_rules! conv_vertical_part_neon_48_f32 {
     }};
 }
 
+#[inline(always)]
+unsafe fn convolve_vertical_part_neon_8_f32(
+    start_y: usize,
+    start_x: usize,
+    src: *const f32,
+    src_stride: usize,
+    dst: *mut f32,
+    filter: *const f32,
+    bounds: &FilterBounds,
+) {
+    let mut store_0 = vdupq_n_f32(0.);
+    let mut store_1 = vdupq_n_f32(0.);
+
+    let px = start_x;
+
+    for j in 0..bounds.size {
+        let py = start_y + j;
+        let weight = unsafe { filter.add(j).read_unaligned() };
+        let v_weight = vdupq_n_f32(weight);
+        let src_ptr = src.add(src_stride * py);
+
+        let s_ptr = src_ptr.add(px);
+        let item_row = vld1q_f32_x2(s_ptr);
+
+        store_0 = prefer_vfmaq_f32(store_0, item_row.0, v_weight);
+        store_1 = prefer_vfmaq_f32(store_1, item_row.1, v_weight);
+    }
+
+    let item = float32x4x2_t(store_0, store_1);
+
+    let dst_ptr = dst.add(px);
+    vst1q_f32_x2(dst_ptr, item);
+}
+
+#[inline(always)]
+unsafe fn convolve_vertical_part_neon_4_f32(
+    start_y: usize,
+    start_x: usize,
+    src: *const f32,
+    src_stride: usize,
+    dst: *mut f32,
+    filter: *const f32,
+    bounds: &FilterBounds,
+) {
+    let mut store_0 = vdupq_n_f32(0.);
+
+    let px = start_x;
+
+    for j in 0..bounds.size {
+        let py = start_y + j;
+        let weight = unsafe { filter.add(j).read_unaligned() };
+        let v_weight = vdupq_n_f32(weight);
+        let src_ptr = src.add(src_stride * py);
+
+        let s_ptr = src_ptr.add(px);
+        let item_row = vld1q_f32_x2(s_ptr);
+
+        store_0 = prefer_vfmaq_f32(store_0, item_row.0, v_weight);
+    }
+
+    let dst_ptr = dst.add(px);
+    vst1q_f32(dst_ptr, store_0);
+}
+
+#[inline(always)]
+unsafe fn convolve_vertical_part_neon_1_f32(
+    start_y: usize,
+    start_x: usize,
+    src: *const f32,
+    src_stride: usize,
+    dst: *mut f32,
+    filter: *const f32,
+    bounds: &FilterBounds,
+) {
+    let mut store_0 = vdupq_n_f32(0.);
+
+    let px = start_x;
+
+    for j in 0..bounds.size {
+        let py = start_y + j;
+        let weight = unsafe { filter.add(j).read_unaligned() };
+        let v_weight = vdupq_n_f32(weight);
+        let src_ptr = src.add(src_stride * py);
+
+        let s_ptr = src_ptr.add(px);
+        let item_row = vld1q_dup_f32(s_ptr);
+
+        store_0 = prefer_vfmaq_f32(store_0, item_row, v_weight);
+    }
+
+    let dst_ptr = dst.add(px);
+    dst_ptr.write_unaligned(vgetq_lane_f32::<0>(store_0));
+}
+
 pub fn convolve_vertical_rgb_neon_row_f32<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,
@@ -220,7 +313,7 @@ pub fn convolve_vertical_rgb_neon_row_f32<const CHANNELS: usize>(
 
     while cx + 8 < dst_width {
         unsafe {
-            convolve_vertical_part_neon_8_f32::<false>(
+            convolve_vertical_part_neon_8_f32(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -228,18 +321,15 @@ pub fn convolve_vertical_rgb_neon_row_f32<const CHANNELS: usize>(
                 unsafe_destination_ptr_0,
                 weight_ptr,
                 bounds,
-                8,
             );
         }
 
         cx += 8;
     }
 
-    let left = dst_width - cx;
-
-    if left > 0 {
+    while cx + 4 < dst_width {
         unsafe {
-            convolve_vertical_part_neon_8_f32::<true>(
+            convolve_vertical_part_neon_4_f32(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -247,8 +337,24 @@ pub fn convolve_vertical_rgb_neon_row_f32<const CHANNELS: usize>(
                 unsafe_destination_ptr_0,
                 weight_ptr,
                 bounds,
-                left,
             );
         }
+
+        cx += 4;
+    }
+
+    while cx < dst_width {
+        unsafe {
+            convolve_vertical_part_neon_1_f32(
+                bounds.start,
+                cx,
+                unsafe_source_ptr_0,
+                src_stride,
+                unsafe_destination_ptr_0,
+                weight_ptr,
+                bounds,
+            );
+        }
+        cx += 1;
     }
 }

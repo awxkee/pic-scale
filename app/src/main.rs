@@ -21,7 +21,7 @@ use pic_scale::{
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/asset_5.png")
+    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -33,17 +33,19 @@ fn main() {
 
     //
 
-    let mut cvt: Vec<u16> = bytes.as_bytes().iter().map(|&x| (x as u16) << 2).collect();
+    let mut f32_bytes: Vec<f32> = bytes.iter().map(|&x| x as f32 / 255f32).collect();
 
     let start_time = Instant::now();
-    let store =
-        ImageStore::<u16, 4>::from_slice(&mut cvt, dimensions.0 as usize, dimensions.1 as usize)
-            .unwrap();
-    let resized = scaler.resize_rgba_u16(
+    let store = ImageStore::<f32, 4>::from_slice(
+        &mut f32_bytes,
+        dimensions.0 as usize,
+        dimensions.1 as usize,
+    )
+    .unwrap();
+    let resized = scaler.resize_rgba_f32(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
         store,
-        10,
-        true,
+        false,
     );
 
     // let mut r_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];
@@ -95,9 +97,13 @@ fn main() {
     // Print the elapsed time in milliseconds
     println!("Scaler: {:.2?}", elapsed_time);
 
-    // let dst: Vec<u8> = res.iter().map(|&x| (x * 255f32) as u8).collect();
+    let dst: Vec<u8> = resized
+        .as_bytes()
+        .iter()
+        .map(|&x| (x * 255f32) as u8)
+        .collect();
 
-    let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 2) as u8).collect();
+    // let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 2) as u8).collect();
     //
     // let dst = resized.as_bytes();
 
