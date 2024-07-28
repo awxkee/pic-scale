@@ -49,6 +49,7 @@ mod vertical_f16;
 mod vertical_f32;
 mod vertical_u16;
 mod vertical_u8;
+mod rgba_u8;
 
 #[cfg(all(feature = "half", target_feature = "f16c"))]
 pub use alpha_f16::{sse_premultiply_alpha_rgba_f16, sse_unpremultiply_alpha_rgba_f16};
@@ -76,6 +77,7 @@ pub use vertical_f16::convolve_vertical_rgb_sse_row_f16;
 pub use vertical_f32::convolve_vertical_rgb_sse_row_f32;
 pub use vertical_u16::convolve_vertical_rgb_sse_row_u16;
 pub use vertical_u8::convolve_vertical_sse_row;
+pub use rgba_u8::{convolve_horizontal_rgba_sse_rows_4, convolve_horizontal_rgba_sse_rows_one};
 
 pub const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
     ((z << 6) | (y << 4) | (x << 2) | w) as i32

@@ -32,7 +32,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-use crate::avx2::utils::{_mm256_packus_epi64, _mm256_srai_epi64x};
+use crate::avx2::utils::{_mm256_packts_epi64, _mm256_srai_epi64x};
 use crate::filter_weights::FilterBounds;
 use crate::support::{PRECISION, ROUNDING_APPROX};
 
@@ -148,16 +148,16 @@ unsafe fn consume_u16_32(
     let n_store_6 = _mm256_srai_epi64x::<PRECISION>(store_6);
     let n_store_7 = _mm256_srai_epi64x::<PRECISION>(store_7);
 
-    let mut new_store_0 = _mm256_packus_epi64(n_store_0, n_store_1);
+    let mut new_store_0 = _mm256_packts_epi64(n_store_0, n_store_1);
     new_store_0 = _mm256_min_epi32(_mm256_max_epi32(new_store_0, zeros), v_max_colors);
 
-    let mut new_store_1 = _mm256_packus_epi64(n_store_2, n_store_3);
+    let mut new_store_1 = _mm256_packts_epi64(n_store_2, n_store_3);
     new_store_1 = _mm256_min_epi32(_mm256_max_epi32(new_store_1, zeros), v_max_colors);
 
-    let mut new_store_2 = _mm256_packus_epi64(n_store_4, n_store_5);
+    let mut new_store_2 = _mm256_packts_epi64(n_store_4, n_store_5);
     new_store_2 = _mm256_min_epi32(_mm256_max_epi32(new_store_2, zeros), v_max_colors);
 
-    let mut new_store_3 = _mm256_packus_epi64(n_store_6, n_store_7);
+    let mut new_store_3 = _mm256_packts_epi64(n_store_6, n_store_7);
     new_store_3 = _mm256_min_epi32(_mm256_max_epi32(new_store_3, zeros), v_max_colors);
 
     let store_0 = _mm256_packus_epi32(new_store_0, new_store_1);
@@ -238,10 +238,10 @@ unsafe fn consume_u16_16(
     let n_store_2 = _mm256_srai_epi64x::<PRECISION>(store_2);
     let n_store_3 = _mm256_srai_epi64x::<PRECISION>(store_3);
 
-    let mut new_store_0 = _mm256_packus_epi64(n_store_0, n_store_1);
+    let mut new_store_0 = _mm256_packts_epi64(n_store_0, n_store_1);
     new_store_0 = _mm256_min_epi32(_mm256_max_epi32(new_store_0, zeros), v_max_colors);
 
-    let mut new_store_1 = _mm256_packus_epi64(n_store_2, n_store_3);
+    let mut new_store_1 = _mm256_packts_epi64(n_store_2, n_store_3);
     new_store_1 = _mm256_min_epi32(_mm256_max_epi32(new_store_1, zeros), v_max_colors);
 
     let store = _mm256_packus_epi32(new_store_0, new_store_1);
@@ -300,7 +300,7 @@ unsafe fn consume_u16_8(
     let n_store_0 = _mm256_srai_epi64x::<PRECISION>(store_0);
     let n_store_1 = _mm256_srai_epi64x::<PRECISION>(store_1);
 
-    let mut new_store_0 = _mm256_packus_epi64(n_store_0, n_store_1);
+    let mut new_store_0 = _mm256_packts_epi64(n_store_0, n_store_1);
     new_store_0 = _mm256_min_epi32(_mm256_max_epi32(new_store_0, zeros), v_max_colors);
 
     let store_u16 = _mm256_castsi256_si128(_mm256_packus_epi32(new_store_0, new_store_0));
@@ -346,7 +346,7 @@ unsafe fn consume_u16_4(
     let v_max_colors = _mm256_set1_epi32(max_colors);
     let n_store_0 = _mm256_srai_epi64x::<PRECISION>(store);
 
-    let mut new_store = _mm256_packus_epi64(n_store_0, n_store_0);
+    let mut new_store = _mm256_packts_epi64(n_store_0, n_store_0);
     new_store = _mm256_min_epi32(_mm256_max_epi32(new_store, zeros), v_max_colors);
 
     let store_u16 = _mm256_castsi256_si128(_mm256_packus_epi32(new_store, new_store));
@@ -390,7 +390,7 @@ unsafe fn consume_u16_1(
     let v_max_colors = _mm256_set1_epi32(max_colors);
 
     let shrinked_64 = _mm256_srai_epi64x::<PRECISION>(store);
-    let shrinked = _mm256_packus_epi64(shrinked_64, shrinked_64);
+    let shrinked = _mm256_packts_epi64(shrinked_64, shrinked_64);
     let shrinked_store = _mm256_min_epi32(_mm256_max_epi32(shrinked, zeros), v_max_colors);
     let dst_ptr = dst.add(px);
     let value = _mm256_extract_epi32::<0>(shrinked_store);

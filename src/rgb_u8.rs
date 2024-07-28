@@ -48,7 +48,7 @@ use crate::sse::convolve_vertical_sse_row;
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 ))]
-use crate::sse::sse_rgb::{
+use crate::sse::{
     convolve_horizontal_rgb_sse_row_one, convolve_horizontal_rgb_sse_rows_4,
 };
 use num_traits::AsPrimitive;

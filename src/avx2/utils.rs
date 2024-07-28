@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+use crate::support::PRECISION;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -332,8 +333,8 @@ pub unsafe fn _mm256_srai_epi64x<const IMM8: i32>(a: __m256i) -> __m256i {
 }
 
 #[inline]
-/// Pack 64bytes integers into 32 bytes
-pub unsafe fn _mm256_packus_epi64(a: __m256i, b: __m256i) -> __m256i {
+/// Pack 64bytes integers into 32 bytes using truncation
+pub unsafe fn _mm256_packts_epi64(a: __m256i, b: __m256i) -> __m256i {
     const SHUFFLE_1: i32 = shuffle(2, 0, 2, 0);
     let combined = _mm256_shuffle_ps::<SHUFFLE_1>(_mm256_castsi256_ps(a), _mm256_castsi256_ps(b));
     const SHUFFLE_2: i32 = shuffle(3, 1, 2, 0);
@@ -344,7 +345,7 @@ pub unsafe fn _mm256_packus_epi64(a: __m256i, b: __m256i) -> __m256i {
 #[inline]
 #[allow(dead_code)]
 /// Pack 64bytes integers into 32 bytes
-pub unsafe fn _mm_cvtepi64_epi32x(v: __m256i) -> __m128i {
+pub unsafe fn _mm256_cvtepi64_epi32x(v: __m256i) -> __m128i {
     let vf = _mm256_castsi256_ps(v);
     let hi = _mm256_extractf128_ps::<1>(vf);
     let lo = _mm256_castps256_ps128(vf);

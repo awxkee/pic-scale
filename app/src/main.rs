@@ -21,7 +21,7 @@ use pic_scale::{
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/asset_5.png")
+    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -31,18 +31,14 @@ fn main() {
     let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
-    //
-
-    let mut f32_bytes: Vec<f32> = bytes.iter().map(|&x| x as f32 / 255f32).collect();
-
     let start_time = Instant::now();
-    let store = ImageStore::<f32, 4>::from_slice(
-        &mut f32_bytes,
+    let store = ImageStore::<u8, 4>::from_slice(
+        &mut bytes,
         dimensions.0 as usize,
         dimensions.1 as usize,
     )
     .unwrap();
-    let resized = scaler.resize_rgba_f32(
+    let resized = scaler.resize_rgba(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
         store,
         false,
@@ -97,15 +93,15 @@ fn main() {
     // Print the elapsed time in milliseconds
     println!("Scaler: {:.2?}", elapsed_time);
 
-    let dst: Vec<u8> = resized
-        .as_bytes()
-        .iter()
-        .map(|&x| (x * 255f32) as u8)
-        .collect();
+    // let dst: Vec<u8> = resized
+    //     .as_bytes()
+    //     .iter()
+    //     .map(|&x| (x * 255f32) as u8)
+    //     .collect();
 
     // let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 2) as u8).collect();
     //
-    // let dst = resized.as_bytes();
+    let dst = resized.as_bytes();
 
     if resized.channels == 4 {
         image::save_buffer(

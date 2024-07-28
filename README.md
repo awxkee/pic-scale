@@ -37,7 +37,7 @@ let resized = scaler.resize_rgba(
 let resized_image = resized.as_bytes();
 ```
 
-### Fastest path with SIMD
+### Fastest paths using SIMD
 
 Despite all implementation are fast, not all the paths are implemented using SIMD, so some paths are slower
 
