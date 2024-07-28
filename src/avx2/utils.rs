@@ -340,3 +340,15 @@ pub unsafe fn _mm256_packus_epi64(a: __m256i, b: __m256i) -> __m256i {
     let ordered = _mm256_permute4x64_pd::<SHUFFLE_2>(_mm256_castps_pd(combined));
     return _mm256_castpd_si256(ordered);
 }
+
+#[inline]
+#[allow(dead_code)]
+/// Pack 64bytes integers into 32 bytes
+pub unsafe fn _mm_cvtepi64_epi32x(v: __m256i) -> __m128i {
+    let vf = _mm256_castsi256_ps(v);
+    let hi = _mm256_extractf128_ps::<1>(vf);
+    let lo = _mm256_castps256_ps128(vf);
+    const FLAGS: i32 = shuffle(2, 0, 2, 0);
+    let packed = _mm_shuffle_ps::<FLAGS>(lo, hi);
+    return _mm_castps_si128(packed);
+}
