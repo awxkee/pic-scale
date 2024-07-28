@@ -4,7 +4,9 @@ use fast_image_resize::FilterType::Lanczos3;
 use fast_image_resize::{CpuExtensions, PixelType, ResizeAlg, ResizeOptions, Resizer};
 use image::io::Reader as ImageReader;
 use image::GenericImageView;
-use pic_scale::{ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ScalingF32, ThreadingPolicy};
+use pic_scale::{
+    ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ScalingF32, ThreadingPolicy,
+};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let img = ImageReader::open("../assets/asset_5.png")

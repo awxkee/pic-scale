@@ -36,7 +36,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-pub unsafe fn consume_u16_16(
+unsafe fn consume_u16_16(
     start_y: usize,
     start_x: usize,
     src: *const u16,
@@ -58,7 +58,7 @@ pub unsafe fn consume_u16_16(
 
     let px = start_x;
 
-    let zeros = _mm_set1_epi32(0);
+    let zeros = _mm_setzero_si128();
 
     for j in 0..bounds.size {
         let py = start_y + j;
@@ -148,7 +148,7 @@ pub unsafe fn consume_u16_16(
 }
 
 #[inline(always)]
-pub unsafe fn consume_u16_8(
+unsafe fn consume_u16_8(
     start_y: usize,
     start_x: usize,
     src: *const u16,
@@ -166,7 +166,7 @@ pub unsafe fn consume_u16_8(
 
     let px = start_x;
 
-    let zeros = _mm_set1_epi32(0);
+    let zeros = _mm_setzero_si128();
 
     for j in 0..bounds.size {
         let py = start_y + j;
@@ -221,7 +221,7 @@ pub unsafe fn consume_u16_8(
 }
 
 #[inline(always)]
-pub unsafe fn consume_u16_4(
+unsafe fn consume_u16_4(
     start_y: usize,
     start_x: usize,
     src: *const u16,
@@ -275,7 +275,7 @@ pub unsafe fn consume_u16_4(
 }
 
 #[inline(never)]
-pub unsafe fn consume_u16_1(
+unsafe fn consume_u16_1(
     start_y: usize,
     start_x: usize,
     src: *const u16,

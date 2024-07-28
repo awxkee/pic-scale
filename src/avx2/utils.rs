@@ -315,10 +315,28 @@ pub unsafe fn avx_combine_ps(lo: __m128, hi: __m128) -> __m256 {
 }
 
 #[inline(always)]
-#[allow(dead_code)]
 pub unsafe fn avx_combine_epi(lo: __m128i, hi: __m128i) -> __m256i {
     _mm256_castps_si256(_mm256_insertf128_ps::<1>(
         _mm256_castps128_ps256(_mm_castsi128_ps(lo)),
         _mm_castsi128_ps(hi),
     ))
+}
+
+#[inline]
+/// Arithmetic shift for i64, shifting with sign bits
+pub unsafe fn _mm256_srai_epi64x<const IMM8: i32>(a: __m256i) -> __m256i {
+    let m = _mm256_set1_epi64x(1 << (64 - 1));
+    let x = _mm256_srli_epi64::<IMM8>(a);
+    let result = _mm256_sub_epi64(_mm256_xor_si256(x, m), m); //result = x^m - m
+    return result;
+}
+
+#[inline]
+/// Pack 64bytes integers into 32 bytes
+pub unsafe fn _mm256_packus_epi64(a: __m256i, b: __m256i) -> __m256i {
+    const SHUFFLE_1: i32 = shuffle(2, 0, 2, 0);
+    let combined = _mm256_shuffle_ps::<SHUFFLE_1>(_mm256_castsi256_ps(a), _mm256_castsi256_ps(b));
+    const SHUFFLE_2: i32 = shuffle(3, 1, 2, 0);
+    let ordered = _mm256_permute4x64_pd::<SHUFFLE_2>(_mm256_castps_pd(combined));
+    return _mm256_castpd_si256(ordered);
 }
