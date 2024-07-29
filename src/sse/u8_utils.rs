@@ -62,19 +62,3 @@ pub(crate) unsafe fn convolve_horizontal_parts_one_sse_rgb(
     let acc = _mm_add_epi32(store_0, _mm_mullo_epi32(_mm_cvtepi16_epi32(lo), weight0));
     acc
 }
-
-#[inline(always)]
-pub(crate) unsafe fn convolve_horizontal_parts_two_sse_rgb(
-    start_x: usize,
-    src: *const u8,
-    weight01: __m128i,
-    store_0: __m128i,
-    shuffle: __m128i,
-) -> __m128i {
-    const COMPONENTS: usize = 3;
-    let src_ptr = src.add(start_x * COMPONENTS);
-    let rgb_pixel = _mm_loadu_si64(src_ptr);
-    let lo = _mm_shuffle_epi8(rgb_pixel, shuffle);
-    let acc = _mm_add_epi32(store_0, _mm_madd_epi16(lo, weight01));
-    acc
-}

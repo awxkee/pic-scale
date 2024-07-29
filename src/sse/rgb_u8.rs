@@ -34,7 +34,7 @@ use std::arch::x86_64::*;
 
 use crate::filter_weights::FilterWeights;
 use crate::sse::{
-    compress_i32, convolve_horizontal_parts_one_sse_rgb, convolve_horizontal_parts_two_sse_rgb,
+    compress_i32, convolve_horizontal_parts_one_sse_rgb,
 };
 use crate::support::ROUNDING_APPROX;
 
@@ -89,38 +89,33 @@ pub fn convolve_horizontal_rgb_sse_rows_4(
                 let weight23 = _mm_set1_epi32((ptr.add(2) as *const i32).read_unaligned());
                 let bounds_start = bounds.start + jx;
 
-                let src_ptr_0 = unsafe_source_ptr_0.add(bounds_start * CHANNELS);
+                let src_ptr = unsafe_source_ptr_0.add(bounds_start * CHANNELS);
 
-                let rgb_pixel = _mm_loadu_si128(src_ptr_0 as *const __m128i);
-                let hi = _mm_shuffle_epi8(rgb_pixel, shuffle_hi);
-                let lo = _mm_shuffle_epi8(rgb_pixel, shuffle_lo);
+                let rgb_pixel_0 = _mm_loadu_si128(src_ptr as *const __m128i);
+                let rgb_pixel_1 = _mm_loadu_si128(src_ptr.add(src_stride) as *const __m128i);
+                let rgb_pixel_2 = _mm_loadu_si128(src_ptr.add(src_stride * 2) as *const __m128i);
+                let rgb_pixel_4 = _mm_loadu_si128(src_ptr.add(src_stride * 3) as *const __m128i);
 
-                store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(lo, weight01));
-                store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(hi, weight23));
+                let hi_0 = _mm_shuffle_epi8(rgb_pixel_0, shuffle_hi);
+                let lo_0 = _mm_shuffle_epi8(rgb_pixel_0, shuffle_lo);
+                let hi_1 = _mm_shuffle_epi8(rgb_pixel_1, shuffle_hi);
+                let lo_1 = _mm_shuffle_epi8(rgb_pixel_1, shuffle_lo);
+                let hi_2 = _mm_shuffle_epi8(rgb_pixel_2, shuffle_hi);
+                let lo_2 = _mm_shuffle_epi8(rgb_pixel_2, shuffle_lo);
+                let hi_3 = _mm_shuffle_epi8(rgb_pixel_4, shuffle_hi);
+                let lo_3 = _mm_shuffle_epi8(rgb_pixel_4, shuffle_lo);
 
-                let src_ptr = src_ptr_0.add(src_stride);
-                let rgb_pixel = _mm_loadu_si128(src_ptr as *const __m128i);
-                let hi = _mm_shuffle_epi8(rgb_pixel, shuffle_hi);
-                let lo = _mm_shuffle_epi8(rgb_pixel, shuffle_lo);
+                store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(lo_0, weight01));
+                store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(hi_0, weight23));
 
-                store_1 = _mm_add_epi32(store_1, _mm_madd_epi16(lo, weight01));
-                store_1 = _mm_add_epi32(store_1, _mm_madd_epi16(hi, weight23));
+                store_1 = _mm_add_epi32(store_1, _mm_madd_epi16(lo_1, weight01));
+                store_1 = _mm_add_epi32(store_1, _mm_madd_epi16(hi_1, weight23));
 
-                let src_ptr = src_ptr_0.add(src_stride * 2);
-                let rgb_pixel = _mm_loadu_si128(src_ptr as *const __m128i);
-                let hi = _mm_shuffle_epi8(rgb_pixel, shuffle_hi);
-                let lo = _mm_shuffle_epi8(rgb_pixel, shuffle_lo);
+                store_2 = _mm_add_epi32(store_2, _mm_madd_epi16(lo_2, weight01));
+                store_2 = _mm_add_epi32(store_2, _mm_madd_epi16(hi_2, weight23));
 
-                store_2 = _mm_add_epi32(store_2, _mm_madd_epi16(lo, weight01));
-                store_2 = _mm_add_epi32(store_2, _mm_madd_epi16(hi, weight23));
-
-                let src_ptr = src_ptr_0.add(src_stride * 3);
-                let rgb_pixel = _mm_loadu_si128(src_ptr as *const __m128i);
-                let hi = _mm_shuffle_epi8(rgb_pixel, shuffle_hi);
-                let lo = _mm_shuffle_epi8(rgb_pixel, shuffle_lo);
-
-                store_3 = _mm_add_epi32(store_3, _mm_madd_epi16(lo, weight01));
-                store_3 = _mm_add_epi32(store_3, _mm_madd_epi16(hi, weight23));
+                store_3 = _mm_add_epi32(store_3, _mm_madd_epi16(lo_3, weight01));
+                store_3 = _mm_add_epi32(store_3, _mm_madd_epi16(hi_3, weight23));
                 jx += 4;
             }
 
@@ -128,41 +123,33 @@ pub fn convolve_horizontal_rgb_sse_rows_4(
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let bounds_start = bounds.start + jx;
                 let weight01 = _mm_set1_epi32((ptr as *const i32).read_unaligned());
-                store_0 = convolve_horizontal_parts_two_sse_rgb(
-                    bounds_start,
-                    unsafe_source_ptr_0,
-                    weight01,
-                    store_0,
-                    shuffle_lo,
-                );
-                store_1 = convolve_horizontal_parts_two_sse_rgb(
-                    bounds_start,
-                    unsafe_source_ptr_0.add(src_stride),
-                    weight01,
-                    store_1,
-                    shuffle_lo,
-                );
-                store_2 = convolve_horizontal_parts_two_sse_rgb(
-                    bounds_start,
-                    unsafe_source_ptr_0.add(src_stride * 2),
-                    weight01,
-                    store_2,
-                    shuffle_lo,
-                );
-                store_3 = convolve_horizontal_parts_two_sse_rgb(
-                    bounds_start,
-                    unsafe_source_ptr_0.add(src_stride * 3),
-                    weight01,
-                    store_3,
-                    shuffle_lo,
-                );
+
+                let src_ptr = unsafe_source_ptr_0.add(bounds_start * CHANNELS);
+
+                let rgb_pixel_0 = _mm_loadu_si128(src_ptr as *const __m128i);
+                let rgb_pixel_1 = _mm_loadu_si128(src_ptr.add(src_stride) as *const __m128i);
+                let rgb_pixel_2 = _mm_loadu_si128(src_ptr.add(src_stride * 2) as *const __m128i);
+                let rgb_pixel_4 = _mm_loadu_si128(src_ptr.add(src_stride * 3) as *const __m128i);
+
+                let lo_0 = _mm_shuffle_epi8(rgb_pixel_0, shuffle_lo);
+                let lo_1 = _mm_shuffle_epi8(rgb_pixel_1, shuffle_lo);
+                let lo_2 = _mm_shuffle_epi8(rgb_pixel_2, shuffle_lo);
+                let lo_3 = _mm_shuffle_epi8(rgb_pixel_4, shuffle_lo);
+
+                store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(lo_0, weight01));
+                store_1 = _mm_add_epi32(store_1, _mm_madd_epi16(lo_1, weight01));
+                store_2 = _mm_add_epi32(store_2, _mm_madd_epi16(lo_2, weight01));
+                store_3 = _mm_add_epi32(store_3, _mm_madd_epi16(lo_3, weight01));
+
                 jx += 2;
             }
 
             while jx < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let bounds_start = bounds.start + jx;
+
                 let weight0 = _mm_set1_epi32(ptr.read_unaligned() as i32);
+
                 store_0 = convolve_horizontal_parts_one_sse_rgb(
                     bounds_start,
                     unsafe_source_ptr_0,
