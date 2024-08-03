@@ -58,13 +58,13 @@ where
     let tp = dp * x;
     if x < 1f32.as_() {
         return ((12f32.as_() - 9f32.as_() * b - 6f32.as_() * c) * tp
-            + (-18f32.as_() + 12f32.as_() * b + 6f32.as_() * c) * dp
+            + ((-18f32).as_() + 12f32.as_() * b + 6f32.as_() * c) * dp
             + (6f32.as_() - 2f32.as_() * b))
             * (1f32.as_() / 6f32.as_());
     } else if x < 2f32.as_() {
         return ((-b - 6f32.as_() * c) * tp
             + (6f32.as_() * b + 30f32.as_() * c) * dp
-            + (-12f32.as_() * b - 48f32.as_() * c) * x
+            + ((-12f32).as_() * b - 48f32.as_() * c) * x
             + (8f32.as_() * b + 24f32.as_() * c))
             * (1f32.as_() / 6f32.as_());
     }

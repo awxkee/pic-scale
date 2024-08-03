@@ -14,10 +14,7 @@ use image::{EncodableLayout, GenericImageView};
 
 use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
-use pic_scale::{
-    ImageSize, ImageStore, JzazbzScaler, OklabScaler, ResamplingFunction, Scaler, Scaling,
-    ScalingF32, ScalingU16, ThreadingPolicy, TransferFunction,
-};
+use pic_scale::{ImageSize, ImageStore, JzazbzScaler, LabScaler, LinearApproxScaler, OklabScaler, ResamplingFunction, Scaler, Scaling, ScalingF32, ScalingU16, ThreadingPolicy, TransferFunction};
 
 fn main() {
     // test_fast_image();
@@ -28,7 +25,7 @@ fn main() {
     let dimensions = img.dimensions();
     let mut bytes = Vec::from(img.as_bytes());
 
-    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    let mut scaler = LabScaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
     let start_time = Instant::now();

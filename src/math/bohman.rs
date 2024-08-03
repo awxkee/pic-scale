@@ -35,7 +35,7 @@ pub(crate) fn bohman<V: Copy + PartialEq + ConstPI + 'static + Signed + Float>(x
 where
     f32: AsPrimitive<V>,
 {
-    if x < -1f32.as_() || x > 1f32.as_() {
+    if x < (-1f32).as_() || x > 1f32.as_() {
         return 0f32.as_();
     }
     let dx = V::const_pi() * x.abs();

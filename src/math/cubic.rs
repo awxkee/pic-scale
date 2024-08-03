@@ -54,7 +54,7 @@ where
     if x < 1f32.as_() {
         return (4f32.as_() + x * x * (3f32.as_() * x - 6f32.as_())) * (1f32.as_() / 6f32.as_());
     } else if x < 2f32.as_() {
-        return (8f32.as_() + x * (-12f32.as_() + x * (6f32.as_() - x)))
+        return (8f32.as_() + x * ((-12f32).as_() + x * (6f32.as_() - x)))
             * (1f32.as_() / 6f32.as_());
     }
     return 0f32.as_();
@@ -77,7 +77,7 @@ where
     f32: AsPrimitive<V>,
 {
     let x = d;
-    let a = -0.5.as_();
+    let a = (-0.5).as_();
     let modulo = x.abs();
     if modulo >= 2f32.as_() {
         return 0f32.as_();
