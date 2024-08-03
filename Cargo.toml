@@ -16,7 +16,7 @@ repository = "https://github.com/awxkee/pic-scale"
 exclude = ["*.jpg", "/assets", "*.png"]
 
 [dependencies]
-colorutils-rs = "0.5.6"
+colorutils-rs = "0.5.8"
 half = { version = "2.4.1", optional = true, features = ["alloc", "std", "num-traits"] }
 num-traits = { version = "0.2.19", features = ["std"] }
 rayon = "1.10.0"
