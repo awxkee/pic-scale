@@ -2,18 +2,19 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use fast_image_resize::images::Image;
 use fast_image_resize::FilterType::Lanczos3;
 use fast_image_resize::{CpuExtensions, PixelType, ResizeAlg, ResizeOptions, Resizer};
-use image::{GenericImageView, ImageReader};
+use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
     ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ScalingF32, ThreadingPolicy,
 };
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    let img = ImageReader::open("../assets/nasa-4928x3279.png")
+    let img = ImageReader::open("../assets/nasa-4928x3279-rgba.png")
         .unwrap()
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
-    let src_bytes = img.as_bytes();
+    let binding = img.to_rgb8();
+    let src_bytes = binding.as_bytes();
 
     c.bench_function("Pic scale RGB: Lanczos 3", |b| {
         b.iter(|| {
