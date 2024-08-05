@@ -9,8 +9,7 @@ use fast_image_resize::{
     CpuExtensions, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
 use half::f16;
-use image::io::Reader as ImageReader;
-use image::{EncodableLayout, GenericImageView};
+use image::{EncodableLayout, GenericImageView, ImageReader};
 
 use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
@@ -18,7 +17,7 @@ use pic_scale::{ImageSize, ImageStore, JzazbzScaler, LabScaler, LinearApproxScal
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/asset_middle.jpg")
+    let img = ImageReader::open("./assets/asset_5.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -29,15 +28,15 @@ fn main() {
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
     let start_time = Instant::now();
-    let store = ImageStore::<u8, 3>::from_slice(
+    let store = ImageStore::<u8, 4>::from_slice(
         &mut bytes,
         dimensions.0 as usize,
         dimensions.1 as usize,
     )
     .unwrap();
-    let resized = scaler.resize_rgb(
+    let resized = scaler.resize_rgba(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-        store,
+        store,true
     );
 
     // let mut r_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];

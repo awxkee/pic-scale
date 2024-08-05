@@ -69,7 +69,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             }
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             unsafe {
-                resizer.set_cpu_extensions(CpuExtensions::Sse4_1);
+                resizer.set_cpu_extensions(CpuExtensions::Avx2);
             }
             resizer
                 .resize(
@@ -117,7 +117,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             }
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             unsafe {
-                resizer.set_cpu_extensions(CpuExtensions::Sse4_1);
+                resizer.set_cpu_extensions(CpuExtensions::Avx2);
             }
             resizer
                 .resize(

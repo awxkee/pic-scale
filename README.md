@@ -69,89 +69,47 @@ Even when `half` feature activated but platform do not support or features not e
 
 ### Performance
 
-Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 image in two times using x86_64 *SSE*.
+Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 image in two times.
 
-|           | Lanczos3 |
-|-----------|:--------:|
-| pic-scale |  27.87   |
-| fir sse   |  36.94   |
+| Lanczos3  |  SSE  |  AVX  | NEON  |
+|-----------|:-----:|:-----:|:-----:|
+| pic-scale | 43.84 | 33.98 | 25.80 |
+| fir sse   | 45.36 | 36.05 | 36.69 |
 
-Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 image in two times using *NEON*.
+Example comparison time for downscale RGBA 4928x3279 image in two times with premultiplying alpha.
 
-|           | Lanczos3 |
-|-----------|:--------:|
-| pic-scale |  25.80   |
-| fir sse   |  36.69   |
+| Lanczos3  |  SSE  |  AVX  | NEON  |
+|-----------|:-----:|:-----:|:-----:|
+| pic-scale | 68.51 | 47.33 | 38.81 |
+| fir sse   | 73.28 | 54.66 | 54.66 |
 
-Example comparison time for downscale RGBA 4928x3279 image in two times using x86_64 *SSE* with premultiplying alpha.
+Example comparison time for downscale RGBA 4928x3279 image in two times without premultiplying alpha.
 
-|           | Lanczos3 |
-|-----------|:--------:|
-| pic-scale |  35.51   |
-| fir sse   |  30.87   |
+| Lanczos3  |  SSE  |  AVX  | NEON  |
+|-----------|:-----:|:-----:|:-----:|
+| pic-scale | 52.42 | 38.37 | 29.54 |
+| fir sse   | 51.89 | 39.82 | 44.54 |
 
-Example comparison time for downscale RGBA 4928x3279 image in two times using *NEON* with premultiplying alpha.
+Example comparison time for downscale RGBA 4928x3279 10 bit image in two times with premultiplying alpha.
 
-|           | Lanczos3 |
-|-----------|:--------:|
-| pic-scale |  38.81   |
-| fir sse   |  54.66   |
+| Lanczos3  |  SSE   | NEON  |
+|-----------|:------:|:-----:|
+| pic-scale | 156.90 | 62.44 |
+| fir sse   | 150.65 | 91.08 |
 
-Example comparison time for downscale RGBA 4928x3279 image in two times using *SSE* without premultiplying alpha.
+RGBA 4928x3279 10 bit downscale in two times without premultiplying alpha 
 
-|           | Lanczos3 |
-|-----------|:--------:|
-| pic-scale |  24.00   |
-| fir sse   |  23.13   |
-
-Example comparison time for downscale RGBA 4928x3279 image in two times using *NEON* without premultiplying alpha.
-
-|           | Lanczos3 |
-|-----------|:--------:|
-| pic-scale |  29.54   |
-| fir sse   |  44.54   |
-
-Example comparison time for downscale RGBA 4928x3279 10 bit image in two times using *NEON* with premultiplying alpha.
-
-|           | Lanczos3 |
-|-----------|:--------:|
-| pic-scale |  62.44   |
-| fir sse   |  91.08   |
-
-RGBA 4928x3279 10 bit downscale without premultiplying alpha using *NEON*
-
-|           | Lanczos3 |
-|-----------|:--------:|
-| pic-scale |  45.09   |
-| fir sse   |  73.82   |
-
-Example comparison time for downscale RGBA 4928x3279 10 bit image in two times using *SSE* with premultiplying alpha.
-
-|           | Lanczos3 |
-|-----------|:--------:|
-| pic-scale |  156.90  |
-| fir sse   |  150.65  |
-
-RGBA 4928x3279 10 bit downscale without premultiplying alpha using *SSE*
-
-|           | Lanczos3 |
-|-----------|:--------:|
-| pic-scale |  107.82  |
-| fir sse   |  113.51  |
+| Lanczos3  |  SSE   | NEON  |
+|-----------|:------:|:-----:|
+| pic-scale | 156.90 | 45.09 |
+| fir sse   | 150.65 | 73.82 |
 
 Example comparison time for downscale RGB 4000x6000 10 bit image in two times using *NEON*.
 
-|           | Lanczos3 |
-|-----------|:--------:|
-| pic-scale |  56.89   |
-| fir sse   |  100.36  |
-
-Example comparison time for downscale RGB 4000x6000 10 bit image in two times using *SSE*.
-
-|           | Lanczos3 |
-|-----------|:--------:|
-| pic-scale |  138.75  |
-| fir sse   |  125.85  |
+| Lanczos3  |  SSE   |  NEON  |
+|-----------|:------:|:------:|
+| pic-scale | 138.75 | 56.89  |
+| fir sse   | 125.85 | 100.36 |
 
 #### Example in sRGB
 
