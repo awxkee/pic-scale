@@ -113,8 +113,8 @@ macro_rules! write_accumulator_u8 {
         let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
         let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
         let bytes = pixel.to_le_bytes();
-        $dst.write_unaligned(bytes[0]);
-        $dst.add(1).write_unaligned(bytes[1]);
+        let first_byte = u16::from_le_bytes([bytes[0], bytes[1]]);
+        ($dst as *mut u16).write_unaligned(first_byte);
         $dst.add(2).write_unaligned(bytes[2]);
     }};
 }

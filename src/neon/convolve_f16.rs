@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use std::arch::aarch64::vdupq_n_f32;
+use std::arch::aarch64::{vdupq_n_f32, vld1q_dup_f32};
 
 use crate::filter_weights::FilterBounds;
 use crate::neon::utils::prefer_vfmaq_f32;
@@ -50,8 +50,8 @@ pub(crate) unsafe fn convolve_vertical_part_neon_8_f16<const USE_BLENDING: bool>
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = unsafe { filter.add(j).read_unaligned() };
-        let v_weight = vdupq_n_f32(weight);
+        let weight = filter.add(j);
+        let v_weight = vld1q_dup_f32(weight);
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);

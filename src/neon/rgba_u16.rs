@@ -141,10 +141,11 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u16(
             while jx + 4 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let bounds_start = bounds.start + jx;
-                let weight0 = vdupq_n_s32(ptr.read_unaligned() as i32);
-                let weight1 = vdupq_n_s32(ptr.add(1).read_unaligned() as i32);
-                let weight2 = vdupq_n_s32(ptr.add(2).read_unaligned() as i32);
-                let weight3 = vdupq_n_s32(ptr.add(3).read_unaligned() as i32);
+                let weights = vmovl_s16(vld1_s16(ptr));
+                let weight0 = vdupq_laneq_s32::<0>(weights);
+                let weight1 = vdupq_laneq_s32::<1>(weights);
+                let weight2 = vdupq_laneq_s32::<2>(weights);
+                let weight3 = vdupq_laneq_s32::<3>(weights);
                 let ptr_0 = unsafe_source_ptr_0;
                 (store_0, store_1) = consume_u16_4(
                     bounds_start,
@@ -195,8 +196,8 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u16(
             while jx + 2 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let bounds_start = bounds.start + jx;
-                let weight0 = vdupq_n_s32(ptr.read_unaligned() as i32);
-                let weight1 = vdupq_n_s32(ptr.add(1).read_unaligned() as i32);
+                let weight0 = vmovl_s16(vld1_dup_s16(ptr));
+                let weight1 = vmovl_s16(vld1_dup_s16(ptr.add(1)));
                 let ptr_0 = unsafe_source_ptr_0;
                 (store_0, store_1) =
                     consume_u16_2(bounds_start, ptr_0, weight0, weight1, store_0, store_1);
@@ -215,7 +216,7 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u16(
             while jx < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let bounds_start = bounds.start + jx;
-                let weight0 = vdupq_n_s32(ptr.read_unaligned() as i32);
+                let weight0 = vmovl_s16(vld1_dup_s16(ptr));
                 let ptr_0 = unsafe_source_ptr_0;
                 (store_0, store_1) = consume_u16_1(bounds_start, ptr_0, weight0, store_0, store_1);
                 let ptr_1 = unsafe_source_ptr_0.add(src_stride);
@@ -309,10 +310,11 @@ pub fn convolve_horizontal_rgba_neon_row_u16(
 
             while jx + 4 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = vdupq_n_s32(ptr.read_unaligned() as i32);
-                let weight1 = vdupq_n_s32(ptr.add(1).read_unaligned() as i32);
-                let weight2 = vdupq_n_s32(ptr.add(2).read_unaligned() as i32);
-                let weight3 = vdupq_n_s32(ptr.add(3).read_unaligned() as i32);
+                let weights = vmovl_s16(vld1_s16(ptr));
+                let weight0 = vdupq_laneq_s32::<0>(weights);
+                let weight1 = vdupq_laneq_s32::<1>(weights);
+                let weight2 = vdupq_laneq_s32::<2>(weights);
+                let weight3 = vdupq_laneq_s32::<3>(weights);
                 let bounds_start = bounds.start + jx;
                 (store0, store1) = consume_u16_4(
                     bounds_start,
@@ -329,8 +331,8 @@ pub fn convolve_horizontal_rgba_neon_row_u16(
 
             while jx + 2 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = vdupq_n_s32(ptr.read_unaligned() as i32);
-                let weight1 = vdupq_n_s32(ptr.add(1).read_unaligned() as i32);
+                let weight0 = vmovl_s16(vld1_dup_s16(ptr));
+                let weight1 = vmovl_s16(vld1_dup_s16(ptr.add(1)));
                 let bounds_start = bounds.start + jx;
                 (store0, store1) = consume_u16_2(
                     bounds_start,
@@ -345,7 +347,7 @@ pub fn convolve_horizontal_rgba_neon_row_u16(
 
             while jx < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = vdupq_n_s32(ptr.read_unaligned() as i32);
+                let weight0 = vmovl_s16(vld1_dup_s16(ptr));
                 let bounds_start = bounds.start + jx;
                 (store0, store1) =
                     consume_u16_1(bounds_start, unsafe_source_ptr_0, weight0, store0, store1);

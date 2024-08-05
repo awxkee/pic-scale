@@ -54,8 +54,8 @@ unsafe fn convolve_vertical_part_sse_24_f32(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = unsafe { filter.add(j).read_unaligned() };
-        let v_weight = _mm_set1_ps(weight);
+        let weight = filter.add(j);
+        let v_weight = _mm_load1_ps(weight);
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -102,8 +102,8 @@ unsafe fn convolve_vertical_part_sse_16_f32(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = unsafe { filter.add(j).read_unaligned() };
-        let v_weight = _mm_set1_ps(weight);
+        let weight = filter.add(j);
+        let v_weight = _mm_load1_ps(weight);
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -142,8 +142,8 @@ unsafe fn convolve_vertical_part_sse_8_f32(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = unsafe { filter.add(j).read_unaligned() };
-        let v_weight = _mm_set1_ps(weight);
+        let weight = filter.add(j);
+        let v_weight = _mm_load1_ps(weight);
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -175,8 +175,8 @@ unsafe fn convolve_vertical_part_sse_4_f32(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = unsafe { filter.add(j).read_unaligned() };
-        let v_weight = _mm_set1_ps(weight);
+        let weight = filter.add(j);
+        let v_weight = _mm_load1_ps(weight);
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -216,7 +216,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_f32(
     }
 
     let dst_ptr = dst.add(px);
-    dst_ptr.write_unaligned(f32::from_bits(_mm_extract_ps::<0>(store_0) as u32));
+    (dst_ptr as *mut i32).write_unaligned(_mm_extract_ps::<0>(store_0));
 }
 
 #[inline(always)]

@@ -36,11 +36,9 @@ use crate::neon::*;
 macro_rules! write_rgb_f16 {
     ($store: expr, $dest_ptr: expr) => {{
         let cvt = xreinterpret_u16_f16(xvcvt_f16_f32($store));
-        let l1 = vget_lane_u16::<0>(cvt);
-        let l2 = vget_lane_u16::<1>(cvt);
+        let l1 = vget_lane_u32::<0>(vreinterpret_u32_u16(cvt));
         let l3 = vget_lane_u16::<2>(cvt);
-        ($dest_ptr as *mut u16).write_unaligned(l1);
-        ($dest_ptr as *mut u16).add(1).write_unaligned(l2);
+        ($dest_ptr as *mut u32).write_unaligned(l1);
         ($dest_ptr as *mut u16).add(2).write_unaligned(l3);
     }};
 }

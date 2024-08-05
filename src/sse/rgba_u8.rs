@@ -28,7 +28,7 @@
  */
 
 use crate::filter_weights::FilterWeights;
-use crate::sse::compress_i32;
+use crate::sse::{compress_i32, shuffle};
 use crate::support::ROUNDING_APPROX;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
@@ -98,8 +98,11 @@ pub fn convolve_horizontal_rgba_sse_rows_4(
 
             while jx + 4 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight01 = _mm_set1_epi32((ptr as *const i32).read_unaligned());
-                let weight23 = _mm_set1_epi32((ptr.add(2) as *const i32).read_unaligned());
+                let weights = _mm_loadu_si64(ptr as * const u8);
+                const SHUFFLE_01: i32 = shuffle(0, 0, 0, 0);
+                let weight01 = _mm_shuffle_epi32::<SHUFFLE_01>(weights);
+                const SHUFFLE_23: i32 = shuffle(1, 1, 1, 1);
+                let weight23 = _mm_shuffle_epi32::<SHUFFLE_23>(weights);
                 let start_bounds = bounds.start + jx;
 
                 let src_ptr = unsafe_source_ptr_0.add(start_bounds * CHANNELS);
@@ -268,8 +271,11 @@ pub fn convolve_horizontal_rgba_sse_rows_one(
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let bounds_start = bounds.start + jx;
 
-                let weight01 = _mm_set1_epi32((ptr as *const i32).read_unaligned());
-                let weight23 = _mm_set1_epi32((ptr.add(2) as *const i32).read_unaligned());
+                let weights = _mm_loadu_si64(ptr as * const u8);
+                const SHUFFLE_01: i32 = shuffle(0, 0, 0, 0);
+                let weight01 = _mm_shuffle_epi32::<SHUFFLE_01>(weights);
+                const SHUFFLE_23: i32 = shuffle(1, 1, 1, 1);
+                let weight23 = _mm_shuffle_epi32::<SHUFFLE_23>(weights);
 
                 let src_ptr = unsafe_source_ptr_0.add(bounds_start * CHANNELS);
 

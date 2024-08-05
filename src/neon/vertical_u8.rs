@@ -88,8 +88,8 @@ macro_rules! consume_64_u8 {
 
         for j in 0..$bounds.size {
             let py = $start_y + j;
-            let weight = $filter.add(j).read_unaligned();
-            let v_weight = vdupq_n_s16(weight);
+            let weight = $filter.add(j);
+            let v_weight = vld1q_dup_s16(weight);
             let src_ptr = $src.add($src_stride * py);
 
             let s_ptr = src_ptr.add(px);
@@ -129,8 +129,8 @@ macro_rules! consume_32_u8 {
 
         for j in 0..$bounds.size {
             let py = $start_y + j;
-            let weight = $filter.add(j).read_unaligned();
-            let v_weight = vdupq_n_s16(weight);
+            let weight = $filter.add(j);
+            let v_weight = vld1q_dup_s16(weight);
             let src_ptr = $src.add($src_stride * py);
 
             let s_ptr = src_ptr.add(px);
@@ -162,8 +162,8 @@ macro_rules! consume_16_u8 {
 
         for j in 0..$bounds.size {
             let py = $start_y + j;
-            let weight = $filter.add(j).read_unaligned();
-            let v_weight = vdupq_n_s16(weight);
+            let weight = $filter.add(j);
+            let v_weight = vld1q_dup_s16(weight);
             let src_ptr = $src.add($src_stride * py);
 
             let s_ptr = src_ptr.add(px);
@@ -188,8 +188,8 @@ macro_rules! consume_u8_8 {
 
         for j in 0..$bounds.size {
             let py = $start_y + j;
-            let weight = $filter.add(j).read_unaligned();
-            let v_weight = vdupq_n_s16(weight);
+            let weight = $filter.add(j);
+            let v_weight = vld1q_dup_s16(weight);
             let src_ptr = $src.add($src_stride * py);
 
             let s_ptr = src_ptr.add(px);
@@ -226,8 +226,8 @@ macro_rules! consume_u8_1 {
 
         for j in 0..$bounds.size {
             let py = $start_y + j;
-            let weight = $filter.add(j).read_unaligned();
-            let v_weight = vdupq_n_s16(weight);
+            let weight = $filter.add(j);
+            let v_weight = vld1q_dup_s16(weight);
             let src_ptr = $src.add($src_stride * py);
 
             let s_ptr = src_ptr.add(px);

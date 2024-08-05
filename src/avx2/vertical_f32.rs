@@ -167,9 +167,7 @@ pub(crate) unsafe fn convolve_vertical_part_avx_f32(
     }
 
     let dst_ptr = dst.add(px);
-    dst_ptr.write_unaligned(f32::from_bits(
-        _mm256_extract_epi32::<0>(_mm256_castps_si256(store_0)) as u32,
-    ));
+    (dst_ptr as *mut i32).write_unaligned(_mm256_extract_epi32::<0>(_mm256_castps_si256(store_0)));
 }
 
 #[inline(always)]

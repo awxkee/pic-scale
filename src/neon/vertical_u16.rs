@@ -51,8 +51,8 @@ unsafe fn consume_u16_8(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j).read_unaligned();
-        let v_weight = vdupq_n_s32(weight as i32);
+        let weight = filter.add(j);
+        let v_weight = vmovl_s16(vld1_dup_s16(weight));
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -109,8 +109,8 @@ unsafe fn consume_u16_4(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j).read_unaligned();
-        let v_weight = vdupq_n_s32(weight as i32);
+        let weight = filter.add(j);
+        let v_weight = vmovl_s16(vld1_dup_s16(weight));
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -157,8 +157,8 @@ unsafe fn consume_u16_1(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j).read_unaligned();
-        let v_weight = vdupq_n_s32(weight as i32);
+        let weight = filter.add(j);
+        let v_weight = vmovl_s16(vld1_dup_s16(weight));
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);

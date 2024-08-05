@@ -27,14 +27,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+use crate::filter_weights::FilterWeights;
+use crate::load_4_weights;
+use crate::sse::{_mm_extract_epi64x, _mm_prefer_fma_ps, shuffle};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
-
-use crate::filter_weights::FilterWeights;
-use crate::load_4_weights;
-use crate::sse::{_mm_prefer_fma_ps, shuffle};
 
 #[inline(always)]
 pub(crate) unsafe fn convolve_horizontal_parts_4_rgb_f32(
@@ -149,8 +148,11 @@ pub fn convolve_horizontal_rgb_sse_row_one_f32(
 
             while jx + 2 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = _mm_set1_ps(ptr.read_unaligned());
-                let weight1 = _mm_set1_ps(ptr.add(1).read_unaligned());
+                let weights = _mm_castsi128_ps(_mm_loadu_si64(ptr as * const u8));
+                const SHUFFLE_0: i32 = shuffle(0, 0, 0, 0);
+                let weight0 = _mm_castsi128_ps(_mm_shuffle_epi32::<SHUFFLE_0>(_mm_castps_si128(weights)));
+                const SHUFFLE_1: i32 = shuffle(1, 1, 1, 1);
+                let weight1 = _mm_castsi128_ps(_mm_shuffle_epi32::<SHUFFLE_1>(_mm_castps_si128(weights)));
                 let filter_start = jx + bounds.start;
                 store = convolve_horizontal_parts_2_rgb_f32(
                     filter_start,
@@ -164,7 +166,7 @@ pub fn convolve_horizontal_rgb_sse_row_one_f32(
 
             while jx < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = _mm_set1_ps(ptr.read_unaligned());
+                let weight0 = _mm_load1_ps(ptr);
                 let filter_start = jx + bounds.start;
                 store = convolve_horizontal_parts_one_rgb_f32(
                     filter_start,
@@ -177,13 +179,11 @@ pub fn convolve_horizontal_rgb_sse_row_one_f32(
 
             let px = x * CHANNELS;
             let dest_ptr = unsafe_destination_ptr_0.add(px);
-            dest_ptr.write_unaligned(f32::from_bits(_mm_extract_ps::<0>(store) as u32));
-            dest_ptr
-                .add(1)
-                .write_unaligned(f32::from_bits(_mm_extract_ps::<1>(store) as u32));
-            dest_ptr
+            (dest_ptr as *mut i64)
+                .write_unaligned(_mm_extract_epi64x::<0>(_mm_castps_si128(store)));
+            (dest_ptr as *mut i32)
                 .add(2)
-                .write_unaligned(f32::from_bits(_mm_extract_ps::<2>(store) as u32));
+                .write_unaligned(_mm_extract_ps::<2>(store));
 
             filter_offset += filter_weights.aligned_size;
         }
@@ -258,8 +258,11 @@ pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f32(
 
             while jx + 2 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = _mm_set1_ps(ptr.read_unaligned());
-                let weight1 = _mm_set1_ps(ptr.add(1).read_unaligned());
+                let weights = _mm_castsi128_ps(_mm_loadu_si64(ptr as * const u8));
+                const SHUFFLE_0: i32 = shuffle(0, 0, 0, 0);
+                let weight0 = _mm_castsi128_ps(_mm_shuffle_epi32::<SHUFFLE_0>(_mm_castps_si128(weights)));
+                const SHUFFLE_1: i32 = shuffle(1, 1, 1, 1);
+                let weight1 = _mm_castsi128_ps(_mm_shuffle_epi32::<SHUFFLE_1>(_mm_castps_si128(weights)));
                 let filter_start = jx + bounds.start;
                 store_0 = convolve_horizontal_parts_2_rgb_f32(
                     filter_start,
@@ -294,7 +297,7 @@ pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f32(
 
             while jx < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = _mm_set1_ps(ptr.read_unaligned());
+                let weight0 = _mm_load1_ps(ptr);
                 let filter_start = jx + bounds.start;
                 store_0 = convolve_horizontal_parts_one_rgb_f32(
                     filter_start,
@@ -325,40 +328,32 @@ pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f32(
 
             let px = x * CHANNELS;
             let dest_ptr = unsafe_destination_ptr_0.add(px);
-            dest_ptr.write_unaligned(f32::from_bits(_mm_extract_ps::<0>(store_0) as u32));
-            dest_ptr
-                .add(1)
-                .write_unaligned(f32::from_bits(_mm_extract_ps::<1>(store_0) as u32));
-            dest_ptr
+            (dest_ptr as *mut i64)
+                .write_unaligned(_mm_extract_epi64x::<0>(_mm_castps_si128(store_0)));
+            (dest_ptr as *mut i32)
                 .add(2)
-                .write_unaligned(f32::from_bits(_mm_extract_ps::<2>(store_0) as u32));
+                .write_unaligned(_mm_extract_ps::<2>(store_0));
 
             let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride);
-            dest_ptr.write_unaligned(f32::from_bits(_mm_extract_ps::<0>(store_1) as u32));
-            dest_ptr
-                .add(1)
-                .write_unaligned(f32::from_bits(_mm_extract_ps::<1>(store_1) as u32));
-            dest_ptr
+            (dest_ptr as *mut i64)
+                .write_unaligned(_mm_extract_epi64x::<0>(_mm_castps_si128(store_1)));
+            (dest_ptr as *mut i32)
                 .add(2)
-                .write_unaligned(f32::from_bits(_mm_extract_ps::<2>(store_1) as u32));
+                .write_unaligned(_mm_extract_ps::<2>(store_1));
 
             let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 2);
-            dest_ptr.write_unaligned(f32::from_bits(_mm_extract_ps::<0>(store_2) as u32));
-            dest_ptr
-                .add(1)
-                .write_unaligned(f32::from_bits(_mm_extract_ps::<1>(store_2) as u32));
-            dest_ptr
+            (dest_ptr as *mut i64)
+                .write_unaligned(_mm_extract_epi64x::<0>(_mm_castps_si128(store_2)));
+            (dest_ptr as *mut i32)
                 .add(2)
-                .write_unaligned(f32::from_bits(_mm_extract_ps::<2>(store_2) as u32));
+                .write_unaligned(_mm_extract_ps::<2>(store_2));
 
             let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 3);
-            dest_ptr.write_unaligned(f32::from_bits(_mm_extract_ps::<0>(store_3) as u32));
-            dest_ptr
-                .add(1)
-                .write_unaligned(f32::from_bits(_mm_extract_ps::<1>(store_3) as u32));
-            dest_ptr
+            (dest_ptr as *mut i64)
+                .write_unaligned(_mm_extract_epi64x::<0>(_mm_castps_si128(store_3)));
+            (dest_ptr as *mut i32)
                 .add(2)
-                .write_unaligned(f32::from_bits(_mm_extract_ps::<2>(store_3) as u32));
+                .write_unaligned(_mm_extract_ps::<2>(store_3));
 
             filter_offset += filter_weights.aligned_size;
         }

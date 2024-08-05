@@ -2,14 +2,13 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use fast_image_resize::images::Image;
 use fast_image_resize::FilterType::Lanczos3;
 use fast_image_resize::{CpuExtensions, PixelType, ResizeAlg, ResizeOptions, Resizer};
-use image::io::Reader as ImageReader;
-use image::GenericImageView;
+use image::{GenericImageView, ImageReader};
 use pic_scale::{
     ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ScalingF32, ThreadingPolicy,
 };
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    let img = ImageReader::open("../assets/asset_5.png")
+    let img = ImageReader::open("../assets/nasa-4928x3279.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -20,7 +19,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
             scaler.set_threading_policy(ThreadingPolicy::Single);
-            let mut copied: Vec<u8> = src_bytes.iter().map(|&x| x).collect();
+            let mut copied: Vec<u8> = Vec::from(src_bytes);
             let store = ImageStore::<u8, 3>::from_slice(
                 &mut copied,
                 dimensions.0 as usize,
@@ -40,7 +39,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
             scaler.set_threading_policy(ThreadingPolicy::Single);
-            let mut copied: Vec<f32> = f32_image.iter().map(|&x| x).collect();
+            let mut copied: Vec<f32> = Vec::from(f32_image.clone());
             let store = ImageStore::<f32, 3>::from_slice(
                 &mut copied,
                 dimensions.0 as usize,

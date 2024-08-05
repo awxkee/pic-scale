@@ -191,29 +191,29 @@ pub fn convolve_horizontal_rgb_sse_rows_4(
             let dest_ptr = unsafe_destination_ptr_0.add(px);
 
             let bytes = element_0.to_le_bytes();
-            dest_ptr.write_unaligned(bytes[0]);
-            dest_ptr.add(1).write_unaligned(bytes[1]);
+            let first_byte = u16::from_le_bytes([bytes[0], bytes[1]]);
+            (dest_ptr as *mut u16).write_unaligned(first_byte);
             dest_ptr.add(2).write_unaligned(bytes[2]);
 
             let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride);
 
             let bytes = element_1.to_le_bytes();
-            dest_ptr.write_unaligned(bytes[0]);
-            dest_ptr.add(1).write_unaligned(bytes[1]);
+            let first_byte = u16::from_le_bytes([bytes[0], bytes[1]]);
+            (dest_ptr as *mut u16).write_unaligned(first_byte);
             dest_ptr.add(2).write_unaligned(bytes[2]);
 
             let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 2);
 
             let bytes = element_2.to_le_bytes();
-            dest_ptr.write_unaligned(bytes[0]);
-            dest_ptr.add(1).write_unaligned(bytes[1]);
+            let first_byte = u16::from_le_bytes([bytes[0], bytes[1]]);
+            (dest_ptr as *mut u16).write_unaligned(first_byte);
             dest_ptr.add(2).write_unaligned(bytes[2]);
 
             let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 3);
 
             let bytes = element_3.to_le_bytes();
-            dest_ptr.write_unaligned(bytes[0]);
-            dest_ptr.add(1).write_unaligned(bytes[1]);
+            let first_byte = u16::from_le_bytes([bytes[0], bytes[1]]);
+            (dest_ptr as *mut u16).write_unaligned(first_byte);
             dest_ptr.add(2).write_unaligned(bytes[2]);
 
             filter_offset += approx_weights.aligned_size;
@@ -309,13 +309,8 @@ pub fn convolve_horizontal_rgb_sse_row_one(
         let element = unsafe { _mm_extract_epi32::<0>(store_16_8) };
         let bytes = element.to_le_bytes();
         unsafe {
-            dest_ptr.write_unaligned(bytes[0]);
-            dest_ptr.add(1).write_unaligned(bytes[1]);
-            dest_ptr.add(2).write_unaligned(bytes[2]);
-        }
-        unsafe {
-            dest_ptr.write_unaligned(bytes[0]);
-            dest_ptr.add(1).write_unaligned(bytes[1]);
+            let first_byte = u16::from_le_bytes([bytes[0], bytes[1]]);
+            (dest_ptr as *mut u16).write_unaligned(first_byte);
             dest_ptr.add(2).write_unaligned(bytes[2]);
         }
 

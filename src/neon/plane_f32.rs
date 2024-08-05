@@ -158,7 +158,7 @@ pub fn convolve_horizontal_plane_neon_row_one(
             while jx < bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = vdupq_n_f32(ptr.read_unaligned());
+                let weight0 = vld1q_dup_f32(ptr);
                 store = conv_horiz_plane_1_f32!(bounds_start, unsafe_source_ptr_0, weight0, store);
                 jx += 1;
             }
@@ -288,7 +288,7 @@ pub fn convolve_horizontal_plane_neon_rows_4(
 
             while jx < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = vdupq_n_f32(ptr.read_unaligned());
+                let weight0 = vld1q_dup_f32(ptr);
                 let bounds_start = bounds.start + jx;
                 store_0 =
                     conv_horiz_plane_1_f32!(bounds_start, unsafe_source_ptr_0, weight0, store_0);

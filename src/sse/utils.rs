@@ -231,11 +231,36 @@ pub(crate) unsafe fn _mm_packus_epi64(a: __m128i, b: __m128i) -> __m128i {
     moved
 }
 
+#[inline(always)]
+/// Extracts i64 value
+pub unsafe fn _mm_extract_epi64x<const IMM: i32>(d: __m128i) -> i64 {
+    #[cfg(target_arch = "x86_64")]
+    {
+        return if IMM == 0 {
+            _mm_cvtsi128_si64(d)
+        } else {
+            _mm_extract_epi64::<IMM>(d)
+        };
+    }
+    #[cfg(target_arch = "x86")]
+    {
+        let (low, high);
+        if IMM == 0 {
+            low = _mm_cvtsi128_si32(d);
+            high = _mm_cvtsi128_si32(_mm_srli_si128::<4>(d));
+        } else {
+            low = _mm_cvtsi128_si32(_mm_srli_si128::<8>(d));
+            high = _mm_cvtsi128_si32(_mm_srli_si128::<12>(d));
+        }
+        return ((high as i64) << 32) | low as i64;
+    }
+}
+
 #[inline]
 pub unsafe fn _mm_store3_u16(ptr: *mut u16, a: __m128i) {
-    let mut aligned_buffer: [u16; 8] = [0; 8];
-    _mm_storeu_si128(aligned_buffer.as_mut_ptr() as *mut __m128i, a);
-    ptr.write_unaligned(*aligned_buffer.get_unchecked(0));
-    ptr.add(1).write_unaligned(*aligned_buffer.get_unchecked(1));
-    ptr.add(2).write_unaligned(*aligned_buffer.get_unchecked(2));
+    let low_pixel = _mm_extract_epi32::<0>(a);
+    (ptr as *mut i32).write_unaligned(low_pixel);
+    (ptr as *mut i16)
+        .add(2)
+        .write_unaligned(_mm_extract_epi16::<2>(a) as i16);
 }

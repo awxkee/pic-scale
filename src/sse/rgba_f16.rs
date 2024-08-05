@@ -134,8 +134,11 @@ pub fn convolve_horizontal_rgba_sse_row_one_f16(
 
             while jx + 2 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = _mm_set1_ps(ptr.read_unaligned());
-                let weight1 = _mm_set1_ps(ptr.add(1).read_unaligned());
+                let weights = _mm_castsi128_ps(_mm_loadu_si64(ptr as * const u8));
+                const SHUFFLE_0: i32 = shuffle(0, 0, 0, 0);
+                let weight0 = _mm_castsi128_ps(_mm_shuffle_epi32::<SHUFFLE_0>(_mm_castps_si128(weights)));
+                const SHUFFLE_1: i32 = shuffle(1, 1, 1, 1);
+                let weight1 = _mm_castsi128_ps(_mm_shuffle_epi32::<SHUFFLE_1>(_mm_castps_si128(weights)));
                 let filter_start = jx + bounds.start;
                 store = convolve_horizontal_parts_2_rgba_f16(
                     filter_start,
@@ -149,7 +152,7 @@ pub fn convolve_horizontal_rgba_sse_row_one_f16(
 
             while jx < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = _mm_set1_ps(ptr.read_unaligned());
+                let weight0 = _mm_load1_ps(ptr);
                 let filter_start = jx + bounds.start;
                 store = convolve_horizontal_parts_one_rgba_f16(
                     filter_start,
@@ -242,8 +245,11 @@ pub fn convolve_horizontal_rgba_sse_rows_4_f16(
 
             while jx + 2 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = _mm_set1_ps(ptr.read_unaligned());
-                let weight1 = _mm_set1_ps(ptr.add(1).read_unaligned());
+                let weights = _mm_castsi128_ps(_mm_loadu_si64(ptr as * const u8));
+                const SHUFFLE_0: i32 = shuffle(0, 0, 0, 0);
+                let weight0 = _mm_castsi128_ps(_mm_shuffle_epi32::<SHUFFLE_0>(_mm_castps_si128(weights)));
+                const SHUFFLE_1: i32 = shuffle(1, 1, 1, 1);
+                let weight1 = _mm_castsi128_ps(_mm_shuffle_epi32::<SHUFFLE_1>(_mm_castps_si128(weights)));
                 let filter_start = jx + bounds.start;
                 store_0 = convolve_horizontal_parts_2_rgba_f16(
                     filter_start,
@@ -279,7 +285,7 @@ pub fn convolve_horizontal_rgba_sse_rows_4_f16(
             while jx < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let filter_start = jx + bounds.start;
-                let weight0 = _mm_set1_ps(ptr.read_unaligned());
+                let weight0 = _mm_load1_ps(ptr);
                 store_0 = convolve_horizontal_parts_one_rgba_f16(
                     filter_start,
                     unsafe_source_ptr_0,

@@ -50,8 +50,8 @@ pub(crate) unsafe fn convolve_vertical_part_sse_f16(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = unsafe { filter.add(j).read_unaligned() };
-        let v_weight = _mm_set1_ps(weight);
+        let weight = filter.add(j);
+        let v_weight = _mm_load1_ps(weight);
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -82,8 +82,8 @@ pub(crate) unsafe fn convolve_vertical_part_sse_4_f16(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = unsafe { filter.add(j).read_unaligned() };
-        let v_weight = _mm_set1_ps(weight);
+        let weight = filter.add(j);
+        let v_weight = _mm_load1_ps(weight);
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -116,8 +116,8 @@ pub(crate) unsafe fn convolve_vertical_part_sse_16_16(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = unsafe { filter.add(j).read_unaligned() };
-        let v_weight = _mm_set1_ps(weight);
+        let weight = filter.add(j);
+        let v_weight = _mm_load1_ps(weight);
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -167,8 +167,8 @@ pub(crate) unsafe fn convolve_vertical_part_sse_8_f16(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = unsafe { filter.add(j).read_unaligned() };
-        let v_weight = _mm_set1_ps(weight);
+        let weight = filter.add(j);
+        let v_weight = _mm_load1_ps(weight);
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);

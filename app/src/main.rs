@@ -18,27 +18,26 @@ use pic_scale::{ImageSize, ImageStore, JzazbzScaler, LabScaler, LinearApproxScal
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
+    let img = ImageReader::open("./assets/asset_middle.jpg")
         .unwrap()
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
     let mut bytes = Vec::from(img.as_bytes());
 
-    let mut scaler = LabScaler::new(ResamplingFunction::Lanczos3);
+    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
     let start_time = Instant::now();
-    let store = ImageStore::<u8, 4>::from_slice(
+    let store = ImageStore::<u8, 3>::from_slice(
         &mut bytes,
         dimensions.0 as usize,
         dimensions.1 as usize,
     )
     .unwrap();
-    let resized = scaler.resize_rgba(
+    let resized = scaler.resize_rgb(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
         store,
-        false,
     );
 
     // let mut r_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];

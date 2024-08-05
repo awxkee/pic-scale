@@ -181,8 +181,8 @@ unsafe fn convolve_vertical_part_neon_8_f32(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = unsafe { filter.add(j).read_unaligned() };
-        let v_weight = vdupq_n_f32(weight);
+        let weight = filter.add(j);
+        let v_weight = vld1q_dup_f32(weight);
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -214,8 +214,8 @@ unsafe fn convolve_vertical_part_neon_4_f32(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = unsafe { filter.add(j).read_unaligned() };
-        let v_weight = vdupq_n_f32(weight);
+        let weight = filter.add(j);
+        let v_weight = vld1q_dup_f32(weight);
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -244,8 +244,8 @@ unsafe fn convolve_vertical_part_neon_1_f32(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = unsafe { filter.add(j).read_unaligned() };
-        let v_weight = vdupq_n_f32(weight);
+        let weight = filter.add(j);
+        let v_weight = vld1q_dup_f32(weight);
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
