@@ -13,7 +13,10 @@ use image::{EncodableLayout, GenericImageView, ImageReader};
 
 use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
-use pic_scale::{ImageSize, ImageStore, JzazbzScaler, LabScaler, LinearApproxScaler, OklabScaler, ResamplingFunction, Scaler, Scaling, ScalingF32, ScalingU16, ThreadingPolicy, TransferFunction};
+use pic_scale::{
+    ImageSize, ImageStore, JzazbzScaler, LabScaler, LinearApproxScaler, OklabScaler,
+    ResamplingFunction, Scaler, Scaling, ScalingF32, ScalingU16, ThreadingPolicy, TransferFunction,
+};
 
 fn main() {
     // test_fast_image();
@@ -22,22 +25,32 @@ fn main() {
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
-    let mut bytes = Vec::from(img.as_bytes());
+    let transient = img.to_rgba8();
+    let mut bytes = Vec::from(transient.as_bytes());
 
     let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
+    let mut choke: Vec<f16> = bytes
+        .iter()
+        .map(|&x| f16::from_f32(x as f32 * (1. / 255.)))
+        .collect();
+
     let start_time = Instant::now();
-    let store = ImageStore::<u8, 4>::from_slice(
-        &mut bytes,
-        dimensions.0 as usize,
-        dimensions.1 as usize,
-    )
-    .unwrap();
-    let resized = scaler.resize_rgba(
-        ImageSize::new(dimensions.0 as usize / 3, dimensions.1 as usize / 3),
-        store, true
+    let store =
+        ImageStore::<f16, 4>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
+            .unwrap();
+    let resized = scaler.resize_rgba_f16(
+        ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
+        store,
+        true,
     );
+
+    let dst: Vec<u8> = resized
+        .as_bytes()
+        .iter()
+        .map(|&x| (x.to_f32() * 255f32) as u8)
+        .collect();
 
     // let mut r_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];
     // let mut g_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];
@@ -96,7 +109,7 @@ fn main() {
 
     // let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 2) as u8).collect();
     //
-    let dst = resized.as_bytes();
+    // let dst = resized.as_bytes();
 
     if resized.channels == 4 {
         image::save_buffer(

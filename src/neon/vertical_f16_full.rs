@@ -1,0 +1,224 @@
+/*
+ * Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *
+ * 1.  Redistributions of source code must retain the above copyright notice, this
+ * list of conditions and the following disclaimer.
+ *
+ * 2.  Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ *
+ * 3.  Neither the name of the copyright holder nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANUSE_FMATIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+use std::arch::aarch64::*;
+
+use crate::filter_weights::FilterBounds;
+use crate::neon::convolve_f16::xconvolve_vertical_part_neon_8_f16;
+use crate::neon::*;
+
+macro_rules! conv_vertical_part_neon_16_f16 {
+    ($start_y: expr, $start_x: expr, $src: expr, $src_stride: expr, $dst: expr, $filter: expr, $bounds: expr) => {{
+        unsafe {
+            let mut store_0 = xvzerosq_f16();
+            let mut store_1 = xvzerosq_f16();
+
+            let px = $start_x;
+
+            for j in 0..$bounds.size {
+                let py = $start_y + j;
+                let v_weight_h = xvcvt_f16_f32(vld1q_dup_f32($filter.add(j)));
+                let v_weight = xvcombine_f16(v_weight_h, v_weight_h);
+                let src_ptr = $src.add($src_stride * py);
+
+                let s_ptr = src_ptr.add(px);
+                let item_row = xvldq_f16_x2(s_ptr);
+
+                store_0 = xvfmlaq_f16(store_0, item_row.0, v_weight);
+                store_1 = xvfmlaq_f16(store_1, item_row.1, v_weight);
+            }
+
+            let dst_ptr = $dst.add(px);
+            let f_set = x_float16x8x2_t(store_0, store_1);
+            xvstq_f16_x2(dst_ptr, f_set);
+        }
+    }};
+}
+
+macro_rules! conv_vertical_part_neon_32_f16 {
+    ($start_y: expr, $start_x: expr, $src: expr, $src_stride: expr, $dst: expr, $filter: expr, $bounds: expr) => {{
+        unsafe {
+            let mut store_0 = xvzerosq_f16();
+            let mut store_1 = xvzerosq_f16();
+            let mut store_2 = xvzerosq_f16();
+            let mut store_3 = xvzerosq_f16();
+
+            let px = $start_x;
+
+            for j in 0..$bounds.size {
+                let py = $start_y + j;
+                let v_weight_h = xvcvt_f16_f32(vld1q_dup_f32($filter.add(j)));
+                let v_weight = xvcombine_f16(v_weight_h, v_weight_h);
+                let src_ptr = $src.add($src_stride * py);
+
+                let s_ptr = src_ptr.add(px);
+                let item_row = xvldq_f16_x4(s_ptr);
+
+                store_0 = xvfmlaq_f16(store_0, item_row.0, v_weight);
+                store_1 = xvfmlaq_f16(store_1, item_row.1, v_weight);
+                store_2 = xvfmlaq_f16(store_2, item_row.2, v_weight);
+                store_3 = xvfmlaq_f16(store_3, item_row.3, v_weight);
+            }
+
+            let dst_ptr = $dst.add(px);
+            let f_set = x_float16x8x4_t(store_0, store_1, store_2, store_3);
+            xvstq_f16_x4(dst_ptr, f_set);
+        }
+    }};
+}
+
+macro_rules! conv_vertical_part_neon_48_f16 {
+    ($start_y: expr, $start_x: expr, $src: expr, $src_stride: expr, $dst: expr, $filter: expr, $bounds: expr) => {{
+        unsafe {
+            let mut store_0 = xvzerosq_f16();
+            let mut store_1 = xvzerosq_f16();
+            let mut store_2 = xvzerosq_f16();
+            let mut store_3 = xvzerosq_f16();
+
+            let mut store_4 = xvzerosq_f16();
+            let mut store_5 = xvzerosq_f16();
+
+            let px = $start_x;
+
+            for j in 0..$bounds.size {
+                let py = $start_y + j;
+                let v_weight_h = xvcvt_f16_f32(vld1q_dup_f32($filter.add(j)));
+                let v_weight = xvcombine_f16(v_weight_h, v_weight_h);
+                let src_ptr = $src.add($src_stride * py);
+
+                let s_ptr = src_ptr.add(px);
+                let item_row_0 = xvldq_f16_x4(s_ptr);
+                let item_row_1 = xvldq_f16_x2(s_ptr.add(32));
+
+                store_0 = xvfmlaq_f16(store_0, item_row_0.0, v_weight);
+                store_1 = xvfmlaq_f16(store_1, item_row_0.1, v_weight);
+                store_2 = xvfmlaq_f16(store_2, item_row_0.2, v_weight);
+                store_3 = xvfmlaq_f16(store_3, item_row_0.3, v_weight);
+
+                store_4 = xvfmlaq_f16(store_4, item_row_1.0, v_weight);
+                store_5 = xvfmlaq_f16(store_5, item_row_1.1, v_weight);
+            }
+
+            let dst_ptr = $dst.add(px);
+            let f_set = x_float16x8x4_t(store_0, store_1, store_2, store_3);
+            xvstq_f16_x4(dst_ptr, f_set);
+            let dst_ptr2 = dst_ptr.add(32);
+
+            let f_set1 = x_float16x8x2_t(store_4, store_5);
+            xvstq_f16_x2(dst_ptr2, f_set1);
+        }
+    }};
+}
+
+pub fn xconvolve_vertical_rgb_neon_row_f16<const CHANNELS: usize>(
+    width: usize,
+    bounds: &FilterBounds,
+    unsafe_source_ptr_0: *const half::f16,
+    unsafe_destination_ptr_0: *mut half::f16,
+    src_stride: usize,
+    weight_ptr: *const f32,
+) {
+    let mut cx = 0usize;
+    let dst_width = width * CHANNELS;
+
+    while cx + 48 < dst_width {
+        conv_vertical_part_neon_48_f16!(
+            bounds.start,
+            cx,
+            unsafe_source_ptr_0,
+            src_stride,
+            unsafe_destination_ptr_0,
+            weight_ptr,
+            bounds
+        );
+
+        cx += 48;
+    }
+
+    while cx + 32 < dst_width {
+        conv_vertical_part_neon_32_f16!(
+            bounds.start,
+            cx,
+            unsafe_source_ptr_0,
+            src_stride,
+            unsafe_destination_ptr_0,
+            weight_ptr,
+            bounds
+        );
+
+        cx += 32;
+    }
+
+    while cx + 16 < dst_width {
+        conv_vertical_part_neon_16_f16!(
+            bounds.start,
+            cx,
+            unsafe_source_ptr_0,
+            src_stride,
+            unsafe_destination_ptr_0,
+            weight_ptr,
+            bounds
+        );
+
+        cx += 16;
+    }
+
+    while cx + 8 < dst_width {
+        unsafe {
+            xconvolve_vertical_part_neon_8_f16::<false>(
+                bounds.start,
+                cx,
+                unsafe_source_ptr_0,
+                src_stride,
+                unsafe_destination_ptr_0,
+                weight_ptr,
+                bounds,
+                8,
+            );
+        }
+
+        cx += 8;
+    }
+
+    let left = dst_width - cx;
+
+    if left > 0 {
+        unsafe {
+            xconvolve_vertical_part_neon_8_f16::<true>(
+                bounds.start,
+                cx,
+                unsafe_source_ptr_0,
+                src_stride,
+                unsafe_destination_ptr_0,
+                weight_ptr,
+                bounds,
+                left,
+            );
+        }
+    }
+}

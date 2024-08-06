@@ -36,7 +36,7 @@ macro_rules! write_rgb_f32 {
     ($store: expr, $dest_ptr: expr) => {{
         let l1 = vgetq_lane_u64::<0>(vreinterpretq_u64_f32($store));
         let l3 = vgetq_lane_f32::<2>($store);
-        ($dest_ptr as * mut u64).write_unaligned(l1);
+        ($dest_ptr as *mut u64).write_unaligned(l1);
         $dest_ptr.add(2).write_unaligned(l3);
     }};
 }
@@ -63,12 +63,9 @@ macro_rules! conv_horiz_4_rgb_f32 {
         const COMPONENTS: usize = 3;
         let src_ptr = $src.add($start_x * COMPONENTS);
 
-        let mut rgb_pixel_0 = vld1q_f32(src_ptr);
-        rgb_pixel_0 = vsetq_lane_f32::<3>(0f32, rgb_pixel_0);
-        let mut rgb_pixel_1 = vld1q_f32(src_ptr.add(3));
-        rgb_pixel_1 = vsetq_lane_f32::<3>(0f32, rgb_pixel_1);
-        let mut rgb_pixel_2 = vld1q_f32(src_ptr.add(6));
-        rgb_pixel_2 = vsetq_lane_f32::<3>(0f32, rgb_pixel_2);
+        let rgb_pixel_0 = vld1q_f32(src_ptr);
+        let rgb_pixel_1 = vld1q_f32(src_ptr.add(3));
+        let rgb_pixel_2 = vld1q_f32(src_ptr.add(6));
         let rgb_pixel_3 = vld1q_f32(
             [
                 src_ptr.add(9).read_unaligned(),

@@ -83,7 +83,7 @@ pub fn convolve_horizontal_rgb_sse_rows_4(
             // Will make step in 4 items however since it is RGB it is necessary to make a safe offset
             while jx + 4 < bounds.size && bounds.start + jx + 6 < src_width {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weights = _mm_loadu_si64(ptr as * const u8);
+                let weights = _mm_loadu_si64(ptr as *const u8);
                 const SHUFFLE_01: i32 = shuffle(0, 0, 0, 0);
                 let weight01 = _mm_shuffle_epi32::<SHUFFLE_01>(weights);
                 const SHUFFLE_23: i32 = shuffle(1, 1, 1, 1);
@@ -261,7 +261,7 @@ pub fn convolve_horizontal_rgb_sse_row_one(
         while jx + 4 < bounds.size && x + 6 < src_width {
             let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
             unsafe {
-                let weights = _mm_loadu_si64(ptr as * const u8);
+                let weights = _mm_loadu_si64(ptr as *const u8);
                 const SHUFFLE_01: i32 = shuffle(0, 0, 0, 0);
                 let weight01 = _mm_shuffle_epi32::<SHUFFLE_01>(weights);
                 const SHUFFLE_23: i32 = shuffle(1, 1, 1, 1);

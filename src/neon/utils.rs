@@ -46,17 +46,11 @@ pub(crate) unsafe fn prefer_vfmaq_f32(
 }
 #[inline(always)]
 pub(crate) unsafe fn vsplit_rgb_5(px: float32x4x4_t) -> Float32x5T {
-    let first_pixel = vsetq_lane_f32::<3>(0f32, px.0);
-    let second_pixel = vsetq_lane_f32::<3>(0f32, vextq_f32::<3>(px.0, px.1));
-    let third_pixel = vsetq_lane_f32::<3>(0f32, vextq_f32::<2>(px.1, px.2));
-    let four_pixel = vsetq_lane_f32::<3>(0f32, vextq_f32::<1>(px.2, px.3));
-    Float32x5T(
-        first_pixel,
-        second_pixel,
-        third_pixel,
-        four_pixel,
-        vsetq_lane_f32::<3>(0f32, px.3),
-    )
+    let first_pixel = px.0;
+    let second_pixel = vextq_f32::<3>(px.0, px.1);
+    let third_pixel = vextq_f32::<2>(px.1, px.2);
+    let four_pixel = vextq_f32::<1>(px.2, px.3);
+    Float32x5T(first_pixel, second_pixel, third_pixel, four_pixel, px.3)
 }
 
 pub(crate) struct Float32x5T(

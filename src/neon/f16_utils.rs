@@ -111,10 +111,20 @@ pub unsafe fn xreinterpret_f16_u16(x: uint16x4_t) -> x_float16x4_t {
     std::mem::transmute(x)
 }
 
-// #[inline]
-// pub unsafe fn xreinterpretq_f16_u16(x: uint16x8_t) -> x_float16x8_t {
-//     std::mem::transmute(x)
-// }
+#[inline]
+pub unsafe fn xreinterpretq_f16_u16(x: uint16x8_t) -> x_float16x8_t {
+    std::mem::transmute(x)
+}
+
+#[inline]
+pub(super) unsafe fn xvzerosq_f16() -> x_float16x8_t {
+    xreinterpretq_f16_u16(vdupq_n_u16(0))
+}
+
+#[inline]
+pub(super) unsafe fn xvzeros_f16() -> x_float16x4_t {
+    xreinterpret_f16_u16(vdup_n_u16(0))
+}
 
 #[inline]
 pub unsafe fn xvcvt_f32_f16(x: x_float16x4_t) -> float32x4_t {
@@ -139,6 +149,158 @@ pub(super) unsafe fn xvcvt_f16_f32(v: float32x4_t) -> x_float16x4_t {
     xreinterpret_f16_u16(result)
 }
 
+// #[inline]
+// pub(super) unsafe fn xvadd_f16(v1: x_float16x4_t, v2: x_float16x4_t) -> x_float16x4_t {
+//     let result: uint16x4_t;
+//     asm!(
+//     "fadd {0:v}.4h, {1:v}.4h, {2:v}.4h",
+//     out(vreg) result,
+//     in(vreg) xreinterpret_u16_f16(v1),
+//     in(vreg) xreinterpret_u16_f16(v2),
+//     options(pure, nomem, nostack)
+//     );
+//     xreinterpret_f16_u16(result)
+// }
+
+// #[inline]
+// pub(super) unsafe fn xvaddq_f16(v1: x_float16x8_t, v2: x_float16x8_t) -> x_float16x8_t {
+//     let result: uint16x8_t;
+//     asm!(
+//     "fadd {0:v}.8h, {1:v}.8h, {2:v}.8h",
+//     out(vreg) result,
+//     in(vreg) xreinterpretq_u16_f16(v1),
+//     in(vreg) xreinterpretq_u16_f16(v2),
+//     options(pure, nomem, nostack)
+//     );
+//     xreinterpretq_f16_u16(result)
+// }
+
+#[inline]
+pub(super) unsafe fn xvcombine_f16(v1: x_float16x4_t, v2: x_float16x4_t) -> x_float16x8_t {
+    xreinterpretq_f16_u16(vcombine_u16(
+        xreinterpret_u16_f16(v1),
+        xreinterpret_u16_f16(v2),
+    ))
+}
+
+// #[inline]
+// pub(super) unsafe fn xvmul_f16(v1: x_float16x4_t, v2: x_float16x4_t) -> x_float16x4_t {
+//     let result: uint16x4_t;
+//     asm!(
+//     "fmul {0:v}.4h, {1:v}.4h, {2:v}.4h",
+//     out(vreg) result,
+//     in(vreg) xreinterpret_u16_f16(v1),
+//     in(vreg) xreinterpret_u16_f16(v2),
+//     options(pure, nomem, nostack)
+//     );
+//     xreinterpret_f16_u16(result)
+// }
+
+#[inline]
+pub(super) unsafe fn xvfmla_f16(
+    a: x_float16x4_t,
+    b: x_float16x4_t,
+    c: x_float16x4_t,
+) -> x_float16x4_t {
+    let mut result: uint16x4_t = xreinterpret_u16_f16(a);
+    asm!(
+    "fmla {0:v}.4h, {1:v}.4h, {2:v}.4h",
+    inout(vreg) result,
+    in(vreg) xreinterpret_u16_f16(b),
+    in(vreg) xreinterpret_u16_f16(c),
+    options(pure, nomem, nostack)
+    );
+    xreinterpret_f16_u16(result)
+}
+
+#[inline]
+pub(super) unsafe fn xvfmlaq_f16(
+    a: x_float16x8_t,
+    b: x_float16x8_t,
+    c: x_float16x8_t,
+) -> x_float16x8_t {
+    let mut result: uint16x8_t = xreinterpretq_u16_f16(a);
+    asm!(
+    "fmla {0:v}.8h, {1:v}.8h, {2:v}.8h",
+    inout(vreg) result,
+    in(vreg) xreinterpretq_u16_f16(b),
+    in(vreg) xreinterpretq_u16_f16(c),
+    options(pure, nomem, nostack)
+    );
+    xreinterpretq_f16_u16(result)
+}
+
+// #[cfg(all(target_arch = "aarch64", target_feature = "fhm"))]
+// #[inline]
+// pub(super) unsafe fn p_xvmlaq_f16(
+//     a: x_float16x8_t,
+//     b: x_float16x8_t,
+//     c: x_float16x8_t,
+// ) -> x_float16x8_t {
+//     xvfmlaq_f16(a, b, c)
+// }
+
+// #[inline]
+// pub(super) unsafe fn xvmlaq_f16(
+//     a: x_float16x8_t,
+//     b: x_float16x8_t,
+//     c: x_float16x8_t,
+// ) -> x_float16x8_t {
+//     xvaddq_f16(a, xvmulq_f16(b, c))
+// }
+
+// #[inline]
+// pub(super) unsafe fn xvmla_f16(
+//     a: x_float16x4_t,
+//     b: x_float16x4_t,
+//     c: x_float16x4_t,
+// ) -> x_float16x4_t {
+//     xvadd_f16(a, xvmul_f16(b, c))
+// }
+
+#[inline]
+pub(super) unsafe fn xvmulq_f16(v1: x_float16x8_t, v2: x_float16x8_t) -> x_float16x8_t {
+    let result: uint16x8_t;
+    asm!(
+    "fmul {0:v}.8h, {1:v}.8h, {2:v}.8h",
+    out(vreg) result,
+    in(vreg) xreinterpretq_u16_f16(v1),
+    in(vreg) xreinterpretq_u16_f16(v2),
+    options(pure, nomem, nostack)
+    );
+    xreinterpretq_f16_u16(result)
+}
+
+#[inline]
+pub(super) unsafe fn xvdivq_f16(v1: x_float16x8_t, v2: x_float16x8_t) -> x_float16x8_t {
+    let result: uint16x8_t;
+    asm!(
+    "fdiv {0:v}.8h, {1:v}.8h, {2:v}.8h",
+    out(vreg) result,
+    in(vreg) xreinterpretq_u16_f16(v1),
+    in(vreg) xreinterpretq_u16_f16(v2),
+    options(pure, nomem, nostack)
+    );
+    xreinterpretq_f16_u16(result)
+}
+
+#[inline]
+pub(super) unsafe fn xvbslq_f16(
+    a: uint16x8_t,
+    b: x_float16x8_t,
+    c: x_float16x8_t,
+) -> x_float16x8_t {
+    let mut result: uint16x8_t = a;
+    asm!(
+    "bsl {0:v}.16b, {1:v}.16b, {2:v}.16b",
+    inout(vreg) result,
+    in(vreg) xreinterpretq_u16_f16(b),
+    in(vreg) xreinterpretq_u16_f16(c),
+    options(pure, nomem, nostack)
+    );
+    xreinterpretq_f16_u16(result)
+}
+
 #[inline]
 pub unsafe fn xvst_f16(ptr: *const half::f16, x: x_float16x4_t) {
     vst1_u16(std::mem::transmute(ptr), xreinterpret_u16_f16(x))
@@ -157,4 +319,26 @@ pub unsafe fn xvstq_f16_x2(ptr: *const half::f16, x: x_float16x8x2_t) {
 #[inline]
 pub unsafe fn xvstq_f16_x4(ptr: *const half::f16, x: x_float16x8x4_t) {
     vst1q_u16_x4(std::mem::transmute(ptr), std::mem::transmute(x))
+}
+
+#[inline]
+pub unsafe fn xvdup_lane_f16<const N: i32>(a: x_float16x4_t) -> x_float16x4_t {
+    xreinterpret_f16_u16(vdup_lane_u16::<N>(xreinterpret_u16_f16(a)))
+}
+
+#[inline]
+pub unsafe fn xvdup_laneq_f16<const N: i32>(a: x_float16x8_t) -> x_float16x4_t {
+    xreinterpret_f16_u16(vdup_laneq_u16::<N>(xreinterpretq_u16_f16(a)))
+}
+
+#[inline]
+pub unsafe fn vceqzq_f16(a: x_float16x8_t) -> uint16x8_t {
+    let mut result: uint16x8_t;
+    asm!(
+    "fcmeq {0:v}.8h, {1:v}.8h, #0",
+    out(vreg) result,
+    in(vreg) xreinterpretq_u16_f16(a),
+    options(pure, nomem, nostack)
+    );
+    result
 }

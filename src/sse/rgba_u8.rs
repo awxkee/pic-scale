@@ -98,7 +98,7 @@ pub fn convolve_horizontal_rgba_sse_rows_4(
 
             while jx + 4 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weights = _mm_loadu_si64(ptr as * const u8);
+                let weights = _mm_loadu_si64(ptr as *const u8);
                 const SHUFFLE_01: i32 = shuffle(0, 0, 0, 0);
                 let weight01 = _mm_shuffle_epi32::<SHUFFLE_01>(weights);
                 const SHUFFLE_23: i32 = shuffle(1, 1, 1, 1);
@@ -271,7 +271,7 @@ pub fn convolve_horizontal_rgba_sse_rows_one(
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let bounds_start = bounds.start + jx;
 
-                let weights = _mm_loadu_si64(ptr as * const u8);
+                let weights = _mm_loadu_si64(ptr as *const u8);
                 const SHUFFLE_01: i32 = shuffle(0, 0, 0, 0);
                 let weight01 = _mm_shuffle_epi32::<SHUFFLE_01>(weights);
                 const SHUFFLE_23: i32 = shuffle(1, 1, 1, 1);

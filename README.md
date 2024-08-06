@@ -62,8 +62,12 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 
 `fma`, `sse4.1`, `sse4.2`, `avx2`, `neon`, `f16c` optional target features are available, enable it when compiling on supported platform to get full features
 
+##### About f16
+
 To enable full support of *f16* `half` feature should be used, and `f16c` enabled when targeting x86 platforms.
 For NEON `f16` feature, target feature `neon` should be activated and target platform expected to be `aarch64`.
+
+For `aarch64` target runtime detection will be used for `fp16full` if available then the very fast paths is available.
 
 Even when `half` feature activated but platform do not support or features not enabled for `f16` speed will be slow
 

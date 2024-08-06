@@ -29,9 +29,58 @@
 
 use std::arch::aarch64::*;
 
-use crate::neon::f16_utils::xvcvt_f16_f32;
-use crate::neon::{xcombine_f16, xreinterpret_f16_u16, xreinterpretq_u16_f16, xvcvt_f32_f16};
+use crate::neon::f16_utils::{xvbslq_f16, xvcvt_f16_f32, xvdivq_f16, xvmulq_f16};
+use crate::neon::{
+    vceqzq_f16, xcombine_f16, xreinterpret_f16_u16, xreinterpretq_f16_u16, xreinterpretq_u16_f16,
+    xvcvt_f32_f16,
+};
 use crate::{premultiply_pixel_f16, unpremultiply_pixel_f16};
+
+pub fn neon_premultiply_alpha_rgba_f16_full(
+    dst: &mut [half::f16],
+    src: &[half::f16],
+    width: usize,
+    height: usize,
+) {
+    let mut _cy = 0usize;
+    let src_stride = 4 * width;
+
+    let mut offset = _cy * src_stride;
+
+    for _ in _cy..height {
+        let mut _cx = 0usize;
+
+        unsafe {
+            while _cx + 8 < width {
+                let px = _cx * 4;
+                let src_ptr = src.as_ptr().add(offset + px);
+                let pixel = vld4q_u16(src_ptr as *const u16);
+
+                let low_alpha = xreinterpretq_f16_u16(pixel.3);
+                let r_values = xvmulq_f16(xreinterpretq_f16_u16(pixel.0), low_alpha);
+                let g_values = xvmulq_f16(xreinterpretq_f16_u16(pixel.1), low_alpha);
+                let b_values = xvmulq_f16(xreinterpretq_f16_u16(pixel.2), low_alpha);
+
+                let dst_ptr = dst.as_mut_ptr().add(offset + px);
+                let store_pixel = uint16x8x4_t(
+                    xreinterpretq_u16_f16(r_values),
+                    xreinterpretq_u16_f16(g_values),
+                    xreinterpretq_u16_f16(b_values),
+                    pixel.3,
+                );
+                vst4q_u16(dst_ptr as *mut u16, store_pixel);
+                _cx += 8;
+            }
+        }
+
+        for x in _cx..width {
+            let px = x * 4;
+            premultiply_pixel_f16!(dst, src, offset + px);
+        }
+
+        offset += 4 * width;
+    }
+}
 
 pub fn neon_premultiply_alpha_rgba_f16(
     dst: &mut [half::f16],
@@ -201,6 +250,68 @@ pub fn neon_unpremultiply_alpha_rgba_f16(
 
                 let dst_ptr = dst.as_mut_ptr().add(pixel_offset);
                 let store_pixel = uint16x8x4_t(r_values, g_values, b_values, pixel.3);
+                vst4q_u16(dst_ptr as *mut u16, store_pixel);
+                _cx += 8;
+            }
+        }
+
+        for x in _cx..width {
+            let px = x * 4;
+            let pixel_offset = offset + px;
+            unpremultiply_pixel_f16!(dst, src, pixel_offset);
+        }
+
+        offset += 4 * width;
+    }
+}
+
+pub fn neon_unpremultiply_alpha_rgba_f16_full(
+    dst: &mut [half::f16],
+    src: &[half::f16],
+    width: usize,
+    height: usize,
+) {
+    let mut _cy = 0usize;
+
+    let mut offset = 0usize;
+    offset += _cy * width * 4;
+
+    for _ in _cy..height {
+        let mut _cx = 0usize;
+
+        unsafe {
+            while _cx + 8 < width {
+                let px = _cx * 4;
+                let pixel_offset = offset + px;
+                let src_ptr = src.as_ptr().add(pixel_offset);
+                let pixel = vld4q_u16(src_ptr as *const u16);
+
+                let alphas = xreinterpretq_f16_u16(pixel.3);
+                let zero_mask = vceqzq_f16(alphas);
+
+                let r_values = xvbslq_f16(
+                    zero_mask,
+                    xreinterpretq_f16_u16(pixel.0),
+                    xvdivq_f16(xreinterpretq_f16_u16(pixel.0), alphas),
+                );
+                let g_values = xvbslq_f16(
+                    zero_mask,
+                    xreinterpretq_f16_u16(pixel.1),
+                    xvdivq_f16(xreinterpretq_f16_u16(pixel.1), alphas),
+                );
+                let b_values = xvbslq_f16(
+                    zero_mask,
+                    xreinterpretq_f16_u16(pixel.2),
+                    xvdivq_f16(xreinterpretq_f16_u16(pixel.2), alphas),
+                );
+
+                let dst_ptr = dst.as_mut_ptr().add(pixel_offset);
+                let store_pixel = uint16x8x4_t(
+                    xreinterpretq_u16_f16(r_values),
+                    xreinterpretq_u16_f16(g_values),
+                    xreinterpretq_u16_f16(b_values),
+                    pixel.3,
+                );
                 vst4q_u16(dst_ptr as *mut u16, store_pixel);
                 _cx += 8;
             }
