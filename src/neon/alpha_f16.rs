@@ -29,11 +29,8 @@
 
 use std::arch::aarch64::*;
 
-use crate::neon::f16_utils::{xvbslq_f16, xvcvt_f16_f32, xvdivq_f16, xvmulq_f16};
-use crate::neon::{
-    vceqzq_f16, xcombine_f16, xreinterpret_f16_u16, xreinterpretq_f16_u16, xreinterpretq_u16_f16,
-    xvcvt_f32_f16,
-};
+use crate::neon::f16_utils::*;
+use crate::neon::*;
 use crate::{premultiply_pixel_f16, unpremultiply_pixel_f16};
 
 #[cfg(target_feature = "fp16")]
