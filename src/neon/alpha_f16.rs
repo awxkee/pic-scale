@@ -30,7 +30,6 @@
 use std::arch::aarch64::*;
 
 use crate::neon::f16_utils::*;
-use crate::neon::*;
 use crate::{premultiply_pixel_f16, unpremultiply_pixel_f16};
 
 #[cfg(target_feature = "fp16")]
