@@ -264,10 +264,10 @@ pub fn convolve_horizontal_rgb_neon_row_one_f32(
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let read_weights = vld1q_f32(ptr);
-                let w0 = vdupq_n_f32(vgetq_lane_f32::<0>(read_weights));
-                let w1 = vdupq_n_f32(vgetq_lane_f32::<1>(read_weights));
-                let w2 = vdupq_n_f32(vgetq_lane_f32::<2>(read_weights));
-                let w3 = vdupq_n_f32(vgetq_lane_f32::<3>(read_weights));
+                let w0 = vdupq_laneq_f32::<0>(read_weights);
+                let w1 = vdupq_laneq_f32::<1>(read_weights);
+                let w2 = vdupq_laneq_f32::<2>(read_weights);
+                let w3 = vdupq_laneq_f32::<3>(read_weights);
                 let set = (w0, w1, w2, w3);
 
                 store = conv_horiz_4_rgb_f32!(bounds_start, unsafe_source_ptr_0, set, store);
