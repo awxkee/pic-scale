@@ -51,6 +51,7 @@ use crate::neon::{
     convolve_horizontal_rgba_neon_row_one_f16, convolve_horizontal_rgba_neon_rows_4_f16,
     convolve_vertical_rgb_neon_row_f16,
 };
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{
     xconvolve_horizontal_rgb_neon_row_one_f16, xconvolve_horizontal_rgb_neon_rows_4_f16,
     xconvolve_horizontal_rgba_neon_row_one_f16, xconvolve_horizontal_rgba_neon_rows_4_f16,
