@@ -40,14 +40,13 @@ macro_rules! conv_horiz_rgba_5_u8 {
         let rgb_pixel = vqtbl1q_u8(pixel, $shuffle);
         let hi = vreinterpretq_s16_u16(vmovl_high_u8(rgb_pixel));
         let lo = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(rgb_pixel)));
-        let mut highest = vreinterpretq_s32_u32(vmovl_high_u16(vmovl_high_u8(pixel)));
-        highest = vsetq_lane_s32::<3>(0, highest);
+        let highest = vreinterpret_s16_u16(vget_high_u16(vmovl_high_u8(pixel)));
 
         let mut acc = vmlal_high_s16($store, hi, $w3);
         acc = vmlal_s16(acc, vget_low_s16(hi), $w2);
         acc = vmlal_high_s16(acc, lo, $w1);
         acc = vmlal_s16(acc, vget_low_s16(lo), $w0);
-        acc = vmlaq_s32(acc, highest, $w4);
+        acc = vmlal_s16(acc, highest, $w4);
         acc
     }};
 }
@@ -153,11 +152,11 @@ pub fn convolve_horizontal_rgb_neon_rows_4(
                 let bnds = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let weights = vld1_s16(ptr);
-                let w0 = vdup_n_s16(vget_lane_s16::<0>(weights));
-                let w1 = vdupq_n_s16(vget_lane_s16::<1>(weights));
-                let w2 = vdup_n_s16(vget_lane_s16::<2>(weights));
-                let w3 = vdupq_n_s16(vget_lane_s16::<3>(weights));
-                let w4 = vdupq_n_s32(ptr.add(4).read_unaligned() as i32);
+                let w0 = vdup_lane_s16::<0>(weights);
+                let w1 = vdupq_lane_s16::<1>(weights);
+                let w2 = vdup_lane_s16::<2>(weights);
+                let w3 = vdupq_lane_s16::<3>(weights);
+                let w4 = vld1_dup_s16(ptr.add(4));
                 let ptr_0 = unsafe_source_ptr_0;
                 store_0 = conv_horiz_rgba_5_u8!(bnds, ptr_0, w0, w1, w2, w3, w4, store_0, shuffle);
                 let ptr_1 = unsafe_source_ptr_0.add(src_stride);
@@ -172,10 +171,11 @@ pub fn convolve_horizontal_rgb_neon_rows_4(
             while jx + 4 < bounds.size && bounds.start + jx + 6 < src_width {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let w0 = vdup_n_s16(ptr.read_unaligned());
-                let w1 = vdupq_n_s16(ptr.add(1).read_unaligned());
-                let w2 = vdup_n_s16(ptr.add(2).read_unaligned());
-                let w3 = vdupq_n_s16(ptr.add(3).read_unaligned());
+                let weights = vld1_s16(ptr);
+                let w0 = vdup_lane_s16::<0>(weights);
+                let w1 = vdupq_lane_s16::<1>(weights);
+                let w2 = vdup_lane_s16::<2>(weights);
+                let w3 = vdupq_lane_s16::<3>(weights);
                 let ptr_0 = unsafe_source_ptr_0;
                 store_0 =
                     conv_horiz_rgba_4_u8!(bounds_start, ptr_0, w0, w1, w2, w3, store_0, shuffle);
@@ -194,8 +194,8 @@ pub fn convolve_horizontal_rgb_neon_rows_4(
             while jx + 2 < bounds.size && bounds.start + jx + 3 < src_width {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let bnds = bounds.start + jx;
-                let w0 = vdup_n_s16(ptr.read_unaligned());
-                let w1 = vdupq_n_s16(ptr.add(1).read_unaligned());
+                let w0 = vld1_dup_s16(ptr);
+                let w1 = vld1q_dup_s16(ptr.add(1));
                 store_0 =
                     conv_horiz_rgba_2_u8!(bnds, unsafe_source_ptr_0, w0, w1, store_0, shuffle_1);
                 let ptr_1 = unsafe_source_ptr_0.add(src_stride);
@@ -210,7 +210,7 @@ pub fn convolve_horizontal_rgb_neon_rows_4(
             while jx < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let bnds = bounds.start + jx;
-                let weight0 = vdup_n_s16(ptr.read_unaligned());
+                let weight0 = vld1_dup_s16(ptr);
                 store_0 = conv_horiz_rgba_1_u8!(bnds, unsafe_source_ptr_0, weight0, store_0);
                 let ptr_1 = unsafe_source_ptr_0.add(src_stride);
                 store_1 = conv_horiz_rgba_1_u8!(bnds, ptr_1, weight0, store_1);
@@ -265,10 +265,11 @@ pub fn convolve_horizontal_rgb_neon_row_one(
             while jx + 4 < bounds.size && bounds.start + jx + 6 < src_width {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let w0 = vdup_n_s16(ptr.read_unaligned());
-                let w1 = vdupq_n_s16(ptr.add(1).read_unaligned());
-                let w2 = vdup_n_s16(ptr.add(2).read_unaligned());
-                let w3 = vdupq_n_s16(ptr.add(3).read_unaligned());
+                let weights = vld1_s16(ptr);
+                let w0 = vdup_lane_s16::<0>(weights);
+                let w1 = vdupq_lane_s16::<1>(weights);
+                let w2 = vdup_lane_s16::<2>(weights);
+                let w3 = vdupq_lane_s16::<3>(weights);
                 let ptr_0 = unsafe_source_ptr_0;
                 store = conv_horiz_rgba_4_u8!(bounds_start, ptr_0, w0, w1, w2, w3, store, shuffle);
                 jx += 4;
@@ -277,15 +278,15 @@ pub fn convolve_horizontal_rgb_neon_row_one(
             while jx + 2 < bounds.size && bounds.start + jx + 3 < src_width {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let bnds = bounds.start + jx;
-                let w0 = vdup_n_s16(ptr.read_unaligned());
-                let w1 = vdupq_n_s16(ptr.add(1).read_unaligned());
+                let w0 = vld1_dup_s16(ptr);
+                let w1 = vld1q_dup_s16(ptr.add(1));
                 store = conv_horiz_rgba_2_u8!(bnds, unsafe_source_ptr_0, w0, w1, store, shuffle_1);
                 jx += 2;
             }
 
             while jx < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = vdup_n_s16(ptr.read_unaligned());
+                let weight0 = vld1_dup_s16(ptr);
                 let bnds = bounds.start + jx;
                 store = conv_horiz_rgba_1_u8!(bnds, unsafe_source_ptr_0, weight0, store);
                 jx += 1;

@@ -126,9 +126,10 @@ pub fn convolve_horizontal_rgba_neon_row_one_f16(
             while jx + 2 < bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = vdupq_n_f32(ptr.read_unaligned());
-                let weight1 = vdupq_n_f32(ptr.add(1).read_unaligned());
-                let set = (weight0, weight1);
+                let read_weights = vld1_f32(ptr);
+                let w0 = vdupq_lane_f32::<0>(read_weights);
+                let w1 = vdupq_lane_f32::<1>(read_weights);
+                let set = (w0, w1);
                 store = conv_horiz_rgba_2_f32!(bounds_start, unsafe_source_ptr_0, set, store);
                 jx += 2;
             }
@@ -136,7 +137,7 @@ pub fn convolve_horizontal_rgba_neon_row_one_f16(
             while jx < bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = vdupq_n_f32(ptr.read_unaligned());
+                let weight0 = vld1q_dup_f32(ptr);
                 store = conv_horiz_rgba_1_f16!(bounds_start, unsafe_source_ptr_0, weight0, store);
                 jx += 1;
             }

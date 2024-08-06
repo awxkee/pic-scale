@@ -199,11 +199,11 @@ pub fn convolve_horizontal_rgb_neon_rows_4_f16(
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let read_weights = vld1q_f32(ptr);
-                let w0 = vdupq_n_f32(vgetq_lane_f32::<0>(read_weights));
-                let w1 = vdupq_n_f32(vgetq_lane_f32::<1>(read_weights));
-                let w2 = vdupq_n_f32(vgetq_lane_f32::<2>(read_weights));
-                let w3 = vdupq_n_f32(vgetq_lane_f32::<3>(read_weights));
-                let w4 = vdupq_n_f32(ptr.add(4).read_unaligned());
+                let w0 = vdupq_laneq_f32::<0>(read_weights);
+                let w1 = vdupq_laneq_f32::<1>(read_weights);
+                let w2 = vdupq_laneq_f32::<2>(read_weights);
+                let w3 = vdupq_laneq_f32::<3>(read_weights);
+                let w4 = vld1q_dup_f32(ptr.add(4));
                 let set = (w0, w1, w2, w3, w4);
                 let b_start = bounds_start;
                 store_0 = conv_horiz_5_rgb_f16!(b_start, unsafe_source_ptr_0, set, store_0);
@@ -220,10 +220,10 @@ pub fn convolve_horizontal_rgb_neon_rows_4_f16(
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let read_weights = vld1q_f32(ptr);
-                let w0 = vdupq_n_f32(vgetq_lane_f32::<0>(read_weights));
-                let w1 = vdupq_n_f32(vgetq_lane_f32::<1>(read_weights));
-                let w2 = vdupq_n_f32(vgetq_lane_f32::<2>(read_weights));
-                let w3 = vdupq_n_f32(vgetq_lane_f32::<3>(read_weights));
+                let w0 = vdupq_laneq_f32::<0>(read_weights);
+                let w1 = vdupq_laneq_f32::<1>(read_weights);
+                let w2 = vdupq_laneq_f32::<2>(read_weights);
+                let w3 = vdupq_laneq_f32::<3>(read_weights);
                 let set = (w0, w1, w2, w3);
                 store_0 = conv_horiz_4_rgb_f16!(bounds_start, unsafe_source_ptr_0, set, store_0);
                 let s_ptr1 = unsafe_source_ptr_0.add(src_stride);
@@ -238,9 +238,10 @@ pub fn convolve_horizontal_rgb_neon_rows_4_f16(
             while jx + 2 < bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = vdupq_n_f32(ptr.read_unaligned());
-                let weight1 = vdupq_n_f32(ptr.add(1).read_unaligned());
-                let set = (weight0, weight1);
+                let read_weights = vld1_f32(ptr);
+                let w0 = vdupq_lane_f32::<0>(read_weights);
+                let w1 = vdupq_lane_f32::<1>(read_weights);
+                let set = (w0, w1);
                 store_0 = conv_horiz_2_rgb_f16!(bounds_start, unsafe_source_ptr_0, set, store_0);
                 let s_ptr_1 = unsafe_source_ptr_0.add(src_stride);
                 store_1 = conv_horiz_2_rgb_f16!(bounds_start, s_ptr_1, set, store_1);
@@ -254,7 +255,7 @@ pub fn convolve_horizontal_rgb_neon_rows_4_f16(
             while jx < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let bounds_start = bounds.start + jx;
-                let weight0 = vdupq_n_f32(ptr.read_unaligned());
+                let weight0 = vld1q_dup_f32(ptr);
                 store_0 =
                     conv_horiz_1_rgb_f16!(bounds_start, unsafe_source_ptr_0, weight0, store_0);
                 let s_ptr_1 = unsafe_source_ptr_0.add(src_stride);
@@ -305,10 +306,10 @@ pub fn convolve_horizontal_rgb_neon_row_one_f16(
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let read_weights = vld1q_f32(ptr);
-                let w0 = vdupq_n_f32(vgetq_lane_f32::<0>(read_weights));
-                let w1 = vdupq_n_f32(vgetq_lane_f32::<1>(read_weights));
-                let w2 = vdupq_n_f32(vgetq_lane_f32::<2>(read_weights));
-                let w3 = vdupq_n_f32(vgetq_lane_f32::<3>(read_weights));
+                let w0 = vdupq_laneq_f32::<0>(read_weights);
+                let w1 = vdupq_laneq_f32::<1>(read_weights);
+                let w2 = vdupq_laneq_f32::<2>(read_weights);
+                let w3 = vdupq_laneq_f32::<3>(read_weights);
                 let set = (w0, w1, w2, w3);
 
                 store = conv_horiz_4_rgb_f16!(bounds_start, unsafe_source_ptr_0, set, store);
@@ -318,16 +319,17 @@ pub fn convolve_horizontal_rgb_neon_row_one_f16(
             while jx + 2 < bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = vdupq_n_f32(ptr.read_unaligned());
-                let weight1 = vdupq_n_f32(ptr.add(1).read_unaligned());
-                let set = (weight0, weight1);
+                let read_weights = vld1_f32(ptr);
+                let w0 = vdupq_lane_f32::<0>(read_weights);
+                let w1 = vdupq_lane_f32::<1>(read_weights);
+                let set = (w0, w1);
                 store = conv_horiz_2_rgb_f16!(bounds_start, unsafe_source_ptr_0, set, store);
                 jx += 2;
             }
 
             while jx < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = vdupq_n_f32(ptr.read_unaligned());
+                let weight0 = vld1q_dup_f32(ptr);
                 let bounds_start = bounds.start + jx;
                 store = conv_horiz_1_rgb_f16!(bounds_start, unsafe_source_ptr_0, weight0, store);
                 jx += 1;

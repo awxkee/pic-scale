@@ -48,31 +48,31 @@ macro_rules! conv_horiz_rgba_12_u8 {
         let hi2 = vreinterpretq_s16_u16(vmovl_high_u8(rgba_pixel.2));
         let lo3 = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(rgba_pixel.2)));
 
-        let w0 = vdupq_n_s16(vgetq_lane_s16::<3>(weights));
+        let w0 = vdupq_laneq_s16::<3>(weights);
         let mut acc = vmlal_high_s16($store, hi0, w0);
-        let w1 = vdup_n_s16(vgetq_lane_s16::<2>(weights));
+        let w1 = vdup_laneq_s16::<2>(weights);
         acc = vmlal_s16(acc, vget_low_s16(hi0), w1);
-        let w2 = vdupq_n_s16(vgetq_lane_s16::<1>(weights));
+        let w2 = vdupq_laneq_s16::<1>(weights);
         acc = vmlal_high_s16(acc, lo0, w2);
-        let w3 = vdup_n_s16(vgetq_lane_s16::<0>(weights));
+        let w3 = vdup_laneq_s16::<0>(weights);
         acc = vmlal_s16(acc, vget_low_s16(lo0), w3);
 
-        let w4 = vdupq_n_s16(vgetq_lane_s16::<7>(weights));
+        let w4 = vdupq_laneq_s16::<7>(weights);
         acc = vmlal_high_s16(acc, hi1, w4);
-        let w5 = vdup_n_s16(vgetq_lane_s16::<6>(weights));
+        let w5 = vdup_laneq_s16::<6>(weights);
         acc = vmlal_s16(acc, vget_low_s16(hi1), w5);
-        let w6 = vdupq_n_s16(vgetq_lane_s16::<5>(weights));
+        let w6 = vdupq_laneq_s16::<5>(weights);
         acc = vmlal_high_s16(acc, lo1, w6);
-        let w7 = vdup_n_s16(vgetq_lane_s16::<4>(weights));
+        let w7 = vdup_laneq_s16::<4>(weights);
         acc = vmlal_s16(acc, vget_low_s16(lo1), w7);
 
-        let w0 = vdupq_n_s16(vget_lane_s16::<3>(weights_1));
+        let w0 = vdupq_lane_s16::<3>(weights_1);
         acc = vmlal_high_s16(acc, hi2, w0);
-        let w1 = vdup_n_s16(vget_lane_s16::<2>(weights_1));
+        let w1 = vdup_lane_s16::<2>(weights_1);
         acc = vmlal_s16(acc, vget_low_s16(hi2), w1);
-        let w2 = vdupq_n_s16(vget_lane_s16::<1>(weights_1));
+        let w2 = vdupq_lane_s16::<1>(weights_1);
         acc = vmlal_high_s16(acc, lo3, w2);
-        let w3 = vdup_n_s16(vget_lane_s16::<0>(weights_1));
+        let w3 = vdup_lane_s16::<0>(weights_1);
         acc = vmlal_s16(acc, vget_low_s16(lo3), w3);
 
         acc
@@ -199,14 +199,14 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u8(
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let weights_set = vld1q_s16(ptr);
-                let w0 = vdupq_n_s16(vgetq_lane_s16::<0>(weights_set));
-                let w1 = vdupq_n_s16(vgetq_lane_s16::<1>(weights_set));
-                let w2 = vdupq_n_s16(vgetq_lane_s16::<2>(weights_set));
-                let w3 = vdupq_n_s16(vgetq_lane_s16::<3>(weights_set));
-                let w4 = vdupq_n_s16(vgetq_lane_s16::<4>(weights_set));
-                let w5 = vdupq_n_s16(vgetq_lane_s16::<5>(weights_set));
-                let w6 = vdupq_n_s16(vgetq_lane_s16::<6>(weights_set));
-                let w7 = vdupq_n_s16(vgetq_lane_s16::<7>(weights_set));
+                let w0 = vdupq_laneq_s16::<0>(weights_set);
+                let w1 = vdupq_laneq_s16::<1>(weights_set);
+                let w2 = vdupq_laneq_s16::<2>(weights_set);
+                let w3 = vdupq_laneq_s16::<3>(weights_set);
+                let w4 = vdupq_laneq_s16::<4>(weights_set);
+                let w5 = vdupq_laneq_s16::<5>(weights_set);
+                let w6 = vdupq_laneq_s16::<6>(weights_set);
+                let w7 = vdupq_laneq_s16::<7>(weights_set);
                 let set1 = (w0, w1, w2, w3);
                 let set2 = (w4, w5, w6, w7);
                 let ptr_0 = unsafe_source_ptr_0;
@@ -242,16 +242,16 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u8(
             while jx + 2 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let bounds_start = bounds.start + jx;
-                let weight0 = vld1_dup_s16(ptr);
-                let weight1 = vld1q_dup_s16(ptr.add(1));
+                let w0 = vld1_dup_s16(ptr);
+                let w1 = vld1q_dup_s16(ptr.add(1));
                 let ptr_0 = unsafe_source_ptr_0;
-                store_0 = conv_horiz_rgba_2_u8!(bounds_start, ptr_0, weight0, weight1, store_0);
+                store_0 = conv_horiz_rgba_2_u8!(bounds_start, ptr_0, w0, w1, store_0);
                 let ptr_1 = unsafe_source_ptr_0.add(src_stride);
-                store_1 = conv_horiz_rgba_2_u8!(bounds_start, ptr_1, weight0, weight1, store_1);
+                store_1 = conv_horiz_rgba_2_u8!(bounds_start, ptr_1, w0, w1, store_1);
                 let ptr_2 = unsafe_source_ptr_0.add(src_stride * 2);
-                store_2 = conv_horiz_rgba_2_u8!(bounds_start, ptr_2, weight0, weight1, store_2);
+                store_2 = conv_horiz_rgba_2_u8!(bounds_start, ptr_2, w0, w1, store_2);
                 let ptr_3 = unsafe_source_ptr_0.add(src_stride * 3);
-                store_3 = conv_horiz_rgba_2_u8!(bounds_start, ptr_3, weight0, weight1, store_3);
+                store_3 = conv_horiz_rgba_2_u8!(bounds_start, ptr_3, w0, w1, store_3);
                 jx += 2;
             }
 

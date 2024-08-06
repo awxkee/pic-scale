@@ -62,8 +62,8 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 
 `fma`, `sse4.1`, `sse4.2`, `avx2`, `neon`, `f16c` optional target features are available, enable it when compiling on supported platform to get full features
 
-#### To enable full support of *f16* `half` feature should be used, and `f16c` enabled when targeting x86 platforms.
-#### For NEON `f16` feature, target feature `neon` should be activated and target platform expected to be `aarch64`.
+To enable full support of *f16* `half` feature should be used, and `f16c` enabled when targeting x86 platforms.
+For NEON `f16` feature, target feature `neon` should be activated and target platform expected to be `aarch64`.
 
 Even when `half` feature activated but platform do not support or features not enabled for `f16` speed will be slow
 
@@ -73,14 +73,14 @@ Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 ima
 
 | Lanczos3  |  SSE  |  AVX  | NEON  |
 |-----------|:-----:|:-----:|:-----:|
-| pic-scale | 43.84 | 33.98 | 25.80 |
+| pic-scale | 43.84 | 33.98 | 24.62 |
 | fir sse   | 45.36 | 36.05 | 36.69 |
 
 Example comparison time for downscale RGBA 4928x3279 image in two times with premultiplying alpha.
 
 | Lanczos3  |  SSE  |  AVX  | NEON  |
 |-----------|:-----:|:-----:|:-----:|
-| pic-scale | 68.51 | 47.33 | 38.81 |
+| pic-scale | 68.51 | 47.33 | 37.17 |
 | fir sse   | 73.28 | 54.66 | 54.66 |
 
 Example comparison time for downscale RGBA 4928x3279 image in two times without premultiplying alpha.

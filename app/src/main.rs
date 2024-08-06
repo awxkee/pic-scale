@@ -35,8 +35,8 @@ fn main() {
     )
     .unwrap();
     let resized = scaler.resize_rgba(
-        ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-        store,true
+        ImageSize::new(dimensions.0 as usize / 3, dimensions.1 as usize / 3),
+        store, true
     );
 
     // let mut r_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];
