@@ -222,7 +222,7 @@ pub unsafe fn _mm_srai_epi64x<const IMM8: i32>(a: __m128i) -> __m128i {
 }
 
 #[inline]
-/// Packs i64 into i32 using unsigned saturation
+/// Packs i64 into i32 using truncation
 pub(crate) unsafe fn _mm_packus_epi64(a: __m128i, b: __m128i) -> __m128i {
     const SHUFFLE_MASK: i32 = shuffle(3, 1, 2, 0);
     let a = _mm_shuffle_epi32::<SHUFFLE_MASK>(a);

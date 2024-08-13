@@ -33,6 +33,7 @@ use crate::{premultiply_pixel_f16, unpremultiply_pixel_f16};
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
+use crate::sse::f16_utils::{_mm_cvtph_psx, _mm_cvtps_phx};
 
 pub fn sse_premultiply_alpha_rgba_f16(
     dst: &mut [half::f16],
@@ -58,26 +59,26 @@ pub fn sse_premultiply_alpha_rgba_f16(
                 let lane3 = _mm_loadu_si128(src_ptr.add(24) as *const __m128i);
                 let pixel = sse_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
 
-                let low_alpha = _mm_cvtph_ps(pixel.3);
-                let low_r = _mm_mul_ps(_mm_cvtph_ps(pixel.0), low_alpha);
-                let low_g = _mm_mul_ps(_mm_cvtph_ps(pixel.1), low_alpha);
-                let low_b = _mm_mul_ps(_mm_cvtph_ps(pixel.2), low_alpha);
+                let low_alpha = _mm_cvtph_psx(pixel.3);
+                let low_r = _mm_mul_ps(_mm_cvtph_psx(pixel.0), low_alpha);
+                let low_g = _mm_mul_ps(_mm_cvtph_psx(pixel.1), low_alpha);
+                let low_b = _mm_mul_ps(_mm_cvtph_psx(pixel.2), low_alpha);
 
-                let high_alpha = _mm_cvtph_ps(_mm_srli_si128::<8>(pixel.3));
-                let high_r = _mm_mul_ps(_mm_cvtph_ps(_mm_srli_si128::<8>(pixel.0)), high_alpha);
-                let high_g = _mm_mul_ps(_mm_cvtph_ps(_mm_srli_si128::<8>(pixel.1)), high_alpha);
-                let high_b = _mm_mul_ps(_mm_cvtph_ps(_mm_srli_si128::<8>(pixel.2)), high_alpha);
+                let high_alpha = _mm_cvtph_psx(_mm_srli_si128::<8>(pixel.3));
+                let high_r = _mm_mul_ps(_mm_cvtph_psx(_mm_srli_si128::<8>(pixel.0)), high_alpha);
+                let high_g = _mm_mul_ps(_mm_cvtph_psx(_mm_srli_si128::<8>(pixel.1)), high_alpha);
+                let high_b = _mm_mul_ps(_mm_cvtph_psx(_mm_srli_si128::<8>(pixel.2)), high_alpha);
                 let r_values = _mm_unpacklo_epi64(
-                    _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(low_r),
-                    _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(high_r),
+                    _mm_cvtps_phx(low_r),
+                    _mm_cvtps_phx(high_r),
                 );
                 let g_values = _mm_unpacklo_epi64(
-                    _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(low_g),
-                    _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(high_g),
+                    _mm_cvtps_phx(low_g),
+                    _mm_cvtps_phx(high_g),
                 );
                 let b_values = _mm_unpacklo_epi64(
-                    _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(low_b),
-                    _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(high_b),
+                    _mm_cvtps_phx(low_b),
+                    _mm_cvtps_phx(high_b),
                 );
                 let dst_ptr = dst.as_mut_ptr().add(offset + px);
                 let (d_lane0, d_lane1, d_lane2, d_lane3) =
@@ -123,53 +124,53 @@ pub fn sse_unpremultiply_alpha_rgba_f16(
                 let lane3 = _mm_loadu_si128(src_ptr.add(24) as *const __m128i);
                 let pixel = sse_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
 
-                let low_alpha = _mm_cvtph_ps(pixel.3);
+                let low_alpha = _mm_cvtph_psx(pixel.3);
                 let zeros = _mm_setzero_ps();
                 let low_alpha_zero_mask = _mm_cmpeq_ps(low_alpha, zeros);
                 let low_r = _mm_blendv_ps(
-                    _mm_mul_ps(_mm_cvtph_ps(pixel.0), low_alpha),
+                    _mm_mul_ps(_mm_cvtph_psx(pixel.0), low_alpha),
                     zeros,
                     low_alpha_zero_mask,
                 );
                 let low_g = _mm_blendv_ps(
-                    _mm_mul_ps(_mm_cvtph_ps(pixel.1), low_alpha),
+                    _mm_mul_ps(_mm_cvtph_psx(pixel.1), low_alpha),
                     zeros,
                     low_alpha_zero_mask,
                 );
                 let low_b = _mm_blendv_ps(
-                    _mm_mul_ps(_mm_cvtph_ps(pixel.2), low_alpha),
+                    _mm_mul_ps(_mm_cvtph_psx(pixel.2), low_alpha),
                     zeros,
                     low_alpha_zero_mask,
                 );
 
-                let high_alpha = _mm_cvtph_ps(_mm_srli_si128::<8>(pixel.3));
+                let high_alpha = _mm_cvtph_psx(_mm_srli_si128::<8>(pixel.3));
                 let high_alpha_zero_mask = _mm_cmpeq_ps(high_alpha, zeros);
                 let high_r = _mm_blendv_ps(
-                    _mm_mul_ps(_mm_cvtph_ps(_mm_srli_si128::<8>(pixel.0)), high_alpha),
+                    _mm_mul_ps(_mm_cvtph_psx(_mm_srli_si128::<8>(pixel.0)), high_alpha),
                     zeros,
                     high_alpha_zero_mask,
                 );
                 let high_g = _mm_blendv_ps(
-                    _mm_mul_ps(_mm_cvtph_ps(_mm_srli_si128::<8>(pixel.1)), high_alpha),
+                    _mm_mul_ps(_mm_cvtph_psx(_mm_srli_si128::<8>(pixel.1)), high_alpha),
                     zeros,
                     high_alpha_zero_mask,
                 );
                 let high_b = _mm_blendv_ps(
-                    _mm_mul_ps(_mm_cvtph_ps(_mm_srli_si128::<8>(pixel.2)), high_alpha),
+                    _mm_mul_ps(_mm_cvtph_psx(_mm_srli_si128::<8>(pixel.2)), high_alpha),
                     zeros,
                     high_alpha_zero_mask,
                 );
                 let r_values = _mm_unpacklo_epi64(
-                    _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(low_r),
-                    _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(high_r),
+                    _mm_cvtps_phx(low_r),
+                    _mm_cvtps_phx(high_r),
                 );
                 let g_values = _mm_unpacklo_epi64(
-                    _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(low_g),
-                    _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(high_g),
+                    _mm_cvtps_phx(low_g),
+                    _mm_cvtps_phx(high_g),
                 );
                 let b_values = _mm_unpacklo_epi64(
-                    _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(low_b),
-                    _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(high_b),
+                    _mm_cvtps_phx(low_b),
+                    _mm_cvtps_phx(high_b),
                 );
                 let dst_ptr = dst.as_mut_ptr().add(offset + px);
                 let (d_lane0, d_lane1, d_lane2, d_lane3) =

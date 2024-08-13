@@ -37,7 +37,7 @@ use crate::neon::{neon_premultiply_alpha_rgba_f16, neon_unpremultiply_alpha_rgba
 use crate::neon::{neon_premultiply_alpha_rgba_f16_full, neon_unpremultiply_alpha_rgba_f16_full};
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
-    all(target_feature = "sse4.1", target_feature = "f16c")
+    all(target_feature = "sse4.1")
 ))]
 use crate::sse::{sse_premultiply_alpha_rgba_f16, sse_unpremultiply_alpha_rgba_f16};
 
@@ -144,7 +144,7 @@ pub fn premultiply_alpha_rgba_f16(
     }
     #[cfg(all(
         any(target_arch = "x86_64", target_arch = "x86"),
-        all(target_feature = "sse4.1", target_feature = "f16c")
+        all(target_feature = "sse4.1")
     ))]
     {
         if is_x86_feature_detected!("sse4.1") {
@@ -181,7 +181,7 @@ pub fn unpremultiply_alpha_rgba_f16(
     }
     #[cfg(all(
         any(target_arch = "x86_64", target_arch = "x86"),
-        all(target_feature = "sse4.1", target_feature = "f16c")
+        all(target_feature = "sse4.1")
     ))]
     {
         if is_x86_feature_detected!("sse4.1") {

@@ -64,15 +64,12 @@ use crate::neon::{
 use crate::rgb_f32::convolve_vertical_rgb_native_row_f32;
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
-    all(target_feature = "sse4.1", target_feature = "f16c")
-))]
-use crate::sse::convolve_vertical_rgb_sse_row_f16;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    all(target_feature = "sse4.1", target_feature = "f16c")
+    all(target_feature = "sse4.1")
 ))]
 use crate::sse::{
+    convolve_horizontal_rgb_sse_row_one_f16, convolve_horizontal_rgb_sse_rows_4_f16,
     convolve_horizontal_rgba_sse_row_one_f16, convolve_horizontal_rgba_sse_rows_4_f16,
+    convolve_vertical_rgb_sse_row_f16,
 };
 use crate::ImageStore;
 use half::f16;
@@ -102,7 +99,7 @@ impl<'a> HorizontalConvolutionPass<f16, 4> for ImageStore<'a, f16, 4> {
         }
         #[cfg(all(
             any(target_arch = "x86_64", target_arch = "x86"),
-            all(target_feature = "sse4.1", target_feature = "f16c")
+            all(target_feature = "sse4.1")
         ))]
         {
             _dispatcher_4_rows = Some(convolve_horizontal_rgba_sse_rows_4_f16);
@@ -146,7 +143,7 @@ impl<'a> VerticalConvolutionPass<f16, 4> for ImageStore<'a, f16, 4> {
         }
         #[cfg(all(
             any(target_arch = "x86_64", target_arch = "x86"),
-            all(target_feature = "sse4.1", target_feature = "f16c")
+            all(target_feature = "sse4.1")
         ))]
         {
             _dispatcher = convolve_vertical_rgb_sse_row_f16::<4>;
@@ -184,6 +181,14 @@ impl<'a> HorizontalConvolutionPass<f16, 3> for ImageStore<'a, f16, 3> {
                 _dispatcher_row = xconvolve_horizontal_rgb_neon_row_one_f16;
             }
         }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            all(target_feature = "sse4.1")
+        ))]
+        {
+            _dispatcher_4_rows = Some(convolve_horizontal_rgb_sse_rows_4_f16);
+            _dispatcher_row = convolve_horizontal_rgb_sse_row_one_f16;
+        }
         convolve_horizontal_dispatch_f16(
             self,
             filter_weights,
@@ -214,7 +219,7 @@ impl<'a> VerticalConvolutionPass<f16, 3> for ImageStore<'a, f16, 3> {
         }
         #[cfg(all(
             any(target_arch = "x86_64", target_arch = "x86"),
-            all(target_feature = "sse4.1", target_feature = "f16c")
+            all(target_feature = "sse4.1")
         ))]
         {
             _dispatcher = convolve_vertical_rgb_sse_row_f16::<3>;
@@ -272,7 +277,7 @@ impl<'a> VerticalConvolutionPass<f16, 1> for ImageStore<'a, f16, 1> {
         }
         #[cfg(all(
             any(target_arch = "x86_64", target_arch = "x86"),
-            all(target_feature = "sse4.1", target_feature = "f16c")
+            all(target_feature = "sse4.1")
         ))]
         {
             _dispatcher = convolve_vertical_rgb_sse_row_f16::<1>;

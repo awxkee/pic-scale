@@ -47,12 +47,10 @@ pub(crate) unsafe fn convolve_horizontal_parts_4_rgb_f32(
 ) -> __m128 {
     const COMPONENTS: usize = 3;
     let src_ptr = src.add(start_x * COMPONENTS);
-    let zeros = _mm_setzero_ps();
-    let mask = _mm_castsi128_ps(_mm_setr_epi32(-1, -1, -1, 0));
 
-    let rgb_pixel_0 = _mm_blendv_ps(zeros, _mm_loadu_ps(src_ptr), mask);
-    let rgb_pixel_1 = _mm_blendv_ps(zeros, _mm_loadu_ps(src_ptr.add(3)), mask);
-    let rgb_pixel_2 = _mm_blendv_ps(zeros, _mm_loadu_ps(src_ptr.add(6)), mask);
+    let rgb_pixel_0 = _mm_loadu_ps(src_ptr);
+    let rgb_pixel_1 = _mm_loadu_ps(src_ptr.add(3));
+    let rgb_pixel_2 = _mm_loadu_ps(src_ptr.add(6));
     let rgb_pixel_3 = _mm_setr_ps(
         src_ptr.add(9).read_unaligned(),
         src_ptr.add(10).read_unaligned(),
@@ -77,11 +75,9 @@ pub(crate) unsafe fn convolve_horizontal_parts_2_rgb_f32(
 ) -> __m128 {
     const COMPONENTS: usize = 3;
     let src_ptr = src.add(start_x * COMPONENTS);
-    let zeros = _mm_setzero_ps();
-    let mask = _mm_setr_epi32(-1, -1, -1, 0);
 
     let orig1 = _mm_loadu_ps(src_ptr);
-    let rgb_pixel_0 = _mm_blendv_ps(zeros, orig1, _mm_castsi128_ps(mask));
+    let rgb_pixel_0 = orig1;
     let rgb_pixel_1 = _mm_setr_ps(
         src_ptr.add(3).read_unaligned(),
         src_ptr.add(4).read_unaligned(),

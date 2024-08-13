@@ -28,6 +28,8 @@
  */
 #[cfg(all(feature = "half"))]
 mod alpha_f16;
+#[cfg(all(feature = "half", target_feature = "fp16"))]
+mod alpha_f16_full;
 mod alpha_f32;
 mod alpha_u16;
 mod alpha_u8;
@@ -63,7 +65,9 @@ mod vertical_u8;
 #[cfg(all(feature = "half"))]
 pub use alpha_f16::{neon_premultiply_alpha_rgba_f16, neon_unpremultiply_alpha_rgba_f16};
 #[cfg(all(feature = "half", target_feature = "fp16"))]
-pub use alpha_f16::{neon_premultiply_alpha_rgba_f16_full, neon_unpremultiply_alpha_rgba_f16_full};
+pub use alpha_f16_full::{
+    neon_premultiply_alpha_rgba_f16_full, neon_unpremultiply_alpha_rgba_f16_full,
+};
 pub use alpha_f32::neon_premultiply_alpha_rgba_f32;
 pub use alpha_f32::neon_unpremultiply_alpha_rgba_f32;
 pub use alpha_u16::{neon_premultiply_alpha_rgba_u16, neon_unpremultiply_alpha_rgba_u16};

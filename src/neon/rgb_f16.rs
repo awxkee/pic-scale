@@ -130,14 +130,12 @@ macro_rules! conv_horiz_2_rgb_f16 {
         ];
         let second_px = xvld_f16(second_part.as_ptr());
 
-        let mut rgb_first_u = xreinterpret_u16_f16(rgb_pixel);
-        rgb_first_u = vset_lane_u16::<3>(0, rgb_first_u);
+        let rgb_first_u = xreinterpret_u16_f16(rgb_pixel);
         let rgb_first = xreinterpret_f16_u16(rgb_first_u);
-        let mut rgb_second_u = vext_u16::<3>(
+        let rgb_second_u = vext_u16::<3>(
             xreinterpret_u16_f16(rgb_pixel),
             xreinterpret_u16_f16(second_px),
         );
-        rgb_second_u = vset_lane_u16::<3>(0, rgb_second_u);
         let rgb_second = xreinterpret_f16_u16(rgb_second_u);
 
         let acc = prefer_vfmaq_f32($store, xvcvt_f32_f16(rgb_first), $set.0);
