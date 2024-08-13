@@ -224,7 +224,7 @@ pub unsafe fn _mm_cvtps_ph_fallback(x: __m128) -> __m128i {
 #[cfg(target_feature = "f16c")]
 #[inline]
 pub unsafe fn _mm_cvtps_phx(x: __m128) -> __m128i {
-    _mm_cvtps_ph::<MM_FROUND_TO_NEAREST_INT>(x)
+    _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(x)
 }
 
 #[cfg(not(target_feature = "f16c"))]
