@@ -32,12 +32,13 @@ use crate::avx2::{avx_premultiply_alpha_rgba_f16, avx_unpremultiply_alpha_rgba_f
 use crate::neon::{neon_premultiply_alpha_rgba_f16, neon_unpremultiply_alpha_rgba_f16};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{neon_premultiply_alpha_rgba_f16_full, neon_unpremultiply_alpha_rgba_f16_full};
-use crate::risc::risc_is_feature_supported;
 #[cfg(all(
     any(target_arch = "riscv64", target_arch = "riscv32"),
     feature = "riscv"
 ))]
-use crate::risc::{risc_premultiply_alpha_rgba_f16, risc_unpremultiply_alpha_rgba_f16};
+use crate::risc::{
+    risc_is_feature_supported, risc_premultiply_alpha_rgba_f16, risc_unpremultiply_alpha_rgba_f16,
+};
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{sse_premultiply_alpha_rgba_f16, sse_unpremultiply_alpha_rgba_f16};
 
