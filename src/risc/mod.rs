@@ -34,8 +34,10 @@ mod feature_selector;
 mod rgba_f16;
 mod rgba_f32;
 mod vendor;
+#[cfg(feature = "half")]
 mod vertical_f16;
 mod vertical_f32;
+mod alpha_u8;
 
 #[cfg(feature = "half")]
 pub use alpha_f16::{risc_premultiply_alpha_rgba_f16, risc_unpremultiply_alpha_rgba_f16};
@@ -52,3 +54,4 @@ pub use vendor::*;
 #[cfg(feature = "half")]
 pub use vertical_f16::convolve_vertical_risc_row_f16;
 pub use vertical_f32::convolve_vertical_rgb_risc_row_f32;
+pub use alpha_u8::{risc_premultiply_alpha_rgba_u8, risc_unpremultiply_alpha_rgba_u8};

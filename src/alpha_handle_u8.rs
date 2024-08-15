@@ -31,6 +31,11 @@
 use crate::avx2::{avx_premultiply_alpha_rgba, avx_unpremultiply_alpha_rgba};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{neon_premultiply_alpha_rgba, neon_unpremultiply_alpha_rgba};
+#[cfg(all(
+    any(target_arch = "riscv64", target_arch = "riscv32"),
+    feature = "riscv"
+))]
+use crate::risc::{risc_premultiply_alpha_rgba_u8, risc_unpremultiply_alpha_rgba_u8};
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::*;
 
@@ -126,6 +131,15 @@ pub fn premultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height: 
             _dispatcher = avx_premultiply_alpha_rgba;
         }
     }
+    #[cfg(all(
+        any(target_arch = "riscv64", target_arch = "riscv32"),
+        feature = "riscv"
+    ))]
+    {
+        if std::arch::is_riscv_feature_detected!("v") {
+            _dispatcher = risc_premultiply_alpha_rgba_u8;
+        }
+    }
     _dispatcher(dst, src, width, height);
 }
 
@@ -145,6 +159,15 @@ pub fn unpremultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height
     {
         if is_x86_feature_detected!("avx2") {
             _dispatcher = avx_unpremultiply_alpha_rgba;
+        }
+    }
+    #[cfg(all(
+        any(target_arch = "riscv64", target_arch = "riscv32"),
+        feature = "riscv"
+    ))]
+    {
+        if std::arch::is_riscv_feature_detected!("v") {
+            _dispatcher = risc_unpremultiply_alpha_rgba_u8;
         }
     }
     _dispatcher(dst, src, width, height);

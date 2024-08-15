@@ -28,7 +28,6 @@
  */
 
 use crate::filter_weights::FilterWeights;
-use crate::risc::xvsetvlmax_f32m1_k;
 use std::arch::asm;
 
 #[target_feature(enable = "v")]
