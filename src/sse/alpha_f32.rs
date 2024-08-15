@@ -34,13 +34,26 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-pub unsafe fn sse_unpremultiply_row_f32(x: __m128, a: __m128) -> __m128 {
+unsafe fn sse_unpremultiply_row_f32(x: __m128, a: __m128) -> __m128 {
     let is_zero_mask = _mm_cmpeq_ps(a, _mm_setzero_ps());
     let rs = _mm_div_ps(x, a);
     _mm_blendv_ps(rs, _mm_setzero_ps(), is_zero_mask)
 }
 
 pub fn sse_unpremultiply_alpha_rgba_f32(dst: &mut [f32], src: &[f32], width: usize, height: usize) {
+    unsafe {
+        sse_unpremultiply_alpha_rgba_f32_impl(dst, src, width, height);
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn sse_unpremultiply_alpha_rgba_f32_impl(
+    dst: &mut [f32],
+    src: &[f32],
+    width: usize,
+    height: usize,
+) {
     let mut _cy = 0usize;
 
     let mut offset = 0usize;
@@ -49,32 +62,30 @@ pub fn sse_unpremultiply_alpha_rgba_f32(dst: &mut [f32], src: &[f32], width: usi
     for _ in _cy..height {
         let mut _cx = 0usize;
 
-        unsafe {
-            while _cx + 4 < width {
-                let px = _cx * 4;
-                let pixel_offset = offset + px;
-                let src_ptr = src.as_ptr().add(pixel_offset);
-                let rgba0 = _mm_loadu_ps(src_ptr);
-                let rgba1 = _mm_loadu_ps(src_ptr.add(4));
-                let rgba2 = _mm_loadu_ps(src_ptr.add(8));
-                let rgba3 = _mm_loadu_ps(src_ptr.add(12));
+        while _cx + 4 < width {
+            let px = _cx * 4;
+            let pixel_offset = offset + px;
+            let src_ptr = src.as_ptr().add(pixel_offset);
+            let rgba0 = _mm_loadu_ps(src_ptr);
+            let rgba1 = _mm_loadu_ps(src_ptr.add(4));
+            let rgba2 = _mm_loadu_ps(src_ptr.add(8));
+            let rgba3 = _mm_loadu_ps(src_ptr.add(12));
 
-                let (rrr, ggg, bbb, aaa) = sse_deinterleave_rgba_ps(rgba0, rgba1, rgba2, rgba3);
+            let (rrr, ggg, bbb, aaa) = sse_deinterleave_rgba_ps(rgba0, rgba1, rgba2, rgba3);
 
-                let rrr = sse_unpremultiply_row_f32(rrr, aaa);
-                let ggg = sse_unpremultiply_row_f32(ggg, aaa);
-                let bbb = sse_unpremultiply_row_f32(bbb, aaa);
+            let rrr = sse_unpremultiply_row_f32(rrr, aaa);
+            let ggg = sse_unpremultiply_row_f32(ggg, aaa);
+            let bbb = sse_unpremultiply_row_f32(bbb, aaa);
 
-                let (rgba0, rgba1, rgba2, rgba3) = sse_interleave_rgba_ps(rrr, ggg, bbb, aaa);
+            let (rgba0, rgba1, rgba2, rgba3) = sse_interleave_rgba_ps(rrr, ggg, bbb, aaa);
 
-                let dst_ptr = dst.as_mut_ptr().add(offset + px);
-                _mm_storeu_ps(dst_ptr, rgba0);
-                _mm_storeu_ps(dst_ptr.add(4), rgba1);
-                _mm_storeu_ps(dst_ptr.add(8), rgba2);
-                _mm_storeu_ps(dst_ptr.add(12), rgba3);
+            let dst_ptr = dst.as_mut_ptr().add(offset + px);
+            _mm_storeu_ps(dst_ptr, rgba0);
+            _mm_storeu_ps(dst_ptr.add(4), rgba1);
+            _mm_storeu_ps(dst_ptr.add(8), rgba2);
+            _mm_storeu_ps(dst_ptr.add(12), rgba3);
 
-                _cx += 4;
-            }
+            _cx += 4;
         }
 
         for x in _cx..width {
@@ -88,6 +99,19 @@ pub fn sse_unpremultiply_alpha_rgba_f32(dst: &mut [f32], src: &[f32], width: usi
 }
 
 pub fn sse_premultiply_alpha_rgba_f32(dst: &mut [f32], src: &[f32], width: usize, height: usize) {
+    unsafe {
+        sse_premultiply_alpha_rgba_f32_impl(dst, src, width, height);
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn sse_premultiply_alpha_rgba_f32_impl(
+    dst: &mut [f32],
+    src: &[f32],
+    width: usize,
+    height: usize,
+) {
     let mut _cy = 0usize;
 
     let mut offset = 0usize;
@@ -96,31 +120,29 @@ pub fn sse_premultiply_alpha_rgba_f32(dst: &mut [f32], src: &[f32], width: usize
     for _ in _cy..height {
         let mut _cx = 0usize;
 
-        unsafe {
-            while _cx + 4 < width {
-                let px = _cx * 4;
-                let pixel_offset = offset + px;
-                let src_ptr = src.as_ptr().add(pixel_offset);
-                let rgba0 = _mm_loadu_ps(src_ptr);
-                let rgba1 = _mm_loadu_ps(src_ptr.add(4));
-                let rgba2 = _mm_loadu_ps(src_ptr.add(8));
-                let rgba3 = _mm_loadu_ps(src_ptr.add(12));
-                let (rrr, ggg, bbb, aaa) = sse_deinterleave_rgba_ps(rgba0, rgba1, rgba2, rgba3);
+        while _cx + 4 < width {
+            let px = _cx * 4;
+            let pixel_offset = offset + px;
+            let src_ptr = src.as_ptr().add(pixel_offset);
+            let rgba0 = _mm_loadu_ps(src_ptr);
+            let rgba1 = _mm_loadu_ps(src_ptr.add(4));
+            let rgba2 = _mm_loadu_ps(src_ptr.add(8));
+            let rgba3 = _mm_loadu_ps(src_ptr.add(12));
+            let (rrr, ggg, bbb, aaa) = sse_deinterleave_rgba_ps(rgba0, rgba1, rgba2, rgba3);
 
-                let rrr = _mm_mul_ps(rrr, aaa);
-                let ggg = _mm_mul_ps(ggg, aaa);
-                let bbb = _mm_mul_ps(bbb, aaa);
+            let rrr = _mm_mul_ps(rrr, aaa);
+            let ggg = _mm_mul_ps(ggg, aaa);
+            let bbb = _mm_mul_ps(bbb, aaa);
 
-                let (rgba0, rgba1, rgba2, rgba3) = sse_interleave_rgba_ps(rrr, ggg, bbb, aaa);
+            let (rgba0, rgba1, rgba2, rgba3) = sse_interleave_rgba_ps(rrr, ggg, bbb, aaa);
 
-                let dst_ptr = dst.as_mut_ptr().add(offset + px);
-                _mm_storeu_ps(dst_ptr, rgba0);
-                _mm_storeu_ps(dst_ptr.add(4), rgba1);
-                _mm_storeu_ps(dst_ptr.add(8), rgba2);
-                _mm_storeu_ps(dst_ptr.add(12), rgba3);
+            let dst_ptr = dst.as_mut_ptr().add(offset + px);
+            _mm_storeu_ps(dst_ptr, rgba0);
+            _mm_storeu_ps(dst_ptr.add(4), rgba1);
+            _mm_storeu_ps(dst_ptr.add(8), rgba2);
+            _mm_storeu_ps(dst_ptr.add(12), rgba3);
 
-                _cx += 4;
-            }
+            _cx += 4;
         }
 
         for x in _cx..width {

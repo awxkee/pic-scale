@@ -2,7 +2,7 @@ workspace = { members = ["app"] }
 
 [package]
 name = "pic-scale"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2021"
 description = "High performance image scaling"
 readme = "README.md"
@@ -13,7 +13,7 @@ documentation = "https://github.com/awxkee/pic-scale"
 categories = ["multimedia::images", "multimedia::video"]
 homepage = "https://github.com/awxkee/pic-scale"
 repository = "https://github.com/awxkee/pic-scale"
-exclude = ["*.jpg", "/assets", "*.png"]
+exclude = ["*.jpg", "/assets", "*.png", "*.sh"]
 
 [dependencies]
 colorutils-rs = "0.5.8"

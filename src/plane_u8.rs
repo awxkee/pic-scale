@@ -26,10 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "avx2"
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::avx2::convolve_vertical_avx_row;
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_naive_u8::convolve_horizontal_rgba_native_row;
@@ -40,16 +37,11 @@ use crate::neon::convolve_vertical_rgb_neon_row;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{convolve_horizontal_plane_neon_row, convolve_horizontal_plane_neon_rows_4_u8};
 use crate::rgb_u8::convolve_vertical_rgb_native_row_u8;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
-use crate::sse::convolve_horizontal_plane_sse_row;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
-use crate::sse::{convolve_horizontal_plane_sse_rows_4_u8, convolve_vertical_sse_row};
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+use crate::sse::{
+    convolve_horizontal_plane_sse_row, convolve_horizontal_plane_sse_rows_4_u8,
+    convolve_vertical_sse_row,
+};
 use crate::ImageStore;
 use rayon::ThreadPool;
 
@@ -70,10 +62,7 @@ impl<'a> HorizontalConvolutionPass<u8, 1> for ImageStore<'a, u8, 1> {
             _dispatcher_4_rows = Some(convolve_horizontal_plane_neon_rows_4_u8);
             _dispatcher_1_row = convolve_horizontal_plane_neon_row;
         }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
             if is_x86_feature_detected!("sse4.1") {
                 _dispatcher_4_rows = Some(convolve_horizontal_plane_sse_rows_4_u8);
@@ -110,20 +99,11 @@ impl<'a> VerticalConvolutionPass<u8, 1> for ImageStore<'a, u8, 1> {
         {
             _dispatcher = convolve_vertical_rgb_neon_row::<1>;
         }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
             if is_x86_feature_detected!("sse4.1") {
                 _dispatcher = convolve_vertical_sse_row::<1>;
             }
-        }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "avx2"
-        ))]
-        {
             if is_x86_feature_detected!("avx2") {
                 _dispatcher = convolve_vertical_avx_row::<1>;
             }

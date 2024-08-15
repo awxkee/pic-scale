@@ -46,6 +46,30 @@ pub fn convolve_horizontal_rgb_sse_rows_4(
     dst_stride: usize,
 ) {
     unsafe {
+        convolve_horizontal_rgb_sse_rows_4_impl(
+            dst_width,
+            src_width,
+            approx_weights,
+            unsafe_source_ptr_0,
+            src_stride,
+            unsafe_destination_ptr_0,
+            dst_stride,
+        );
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn convolve_horizontal_rgb_sse_rows_4_impl(
+    dst_width: usize,
+    src_width: usize,
+    approx_weights: &FilterWeights<i16>,
+    unsafe_source_ptr_0: *const u8,
+    src_stride: usize,
+    unsafe_destination_ptr_0: *mut u8,
+    dst_stride: usize,
+) {
+    unsafe {
         const CHANNELS: usize = 3;
         let mut filter_offset = 0usize;
         let weights_ptr = approx_weights.weights.as_ptr();
@@ -223,6 +247,26 @@ pub fn convolve_horizontal_rgb_sse_rows_4(
 }
 
 pub fn convolve_horizontal_rgb_sse_row_one(
+    dst_width: usize,
+    src_width: usize,
+    approx_weights: &FilterWeights<i16>,
+    unsafe_source_ptr_0: *const u8,
+    unsafe_destination_ptr_0: *mut u8,
+) {
+    unsafe {
+        convolve_horizontal_rgb_sse_row_one_impl(
+            dst_width,
+            src_width,
+            approx_weights,
+            unsafe_source_ptr_0,
+            unsafe_destination_ptr_0,
+        );
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn convolve_horizontal_rgb_sse_row_one_impl(
     dst_width: usize,
     src_width: usize,
     approx_weights: &FilterWeights<i16>,

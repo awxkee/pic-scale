@@ -54,17 +54,25 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 | RGBA (f32)     | x    | x   | x   | x      | 
 | RGB (f32)      | x    | x   | ~   | ~      | 
 | Plane (f32)    | x    | x   | ~   | ~      | 
-| RGBA (f16)     | x    | x   | x   | -      | 
-| RGB (f16)      | x    | ~   | ~   | -      | 
-| Plane (f16)    | ~    | ~   | ~   | -      | 
-
-#### Target features
-
-`fma`, `sse4.1`, `sse4.2`, `avx2`, `neon`, `f16c` optional target features are available, enable it when compiling on supported platform to get full features
+| RGBA (f16)     | x    | x   | x   | x      | 
+| RGB (f16)      | x    | ~   | ~   | ~      | 
+| Plane (f16)    | ~    | ~   | ~   | ~      | 
 
 #### Features
 
 For RISC-V `riscv` feature should be implicitly enabled, nightly compiler channel is required
+
+To enable support of `f16` the feature `half` should be activated.
+
+#### Target features
+
+`neon` optional target features are available, enable it when compiling on supported platform to get full features
+
+`avx2`, `fma`, `sse4.1`, `f16c` will be detected automatically if available, and called the best path
+
+`fullfp16` NEON target detection performed in runtime, when available best the best paths for *f16* images are available on ARM.
+
+RISC-V `V (vector extension)` will be detected in runtime if available when feature `riscv` is enabled. *Nightly* rust channel is required
 
 ##### About f16
 
@@ -72,6 +80,8 @@ To enable full support of *f16* `half` feature should be used, and `f16c` enable
 For NEON `f16` feature use runtime detection, if CPU supports this feature then the very fast path is available
 
 Even when `half` feature activated but platform do not support or features not enabled for `f16` speed will be slow
+
+For RISC-V `V` and `zfh` along `zvfh` is required on cpu support for fastest paths
 
 ### Performance
 

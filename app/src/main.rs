@@ -9,8 +9,8 @@ use fast_image_resize::{
     CpuExtensions, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
 use half::f16;
-use image::{EncodableLayout, GenericImageView};
 use image::io::Reader;
+use image::{EncodableLayout, GenericImageView};
 
 use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
@@ -21,6 +21,7 @@ use pic_scale::{
 
 fn main() {
     // test_fast_image();
+    println!("one f16 {:X}", f16::from_f32(1.).to_bits());
     let img = Reader::open("./assets/asset_middle.jpg")
         .unwrap()
         .decode()
@@ -43,10 +44,16 @@ fn main() {
             .unwrap();
     let resized = scaler.resize_rgba_f16(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-        store, true,
+        store,
+        true,
     );
 
-    print!("f1: {}, f2: {}, f3: {}", resized.as_bytes()[0], resized.as_bytes()[1], resized.as_bytes()[2]);
+    print!(
+        "f1: {}, f2: {}, f3: {}",
+        resized.as_bytes()[0],
+        resized.as_bytes()[1],
+        resized.as_bytes()[2]
+    );
 
     let dst: Vec<u8> = resized
         .as_bytes()

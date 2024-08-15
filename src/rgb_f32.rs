@@ -26,10 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "avx2"
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::avx2::convolve_vertical_avx_row_f32;
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_naive_f32::*;
@@ -43,10 +40,7 @@ use crate::neon::*;
     feature = "riscv"
 ))]
 use crate::risc::convolve_vertical_rgb_risc_row_f32;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::*;
 use num_traits::AsPrimitive;
 use rayon::ThreadPool;
@@ -187,14 +181,15 @@ impl<'a> HorizontalConvolutionPass<f32, 3> for ImageStore<'a, f32, 3> {
             _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rows_4_f32);
             _dispatcher_row = convolve_horizontal_rgb_neon_row_one_f32;
         }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
             if is_x86_feature_detected!("sse4.1") {
-                _dispatcher_4_rows = Some(convolve_horizontal_rgb_sse_rows_4_f32);
-                _dispatcher_row = convolve_horizontal_rgb_sse_row_one_f32;
+                _dispatcher_4_rows = Some(convolve_horizontal_rgb_sse_rows_4_f32::<false>);
+                _dispatcher_row = convolve_horizontal_rgb_sse_row_one_f32::<false>;
+                if is_x86_feature_detected!("fma") {
+                    _dispatcher_4_rows = Some(convolve_horizontal_rgb_sse_rows_4_f32::<true>);
+                    _dispatcher_row = convolve_horizontal_rgb_sse_row_one_f32::<true>;
+                }
             }
         }
         convolve_horizontal_dispatch_f32(
@@ -221,22 +216,21 @@ impl<'a> VerticalConvolutionPass<f32, 3> for ImageStore<'a, f32, 3> {
         {
             _dispatcher = convolve_vertical_rgb_neon_row_f32::<3>;
         }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
+            let has_fma = is_x86_feature_detected!("fma");
             if is_x86_feature_detected!("sse4.1") {
-                _dispatcher = convolve_vertical_rgb_sse_row_f32::<3>;
+                if has_fma {
+                    _dispatcher = convolve_vertical_rgb_sse_row_f32::<3, true>;
+                } else {
+                    _dispatcher = convolve_vertical_rgb_sse_row_f32::<3, false>;
+                }
             }
-        }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "avx2"
-        ))]
-        {
             if is_x86_feature_detected!("avx2") {
-                _dispatcher = convolve_vertical_avx_row_f32::<3>;
+                _dispatcher = convolve_vertical_avx_row_f32::<3, false>;
+                if has_fma {
+                    _dispatcher = convolve_vertical_avx_row_f32::<3, true>;
+                }
             }
         }
         #[cfg(all(

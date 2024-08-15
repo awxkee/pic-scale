@@ -36,7 +36,7 @@ use crate::sse::_mm_prefer_fma_ps;
 use crate::sse::f16_utils::{_mm_cvtph_psx, _mm_cvtps_phx};
 
 #[inline(always)]
-pub(crate) unsafe fn convolve_vertical_part_sse_f16(
+pub(crate) unsafe fn convolve_vertical_part_sse_f16<const F16C: bool, const FMA: bool>(
     start_y: usize,
     start_x: usize,
     src: *const half::f16,
@@ -58,17 +58,17 @@ pub(crate) unsafe fn convolve_vertical_part_sse_f16(
         let s_ptr = src_ptr.add(px);
         let item_row_0 = _mm_set1_epi16(s_ptr.read_unaligned().to_bits() as i16);
 
-        store_0 = _mm_prefer_fma_ps(store_0, _mm_cvtph_psx(item_row_0), v_weight);
+        store_0 = _mm_prefer_fma_ps::<FMA>(store_0, _mm_cvtph_psx::<F16C>(item_row_0), v_weight);
     }
 
     let dst_ptr = dst.add(px);
-    let converted = _mm_cvtps_phx(store_0);
+    let converted = _mm_cvtps_phx::<F16C>(store_0);
     let first_item = _mm_extract_epi16::<0>(converted) as u16;
     (dst_ptr as *mut u16).write_unaligned(first_item);
 }
 
 #[inline(always)]
-pub(crate) unsafe fn convolve_vertical_part_sse_4_f16(
+pub(crate) unsafe fn convolve_vertical_part_sse_4_f16<const F16C: bool, const FMA: bool>(
     start_y: usize,
     start_x: usize,
     src: *const half::f16,
@@ -90,16 +90,16 @@ pub(crate) unsafe fn convolve_vertical_part_sse_4_f16(
         let s_ptr = src_ptr.add(px);
         let item_row_0 = _mm_loadu_si64(s_ptr as *const u8);
 
-        store_0 = _mm_prefer_fma_ps(store_0, _mm_cvtph_psx(item_row_0), v_weight);
+        store_0 = _mm_prefer_fma_ps::<FMA>(store_0, _mm_cvtph_psx::<F16C>(item_row_0), v_weight);
     }
 
     let dst_ptr = dst.add(px);
-    let acc = _mm_cvtps_phx(store_0);
+    let acc = _mm_cvtps_phx::<F16C>(store_0);
     std::ptr::copy_nonoverlapping(&acc as *const _ as *const u8, dst_ptr as *mut u8, 8);
 }
 
 #[inline(always)]
-pub(crate) unsafe fn convolve_vertical_part_sse_16_16(
+pub(crate) unsafe fn convolve_vertical_part_sse_16_16<const F16C: bool, const FMA: bool>(
     start_y: usize,
     start_x: usize,
     src: *const half::f16,
@@ -125,26 +125,26 @@ pub(crate) unsafe fn convolve_vertical_part_sse_16_16(
         let item_row_0 = _mm_loadu_si128(s_ptr as *const __m128i);
         let item_row_1 = _mm_loadu_si128(s_ptr.add(8) as *const __m128i);
 
-        let items0 = _mm_cvtph_psx(item_row_0);
-        let items1 = _mm_cvtph_psx(_mm_srli_si128::<8>(item_row_0));
-        let items2 = _mm_cvtph_psx(item_row_1);
-        let items3 = _mm_cvtph_psx(_mm_srli_si128::<8>(item_row_1));
+        let items0 = _mm_cvtph_psx::<F16C>(item_row_0);
+        let items1 = _mm_cvtph_psx::<F16C>(_mm_srli_si128::<8>(item_row_0));
+        let items2 = _mm_cvtph_psx::<F16C>(item_row_1);
+        let items3 = _mm_cvtph_psx::<F16C>(_mm_srli_si128::<8>(item_row_1));
 
-        store_0 = _mm_prefer_fma_ps(store_0, items0, v_weight);
-        store_1 = _mm_prefer_fma_ps(store_1, items1, v_weight);
-        store_2 = _mm_prefer_fma_ps(store_2, items2, v_weight);
-        store_3 = _mm_prefer_fma_ps(store_3, items3, v_weight);
+        store_0 = _mm_prefer_fma_ps::<FMA>(store_0, items0, v_weight);
+        store_1 = _mm_prefer_fma_ps::<FMA>(store_1, items1, v_weight);
+        store_2 = _mm_prefer_fma_ps::<FMA>(store_2, items2, v_weight);
+        store_3 = _mm_prefer_fma_ps::<FMA>(store_3, items3, v_weight);
     }
 
     let dst_ptr = dst.add(px);
 
     let acc0 = _mm_unpacklo_epi64(
-        _mm_cvtps_phx(store_0),
-        _mm_cvtps_phx(store_1),
+        _mm_cvtps_phx::<F16C>(store_0),
+        _mm_cvtps_phx::<F16C>(store_1),
     );
     let acc1 = _mm_unpacklo_epi64(
-        _mm_cvtps_phx(store_2),
-        _mm_cvtps_phx(store_3),
+        _mm_cvtps_phx::<F16C>(store_2),
+        _mm_cvtps_phx::<F16C>(store_3),
     );
 
     _mm_storeu_si128(dst_ptr as *mut __m128i, acc0);
@@ -152,7 +152,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_16_16(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn convolve_vertical_part_sse_8_f16(
+pub(crate) unsafe fn convolve_vertical_part_sse_8_f16<const F16C: bool, const FMA: bool>(
     start_y: usize,
     start_x: usize,
     src: *const half::f16,
@@ -174,23 +174,129 @@ pub(crate) unsafe fn convolve_vertical_part_sse_8_f16(
 
         let s_ptr = src_ptr.add(px);
         let item_row = _mm_loadu_si128(s_ptr as *const __m128i);
-        let items0 = _mm_cvtph_psx(item_row);
-        let items1 = _mm_cvtph_psx(_mm_srli_si128::<8>(item_row));
+        let items0 = _mm_cvtph_psx::<F16C>(item_row);
+        let items1 = _mm_cvtph_psx::<F16C>(_mm_srli_si128::<8>(item_row));
 
-        store_0 = _mm_prefer_fma_ps(store_0, items0, v_weight);
-        store_1 = _mm_prefer_fma_ps(store_1, items1, v_weight);
+        store_0 = _mm_prefer_fma_ps::<FMA>(store_0, items0, v_weight);
+        store_1 = _mm_prefer_fma_ps::<FMA>(store_1, items1, v_weight);
     }
 
     let dst_ptr = dst.add(px);
     let acc0 = _mm_unpacklo_epi64(
-        _mm_cvtps_phx(store_0),
-        _mm_cvtps_phx(store_1),
+        _mm_cvtps_phx::<F16C>(store_0),
+        _mm_cvtps_phx::<F16C>(store_1),
     );
     _mm_storeu_si128(dst_ptr as *mut __m128i, acc0);
 }
 
-#[inline(always)]
-pub fn convolve_vertical_rgb_sse_row_f16<const CHANNELS: usize>(
+pub fn convolve_vertical_sse_row_f16<const CHANNELS: usize, const F16C: bool, const FMA: bool>(
+    width: usize,
+    bounds: &FilterBounds,
+    unsafe_source_ptr_0: *const half::f16,
+    unsafe_destination_ptr_0: *mut half::f16,
+    src_stride: usize,
+    weight_ptr: *const f32,
+) {
+    unsafe {
+        if F16C {
+            if FMA {
+                convolve_vertical_sse_row_f16c_fma::<CHANNELS>(
+                    width,
+                    bounds,
+                    unsafe_source_ptr_0,
+                    unsafe_destination_ptr_0,
+                    src_stride,
+                    weight_ptr,
+                );
+            } else {
+                convolve_vertical_sse_row_f16c::<CHANNELS>(
+                    width,
+                    bounds,
+                    unsafe_source_ptr_0,
+                    unsafe_destination_ptr_0,
+                    src_stride,
+                    weight_ptr,
+                );
+            }
+        } else {
+            convolve_vertical_sse_row_f16_regular::<CHANNELS>(
+                width,
+                bounds,
+                unsafe_source_ptr_0,
+                unsafe_destination_ptr_0,
+                src_stride,
+                weight_ptr,
+            );
+        }
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn convolve_vertical_sse_row_f16_regular<const CHANNELS: usize>(
+    width: usize,
+    bounds: &FilterBounds,
+    unsafe_source_ptr_0: *const half::f16,
+    unsafe_destination_ptr_0: *mut half::f16,
+    src_stride: usize,
+    weight_ptr: *const f32,
+) {
+    convolve_vertical_sse_row_f16_impl::<CHANNELS, false, false>(
+        width,
+        bounds,
+        unsafe_source_ptr_0,
+        unsafe_destination_ptr_0,
+        src_stride,
+        weight_ptr,
+    );
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1,f16c,fma")]
+unsafe fn convolve_vertical_sse_row_f16c_fma<const CHANNELS: usize>(
+    width: usize,
+    bounds: &FilterBounds,
+    unsafe_source_ptr_0: *const half::f16,
+    unsafe_destination_ptr_0: *mut half::f16,
+    src_stride: usize,
+    weight_ptr: *const f32,
+) {
+    convolve_vertical_sse_row_f16_impl::<CHANNELS, true, true>(
+        width,
+        bounds,
+        unsafe_source_ptr_0,
+        unsafe_destination_ptr_0,
+        src_stride,
+        weight_ptr,
+    );
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1,f16c")]
+unsafe fn convolve_vertical_sse_row_f16c<const CHANNELS: usize>(
+    width: usize,
+    bounds: &FilterBounds,
+    unsafe_source_ptr_0: *const half::f16,
+    unsafe_destination_ptr_0: *mut half::f16,
+    src_stride: usize,
+    weight_ptr: *const f32,
+) {
+    convolve_vertical_sse_row_f16_impl::<CHANNELS, false, true>(
+        width,
+        bounds,
+        unsafe_source_ptr_0,
+        unsafe_destination_ptr_0,
+        src_stride,
+        weight_ptr,
+    );
+}
+
+#[inline]
+unsafe fn convolve_vertical_sse_row_f16_impl<
+    const CHANNELS: usize,
+    const FMA: bool,
+    const F16C: bool,
+>(
     width: usize,
     bounds: &FilterBounds,
     unsafe_source_ptr_0: *const half::f16,
@@ -203,7 +309,7 @@ pub fn convolve_vertical_rgb_sse_row_f16<const CHANNELS: usize>(
 
     while cx + 16 < dst_width {
         unsafe {
-            convolve_vertical_part_sse_16_16(
+            convolve_vertical_part_sse_16_16::<F16C, FMA>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -219,7 +325,7 @@ pub fn convolve_vertical_rgb_sse_row_f16<const CHANNELS: usize>(
 
     while cx + 8 < dst_width {
         unsafe {
-            convolve_vertical_part_sse_8_f16(
+            convolve_vertical_part_sse_8_f16::<F16C, FMA>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -235,7 +341,7 @@ pub fn convolve_vertical_rgb_sse_row_f16<const CHANNELS: usize>(
 
     while cx + 4 < dst_width {
         unsafe {
-            convolve_vertical_part_sse_4_f16(
+            convolve_vertical_part_sse_4_f16::<F16C, FMA>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -251,7 +357,7 @@ pub fn convolve_vertical_rgb_sse_row_f16<const CHANNELS: usize>(
 
     while cx < dst_width {
         unsafe {
-            convolve_vertical_part_sse_f16(
+            convolve_vertical_part_sse_f16::<F16C, FMA>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,

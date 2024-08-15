@@ -44,7 +44,8 @@ qemu-system-riscv64 \
 
 qemu-system-riscv64 \
     -machine virt \
-    -cpu rv64,zba=true,zbb=true,v=true,vlen=256,vext_spec=v1.0,rvv_ta_all_1s=true,rvv_ma_all_1s=true \
+    -cpu rv64,zba=true,zbb=true,zvfh=true,zfh=true,zfhmin=true,v=true,vlen=256,vext_spec=v1.0,rvv_ta_all_1s=true,rvv_ma_all_1s=true \
+    -smp 4 \
     -m 4G \
     -nographic \
     -bios default \

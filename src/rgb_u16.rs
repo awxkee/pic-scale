@@ -27,10 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "avx2"
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::avx2::convolve_vertical_rgb_avx_row_u16;
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_naive_u16::{
@@ -43,16 +40,11 @@ use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::neon::convolve_vertical_rgb_neon_row_u16;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{convolve_horizontal_rgb_neon_row_u16, convolve_horizontal_rgb_neon_rows_4_u16};
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
-use crate::sse::convolve_vertical_rgb_sse_row_u16;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
-use crate::sse::{convolve_horizontal_rgb_sse_row_u16, convolve_horizontal_rgb_sse_rows_4_u16};
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+use crate::sse::{
+    convolve_horizontal_rgb_sse_row_u16, convolve_horizontal_rgb_sse_rows_4_u16,
+    convolve_vertical_rgb_sse_row_u16,
+};
 use crate::ImageStore;
 use rayon::ThreadPool;
 
@@ -79,10 +71,7 @@ impl<'a> HorizontalConvolutionPass<u16, 3> for ImageStore<'a, u16, 3> {
             _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rows_4_u16);
             _dispatcher_1_row = convolve_horizontal_rgb_neon_row_u16;
         }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
             if is_x86_feature_detected!("sse4.1") {
                 _dispatcher_4_rows = Some(convolve_horizontal_rgb_sse_rows_4_u16);
@@ -120,20 +109,11 @@ impl<'a> VerticalConvolutionPass<u16, 3> for ImageStore<'a, u16, 3> {
         {
             _dispatcher = convolve_vertical_rgb_neon_row_u16::<3>;
         }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
             if is_x86_feature_detected!("sse4.1") {
                 _dispatcher = convolve_vertical_rgb_sse_row_u16::<3>;
             }
-        }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "avx2"
-        ))]
-        {
             if is_x86_feature_detected!("avx2") {
                 _dispatcher = convolve_vertical_rgb_avx_row_u16::<3>;
             }

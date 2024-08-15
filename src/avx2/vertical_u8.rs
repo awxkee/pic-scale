@@ -303,6 +303,28 @@ pub fn convolve_vertical_avx_row<const CHANNELS: usize>(
     src_stride: usize,
     weight_ptr: *const i16,
 ) {
+    unsafe {
+        convolve_vertical_avx_row_impl::<CHANNELS>(
+            width,
+            bounds,
+            unsafe_source_ptr_0,
+            unsafe_destination_ptr_0,
+            src_stride,
+            weight_ptr,
+        );
+    }
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn convolve_vertical_avx_row_impl<const CHANNELS: usize>(
+    width: usize,
+    bounds: &FilterBounds,
+    unsafe_source_ptr_0: *const u8,
+    unsafe_destination_ptr_0: *mut u8,
+    src_stride: usize,
+    weight_ptr: *const i16,
+) {
     let mut cx = 0usize;
     let total_width = width * CHANNELS;
 

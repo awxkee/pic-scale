@@ -45,10 +45,7 @@ mod alpha_handle_f16;
 mod alpha_handle_f32;
 mod alpha_handle_u16;
 mod alpha_handle_u8;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "avx2"
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod avx2;
 mod chunking;
 mod colors;
@@ -89,10 +86,7 @@ mod saturate_narrow;
 mod scaler;
 #[cfg(feature = "half")]
 mod scaler_f16;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod sse;
 mod support;
 mod threading_policy;

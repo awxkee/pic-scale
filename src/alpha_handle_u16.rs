@@ -27,17 +27,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "avx2"
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::avx2::{avx_premultiply_alpha_rgba_u16, avx_unpremultiply_alpha_rgba_u16};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{neon_premultiply_alpha_rgba_u16, neon_unpremultiply_alpha_rgba_u16};
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{premultiply_alpha_sse_rgba_u16, unpremultiply_alpha_sse_rgba_u16};
 
 #[macro_export]
@@ -138,21 +132,15 @@ pub fn premultiply_alpha_rgba_u16(
     bit_depth: usize,
 ) {
     let mut _dispatcher: fn(&mut [u16], &[u16], usize, usize, usize) = premultiply_alpha_rgba_impl;
-    #[cfg(all(
-        any(target_arch = "x86_64", target_arch = "x86"),
-        target_feature = "sse4.1"
-    ))]
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
         if is_x86_feature_detected!("sse4.1") {
             _dispatcher = premultiply_alpha_sse_rgba_u16;
         }
     }
-    #[cfg(all(
-        any(target_arch = "x86_64", target_arch = "x86"),
-        target_feature = "avx2"
-    ))]
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
-        if is_x86_feature_detected!("sse4.1") {
+        if is_x86_feature_detected!("avx2") {
             _dispatcher = avx_premultiply_alpha_rgba_u16;
         }
     }
@@ -172,21 +160,15 @@ pub fn unpremultiply_alpha_rgba_u16(
 ) {
     let mut _dispatcher: fn(&mut [u16], &[u16], usize, usize, usize) =
         unpremultiply_alpha_rgba_impl;
-    #[cfg(all(
-        any(target_arch = "x86_64", target_arch = "x86"),
-        target_feature = "sse4.1"
-    ))]
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
         if is_x86_feature_detected!("sse4.1") {
             _dispatcher = unpremultiply_alpha_sse_rgba_u16;
         }
     }
-    #[cfg(all(
-        any(target_arch = "x86_64", target_arch = "x86"),
-        target_feature = "avx2"
-    ))]
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
-        if is_x86_feature_detected!("sse4.1") {
+        if is_x86_feature_detected!("avx2") {
             _dispatcher = avx_unpremultiply_alpha_rgba_u16;
         }
     }

@@ -27,36 +27,36 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#[cfg(all(feature = "half", target_feature = "f16c"))]
+#[cfg(feature = "half")]
 mod alpha_f16;
 mod alpha_f32;
 mod alpha_u16;
 mod alpha_u8;
-#[cfg(all(feature = "half", target_feature = "f16c"))]
+#[cfg(feature = "half")]
 mod rgba_f16;
 mod rgba_f32;
 pub mod utils;
-#[cfg(all(feature = "half", target_feature = "f16c"))]
+#[cfg(feature = "half")]
 mod vertical_f16;
 mod vertical_f32;
 mod vertical_u16;
 mod vertical_u8;
 
-#[cfg(all(feature = "half", target_feature = "f16c"))]
+#[cfg(feature = "half")]
 pub use alpha_f16::{avx_premultiply_alpha_rgba_f16, avx_unpremultiply_alpha_rgba_f16};
 pub use alpha_f32::avx_premultiply_alpha_rgba_f32;
 pub use alpha_f32::avx_unpremultiply_alpha_rgba_f32;
 pub use alpha_u16::{avx_premultiply_alpha_rgba_u16, avx_unpremultiply_alpha_rgba_u16};
 pub use alpha_u8::avx_premultiply_alpha_rgba;
 pub use alpha_u8::avx_unpremultiply_alpha_rgba;
-#[cfg(all(feature = "half", target_feature = "f16c"))]
+#[cfg(feature = "half")]
 pub use rgba_f16::{
     convolve_horizontal_rgba_avx_row_one_f16, convolve_horizontal_rgba_avx_rows_4_f16,
 };
 pub use rgba_f32::{
     convolve_horizontal_rgba_avx_row_one_f32, convolve_horizontal_rgba_avx_rows_4_f32,
 };
-#[cfg(all(feature = "half", target_feature = "f16c"))]
+#[cfg(feature = "half")]
 pub use vertical_f16::convolve_vertical_avx_row_f16;
 pub use vertical_f32::convolve_vertical_avx_row_f32;
 pub use vertical_u16::convolve_vertical_rgb_avx_row_u16;

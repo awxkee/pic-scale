@@ -43,6 +43,19 @@ pub unsafe fn avx_unpremultiply_row_f32(x: __m256, a: __m256) -> __m256 {
 }
 
 pub fn avx_unpremultiply_alpha_rgba_f32(dst: &mut [f32], src: &[f32], width: usize, height: usize) {
+    unsafe {
+        avx_unpremultiply_alpha_rgba_f32_impl(dst, src, width, height);
+    }
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn avx_unpremultiply_alpha_rgba_f32_impl(
+    dst: &mut [f32],
+    src: &[f32],
+    width: usize,
+    height: usize,
+) {
     let mut _cy = 0usize;
 
     let mut offset = 0usize;
@@ -51,32 +64,30 @@ pub fn avx_unpremultiply_alpha_rgba_f32(dst: &mut [f32], src: &[f32], width: usi
     for _ in _cy..height {
         let mut _cx = 0usize;
 
-        unsafe {
-            while _cx + 8 < width {
-                let px = _cx * 4;
-                let pixel_offset = offset + px;
-                let src_ptr = src.as_ptr().add(pixel_offset);
-                let rgba0 = _mm256_loadu_ps(src_ptr);
-                let rgba1 = _mm256_loadu_ps(src_ptr.add(8));
-                let rgba2 = _mm256_loadu_ps(src_ptr.add(16));
-                let rgba3 = _mm256_loadu_ps(src_ptr.add(24));
+        while _cx + 8 < width {
+            let px = _cx * 4;
+            let pixel_offset = offset + px;
+            let src_ptr = src.as_ptr().add(pixel_offset);
+            let rgba0 = _mm256_loadu_ps(src_ptr);
+            let rgba1 = _mm256_loadu_ps(src_ptr.add(8));
+            let rgba2 = _mm256_loadu_ps(src_ptr.add(16));
+            let rgba3 = _mm256_loadu_ps(src_ptr.add(24));
 
-                let (rrr, ggg, bbb, aaa) = avx_deinterleave_rgba_ps(rgba0, rgba1, rgba2, rgba3);
+            let (rrr, ggg, bbb, aaa) = avx_deinterleave_rgba_ps(rgba0, rgba1, rgba2, rgba3);
 
-                let rrr = avx_unpremultiply_row_f32(rrr, aaa);
-                let ggg = avx_unpremultiply_row_f32(ggg, aaa);
-                let bbb = avx_unpremultiply_row_f32(bbb, aaa);
+            let rrr = avx_unpremultiply_row_f32(rrr, aaa);
+            let ggg = avx_unpremultiply_row_f32(ggg, aaa);
+            let bbb = avx_unpremultiply_row_f32(bbb, aaa);
 
-                let (rgba0, rgba1, rgba2, rgba3) = avx_interleave_rgba_ps(rrr, ggg, bbb, aaa);
+            let (rgba0, rgba1, rgba2, rgba3) = avx_interleave_rgba_ps(rrr, ggg, bbb, aaa);
 
-                let dst_ptr = dst.as_mut_ptr().add(offset + px);
-                _mm256_storeu_ps(dst_ptr, rgba0);
-                _mm256_storeu_ps(dst_ptr.add(8), rgba1);
-                _mm256_storeu_ps(dst_ptr.add(16), rgba2);
-                _mm256_storeu_ps(dst_ptr.add(24), rgba3);
+            let dst_ptr = dst.as_mut_ptr().add(offset + px);
+            _mm256_storeu_ps(dst_ptr, rgba0);
+            _mm256_storeu_ps(dst_ptr.add(8), rgba1);
+            _mm256_storeu_ps(dst_ptr.add(16), rgba2);
+            _mm256_storeu_ps(dst_ptr.add(24), rgba3);
 
-                _cx += 8;
-            }
+            _cx += 8;
         }
 
         for x in _cx..width {
@@ -90,6 +101,19 @@ pub fn avx_unpremultiply_alpha_rgba_f32(dst: &mut [f32], src: &[f32], width: usi
 }
 
 pub fn avx_premultiply_alpha_rgba_f32(dst: &mut [f32], src: &[f32], width: usize, height: usize) {
+    unsafe {
+        avx_premultiply_alpha_rgba_f32_impl(dst, src, width, height);
+    }
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn avx_premultiply_alpha_rgba_f32_impl(
+    dst: &mut [f32],
+    src: &[f32],
+    width: usize,
+    height: usize,
+) {
     let mut _cy = 0usize;
 
     let mut offset = 0usize;

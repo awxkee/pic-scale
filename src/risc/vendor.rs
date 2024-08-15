@@ -29,7 +29,7 @@
 use std::arch::asm;
 
 #[inline]
-#[allow(dead_code)]
+#[target_feature(enable = "v")]
 pub unsafe fn xvsetvlmax_e8m1() -> usize {
     let request: usize = 0;
     let mut result: usize;
@@ -42,7 +42,7 @@ pub unsafe fn xvsetvlmax_e8m1() -> usize {
 }
 
 #[inline]
-#[allow(dead_code)]
+#[target_feature(enable = "v")]
 pub unsafe fn xvsetvlmax_f32m1() -> usize {
     let mut result: usize;
     asm!(
@@ -56,7 +56,22 @@ pub unsafe fn xvsetvlmax_f32m1() -> usize {
 }
 
 #[inline]
-#[allow(dead_code)]
+#[target_feature(enable = "v,zfh")]
+pub unsafe fn xvsetvlmax_f16m1() -> usize {
+    let mut result: usize;
+    asm!(
+    "\
+    li t0, -1
+    vsetvli {0}, t0, e16, m1, ta, ma\
+    ",
+    out(reg) result,
+    options(pure, nomem, nostack));
+    result
+}
+
+
+#[inline]
+#[target_feature(enable = "v")]
 pub unsafe fn xvsetvlmax_f32m1_k(k: usize) -> usize {
     let mut result: usize;
     asm!(

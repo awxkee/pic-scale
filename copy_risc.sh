@@ -27,4 +27,4 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-scp -r -o Port=2222  ubuntu@localhost:/home/ubuntu/image-scale/4SDny9Trjm/converted.png /Users/radzivon/RustroverProjects/image-scale/converted_risc.png
+scp -r -o Port=2222  ubuntu@localhost:/home/ubuntu/image-scale/vugldMYh03/converted.png /Users/radzivon/RustroverProjects/image-scale/converted_risc.png

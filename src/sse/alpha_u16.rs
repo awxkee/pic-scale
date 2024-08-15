@@ -8,7 +8,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-pub unsafe fn sse_unpremultiply_row_u16(
+unsafe fn sse_unpremultiply_row_u16(
     x: __m128i,
     is_zero_mask: __m128i,
     a_lo_f: __m128,
@@ -34,6 +34,20 @@ pub unsafe fn sse_unpremultiply_row_u16(
 }
 
 pub fn unpremultiply_alpha_sse_rgba_u16(
+    dst: &mut [u16],
+    src: &[u16],
+    width: usize,
+    height: usize,
+    bit_depth: usize,
+) {
+    unsafe {
+        unpremultiply_alpha_sse_rgba_u16_impl(dst, src, width, height, bit_depth);
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn unpremultiply_alpha_sse_rgba_u16_impl(
     dst: &mut [u16],
     src: &[u16],
     width: usize,
@@ -101,7 +115,7 @@ pub fn unpremultiply_alpha_sse_rgba_u16(
 }
 
 #[inline(always)]
-pub unsafe fn sse_premultiply_row_u16(
+unsafe fn sse_premultiply_row_u16(
     x: __m128i,
     a_lo_f: __m128,
     a_hi_f: __m128,
@@ -124,6 +138,20 @@ pub unsafe fn sse_premultiply_row_u16(
 }
 
 pub fn premultiply_alpha_sse_rgba_u16(
+    dst: &mut [u16],
+    src: &[u16],
+    width: usize,
+    height: usize,
+    bit_depth: usize,
+) {
+    unsafe {
+        premultiply_alpha_sse_rgba_u16_impl(dst, src, width, height, bit_depth);
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn premultiply_alpha_sse_rgba_u16_impl(
     dst: &mut [u16],
     src: &[u16],
     width: usize,

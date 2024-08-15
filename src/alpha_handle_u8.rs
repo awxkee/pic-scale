@@ -27,17 +27,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "avx2"
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::avx2::{avx_premultiply_alpha_rgba, avx_unpremultiply_alpha_rgba};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{neon_premultiply_alpha_rgba, neon_unpremultiply_alpha_rgba};
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::*;
 
 #[macro_export]
@@ -120,19 +114,13 @@ pub fn premultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height: 
     {
         _dispatcher = neon_premultiply_alpha_rgba;
     }
-    #[cfg(all(
-        any(target_arch = "x86_64", target_arch = "x86"),
-        target_feature = "sse4.1"
-    ))]
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
         if is_x86_feature_detected!("sse4.1") {
             _dispatcher = sse_premultiply_alpha_rgba;
         }
     }
-    #[cfg(all(
-        any(target_arch = "x86_64", target_arch = "x86"),
-        target_feature = "avx2"
-    ))]
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
         if is_x86_feature_detected!("avx2") {
             _dispatcher = avx_premultiply_alpha_rgba;
@@ -147,19 +135,13 @@ pub fn unpremultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height
     {
         _dispatcher = neon_unpremultiply_alpha_rgba;
     }
-    #[cfg(all(
-        any(target_arch = "x86_64", target_arch = "x86"),
-        target_feature = "sse4.1"
-    ))]
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
         if is_x86_feature_detected!("sse4.1") {
             _dispatcher = sse_unpremultiply_alpha_rgba;
         }
     }
-    #[cfg(all(
-        any(target_arch = "x86_64", target_arch = "x86"),
-        target_feature = "avx2"
-    ))]
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
         if is_x86_feature_detected!("avx2") {
             _dispatcher = avx_unpremultiply_alpha_rgba;

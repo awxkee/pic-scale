@@ -39,7 +39,7 @@ use crate::avx2::utils::{
 use crate::{premultiply_pixel, unpremultiply_pixel};
 
 #[inline(always)]
-pub unsafe fn avx2_unpremultiply_row(x: __m256i, a: __m256i) -> __m256i {
+unsafe fn avx2_unpremultiply_row(x: __m256i, a: __m256i) -> __m256i {
     let zeros = _mm256_setzero_si256();
     let lo = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(x));
     let hi = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(x));
@@ -93,6 +93,14 @@ pub unsafe fn avx2_unpremultiply_row(x: __m256i, a: __m256i) -> __m256i {
 }
 
 pub fn avx_premultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height: usize) {
+    unsafe {
+        avx_premultiply_alpha_rgba_impl(dst, src, width, height);
+    }
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn avx_premultiply_alpha_rgba_impl(dst: &mut [u8], src: &[u8], width: usize, height: usize) {
     let mut offset = 0usize;
 
     for _ in 0..height {
@@ -152,6 +160,19 @@ pub fn avx_premultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, heig
 }
 
 pub fn avx_unpremultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height: usize) {
+    unsafe {
+        avx_unpremultiply_alpha_rgba_impl(dst, src, width, height);
+    }
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn avx_unpremultiply_alpha_rgba_impl(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    height: usize,
+) {
     let mut offset = 0usize;
 
     for _ in 0..height {

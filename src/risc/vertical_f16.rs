@@ -27,19 +27,20 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter_weights::FilterBounds;
-use crate::risc::xvsetvlmax_f32m1;
+use crate::risc::xvsetvlmax_f16m1;
+use half::f16;
 use std::arch::asm;
 
-pub fn convolve_vertical_rgb_risc_row_f32<const CHANNELS: usize>(
+pub fn convolve_vertical_risc_row_f16<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,
-    unsafe_source_ptr_0: *const f32,
-    unsafe_destination_ptr_0: *mut f32,
+    unsafe_source_ptr_0: *const f16,
+    unsafe_destination_ptr_0: *mut f16,
     src_stride: usize,
     weight_ptr: *const f32,
 ) {
     unsafe {
-        convolve_vertical_rgb_risc_row_f32_impl::<CHANNELS>(
+        convolve_vertical_risc_row_f16_impl::<CHANNELS>(
             width,
             bounds,
             unsafe_source_ptr_0,
@@ -51,59 +52,39 @@ pub fn convolve_vertical_rgb_risc_row_f32<const CHANNELS: usize>(
 }
 
 #[inline]
-#[target_feature(enable = "v")]
-unsafe fn convolve_vertical_rgb_risc_row_f32_impl<const CHANNELS: usize>(
+#[target_feature(enable = "v,zfh")]
+unsafe fn convolve_vertical_risc_row_f16_impl<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,
-    unsafe_source_ptr_0: *const f32,
-    unsafe_destination_ptr_0: *mut f32,
+    unsafe_source_ptr_0: *const f16,
+    unsafe_destination_ptr_0: *mut f16,
     src_stride: usize,
     weight_ptr: *const f32,
 ) {
     let mut cx = 0usize;
     let dst_width = width * CHANNELS;
 
-    let lane_length = unsafe { xvsetvlmax_f32m1() };
-    let double_length = 2 * lane_length;
-    let triple_length = 3 * lane_length;
-
-    while cx + triple_length < dst_width {
-        unsafe {
-            let bnd_start = bounds.start;
-            let bounds_size = bounds.size;
-            asm!(include_str!("vert_n_m_3_f32.asm"),
-                 in(reg) bnd_start,
-                 in(reg) cx,
-                 in(reg) unsafe_source_ptr_0,
-                 in(reg) src_stride,
-                 in(reg) unsafe_destination_ptr_0,
-                 in(reg) weight_ptr,
-                 in(reg) bounds_size);
-        }
-        cx += triple_length;
-    }
+    let lane_length = unsafe { xvsetvlmax_f16m1() };
+    let double_length = lane_length * 2;
 
     while cx + double_length < dst_width {
-        unsafe {
-            let bnd_start = bounds.start;
-            let bounds_size = bounds.size;
-            asm!(include_str!("vert_n_m_2_f32.asm"),
-                 in(reg) bnd_start,
-                 in(reg) cx,
-                 in(reg) unsafe_source_ptr_0,
-                 in(reg) src_stride,
-                 in(reg) unsafe_destination_ptr_0,
-                 in(reg) weight_ptr,
-                 in(reg) bounds_size);
-        }
+        let bnd_start = bounds.start;
+        let bounds_size = bounds.size;
+        asm!(include_str!("vert_n_m_2_f16.asm"),
+             in(reg) bnd_start,
+             in(reg) cx,
+             in(reg) unsafe_source_ptr_0,
+             in(reg) src_stride,
+             in(reg) unsafe_destination_ptr_0,
+             in(reg) weight_ptr,
+             in(reg) bounds_size);
         cx += double_length;
     }
 
     while cx + lane_length < dst_width {
-        unsafe {
-            let bnd_start = bounds.start;
-            let bounds_size = bounds.size;
-            asm!(include_str!("vert_n_f32.asm"),
+        let bnd_start = bounds.start;
+        let bounds_size = bounds.size;
+        asm!(include_str!("vert_n_f16.asm"),
                  in(reg) bnd_start,
                  in(reg) cx,
                  in(reg) unsafe_source_ptr_0,
@@ -111,15 +92,13 @@ unsafe fn convolve_vertical_rgb_risc_row_f32_impl<const CHANNELS: usize>(
                  in(reg) unsafe_destination_ptr_0,
                  in(reg) weight_ptr,
                  in(reg) bounds_size);
-        }
         cx += lane_length;
     }
 
     while cx < dst_width {
-        unsafe {
-            let bnd_start = bounds.start;
-            let bounds_size = bounds.size;
-            asm!(include_str!("vert_1_f32.asm"),
+        let bnd_start = bounds.start;
+        let bounds_size = bounds.size;
+        asm!(include_str!("vert_1_f16.asm"),
                  in(reg) bnd_start,
                  in(reg) cx,
                  in(reg) unsafe_source_ptr_0,
@@ -127,7 +106,6 @@ unsafe fn convolve_vertical_rgb_risc_row_f32_impl<const CHANNELS: usize>(
                  in(reg) unsafe_destination_ptr_0,
                  in(reg) weight_ptr,
                  in(reg) bounds_size);
-        }
         cx += 1;
     }
 }

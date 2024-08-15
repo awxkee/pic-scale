@@ -406,6 +406,30 @@ pub fn convolve_vertical_rgb_avx_row_u16<const CHANNELS: usize>(
     weight_ptr: *const i16,
     bit_depth: usize,
 ) {
+    unsafe {
+        convolve_vertical_rgb_avx_row_u16_impl::<CHANNELS>(
+            width,
+            bounds,
+            unsafe_source_ptr_0,
+            unsafe_destination_ptr_0,
+            src_stride,
+            weight_ptr,
+            bit_depth,
+        );
+    }
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn convolve_vertical_rgb_avx_row_u16_impl<const CHANNELS: usize>(
+    width: usize,
+    bounds: &FilterBounds,
+    unsafe_source_ptr_0: *const u16,
+    unsafe_destination_ptr_0: *mut u16,
+    src_stride: usize,
+    weight_ptr: *const i16,
+    bit_depth: usize,
+) {
     let max_colors = 2i32.pow(bit_depth as u32) - 1i32;
     let mut cx = 0usize;
     let dst_width = width * CHANNELS;

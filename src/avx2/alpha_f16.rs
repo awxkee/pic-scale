@@ -40,6 +40,19 @@ pub fn avx_premultiply_alpha_rgba_f16(
     width: usize,
     height: usize,
 ) {
+    unsafe {
+        avx_premultiply_alpha_rgba_f16_impl(dst, src, width, height);
+    }
+}
+
+#[inline]
+#[target_feature(enable = "avx2,f16c")]
+unsafe fn avx_premultiply_alpha_rgba_f16_impl(
+    dst: &mut [half::f16],
+    src: &[half::f16],
+    width: usize,
+    height: usize,
+) {
     let mut _cy = 0usize;
     let src_stride = 4 * width;
 
@@ -112,6 +125,19 @@ pub fn avx_premultiply_alpha_rgba_f16(
 }
 
 pub fn avx_unpremultiply_alpha_rgba_f16(
+    dst: &mut [half::f16],
+    src: &[half::f16],
+    width: usize,
+    height: usize,
+) {
+    unsafe {
+        avx_unpremultiply_alpha_rgba_f16_impl(dst, src, width, height);
+    }
+}
+
+#[inline]
+#[target_feature(enable = "avx2,f16c")]
+unsafe fn avx_unpremultiply_alpha_rgba_f16_impl(
     dst: &mut [half::f16],
     src: &[half::f16],
     width: usize,

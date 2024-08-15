@@ -47,29 +47,6 @@ pub unsafe fn _mm_srlv_epi32x(c: __m128i, n: __m128i) -> __m128i {
         _mm_extract_epi32::<2>(c).wrapping_shr(_mm_extract_epi32::<2>(n) as u32),
         _mm_extract_epi32::<3>(c).wrapping_shr(_mm_extract_epi32::<3>(n) as u32),
     )
-    // let shuffle_lo_1 = _mm_setr_epi8(0, 1, 2, 3,-1, -1, -1, -1,  -1, -1, -1, -1, -1, -1, -1, -1);
-    // let count_lo1 = _mm_shuffle_epi8(n, shuffle_lo_1);
-    // let v0 = _mm_srl_epi32(c, count_lo1);
-    // const SHUFFLE_LO_2: i32 = shuffle(1, 1, 1, 1);
-    // let shuffle_lo_2 = _mm_setr_epi8(4, 5, 6, 7, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1);
-    //
-    // let count_lo2 = _mm_shuffle_epi8(n, shuffle_lo_2);
-    // let v1 = _mm_srl_epi32(_mm_shuffle_epi32::<SHUFFLE_LO_2>(c), count_lo2);
-    // let permute_lowers = _mm_unpacklo_epi32(v0, v1);
-    //
-    // const SHUFFLE_LO_3: i32 = shuffle(2, 2, 2, 2);
-    //
-    // let shuffle_lo_2 = _mm_setr_epi8(8, 9, 10, 11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1);
-    // let count_lo2 = _mm_shuffle_epi8(n, shuffle_lo_2);
-    // let v2 = _mm_srl_epi32(_mm_shuffle_epi32::<SHUFFLE_LO_3>(c), count_lo2);
-    //
-    // let shuffle_lo_3 = _mm_setr_epi8(12, 13, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1);
-    // let count_lo3 = _mm_shuffle_epi8(n, shuffle_lo_3);
-    //
-    // const SHUFFLE_LO_4: i32 = shuffle(3, 3, 3, 3);
-    // let v3 = _mm_srl_epi32(_mm_shuffle_epi32::<SHUFFLE_LO_4>(c), count_lo3);
-    // let permute_uppers = _mm_unpacklo_epi32(v2, v3);
-    // _mm_unpacklo_epi64(permute_lowers, permute_uppers)
 }
 
 #[inline]
@@ -87,30 +64,6 @@ pub unsafe fn _mm_sllv_epi32x(c: __m128i, n: __m128i) -> __m128i {
         _mm_extract_epi32::<2>(c).wrapping_shl(_mm_extract_epi32::<2>(n) as u32),
         _mm_extract_epi32::<3>(c).wrapping_shl(_mm_extract_epi32::<3>(n) as u32),
     )
-
-    // let shuffle_lo_1 = _mm_setr_epi8(0, 1, 2, 3,-1, -1, -1, -1,  -1, -1, -1, -1, -1, -1, -1, -1);
-    // let count_lo1 = _mm_shuffle_epi8(n, shuffle_lo_1);
-    // let v0 = _mm_sll_epi32(c, count_lo1);
-    // const SHUFFLE_LO_2: i32 = shuffle(1, 1, 1, 1);
-    // let shuffle_lo_2 = _mm_setr_epi8(4, 5, 6, 7, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1);
-    //
-    // let count_lo2 = _mm_shuffle_epi8(n, shuffle_lo_2);
-    // let v1 = _mm_sll_epi32(_mm_shuffle_epi32::<SHUFFLE_LO_2>(c), count_lo2);
-    // let permute_lowers = _mm_unpacklo_epi32(v0, v1);
-    //
-    // const SHUFFLE_LO_3: i32 = shuffle(2, 2, 2, 2);
-    //
-    // let shuffle_lo_2 = _mm_setr_epi8(8, 9, 10, 11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1);
-    // let count_lo2 = _mm_shuffle_epi8(n, shuffle_lo_2);
-    // let v2 = _mm_sll_epi32(_mm_shuffle_epi32::<SHUFFLE_LO_3>(c), count_lo2);
-    //
-    // let shuffle_lo_3 = _mm_setr_epi8(12, 13, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1);
-    // let count_lo3 = _mm_shuffle_epi8(n, shuffle_lo_3);
-    //
-    // const SHUFFLE_LO_4: i32 = shuffle(3, 3, 3, 3);
-    // let v3 = _mm_sll_epi32(_mm_shuffle_epi32::<SHUFFLE_LO_4>(c), count_lo3);
-    // let permute_uppers = _mm_unpacklo_epi32(v2, v3);
-    // _mm_unpacklo_epi64(permute_lowers, permute_uppers)
 }
 
 #[inline(always)]
@@ -139,7 +92,7 @@ unsafe fn _mm_cmpneq_epi32(a: __m128i, b: __m128i) -> __m128i {
     This is not fully IEEE complaint conversion, only more straight for fallback
 **/
 #[inline]
-pub unsafe fn _mm_cvtph_ps_fallback(k: __m128i) -> __m128 {
+unsafe fn _mm_cvtph_ps_fallback(k: __m128i) -> __m128 {
     let h = _mm_unpacklo_epi16(k, _mm_setzero_si128());
     // Constants
     let exp_mask = _mm_set1_epi32(0x7C00);
@@ -178,7 +131,7 @@ pub unsafe fn _mm_cvtph_ps_fallback(k: __m128i) -> __m128 {
    This is not fully IEEE complaint conversion, only more straight for fallback
 **/
 #[inline]
-pub unsafe fn _mm_cvtps_ph_fallback(x: __m128) -> __m128i {
+unsafe fn _mm_cvtps_ph_fallback(x: __m128) -> __m128i {
     let b = _mm_add_epi32(_mm_castps_si128(x), _mm_set1_epi32(0x00001000));
     let e = _mm_srli_epi32::<23>(_mm_and_si128(b, _mm_set1_epi32(0x7F800000)));
     let m = _mm_and_si128(b, _mm_set1_epi32(0x007FFFFF));
@@ -221,28 +174,34 @@ pub unsafe fn _mm_cvtps_ph_fallback(x: __m128) -> __m128i {
     _mm_packus_epi32(packed_32, _mm_setzero_si128())
 }
 
-#[cfg(target_feature = "f16c")]
 #[inline]
-pub unsafe fn _mm_cvtps_phx(x: __m128) -> __m128i {
+#[target_feature(enable = "f16c")]
+unsafe fn _mm_cvtps_phdx(x: __m128) -> __m128i {
     _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(x)
 }
 
-#[cfg(not(target_feature = "f16c"))]
 #[inline]
-pub unsafe fn _mm_cvtps_phx(x: __m128) -> __m128i {
-    _mm_cvtps_ph_fallback(x)
+pub unsafe fn _mm_cvtps_phx<const F16C: bool>(x: __m128) -> __m128i {
+    if F16C {
+        _mm_cvtps_phdx(x)
+    } else {
+        _mm_cvtps_ph_fallback(x)
+    }
 }
 
-#[cfg(target_feature = "f16c")]
 #[inline]
-pub unsafe fn _mm_cvtph_psx(x: __m128i) -> __m128 {
+#[target_feature(enable = "f16c")]
+unsafe fn _mm_cvtph_psdx(x: __m128i) -> __m128 {
     _mm_cvtph_ps(x)
 }
 
-#[cfg(not(target_feature = "f16c"))]
 #[inline]
-pub unsafe fn _mm_cvtph_psx(x: __m128i) -> __m128 {
-    _mm_cvtph_ps_fallback(x)
+pub unsafe fn _mm_cvtph_psx<const F16C: bool>(x: __m128i) -> __m128 {
+    if F16C {
+        _mm_cvtph_ps(x)
+    } else {
+        _mm_cvtph_ps_fallback(x)
+    }
 }
 
 #[cfg(test)]

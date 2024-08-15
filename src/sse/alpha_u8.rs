@@ -52,7 +52,7 @@ pub unsafe fn sse_div_by255(v: __m128i) -> __m128i {
 }
 
 #[inline(always)]
-pub unsafe fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
+unsafe fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
     let zeros = _mm_setzero_si128();
     let lo = _mm_cvtepu8_epi16(x);
     let hi = _mm_unpackhi_epi8(x, zeros);
@@ -88,6 +88,14 @@ pub unsafe fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
 }
 
 pub fn sse_premultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height: usize) {
+    unsafe {
+        sse_premultiply_alpha_rgba_impl(dst, src, width, height);
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn sse_premultiply_alpha_rgba_impl(dst: &mut [u8], src: &[u8], width: usize, height: usize) {
     let mut _cy = 0usize;
     let src_stride = 4 * width;
 
@@ -152,6 +160,19 @@ pub fn sse_premultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, heig
 }
 
 pub fn sse_unpremultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height: usize) {
+    unsafe {
+        sse_unpremultiply_alpha_rgba_impl(dst, src, width, height);
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn sse_unpremultiply_alpha_rgba_impl(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    height: usize,
+) {
     let mut _cy = 0usize;
 
     let mut offset = 0usize;
