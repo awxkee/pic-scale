@@ -38,9 +38,6 @@ vnclipu.wi v10, v4, 0   # R8
 vnclipu.wi v1, v6, 0    # G8
 vnclipu.wi v2, v8, 0    # B8
 
-vmv.x.s t6, v10
-mv {2}, t6
-
 vmv.v.v v0, v10
 
 # Store the result with strided store (interleaving)
