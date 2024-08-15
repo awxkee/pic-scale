@@ -34,7 +34,7 @@ use std::arch::x86_64::*;
 
 #[inline]
 #[cfg(target_feature = "avx2")]
-pub unsafe fn _mm_srlv_epi32x(c: __m128i, n: __m128i) -> __m128 {
+pub unsafe fn _mm_srlv_epi32x(c: __m128i, n: __m128i) -> __m128i {
     _mm_srlv_epi32(c, n)
 }
 
@@ -74,7 +74,7 @@ pub unsafe fn _mm_srlv_epi32x(c: __m128i, n: __m128i) -> __m128i {
 
 #[inline]
 #[cfg(target_feature = "avx2")]
-pub unsafe fn _mm_sllv_epi32x(c: __m128i, n: __m128i) -> __m128 {
+pub unsafe fn _mm_sllv_epi32x(c: __m128i, n: __m128i) -> __m128i {
     _mm_sllv_epi32(c, n)
 }
 
