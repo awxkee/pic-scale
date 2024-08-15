@@ -289,54 +289,71 @@ pub fn xconvolve_horizontal_rgb_neon_row_one_f16(
     unsafe_destination_ptr_0: *mut half::f16,
 ) {
     unsafe {
-        const CHANNELS: usize = 3;
-        let weights_ptr = filter_weights.weights.as_ptr();
-        let mut filter_offset = 0usize;
+        xconvolve_horizontal_rgb_neon_row_one_f16_impl(
+            dst_width,
+            src_width,
+            filter_weights,
+            unsafe_source_ptr_0,
+            unsafe_destination_ptr_0,
+        );
+    }
+}
 
-        for x in 0..dst_width {
-            let bounds = filter_weights.bounds.get_unchecked(x);
-            let mut jx = 0usize;
-            let mut store = xvzeros_f16();
+#[target_feature(enable = "fp16")]
+unsafe fn xconvolve_horizontal_rgb_neon_row_one_f16_impl(
+    dst_width: usize,
+    src_width: usize,
+    filter_weights: &FilterWeights<f32>,
+    unsafe_source_ptr_0: *const half::f16,
+    unsafe_destination_ptr_0: *mut half::f16,
+) {
+    const CHANNELS: usize = 3;
+    let weights_ptr = filter_weights.weights.as_ptr();
+    let mut filter_offset = 0usize;
 
-            while jx + 4 < bounds.size && bounds.start + jx + 6 < src_width {
-                let bounds_start = bounds.start + jx;
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let read_weights = xvcvt_f16_f32(vld1q_f32(ptr));
-                let w0 = xvdup_lane_f16::<0>(read_weights);
-                let w1 = xvdup_lane_f16::<1>(read_weights);
-                let w2 = xvdup_lane_f16::<2>(read_weights);
-                let w3 = xvdup_lane_f16::<3>(read_weights);
-                let set = (w0, w1, w2, w3);
+    for x in 0..dst_width {
+        let bounds = filter_weights.bounds.get_unchecked(x);
+        let mut jx = 0usize;
+        let mut store = xvzeros_f16();
 
-                store = conv_horiz_4_rgb_f16!(bounds_start, unsafe_source_ptr_0, set, store);
-                jx += 4;
-            }
+        while jx + 4 < bounds.size && bounds.start + jx + 6 < src_width {
+            let bounds_start = bounds.start + jx;
+            let ptr = weights_ptr.add(jx + filter_offset);
+            let read_weights = xvcvt_f16_f32(vld1q_f32(ptr));
+            let w0 = xvdup_lane_f16::<0>(read_weights);
+            let w1 = xvdup_lane_f16::<1>(read_weights);
+            let w2 = xvdup_lane_f16::<2>(read_weights);
+            let w3 = xvdup_lane_f16::<3>(read_weights);
+            let set = (w0, w1, w2, w3);
 
-            while jx + 2 < bounds.size {
-                let bounds_start = bounds.start + jx;
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let read_weights_h = vld1_f32(ptr);
-                let read_weights = xvcvt_f16_f32(vcombine_f32(read_weights_h, read_weights_h));
-                let w0 = xvdup_lane_f16::<0>(read_weights);
-                let w1 = xvdup_lane_f16::<1>(read_weights);
-                let set = (w0, w1);
-                store = conv_horiz_2_rgb_f16!(bounds_start, unsafe_source_ptr_0, set, store);
-                jx += 2;
-            }
-
-            while jx < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = xvcvt_f16_f32(vld1q_dup_f32(ptr));
-                let bounds_start = bounds.start + jx;
-                store = conv_horiz_1_rgb_f16!(bounds_start, unsafe_source_ptr_0, weight0, store);
-                jx += 1;
-            }
-
-            let px = x * CHANNELS;
-            let dest_ptr = unsafe_destination_ptr_0.add(px);
-            write_rgb_f16!(store, dest_ptr);
-
-            filter_offset += filter_weights.aligned_size;
+            store = conv_horiz_4_rgb_f16!(bounds_start, unsafe_source_ptr_0, set, store);
+            jx += 4;
         }
+
+        while jx + 2 < bounds.size {
+            let bounds_start = bounds.start + jx;
+            let ptr = weights_ptr.add(jx + filter_offset);
+            let read_weights_h = vld1_f32(ptr);
+            let read_weights = xvcvt_f16_f32(vcombine_f32(read_weights_h, read_weights_h));
+            let w0 = xvdup_lane_f16::<0>(read_weights);
+            let w1 = xvdup_lane_f16::<1>(read_weights);
+            let set = (w0, w1);
+            store = conv_horiz_2_rgb_f16!(bounds_start, unsafe_source_ptr_0, set, store);
+            jx += 2;
+        }
+
+        while jx < bounds.size {
+            let ptr = weights_ptr.add(jx + filter_offset);
+            let weight0 = xvcvt_f16_f32(vld1q_dup_f32(ptr));
+            let bounds_start = bounds.start + jx;
+            store = conv_horiz_1_rgb_f16!(bounds_start, unsafe_source_ptr_0, weight0, store);
+            jx += 1;
+        }
+
+        let px = x * CHANNELS;
+        let dest_ptr = unsafe_destination_ptr_0.add(px);
+        write_rgb_f16!(store, dest_ptr);
+
+        filter_offset += filter_weights.aligned_size;
     }
 }

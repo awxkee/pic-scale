@@ -26,7 +26,8 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+#[cfg(all(any(target_arch = "riscv64", target_arch = "riscv32"), feature = "riscv"))]
+use std::arch::is_riscv_feature_detected;
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "avx2"
@@ -55,6 +56,8 @@ use crate::rgb_f32::convolve_vertical_rgb_native_row_f32;
 use crate::sse::*;
 use crate::ImageStore;
 use rayon::ThreadPool;
+#[cfg(all(any(target_arch = "riscv64", target_arch = "riscv32"), feature = "riscv"))]
+use crate::risc::{convolve_vertical_rgb_risc_row_f32, convolve_horizontal_rgba_risc_row_one_f32, convolve_horizontal_rgba_risc_rows_4};
 
 impl<'a> HorizontalConvolutionPass<f32, 4> for ImageStore<'a, f32, 4> {
     fn convolve_horizontal(
@@ -91,6 +94,13 @@ impl<'a> HorizontalConvolutionPass<f32, 4> for ImageStore<'a, f32, 4> {
             if is_x86_feature_detected!("avx2") {
                 _dispatcher_4_rows = Some(convolve_horizontal_rgba_avx_rows_4_f32);
                 _dispatcher_row = convolve_horizontal_rgba_avx_row_one_f32;
+            }
+        }
+        #[cfg(all(any(target_arch = "riscv64", target_arch = "riscv32"), feature = "riscv"))]
+        {
+            if is_riscv_feature_detected!("v") {
+                _dispatcher_4_rows = Some(convolve_horizontal_rgba_risc_rows_4);
+                _dispatcher_row = convolve_horizontal_rgba_risc_row_one_f32;
             }
         }
         convolve_horizontal_dispatch_f32(
@@ -133,6 +143,12 @@ impl<'a> VerticalConvolutionPass<f32, 4> for ImageStore<'a, f32, 4> {
         {
             if is_x86_feature_detected!("avx2") {
                 _dispatcher = convolve_vertical_avx_row_f32::<4>;
+            }
+        }
+        #[cfg(all(any(target_arch = "riscv64", target_arch = "riscv32"), feature = "riscv"))]
+        {
+            if is_riscv_feature_detected!("v") {
+                _dispatcher = convolve_vertical_rgb_risc_row_f32::<4>;
             }
         }
         convolve_vertical_dispatch_f32(self, filter_weights, destination, pool, _dispatcher);

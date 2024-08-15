@@ -2,5 +2,13 @@
 #rustflags = ["-C", "target-feature=+f16c,+sse4.1"]
 rustflags = ["-Ctarget-cpu=native"]
 
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "target-feature=-fp16"]
+
 [target.x86_64-apple-darwin]
 rustflags = ["-C", "target-feature=+sse4.1"]
+
+[target.riscv64gc-unknown-linux-gnu]
+rustflags = ["-Ctarget-feature=+rvv", "-Ctarget-cpu=native"]
+#linker = "/opt/homebrew/Cellar/riscv-gnu-toolchain/main/bin/riscv64-unknown-elf-gcc"
+#ar = "/opt/homebrew/Cellar/riscv-gnu-toolchain/main/bin/riscv64-unknown-elf-ar"

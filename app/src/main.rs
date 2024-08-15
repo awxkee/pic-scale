@@ -9,7 +9,8 @@ use fast_image_resize::{
     CpuExtensions, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
 use half::f16;
-use image::{EncodableLayout, GenericImageView, ImageReader};
+use image::{EncodableLayout, GenericImageView};
+use image::io::Reader;
 
 use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
@@ -20,12 +21,12 @@ use pic_scale::{
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/asset_5.png")
+    let img = Reader::open("./assets/asset_middle.jpg")
         .unwrap()
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
-    let transient = img.to_rgb8();
+    let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
     let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
@@ -38,12 +39,14 @@ fn main() {
 
     let start_time = Instant::now();
     let store =
-        ImageStore::<f16, 3>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
+        ImageStore::<f16, 4>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
-    let resized = scaler.resize_rgb_f16(
+    let resized = scaler.resize_rgba_f16(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-        store,
+        store, true,
     );
+
+    print!("f1: {}, f2: {}, f3: {}", resized.as_bytes()[0], resized.as_bytes()[1], resized.as_bytes()[2]);
 
     let dst: Vec<u8> = resized
         .as_bytes()
@@ -116,7 +119,7 @@ fn main() {
             &dst,
             resized.width as u32,
             resized.height as u32,
-            image::ExtendedColorType::Rgba8,
+            image::ColorType::Rgba8,
         )
         .unwrap();
     } else {
@@ -125,7 +128,7 @@ fn main() {
             &dst,
             resized.width as u32,
             resized.height as u32,
-            image::ExtendedColorType::Rgb8,
+            image::ColorType::Rgb8,
         )
         .unwrap();
     }
@@ -178,7 +181,7 @@ fn u8_to_u16(u8_buffer: &[u8]) -> &[u16] {
 }
 
 fn test_fast_image() {
-    let img = ImageReader::open("./assets/asset_5.png")
+    let img = Reader::open("./assets/asset_5.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -231,7 +234,7 @@ fn test_fast_image() {
             &dst,
             dst_image.width() as u32,
             dst_image.height() as u32,
-            image::ExtendedColorType::Rgb8,
+            image::ColorType::Rgb8,
         )
         .unwrap();
     } else {
@@ -240,7 +243,7 @@ fn test_fast_image() {
             &dst,
             dst_image.width() as u32,
             dst_image.height() as u32,
-            image::ExtendedColorType::Rgba8,
+            image::ColorType::Rgba8,
         )
         .unwrap();
     }

@@ -2,7 +2,7 @@
 
 Rust image scale in different color spaces using SIMD and multithreading.
 
-Supported NEON, SSE, AVX-2.
+Supported NEON, SSE, AVX-2, RISC-V (Vector Extension).
 
 ### Colorspace
 
@@ -43,31 +43,33 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 
 `~` - Partially implemented
 
-|                | NEON | SSE | AVX |
-|----------------|------|-----|-----|
-| RGBA (8 bit)   | x    | x   | ~   |
-| RGB (8 bit)    | x    | x   | ~   |
-| Plane (8 bit)  | x    | x   | ~   |
-| RGBA (8+ bit)  | x    | x   | ~   |
-| RGB (8+ bit)   | x    | x   | ~   |
-| Plane (8+ bit) | ~    | ~   | ~   |
-| RGBA (f32)     | x    | x   | x   |
-| RGB (f32)      | x    | x   | ~   |
-| Plane (f32)    | x    | x   | ~   |
-| RGBA (f16)     | x    | x   | x   |
-| RGB (f16)      | x    | ~   | ~   |
-| Plane (f16)    | ~    | ~   | ~   |
+|                | NEON | SSE | AVX | RISC-V | 
+|----------------|------|-----|-----|--------| 
+| RGBA (8 bit)   | x    | x   | ~   | -      | 
+| RGB (8 bit)    | x    | x   | ~   | -      | 
+| Plane (8 bit)  | x    | x   | ~   | -      | 
+| RGBA (8+ bit)  | x    | x   | ~   | -      | 
+| RGB (8+ bit)   | x    | x   | ~   | -      | 
+| Plane (8+ bit) | ~    | ~   | ~   | -      | 
+| RGBA (f32)     | x    | x   | x   | x      | 
+| RGB (f32)      | x    | x   | ~   | ~      | 
+| Plane (f32)    | x    | x   | ~   | ~      | 
+| RGBA (f16)     | x    | x   | x   | -      | 
+| RGB (f16)      | x    | ~   | ~   | -      | 
+| Plane (f16)    | ~    | ~   | ~   | -      | 
 
 #### Target features
 
 `fma`, `sse4.1`, `sse4.2`, `avx2`, `neon`, `f16c` optional target features are available, enable it when compiling on supported platform to get full features
 
+#### Features
+
+For RISC-V `riscv` feature should be implicitly enabled, nightly compiler channel is required
+
 ##### About f16
 
 To enable full support of *f16* `half` feature should be used, and `f16c` enabled when targeting x86 platforms.
-For NEON `f16` feature, target feature `neon` should be activated and target platform expected to be `aarch64`.
-
-For `aarch64` if compiled with `fp16` then the very fast paths is available.
+For NEON `f16` feature use runtime detection, if CPU supports this feature then the very fast path is available
 
 Even when `half` feature activated but platform do not support or features not enabled for `f16` speed will be slow
 

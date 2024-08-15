@@ -26,12 +26,45 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-mod vendor;
-mod alpha_f32;
-mod vertical_f32;
-mod rgba_f32;
+use std::arch::asm;
 
-pub use vendor::*;
-pub use alpha_f32::{risc_premultiply_alpha_rgba_f32, risc_unpremultiply_alpha_rgba_f32};
-pub use vertical_f32::{convolve_vertical_rgb_risc_row_f32};
-pub use rgba_f32::{convolve_horizontal_rgba_risc_row_one_f32, convolve_horizontal_rgba_risc_rows_4};
+#[inline]
+#[allow(dead_code)]
+pub unsafe fn xvsetvlmax_e8m1() -> usize {
+    let request: usize = 0;
+    let mut result: usize;
+    asm!(
+    "vsetvl {0}, {1}",
+    out(reg) result,
+    in(reg) request,
+    options(pure, nomem, nostack));
+    result
+}
+
+#[inline]
+#[allow(dead_code)]
+pub unsafe fn xvsetvlmax_f32m1() -> usize {
+    let mut result: usize;
+    asm!(
+    "\
+    li t0, -1
+    vsetvli {0}, t0, e32, m1, ta, ma\
+    ",
+    out(reg) result,
+    options(pure, nomem, nostack));
+    result
+}
+
+#[inline]
+#[allow(dead_code)]
+pub unsafe fn xvsetvlmax_f32m1_k(k: usize) -> usize {
+    let mut result: usize;
+    asm!(
+    "\
+    vsetvli {0}, {1}, e32, m1, ta, ma\
+    ",
+    out(reg) result,
+    in(reg) k,
+    options(pure, nomem, nostack));
+    result
+}

@@ -39,12 +39,22 @@ use crate::image_store::ImageStore;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::*;
 #[cfg(all(
+    any(target_arch = "riscv64", target_arch = "riscv32"),
+    feature = "riscv"
+))]
+use crate::risc::convolve_vertical_rgb_risc_row_f32;
+#[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 ))]
 use crate::sse::*;
 use num_traits::AsPrimitive;
 use rayon::ThreadPool;
+#[cfg(all(
+    any(target_arch = "riscv64", target_arch = "riscv32"),
+    feature = "riscv"
+))]
+use std::arch::is_riscv_feature_detected;
 
 pub(crate) fn convolve_vertical_rgb_native_row_f32<
     T: Copy + 'static + AsPrimitive<f32>,
@@ -227,6 +237,15 @@ impl<'a> VerticalConvolutionPass<f32, 3> for ImageStore<'a, f32, 3> {
         {
             if is_x86_feature_detected!("avx2") {
                 _dispatcher = convolve_vertical_avx_row_f32::<3>;
+            }
+        }
+        #[cfg(all(
+            any(target_arch = "riscv64", target_arch = "riscv32"),
+            feature = "riscv"
+        ))]
+        {
+            if is_riscv_feature_detected!("v") {
+                _dispatcher = convolve_vertical_rgb_risc_row_f32::<3>;
             }
         }
         convolve_vertical_dispatch_f32(self, filter_weights, destination, pool, _dispatcher);

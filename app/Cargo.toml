@@ -4,14 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-image = {version = "0.25.1", features = ["default"]}
-pic-scale = { path = "..", features = ["half"] }
+image = {version = "0.23.14", features = ["default"]}
+pic-scale = { path = "..", features = ["half", "riscv"] }
 fast_image_resize = "4.0.0"
 half = { version = "2.4.1", default-features = true }
 
 [dev-dependencies]
 criterion = "0.5.1"
-image = {version = "0.25.1", features = ["default"]}
+image = {version = "0.23.14", features = ["default"]}
 fast_image_resize = "4.0.0"
 pic-scale = { path = ".." }
 

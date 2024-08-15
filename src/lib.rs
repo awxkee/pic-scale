@@ -26,7 +26,20 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+#![cfg_attr(
+    all(
+        feature = "riscv",
+        any(target_arch = "riscv64", target_arch = "riscv32")
+    ),
+    feature(riscv_target_feature)
+)]
+#![cfg_attr(
+    all(
+        feature = "riscv",
+        any(target_arch = "riscv64", target_arch = "riscv32")
+    ),
+    feature(stdarch_riscv_feature_detection)
+)]
 #[cfg(all(feature = "half"))]
 mod alpha_handle_f16;
 mod alpha_handle_f32;
@@ -66,6 +79,11 @@ mod rgb_u8;
 mod rgba_f32;
 mod rgba_u16;
 mod rgba_u8;
+#[cfg(all(
+    any(target_arch = "riscv64", target_arch = "riscv32"),
+    feature = "riscv"
+))]
+mod risc;
 mod sampler;
 mod saturate_narrow;
 mod scaler;
@@ -79,7 +97,6 @@ mod sse;
 mod support;
 mod threading_policy;
 mod unsafe_slice;
-mod risc;
 
 pub use colors::JzazbzScaler;
 pub use colors::LChScaler;

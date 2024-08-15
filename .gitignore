@@ -4,3 +4,5 @@ app/target
 .idea
 converted.*
 fast_image.*
+cross/
+converted_risc_o.png

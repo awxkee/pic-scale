@@ -186,6 +186,20 @@ pub fn xconvolve_vertical_rgb_neon_row_f16<const CHANNELS: usize>(
     src_stride: usize,
     weight_ptr: *const f32,
 ) {
+    unsafe {
+        xconvolve_vertical_rgb_neon_row_f16_impl::<CHANNELS>(width, bounds, unsafe_source_ptr_0, unsafe_destination_ptr_0, src_stride, weight_ptr);
+    }
+}
+
+#[target_feature(enable = "fp16")]
+pub unsafe  fn xconvolve_vertical_rgb_neon_row_f16_impl<const CHANNELS: usize>(
+    width: usize,
+    bounds: &FilterBounds,
+    unsafe_source_ptr_0: *const half::f16,
+    unsafe_destination_ptr_0: *mut half::f16,
+    src_stride: usize,
+    weight_ptr: *const f32,
+) {
     let mut cx = 0usize;
     let dst_width = width * CHANNELS;
 

@@ -33,7 +33,7 @@
 use crate::avx2::{avx_premultiply_alpha_rgba_f16, avx_unpremultiply_alpha_rgba_f16};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{neon_premultiply_alpha_rgba_f16, neon_unpremultiply_alpha_rgba_f16};
-#[cfg(all(target_arch = "aarch64", target_feature = "neon", target_feature = "fp16"))]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{neon_premultiply_alpha_rgba_f16_full, neon_unpremultiply_alpha_rgba_f16_full};
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
@@ -137,8 +137,7 @@ pub fn premultiply_alpha_rgba_f16(
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
         _dispatcher = neon_premultiply_alpha_rgba_f16;
-        #[cfg(target_feature = "fp16")]
-        {
+        if std::arch::is_aarch64_feature_detected!("fp16") {
             _dispatcher = neon_premultiply_alpha_rgba_f16_full;
         }
     }
@@ -174,8 +173,7 @@ pub fn unpremultiply_alpha_rgba_f16(
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
         _dispatcher = neon_unpremultiply_alpha_rgba_f16;
-        #[cfg(target_feature = "fp16")]
-        {
+        if std::arch::is_aarch64_feature_detected!("fp16") {
             _dispatcher = neon_unpremultiply_alpha_rgba_f16_full;
         }
     }

@@ -26,7 +26,8 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+#[cfg(all(any(target_arch = "riscv64", target_arch = "riscv32"), feature = "riscv"))]
+use std::arch::is_riscv_feature_detected;
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "avx2"
@@ -54,6 +55,8 @@ use crate::sse::{
 };
 use crate::ImageStore;
 use rayon::ThreadPool;
+#[cfg(all(any(target_arch = "riscv64", target_arch = "riscv32"), feature = "riscv"))]
+use crate::risc::convolve_vertical_rgb_risc_row_f32;
 
 impl<'a> HorizontalConvolutionPass<f32, 1> for ImageStore<'a, f32, 1> {
     #[inline(always)]
@@ -123,6 +126,12 @@ impl<'a> VerticalConvolutionPass<f32, 1> for ImageStore<'a, f32, 1> {
         {
             if is_x86_feature_detected!("avx2") {
                 _dispatcher = convolve_vertical_avx_row_f32::<1>;
+            }
+        }
+        #[cfg(all(any(target_arch = "riscv64", target_arch = "riscv32"), feature = "riscv"))]
+        {
+            if is_riscv_feature_detected!("v") {
+                _dispatcher = convolve_vertical_rgb_risc_row_f32::<1>;
             }
         }
         convolve_vertical_dispatch_f32(self, filter_weights, destination, pool, _dispatcher);

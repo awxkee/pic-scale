@@ -198,7 +198,7 @@ pub(super) unsafe fn xvcombine_f16(v1: x_float16x4_t, v2: x_float16x4_t) -> x_fl
 //     xreinterpret_f16_u16(result)
 // }
 
-#[cfg(target_feature = "fp16")]
+#[target_feature(enable = "fp16")]
 #[inline]
 pub(super) unsafe fn xvfmla_f16(
     a: x_float16x4_t,
@@ -216,7 +216,7 @@ pub(super) unsafe fn xvfmla_f16(
     xreinterpret_f16_u16(result)
 }
 
-#[cfg(target_feature = "fp16")]
+#[target_feature(enable = "fp16")]
 #[inline]
 pub(super) unsafe fn xvfmlaq_f16(
     a: x_float16x8_t,
@@ -262,7 +262,7 @@ pub(super) unsafe fn xvfmlaq_f16(
 //     xvadd_f16(a, xvmul_f16(b, c))
 // }
 
-#[cfg(target_feature = "fp16")]
+#[target_feature(enable = "fp16")]
 #[inline]
 pub(super) unsafe fn xvmulq_f16(v1: x_float16x8_t, v2: x_float16x8_t) -> x_float16x8_t {
     let result: uint16x8_t;
@@ -276,7 +276,7 @@ pub(super) unsafe fn xvmulq_f16(v1: x_float16x8_t, v2: x_float16x8_t) -> x_float
     xreinterpretq_f16_u16(result)
 }
 
-#[cfg(target_feature = "fp16")]
+#[target_feature(enable = "fp16")]
 #[inline]
 pub(super) unsafe fn xvdivq_f16(v1: x_float16x8_t, v2: x_float16x8_t) -> x_float16x8_t {
     let result: uint16x8_t;
@@ -290,7 +290,7 @@ pub(super) unsafe fn xvdivq_f16(v1: x_float16x8_t, v2: x_float16x8_t) -> x_float
     xreinterpretq_f16_u16(result)
 }
 
-#[cfg(target_feature = "fp16")]
+#[target_feature(enable = "fp16")]
 #[inline]
 pub(super) unsafe fn xvbslq_f16(
     a: uint16x8_t,
@@ -338,7 +338,7 @@ pub unsafe fn xvdup_laneq_f16<const N: i32>(a: x_float16x8_t) -> x_float16x4_t {
     xreinterpret_f16_u16(vdup_laneq_u16::<N>(xreinterpretq_u16_f16(a)))
 }
 
-#[cfg(target_feature = "fp16")]
+#[target_feature(enable = "fp16")]
 #[inline]
 pub unsafe fn vceqzq_f16(a: x_float16x8_t) -> uint16x8_t {
     let mut result: uint16x8_t;

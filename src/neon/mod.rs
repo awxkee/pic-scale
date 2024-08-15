@@ -28,7 +28,7 @@
  */
 #[cfg(all(feature = "half"))]
 mod alpha_f16;
-#[cfg(all(feature = "half", target_feature = "fp16"))]
+#[cfg(feature = "half")]
 mod alpha_f16_full;
 mod alpha_f32;
 mod alpha_u16;
@@ -41,14 +41,14 @@ mod plane_f32;
 mod plane_u8;
 #[cfg(all(feature = "half"))]
 mod rgb_f16;
-#[cfg(all(feature = "half", target_feature = "fp16"))]
+#[cfg(feature = "half")]
 mod rgb_f16_full;
 mod rgb_f32;
 mod rgb_u16;
 mod rgb_u8;
-#[cfg(all(feature = "half"))]
+#[cfg(feature = "half")]
 mod rgba_f16;
-#[cfg(all(feature = "half", target_feature = "fp16"))]
+#[cfg(feature = "half")]
 mod rgba_f16_full;
 mod rgba_f32;
 mod rgba_u16;
@@ -56,15 +56,15 @@ mod rgba_u8;
 mod utils;
 #[cfg(all(feature = "half"))]
 mod vertical_f16;
-#[cfg(all(feature = "half", target_feature = "fp16"))]
+#[cfg(feature = "half")]
 mod vertical_f16_full;
 mod vertical_f32;
 mod vertical_u16;
 mod vertical_u8;
 
-#[cfg(all(feature = "half"))]
+#[cfg(feature = "half")]
 pub use alpha_f16::{neon_premultiply_alpha_rgba_f16, neon_unpremultiply_alpha_rgba_f16};
-#[cfg(all(feature = "half", target_feature = "fp16"))]
+#[cfg(feature = "half")]
 pub use alpha_f16_full::{
     neon_premultiply_alpha_rgba_f16_full, neon_unpremultiply_alpha_rgba_f16_full,
 };
@@ -73,27 +73,27 @@ pub use alpha_f32::neon_unpremultiply_alpha_rgba_f32;
 pub use alpha_u16::{neon_premultiply_alpha_rgba_u16, neon_unpremultiply_alpha_rgba_u16};
 pub use alpha_u8::neon_premultiply_alpha_rgba;
 pub use alpha_u8::neon_unpremultiply_alpha_rgba;
-#[cfg(all(feature = "half"))]
+#[cfg(feature = "half")]
 pub use f16_utils::*;
 pub use plane_f32::convolve_horizontal_plane_neon_row_one;
 pub use plane_f32::convolve_horizontal_plane_neon_rows_4;
 pub use plane_u8::{convolve_horizontal_plane_neon_row, convolve_horizontal_plane_neon_rows_4_u8};
-#[cfg(all(feature = "half"))]
+#[cfg(feature = "half")]
 pub use rgb_f16::{
     convolve_horizontal_rgb_neon_row_one_f16, convolve_horizontal_rgb_neon_rows_4_f16,
 };
-#[cfg(all(feature = "half", target_feature = "fp16"))]
+#[cfg(feature = "half")]
 pub use rgb_f16_full::{
     xconvolve_horizontal_rgb_neon_row_one_f16, xconvolve_horizontal_rgb_neon_rows_4_f16,
 };
 pub use rgb_f32::*;
 pub use rgb_u16::{convolve_horizontal_rgb_neon_row_u16, convolve_horizontal_rgb_neon_rows_4_u16};
 pub use rgb_u8::*;
-#[cfg(all(feature = "half"))]
+#[cfg(feature = "half")]
 pub use rgba_f16::convolve_horizontal_rgba_neon_row_one_f16;
-#[cfg(all(feature = "half"))]
+#[cfg(feature = "half")]
 pub use rgba_f16::convolve_horizontal_rgba_neon_rows_4_f16;
-#[cfg(all(feature = "half", target_feature = "fp16"))]
+#[cfg(feature = "half")]
 pub use rgba_f16_full::{
     xconvolve_horizontal_rgba_neon_row_one_f16, xconvolve_horizontal_rgba_neon_rows_4_f16,
 };
@@ -104,7 +104,7 @@ pub use rgba_u16::{
 pub use rgba_u8::*;
 #[cfg(all(feature = "half"))]
 pub use vertical_f16::convolve_vertical_rgb_neon_row_f16;
-#[cfg(all(feature = "half", target_feature = "fp16"))]
+#[cfg(feature = "half")]
 pub use vertical_f16_full::xconvolve_vertical_rgb_neon_row_f16;
 pub use vertical_f32::convolve_vertical_rgb_neon_row_f32;
 pub use vertical_u16::convolve_vertical_rgb_neon_row_u16;
