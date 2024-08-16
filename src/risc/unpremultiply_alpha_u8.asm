@@ -1,6 +1,6 @@
 vsetvli zero, {2}, e8, m1, ta, ma
 
-li   t4, 255
+li t4, 255
 
 vlseg4e8.v v0, ({0})
 

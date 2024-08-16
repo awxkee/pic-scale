@@ -92,8 +92,8 @@ unsafe fn convolve_horizontal_rgba_risc_rows_4_impl_f16(
         let mut filter_offset = 0usize;
         let weights_ptr = filter_weights.weights.as_ptr();
 
-        let real_src_stride = src_stride * 4;
-        let real_dst_stride = dst_stride * 4;
+        let real_src_stride = src_stride * std::mem::size_of::<u16>();
+        let real_dst_stride = dst_stride * std::mem::size_of::<u16>();
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);

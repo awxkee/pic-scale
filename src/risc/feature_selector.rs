@@ -31,6 +31,7 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 
+#[allow(dead_code)]
 pub fn risc_is_feature_supported(feature: &str) -> bool {
     let path = Path::new("/proc/cpuinfo");
     let file = match File::open(&path) {
@@ -64,6 +65,7 @@ pub fn risc_is_feature_supported(feature: &str) -> bool {
     false
 }
 
+#[allow(dead_code)]
 pub fn risc_is_features_supported(feature: &[String]) -> bool {
     let path = Path::new("/proc/cpuinfo");
     let file = match File::open(&path) {

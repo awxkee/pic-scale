@@ -108,4 +108,4 @@ pub use vertical_f16::convolve_vertical_rgb_neon_row_f16;
 pub use vertical_f16_full::xconvolve_vertical_rgb_neon_row_f16;
 pub use vertical_f32::convolve_vertical_rgb_neon_row_f32;
 pub use vertical_u16::convolve_vertical_rgb_neon_row_u16;
-pub use vertical_u8::convolve_vertical_rgb_neon_row;
+pub use vertical_u8::convolve_vertical_neon_row;

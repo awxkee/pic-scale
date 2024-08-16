@@ -35,6 +35,11 @@ use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::image_store::ImageStore;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::*;
+#[cfg(all(
+    any(target_arch = "riscv64", target_arch = "riscv32"),
+    feature = "riscv"
+))]
+use crate::risc::convolve_vertical_risc_row;
 use crate::saturate_narrow::SaturateNarrow;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{
@@ -232,7 +237,7 @@ impl<'a> VerticalConvolutionPass<u8, 3> for ImageStore<'a, u8, 3> {
         ) = convolve_vertical_rgb_native_row_u8::<u8, i32, 3>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            _dispatcher = convolve_vertical_rgb_neon_row::<3>;
+            _dispatcher = convolve_vertical_neon_row::<3>;
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
@@ -241,6 +246,15 @@ impl<'a> VerticalConvolutionPass<u8, 3> for ImageStore<'a, u8, 3> {
             }
             if is_x86_feature_detected!("avx2") {
                 _dispatcher = convolve_vertical_avx_row::<3>;
+            }
+        }
+        #[cfg(all(
+            any(target_arch = "riscv64", target_arch = "riscv32"),
+            feature = "riscv"
+        ))]
+        {
+            if std::arch::is_riscv_feature_detected!("v") {
+                _dispatcher = convolve_vertical_risc_row::<3>;
             }
         }
         convolve_vertical_dispatch_u8(self, filter_weights, destination, pool, _dispatcher);

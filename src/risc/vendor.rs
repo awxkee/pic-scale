@@ -56,6 +56,7 @@ pub unsafe fn xvsetvlmax_f32m1() -> usize {
 }
 
 #[inline]
+#[allow(dead_code)]
 #[target_feature(enable = "v,zfh")]
 pub unsafe fn xvsetvlmax_f16m1() -> usize {
     let mut result: usize;

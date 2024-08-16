@@ -27,16 +27,16 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::filter_weights::FilterWeights;
 use std::arch::asm;
+use crate::filter_weights::FilterWeights;
 
 #[target_feature(enable = "v")]
-unsafe fn convolve_horizontal_rgba_risc_row_one_f32_impl(
+unsafe fn convolve_horizontal_rgba_risc_row_one_u8_impl(
     dst_width: usize,
     _: usize,
-    filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f32,
-    unsafe_destination_ptr_0: *mut f32,
+    filter_weights: &FilterWeights<i16>,
+    unsafe_source_ptr_0: *const u8,
+    unsafe_destination_ptr_0: *mut u8,
 ) {
     unsafe {
         let mut filter_offset = 0usize;
@@ -47,7 +47,7 @@ unsafe fn convolve_horizontal_rgba_risc_row_one_f32_impl(
             let bounds_start = bounds.start;
             let bounds_size = bounds.size;
             let local_filter_ptr = weights_ptr.add(filter_offset);
-            asm!(include_str!("horiz_rgba_n1_f32.asm"),
+            asm!(include_str!("horiz_rgba_n1_u8.asm"),
                  in(reg) local_filter_ptr,
                  in(reg) bounds_start,
                  in(reg) bounds_size,
@@ -60,15 +60,15 @@ unsafe fn convolve_horizontal_rgba_risc_row_one_f32_impl(
     }
 }
 
-pub fn convolve_horizontal_rgba_risc_row_one_f32(
+pub fn convolve_horizontal_rgba_risc_row_one_u8(
     dst_width: usize,
     src_width: usize,
-    filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f32,
-    unsafe_destination_ptr_0: *mut f32,
+    filter_weights: &FilterWeights<i16>,
+    unsafe_source_ptr_0: *const u8,
+    unsafe_destination_ptr_0: *mut u8,
 ) {
     unsafe {
-        convolve_horizontal_rgba_risc_row_one_f32_impl(
+        convolve_horizontal_rgba_risc_row_one_u8_impl(
             dst_width,
             src_width,
             filter_weights,
@@ -82,25 +82,25 @@ pub fn convolve_horizontal_rgba_risc_row_one_f32(
 unsafe fn convolve_horizontal_rgba_risc_rows_4_impl(
     dst_width: usize,
     _: usize,
-    filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f32,
+    filter_weights: &FilterWeights<i16>,
+    unsafe_source_ptr_0: *const u8,
     src_stride: usize,
-    unsafe_destination_ptr_0: *mut f32,
+    unsafe_destination_ptr_0: *mut u8,
     dst_stride: usize,
 ) {
     unsafe {
         let mut filter_offset = 0usize;
         let weights_ptr = filter_weights.weights.as_ptr();
 
-        let real_src_stride = src_stride * std::mem::size_of::<f32>();
-        let real_dst_stride = dst_stride * std::mem::size_of::<f32>();
+        let real_src_stride = src_stride;
+        let real_dst_stride = dst_stride;
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);
             let bounds_start = bounds.start;
             let bounds_size = bounds.size;
             let local_filter_ptr = weights_ptr.add(filter_offset);
-            asm!(include_str!("horiz_rgba_n4_f32.asm"),
+            asm!(include_str!("horiz_rgba_n4_u8.asm"),
                  in(reg) local_filter_ptr,
                  in(reg) bounds_start,
                  in(reg) bounds_size,
@@ -115,13 +115,13 @@ unsafe fn convolve_horizontal_rgba_risc_rows_4_impl(
     }
 }
 
-pub fn convolve_horizontal_rgba_risc_rows_4(
+pub fn convolve_horizontal_rgba_risc_rows_4_u8(
     dst_width: usize,
     src_width: usize,
-    filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f32,
+    filter_weights: &FilterWeights<i16>,
+    unsafe_source_ptr_0: *const u8,
     src_stride: usize,
-    unsafe_destination_ptr_0: *mut f32,
+    unsafe_destination_ptr_0: *mut u8,
     dst_stride: usize,
 ) {
     unsafe {

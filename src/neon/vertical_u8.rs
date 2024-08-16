@@ -254,7 +254,7 @@ macro_rules! consume_u8_1 {
 }
 
 #[inline(always)]
-pub fn convolve_vertical_rgb_neon_row<const CHANNELS: usize>(
+pub fn convolve_vertical_neon_row<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,
     unsafe_source_ptr_0: *const u8,

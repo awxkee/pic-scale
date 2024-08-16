@@ -36,6 +36,14 @@ use crate::filter_weights::{FilterBounds, FilterWeights};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::*;
 use crate::rgb_u8::*;
+#[cfg(all(
+    any(target_arch = "riscv64", target_arch = "riscv32"),
+    feature = "riscv"
+))]
+use crate::risc::{
+    convolve_horizontal_rgba_risc_row_one_u8, convolve_horizontal_rgba_risc_rows_4_u8,
+    convolve_vertical_risc_row,
+};
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{
     convolve_horizontal_rgba_sse_rows_4, convolve_horizontal_rgba_sse_rows_one,
@@ -68,6 +76,16 @@ impl<'a> HorizontalConvolutionPass<u8, 4> for ImageStore<'a, u8, 4> {
                 _dispatcher_1_row = convolve_horizontal_rgba_sse_rows_one;
             }
         }
+        #[cfg(all(
+            any(target_arch = "riscv64", target_arch = "riscv32"),
+            feature = "riscv"
+        ))]
+        {
+            if std::arch::is_riscv_feature_detected!("v") {
+                _dispatcher_4_rows = Some(convolve_horizontal_rgba_risc_rows_4_u8);
+                _dispatcher_1_row = convolve_horizontal_rgba_risc_row_one_u8;
+            }
+        }
         convolve_horizontal_dispatch_u8(
             self,
             filter_weights,
@@ -96,7 +114,7 @@ impl<'a> VerticalConvolutionPass<u8, 4> for ImageStore<'a, u8, 4> {
         ) = convolve_vertical_rgb_native_row_u8::<u8, i32, 4>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            _dispatcher = convolve_vertical_rgb_neon_row::<4>;
+            _dispatcher = convolve_vertical_neon_row::<4>;
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
@@ -105,6 +123,15 @@ impl<'a> VerticalConvolutionPass<u8, 4> for ImageStore<'a, u8, 4> {
             }
             if is_x86_feature_detected!("avx2") {
                 _dispatcher = convolve_vertical_avx_row::<4>;
+            }
+        }
+        #[cfg(all(
+            any(target_arch = "riscv64", target_arch = "riscv32"),
+            feature = "riscv"
+        ))]
+        {
+            if std::arch::is_riscv_feature_detected!("v") {
+                _dispatcher = convolve_vertical_risc_row::<4>;
             }
         }
         convolve_vertical_dispatch_u8(self, filter_weights, destination, pool, _dispatcher);
