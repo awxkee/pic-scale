@@ -1,10 +1,6 @@
-#![feature(stdarch_neon_dotprod)]
-
 mod merge;
 mod split;
 
-use std::arch::aarch64::{vdotq_u32, vdupq_n_u32, vdupq_n_u8, vld1q_u8, vst1q_u32};
-use std::arch::is_aarch64_feature_detected;
 use std::time::Instant;
 
 use fast_image_resize::images::Image;
