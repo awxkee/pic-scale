@@ -206,7 +206,7 @@ impl<'a> ImageStore<'a, f32, 4> {
     }
 }
 
-#[cfg(all(feature = "half"))]
+#[cfg(feature = "half")]
 impl<'a> ImageStore<'a, half::f16, 4> {
     pub fn unpremultiply_alpha(&self, into: &mut ImageStore<half::f16, 4>) {
         let dst = into.buffer.borrow_mut();

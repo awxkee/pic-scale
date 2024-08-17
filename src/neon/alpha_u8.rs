@@ -30,18 +30,18 @@
 use crate::{premultiply_pixel, unpremultiply_pixel};
 use std::arch::aarch64::*;
 
-#[inline(always)]
-pub unsafe fn neon_div_by_255(v: uint16x8_t) -> uint16x8_t {
+#[inline]
+pub unsafe fn neon_div_by_255_n(v: uint16x8_t) -> uint8x8_t {
     let addition = vdupq_n_u16(127);
-    vshrq_n_u16::<8>(vaddq_u16(vaddq_u16(v, addition), vshrq_n_u16::<8>(v)))
+    vqshrn_n_u16::<8>(vrsraq_n_u16::<8>(vaddq_u16(v, addition), v))
 }
 
 macro_rules! premultiply_vec {
     ($v: expr, $a_values: expr) => {{
         let acc_hi = vmull_high_u8($v, $a_values);
         let acc_lo = vmull_u8(vget_low_u8($v), vget_low_u8($a_values));
-        let hi = vqmovn_u16(neon_div_by_255(acc_hi));
-        let lo = vqmovn_u16(neon_div_by_255(acc_lo));
+        let hi = neon_div_by_255_n(acc_hi);
+        let lo = neon_div_by_255_n(acc_lo);
         vcombine_u8(lo, hi)
     }};
 }

@@ -32,19 +32,17 @@ use std::arch::aarch64::*;
 
 macro_rules! pack_weights {
     ($store_0: expr, $store_1: expr, $store_2: expr, $store_3: expr) => {{
-        let zeros = vdupq_n_s32(0);
-        let store_0 = vmaxq_s32($store_0, zeros);
-        let store_1 = vmaxq_s32($store_1, zeros);
-        let store_2 = vmaxq_s32($store_2, zeros);
-        let store_3 = vmaxq_s32($store_3, zeros);
-        let low_16 = vcombine_u16(
-            vqshrun_n_s32::<PRECISION>(store_0),
-            vqshrun_n_s32::<PRECISION>(store_1),
+        let zeros = vdupq_n_s16(0);
+        let low_s16 = vcombine_s16(
+            vqshrn_n_s32::<PRECISION>($store_0),
+            vqshrn_n_s32::<PRECISION>($store_1),
         );
-        let high_16 = vcombine_u16(
-            vqshrun_n_s32::<PRECISION>(store_2),
-            vqshrun_n_s32::<PRECISION>(store_3),
+        let high_s16 = vcombine_s16(
+            vqshrn_n_s32::<PRECISION>($store_2),
+            vqshrn_n_s32::<PRECISION>($store_3),
         );
+        let low_16 = vreinterpretq_u16_s16(vmaxq_s16(low_s16, zeros));
+        let high_16 = vreinterpretq_u16_s16(vmaxq_s16(high_s16, zeros));
         vcombine_u8(vqmovn_u16(low_16), vqmovn_u16(high_16))
     }};
 }
@@ -200,15 +198,13 @@ macro_rules! consume_u8_8 {
             store_1 = vmlal_high_s16(store_1, low, v_weight);
         }
 
-        let zeros = vdupq_n_s32(0);
+        let zeros = vdupq_n_s16(0);
 
-        store_0 = vmaxq_s32(store_0, zeros);
-        store_1 = vmaxq_s32(store_1, zeros);
-
-        let low_16 = vcombine_u16(
-            vqshrun_n_s32::<PRECISION>(store_0),
-            vqshrun_n_s32::<PRECISION>(store_1),
+        let low_s16 = vcombine_s16(
+            vqshrn_n_s32::<PRECISION>(store_0),
+            vqshrn_n_s32::<PRECISION>(store_1),
         );
+        let low_16 = vreinterpretq_u16_s16(vmaxq_s16(low_s16, zeros));
 
         let item = vqmovn_u16(low_16);
 

@@ -96,7 +96,6 @@ pub(crate) fn convolve_vertical_dispatch_f16<const COMPONENTS: usize>(
     }
 }
 
-#[inline(always)]
 pub(crate) fn convolve_horizontal_dispatch_f16<const CHANNELS: usize>(
     image_store: &ImageStore<f16, CHANNELS>,
     filter_weights: FilterWeights<f32>,

@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/// Struct that represents image size
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct ImageSize {
     pub width: usize,
@@ -34,6 +35,7 @@ pub struct ImageSize {
 }
 
 impl ImageSize {
+    /// Creates new image size
     pub fn new(width: usize, height: usize) -> ImageSize {
         ImageSize { width, height }
     }

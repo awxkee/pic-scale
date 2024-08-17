@@ -96,7 +96,7 @@ macro_rules! write_out_pixels {
     }};
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn convolve_horizontal_rgb_native_row<
     T: Copy + 'static + AsPrimitive<f32>,
     const CHANNELS: usize,
