@@ -28,6 +28,7 @@
  */
 
 use crate::filter_weights::FilterWeights;
+use crate::neon::utils::load_3b_as_u16x4;
 use crate::support::{PRECISION, ROUNDING_APPROX};
 use std::arch::aarch64::*;
 
@@ -88,18 +89,7 @@ macro_rules! conv_horiz_rgba_1_u8 {
     ($start_x: expr, $src: expr, $w0: expr, $store: expr) => {{
         const COMPONENTS: usize = 3;
         let src_ptr = $src.add($start_x * COMPONENTS);
-        let read_forward = ((src_ptr as *const u16).read_unaligned()).to_le_bytes();
-        let vl = u64::from_le_bytes([
-            read_forward[0],
-            0,
-            read_forward[1],
-            0,
-            src_ptr.add(2).read_unaligned(),
-            0,
-            0,
-            0,
-        ]);
-        let rgb_pixel = vcreate_u16(vl);
+        let rgb_pixel = load_3b_as_u16x4(src_ptr);
         let lo = vreinterpret_s16_u16(rgb_pixel);
         let acc = vmlal_s16($store, lo, $w0);
         acc

@@ -34,9 +34,10 @@ pub unsafe fn xvsetvlmax_e8m1() -> usize {
     let mut result: usize;
     asm!(
     "\
-    li t0, -1
-    vsetvli {0}, t0, e8, m1, ta, ma",
+    li {t0}, -1
+    vsetvli {0}, {t0}, e8, m1, ta, ma",
     out(reg) result,
+    t0 = out(reg) _,
     options(pure, nomem, nostack));
     result
 }
@@ -47,10 +48,11 @@ pub unsafe fn xvsetvlmax_f32m1() -> usize {
     let mut result: usize;
     asm!(
     "\
-    li t0, -1
-    vsetvli {0}, t0, e32, m1, ta, ma\
+    li {t0}, -1
+    vsetvli {0}, {t0}, e32, m1, ta, ma\
     ",
     out(reg) result,
+    t0 = out(reg) _,
     options(pure, nomem, nostack));
     result
 }
@@ -62,10 +64,11 @@ pub unsafe fn xvsetvlmax_f16m1() -> usize {
     let mut result: usize;
     asm!(
     "\
-    li t0, -1
-    vsetvli {0}, t0, e16, m1, ta, ma\
+    li {t0}, -1
+    vsetvli {0}, {t0}, e16, m1, ta, ma\
     ",
     out(reg) result,
+    t0 = out(reg) _,
     options(pure, nomem, nostack));
     result
 }

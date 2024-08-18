@@ -1,5 +1,5 @@
-li t1, -1
-vsetvli t1, t1, e16, m1, ta, ma
+li {t1}, -1
+vsetvli {t1}, {t1}, e16, m1, ta, ma
 
 vlseg4e16.v v0, ({0})
 

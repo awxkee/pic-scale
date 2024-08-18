@@ -27,8 +27,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use std::arch::asm;
 use crate::filter_weights::FilterWeights;
+use std::arch::asm;
 
 #[target_feature(enable = "v")]
 unsafe fn convolve_horizontal_rgba_risc_row_one_u8_impl(
@@ -53,7 +53,13 @@ unsafe fn convolve_horizontal_rgba_risc_row_one_u8_impl(
                  in(reg) bounds_size,
                  in(reg) unsafe_source_ptr_0,
                  in(reg) unsafe_destination_ptr_0,
-                 in(reg) x);
+                 in(reg) x,
+                 t1 = out(reg) _,
+                 t2 = out(reg) _,
+                 t4 = out(reg) _,
+                 t5 = out(reg) _,
+                 t6 = out(reg) _,
+                 out("v1") _, out("v10") _);
 
             filter_offset += filter_weights.aligned_size;
         }
@@ -108,7 +114,16 @@ unsafe fn convolve_horizontal_rgba_risc_rows_4_impl(
                  in(reg) unsafe_destination_ptr_0,
                  in(reg) x,
                  in(reg) real_src_stride,
-                 in(reg) real_dst_stride);
+                 in(reg) real_dst_stride,
+                 t1 = out(reg) _,
+                 t2 = out(reg) _,
+                 t4 = out(reg) _,
+                 t5 = out(reg) _,
+                 t6 = out(reg) _,
+                 out("v1") _, out("v2") _, out("v3") _, out("v4") _, out("v5") _,
+                 out("v7") _, out("v8") _, out("v9") _, out("v10") _, out("v11") _,
+                 out("v12") _, out("v13") _, out("v14") _, out("v15") _, out("v16") _,
+                 out("v17") _);
 
             filter_offset += filter_weights.aligned_size;
         }

@@ -53,7 +53,13 @@ unsafe fn risc_premultiply_alpha_rgba_u8_impl(
             let dst_ptr = dst.as_mut_ptr().add(offset + px);
             asm!(include_str!("premultiply_alpha_u8.asm"),
                      in(reg) src_ptr,
-                     in(reg) dst_ptr);
+                     in(reg) dst_ptr,
+                     t0 = out(reg) _,
+                     t1 = out(reg) _,
+                     t4 = out(reg) _,
+                     out("v1") _, out("v2") _, out("v3") _, out("v4") _, out("v5") _,
+                     out("v7") _, out("v8") _, out("v9") _, out("v10") _, out("v11") _,
+                     out("v12") _, out("v13") _);
             _cx += iter_width;
         }
 
@@ -93,7 +99,15 @@ unsafe fn risc_unpremultiply_alpha_rgba_u8_impl(
             let px = _cx * 4;
             let src_ptr = src.as_ptr().add(offset + px);
             let dst_ptr = dst.as_mut_ptr().add(offset + px);
-            asm!(include_str!("unpremultiply_alpha_u8.asm"), in(reg) src_ptr, in(reg) dst_ptr, in(reg) iter_width);
+            asm!(include_str!("unpremultiply_alpha_u8.asm"),
+                in(reg) src_ptr,
+                in(reg) dst_ptr,
+                in(reg) iter_width,
+                t4 = out(reg) _,
+                t5 = out(reg) _,
+                out("v0") _,
+                out("v1") _, out("v2") _, out("v3") _, out("v4") _, out("v5") _,
+                out("v7") _, out("v8") _, out("v9") _, out("v10") _, out("v11") _);
             _cx += iter_width;
         }
 

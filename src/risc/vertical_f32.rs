@@ -65,23 +65,6 @@ unsafe fn convolve_vertical_rgb_risc_row_f32_impl<const CHANNELS: usize>(
 
     let lane_length = unsafe { xvsetvlmax_f32m1() };
     let double_length = 2 * lane_length;
-    let triple_length = 3 * lane_length;
-
-    while cx + triple_length < dst_width {
-        unsafe {
-            let bnd_start = bounds.start;
-            let bounds_size = bounds.size;
-            asm!(include_str!("vert_n_m_3_f32.asm"),
-                 in(reg) bnd_start,
-                 in(reg) cx,
-                 in(reg) unsafe_source_ptr_0,
-                 in(reg) src_stride,
-                 in(reg) unsafe_destination_ptr_0,
-                 in(reg) weight_ptr,
-                 in(reg) bounds_size);
-        }
-        cx += triple_length;
-    }
 
     while cx + double_length < dst_width {
         unsafe {
@@ -94,7 +77,15 @@ unsafe fn convolve_vertical_rgb_risc_row_f32_impl<const CHANNELS: usize>(
                  in(reg) src_stride,
                  in(reg) unsafe_destination_ptr_0,
                  in(reg) weight_ptr,
-                 in(reg) bounds_size);
+                 in(reg) bounds_size,
+                 t1 = out(reg) _,
+                 ft1 = out(freg) _,
+                 t2 = out(reg) _,
+                 t3 = out(reg) _,
+                 t4 = out(reg) _,
+                 t5 = out(reg) _,
+                 t6 = out(reg) _,
+                 out("v1") _, out("v2") _, out("v3") _, out("v4") _, out("v5") _);
         }
         cx += double_length;
     }
@@ -110,7 +101,15 @@ unsafe fn convolve_vertical_rgb_risc_row_f32_impl<const CHANNELS: usize>(
                  in(reg) src_stride,
                  in(reg) unsafe_destination_ptr_0,
                  in(reg) weight_ptr,
-                 in(reg) bounds_size);
+                 in(reg) bounds_size,
+                 t1 = out(reg) _,
+                 ft1 = out(freg) _,
+                 t2 = out(reg) _,
+                 t3 = out(reg) _,
+                 t4 = out(reg) _,
+                 t5 = out(reg) _,
+                 t6 = out(reg) _,
+                 out("v1") _, out("v2") _, out("v3") _);
         }
         cx += lane_length;
     }
@@ -126,7 +125,16 @@ unsafe fn convolve_vertical_rgb_risc_row_f32_impl<const CHANNELS: usize>(
                  in(reg) src_stride,
                  in(reg) unsafe_destination_ptr_0,
                  in(reg) weight_ptr,
-                 in(reg) bounds_size);
+                 in(reg) bounds_size,
+                 t1 = out(reg) _,
+                 ft1 = out(freg) _,
+                 t2 = out(reg) _,
+                 ft2 = out(freg) _,
+                 t3 = out(reg) _,
+                 ft3 = out(freg) _,
+                 t4 = out(reg) _,
+                 t5 = out(reg) _,
+                 t6 = out(reg) _);
         }
         cx += 1;
     }

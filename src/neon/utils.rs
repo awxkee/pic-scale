@@ -28,6 +28,7 @@
  */
 
 use std::arch::aarch64::*;
+use std::arch::asm;
 
 #[inline(always)]
 pub(crate) unsafe fn prefer_vfmaq_f32(
@@ -44,6 +45,45 @@ pub(crate) unsafe fn prefer_vfmaq_f32(
         return vmlaq_f32(a, b, c);
     }
 }
+
+#[inline(always)]
+pub(crate) unsafe fn load_3b_as_u16x4(src_ptr: *const u8) -> uint16x4_t {
+    let out_reg: uint16x4_t;
+    asm!("\
+         ldrb    {t1:w}, [{0}]
+         ldrb    {t2:w}, [{0}, #1]
+         ldrb    {t3:w}, [{0}, #2]
+
+         ins {1:v}.h[0], {t1:w}
+         ins {1:v}.h[1], {t2:w}
+         ins {1:v}.h[2], {t3:w}
+    \
+    ",
+    in(reg) src_ptr,
+    out(vreg) out_reg,
+    t1 = out(reg) _,
+    t2 = out(reg) _,
+    t3 = out(reg) _);
+    out_reg
+}
+
+#[inline(always)]
+pub(crate) unsafe fn load_4b_as_u16x4(src_ptr: *const u8) -> uint16x4_t {
+    let out_reg: uint16x4_t;
+    asm!("\
+         ldr {t1:w}, [{0}]
+         mov {1:v}.s[0], {t1:w}
+         uxtl {1:v}.8h, {1:v}.8b
+         uxtl {1:v}.4s, {1:v}.4h
+    \
+    ",
+    in(reg) src_ptr,
+    out(vreg) out_reg,
+    t1 = out(reg) _);
+    out_reg
+}
+
+
 #[inline(always)]
 pub(crate) unsafe fn vsplit_rgb_5(px: float32x4x4_t) -> Float32x5T {
     let first_pixel = px.0;

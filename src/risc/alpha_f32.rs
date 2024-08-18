@@ -53,8 +53,11 @@ unsafe fn risc_premultiply_alpha_rgba_f32_impl(
                 let src_ptr = src.as_ptr().add(offset + px);
                 let dst_ptr = dst.as_mut_ptr().add(offset + px);
                 asm!(include_str!("premultiply_alpha_f32.asm"),
-                in(reg) src_ptr,
-                in(reg) dst_ptr);
+                    in(reg) src_ptr,
+                    in(reg) dst_ptr,
+                    t1 = out(reg) _,
+                    out("v0") _, out("v1") _,
+                    out("v2") _, out("v3") _);
                 _cx += iter_width;
             }
         }
@@ -95,7 +98,15 @@ unsafe fn risc_unpremultiply_alpha_rgba_f32_impl(
                 let px = _cx * 4;
                 let src_ptr = src.as_ptr().add(offset + px);
                 let dst_ptr = dst.as_mut_ptr().add(offset + px);
-                asm!(include_str!("unpremultiply_alpha_f32.asm"), in(reg) src_ptr, in(reg) dst_ptr);
+                asm!(include_str!("unpremultiply_alpha_f32.asm"),
+                     in(reg) src_ptr,
+                     in(reg) dst_ptr,
+                     t1 = out(reg) _,
+                     a7 = out(reg) _,
+                     f1 = out(freg) _,
+                     out("v0") _,
+                     out("v1") _, out("v2") _, out("v3") _, out("v4") _, out("v5") _,
+                     out("v7") _, out("v8") _);
                 _cx += iter_width;
             }
         }

@@ -76,7 +76,17 @@ unsafe fn convolve_vertical_risc_row_impl<const CHANNELS: usize>(
              in(reg) src_stride,
              in(reg) unsafe_destination_ptr_0,
              in(reg) weight_ptr,
-             in(reg) bounds_size);
+             in(reg) bounds_size,
+             t1 = out(reg) _,
+             t2 = out(reg) _,
+             t3 = out(reg) _,
+             t4 = out(reg) _,
+             t5 = out(reg) _,
+             t6 = out(reg) _,
+             out("v1") _, out("v2") _, out("v3") _, out("v4") _, out("v5") _,
+             out("v7") _, out("v8") _, out("v9") _, out("v10") _, out("v11") _,
+             out("v12") _, out("v13") _, out("v14") _, out("v15") _, out("v16") _,
+             out("v17") _);
         cx += double_length;
     }
 
@@ -90,7 +100,14 @@ unsafe fn convolve_vertical_risc_row_impl<const CHANNELS: usize>(
              in(reg) src_stride,
              in(reg) unsafe_destination_ptr_0,
              in(reg) weight_ptr,
-             in(reg) bounds_size);
+             in(reg) bounds_size,
+             t1 = out(reg) _,
+             t2 = out(reg) _,
+             t3 = out(reg) _,
+             t4 = out(reg) _,
+             t6 = out(reg) _,
+             out("v1") _, out("v2") _, out("v3") _, out("v4") _, out("v5") _,
+             out("v7") _, out("v8") _, out("v9") _, out("v10") _, out("v11") _);
         cx += lane_length;
     }
 
@@ -104,7 +121,12 @@ unsafe fn convolve_vertical_risc_row_impl<const CHANNELS: usize>(
              in(reg) src_stride,
              in(reg) unsafe_destination_ptr_0,
              in(reg) weight_ptr,
-             in(reg) bounds_size);
+             in(reg) bounds_size,
+             t1 = out(reg) _,
+             t2 = out(reg) _,
+             t6 = out(reg) _,
+             t3 = out(reg) _,
+             out("v10") _, out("v7") _, out("v2") _, out("v8") _, out("v1") _);
         cx += 1;
     }
 }

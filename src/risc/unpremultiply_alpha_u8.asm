@@ -1,25 +1,25 @@
 vsetvli zero, {2}, e8, m1, ta, ma
 
-li t4, 255
+li {t4}, 255
 
 vlseg4e8.v v0, ({0})
 
 vmv.v.v v10, v0
 
 vmseq.vi v0, v3, 0       # Erase to zero mask
-li t5, 1
-vmerge.vxm v3, v3, t5, v0
+li {t5}, 1
+vmerge.vxm v3, v3, {t5}, v0
 vmv.v.v v0, v10
 
 # Widening lower parts
-vwmulu.vx v4, v0, t4     # R16
-vwmulu.vx v6, v1, t4     # G16
-vwmulu.vx v8, v2, t4     # B16
+vwmulu.vx v4, v0, {t4}     # R16
+vwmulu.vx v6, v1, {t4}     # G16
+vwmulu.vx v8, v2, {t4}     # B16
 vwaddu.vx v10, v3, x0    # A16
 
-srli t5, {2}, 1
+srli {t5}, {2}, 1
 
-vsetvli zero, t5, e16, m1, ta, ma
+vsetvli zero, {t5}, e16, m1, ta, ma
 
 # Div by alpha
 

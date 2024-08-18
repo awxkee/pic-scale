@@ -53,7 +53,14 @@ unsafe fn convolve_horizontal_rgba_risc_row_one_f32_impl(
                  in(reg) bounds_size,
                  in(reg) unsafe_source_ptr_0,
                  in(reg) unsafe_destination_ptr_0,
-                 in(reg) x);
+                 in(reg) x,
+                 t1 = out(reg) _,
+                 ft1 = out(freg) _,
+                 t2 = out(reg) _,
+                 t4 = out(reg) _,
+                 t5 = out(reg) _,
+                 t6 = out(reg) _,
+                 out("v1") _, out("v2") _, out("v3") _);
 
             filter_offset += filter_weights.aligned_size;
         }
@@ -108,7 +115,16 @@ unsafe fn convolve_horizontal_rgba_risc_rows_4_impl(
                  in(reg) unsafe_destination_ptr_0,
                  in(reg) x,
                  in(reg) real_src_stride,
-                 in(reg) real_dst_stride);
+                 in(reg) real_dst_stride,
+                 t1 = out(reg) _,
+                 ft1 = out(freg) _,
+                 t2 = out(reg) _,
+                 t3 = out(reg) _,
+                 t4 = out(reg) _,
+                 t5 = out(reg) _,
+                 t6 = out(reg) _,
+                 out("v1") _, out("v2") _, out("v3") _, out("v4") _, out("v5") _,
+                 out("v7") _, out("v8") _, out("v9") _);
 
             filter_offset += filter_weights.aligned_size;
         }
