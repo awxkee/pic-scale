@@ -73,7 +73,6 @@ pub unsafe fn xvsetvlmax_f16m1() -> usize {
     result
 }
 
-
 #[inline]
 #[target_feature(enable = "v")]
 #[allow(dead_code)]

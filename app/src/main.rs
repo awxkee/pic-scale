@@ -11,8 +11,8 @@ use fast_image_resize::{
 use image::{EncodableLayout, GenericImageView, ImageReader};
 
 use pic_scale::{
-    ImageSize, ImageStore,
-    ResamplingFunction, Scaler, Scaling, ScalingF32, ScalingU16, ThreadingPolicy,
+    ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ScalingF32, ScalingU16,
+    ThreadingPolicy,
 };
 
 fn main() {

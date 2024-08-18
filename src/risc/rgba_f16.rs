@@ -26,9 +26,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use std::arch::asm;
-use half::f16;
 use crate::filter_weights::FilterWeights;
+use half::f16;
+use std::arch::asm;
 
 #[target_feature(enable = "v,zfh")]
 unsafe fn convolve_horizontal_rgba_risc_row_one_f16_impl(

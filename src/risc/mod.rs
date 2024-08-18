@@ -54,7 +54,9 @@ pub use rgba_f16::{
 pub use rgba_f32::{
     convolve_horizontal_rgba_risc_row_one_f32, convolve_horizontal_rgba_risc_rows_4,
 };
-pub use rgba_u8::{convolve_horizontal_rgba_risc_row_one_u8, convolve_horizontal_rgba_risc_rows_4_u8};
+pub use rgba_u8::{
+    convolve_horizontal_rgba_risc_row_one_u8, convolve_horizontal_rgba_risc_rows_4_u8,
+};
 pub use vendor::*;
 #[cfg(feature = "half")]
 pub use vertical_f16::convolve_vertical_risc_row_f16;

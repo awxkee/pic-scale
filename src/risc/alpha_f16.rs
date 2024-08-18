@@ -29,8 +29,8 @@
 
 use crate::risc::xvsetvlmax_f16m1;
 use crate::{premultiply_pixel_f16, unpremultiply_pixel_f16};
-use std::arch::asm;
 use half::f16;
+use std::arch::asm;
 
 #[target_feature(enable = "v")]
 unsafe fn risc_premultiply_alpha_rgba_f16_impl(

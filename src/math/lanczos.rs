@@ -52,7 +52,7 @@ where
         let d = V::const_pi() * x;
         return (jinc(d.as_()) * jinc((d * scale_a).as_())).as_();
     }
-    return 0f32.as_();
+    0f32.as_()
 }
 
 #[inline(always)]
@@ -113,7 +113,7 @@ where
         let d = V::const_pi() * x;
         return sinc(d) * sinc(d * scale_a);
     }
-    return 0f32.as_();
+    0f32.as_()
 }
 
 #[inline(always)]

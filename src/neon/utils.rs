@@ -74,7 +74,6 @@ pub(crate) unsafe fn load_4b_as_u16x4(src_ptr: *const u8) -> uint16x4_t {
          ldr {t1:w}, [{0}]
          mov {1:v}.s[0], {t1:w}
          uxtl {1:v}.8h, {1:v}.8b
-         uxtl {1:v}.4s, {1:v}.4h
     \
     ",
     in(reg) src_ptr,
@@ -82,7 +81,6 @@ pub(crate) unsafe fn load_4b_as_u16x4(src_ptr: *const u8) -> uint16x4_t {
     t1 = out(reg) _);
     out_reg
 }
-
 
 #[inline(always)]
 pub(crate) unsafe fn vsplit_rgb_5(px: float32x4x4_t) -> Float32x5T {

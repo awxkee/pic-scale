@@ -239,7 +239,6 @@ unsafe fn convolve_horizontal_rgb_sse_row_one_f16c_fma(
     );
 }
 
-
 #[inline]
 unsafe fn convolve_horizontal_rgb_sse_row_one_f16_impl<const F16C: bool, const FMA: bool>(
     dst_width: usize,

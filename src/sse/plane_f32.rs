@@ -354,8 +354,13 @@ unsafe fn convolve_horizontal_plane_sse_rows_4_impl<const FMA: bool>(
                 let read_weights3 = _mm_loadu_ps(ptr.add(12));
                 let weights = (read_weights0, read_weights1, read_weights2, read_weights3);
                 let bounds_start = bounds.start + jx;
-                store_0 =
-                    conv_horiz_plane_16_f32!(bounds_start, unsafe_source_ptr_0, weights, store_0, FMA);
+                store_0 = conv_horiz_plane_16_f32!(
+                    bounds_start,
+                    unsafe_source_ptr_0,
+                    weights,
+                    store_0,
+                    FMA
+                );
                 let s_ptr_1 = unsafe_source_ptr_0.add(src_stride);
                 store_1 = conv_horiz_plane_16_f32!(bounds_start, s_ptr_1, weights, store_1, FMA);
                 let s_ptr2 = unsafe_source_ptr_0.add(src_stride * 2);
