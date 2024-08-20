@@ -41,7 +41,7 @@ where
     if x >= 0f32.as_() && x <= 1f32.as_() {
         return 2f32.as_() * x;
     }
-    return 2f32.as_() - 2f32.as_() * x;
+    2f32.as_() - 2f32.as_() * x
 }
 
 #[inline(always)]
@@ -61,5 +61,5 @@ where
     let fac = (x / (l - 1.0f32.as_()) - 0.5f32.as_()).abs();
     let w = 0.62f32.as_() - 0.4832.as_() * fac
         + 0.38f32.as_() * (2f32.as_() * V::const_pi() * fac).cos();
-    return w;
+    w
 }

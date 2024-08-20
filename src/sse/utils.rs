@@ -34,6 +34,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline]
+#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_prefer_fma_ps<const FMA: bool>(a: __m128, b: __m128, c: __m128) -> __m128 {
     if FMA {
         _mm_fma_psx(a, b, c)
@@ -43,7 +44,7 @@ pub unsafe fn _mm_prefer_fma_ps<const FMA: bool>(a: __m128, b: __m128, c: __m128
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
+#[target_feature(enable = "sse4.1,fma")]
 unsafe fn _mm_fma_psx(a: __m128, b: __m128, c: __m128) -> __m128 {
     _mm_fmadd_ps(b, c, a)
 }

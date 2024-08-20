@@ -50,20 +50,17 @@ pub(crate) unsafe fn prefer_vfmaq_f32(
 pub(crate) unsafe fn load_3b_as_u16x4(src_ptr: *const u8) -> uint16x4_t {
     let out_reg: uint16x4_t;
     asm!("\
-         ldrb    {t1:w}, [{0}]
-         ldrb    {t2:w}, [{0}, #1]
-         ldrb    {t3:w}, [{0}, #2]
+         ldrh    {t1:w}, [{0}]
+         ldrb    {t2:w}, [{0}, #2]
 
-         ins {1:v}.h[0], {t1:w}
-         ins {1:v}.h[1], {t2:w}
-         ins {1:v}.h[2], {t3:w}
+         ins {1:v}.s[0], {t1:w}
+         ins {1:v}.h[2], {t2:w}
     \
     ",
     in(reg) src_ptr,
     out(vreg) out_reg,
     t1 = out(reg) _,
-    t2 = out(reg) _,
-    t3 = out(reg) _);
+    t2 = out(reg) _);
     out_reg
 }
 
