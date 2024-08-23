@@ -38,8 +38,10 @@ pub enum ThreadingPolicy {
     /// Will use only one current thread
     Single,
     /// Spawn provided threads count, will not work for wasm - fallback to Single
+    #[cfg(not(target_arch = "wasm32"))]
     Fixed(usize),
     /// Computes adaptive thread count between 1...12 for given image bounds, will not work for wasm - fallback to Single
+    #[cfg(not(target_arch = "wasm32"))]
     Adaptive,
 }
 

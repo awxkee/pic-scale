@@ -49,10 +49,13 @@ use crate::sse::{
     convolve_horizontal_rgba_sse_rows_4, convolve_horizontal_rgba_sse_rows_one,
     convolve_vertical_sse_row,
 };
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+use crate::wasm32::{
+    convolve_horizontal_rgba_wasm_rows_4, convolve_horizontal_rgba_wasm_rows_one,
+    wasm_vertical_neon_row,
+};
 use crate::ImageStore;
 use rayon::ThreadPool;
-#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-use crate::wasm32::wasm_vertical_neon_row;
 
 impl<'a> HorizontalConvolutionPass<u8, 4> for ImageStore<'a, u8, 4> {
     fn convolve_horizontal(
@@ -87,6 +90,11 @@ impl<'a> HorizontalConvolutionPass<u8, 4> for ImageStore<'a, u8, 4> {
                 _dispatcher_4_rows = Some(convolve_horizontal_rgba_risc_rows_4_u8);
                 _dispatcher_1_row = convolve_horizontal_rgba_risc_row_one_u8;
             }
+        }
+        #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+        {
+            _dispatcher_4_rows = Some(convolve_horizontal_rgba_wasm_rows_4);
+            _dispatcher_1_row = convolve_horizontal_rgba_wasm_rows_one;
         }
         convolve_horizontal_dispatch_u8(
             self,

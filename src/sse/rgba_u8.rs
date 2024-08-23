@@ -35,6 +35,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
+#[inline]
 unsafe fn convolve_horizontal_parts_one_rgba_sse(
     start_x: usize,
     src: *const u8,

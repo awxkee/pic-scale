@@ -27,6 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
+set -e
 RUSTFLAGS="-C target-feature=+simd128" cargo build --target wasm32-unknown-unknown --package wasm
 wasm-pack build
 cd www
