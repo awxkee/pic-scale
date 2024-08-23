@@ -27,6 +27,3 @@ libc = "0.2.158"
 [features]
 default = []
 riscv = []
-
-[lib]
-crate-type = ["cdylib", "rlib"]
