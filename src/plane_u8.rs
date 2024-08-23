@@ -47,6 +47,8 @@ use crate::sse::{
     convolve_horizontal_plane_sse_row, convolve_horizontal_plane_sse_rows_4_u8,
     convolve_vertical_sse_row,
 };
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+use crate::wasm32::wasm_vertical_neon_row;
 use crate::ImageStore;
 use rayon::ThreadPool;
 
@@ -121,6 +123,10 @@ impl<'a> VerticalConvolutionPass<u8, 1> for ImageStore<'a, u8, 1> {
             if std::arch::is_riscv_feature_detected!("v") {
                 _dispatcher = convolve_vertical_risc_row::<1>;
             }
+        }
+        #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+        {
+            _dispatcher = wasm_vertical_neon_row::<1>;
         }
         convolve_vertical_dispatch_u8(self, filter_weights, destination, pool, _dispatcher);
     }

@@ -38,6 +38,8 @@ use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_naive_f32::{
     convolve_horizontal_rgb_native_row, convolve_horizontal_rgba_4_row_f32,
 };
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::cpu_features::{is_aarch_f16_supported, is_aarch_f16c_supported};
 use crate::dispatch_group_f16::{convolve_horizontal_dispatch_f16, convolve_vertical_dispatch_f16};
 use crate::filter_weights::{FilterBounds, FilterWeights};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -85,11 +87,13 @@ impl<'a> HorizontalConvolutionPass<f16, 4> for ImageStore<'a, f16, 4> {
             convolve_horizontal_rgb_native_row::<f16, 4>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            _dispatcher_4_rows = Some(convolve_horizontal_rgba_neon_rows_4_f16);
-            _dispatcher_row = convolve_horizontal_rgba_neon_row_one_f16;
-            if std::arch::is_aarch64_feature_detected!("fp16") {
-                _dispatcher_4_rows = Some(xconvolve_horizontal_rgba_neon_rows_4_f16);
-                _dispatcher_row = xconvolve_horizontal_rgba_neon_row_one_f16;
+            if is_aarch_f16c_supported() {
+                _dispatcher_4_rows = Some(convolve_horizontal_rgba_neon_rows_4_f16);
+                _dispatcher_row = convolve_horizontal_rgba_neon_row_one_f16;
+                if is_aarch_f16_supported() {
+                    _dispatcher_4_rows = Some(xconvolve_horizontal_rgba_neon_rows_4_f16);
+                    _dispatcher_row = xconvolve_horizontal_rgba_neon_row_one_f16;
+                }
             }
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -152,9 +156,11 @@ impl<'a> VerticalConvolutionPass<f16, 4> for ImageStore<'a, f16, 4> {
             convolve_vertical_rgb_native_row_f32::<f16, 4>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            _dispatcher = convolve_vertical_rgb_neon_row_f16::<4>;
-            if std::arch::is_aarch64_feature_detected!("fp16") {
-                _dispatcher = xconvolve_vertical_rgb_neon_row_f16::<4>;
+            if is_aarch_f16c_supported() {
+                _dispatcher = convolve_vertical_rgb_neon_row_f16::<4>;
+                if is_aarch_f16_supported() {
+                    _dispatcher = xconvolve_vertical_rgb_neon_row_f16::<4>;
+                }
             }
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -207,11 +213,13 @@ impl<'a> HorizontalConvolutionPass<f16, 3> for ImageStore<'a, f16, 3> {
             convolve_horizontal_rgb_native_row::<f16, 3>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rows_4_f16);
-            _dispatcher_row = convolve_horizontal_rgb_neon_row_one_f16;
-            if std::arch::is_aarch64_feature_detected!("fp16") {
-                _dispatcher_4_rows = Some(xconvolve_horizontal_rgb_neon_rows_4_f16);
-                _dispatcher_row = xconvolve_horizontal_rgb_neon_row_one_f16;
+            if is_aarch_f16c_supported() {
+                _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rows_4_f16);
+                _dispatcher_row = convolve_horizontal_rgb_neon_row_one_f16;
+                if is_aarch_f16_supported() {
+                    _dispatcher_4_rows = Some(xconvolve_horizontal_rgb_neon_rows_4_f16);
+                    _dispatcher_row = xconvolve_horizontal_rgb_neon_row_one_f16;
+                }
             }
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -254,9 +262,11 @@ impl<'a> VerticalConvolutionPass<f16, 3> for ImageStore<'a, f16, 3> {
             convolve_vertical_rgb_native_row_f32::<f16, 3>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            _dispatcher = convolve_vertical_rgb_neon_row_f16::<3>;
-            if std::arch::is_aarch64_feature_detected!("fp16") {
-                _dispatcher = xconvolve_vertical_rgb_neon_row_f16::<3>;
+            if is_aarch_f16c_supported() {
+                _dispatcher = convolve_vertical_rgb_neon_row_f16::<3>;
+                if is_aarch_f16_supported() {
+                    _dispatcher = xconvolve_vertical_rgb_neon_row_f16::<3>;
+                }
             }
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -329,9 +339,11 @@ impl<'a> VerticalConvolutionPass<f16, 1> for ImageStore<'a, f16, 1> {
             convolve_vertical_rgb_native_row_f32::<f16, 1>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            _dispatcher = convolve_vertical_rgb_neon_row_f16::<1>;
-            if std::arch::is_aarch64_feature_detected!("fp16") {
-                _dispatcher = xconvolve_vertical_rgb_neon_row_f16::<1>;
+            if is_aarch_f16c_supported() {
+                _dispatcher = convolve_vertical_rgb_neon_row_f16::<1>;
+                if is_aarch_f16_supported() {
+                    _dispatcher = xconvolve_vertical_rgb_neon_row_f16::<1>;
+                }
             }
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]

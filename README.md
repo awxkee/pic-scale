@@ -43,20 +43,20 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 
 `~` - Partially implemented
 
-|                | NEON | SSE | AVX | RISC-V | 
-|----------------|------|-----|-----|--------| 
-| RGBA (8 bit)   | x    | x   | ~   | x      | 
-| RGB (8 bit)    | x    | x   | ~   | ~      | 
-| Plane (8 bit)  | x    | x   | ~   | ~      | 
-| RGBA (8+ bit)  | x    | x   | ~   | -      | 
-| RGB (8+ bit)   | x    | x   | ~   | -      | 
-| Plane (8+ bit) | ~    | ~   | ~   | -      | 
-| RGBA (f32)     | x    | x   | x   | x      | 
-| RGB (f32)      | x    | x   | ~   | ~      | 
-| Plane (f32)    | x    | x   | ~   | ~      | 
-| RGBA (f16)     | x    | x   | x   | x      | 
-| RGB (f16)      | x    | ~   | ~   | ~      | 
-| Plane (f16)    | ~    | ~   | ~   | ~      | 
+|                | NEON | SSE | AVX | RISC-V | WASM | 
+|----------------|------|-----|-----|--------|------| 
+| RGBA (8 bit)   | x    | x   | ~   | x      | ~    | 
+| RGB (8 bit)    | x    | x   | ~   | ~      | ~    | 
+| Plane (8 bit)  | x    | x   | ~   | ~      | ~    | 
+| RGBA (8+ bit)  | x    | x   | ~   | -      | -    | 
+| RGB (8+ bit)   | x    | x   | ~   | -      | -    | 
+| Plane (8+ bit) | ~    | ~   | ~   | -      | -    | 
+| RGBA (f32)     | x    | x   | x   | x      | -    | 
+| RGB (f32)      | x    | x   | ~   | ~      | -    | 
+| Plane (f32)    | x    | x   | ~   | ~      | -    | 
+| RGBA (f16)     | x    | x   | x   | x      | -    | 
+| RGB (f16)      | x    | ~   | ~   | ~      | -    | 
+| Plane (f16)    | ~    | ~   | ~   | ~      | -    | 
 
 #### Features
 
@@ -72,7 +72,9 @@ To enable support of `f16` the feature `half` should be activated.
 
 `fullfp16` NEON target detection performed in runtime, when available best the best paths for *f16* images are available on ARM.
 
-RISC-V `V (vector extension)` will be detected in runtime if available when feature `riscv` is enabled. *Nightly* rust channel is required
+RISC-V `V (vector extension)` will be detected in runtime if available when feature `riscv` is enabled. *Nightly* rust channel is required.
+
+WASM `simd128` target feature activating is mandatory in build flags
 
 ##### About f16
 

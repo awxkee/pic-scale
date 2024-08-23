@@ -12,3 +12,6 @@ rustflags = ["-C", "target-feature=+sse4.1"]
 rustflags = ["-Ctarget-feature=+rvv", "-Ctarget-cpu=native"]
 #linker = "/opt/homebrew/Cellar/riscv-gnu-toolchain/main/bin/riscv64-unknown-elf-gcc"
 #ar = "/opt/homebrew/Cellar/riscv-gnu-toolchain/main/bin/riscv64-unknown-elf-ar"
+
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-feature=+simd128"]

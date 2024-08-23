@@ -1,4 +1,4 @@
-workspace = { members = ["app"] }
+workspace = { members = ["app", "wasm"] }
 
 [package]
 name = "pic-scale"
@@ -21,6 +21,12 @@ half = { version = "2.4.1", optional = true, features = ["alloc", "std", "num-tr
 num-traits = { version = "0.2.19", features = ["std"] }
 rayon = "1.10.0"
 
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+libc = "0.2.158"
+
 [features]
 default = []
 riscv = []
+
+[lib]
+crate-type = ["cdylib", "rlib"]

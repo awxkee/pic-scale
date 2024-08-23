@@ -249,7 +249,7 @@ macro_rules! consume_u8_1 {
     }};
 }
 
-#[inline(always)]
+#[inline]
 pub fn convolve_vertical_neon_row<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,

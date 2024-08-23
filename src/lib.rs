@@ -53,6 +53,7 @@ mod convolution;
 mod convolve_naive_f32;
 mod convolve_naive_u16;
 mod convolve_naive_u8;
+mod cpu_features;
 #[cfg(feature = "half")]
 mod dispatch_group_f16;
 mod dispatch_group_f32;
@@ -91,6 +92,8 @@ mod sse;
 mod support;
 mod threading_policy;
 mod unsafe_slice;
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+mod wasm32;
 
 pub use colors::JzazbzScaler;
 pub use colors::LChScaler;
@@ -102,6 +105,8 @@ pub use colors::SigmoidalScaler;
 pub use colors::XYZScaler;
 pub use colors::*;
 pub use colorutils_rs::TransferFunction;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+pub use cpu_features::{is_aarch_f16_supported, is_aarch_f16c_supported};
 pub use image_size::ImageSize;
 pub use image_store::ImageStore;
 pub use math::*;

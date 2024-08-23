@@ -37,13 +37,14 @@ use crate::ImageSize;
 pub enum ThreadingPolicy {
     /// Will use only one current thread
     Single,
-    /// Spawn provided threads count
+    /// Spawn provided threads count, will not work for wasm - fallback to Single
     Fixed(usize),
-    /// Computes adaptive thread count between 1...12 for given image bounds
+    /// Computes adaptive thread count between 1...12 for given image bounds, will not work for wasm - fallback to Single
     Adaptive,
 }
 
 impl<'a> ThreadingPolicy {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn get_threads_count(&self, for_size: ImageSize) -> usize {
         match self {
             ThreadingPolicy::Single => 1,
@@ -51,24 +52,35 @@ impl<'a> ThreadingPolicy {
             ThreadingPolicy::Adaptive => {
                 let box_size = 256 * 256;
                 let new_box_size = for_size.height * for_size.width;
-                return (new_box_size / box_size).max(1).min(16);
+                (new_box_size / box_size).max(1).min(16)
             }
         }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn get_threads_count(&self, _: ImageSize) -> usize {
+        1
     }
 }
 
 impl<'a> ThreadingPolicy {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn get_pool(&self, for_size: ImageSize) -> Option<ThreadPool> {
         if *self == ThreadingPolicy::Single {
             return None;
         }
         let threads_count = self.get_threads_count(for_size);
-        return match rayon::ThreadPoolBuilder::new()
+        match rayon::ThreadPoolBuilder::new()
             .num_threads(threads_count)
             .build()
         {
             Ok(pool) => Some(pool),
             Err(_) => None,
-        };
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn get_pool(&self, _: ImageSize) -> Option<ThreadPool> {
+        None
     }
 }

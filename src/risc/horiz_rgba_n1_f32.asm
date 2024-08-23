@@ -32,4 +32,4 @@
     # Store the result in destination memory
     slli {t1}, {5}, 4         # t1 = cx * 4 * sizeof(f32) (assuming 4 bytes per float)
     add {4}, {4}, {t1}        # t8 = dst_ptr = dst_ptr + px
-    vse32.v v1, ({4})        # Store the result from v8[0] to dst_ptr
+    vse32.v v1, ({4})         # Store the result from v8[0] to dst_ptr

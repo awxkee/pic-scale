@@ -50,7 +50,7 @@
     add {t2}, {4}, {7}        # dst_ptr = dst_ptr + px + dst_stride
     add {t3}, {t2}, {7}         # dst_ptr = dst_ptr + px + dst_stride * 2
     add {t4}, {t3}, {7}         # dst_ptr = dst_ptr + px + dst_stride * 3
-    vse32.v v1, ({4})       # Store the result from v8[0] to dst_ptr
+    vse32.v v1, ({4})        # Store the result from v8[0] to dst_ptr
     vse32.v v2, ({t2})       # Store the result from v8[0] to dst_ptr
     vse32.v v3, ({t3})       # Store the result from v8[0] to dst_ptr
     vse32.v v4, ({t4})       # Store the result from v8[0] to dst_ptr

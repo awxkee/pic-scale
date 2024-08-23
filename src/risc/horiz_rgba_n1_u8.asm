@@ -55,4 +55,4 @@
     # Store the result in destination memory
     slli {t1}, {5}, 2         # {t1} = cx * 4 * sizeof(u8)
     add {4}, {4}, {t1}        # t8 = dst_ptr = dst_ptr + px
-    vse8.v v1, ({4})        # Store the result from v8[0] to dst_ptr
+    vse8.v v1, ({4})          # Store the result from v8[0] to dst_ptr

@@ -9,11 +9,7 @@ use fast_image_resize::{
     CpuExtensions, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
-
-use pic_scale::{
-    ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ScalingF32, ScalingU16,
-    ThreadingPolicy,
-};
+use pic_scale::{ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ScalingF32, ScalingU16, ThreadingPolicy};
 
 fn main() {
     // test_fast_image();
@@ -25,7 +21,7 @@ fn main() {
     let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
-    let mut scaler = Scaler::new(ResamplingFunction::Robidoux);
+    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
     // let mut choke: Vec<f32> = bytes

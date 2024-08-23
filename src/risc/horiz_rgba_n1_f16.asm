@@ -33,4 +33,4 @@
     # Store the result in destination memory
     slli {t1}, {5}, 3         # t1 = cx * 4 * sizeof(f16) (assuming 4 bytes per float)
     add {4}, {4}, {t1}        # t8 = dst_ptr = dst_ptr + px
-    vse16.v v1, ({4})        # Store the result from v8[0] to dst_ptr
+    vse16.v v1, ({4})         # Store the result from v8[0] to dst_ptr

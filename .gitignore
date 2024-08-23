@@ -7,3 +7,6 @@ fast_image.*
 cross/
 converted_risc_o.png
 converted_risc.png
+pkg/
+wasm/target/
+wasm/pkg/
