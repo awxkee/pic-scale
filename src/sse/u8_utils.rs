@@ -42,7 +42,7 @@ pub fn compress_i32(x: __m128i) -> __m128i {
     store_16_8
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) unsafe fn convolve_horizontal_parts_one_sse_rgb(
     start_x: usize,
     src: *const u8,

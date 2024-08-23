@@ -302,7 +302,7 @@ unsafe fn convolve_horizontal_rgb_sse_row_one_impl(
         let mut jx = 0usize;
         let mut store = unsafe { _mm_setzero_si128() };
 
-        while jx + 4 < bounds.size && x + 6 < src_width {
+        while jx + 4 < bounds.size && bounds.start + jx + 6 < src_width {
             let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
             unsafe {
                 let weights = _mm_loadu_si64(ptr as *const u8);
@@ -323,7 +323,7 @@ unsafe fn convolve_horizontal_rgb_sse_row_one_impl(
             jx += 4;
         }
 
-        while jx + 2 < bounds.size && x + 3 < src_width {
+        while jx + 2 < bounds.size && bounds.start + jx + 3 < src_width {
             let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
             unsafe {
                 let weight0 = _mm_set1_epi32((ptr as *const i32).read_unaligned());

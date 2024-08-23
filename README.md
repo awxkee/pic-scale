@@ -45,8 +45,8 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 
 |                | NEON | SSE | AVX | RISC-V | WASM | 
 |----------------|------|-----|-----|--------|------| 
-| RGBA (8 bit)   | x    | x   | ~   | x      | ~    | 
-| RGB (8 bit)    | x    | x   | ~   | ~      | ~    | 
+| RGBA (8 bit)   | x    | x   | ~   | x      | x    | 
+| RGB (8 bit)    | x    | x   | ~   | ~      | x    | 
 | Plane (8 bit)  | x    | x   | ~   | ~      | ~    | 
 | RGBA (8+ bit)  | x    | x   | ~   | -      | -    | 
 | RGB (8+ bit)   | x    | x   | ~   | -      | -    | 
