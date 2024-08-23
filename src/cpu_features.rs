@@ -57,6 +57,7 @@ fn apple_has_cpu_feature(feature_name: &str) -> bool {
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+#[allow(dead_code)]
 fn apple_has_cpu_feature(_feature_name: &str) -> bool {
     false
 }
