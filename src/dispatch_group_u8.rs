@@ -34,6 +34,7 @@ use crate::ImageStore;
 use rayon::ThreadPool;
 use std::sync::Arc;
 
+#[allow(clippy::type_complexity)]
 pub(crate) fn convolve_horizontal_dispatch_u8<const CHANNELS: usize>(
     image_store: &ImageStore<u8, CHANNELS>,
     filter_weights: FilterWeights<f32>,

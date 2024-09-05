@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#![allow(clippy::excessive_precision)]
 
 const INVSQRTPI: f64 = 5.64189583547756279280e-01; /* 0x3FE20DD7, 0x50429B6D */
 #[inline]
@@ -36,7 +37,6 @@ fn get_high_word(x: f64) -> u32 {
 fn common(ix: u32, x: f64, y1: bool, sign: bool) -> f64 {
     let z: f64;
     let mut s: f64;
-    let c: f64;
     let mut ss: f64;
     let mut cc: f64;
 
@@ -52,7 +52,7 @@ fn common(ix: u32, x: f64, y1: bool, sign: bool) -> f64 {
     if y1 {
         s = -s;
     }
-    c = x.cos();
+    let c = x.cos();
     cc = s - c;
     if ix < 0x7fe00000 {
         /* avoid overflow in 2*x */
@@ -73,7 +73,7 @@ fn common(ix: u32, x: f64, y1: bool, sign: bool) -> f64 {
     if sign {
         cc = -cc;
     }
-    return INVSQRTPI * cc / x.sqrt();
+    INVSQRTPI * cc / x.sqrt()
 }
 
 /* R0/S0 on [0,2] */
@@ -92,10 +92,9 @@ pub fn j1(x: f64) -> f64 {
     let r: f64;
     let s: f64;
     let mut ix: u32;
-    let sign: bool;
 
     ix = get_high_word(x);
-    sign = (ix >> 31) != 0;
+    let sign = (ix >> 31) != 0;
     ix &= 0x7fffffff;
     if ix >= 0x7ff00000 {
         return 1.0 / (x * x);
@@ -114,7 +113,7 @@ pub fn j1(x: f64) -> f64 {
         /* avoid underflow, raise inexact if x!=0 */
         z = x;
     }
-    return (0.5 + z) * x;
+    (0.5 + z) * x
 }
 
 /* For x >= 8, the asymptotic expansions of pone is
@@ -197,9 +196,6 @@ const PS2: [f64; 5] = [
 fn pone(x: f64) -> f64 {
     let p: &[f64; 6];
     let q: &[f64; 5];
-    let z: f64;
-    let r: f64;
-    let s: f64;
     let mut ix: u32;
 
     ix = get_high_word(x);
@@ -219,10 +215,10 @@ fn pone(x: f64) -> f64 {
         p = &PR2;
         q = &PS2;
     }
-    z = 1.0 / (x * x);
-    r = p[0] + z * (p[1] + z * (p[2] + z * (p[3] + z * (p[4] + z * p[5]))));
-    s = 1.0 + z * (q[0] + z * (q[1] + z * (q[2] + z * (q[3] + z * q[4]))));
-    return 1.0 + r / s;
+    let z = 1.0 / (x * x);
+    let r = p[0] + z * (p[1] + z * (p[2] + z * (p[3] + z * (p[4] + z * p[5]))));
+    let s = 1.0 + z * (q[0] + z * (q[1] + z * (q[2] + z * (q[3] + z * q[4]))));
+    1.0 + r / s
 }
 
 /* For x >= 8, the asymptotic expansions of qone is
@@ -309,9 +305,6 @@ const QS2: [f64; 6] = [
 fn qone(x: f64) -> f64 {
     let p: &[f64; 6];
     let q: &[f64; 6];
-    let s: f64;
-    let r: f64;
-    let z: f64;
     let mut ix: u32;
 
     ix = get_high_word(x);
@@ -331,10 +324,10 @@ fn qone(x: f64) -> f64 {
         p = &QR2;
         q = &QS2;
     }
-    z = 1.0 / (x * x);
-    r = p[0] + z * (p[1] + z * (p[2] + z * (p[3] + z * (p[4] + z * p[5]))));
-    s = 1.0 + z * (q[0] + z * (q[1] + z * (q[2] + z * (q[3] + z * (q[4] + z * q[5])))));
-    return (0.375 + r / s) / x;
+    let z = 1.0 / (x * x);
+    let r = p[0] + z * (p[1] + z * (p[2] + z * (p[3] + z * (p[4] + z * p[5]))));
+    let s = 1.0 + z * (q[0] + z * (q[1] + z * (q[2] + z * (q[3] + z * (q[4] + z * q[5])))));
+    (0.375 + r / s) / x
 }
 
 #[inline]

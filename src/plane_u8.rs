@@ -53,6 +53,7 @@ use crate::ImageStore;
 use rayon::ThreadPool;
 
 impl<'a> HorizontalConvolutionPass<u8, 1> for ImageStore<'a, u8, 1> {
+    #[allow(clippy::type_complexity)]
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,

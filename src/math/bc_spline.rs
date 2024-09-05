@@ -68,7 +68,7 @@ where
             + (8f32.as_() * b + 24f32.as_() * c))
             * (1f32.as_() / 6f32.as_());
     }
-    return 0f32.as_();
+    0f32.as_()
 }
 
 #[inline(always)]
@@ -88,7 +88,7 @@ pub fn hermite_spline<
 where
     f32: AsPrimitive<V>,
 {
-    return bc_spline(x, 0f32.as_(), 0f32.as_());
+    bc_spline(x, 0f32.as_(), 0f32.as_())
 }
 
 #[inline(always)]
@@ -108,7 +108,7 @@ pub fn b_spline<
 where
     f32: AsPrimitive<V>,
 {
-    return bc_spline(x, 1f32.as_(), 0f32.as_());
+    bc_spline(x, 1f32.as_(), 0f32.as_())
 }
 
 #[inline(always)]
@@ -128,7 +128,7 @@ pub fn mitchell_netravalli<
 where
     f32: AsPrimitive<V>,
 {
-    return bc_spline(x, 1f32.as_() / 3f32.as_(), 1f32.as_() / 3f32.as_());
+    bc_spline(x, 1f32.as_() / 3f32.as_(), 1f32.as_() / 3f32.as_())
 }
 
 #[inline(always)]
@@ -148,7 +148,7 @@ pub fn catmull_rom<
 where
     f32: AsPrimitive<V>,
 {
-    return bc_spline(x, 0f32.as_(), 0.5f32.as_());
+    bc_spline(x, 0f32.as_(), 0.5f32.as_())
 }
 
 #[inline(always)]
@@ -169,11 +169,11 @@ pub fn robidoux<
 where
     f32: AsPrimitive<V>,
 {
-    return bc_spline(
+    bc_spline(
         x,
         12f32.as_() / (19f32.as_() + 9f32.as_() * V::const_sqrt2()),
         13f32.as_() / (58f32.as_() + 216f32.as_() * V::const_sqrt2()),
-    );
+    )
 }
 
 #[inline(always)]
@@ -194,9 +194,9 @@ pub fn robidoux_sharp<
 where
     f32: AsPrimitive<V>,
 {
-    return bc_spline(
+    bc_spline(
         x,
         6f32.as_() / (13f32.as_() + 7f32.as_() * V::const_sqrt2()),
         7f32.as_() / (2f32.as_() + 12f32.as_() * V::const_sqrt2()),
-    );
+    )
 }

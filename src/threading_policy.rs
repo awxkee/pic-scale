@@ -45,7 +45,7 @@ pub enum ThreadingPolicy {
     Adaptive,
 }
 
-impl<'a> ThreadingPolicy {
+impl ThreadingPolicy {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn get_threads_count(&self, for_size: ImageSize) -> usize {
         match self {
@@ -54,7 +54,7 @@ impl<'a> ThreadingPolicy {
             ThreadingPolicy::Adaptive => {
                 let box_size = 256 * 256;
                 let new_box_size = for_size.height * for_size.width;
-                (new_box_size / box_size).max(1).min(16)
+                (new_box_size / box_size).clamp(1, 16)
             }
         }
     }
@@ -65,7 +65,7 @@ impl<'a> ThreadingPolicy {
     }
 }
 
-impl<'a> ThreadingPolicy {
+impl ThreadingPolicy {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn get_pool(&self, for_size: ImageSize) -> Option<ThreadPool> {
         if *self == ThreadingPolicy::Single {

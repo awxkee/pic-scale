@@ -243,14 +243,14 @@ impl Scaler {
             filter_position += kernel_size;
         }
 
-        return FilterWeights::<f32>::new(
+        FilterWeights::<f32>::new(
             weights,
             kernel_size,
             kernel_size,
             out_size,
             filter_radius as i32,
             bounds,
-        );
+        )
     }
 }
 
@@ -263,7 +263,7 @@ impl Scaling for Scaler {
         if self.function == Nearest {
             let mut allocated_store: Vec<u8> = vec![0u8; new_size.width * 3 * new_size.height];
             resize_nearest::<u8, 3>(
-                &store.buffer.borrow(),
+                store.buffer.borrow(),
                 store.width,
                 store.height,
                 &mut allocated_store,
@@ -308,10 +308,10 @@ impl Scaling for Scaler {
         if self.function == Nearest {
             let mut new_image = ImageStore::<u8, 4>::alloc(new_size.width, new_size.height);
             resize_nearest::<u8, 4>(
-                &src_store.buffer.borrow(),
+                src_store.buffer.borrow(),
                 src_store.width,
                 src_store.height,
-                &mut new_image.buffer.borrow_mut(),
+                new_image.buffer.borrow_mut(),
                 new_size.width,
                 new_size.height,
             );
@@ -354,7 +354,7 @@ impl ScalingF32 for Scaler {
         if self.function == Nearest {
             let mut allocated_store: Vec<f32> = vec![0f32; new_size.width * 3 * new_size.height];
             resize_nearest::<f32, 3>(
-                &store.buffer.borrow(),
+                store.buffer.borrow(),
                 store.width,
                 store.height,
                 &mut allocated_store,
@@ -407,7 +407,7 @@ impl ScalingF32 for Scaler {
         if self.function == Nearest {
             let mut allocated_store: Vec<f32> = vec![0f32; new_size.width * 4 * new_size.height];
             resize_nearest::<f32, 4>(
-                &src_store.buffer.borrow(),
+                src_store.buffer.borrow(),
                 src_store.width,
                 src_store.height,
                 &mut allocated_store,
@@ -471,9 +471,9 @@ impl Scaler {
         store: ImageStore<f32, 1>,
     ) -> ImageStore<f32, 1> {
         if self.function == Nearest {
-            let mut allocated_store: Vec<f32> = vec![0f32; new_size.width * 1 * new_size.height];
+            let mut allocated_store: Vec<f32> = vec![0f32; new_size.width * new_size.height];
             resize_nearest::<f32, 1>(
-                &store.buffer.borrow(),
+                store.buffer.borrow(),
                 store.width,
                 store.height,
                 &mut allocated_store,
@@ -517,7 +517,7 @@ impl Scaler {
         if self.function == Nearest {
             let mut allocated_store: Vec<u8> = vec![0u8; new_size.width * new_size.height];
             resize_nearest::<u8, 1>(
-                &store.buffer.borrow(),
+                store.buffer.borrow(),
                 store.width,
                 store.height,
                 &mut allocated_store,
@@ -557,7 +557,7 @@ impl ScalingU16 for Scaler {
         if self.function == Nearest {
             let mut allocated_store: Vec<u16> = vec![0u16; new_size.width * 3 * new_size.height];
             resize_nearest::<u16, 3>(
-                &store.buffer.borrow(),
+                store.buffer.borrow(),
                 store.width,
                 store.height,
                 &mut allocated_store,
@@ -571,7 +571,7 @@ impl ScalingU16 for Scaler {
             return new_image;
         }
 
-        if bit_depth < 1 || bit_depth > 16 {
+        if (1..=16).contains(&bit_depth) {
             panic!("Bit depth must be in [1, 16] but got {}", bit_depth);
         }
 
@@ -628,10 +628,10 @@ impl ScalingU16 for Scaler {
         if self.function == Nearest {
             let mut new_image = ImageStore::<u16, 4>::alloc(new_size.width, new_size.height);
             resize_nearest::<u16, 4>(
-                &src_store.buffer.borrow(),
+                src_store.buffer.borrow(),
                 src_store.width,
                 src_store.height,
-                &mut new_image.buffer.borrow_mut(),
+                new_image.buffer.borrow_mut(),
                 new_size.width,
                 new_size.height,
             );
@@ -646,7 +646,7 @@ impl ScalingU16 for Scaler {
             return new_image;
         }
 
-        if bit_depth < 1 || bit_depth > 16 {
+        if !(1..=16).contains(&bit_depth) {
             panic!("Bit depth must be in [1, 16] but got {}", bit_depth);
         }
 
@@ -690,7 +690,7 @@ impl ScalingU16 for Scaler {
         if self.function == Nearest {
             let mut allocated_store: Vec<u16> = vec![0u16; new_size.width * new_size.height];
             resize_nearest::<u16, 1>(
-                &store.buffer.borrow(),
+                store.buffer.borrow(),
                 store.width,
                 store.height,
                 &mut allocated_store,
@@ -704,7 +704,7 @@ impl ScalingU16 for Scaler {
             return new_image;
         }
 
-        if bit_depth < 1 || bit_depth > 16 {
+        if (1..=16).contains(&bit_depth) {
             panic!("Bit depth must be in [1, 16] but got {}", bit_depth);
         }
 

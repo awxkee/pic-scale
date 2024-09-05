@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#![allow(clippy::excessive_precision)]
 use crate::bartlett::{bartlett, bartlett_hann};
 use crate::bc_spline::{
     b_spline, catmull_rom, hermite_spline, mitchell_netravalli, robidoux, robidoux_sharp,
@@ -242,7 +243,7 @@ const JINC_R4: f32 = 4.2410628637960699f32;
 
 impl ResamplingFunction {
     pub fn get_resampling_filter(&self) -> ResamplingFilter {
-        return match self {
+        match self {
             ResamplingFunction::Bilinear => ResamplingFilter::new(bilinear, 2f32, false),
             ResamplingFunction::Nearest => {
                 // Just a stab for nearest
@@ -347,6 +348,6 @@ impl ResamplingFunction {
             ResamplingFunction::Lagrange3 => ResamplingFilter::new(lagrange3, 3f32, false),
             ResamplingFunction::Lanczos6Jinc => ResamplingFilter::new(lanczos6_jinc, 6f32, false),
             ResamplingFunction::Lanczos6 => ResamplingFilter::new(lanczos6, 6f32, false),
-        };
+        }
     }
 }

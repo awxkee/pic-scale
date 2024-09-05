@@ -35,9 +35,9 @@ pub fn sinc<V: Copy + PartialEq + Div<Output = V> + 'static + Float>(x: V) -> V
 where
     f32: AsPrimitive<V>,
 {
-    return if x == 0.0.as_() {
+    if x == 0.0.as_() {
         1f32.as_()
     } else {
         x.sin() / x
-    };
+    }
 }

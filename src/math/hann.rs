@@ -49,7 +49,7 @@ where
     }
     let r = (x * part).cos();
     let r = r * r;
-    return r * size_scale;
+    r * size_scale
 }
 
 #[inline(always)]

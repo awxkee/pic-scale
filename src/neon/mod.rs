@@ -26,20 +26,20 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#[cfg(all(feature = "half"))]
+#[cfg(feature = "half")]
 mod alpha_f16;
 #[cfg(feature = "half")]
 mod alpha_f16_full;
 mod alpha_f32;
 mod alpha_u16;
 mod alpha_u8;
-#[cfg(all(feature = "half"))]
+#[cfg(feature = "half")]
 mod convolve_f16;
-#[cfg(all(feature = "half"))]
+#[cfg(feature = "half")]
 mod f16_utils;
 mod plane_f32;
 mod plane_u8;
-#[cfg(all(feature = "half"))]
+#[cfg(feature = "half")]
 mod rgb_f16;
 #[cfg(feature = "half")]
 mod rgb_f16_full;
@@ -54,7 +54,7 @@ mod rgba_f32;
 mod rgba_u16;
 mod rgba_u8;
 mod utils;
-#[cfg(all(feature = "half"))]
+#[cfg(feature = "half")]
 mod vertical_f16;
 #[cfg(feature = "half")]
 mod vertical_f16_full;
@@ -102,7 +102,7 @@ pub use rgba_u16::{
     convolve_horizontal_rgba_neon_row_u16, convolve_horizontal_rgba_neon_rows_4_u16,
 };
 pub use rgba_u8::*;
-#[cfg(all(feature = "half"))]
+#[cfg(feature = "half")]
 pub use vertical_f16::convolve_vertical_rgb_neon_row_f16;
 #[cfg(feature = "half")]
 pub use vertical_f16_full::xconvolve_vertical_rgb_neon_row_f16;

@@ -39,5 +39,5 @@ where
         return 0f32.as_();
     }
     let dx = V::const_pi() * x.abs();
-    return (1.0f32.as_() - x.abs()) * dx.cos() + (1.0f32.as_() / V::const_pi()) * dx.sin();
+    (1.0f32.as_() - x.abs()) * dx.cos() + (1.0f32.as_() / V::const_pi()) * dx.sin()
 }

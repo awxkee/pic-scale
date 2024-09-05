@@ -88,7 +88,7 @@ impl FilterWeights<f32> {
         let mut chunk_position = 0usize;
 
         for chunk in chunked(&self.weights, self.kernel_size) {
-            for i in 0..chunk.len() {
+            for (i, _) in chunk.iter().enumerate() {
                 let k = chunk_position + i;
                 unsafe {
                     *output_kernel.get_unchecked_mut(k) =
@@ -105,13 +105,13 @@ impl FilterWeights<f32> {
             }
         }
 
-        return FilterWeights::new(
+        FilterWeights::new(
             output_kernel,
             self.kernel_size,
             align,
             self.distinct_elements,
             self.coeffs_size,
             new_bounds,
-        );
+        )
     }
 }

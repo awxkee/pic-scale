@@ -68,25 +68,26 @@ fn apple_has_cpu_feature(_feature_name: &str) -> bool {
 pub fn is_aarch_f16_supported() -> bool {
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     {
-        return apple_has_cpu_feature("hw.optional.arm.FEAT_FP16");
+        apple_has_cpu_feature("hw.optional.arm.FEAT_FP16")
     }
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     {
-        return std::arch::is_aarch64_feature_detected!("fp16");
+        std::arch::is_aarch64_feature_detected!("fp16")
     }
 }
 
 /// Test aarch64 cpu with *f16 conversion* instructions.
 /// on *Apple* platform [libc](https://developer.apple.com/documentation/kernel/1387446-sysctlbyname/determining_instruction_set_characteristics) be used
 /// otherwise consider it is always available
+#[allow(clippy::too_long_first_doc_paragraph)]
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 pub fn is_aarch_f16c_supported() -> bool {
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     {
-        return apple_has_cpu_feature("hw.optional.AdvSIMD_HPFPCvt");
+        apple_has_cpu_feature("hw.optional.AdvSIMD_HPFPCvt")
     }
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     {
-        return true;
+        true
     }
 }

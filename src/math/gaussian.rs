@@ -44,5 +44,5 @@ where
     let pi = V::const_pi();
     let mut den = 2f32.as_() * sigma * sigma;
     den *= den;
-    return (1f32.as_() / ((2f32.as_() * pi).sqrt() * sigma)) * (-x / den).exp();
+    (1f32.as_() / ((2f32.as_() * pi).sqrt() * sigma)) * (-x / den).exp()
 }

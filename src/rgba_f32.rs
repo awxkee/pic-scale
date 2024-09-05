@@ -59,6 +59,7 @@ use rayon::ThreadPool;
 use std::arch::is_riscv_feature_detected;
 
 impl<'a> HorizontalConvolutionPass<f32, 4> for ImageStore<'a, f32, 4> {
+    #[allow(clippy::type_complexity)]
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,

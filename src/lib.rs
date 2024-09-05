@@ -40,7 +40,7 @@
     ),
     feature(stdarch_riscv_feature_detection)
 )]
-#[cfg(all(feature = "half"))]
+#[cfg(feature = "half")]
 mod alpha_handle_f16;
 mod alpha_handle_f32;
 mod alpha_handle_u16;

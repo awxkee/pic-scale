@@ -35,9 +35,9 @@ where
     f32: AsPrimitive<V>,
 {
     let x = x.abs();
-    return if x < 1f32.as_() {
+    if x < 1f32.as_() {
         1.0f32.as_() - x
     } else {
         0f32.as_()
-    };
+    }
 }

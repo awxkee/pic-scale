@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#[cfg(all(feature = "half"))]
+#[cfg(feature = "half")]
 use crate::alpha_handle_f16::{premultiply_alpha_rgba_f16, unpremultiply_alpha_rgba_f16};
 use crate::alpha_handle_f32::{premultiply_alpha_rgba_f32, unpremultiply_alpha_rgba_f32};
 use crate::alpha_handle_u16::{premultiply_alpha_rgba_u16, unpremultiply_alpha_rgba_u16};
@@ -142,7 +142,7 @@ where
         slice_ref: &'a mut [T],
         width: usize,
         height: usize,
-    ) -> Result<ImageStore<T, N>, String> {
+    ) -> Result<ImageStore<'a, T, N>, String> {
         let expected_size = width * height * N;
         if slice_ref.len() != width * height * N {
             return Err(format!(

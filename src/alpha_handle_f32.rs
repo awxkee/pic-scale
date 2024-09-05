@@ -65,9 +65,9 @@ macro_rules! unpremultiply_pixel_f32 {
         let mut b = *unsafe { $src.get_unchecked($pixel_offset + 2) } as f32;
         let a = *unsafe { $src.get_unchecked($pixel_offset + 3) } as f32;
         if a != 0. {
-            r = r / a;
-            g = g / a;
-            b = b / a;
+            r /= a;
+            g /= a;
+            b /= a;
         } else {
             r = 0.;
             g = 0.;

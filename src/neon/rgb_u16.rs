@@ -34,6 +34,7 @@ use crate::support::ROUNDING_APPROX;
 use std::arch::aarch64::*;
 
 #[inline(always)]
+#[allow(clippy::too_many_arguments)]
 unsafe fn consume_u16_4(
     start_x: usize,
     src: *const u16,
@@ -122,6 +123,7 @@ unsafe fn consume_u16_1(
     (acc0, acc1)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn convolve_horizontal_rgb_neon_rows_4_u16(
     dst_width: usize,
     src_width: usize,

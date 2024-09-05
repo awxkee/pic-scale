@@ -34,9 +34,7 @@ pub fn resize_nearest<T: Copy, const CHANNELS: usize>(
     dst: &mut [T],
     dst_width: usize,
     dst_height: usize,
-) where
-    T: Copy,
-{
+) {
     let x_scale = src_width as f32 / dst_width as f32;
     let y_scale = src_height as f32 / dst_height as f32;
 

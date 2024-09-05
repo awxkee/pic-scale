@@ -48,7 +48,7 @@ where
         t *= y / (i * i);
         i += 1f64.as_();
     }
-    return s;
+    s
 }
 
 #[inline(always)]
@@ -73,5 +73,5 @@ where
         return 0f32.as_();
     }
     let i0a = 1.0f64.as_() / bessel_i0(6.33f64.as_());
-    return bessel_i0(6.33f64.as_() * (1.0f64.as_() - x * x).sqrt()) * i0a;
+    bessel_i0(6.33f64.as_() * (1.0f64.as_() - x * x).sqrt()) * i0a
 }

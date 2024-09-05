@@ -31,6 +31,7 @@ use crate::support::{PRECISION, ROUNDING_APPROX};
 use std::arch::aarch64::*;
 
 #[inline(always)]
+#[allow(clippy::too_many_arguments)]
 unsafe fn consume_u16_8(
     start_y: usize,
     start_x: usize,
@@ -91,6 +92,7 @@ unsafe fn consume_u16_8(
 }
 
 #[inline(always)]
+#[allow(clippy::too_many_arguments)]
 unsafe fn consume_u16_4(
     start_y: usize,
     start_x: usize,
@@ -140,6 +142,7 @@ unsafe fn consume_u16_4(
 }
 
 #[inline(always)]
+#[allow(clippy::too_many_arguments)]
 unsafe fn consume_u16_1(
     start_y: usize,
     start_x: usize,

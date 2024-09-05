@@ -52,10 +52,6 @@ macro_rules! unpremultiply_pixel {
             r = (r * 255) / a;
             g = (g * 255) / a;
             b = (b * 255) / a;
-        } else {
-            r = r;
-            g = g;
-            b = b;
         }
         unsafe {
             *$dst.get_unchecked_mut($pixel_offset) = r as u8;

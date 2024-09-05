@@ -57,7 +57,7 @@ where
         return (8f32.as_() + x * ((-12f32).as_() + x * (6f32.as_() - x)))
             * (1f32.as_() / 6f32.as_());
     }
-    return 0f32.as_();
+    0f32.as_()
 }
 
 #[inline(always)]
@@ -87,5 +87,5 @@ where
     if modulo <= 1f32.as_() {
         return (a + 2f32.as_()) * triplet - (a + 3f32.as_()) * floatd + 1f32.as_();
     }
-    return a * triplet - 5f32.as_() * a * floatd + 8f32.as_() * a * modulo - 4f32.as_() * a;
+    a * triplet - 5f32.as_() * a * floatd + 8f32.as_() * a * modulo - 4f32.as_() * a
 }

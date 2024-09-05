@@ -29,6 +29,8 @@
 use crate::wasm32::utils::{wasm_unpackhi_i8x16, wasm_unpacklo_i8x16};
 use std::arch::wasm32::*;
 
+#[inline]
+#[target_feature(enable = "simd128")]
 pub unsafe fn wasm_load_deinterleave_u8x4(ptr: *const u8) -> (v128, v128, v128, v128) {
     let u0 = v128_load(ptr as *const v128); // a0 b0 c0 d0 a1 b1 c1 d1 ...
     let u1 = v128_load(ptr.add(16) as *const v128); // a4 b4 c4 d4 ...
@@ -47,6 +49,8 @@ pub unsafe fn wasm_load_deinterleave_u8x4(ptr: *const u8) -> (v128, v128, v128, 
     (a, b, c, d)
 }
 
+#[inline]
+#[target_feature(enable = "simd128")]
 pub unsafe fn wasm_store_interleave_u8x4(ptr: *mut u8, packed: (v128, v128, v128, v128)) {
     let a = packed.0;
     let b = packed.1;

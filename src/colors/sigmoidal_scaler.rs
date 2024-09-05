@@ -48,27 +48,27 @@ impl SigmoidalScaler {
         let mut new_store = ImageStore::<f32, 4>::alloc(store.width, store.height);
         let lab_stride = store.width as u32 * 4u32 * std::mem::size_of::<f32>() as u32;
         rgba_to_sigmoidal(
-            &store.buffer.borrow(),
+            store.buffer.borrow(),
             store.width as u32 * 4u32,
-            &mut new_store.buffer.borrow_mut(),
+            new_store.buffer.borrow_mut(),
             lab_stride,
             store.width as u32,
             store.height as u32,
         );
-        return new_store;
+        new_store
     }
 
     fn sigmoidal_to_rgba(store: ImageStore<f32, 4>) -> ImageStore<u8, 4> {
         let mut new_store = ImageStore::<u8, 4>::alloc(store.width, store.height);
         sigmoidal_to_rgba(
-            &store.buffer.borrow(),
+            store.buffer.borrow(),
             store.width as u32 * 4u32 * std::mem::size_of::<f32>() as u32,
-            &mut new_store.buffer.borrow_mut(),
+            new_store.buffer.borrow_mut(),
             store.width as u32 * 4u32,
             store.width as u32,
             store.height as u32,
         );
-        return new_store;
+        new_store
     }
 }
 
@@ -83,9 +83,9 @@ impl Scaling for SigmoidalScaler {
         let lab_stride =
             lab_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<f32>() as u32;
         rgb_to_sigmoidal(
-            &store.buffer.borrow(),
+            store.buffer.borrow(),
             store.width as u32 * COMPONENTS as u32,
-            &mut lab_store.buffer.borrow_mut(),
+            lab_store.buffer.borrow_mut(),
             lab_stride,
             lab_store.width as u32,
             lab_store.height as u32,
@@ -95,14 +95,14 @@ impl Scaling for SigmoidalScaler {
         let new_lab_stride =
             new_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<f32>() as u32;
         sigmoidal_to_rgb(
-            &new_store.buffer.borrow(),
+            new_store.buffer.borrow(),
             new_lab_stride,
-            &mut new_u8_store.buffer.borrow_mut(),
+            new_u8_store.buffer.borrow_mut(),
             new_u8_store.width as u32 * COMPONENTS as u32,
             new_store.width as u32,
             new_store.height as u32,
         );
-        return new_u8_store;
+        new_u8_store
     }
 
     fn resize_rgba(
@@ -127,6 +127,6 @@ impl Scaling for SigmoidalScaler {
             rgba_store.premultiply_alpha(&mut premultiplied_store);
             return premultiplied_store;
         }
-        return rgba_store;
+        rgba_store
     }
 }

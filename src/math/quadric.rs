@@ -44,5 +44,5 @@ where
         let t = x - 1.5f32.as_();
         return 0.5f32.as_() * t * t;
     }
-    return 0f32.as_();
+    0f32.as_()
 }

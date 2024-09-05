@@ -95,6 +95,7 @@ pub(crate) fn convolve_vertical_dispatch_f32<const COMPONENTS: usize>(
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub(crate) fn convolve_horizontal_dispatch_f32<const CHANNELS: usize>(
     image_store: &ImageStore<f32, CHANNELS>,
     filter_weights: FilterWeights<f32>,

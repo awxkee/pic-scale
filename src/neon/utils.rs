@@ -38,11 +38,11 @@ pub(crate) unsafe fn prefer_vfmaq_f32(
 ) -> float32x4_t {
     #[cfg(target_arch = "aarch64")]
     {
-        return vfmaq_f32(a, b, c);
+        vfmaq_f32(a, b, c)
     }
     #[cfg(target_arch = "arm")]
     {
-        return vmlaq_f32(a, b, c);
+        vmlaq_f32(a, b, c)
     }
 }
 

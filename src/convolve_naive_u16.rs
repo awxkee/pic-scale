@@ -38,6 +38,7 @@ macro_rules! compress_u16 {
 }
 
 #[inline]
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn convolve_vertical_part_u16<const BUFFER_SIZE: usize>(
     start_y: usize,
     start_x: usize,
@@ -150,6 +151,7 @@ pub(crate) fn convolve_horizontal_rgba_native_row_u16<const CHANNELS: usize>(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn convolve_horizontal_rgba_native_4_row_u16<const CHANNELS: usize>(
     dst_width: usize,
     _: usize,

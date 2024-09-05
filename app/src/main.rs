@@ -13,7 +13,7 @@ use pic_scale::{ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, Scal
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/asset.jpg")
+    let img = ImageReader::open("./assets/test_1.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -21,7 +21,7 @@ fn main() {
     let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
-    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    let mut scaler = Scaler::new(ResamplingFunction::MitchellNetravalli);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
     // let mut choke: Vec<f32> = bytes
@@ -34,7 +34,7 @@ fn main() {
         ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
     let resized = scaler.resize_rgba(
-        ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
+        ImageSize::new(74, 74),
         store,
         true,
     );

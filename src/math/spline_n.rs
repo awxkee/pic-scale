@@ -47,13 +47,13 @@ where
     f64: AsPrimitive<V>,
     f32: AsPrimitive<V>,
 {
-    return if x < 1.0.as_() {
+    if x < 1.0.as_() {
         ((x - 9.0.as_() / 5.0.as_()) * x - 1.0.as_() / 5.0.as_()) * x + 1.0.as_()
     } else {
         (((-1.0).as_() / 3.0.as_() * (x - 1f32.as_()) + 4.0.as_() / 5.0.as_()) * (x - 1f32.as_())
             - 7.0.as_() / 15.0.as_())
             * (x - 1f32.as_())
-    };
+    }
 }
 
 #[inline(always)]
@@ -73,7 +73,7 @@ where
     f64: AsPrimitive<V>,
     f32: AsPrimitive<V>,
 {
-    return if x < 1.0.as_() {
+    if x < 1.0.as_() {
         ((13.0.as_() / 11.0.as_() * x - 453.0.as_() / 209.0.as_()) * x - 3.0.as_() / 209.0.as_())
             * x
             + 1.0.as_()
@@ -86,7 +86,7 @@ where
         ((1.0.as_() / 11.0.as_() * (x - 2f32.as_()) - 45.0.as_() / 209.0.as_()) * (x - 2f32.as_())
             + 26.0.as_() / 209.0.as_())
             * (x - 2f32.as_())
-    };
+    }
 }
 
 #[inline(always)]
@@ -106,7 +106,7 @@ where
     f64: AsPrimitive<V>,
     f32: AsPrimitive<V>,
 {
-    return if x < 1.0.as_() {
+    if x < 1.0.as_() {
         ((49.0.as_() / 41.0.as_() * x - 6387.0.as_() / 2911.0.as_()) * x - 3.0.as_() / 2911.0.as_())
             * x
             + 1.0.as_()
@@ -125,5 +125,5 @@ where
             * (x - 3f32.as_())
             - 97.0.as_() / 2911.0.as_())
             * (x - 3f32.as_())
-    };
+    }
 }

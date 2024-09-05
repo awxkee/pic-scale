@@ -165,6 +165,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_f32<
 }
 
 impl<'a> HorizontalConvolutionPass<f32, 3> for ImageStore<'a, f32, 3> {
+    #[allow(clippy::type_complexity)]
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,

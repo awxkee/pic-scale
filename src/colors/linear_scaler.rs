@@ -62,7 +62,7 @@ impl LinearApproxScaler {
     }
 }
 
-impl<'a> Scaling for LinearApproxScaler {
+impl Scaling for LinearApproxScaler {
     fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy) {
         self.scaler.threading_policy = threading_policy;
     }

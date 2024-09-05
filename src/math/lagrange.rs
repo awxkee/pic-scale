@@ -60,7 +60,7 @@ where
             value *= (n.as_() - i.as_() - x) / (n.as_() - i.as_());
         }
     }
-    return value;
+    value
 }
 
 #[inline(always)]
