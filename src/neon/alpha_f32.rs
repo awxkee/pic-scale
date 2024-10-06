@@ -84,9 +84,7 @@ pub fn neon_premultiply_alpha_rgba_f32(
                 neon_premultiply_alpha_rgba_row_f32(dst, src, width, 0);
             });
     } else {
-        let src_stride = 4 * width;
-
-        let mut offset = src_stride;
+        let mut offset = 0usize;
 
         for _ in 0..height {
             unsafe {
