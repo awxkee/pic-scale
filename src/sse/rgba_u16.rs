@@ -31,7 +31,7 @@ use crate::filter_weights::FilterWeights;
 use crate::load_4_weights_epi32;
 use crate::sse::{_mm_packus_epi64, _mm_srai_epi64x, shuffle};
 use crate::support::PRECISION;
-use crate::support::ROUNDING_APPROX;
+use crate::support::ROUNDING_CONST;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -208,7 +208,7 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_u16_impl(
         const CHANNELS: usize = 4;
         let zeros = _mm_setzero_si128();
         let v_max_colors = _mm_set1_epi32(max_colors);
-        let init = _mm_set1_epi64x(ROUNDING_APPROX as i64);
+        let init = _mm_set1_epi64x(ROUNDING_CONST as i64);
         for x in 0..dst_width {
             let bounds = approx_weights.bounds.get_unchecked(x);
             let mut jx = 0usize;
@@ -418,8 +418,8 @@ unsafe fn convolve_horizontal_rgba_sse_row_u16_impl(
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);
             let mut jx = 0usize;
-            let mut store0 = _mm_set1_epi64x(ROUNDING_APPROX as i64);
-            let mut store1 = _mm_set1_epi64x(ROUNDING_APPROX as i64);
+            let mut store0 = _mm_set1_epi64x(ROUNDING_CONST as i64);
+            let mut store1 = _mm_set1_epi64x(ROUNDING_CONST as i64);
 
             while jx + 4 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);

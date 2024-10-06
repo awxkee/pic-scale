@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter_weights::FilterWeights;
-use crate::support::{PRECISION, ROUNDING_APPROX};
+use crate::support::{PRECISION, ROUNDING_CONST};
 use crate::wasm32::utils::{u16x8_pack_sat_u8x16, u32x4_pack_trunc_u16x8, w_zeros};
 use std::arch::wasm32::*;
 
@@ -88,7 +88,7 @@ unsafe fn convolve_horizontal_rgb_wasm_rows_4_impl(
     let mut filter_offset = 0usize;
     let weights_ptr = approx_weights.weights.as_ptr();
 
-    let vld = i32x4_splat(ROUNDING_APPROX);
+    let vld = i32x4_splat(ROUNDING_CONST);
 
     let zeros = w_zeros();
 

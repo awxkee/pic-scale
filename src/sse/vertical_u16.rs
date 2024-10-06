@@ -29,7 +29,7 @@
 
 use crate::filter_weights::FilterBounds;
 use crate::sse::{_mm_packus_epi64, _mm_srai_epi64x, shuffle};
-use crate::support::{PRECISION, ROUNDING_APPROX};
+use crate::support::{PRECISION, ROUNDING_CONST};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -46,7 +46,7 @@ unsafe fn consume_u16_16(
     bounds: &FilterBounds,
     max_colors: i32,
 ) {
-    let vld = _mm_set1_epi64x(ROUNDING_APPROX as i64);
+    let vld = _mm_set1_epi64x(ROUNDING_CONST as i64);
     let mut store_0 = vld;
     let mut store_1 = vld;
     let mut store_2 = vld;
@@ -158,7 +158,7 @@ unsafe fn consume_u16_8(
     bounds: &FilterBounds,
     max_colors: i32,
 ) {
-    let vld = _mm_set1_epi64x(ROUNDING_APPROX as i64);
+    let vld = _mm_set1_epi64x(ROUNDING_CONST as i64);
     let mut store_0 = vld;
     let mut store_1 = vld;
     let mut store_2 = vld;
@@ -231,7 +231,7 @@ unsafe fn consume_u16_4(
     bounds: &FilterBounds,
     max_colors: i32,
 ) {
-    let vld = _mm_set1_epi64x(ROUNDING_APPROX as i64);
+    let vld = _mm_set1_epi64x(ROUNDING_CONST as i64);
     let mut store_0 = vld;
     let mut store_1 = vld;
 
@@ -285,7 +285,7 @@ unsafe fn consume_u16_1(
     bounds: &FilterBounds,
     max_colors: i32,
 ) {
-    let vld = _mm_set1_epi64x(ROUNDING_APPROX as i64);
+    let vld = _mm_set1_epi64x(ROUNDING_CONST as i64);
     let mut store = vld;
 
     let px = start_x;

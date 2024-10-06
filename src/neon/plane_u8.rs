@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter_weights::FilterWeights;
-use crate::support::{PRECISION, ROUNDING_APPROX};
+use crate::support::{PRECISION, ROUNDING_CONST};
 use std::arch::aarch64::*;
 
 macro_rules! vfullq_sum_s32 {
@@ -104,13 +104,13 @@ pub fn convolve_horizontal_plane_neon_rows_4_u8(
             let bounds = filter_weights.bounds.get_unchecked(x);
             let mut jx = 0usize;
             let mut store0 = vdupq_n_s32(0i32);
-            store0 = vsetq_lane_s32::<0>(ROUNDING_APPROX, store0);
+            store0 = vsetq_lane_s32::<0>(ROUNDING_CONST, store0);
             let mut store1 = vdupq_n_s32(0i32);
-            store1 = vsetq_lane_s32::<0>(ROUNDING_APPROX, store1);
+            store1 = vsetq_lane_s32::<0>(ROUNDING_CONST, store1);
             let mut store2 = vdupq_n_s32(0i32);
-            store2 = vsetq_lane_s32::<0>(ROUNDING_APPROX, store2);
+            store2 = vsetq_lane_s32::<0>(ROUNDING_CONST, store2);
             let mut store3 = vdupq_n_s32(0i32);
-            store3 = vsetq_lane_s32::<0>(ROUNDING_APPROX, store3);
+            store3 = vsetq_lane_s32::<0>(ROUNDING_CONST, store3);
 
             let row1 = unsafe_source_ptr_0.add(src_stride);
             let row2 = unsafe_source_ptr_0.add(src_stride * 2);
@@ -249,7 +249,7 @@ pub fn convolve_horizontal_plane_neon_row(
             let bounds = filter_weights.bounds.get_unchecked(x);
             let mut jx = 0usize;
             let mut store = vdupq_n_s32(0i32);
-            store = vsetq_lane_s32::<0>(ROUNDING_APPROX, store);
+            store = vsetq_lane_s32::<0>(ROUNDING_CONST, store);
 
             while jx + 16 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);

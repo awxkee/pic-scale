@@ -32,7 +32,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 use crate::filter_weights::FilterBounds;
-use crate::support::{PRECISION, ROUNDING_APPROX};
+use crate::support::{PRECISION, ROUNDING_CONST};
 
 #[inline(always)]
 pub(crate) unsafe fn convolve_vertical_part_sse_32(
@@ -45,7 +45,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_32(
     bounds: &FilterBounds,
 ) {
     let zeros = _mm_setzero_si128();
-    let vld = _mm_set1_epi32(ROUNDING_APPROX);
+    let vld = _mm_set1_epi32(ROUNDING_CONST);
     let mut store_0 = vld;
     let mut store_1 = vld;
     let mut store_2 = vld;
@@ -170,7 +170,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_16(
     filter: *const i16,
     bounds: &FilterBounds,
 ) {
-    let vld = _mm_set1_epi32(ROUNDING_APPROX);
+    let vld = _mm_set1_epi32(ROUNDING_CONST);
     let mut store_0 = vld;
     let mut store_1 = vld;
     let mut store_2 = vld;
@@ -232,7 +232,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_8(
     filter: *const i16,
     bounds: &FilterBounds,
 ) {
-    let vld = _mm_set1_epi32(ROUNDING_APPROX);
+    let vld = _mm_set1_epi32(ROUNDING_CONST);
     let mut store_0 = vld;
     let mut store_1 = vld;
 
@@ -281,7 +281,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse(
     filter: *const i16,
     bounds: &FilterBounds,
 ) {
-    let vld = _mm_set1_epi32(ROUNDING_APPROX);
+    let vld = _mm_set1_epi32(ROUNDING_CONST);
     let mut store = vld;
 
     let zeros = _mm_setzero_si128();

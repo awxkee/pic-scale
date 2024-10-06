@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter_weights::FilterBounds;
-use crate::support::{PRECISION, ROUNDING_APPROX};
+use crate::support::{PRECISION, ROUNDING_CONST};
 use std::arch::aarch64::*;
 
 macro_rules! pack_weights {
@@ -61,7 +61,7 @@ macro_rules! accumulate_4_into {
 
 macro_rules! consume_64_u8 {
     ($start_y: expr,$start_x: expr, $src: expr, $src_stride: expr, $dst: expr, $filter: expr, $bounds: expr) => {{
-        let vld = vdupq_n_s32(ROUNDING_APPROX);
+        let vld = vdupq_n_s32(ROUNDING_CONST);
         let mut store_0 = vld;
         let mut store_1 = vld;
         let mut store_2 = vld;
@@ -113,7 +113,7 @@ macro_rules! consume_64_u8 {
 
 macro_rules! consume_32_u8 {
     ($start_y: expr,$start_x: expr, $src: expr, $src_stride: expr, $dst: expr, $filter: expr, $bounds: expr) => {{
-        let vld = vdupq_n_s32(ROUNDING_APPROX);
+        let vld = vdupq_n_s32(ROUNDING_CONST);
         let mut store_0 = vld;
         let mut store_1 = vld;
         let mut store_2 = vld;
@@ -150,7 +150,7 @@ macro_rules! consume_32_u8 {
 
 macro_rules! consume_16_u8 {
     ($start_y: expr,$start_x: expr, $src: expr, $src_stride: expr, $dst: expr, $filter: expr, $bounds: expr) => {{
-        let vld = vdupq_n_s32(ROUNDING_APPROX);
+        let vld = vdupq_n_s32(ROUNDING_CONST);
         let mut store_0 = vld;
         let mut store_1 = vld;
         let mut store_2 = vld;
@@ -178,7 +178,7 @@ macro_rules! consume_16_u8 {
 
 macro_rules! consume_u8_8 {
     ($start_y: expr,$start_x: expr, $src: expr, $src_stride: expr, $dst: expr, $filter: expr, $bounds: expr) => {{
-        let vld = vdupq_n_s32(ROUNDING_APPROX);
+        let vld = vdupq_n_s32(ROUNDING_CONST);
         let mut store_0 = vld;
         let mut store_1 = vld;
 
@@ -215,7 +215,7 @@ macro_rules! consume_u8_8 {
 
 macro_rules! consume_u8_1 {
     ($start_y: expr, $start_x: expr, $src: expr, $src_stride: expr, $dst: expr, $filter: expr, $bounds: expr) => {{
-        let vld = vdupq_n_s32(ROUNDING_APPROX);
+        let vld = vdupq_n_s32(ROUNDING_CONST);
         let mut store = vld;
 
         let px = $start_x;

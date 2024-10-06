@@ -28,4 +28,4 @@
  */
 
 pub const PRECISION: i32 = 15;
-pub const ROUNDING_APPROX: i32 = 1 << PRECISION;
+pub const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);

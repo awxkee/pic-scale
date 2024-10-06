@@ -29,7 +29,7 @@
 
 use crate::filter_weights::FilterWeights;
 use crate::sse::{compress_i32, shuffle};
-use crate::support::ROUNDING_APPROX;
+use crate::support::ROUNDING_CONST;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -110,7 +110,7 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_impl(
                                                11, -1,
                                                15, -1);
 
-        let vld = _mm_set1_epi32(ROUNDING_APPROX);
+        let vld = _mm_set1_epi32(ROUNDING_CONST);
 
         for x in 0..dst_width {
             let bounds = approx_weights.bounds.get_unchecked(x);
@@ -303,7 +303,7 @@ unsafe fn convolve_horizontal_rgba_sse_rows_one_impl(
                                            11, -1,
                                            15, -1);
 
-    let vld = _mm_set1_epi32(ROUNDING_APPROX);
+    let vld = _mm_set1_epi32(ROUNDING_CONST);
 
     for x in 0..dst_width {
         let bounds = approx_weights.bounds.get_unchecked(x);

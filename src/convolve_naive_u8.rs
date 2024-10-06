@@ -28,7 +28,7 @@
  */
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::saturate_narrow::SaturateNarrow;
-use crate::support::ROUNDING_APPROX;
+use crate::support::ROUNDING_CONST;
 use num_traits::AsPrimitive;
 use std::ops::{AddAssign, Mul};
 
@@ -52,7 +52,7 @@ pub(crate) unsafe fn convolve_vertical_part<
     i32: AsPrimitive<J>,
     i16: AsPrimitive<J>,
 {
-    let mut store: [J; BUFFER_SIZE] = [ROUNDING_APPROX.as_(); BUFFER_SIZE];
+    let mut store: [J; BUFFER_SIZE] = [ROUNDING_CONST.as_(); BUFFER_SIZE];
 
     for j in 0..bounds.size {
         let py = start_y + j;
@@ -124,10 +124,10 @@ pub(crate) fn convolve_horizontal_rgba_native_row<
         let weights_ptr = filter_weights.weights.as_ptr();
 
         for x in 0..dst_width {
-            let mut sum_r: J = ROUNDING_APPROX.as_();
-            let mut sum_g: J = ROUNDING_APPROX.as_();
-            let mut sum_b: J = ROUNDING_APPROX.as_();
-            let mut sum_a: J = ROUNDING_APPROX.as_();
+            let mut sum_r: J = ROUNDING_CONST.as_();
+            let mut sum_g: J = ROUNDING_CONST.as_();
+            let mut sum_b: J = ROUNDING_CONST.as_();
+            let mut sum_a: J = ROUNDING_CONST.as_();
 
             let bounds = filter_weights.bounds.get_unchecked(x);
             let start_x = bounds.start;
@@ -183,22 +183,22 @@ pub(crate) fn convolve_horizontal_rgba_native_4_row<
         let dst_row3 = unsafe_destination_ptr_0.add(dst_stride * 3);
 
         for x in 0..dst_width {
-            let mut sum_r_0: J = ROUNDING_APPROX.as_();
-            let mut sum_g_0: J = ROUNDING_APPROX.as_();
-            let mut sum_b_0: J = ROUNDING_APPROX.as_();
-            let mut sum_a_0: J = ROUNDING_APPROX.as_();
-            let mut sum_r_1: J = ROUNDING_APPROX.as_();
-            let mut sum_g_1: J = ROUNDING_APPROX.as_();
-            let mut sum_b_1: J = ROUNDING_APPROX.as_();
-            let mut sum_a_1: J = ROUNDING_APPROX.as_();
-            let mut sum_r_2: J = ROUNDING_APPROX.as_();
-            let mut sum_g_2: J = ROUNDING_APPROX.as_();
-            let mut sum_b_2: J = ROUNDING_APPROX.as_();
-            let mut sum_a_2: J = ROUNDING_APPROX.as_();
-            let mut sum_r_3: J = ROUNDING_APPROX.as_();
-            let mut sum_g_3: J = ROUNDING_APPROX.as_();
-            let mut sum_b_3: J = ROUNDING_APPROX.as_();
-            let mut sum_a_3: J = ROUNDING_APPROX.as_();
+            let mut sum_r_0: J = ROUNDING_CONST.as_();
+            let mut sum_g_0: J = ROUNDING_CONST.as_();
+            let mut sum_b_0: J = ROUNDING_CONST.as_();
+            let mut sum_a_0: J = ROUNDING_CONST.as_();
+            let mut sum_r_1: J = ROUNDING_CONST.as_();
+            let mut sum_g_1: J = ROUNDING_CONST.as_();
+            let mut sum_b_1: J = ROUNDING_CONST.as_();
+            let mut sum_a_1: J = ROUNDING_CONST.as_();
+            let mut sum_r_2: J = ROUNDING_CONST.as_();
+            let mut sum_g_2: J = ROUNDING_CONST.as_();
+            let mut sum_b_2: J = ROUNDING_CONST.as_();
+            let mut sum_a_2: J = ROUNDING_CONST.as_();
+            let mut sum_r_3: J = ROUNDING_CONST.as_();
+            let mut sum_g_3: J = ROUNDING_CONST.as_();
+            let mut sum_b_3: J = ROUNDING_CONST.as_();
+            let mut sum_a_3: J = ROUNDING_CONST.as_();
 
             let bounds = filter_weights.bounds.get_unchecked(x);
             let start_x = bounds.start;

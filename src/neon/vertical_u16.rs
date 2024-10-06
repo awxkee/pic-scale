@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter_weights::FilterBounds;
-use crate::support::{PRECISION, ROUNDING_APPROX};
+use crate::support::{PRECISION, ROUNDING_CONST};
 use std::arch::aarch64::*;
 
 #[inline(always)]
@@ -42,7 +42,7 @@ unsafe fn consume_u16_8(
     bounds: &FilterBounds,
     max_colors: i32,
 ) {
-    let vld = vdupq_n_s64(ROUNDING_APPROX as i64);
+    let vld = vdupq_n_s64(ROUNDING_CONST as i64);
     let mut store_0 = vld;
     let mut store_1 = vld;
     let mut store_2 = vld;
@@ -103,7 +103,7 @@ unsafe fn consume_u16_4(
     bounds: &FilterBounds,
     max_colors: i32,
 ) {
-    let vld = vdupq_n_s64(ROUNDING_APPROX as i64);
+    let vld = vdupq_n_s64(ROUNDING_CONST as i64);
     let mut store_0 = vld;
     let mut store_1 = vld;
 
@@ -153,7 +153,7 @@ unsafe fn consume_u16_1(
     bounds: &FilterBounds,
     max_colors: i32,
 ) {
-    let vld = vdupq_n_s64(ROUNDING_APPROX as i64);
+    let vld = vdupq_n_s64(ROUNDING_CONST as i64);
     let mut store = vld;
 
     let px = start_x;

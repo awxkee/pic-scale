@@ -29,7 +29,7 @@
 
 use crate::filter_weights::FilterWeights;
 use crate::neon::utils::load_3b_as_u16x4;
-use crate::support::{PRECISION, ROUNDING_APPROX};
+use crate::support::{PRECISION, ROUNDING_CONST};
 use std::arch::aarch64::*;
 
 macro_rules! conv_horiz_rgba_5_u8 {
@@ -130,7 +130,7 @@ pub fn convolve_horizontal_rgb_neon_rows_4(
         let mut filter_offset = 0usize;
         let weights_ptr = approx_weights.weights.as_ptr();
         const CHANNELS: usize = 3;
-        let init = vdupq_n_s32(ROUNDING_APPROX);
+        let init = vdupq_n_s32(ROUNDING_CONST);
         for x in 0..dst_width {
             let bounds = approx_weights.bounds.get_unchecked(x);
             let mut jx = 0usize;
@@ -251,7 +251,7 @@ pub fn convolve_horizontal_rgb_neon_row_one(
         for x in 0..dst_width {
             let bounds = approx_weights.bounds.get_unchecked(x);
             let mut jx = 0usize;
-            let mut store = vdupq_n_s32(ROUNDING_APPROX);
+            let mut store = vdupq_n_s32(ROUNDING_CONST);
 
             while jx + 4 < bounds.size && bounds.start + jx + 6 < src_width {
                 let bounds_start = bounds.start + jx;

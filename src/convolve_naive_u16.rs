@@ -29,7 +29,7 @@
 use num_traits::AsPrimitive;
 
 use crate::filter_weights::{FilterBounds, FilterWeights};
-use crate::support::{PRECISION, ROUNDING_APPROX};
+use crate::support::{PRECISION, ROUNDING_CONST};
 
 macro_rules! compress_u16 {
     ($accumulator: expr, $max_colors: expr) => {{
@@ -51,7 +51,7 @@ pub(crate) fn convolve_vertical_part_u16<const BUFFER_SIZE: usize>(
 ) {
     unsafe {
         let max_colors = 2i64.pow(bit_depth as u32) - 1;
-        let mut store: [i64; BUFFER_SIZE] = [ROUNDING_APPROX.as_(); BUFFER_SIZE];
+        let mut store: [i64; BUFFER_SIZE] = [ROUNDING_CONST.as_(); BUFFER_SIZE];
 
         for j in 0..bounds.size {
             let py = start_y + j;
@@ -122,10 +122,10 @@ pub(crate) fn convolve_horizontal_rgba_native_row_u16<const CHANNELS: usize>(
         let weights_ptr = filter_weights.weights.as_ptr();
 
         for x in 0..dst_width {
-            let mut sum_r: i64 = ROUNDING_APPROX as i64;
-            let mut sum_g: i64 = ROUNDING_APPROX as i64;
-            let mut sum_b: i64 = ROUNDING_APPROX as i64;
-            let mut sum_a: i64 = ROUNDING_APPROX as i64;
+            let mut sum_r: i64 = ROUNDING_CONST as i64;
+            let mut sum_g: i64 = ROUNDING_CONST as i64;
+            let mut sum_b: i64 = ROUNDING_CONST as i64;
+            let mut sum_a: i64 = ROUNDING_CONST as i64;
 
             let bounds = filter_weights.bounds.get_unchecked(x);
             let start_x = bounds.start;
@@ -174,22 +174,22 @@ pub(crate) fn convolve_horizontal_rgba_native_4_row_u16<const CHANNELS: usize>(
         let dst_row3 = unsafe_destination_ptr_0.add(dst_stride * 3);
 
         for x in 0..dst_width {
-            let mut sum_r_0: i64 = ROUNDING_APPROX as i64;
-            let mut sum_g_0: i64 = ROUNDING_APPROX as i64;
-            let mut sum_b_0: i64 = ROUNDING_APPROX as i64;
-            let mut sum_a_0: i64 = ROUNDING_APPROX as i64;
-            let mut sum_r_1: i64 = ROUNDING_APPROX as i64;
-            let mut sum_g_1: i64 = ROUNDING_APPROX as i64;
-            let mut sum_b_1: i64 = ROUNDING_APPROX as i64;
-            let mut sum_a_1: i64 = ROUNDING_APPROX as i64;
-            let mut sum_r_2: i64 = ROUNDING_APPROX as i64;
-            let mut sum_g_2: i64 = ROUNDING_APPROX as i64;
-            let mut sum_b_2: i64 = ROUNDING_APPROX as i64;
-            let mut sum_a_2: i64 = ROUNDING_APPROX as i64;
-            let mut sum_r_3: i64 = ROUNDING_APPROX as i64;
-            let mut sum_g_3: i64 = ROUNDING_APPROX as i64;
-            let mut sum_b_3: i64 = ROUNDING_APPROX as i64;
-            let mut sum_a_3: i64 = ROUNDING_APPROX as i64;
+            let mut sum_r_0: i64 = ROUNDING_CONST as i64;
+            let mut sum_g_0: i64 = ROUNDING_CONST as i64;
+            let mut sum_b_0: i64 = ROUNDING_CONST as i64;
+            let mut sum_a_0: i64 = ROUNDING_CONST as i64;
+            let mut sum_r_1: i64 = ROUNDING_CONST as i64;
+            let mut sum_g_1: i64 = ROUNDING_CONST as i64;
+            let mut sum_b_1: i64 = ROUNDING_CONST as i64;
+            let mut sum_a_1: i64 = ROUNDING_CONST as i64;
+            let mut sum_r_2: i64 = ROUNDING_CONST as i64;
+            let mut sum_g_2: i64 = ROUNDING_CONST as i64;
+            let mut sum_b_2: i64 = ROUNDING_CONST as i64;
+            let mut sum_a_2: i64 = ROUNDING_CONST as i64;
+            let mut sum_r_3: i64 = ROUNDING_CONST as i64;
+            let mut sum_g_3: i64 = ROUNDING_CONST as i64;
+            let mut sum_b_3: i64 = ROUNDING_CONST as i64;
+            let mut sum_a_3: i64 = ROUNDING_CONST as i64;
 
             let bounds = filter_weights.bounds.get_unchecked(x);
             let start_x = bounds.start;

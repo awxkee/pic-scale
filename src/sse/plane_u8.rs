@@ -34,7 +34,7 @@ use std::arch::x86_64::*;
 
 use crate::filter_weights::FilterWeights;
 use crate::sse::{_mm_hsum_epi32, _mm_muladd_epi32};
-use crate::support::{PRECISION, ROUNDING_APPROX};
+use crate::support::{PRECISION, ROUNDING_CONST};
 
 macro_rules! s_accumulate_8_horiz {
     ($store: expr, $ptr: expr, $weights: expr) => {{
@@ -109,10 +109,10 @@ unsafe fn convolve_horizontal_plane_sse_rows_4_u8_impl(
     for x in 0..dst_width {
         let bounds = filter_weights.bounds.get_unchecked(x);
         let mut jx = 0usize;
-        let mut store0 = _mm_setr_epi32(ROUNDING_APPROX, 0i32, 0i32, 0i32);
-        let mut store1 = _mm_setr_epi32(ROUNDING_APPROX, 0i32, 0i32, 0i32);
-        let mut store2 = _mm_setr_epi32(ROUNDING_APPROX, 0i32, 0i32, 0i32);
-        let mut store3 = _mm_setr_epi32(ROUNDING_APPROX, 0i32, 0i32, 0i32);
+        let mut store0 = _mm_setr_epi32(ROUNDING_CONST, 0i32, 0i32, 0i32);
+        let mut store1 = _mm_setr_epi32(ROUNDING_CONST, 0i32, 0i32, 0i32);
+        let mut store2 = _mm_setr_epi32(ROUNDING_CONST, 0i32, 0i32, 0i32);
+        let mut store3 = _mm_setr_epi32(ROUNDING_CONST, 0i32, 0i32, 0i32);
 
         let row1 = unsafe_source_ptr_0.add(src_stride);
         let row2 = unsafe_source_ptr_0.add(src_stride * 2);
@@ -254,7 +254,7 @@ unsafe fn convolve_horizontal_plane_sse_row_impl(
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);
             let mut jx = 0usize;
-            let mut store = _mm_setr_epi32(ROUNDING_APPROX, 0i32, 0i32, 0i32);
+            let mut store = _mm_setr_epi32(ROUNDING_CONST, 0i32, 0i32, 0i32);
 
             while jx + 8 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);

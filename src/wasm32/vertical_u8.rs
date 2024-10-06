@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter_weights::FilterBounds;
-use crate::support::{PRECISION, ROUNDING_APPROX};
+use crate::support::{PRECISION, ROUNDING_CONST};
 use crate::wasm32::utils::{u16x8_pack_sat_u8x16, u32x4_pack_trunc_u16x8, w_zeros};
 use std::arch::wasm32::*;
 
@@ -41,7 +41,7 @@ unsafe fn consume_u8_32(
     filter: *const i16,
     bounds: &FilterBounds,
 ) {
-    let vld = i32x4_splat(ROUNDING_APPROX);
+    let vld = i32x4_splat(ROUNDING_CONST);
     let mut store0 = vld;
     let mut store1 = vld;
     let mut store2 = vld;
@@ -125,7 +125,7 @@ unsafe fn consume_u8_16(
     filter: *const i16,
     bounds: &FilterBounds,
 ) {
-    let vld = i32x4_splat(ROUNDING_APPROX);
+    let vld = i32x4_splat(ROUNDING_CONST);
     let mut store0 = vld;
     let mut store1 = vld;
     let mut store2 = vld;
@@ -182,7 +182,7 @@ unsafe fn consume_u8_8(
     filter: *const i16,
     bounds: &FilterBounds,
 ) {
-    let vld = i32x4_splat(ROUNDING_APPROX);
+    let vld = i32x4_splat(ROUNDING_CONST);
     let mut store0 = vld;
     let mut store1 = vld;
 
@@ -228,7 +228,7 @@ unsafe fn consume_u8_1(
     filter: *const i16,
     bounds: &FilterBounds,
 ) {
-    let vld = i32x4_splat(ROUNDING_APPROX);
+    let vld = i32x4_splat(ROUNDING_CONST);
     let mut store = vld;
 
     let px = start_x;
