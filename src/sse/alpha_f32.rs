@@ -27,9 +27,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::sse::{sse_deinterleave_rgba_ps, sse_interleave_rgba_ps};
-use crate::{premultiply_pixel_f32, unpremultiply_pixel_f32, ThreadingPolicy};
+use crate::{premultiply_pixel_f32, unpremultiply_pixel_f32};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::slice::{ParallelSlice, ParallelSliceMut};
+use rayon::ThreadPool;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -47,10 +48,10 @@ pub fn sse_unpremultiply_alpha_rgba_f32(
     src: &[f32],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
     unsafe {
-        sse_unpremultiply_alpha_rgba_f32_impl(dst, src, width, height, threading_policy);
+        sse_unpremultiply_alpha_rgba_f32_impl(dst, src, width, height, pool);
     }
 }
 
@@ -102,16 +103,16 @@ unsafe fn sse_unpremultiply_alpha_rgba_f32_impl(
     src: &[f32],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let allowed_threading = threading_policy.allowed_threading();
-
-    if allowed_threading {
-        src.par_chunks_exact(width * 4)
-            .zip(dst.par_chunks_exact_mut(width * 4))
-            .for_each(|(src, dst)| unsafe {
-                sse_unpremultiply_alpha_rgba_f32_row_impl(dst, src, width, 0);
-            });
+    if let Some(pool) = pool {
+        pool.install(|| {
+            src.par_chunks_exact(width * 4)
+                .zip(dst.par_chunks_exact_mut(width * 4))
+                .for_each(|(src, dst)| unsafe {
+                    sse_unpremultiply_alpha_rgba_f32_row_impl(dst, src, width, 0);
+                });
+        });
     } else {
         let mut offset = 0usize;
         for _ in 0..height {
@@ -128,10 +129,10 @@ pub fn sse_premultiply_alpha_rgba_f32(
     src: &[f32],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
     unsafe {
-        sse_premultiply_alpha_rgba_f32_impl(dst, src, width, height, threading_policy);
+        sse_premultiply_alpha_rgba_f32_impl(dst, src, width, height, pool);
     }
 }
 
@@ -183,16 +184,16 @@ unsafe fn sse_premultiply_alpha_rgba_f32_impl(
     src: &[f32],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let allowed_threading = threading_policy.allowed_threading();
-
-    if allowed_threading {
-        src.par_chunks_exact(width * 4)
-            .zip(dst.par_chunks_exact_mut(width * 4))
-            .for_each(|(src, dst)| unsafe {
-                sse_premultiply_alpha_rgba_f32_row_impl(dst, src, width, 0);
-            });
+    if let Some(pool) = pool {
+        pool.install(|| {
+            src.par_chunks_exact(width * 4)
+                .zip(dst.par_chunks_exact_mut(width * 4))
+                .for_each(|(src, dst)| unsafe {
+                    sse_premultiply_alpha_rgba_f32_row_impl(dst, src, width, 0);
+                });
+        });
     } else {
         let mut offset = 0usize;
 

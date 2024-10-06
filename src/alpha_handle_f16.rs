@@ -43,10 +43,10 @@ use crate::risc::{
 };
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{sse_premultiply_alpha_rgba_f16, sse_unpremultiply_alpha_rgba_f16};
-use crate::ThreadingPolicy;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::ParallelSliceMut;
 use rayon::slice::ParallelSlice;
+use rayon::ThreadPool;
 
 #[macro_export]
 macro_rules! premultiply_pixel_f16 {
@@ -97,21 +97,21 @@ fn premultiply_alpha_rgba_impl_f16(
     src: &[half::f16],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let allowed_threading = threading_policy.allowed_threading();
+    if let Some(pool) = pool {
+        pool.install(|| {
+            src.par_chunks_exact(width * 4)
+                .zip(dst.par_chunks_exact_mut(width * 4))
+                .for_each(|(src, dst)| {
+                    let mut _cx = 0usize;
 
-    if allowed_threading {
-        src.par_chunks_exact(width * 4)
-            .zip(dst.par_chunks_exact_mut(width * 4))
-            .for_each(|(src, dst)| {
-                let mut _cx = 0usize;
-
-                for x in _cx..width {
-                    let px = x * 4;
-                    premultiply_pixel_f16!(dst, src, px);
-                }
-            });
+                    for x in _cx..width {
+                        let px = x * 4;
+                        premultiply_pixel_f16!(dst, src, px);
+                    }
+                });
+        });
     } else {
         let mut offset = 0usize;
 
@@ -133,20 +133,20 @@ fn unpremultiply_alpha_rgba_impl_f16(
     src: &[half::f16],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let allowed_threading = threading_policy.allowed_threading();
-
-    if allowed_threading {
-        src.par_chunks_exact(width * 4)
-            .zip(dst.par_chunks_exact_mut(width * 4))
-            .for_each(|(src, dst)| {
-                for x in 0..width {
-                    let px = x * 4;
-                    let pixel_offset = px;
-                    unpremultiply_pixel_f16!(dst, src, pixel_offset);
-                }
-            });
+    if let Some(pool) = pool {
+        pool.install(|| {
+            src.par_chunks_exact(width * 4)
+                .zip(dst.par_chunks_exact_mut(width * 4))
+                .for_each(|(src, dst)| {
+                    for x in 0..width {
+                        let px = x * 4;
+                        let pixel_offset = px;
+                        unpremultiply_pixel_f16!(dst, src, pixel_offset);
+                    }
+                });
+        });
     } else {
         let mut offset = 0usize;
 
@@ -169,9 +169,9 @@ pub fn premultiply_alpha_rgba_f16(
     src: &[half::f16],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let mut _dispatcher: fn(&mut [half::f16], &[half::f16], usize, usize, ThreadingPolicy) =
+    let mut _dispatcher: fn(&mut [half::f16], &[half::f16], usize, usize, &Option<ThreadPool>) =
         premultiply_alpha_rgba_impl_f16;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
@@ -201,7 +201,7 @@ pub fn premultiply_alpha_rgba_f16(
             _dispatcher = risc_unpremultiply_alpha_rgba_f16;
         }
     }
-    _dispatcher(dst, src, width, height, threading_policy);
+    _dispatcher(dst, src, width, height, pool);
 }
 
 pub fn unpremultiply_alpha_rgba_f16(
@@ -209,9 +209,9 @@ pub fn unpremultiply_alpha_rgba_f16(
     src: &[half::f16],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let mut _dispatcher: fn(&mut [half::f16], &[half::f16], usize, usize, ThreadingPolicy) =
+    let mut _dispatcher: fn(&mut [half::f16], &[half::f16], usize, usize, &Option<ThreadPool>) =
         unpremultiply_alpha_rgba_impl_f16;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
@@ -241,5 +241,5 @@ pub fn unpremultiply_alpha_rgba_f16(
             _dispatcher = risc_premultiply_alpha_rgba_f16;
         }
     }
-    _dispatcher(dst, src, width, height, threading_policy);
+    _dispatcher(dst, src, width, height, pool);
 }

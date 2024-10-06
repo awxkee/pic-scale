@@ -37,9 +37,9 @@ use crate::neon::{neon_premultiply_alpha_rgba_f32, neon_unpremultiply_alpha_rgba
 use crate::risc::{risc_premultiply_alpha_rgba_f32, risc_unpremultiply_alpha_rgba_f32};
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{sse_premultiply_alpha_rgba_f32, sse_unpremultiply_alpha_rgba_f32};
-use crate::ThreadingPolicy;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::slice::{ParallelSlice, ParallelSliceMut};
+use rayon::ThreadPool;
 
 #[macro_export]
 macro_rules! premultiply_pixel_f32 {
@@ -90,21 +90,21 @@ fn premultiply_alpha_rgba_impl_f32(
     src: &[f32],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let allowed_threading = threading_policy.allowed_threading();
+    if let Some(pool) = pool {
+        pool.install(|| {
+            src.par_chunks_exact(width * 4)
+                .zip(dst.par_chunks_exact_mut(width * 4))
+                .for_each(|(src, dst)| {
+                    let mut _cx = 0usize;
 
-    if allowed_threading {
-        src.par_chunks_exact(width * 4)
-            .zip(dst.par_chunks_exact_mut(width * 4))
-            .for_each(|(src, dst)| {
-                let mut _cx = 0usize;
-
-                for x in _cx..width {
-                    let px = x * 4;
-                    premultiply_pixel_f32!(dst, src, px);
-                }
-            });
+                    for x in _cx..width {
+                        let px = x * 4;
+                        premultiply_pixel_f32!(dst, src, px);
+                    }
+                });
+        });
     } else {
         let mut offset = 0usize;
 
@@ -126,21 +126,22 @@ fn unpremultiply_alpha_rgba_impl_f32(
     src: &[f32],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let allowed_threading = threading_policy.allowed_threading();
-    if allowed_threading {
-        src.par_chunks_exact(width * 4)
-            .zip(dst.par_chunks_exact_mut(width * 4))
-            .for_each(|(src, dst)| {
-                let mut _cx = 0usize;
+    if let Some(pool) = pool {
+        pool.install(|| {
+            src.par_chunks_exact(width * 4)
+                .zip(dst.par_chunks_exact_mut(width * 4))
+                .for_each(|(src, dst)| {
+                    let mut _cx = 0usize;
 
-                for x in _cx..width {
-                    let px = x * 4;
-                    let pixel_offset = px;
-                    unpremultiply_pixel_f32!(dst, src, pixel_offset);
-                }
-            });
+                    for x in _cx..width {
+                        let px = x * 4;
+                        let pixel_offset = px;
+                        unpremultiply_pixel_f32!(dst, src, pixel_offset);
+                    }
+                });
+        });
     } else {
         let mut offset = 0usize;
         for _ in 0..height {
@@ -162,9 +163,9 @@ pub fn premultiply_alpha_rgba_f32(
     src: &[f32],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let mut _dispatcher: fn(&mut [f32], &[f32], usize, usize, ThreadingPolicy) =
+    let mut _dispatcher: fn(&mut [f32], &[f32], usize, usize, &Option<ThreadPool>) =
         premultiply_alpha_rgba_impl_f32;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
@@ -191,7 +192,7 @@ pub fn premultiply_alpha_rgba_f32(
             _dispatcher = risc_premultiply_alpha_rgba_f32;
         }
     }
-    _dispatcher(dst, src, width, height, threading_policy);
+    _dispatcher(dst, src, width, height, pool);
 }
 
 pub fn unpremultiply_alpha_rgba_f32(
@@ -199,9 +200,9 @@ pub fn unpremultiply_alpha_rgba_f32(
     src: &[f32],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let mut _dispatcher: fn(&mut [f32], &[f32], usize, usize, ThreadingPolicy) =
+    let mut _dispatcher: fn(&mut [f32], &[f32], usize, usize, &Option<ThreadPool>) =
         unpremultiply_alpha_rgba_impl_f32;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
@@ -228,5 +229,5 @@ pub fn unpremultiply_alpha_rgba_f32(
             _dispatcher = risc_unpremultiply_alpha_rgba_f32;
         }
     }
-    _dispatcher(dst, src, width, height, threading_policy);
+    _dispatcher(dst, src, width, height, pool);
 }

@@ -307,7 +307,7 @@ pub fn convolve_horizontal_rgba_avx_rows_4_f16<const FMA: bool>(
 }
 
 #[inline]
-#[target_feature(enable = "avx2,f16c")]
+#[target_feature(enable = "avx2", enable = "f16c")]
 unsafe fn convolve_horizontal_rgba_avx_rows_4_f16_regular(
     dst_width: usize,
     src_width: usize,
@@ -329,7 +329,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_f16_regular(
 }
 
 #[inline]
-#[target_feature(enable = "avx2,f16c,fma")]
+#[target_feature(enable = "avx2", enable = "f16c", enable = "fma")]
 unsafe fn convolve_horizontal_rgba_avx_rows_4_f16_fma(
     dst_width: usize,
     src_width: usize,
@@ -350,7 +350,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_f16_fma(
     );
 }
 
-#[inline]
+#[inline(always)]
 unsafe fn convolve_horizontal_rgba_avx_rows_4_f16_impl<const FMA: bool>(
     dst_width: usize,
     _: usize,

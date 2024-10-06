@@ -48,8 +48,7 @@ unsafe fn convolve_horizontal_parts_one_wasm_rgb(
     ]);
     let m_vl = i32x4_replace_lane::<0>(w_zeros(), vl);
     let lo = u16x8_extend_low_u8x16(m_vl);
-    let acc = i32x4_add(store_0, i32x4_extmul_low_i16x8(lo, weight0));
-    acc
+    i32x4_add(store_0, i32x4_extmul_low_i16x8(lo, weight0))
 }
 
 pub fn convolve_horizontal_rgb_wasm_rows_4(

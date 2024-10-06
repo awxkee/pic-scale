@@ -34,6 +34,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
+#[target_feature(enable = "avx2")]
 unsafe fn convolve_vertical_part_avx_64(
     start_y: usize,
     start_x: usize,
@@ -159,6 +160,7 @@ unsafe fn convolve_vertical_part_avx_64(
     _mm256_storeu_si256(dst_ptr as *mut __m256i, rgb);
 }
 
+#[target_feature(enable = "avx2")]
 unsafe fn convolve_vertical_part_avx_32(
     start_y: usize,
     start_x: usize,
@@ -213,6 +215,7 @@ unsafe fn convolve_vertical_part_avx_32(
     _mm256_storeu_si256(dst_ptr as *mut __m256i, rgb);
 }
 
+#[target_feature(enable = "avx2")]
 unsafe fn convolve_vertical_part_8_avx(
     start_y: usize,
     start_x: usize,
@@ -257,6 +260,7 @@ unsafe fn convolve_vertical_part_8_avx(
     std::ptr::copy_nonoverlapping(&item_sse as *const _ as *const u8, dst_ptr, 8);
 }
 
+#[target_feature(enable = "avx2")]
 unsafe fn convolve_vertical_part_avx(
     start_y: usize,
     start_x: usize,

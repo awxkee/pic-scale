@@ -425,7 +425,6 @@ pub fn convolve_horizontal_rgba_avx_row_one_f32<const FMA: bool>(
     }
 }
 
-#[inline]
 #[target_feature(enable = "avx2")]
 unsafe fn convolve_horizontal_rgba_avx_row_one_f32_regular(
     dst_width: usize,
@@ -443,8 +442,7 @@ unsafe fn convolve_horizontal_rgba_avx_row_one_f32_regular(
     );
 }
 
-#[inline]
-#[target_feature(enable = "avx2,fma")]
+#[target_feature(enable = "avx2", enable = "fma")]
 unsafe fn convolve_horizontal_rgba_avx_row_one_f32_fma(
     dst_width: usize,
     src_width: usize,

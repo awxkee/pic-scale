@@ -33,10 +33,10 @@ use crate::avx2::{avx_premultiply_alpha_rgba_u16, avx_unpremultiply_alpha_rgba_u
 use crate::neon::{neon_premultiply_alpha_rgba_u16, neon_unpremultiply_alpha_rgba_u16};
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{premultiply_alpha_sse_rgba_u16, unpremultiply_alpha_sse_rgba_u16};
-use crate::ThreadingPolicy;
 use rayon::iter::IndexedParallelIterator;
 use rayon::iter::ParallelIterator;
 use rayon::slice::{ParallelSlice, ParallelSliceMut};
+use rayon::ThreadPool;
 
 #[macro_export]
 macro_rules! unpremultiply_pixel_u16 {
@@ -87,19 +87,20 @@ fn premultiply_alpha_rgba_impl(
     width: usize,
     height: usize,
     bit_depth: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
     let max_colors = (1 << bit_depth) - 1;
-    let allowed_threading = threading_policy.allowed_threading();
-    if allowed_threading {
-        src.par_chunks_exact(width * 4)
-            .zip(dst.par_chunks_exact_mut(width * 4))
-            .for_each(|(src, dst)| {
-                for x in 0..width {
-                    let px = x * 4;
-                    premultiply_pixel_u16!(dst, src, px, max_colors);
-                }
-            });
+    if let Some(pool) = pool {
+        pool.install(|| {
+            src.par_chunks_exact(width * 4)
+                .zip(dst.par_chunks_exact_mut(width * 4))
+                .for_each(|(src, dst)| {
+                    for x in 0..width {
+                        let px = x * 4;
+                        premultiply_pixel_u16!(dst, src, px, max_colors);
+                    }
+                });
+        });
     } else {
         let mut offset = 0usize;
 
@@ -120,20 +121,21 @@ fn unpremultiply_alpha_rgba_impl(
     width: usize,
     height: usize,
     bit_depth: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
     let max_colors = (1 << bit_depth) - 1;
-    let allowed_threading = threading_policy.allowed_threading();
-    if allowed_threading {
-        src.par_chunks_exact(width * 4)
-            .zip(dst.par_chunks_exact_mut(width * 4))
-            .for_each(|(src, dst)| {
-                for x in 0..width {
-                    let px = x * 4;
-                    let pixel_offset = px;
-                    unpremultiply_pixel_u16!(dst, src, pixel_offset, max_colors);
-                }
-            });
+    if let Some(pool) = pool {
+        pool.install(|| {
+            src.par_chunks_exact(width * 4)
+                .zip(dst.par_chunks_exact_mut(width * 4))
+                .for_each(|(src, dst)| {
+                    for x in 0..width {
+                        let px = x * 4;
+                        let pixel_offset = px;
+                        unpremultiply_pixel_u16!(dst, src, pixel_offset, max_colors);
+                    }
+                });
+        });
     } else {
         let mut offset = 0usize;
 
@@ -155,9 +157,10 @@ pub fn premultiply_alpha_rgba_u16(
     width: usize,
     height: usize,
     bit_depth: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let mut _dispatcher: fn(&mut [u16], &[u16], usize, usize, usize, ThreadingPolicy) =
+    #[allow(clippy::type_complexity)]
+    let mut _dispatcher: fn(&mut [u16], &[u16], usize, usize, usize, &Option<ThreadPool>) =
         premultiply_alpha_rgba_impl;
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
@@ -175,7 +178,7 @@ pub fn premultiply_alpha_rgba_u16(
     {
         _dispatcher = neon_premultiply_alpha_rgba_u16;
     }
-    _dispatcher(dst, src, width, height, bit_depth, threading_policy);
+    _dispatcher(dst, src, width, height, bit_depth, pool);
 }
 
 pub fn unpremultiply_alpha_rgba_u16(
@@ -184,9 +187,10 @@ pub fn unpremultiply_alpha_rgba_u16(
     width: usize,
     height: usize,
     bit_depth: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let mut _dispatcher: fn(&mut [u16], &[u16], usize, usize, usize, ThreadingPolicy) =
+    #[allow(clippy::type_complexity)]
+    let mut _dispatcher: fn(&mut [u16], &[u16], usize, usize, usize, &Option<ThreadPool>) =
         unpremultiply_alpha_rgba_impl;
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
@@ -204,5 +208,5 @@ pub fn unpremultiply_alpha_rgba_u16(
     {
         _dispatcher = neon_unpremultiply_alpha_rgba_u16;
     }
-    _dispatcher(dst, src, width, height, bit_depth, threading_policy);
+    _dispatcher(dst, src, width, height, bit_depth, pool);
 }

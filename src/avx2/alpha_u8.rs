@@ -31,10 +31,11 @@ use crate::avx2::utils::{
     _mm256_select_si256, avx2_deinterleave_rgba, avx2_div_by255, avx2_interleave_rgba,
     avx2_pack_s32, avx2_pack_u16,
 };
-use crate::{premultiply_pixel, unpremultiply_pixel, ThreadingPolicy};
+use crate::{premultiply_pixel, unpremultiply_pixel};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::ParallelSliceMut;
 use rayon::slice::ParallelSlice;
+use rayon::ThreadPool;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -99,10 +100,10 @@ pub fn avx_premultiply_alpha_rgba(
     src: &[u8],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
     unsafe {
-        avx_premultiply_alpha_rgba_impl(dst, src, width, height, threading_policy);
+        avx_premultiply_alpha_rgba_impl(dst, src, width, height, pool);
     }
 }
 
@@ -172,18 +173,18 @@ unsafe fn avx_premultiply_alpha_rgba_impl(
     src: &[u8],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let allowed_threading = threading_policy.allowed_threading();
-
-    if allowed_threading {
+    if let Some(pool) = pool {
+        pool.install(|| {
+            src.par_chunks_exact(width * 4)
+                .zip(dst.par_chunks_exact_mut(width * 4))
+                .for_each(|(src, dst)| unsafe {
+                    avx_premultiply_alpha_rgba_impl_row(dst, src, width, 0);
+                });
+        });
     } else {
         let mut offset = 0usize;
-        src.par_chunks_exact(width * 4)
-            .zip(dst.par_chunks_exact_mut(width * 4))
-            .for_each(|(src, dst)| unsafe {
-                avx_premultiply_alpha_rgba_impl_row(dst, src, width, 0);
-            });
         for _ in 0..height {
             avx_premultiply_alpha_rgba_impl_row(dst, src, width, offset);
             offset += 4 * width;
@@ -196,10 +197,10 @@ pub fn avx_unpremultiply_alpha_rgba(
     src: &[u8],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
     unsafe {
-        avx_unpremultiply_alpha_rgba_impl(dst, src, width, height, threading_policy);
+        avx_unpremultiply_alpha_rgba_impl(dst, src, width, height, pool);
     }
 }
 
@@ -253,16 +254,16 @@ unsafe fn avx_unpremultiply_alpha_rgba_impl(
     src: &[u8],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let allowed_threading = threading_policy.allowed_threading();
-
-    if allowed_threading {
-        src.par_chunks_exact(width * 4)
-            .zip(dst.par_chunks_exact_mut(width * 4))
-            .for_each(|(src, dst)| unsafe {
-                avx_unpremultiply_alpha_rgba_impl_row(dst, src, width, 0);
-            });
+    if let Some(pool) = pool {
+        pool.install(|| {
+            src.par_chunks_exact(width * 4)
+                .zip(dst.par_chunks_exact_mut(width * 4))
+                .for_each(|(src, dst)| unsafe {
+                    avx_unpremultiply_alpha_rgba_impl_row(dst, src, width, 0);
+                });
+        });
     } else {
         let mut offset = 0usize;
 

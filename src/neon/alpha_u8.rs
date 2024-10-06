@@ -27,10 +27,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::{premultiply_pixel, unpremultiply_pixel, ThreadingPolicy};
+use crate::{premultiply_pixel, unpremultiply_pixel};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::ParallelSliceMut;
 use rayon::slice::ParallelSlice;
+use rayon::ThreadPool;
 use std::arch::aarch64::*;
 
 #[inline]
@@ -139,15 +140,16 @@ pub fn neon_premultiply_alpha_rgba(
     src: &[u8],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let allowed_threading = threading_policy.allowed_threading();
-    if allowed_threading {
-        src.par_chunks_exact(width * 4)
-            .zip(dst.par_chunks_exact_mut(width * 4))
-            .for_each(|(src, dst)| unsafe {
-                neon_premultiply_alpha_rgba_impl_row(dst, src, width, 0);
-            })
+    if let Some(pool) = pool {
+        pool.install(|| {
+            src.par_chunks_exact(width * 4)
+                .zip(dst.par_chunks_exact_mut(width * 4))
+                .for_each(|(src, dst)| unsafe {
+                    neon_premultiply_alpha_rgba_impl_row(dst, src, width, 0);
+                });
+        });
     } else {
         let mut _cy = 0usize;
         let src_stride = 4 * width;
@@ -198,15 +200,16 @@ pub fn neon_unpremultiply_alpha_rgba(
     src: &[u8],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let allowed_threading = threading_policy.allowed_threading();
-    if allowed_threading {
-        src.par_chunks_exact(width * 4)
-            .zip(dst.par_chunks_exact_mut(width * 4))
-            .for_each(|(src, dst)| unsafe {
-                neon_unpremultiply_alpha_rgba_impl_row(dst, src, width, 0);
-            });
+    if let Some(pool) = pool {
+        pool.install(|| {
+            src.par_chunks_exact(width * 4)
+                .zip(dst.par_chunks_exact_mut(width * 4))
+                .for_each(|(src, dst)| unsafe {
+                    neon_unpremultiply_alpha_rgba_impl_row(dst, src, width, 0);
+                });
+        });
     } else {
         let mut offset = 0usize;
 

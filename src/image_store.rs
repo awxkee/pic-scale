@@ -31,8 +31,9 @@ use crate::alpha_handle_f16::{premultiply_alpha_rgba_f16, unpremultiply_alpha_rg
 use crate::alpha_handle_f32::{premultiply_alpha_rgba_f32, unpremultiply_alpha_rgba_f32};
 use crate::alpha_handle_u16::{premultiply_alpha_rgba_u16, unpremultiply_alpha_rgba_u16};
 use crate::alpha_handle_u8::{premultiply_alpha_rgba, unpremultiply_alpha_rgba};
-use crate::{ImageSize, ThreadingPolicy};
+use crate::ImageSize;
 use num_traits::FromPrimitive;
+use rayon::ThreadPool;
 use std::fmt::Debug;
 
 #[derive(Debug)]
@@ -165,82 +166,44 @@ where
 }
 
 impl<'a> ImageStore<'a, u8, 4> {
-    pub fn unpremultiply_alpha(
-        &self,
-        into: &mut ImageStore<u8, 4>,
-        threading_policy: ThreadingPolicy,
-    ) {
+    pub fn unpremultiply_alpha(&self, into: &mut ImageStore<u8, 4>, pool: &Option<ThreadPool>) {
         let dst = into.buffer.borrow_mut();
         let src = self.buffer.borrow();
-        unpremultiply_alpha_rgba(dst, src, self.width, self.height, threading_policy);
+        unpremultiply_alpha_rgba(dst, src, self.width, self.height, pool);
     }
 
-    pub fn premultiply_alpha(
-        &self,
-        into: &mut ImageStore<u8, 4>,
-        threading_policy: ThreadingPolicy,
-    ) {
+    pub fn premultiply_alpha(&self, into: &mut ImageStore<u8, 4>, pool: &Option<ThreadPool>) {
         let dst = into.buffer.borrow_mut();
         let src = self.buffer.borrow();
-        premultiply_alpha_rgba(dst, src, self.width, self.height, threading_policy);
+        premultiply_alpha_rgba(dst, src, self.width, self.height, pool);
     }
 }
 
 impl<'a> ImageStore<'a, u16, 4> {
-    pub fn unpremultiply_alpha(
-        &self,
-        into: &mut ImageStore<u16, 4>,
-        threading_policy: ThreadingPolicy,
-    ) {
+    pub fn unpremultiply_alpha(&self, into: &mut ImageStore<u16, 4>, pool: &Option<ThreadPool>) {
         let dst = into.buffer.borrow_mut();
         let src = self.buffer.borrow();
-        unpremultiply_alpha_rgba_u16(
-            dst,
-            src,
-            self.width,
-            self.height,
-            self.bit_depth,
-            threading_policy,
-        );
+        unpremultiply_alpha_rgba_u16(dst, src, self.width, self.height, self.bit_depth, pool);
     }
 
-    pub fn premultiply_alpha(
-        &self,
-        into: &mut ImageStore<u16, 4>,
-        threading_policy: ThreadingPolicy,
-    ) {
+    pub fn premultiply_alpha(&self, into: &mut ImageStore<u16, 4>, pool: &Option<ThreadPool>) {
         let dst = into.buffer.borrow_mut();
         let src = self.buffer.borrow();
-        premultiply_alpha_rgba_u16(
-            dst,
-            src,
-            self.width,
-            self.height,
-            self.bit_depth,
-            threading_policy,
-        );
+        premultiply_alpha_rgba_u16(dst, src, self.width, self.height, self.bit_depth, pool);
     }
 }
 
 impl<'a> ImageStore<'a, f32, 4> {
-    pub fn unpremultiply_alpha(
-        &self,
-        into: &mut ImageStore<f32, 4>,
-        threading_policy: ThreadingPolicy,
-    ) {
+    pub fn unpremultiply_alpha(&self, into: &mut ImageStore<f32, 4>, pool: &Option<ThreadPool>) {
         let dst = into.buffer.borrow_mut();
         let src = self.buffer.borrow();
-        unpremultiply_alpha_rgba_f32(dst, src, self.width, self.height, threading_policy);
+        unpremultiply_alpha_rgba_f32(dst, src, self.width, self.height, pool);
     }
 
-    pub fn premultiply_alpha(
-        &self,
-        into: &mut ImageStore<f32, 4>,
-        threading_policy: ThreadingPolicy,
-    ) {
+    pub fn premultiply_alpha(&self, into: &mut ImageStore<f32, 4>, pool: &Option<ThreadPool>) {
         let dst = into.buffer.borrow_mut();
         let src = self.buffer.borrow();
-        premultiply_alpha_rgba_f32(dst, src, self.width, self.height, threading_policy);
+        premultiply_alpha_rgba_f32(dst, src, self.width, self.height, pool);
     }
 }
 
@@ -249,20 +212,20 @@ impl<'a> ImageStore<'a, half::f16, 4> {
     pub fn unpremultiply_alpha(
         &self,
         into: &mut ImageStore<half::f16, 4>,
-        threading_policy: ThreadingPolicy,
+        pool: &Option<ThreadPool>,
     ) {
         let dst = into.buffer.borrow_mut();
         let src = self.buffer.borrow();
-        unpremultiply_alpha_rgba_f16(dst, src, self.width, self.height, threading_policy);
+        unpremultiply_alpha_rgba_f16(dst, src, self.width, self.height, pool);
     }
 
     pub fn premultiply_alpha(
         &self,
         into: &mut ImageStore<half::f16, 4>,
-        threading_policy: ThreadingPolicy,
+        pool: &Option<ThreadPool>,
     ) {
         let dst = into.buffer.borrow_mut();
         let src = self.buffer.borrow();
-        premultiply_alpha_rgba_f16(dst, src, self.width, self.height, threading_policy);
+        premultiply_alpha_rgba_f16(dst, src, self.width, self.height, pool);
     }
 }

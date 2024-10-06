@@ -29,10 +29,11 @@
 
 use crate::sse::f16_utils::{_mm_cvtph_psx, _mm_cvtps_phx};
 use crate::sse::{sse_deinterleave_rgba_epi16, sse_interleave_rgba_epi16};
-use crate::{premultiply_pixel_f16, unpremultiply_pixel_f16, ThreadingPolicy};
+use crate::{premultiply_pixel_f16, unpremultiply_pixel_f16};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::ParallelSliceMut;
 use rayon::slice::ParallelSlice;
+use rayon::ThreadPool;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -43,13 +44,13 @@ pub fn sse_premultiply_alpha_rgba_f16(
     src: &[half::f16],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
     unsafe {
         if is_x86_feature_detected!("f16c") {
-            sse_premultiply_alpha_rgba_f16c(dst, src, width, height, threading_policy);
+            sse_premultiply_alpha_rgba_f16c(dst, src, width, height, pool);
         } else {
-            sse_premultiply_alpha_rgba_f16_regular(dst, src, width, height, threading_policy);
+            sse_premultiply_alpha_rgba_f16_regular(dst, src, width, height, pool);
         }
     }
 }
@@ -60,9 +61,9 @@ unsafe fn sse_premultiply_alpha_rgba_f16_regular(
     src: &[half::f16],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    sse_premultiply_alpha_rgba_f16_impl::<false>(dst, src, width, height, threading_policy);
+    sse_premultiply_alpha_rgba_f16_impl::<false>(dst, src, width, height, pool);
 }
 
 #[target_feature(enable = "sse4.1", enable = "f16c")]
@@ -71,9 +72,9 @@ unsafe fn sse_premultiply_alpha_rgba_f16c(
     src: &[half::f16],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    sse_premultiply_alpha_rgba_f16_impl::<true>(dst, src, width, height, threading_policy);
+    sse_premultiply_alpha_rgba_f16_impl::<true>(dst, src, width, height, pool);
 }
 
 #[inline(always)]
@@ -140,15 +141,16 @@ unsafe fn sse_premultiply_alpha_rgba_f16_impl<const F16C: bool>(
     src: &[half::f16],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let allowed_threading = threading_policy.allowed_threading();
-    if allowed_threading {
-        src.par_chunks_exact(width * 4)
-            .zip(dst.par_chunks_exact_mut(width * 4))
-            .for_each(|(src, dst)| unsafe {
-                sse_premultiply_alpha_rgba_row_f16_impl::<F16C>(dst, src, width, 0);
-            });
+    if let Some(pool) = pool {
+        pool.install(|| {
+            src.par_chunks_exact(width * 4)
+                .zip(dst.par_chunks_exact_mut(width * 4))
+                .for_each(|(src, dst)| unsafe {
+                    sse_premultiply_alpha_rgba_row_f16_impl::<F16C>(dst, src, width, 0);
+                });
+        });
     } else {
         let mut offset = 0usize;
 
@@ -166,13 +168,13 @@ pub fn sse_unpremultiply_alpha_rgba_f16(
     src: &[half::f16],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
     unsafe {
         if is_x86_feature_detected!("f16c") {
-            sse_unpremultiply_alpha_rgba_f16c(dst, src, width, height, threading_policy);
+            sse_unpremultiply_alpha_rgba_f16c(dst, src, width, height, pool);
         } else {
-            sse_unpremultiply_alpha_rgba_f16_regular(dst, src, width, height, threading_policy);
+            sse_unpremultiply_alpha_rgba_f16_regular(dst, src, width, height, pool);
         }
     }
 }
@@ -184,9 +186,9 @@ unsafe fn sse_unpremultiply_alpha_rgba_f16_regular(
     src: &[half::f16],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    sse_unpremultiply_alpha_rgba_f16_impl::<false>(dst, src, width, height, threading_policy);
+    sse_unpremultiply_alpha_rgba_f16_impl::<false>(dst, src, width, height, pool);
 }
 
 #[inline]
@@ -196,9 +198,9 @@ unsafe fn sse_unpremultiply_alpha_rgba_f16c(
     src: &[half::f16],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    sse_unpremultiply_alpha_rgba_f16_impl::<true>(dst, src, width, height, threading_policy);
+    sse_unpremultiply_alpha_rgba_f16_impl::<true>(dst, src, width, height, pool);
 }
 
 #[inline(always)]
@@ -295,15 +297,16 @@ unsafe fn sse_unpremultiply_alpha_rgba_f16_impl<const F16C: bool>(
     src: &[half::f16],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let allowed_threading = threading_policy.allowed_threading();
-    if allowed_threading {
-        src.par_chunks_exact(width * 4)
-            .zip(dst.par_chunks_exact_mut(width * 4))
-            .for_each(|(src, dst)| unsafe {
-                sse_unpremultiply_alpha_rgba_f16_row_impl::<F16C>(dst, src, width, 0);
-            });
+    if let Some(pool) = pool {
+        pool.install(|| {
+            src.par_chunks_exact(width * 4)
+                .zip(dst.par_chunks_exact_mut(width * 4))
+                .for_each(|(src, dst)| unsafe {
+                    sse_unpremultiply_alpha_rgba_f16_row_impl::<F16C>(dst, src, width, 0);
+                });
+        });
     } else {
         let mut offset = 0usize;
 

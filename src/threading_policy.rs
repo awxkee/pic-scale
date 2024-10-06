@@ -60,11 +60,6 @@ impl ThreadingPolicy {
     }
 
     #[cfg(target_arch = "wasm32")]
-    pub fn allowed_threading(&self) -> bool {
-        false
-    }
-
-    #[cfg(target_arch = "wasm32")]
     pub fn get_threads_count(&self, _: ImageSize) -> usize {
         1
     }
@@ -84,11 +79,6 @@ impl ThreadingPolicy {
             Ok(pool) => Some(pool),
             Err(_) => None,
         }
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn allowed_threading(&self) -> bool {
-        *self != ThreadingPolicy::Single
     }
 
     #[cfg(target_arch = "wasm32")]

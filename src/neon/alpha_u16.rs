@@ -26,10 +26,11 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::{premultiply_pixel_u16, unpremultiply_pixel_u16, ThreadingPolicy};
+use crate::{premultiply_pixel_u16, unpremultiply_pixel_u16};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::ParallelSliceMut;
 use rayon::slice::ParallelSlice;
+use rayon::ThreadPool;
 use std::arch::aarch64::*;
 
 pub fn neon_premultiply_alpha_rgba_row_u16(
@@ -82,15 +83,16 @@ pub fn neon_premultiply_alpha_rgba_u16(
     width: usize,
     height: usize,
     bit_depth: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let allowed_threading = threading_policy.allowed_threading();
-    if allowed_threading {
-        src.par_chunks_exact(width * 4)
-            .zip(dst.par_chunks_exact_mut(width * 4))
-            .for_each(|(src, dst)| {
-                neon_premultiply_alpha_rgba_row_u16(dst, src, width, 0, bit_depth);
-            });
+    if let Some(pool) = pool {
+        pool.install(|| {
+            src.par_chunks_exact(width * 4)
+                .zip(dst.par_chunks_exact_mut(width * 4))
+                .for_each(|(src, dst)| {
+                    neon_premultiply_alpha_rgba_row_u16(dst, src, width, 0, bit_depth);
+                });
+        });
     } else {
         let mut offset = 0usize;
 
@@ -185,15 +187,16 @@ pub fn neon_unpremultiply_alpha_rgba_u16(
     width: usize,
     height: usize,
     bit_depth: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let allowed_threading = threading_policy.allowed_threading();
-    if allowed_threading {
-        src.par_chunks_exact(width * 4)
-            .zip(dst.par_chunks_exact_mut(width * 4))
-            .for_each(|(src, dst)| {
-                neon_unpremultiply_alpha_rgba_row_u16(dst, src, width, 0, bit_depth);
-            });
+    if let Some(pool) = pool.as_ref() {
+        pool.install(|| {
+            src.par_chunks_exact(width * 4)
+                .zip(dst.par_chunks_exact_mut(width * 4))
+                .for_each(|(src, dst)| {
+                    neon_unpremultiply_alpha_rgba_row_u16(dst, src, width, 0, bit_depth);
+                });
+        });
     } else {
         let mut offset = 0usize;
 

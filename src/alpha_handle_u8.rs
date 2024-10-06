@@ -39,10 +39,10 @@ use crate::risc::{risc_premultiply_alpha_rgba_u8, risc_unpremultiply_alpha_rgba_
 use crate::sse::*;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 use crate::wasm32::{wasm_premultiply_alpha_rgba, wasm_unpremultiply_alpha_rgba};
-use crate::ThreadingPolicy;
 use rayon::iter::IndexedParallelIterator;
 use rayon::iter::ParallelIterator;
 use rayon::slice::{ParallelSlice, ParallelSliceMut};
+use rayon::ThreadPool;
 
 #[macro_export]
 macro_rules! unpremultiply_pixel {
@@ -92,19 +92,19 @@ fn premultiply_alpha_rgba_impl(
     src: &[u8],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let allowed_threading = threading_policy.allowed_threading();
-
-    if allowed_threading {
-        src.par_chunks_exact(width * 4)
-            .zip(dst.par_chunks_exact_mut(width * 4))
-            .for_each(|(src, dst)| {
-                for x in 0..width {
-                    let px = x * 4;
-                    premultiply_pixel!(dst, src, px);
-                }
-            });
+    if let Some(pool) = pool {
+        pool.install(|| {
+            src.par_chunks_exact(width * 4)
+                .zip(dst.par_chunks_exact_mut(width * 4))
+                .for_each(|(src, dst)| {
+                    for x in 0..width {
+                        let px = x * 4;
+                        premultiply_pixel!(dst, src, px);
+                    }
+                });
+        });
     } else {
         let mut offset = 0usize;
 
@@ -124,18 +124,19 @@ fn unpremultiply_alpha_rgba_impl(
     src: &[u8],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let allowed_threading = threading_policy.allowed_threading();
-    if allowed_threading {
-        src.par_chunks_exact(width * 4)
-            .zip(dst.par_chunks_exact_mut(width * 4))
-            .for_each(|(src, dst)| {
-                for x in 0..width {
-                    let px = x * 4;
-                    unpremultiply_pixel!(dst, src, px);
-                }
-            });
+    if let Some(pool) = pool {
+        pool.install(move || {
+            src.par_chunks_exact(width * 4)
+                .zip(dst.par_chunks_exact_mut(width * 4))
+                .for_each(|(src, dst)| {
+                    for x in 0..width {
+                        let px = x * 4;
+                        unpremultiply_pixel!(dst, src, px);
+                    }
+                });
+        });
     } else {
         let mut offset = 0usize;
         for _ in 0..height {
@@ -155,9 +156,9 @@ pub fn premultiply_alpha_rgba(
     src: &[u8],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let mut _dispatcher: fn(&mut [u8], &[u8], usize, usize, ThreadingPolicy) =
+    let mut _dispatcher: fn(&mut [u8], &[u8], usize, usize, &Option<ThreadPool>) =
         premultiply_alpha_rgba_impl;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
@@ -188,7 +189,7 @@ pub fn premultiply_alpha_rgba(
     {
         _dispatcher = wasm_premultiply_alpha_rgba;
     }
-    _dispatcher(dst, src, width, height, threading_policy);
+    _dispatcher(dst, src, width, height, pool);
 }
 
 pub fn unpremultiply_alpha_rgba(
@@ -196,9 +197,9 @@ pub fn unpremultiply_alpha_rgba(
     src: &[u8],
     width: usize,
     height: usize,
-    threading_policy: ThreadingPolicy,
+    pool: &Option<ThreadPool>,
 ) {
-    let mut _dispatcher: fn(&mut [u8], &[u8], usize, usize, ThreadingPolicy) =
+    let mut _dispatcher: fn(&mut [u8], &[u8], usize, usize, &Option<ThreadPool>) =
         unpremultiply_alpha_rgba_impl;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
@@ -229,5 +230,5 @@ pub fn unpremultiply_alpha_rgba(
     {
         _dispatcher = wasm_unpremultiply_alpha_rgba;
     }
-    _dispatcher(dst, src, width, height, threading_policy);
+    _dispatcher(dst, src, width, height, pool);
 }

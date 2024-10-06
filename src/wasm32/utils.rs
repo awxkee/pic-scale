@@ -67,42 +67,6 @@ pub unsafe fn wasm_unpacklo_i8x16(a: v128, b: v128) -> v128 {
 
 #[inline]
 #[target_feature(enable = "simd128")]
-pub unsafe fn wasm_unpacklo_i16x8(a: v128, b: v128) -> v128 {
-    u8x16_shuffle::<0, 1, 16, 17, 2, 3, 18, 19, 4, 5, 20, 21, 6, 7, 22, 23>(a, b)
-}
-
-#[inline]
-#[target_feature(enable = "simd128")]
-pub unsafe fn wasm_unpacklo_i32x4(a: v128, b: v128) -> v128 {
-    u8x16_shuffle::<0, 1, 2, 3, 16, 17, 18, 19, 4, 5, 6, 7, 20, 21, 22, 23>(a, b)
-}
-
-#[inline]
-#[target_feature(enable = "simd128")]
-pub unsafe fn wasm_unpacklo_i64x2(a: v128, b: v128) -> v128 {
-    u8x16_shuffle::<0, 1, 2, 3, 4, 5, 6, 7, 16, 17, 18, 19, 20, 21, 22, 23>(a, b)
-}
-
-#[inline]
-#[target_feature(enable = "simd128")]
 pub unsafe fn wasm_unpackhi_i8x16(a: v128, b: v128) -> v128 {
     u8x16_shuffle::<8, 24, 9, 25, 10, 26, 11, 27, 12, 28, 13, 29, 14, 30, 15, 31>(a, b)
-}
-
-#[inline]
-#[target_feature(enable = "simd128")]
-pub unsafe fn wasm_unpackhi_i16x8(a: v128, b: v128) -> v128 {
-    u8x16_shuffle::<8, 9, 24, 25, 10, 11, 26, 27, 12, 13, 28, 29, 14, 15, 30, 31>(a, b)
-}
-
-#[inline]
-#[target_feature(enable = "simd128")]
-pub unsafe fn wasm_unpackhi_i32x4(a: v128, b: v128) -> v128 {
-    u8x16_shuffle::<8, 9, 10, 11, 24, 25, 26, 27, 12, 13, 14, 15, 28, 29, 30, 31>(a, b)
-}
-
-#[inline]
-#[target_feature(enable = "simd128")]
-pub unsafe fn wasm_unpackhi_i64x2(a: v128, b: v128) -> v128 {
-    u8x16_shuffle::<8, 9, 10, 11, 12, 13, 14, 15, 24, 25, 26, 27, 28, 29, 30, 31>(a, b)
 }

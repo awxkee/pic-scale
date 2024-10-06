@@ -43,12 +43,10 @@ impl Scaler {
         is_alpha_premultiplied: bool,
     ) -> ImageStore<f16, 4> {
         let mut src_store = store;
-        if is_alpha_premultiplied {
-            let mut premultiplied_store =
-                ImageStore::<f16, 4>::alloc(src_store.width, src_store.height);
-            src_store.unpremultiply_alpha(&mut premultiplied_store, self.threading_policy);
-            src_store = premultiplied_store;
-        }
+
+        let pool = self
+            .threading_policy
+            .get_pool(ImageSize::new(new_size.width, new_size.height));
 
         if self.function == Nearest {
             let mut allocated_store: Vec<f16> =
@@ -60,24 +58,21 @@ impl Scaler {
                 &mut allocated_store,
                 new_size.width,
                 new_size.height,
+                &pool,
             );
             let new_image =
                 ImageStore::<f16, 4>::new(allocated_store, new_size.width, new_size.height)
                     .unwrap();
 
-            if is_alpha_premultiplied {
-                let mut premultiplied_store =
-                    ImageStore::<f16, 4>::alloc(new_image.width, new_image.height);
-                new_image.premultiply_alpha(&mut premultiplied_store, self.threading_policy);
-                return premultiplied_store;
-            }
-
             return new_image;
         }
 
-        let pool = self
-            .threading_policy
-            .get_pool(ImageSize::new(new_size.width, new_size.height));
+        if is_alpha_premultiplied {
+            let mut premultiplied_store =
+                ImageStore::<f16, 4>::alloc(src_store.width, src_store.height);
+            src_store.unpremultiply_alpha(&mut premultiplied_store, &pool);
+            src_store = premultiplied_store;
+        }
 
         let allocated_store_vertical: Vec<f16> =
             vec![f16::from_f32(0.); src_store.width * 4 * new_size.height];
@@ -104,7 +99,7 @@ impl Scaler {
                 new_image_horizontal.width,
                 new_image_horizontal.height,
             );
-            new_image_horizontal.premultiply_alpha(&mut premultiplied_store, self.threading_policy);
+            new_image_horizontal.premultiply_alpha(&mut premultiplied_store, &pool);
             return premultiplied_store;
         }
 
@@ -117,6 +112,10 @@ impl Scaler {
         new_size: ImageSize,
         store: ImageStore<f16, 3>,
     ) -> ImageStore<f16, 3> {
+        let pool = self
+            .threading_policy
+            .get_pool(ImageSize::new(new_size.width, new_size.height));
+
         if self.function == Nearest {
             let mut allocated_store: Vec<f16> =
                 vec![f16::from_f32(0.); new_size.width * 3 * new_size.height];
@@ -127,16 +126,13 @@ impl Scaler {
                 &mut allocated_store,
                 new_size.width,
                 new_size.height,
+                &pool,
             );
             let new_image =
                 ImageStore::<f16, 3>::new(allocated_store, new_size.width, new_size.height)
                     .unwrap();
             return new_image;
         }
-
-        let pool = self
-            .threading_policy
-            .get_pool(ImageSize::new(new_size.width, new_size.height));
 
         let allocated_store_vertical: Vec<f16> =
             vec![f16::from_f32(0.); store.width * 3 * new_size.height];
@@ -166,6 +162,10 @@ impl Scaler {
         new_size: ImageSize,
         store: ImageStore<f16, 1>,
     ) -> ImageStore<f16, 1> {
+        let pool = self
+            .threading_policy
+            .get_pool(ImageSize::new(new_size.width, new_size.height));
+
         if self.function == Nearest {
             let mut allocated_store: Vec<f16> =
                 vec![f16::from_f32(0.); new_size.width * new_size.height];
@@ -176,16 +176,13 @@ impl Scaler {
                 &mut allocated_store,
                 new_size.width,
                 new_size.height,
+                &pool,
             );
             let new_image =
                 ImageStore::<f16, 1>::new(allocated_store, new_size.width, new_size.height)
                     .unwrap();
             return new_image;
         }
-
-        let pool = self
-            .threading_policy
-            .get_pool(ImageSize::new(new_size.width, new_size.height));
 
         let allocated_store_vertical: Vec<f16> =
             vec![f16::from_f32(0.); store.width * 1 * new_size.height];

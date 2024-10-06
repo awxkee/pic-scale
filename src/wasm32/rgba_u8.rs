@@ -44,8 +44,7 @@ unsafe fn convolve_horizontal_parts_one_rgba_sse(
     let src_ptr_32 = src_ptr as *const u32;
     let rgba_pixel = v128_load32_splat(src_ptr_32);
     let lo = u16x8_extend_low_u8x16(rgba_pixel);
-    let acc = i32x4_add(store_0, i32x4_extmul_low_i16x8(lo, weight0));
-    acc
+    i32x4_add(store_0, i32x4_extmul_low_i16x8(lo, weight0))
 }
 
 pub fn convolve_horizontal_rgba_wasm_rows_4(

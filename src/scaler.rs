@@ -26,8 +26,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use std::fmt::Debug;
-
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::image_size::ImageSize;
@@ -36,6 +34,8 @@ use crate::nearest_sampler::resize_nearest;
 use crate::threading_policy::ThreadingPolicy;
 use crate::ResamplingFunction::Nearest;
 use crate::{ResamplingFilter, ResamplingFunction};
+use rayon::ThreadPool;
+use std::fmt::Debug;
 
 #[derive(Debug, Copy, Clone)]
 /// Represents base scaling structure
@@ -258,12 +258,63 @@ impl Scaler {
     }
 }
 
+impl Scaler {
+    pub(crate) fn resize_rgba_impl(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<u8, 4>,
+        is_alpha_premultiplied: bool,
+        pool: &Option<ThreadPool>,
+    ) -> ImageStore<u8, 4> {
+        let mut src_store = store;
+        if self.function == Nearest {
+            let mut new_image = ImageStore::<u8, 4>::alloc(new_size.width, new_size.height);
+            resize_nearest::<u8, 4>(
+                src_store.buffer.borrow(),
+                src_store.width,
+                src_store.height,
+                new_image.buffer.borrow_mut(),
+                new_size.width,
+                new_size.height,
+                pool,
+            );
+            return new_image;
+        }
+
+        if is_alpha_premultiplied {
+            let mut premultiplied_store =
+                ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
+            src_store.unpremultiply_alpha(&mut premultiplied_store, pool);
+            src_store = premultiplied_store;
+        }
+
+        let mut new_image_vertical = ImageStore::<u8, 4>::alloc(src_store.width, new_size.height);
+        let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
+        let vertical_filters = self.generate_weights(src_store.height, new_image_vertical.height);
+        src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, pool);
+
+        let mut new_image_horizontal = ImageStore::<u8, 4>::alloc(new_size.width, new_size.height);
+        new_image_vertical.convolve_horizontal(horizontal_filters, &mut new_image_horizontal, pool);
+        if is_alpha_premultiplied {
+            let mut premultiplied_store =
+                ImageStore::<u8, 4>::alloc(new_image_horizontal.width, new_image_horizontal.height);
+            new_image_horizontal.premultiply_alpha(&mut premultiplied_store, pool);
+            return premultiplied_store;
+        }
+        new_image_horizontal
+    }
+}
+
 impl Scaling for Scaler {
     fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy) {
         self.threading_policy = threading_policy;
     }
 
     fn resize_rgb(&self, new_size: ImageSize, store: ImageStore<u8, 3>) -> ImageStore<u8, 3> {
+        let pool = self
+            .threading_policy
+            .get_pool(ImageSize::new(new_size.width, new_size.height));
+
         if self.function == Nearest {
             let mut allocated_store: Vec<u8> = vec![0u8; new_size.width * 3 * new_size.height];
             resize_nearest::<u8, 3>(
@@ -273,6 +324,7 @@ impl Scaling for Scaler {
                 &mut allocated_store,
                 new_size.width,
                 new_size.height,
+                &pool,
             );
             let new_image =
                 ImageStore::<u8, 3>::new(allocated_store, new_size.width, new_size.height);
@@ -280,10 +332,6 @@ impl Scaling for Scaler {
         }
         let vertical_filters = self.generate_weights(store.height, new_size.height);
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
-
-        let pool = self
-            .threading_policy
-            .get_pool(ImageSize::new(new_size.width, new_size.height));
 
         let mut new_image_vertical = ImageStore::<u8, 3>::alloc(store.width, new_size.height);
         store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
@@ -302,59 +350,78 @@ impl Scaling for Scaler {
         store: ImageStore<u8, 4>,
         is_alpha_premultiplied: bool,
     ) -> ImageStore<u8, 4> {
-        let mut src_store = store;
-        if is_alpha_premultiplied {
-            let mut premultiplied_store =
-                ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
-            src_store.unpremultiply_alpha(&mut premultiplied_store, self.threading_policy);
-            src_store = premultiplied_store;
-        }
-        if self.function == Nearest {
-            let mut new_image = ImageStore::<u8, 4>::alloc(new_size.width, new_size.height);
-            resize_nearest::<u8, 4>(
-                src_store.buffer.borrow(),
-                src_store.width,
-                src_store.height,
-                new_image.buffer.borrow_mut(),
-                new_size.width,
-                new_size.height,
-            );
-            if is_alpha_premultiplied {
-                let mut premultiplied_store =
-                    ImageStore::<u8, 4>::alloc(new_image.width, new_image.height);
-                new_image.premultiply_alpha(&mut premultiplied_store, self.threading_policy);
-                return premultiplied_store;
-            }
-            return new_image;
-        }
-
         let pool = self
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
+        self.resize_rgba_impl(new_size, store, is_alpha_premultiplied, &pool)
+    }
+}
 
-        let mut new_image_vertical = ImageStore::<u8, 4>::alloc(src_store.width, new_size.height);
-        let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
-        let vertical_filters = self.generate_weights(src_store.height, new_image_vertical.height);
-        src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+impl Scaler {
+    pub(crate) fn resize_rgba_f32_impl(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<f32, 4>,
+        is_alpha_premultiplied: bool,
+        pool: &Option<ThreadPool>,
+    ) -> ImageStore<f32, 4> {
+        let mut src_store = store;
+        if self.function == Nearest {
+            let mut allocated_store: Vec<f32> = vec![0f32; new_size.width * 4 * new_size.height];
+            resize_nearest::<f32, 4>(
+                src_store.buffer.borrow(),
+                src_store.width,
+                src_store.height,
+                &mut allocated_store,
+                new_size.width,
+                new_size.height,
+                pool,
+            );
+            let new_image =
+                ImageStore::new(allocated_store, new_size.width, new_size.height).unwrap();
+            return new_image;
+        }
 
-        let mut new_image_horizontal = ImageStore::<u8, 4>::alloc(new_size.width, new_size.height);
-        new_image_vertical.convolve_horizontal(
-            horizontal_filters,
-            &mut new_image_horizontal,
-            &pool,
-        );
         if is_alpha_premultiplied {
             let mut premultiplied_store =
-                ImageStore::<u8, 4>::alloc(new_image_horizontal.width, new_image_horizontal.height);
-            new_image_horizontal.premultiply_alpha(&mut premultiplied_store, self.threading_policy);
+                ImageStore::<f32, 4>::alloc(src_store.width, src_store.height);
+            src_store.unpremultiply_alpha(&mut premultiplied_store, pool);
+            src_store = premultiplied_store;
+        }
+
+        let allocated_store_vertical: Vec<f32> = vec![0f32; src_store.width * 4 * new_size.height];
+        let mut new_image_vertical =
+            ImageStore::<f32, 4>::new(allocated_store_vertical, src_store.width, new_size.height)
+                .unwrap();
+        let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
+        let vertical_filters = self.generate_weights(src_store.height, new_image_vertical.height);
+        src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, pool);
+
+        let allocated_store_horizontal: Vec<f32> = vec![0f32; new_size.width * 4 * new_size.height];
+        let mut new_image_horizontal =
+            ImageStore::<f32, 4>::new(allocated_store_horizontal, new_size.width, new_size.height)
+                .unwrap();
+        new_image_vertical.convolve_horizontal(horizontal_filters, &mut new_image_horizontal, pool);
+
+        if is_alpha_premultiplied {
+            let mut premultiplied_store = ImageStore::<f32, 4>::alloc(
+                new_image_horizontal.width,
+                new_image_horizontal.height,
+            );
+            new_image_horizontal.premultiply_alpha(&mut premultiplied_store, pool);
             return premultiplied_store;
         }
+
         new_image_horizontal
     }
 }
 
 impl ScalingF32 for Scaler {
     fn resize_rgb_f32(&self, new_size: ImageSize, store: ImageStore<f32, 3>) -> ImageStore<f32, 3> {
+        let pool = self
+            .threading_policy
+            .get_pool(ImageSize::new(new_size.width, new_size.height));
+
         if self.function == Nearest {
             let mut allocated_store: Vec<f32> = vec![0f32; new_size.width * 3 * new_size.height];
             resize_nearest::<f32, 3>(
@@ -364,15 +431,12 @@ impl ScalingF32 for Scaler {
                 &mut allocated_store,
                 new_size.width,
                 new_size.height,
+                &pool,
             );
             let new_image =
                 ImageStore::<f32, 3>::new(allocated_store, new_size.width, new_size.height);
             return new_image.unwrap();
         }
-
-        let pool = self
-            .threading_policy
-            .get_pool(ImageSize::new(new_size.width, new_size.height));
 
         let allocated_store_vertical: Vec<f32> = vec![0f32; store.width * 3 * new_size.height];
         let mut new_image_vertical =
@@ -400,70 +464,10 @@ impl ScalingF32 for Scaler {
         store: ImageStore<f32, 4>,
         is_alpha_premultiplied: bool,
     ) -> ImageStore<f32, 4> {
-        let mut src_store = store;
-        if is_alpha_premultiplied {
-            let mut premultiplied_store =
-                ImageStore::<f32, 4>::alloc(src_store.width, src_store.height);
-            src_store.unpremultiply_alpha(&mut premultiplied_store, self.threading_policy);
-            src_store = premultiplied_store;
-        }
-
-        if self.function == Nearest {
-            let mut allocated_store: Vec<f32> = vec![0f32; new_size.width * 4 * new_size.height];
-            resize_nearest::<f32, 4>(
-                src_store.buffer.borrow(),
-                src_store.width,
-                src_store.height,
-                &mut allocated_store,
-                new_size.width,
-                new_size.height,
-            );
-            let new_image =
-                ImageStore::<f32, 4>::new(allocated_store, new_size.width, new_size.height)
-                    .unwrap();
-
-            if is_alpha_premultiplied {
-                let mut premultiplied_store =
-                    ImageStore::<f32, 4>::alloc(new_image.width, new_image.height);
-                new_image.premultiply_alpha(&mut premultiplied_store, self.threading_policy);
-                return premultiplied_store;
-            }
-
-            return new_image;
-        }
-
         let pool = self
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
-
-        let allocated_store_vertical: Vec<f32> = vec![0f32; src_store.width * 4 * new_size.height];
-        let mut new_image_vertical =
-            ImageStore::<f32, 4>::new(allocated_store_vertical, src_store.width, new_size.height)
-                .unwrap();
-        let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
-        let vertical_filters = self.generate_weights(src_store.height, new_image_vertical.height);
-        src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
-
-        let allocated_store_horizontal: Vec<f32> = vec![0f32; new_size.width * 4 * new_size.height];
-        let mut new_image_horizontal =
-            ImageStore::<f32, 4>::new(allocated_store_horizontal, new_size.width, new_size.height)
-                .unwrap();
-        new_image_vertical.convolve_horizontal(
-            horizontal_filters,
-            &mut new_image_horizontal,
-            &pool,
-        );
-
-        if is_alpha_premultiplied {
-            let mut premultiplied_store = ImageStore::<f32, 4>::alloc(
-                new_image_horizontal.width,
-                new_image_horizontal.height,
-            );
-            new_image_horizontal.premultiply_alpha(&mut premultiplied_store, self.threading_policy);
-            return premultiplied_store;
-        }
-
-        new_image_horizontal
+        self.resize_rgba_f32_impl(new_size, store, is_alpha_premultiplied, &pool)
     }
 }
 
@@ -474,6 +478,10 @@ impl Scaler {
         new_size: ImageSize,
         store: ImageStore<f32, 1>,
     ) -> ImageStore<f32, 1> {
+        let pool = self
+            .threading_policy
+            .get_pool(ImageSize::new(new_size.width, new_size.height));
+
         if self.function == Nearest {
             let mut allocated_store: Vec<f32> = vec![0f32; new_size.width * new_size.height];
             resize_nearest::<f32, 1>(
@@ -483,16 +491,13 @@ impl Scaler {
                 &mut allocated_store,
                 new_size.width,
                 new_size.height,
+                &pool,
             );
             let new_image =
                 ImageStore::<f32, 1>::new(allocated_store, new_size.width, new_size.height)
                     .unwrap();
             return new_image;
         }
-
-        let pool = self
-            .threading_policy
-            .get_pool(ImageSize::new(new_size.width, new_size.height));
 
         let allocated_store_vertical: Vec<f32> = vec![0f32; store.width * new_size.height];
         let mut new_image_vertical =
@@ -518,6 +523,10 @@ impl Scaler {
 impl Scaler {
     /// Performs rescaling for u8 plane
     pub fn resize_plane(&self, new_size: ImageSize, store: ImageStore<u8, 1>) -> ImageStore<u8, 1> {
+        let pool = self
+            .threading_policy
+            .get_pool(ImageSize::new(new_size.width, new_size.height));
+
         if self.function == Nearest {
             let mut allocated_store: Vec<u8> = vec![0u8; new_size.width * new_size.height];
             resize_nearest::<u8, 1>(
@@ -527,6 +536,7 @@ impl Scaler {
                 &mut allocated_store,
                 new_size.width,
                 new_size.height,
+                &pool,
             );
             let new_image =
                 ImageStore::<u8, 1>::new(allocated_store, new_size.width, new_size.height).unwrap();
@@ -534,10 +544,6 @@ impl Scaler {
         }
         let vertical_filters = self.generate_weights(store.height, new_size.height);
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
-
-        let pool = self
-            .threading_policy
-            .get_pool(ImageSize::new(new_size.width, new_size.height));
 
         let mut new_image_vertical = ImageStore::<u8, 1>::alloc(store.width, new_size.height);
         store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
@@ -558,6 +564,10 @@ impl ScalingU16 for Scaler {
         store: ImageStore<u16, 3>,
         bit_depth: usize,
     ) -> ImageStore<u16, 3> {
+        let pool = self
+            .threading_policy
+            .get_pool(ImageSize::new(new_size.width, new_size.height));
+
         if self.function == Nearest {
             let mut allocated_store: Vec<u16> = vec![0u16; new_size.width * 3 * new_size.height];
             resize_nearest::<u16, 3>(
@@ -567,6 +577,7 @@ impl ScalingU16 for Scaler {
                 &mut allocated_store,
                 new_size.width,
                 new_size.height,
+                &pool,
             );
             let mut new_image =
                 ImageStore::<u16, 3>::new(allocated_store, new_size.width, new_size.height)
@@ -581,10 +592,6 @@ impl ScalingU16 for Scaler {
 
         let vertical_filters = self.generate_weights(store.height, new_size.height);
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
-
-        let pool = self
-            .threading_policy
-            .get_pool(ImageSize::new(new_size.width, new_size.height));
 
         let mut copied_store = store;
 
@@ -621,14 +628,11 @@ impl ScalingU16 for Scaler {
         is_alpha_premultiplied: bool,
     ) -> ImageStore<u16, 4> {
         let mut src_store = store;
-        if is_alpha_premultiplied {
-            let mut premultiplied_store =
-                ImageStore::<u16, 4>::alloc(src_store.width, src_store.height);
-            src_store.bit_depth = bit_depth;
-            premultiplied_store.bit_depth = bit_depth;
-            src_store.unpremultiply_alpha(&mut premultiplied_store, self.threading_policy);
-            src_store = premultiplied_store;
-        }
+
+        let pool = self
+            .threading_policy
+            .get_pool(ImageSize::new(new_size.width, new_size.height));
+
         if self.function == Nearest {
             let mut new_image = ImageStore::<u16, 4>::alloc(new_size.width, new_size.height);
             resize_nearest::<u16, 4>(
@@ -638,25 +642,24 @@ impl ScalingU16 for Scaler {
                 new_image.buffer.borrow_mut(),
                 new_size.width,
                 new_size.height,
+                &pool,
             );
             new_image.bit_depth = bit_depth;
-            if is_alpha_premultiplied {
-                let mut premultiplied_store =
-                    ImageStore::<u16, 4>::alloc(new_image.width, new_image.height);
-                premultiplied_store.bit_depth = bit_depth;
-                new_image.premultiply_alpha(&mut premultiplied_store, self.threading_policy);
-                return premultiplied_store;
-            }
             return new_image;
+        }
+
+        if is_alpha_premultiplied {
+            let mut premultiplied_store =
+                ImageStore::<u16, 4>::alloc(src_store.width, src_store.height);
+            src_store.bit_depth = bit_depth;
+            premultiplied_store.bit_depth = bit_depth;
+            src_store.unpremultiply_alpha(&mut premultiplied_store, &pool);
+            src_store = premultiplied_store;
         }
 
         if !(1..=16).contains(&bit_depth) {
             panic!("Bit depth must be in [1, 16] but got {}", bit_depth);
         }
-
-        let pool = self
-            .threading_policy
-            .get_pool(ImageSize::new(new_size.width, new_size.height));
 
         let mut new_image_vertical = ImageStore::<u16, 4>::alloc(src_store.width, new_size.height);
         let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
@@ -678,7 +681,7 @@ impl ScalingU16 for Scaler {
                 new_image_horizontal.height,
             );
             premultiplied_store.bit_depth = bit_depth;
-            new_image_horizontal.premultiply_alpha(&mut premultiplied_store, self.threading_policy);
+            new_image_horizontal.premultiply_alpha(&mut premultiplied_store, &pool);
             return premultiplied_store;
         }
         new_image_horizontal
@@ -691,6 +694,10 @@ impl ScalingU16 for Scaler {
         store: ImageStore<u16, 1>,
         bit_depth: usize,
     ) -> ImageStore<u16, 1> {
+        let pool = self
+            .threading_policy
+            .get_pool(ImageSize::new(new_size.width, new_size.height));
+
         if self.function == Nearest {
             let mut allocated_store: Vec<u16> = vec![0u16; new_size.width * new_size.height];
             resize_nearest::<u16, 1>(
@@ -700,6 +707,7 @@ impl ScalingU16 for Scaler {
                 &mut allocated_store,
                 new_size.width,
                 new_size.height,
+                &pool,
             );
             let mut new_image =
                 ImageStore::<u16, 1>::new(allocated_store, new_size.width, new_size.height)
@@ -714,10 +722,6 @@ impl ScalingU16 for Scaler {
 
         let vertical_filters = self.generate_weights(store.height, new_size.height);
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
-
-        let pool = self
-            .threading_policy
-            .get_pool(ImageSize::new(new_size.width, new_size.height));
 
         let mut copied_store = store;
         copied_store.bit_depth = bit_depth;
