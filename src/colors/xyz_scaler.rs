@@ -116,7 +116,7 @@ impl Scaling for XYZScaler {
         if is_alpha_premultiplied {
             let mut premultiplied_store =
                 ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
-            src_store.unpremultiply_alpha(&mut premultiplied_store);
+            src_store.unpremultiply_alpha(&mut premultiplied_store, self.scaler.threading_policy);
             src_store = premultiplied_store;
         }
         let lab_store = Self::rgba_to_xyz(src_store);
@@ -125,7 +125,7 @@ impl Scaling for XYZScaler {
         if is_alpha_premultiplied {
             let mut premultiplied_store =
                 ImageStore::<u8, 4>::alloc(rgba_store.width, rgba_store.height);
-            rgba_store.premultiply_alpha(&mut premultiplied_store);
+            rgba_store.premultiply_alpha(&mut premultiplied_store, self.scaler.threading_policy);
             return premultiplied_store;
         }
         rgba_store

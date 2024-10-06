@@ -27,9 +27,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+use crate::{premultiply_pixel_f32, unpremultiply_pixel_f32, ThreadingPolicy};
+use rayon::iter::{IndexedParallelIterator, ParallelIterator};
+use rayon::slice::{ParallelSlice, ParallelSliceMut};
 use std::arch::aarch64::*;
-
-use crate::{premultiply_pixel_f32, unpremultiply_pixel_f32};
 
 macro_rules! unpremultiply_vec_f32 {
     ($v: expr, $a_values: expr) => {{
@@ -39,35 +40,90 @@ macro_rules! unpremultiply_vec_f32 {
     }};
 }
 
-pub fn neon_premultiply_alpha_rgba_f32(dst: &mut [f32], src: &[f32], width: usize, height: usize) {
-    let mut _cy = 0usize;
-    let src_stride = 4 * width;
+unsafe fn neon_premultiply_alpha_rgba_row_f32(
+    dst: &mut [f32],
+    src: &[f32],
+    width: usize,
+    offset: usize,
+) {
+    let mut _cx = 0usize;
 
-    let mut offset = _cy * src_stride;
+    unsafe {
+        while _cx + 4 < width {
+            let px = _cx * 4;
+            let src_ptr = src.as_ptr().add(offset + px);
+            let mut pixel = vld4q_f32(src_ptr);
+            pixel.0 = vmulq_f32(pixel.0, pixel.3);
+            pixel.1 = vmulq_f32(pixel.1, pixel.3);
+            pixel.2 = vmulq_f32(pixel.2, pixel.3);
+            let dst_ptr = dst.as_mut_ptr().add(offset + px);
+            vst4q_f32(dst_ptr, pixel);
+            _cx += 4;
+        }
+    }
 
-    for _ in _cy..height {
-        let mut _cx = 0usize;
+    for x in _cx..width {
+        let px = x * 4;
+        premultiply_pixel_f32!(dst, src, offset + px);
+    }
+}
 
-        unsafe {
-            while _cx + 4 < width {
-                let px = _cx * 4;
-                let src_ptr = src.as_ptr().add(offset + px);
-                let mut pixel = vld4q_f32(src_ptr);
-                pixel.0 = vmulq_f32(pixel.0, pixel.3);
-                pixel.1 = vmulq_f32(pixel.1, pixel.3);
-                pixel.2 = vmulq_f32(pixel.2, pixel.3);
-                let dst_ptr = dst.as_mut_ptr().add(offset + px);
-                vst4q_f32(dst_ptr, pixel);
-                _cx += 4;
+pub fn neon_premultiply_alpha_rgba_f32(
+    dst: &mut [f32],
+    src: &[f32],
+    width: usize,
+    height: usize,
+    threading_policy: ThreadingPolicy,
+) {
+    let allowed_threading = threading_policy.allowed_threading();
+
+    if allowed_threading {
+        src.par_chunks_exact(width * 4)
+            .zip(dst.par_chunks_exact_mut(width * 4))
+            .for_each(|(src, dst)| unsafe {
+                neon_premultiply_alpha_rgba_row_f32(dst, src, width, 0);
+            });
+    } else {
+        let src_stride = 4 * width;
+
+        let mut offset = src_stride;
+
+        for _ in 0..height {
+            unsafe {
+                neon_premultiply_alpha_rgba_row_f32(dst, src, width, offset);
             }
+            offset += 4 * width;
         }
+    }
+}
 
-        for x in _cx..width {
-            let px = x * 4;
-            premultiply_pixel_f32!(dst, src, offset + px);
+unsafe fn neon_unpremultiply_alpha_rgba_f32_row(
+    dst: &mut [f32],
+    src: &[f32],
+    width: usize,
+    offset: usize,
+) {
+    let mut _cx = 0usize;
+
+    unsafe {
+        while _cx + 4 < width {
+            let px = _cx * 4;
+            let pixel_offset = offset + px;
+            let src_ptr = src.as_ptr().add(pixel_offset);
+            let mut pixel = vld4q_f32(src_ptr);
+            pixel.0 = unpremultiply_vec_f32!(pixel.0, pixel.3);
+            pixel.1 = unpremultiply_vec_f32!(pixel.1, pixel.3);
+            pixel.2 = unpremultiply_vec_f32!(pixel.2, pixel.3);
+            let dst_ptr = dst.as_mut_ptr().add(pixel_offset);
+            vst4q_f32(dst_ptr, pixel);
+            _cx += 4;
         }
+    }
 
-        offset += 4 * width;
+    for x in _cx..width {
+        let px = x * 4;
+        let pixel_offset = offset + px;
+        unpremultiply_pixel_f32!(dst, src, pixel_offset);
     }
 }
 
@@ -76,36 +132,24 @@ pub fn neon_unpremultiply_alpha_rgba_f32(
     src: &[f32],
     width: usize,
     height: usize,
+    threading_policy: ThreadingPolicy,
 ) {
-    let mut _cy = 0usize;
+    let allowed_threading = threading_policy.allowed_threading();
 
-    let mut offset = 0usize;
-    offset += _cy * width * 4;
+    if allowed_threading {
+        src.par_chunks_exact(width * 4)
+            .zip(dst.par_chunks_exact_mut(width * 4))
+            .for_each(|(src, dst)| unsafe {
+                neon_unpremultiply_alpha_rgba_f32_row(dst, src, width, 0);
+            });
+    } else {
+        let mut offset = 0usize;
 
-    for _ in _cy..height {
-        let mut _cx = 0usize;
-
-        unsafe {
-            while _cx + 4 < width {
-                let px = _cx * 4;
-                let pixel_offset = offset + px;
-                let src_ptr = src.as_ptr().add(pixel_offset);
-                let mut pixel = vld4q_f32(src_ptr);
-                pixel.0 = unpremultiply_vec_f32!(pixel.0, pixel.3);
-                pixel.1 = unpremultiply_vec_f32!(pixel.1, pixel.3);
-                pixel.2 = unpremultiply_vec_f32!(pixel.2, pixel.3);
-                let dst_ptr = dst.as_mut_ptr().add(pixel_offset);
-                vst4q_f32(dst_ptr, pixel);
-                _cx += 4;
+        for _ in 0..height {
+            unsafe {
+                neon_unpremultiply_alpha_rgba_f32_row(dst, src, width, offset);
             }
+            offset += 4 * width;
         }
-
-        for x in _cx..width {
-            let px = x * 4;
-            let pixel_offset = offset + px;
-            unpremultiply_pixel_f32!(dst, src, pixel_offset);
-        }
-
-        offset += 4 * width;
     }
 }

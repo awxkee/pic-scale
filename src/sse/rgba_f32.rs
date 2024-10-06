@@ -45,8 +45,7 @@ unsafe fn convolve_horizontal_parts_one_rgba_f32<const FMA: bool>(
     const COMPONENTS: usize = 4;
     let src_ptr = src.add(start_x * COMPONENTS);
     let rgb_pixel = _mm_loadu_ps(src_ptr);
-    let acc = _mm_prefer_fma_ps::<FMA>(store_0, rgb_pixel, weight0);
-    acc
+    _mm_prefer_fma_ps::<FMA>(store_0, rgb_pixel, weight0)
 }
 
 pub fn convolve_horizontal_rgba_sse_row_one_f32<const FMA: bool>(
@@ -210,8 +209,7 @@ unsafe fn convolve_horizontal_parts_4_rgba_f32<const FMA: bool>(
     let acc = _mm_prefer_fma_ps::<FMA>(store_0, rgb_pixel_0, weight0);
     let acc = _mm_prefer_fma_ps::<FMA>(acc, rgb_pixel_1, weight1);
     let acc = _mm_prefer_fma_ps::<FMA>(acc, rgb_pixel_2, weight2);
-    let acc = _mm_prefer_fma_ps::<FMA>(acc, rgb_pixel_3, weight3);
-    acc
+    _mm_prefer_fma_ps::<FMA>(acc, rgb_pixel_3, weight3)
 }
 
 #[inline(always)]
@@ -229,8 +227,7 @@ unsafe fn convolve_horizontal_parts_2_rgba_f32<const FMA: bool>(
     let rgb_pixel_1 = _mm_loadu_ps(src_ptr.add(4));
 
     let acc = _mm_prefer_fma_ps::<FMA>(store_0, rgb_pixel_0, weight0);
-    let acc = _mm_prefer_fma_ps::<FMA>(acc, rgb_pixel_1, weight1);
-    acc
+    _mm_prefer_fma_ps::<FMA>(acc, rgb_pixel_1, weight1)
 }
 
 pub fn convolve_horizontal_rgba_sse_rows_4_f32<const FMA: bool>(

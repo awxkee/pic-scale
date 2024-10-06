@@ -30,80 +30,189 @@
 use std::arch::aarch64::*;
 
 use crate::neon::f16_utils::*;
-use crate::{premultiply_pixel_f16, unpremultiply_pixel_f16};
+use crate::{premultiply_pixel_f16, unpremultiply_pixel_f16, ThreadingPolicy};
+use rayon::iter::{IndexedParallelIterator, ParallelIterator};
+use rayon::prelude::ParallelSliceMut;
+use rayon::slice::ParallelSlice;
+
+unsafe fn neon_premultiply_alpha_rgba_row_f16(
+    dst: &mut [half::f16],
+    src: &[half::f16],
+    width: usize,
+    offset: usize,
+) {
+    let mut _cx = 0usize;
+
+    unsafe {
+        while _cx + 8 < width {
+            let px = _cx * 4;
+            let src_ptr = src.as_ptr().add(offset + px);
+            let pixel = vld4q_u16(src_ptr as *const u16);
+
+            let low_alpha = xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.3)));
+            let low_r = vmulq_f32(
+                xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.0))),
+                low_alpha,
+            );
+            let low_g = vmulq_f32(
+                xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.1))),
+                low_alpha,
+            );
+            let low_b = vmulq_f32(
+                xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.2))),
+                low_alpha,
+            );
+
+            let high_alpha = xvcvt_f32_f16(xreinterpret_f16_u16(vget_high_u16(pixel.3)));
+            let high_r = vmulq_f32(
+                xvcvt_f32_f16(xreinterpret_f16_u16(vget_high_u16(pixel.0))),
+                high_alpha,
+            );
+            let high_g = vmulq_f32(
+                xvcvt_f32_f16(xreinterpret_f16_u16(vget_high_u16(pixel.1))),
+                high_alpha,
+            );
+            let high_b = vmulq_f32(
+                xvcvt_f32_f16(xreinterpret_f16_u16(vget_high_u16(pixel.2))),
+                high_alpha,
+            );
+            let r_values =
+                xreinterpretq_u16_f16(xcombine_f16(xvcvt_f16_f32(low_r), xvcvt_f16_f32(high_r)));
+            let g_values =
+                xreinterpretq_u16_f16(xcombine_f16(xvcvt_f16_f32(low_g), xvcvt_f16_f32(high_g)));
+            let b_values =
+                xreinterpretq_u16_f16(xcombine_f16(xvcvt_f16_f32(low_b), xvcvt_f16_f32(high_b)));
+            let dst_ptr = dst.as_mut_ptr().add(offset + px);
+            let store_pixel = uint16x8x4_t(r_values, g_values, b_values, pixel.3);
+            vst4q_u16(dst_ptr as *mut u16, store_pixel);
+            _cx += 8;
+        }
+    }
+
+    for x in _cx..width {
+        let px = x * 4;
+        premultiply_pixel_f16!(dst, src, offset + px);
+    }
+}
 
 pub fn neon_premultiply_alpha_rgba_f16(
     dst: &mut [half::f16],
     src: &[half::f16],
     width: usize,
     height: usize,
+    threading_policy: ThreadingPolicy,
 ) {
-    let mut _cy = 0usize;
-    let src_stride = 4 * width;
+    let allowed_threading = threading_policy.allowed_threading();
 
-    let mut offset = _cy * src_stride;
+    if allowed_threading {
+        src.par_chunks_exact(width * 4)
+            .zip(dst.par_chunks_exact_mut(width * 4))
+            .for_each(|(src, dst)| unsafe {
+                neon_premultiply_alpha_rgba_row_f16(dst, src, width, 0);
+            });
+    } else {
+        let mut offset = 0usize;
 
-    for _ in _cy..height {
-        let mut _cx = 0usize;
+        for _ in 0..height {
+            unsafe {
+                neon_premultiply_alpha_rgba_row_f16(dst, src, width, offset);
+            }
 
-        unsafe {
-            while _cx + 8 < width {
-                let px = _cx * 4;
-                let src_ptr = src.as_ptr().add(offset + px);
-                let pixel = vld4q_u16(src_ptr as *const u16);
+            offset += 4 * width;
+        }
+    }
+}
 
-                let low_alpha = xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.3)));
-                let low_r = vmulq_f32(
+unsafe fn neon_unpremultiply_alpha_rgba_row_f16(
+    dst: &mut [half::f16],
+    src: &[half::f16],
+    width: usize,
+    offset: usize,
+) {
+    let mut _cx = 0usize;
+
+    unsafe {
+        while _cx + 8 < width {
+            let px = _cx * 4;
+            let pixel_offset = offset + px;
+            let src_ptr = src.as_ptr().add(pixel_offset);
+            let pixel = vld4q_u16(src_ptr as *const u16);
+
+            let low_alpha = xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.3)));
+            let low_zero_mask = vceqzq_f32(low_alpha);
+            let zeros = vdupq_n_f32(0.);
+
+            let low_r = vbslq_f32(
+                low_zero_mask,
+                zeros,
+                vdivq_f32(
                     xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.0))),
                     low_alpha,
-                );
-                let low_g = vmulq_f32(
+                ),
+            );
+            let low_g = vbslq_f32(
+                low_zero_mask,
+                zeros,
+                vdivq_f32(
                     xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.1))),
                     low_alpha,
-                );
-                let low_b = vmulq_f32(
+                ),
+            );
+            let low_b = vbslq_f32(
+                low_zero_mask,
+                zeros,
+                vdivq_f32(
                     xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.2))),
                     low_alpha,
-                );
+                ),
+            );
 
-                let high_alpha = xvcvt_f32_f16(xreinterpret_f16_u16(vget_high_u16(pixel.3)));
-                let high_r = vmulq_f32(
+            let high_alpha = xvcvt_f32_f16(xreinterpret_f16_u16(vget_high_u16(pixel.3)));
+            let high_zero_mask = vceqzq_f32(high_alpha);
+
+            let high_r = vbslq_f32(
+                high_zero_mask,
+                zeros,
+                vdivq_f32(
                     xvcvt_f32_f16(xreinterpret_f16_u16(vget_high_u16(pixel.0))),
                     high_alpha,
-                );
-                let high_g = vmulq_f32(
+                ),
+            );
+            let high_g = vbslq_f32(
+                high_zero_mask,
+                zeros,
+                vdivq_f32(
                     xvcvt_f32_f16(xreinterpret_f16_u16(vget_high_u16(pixel.1))),
                     high_alpha,
-                );
-                let high_b = vmulq_f32(
+                ),
+            );
+            let high_b = vbslq_f32(
+                high_zero_mask,
+                zeros,
+                vdivq_f32(
                     xvcvt_f32_f16(xreinterpret_f16_u16(vget_high_u16(pixel.2))),
                     high_alpha,
-                );
-                let r_values = xreinterpretq_u16_f16(xcombine_f16(
-                    xvcvt_f16_f32(low_r),
-                    xvcvt_f16_f32(high_r),
-                ));
-                let g_values = xreinterpretq_u16_f16(xcombine_f16(
-                    xvcvt_f16_f32(low_g),
-                    xvcvt_f16_f32(high_g),
-                ));
-                let b_values = xreinterpretq_u16_f16(xcombine_f16(
-                    xvcvt_f16_f32(low_b),
-                    xvcvt_f16_f32(high_b),
-                ));
-                let dst_ptr = dst.as_mut_ptr().add(offset + px);
-                let store_pixel = uint16x8x4_t(r_values, g_values, b_values, pixel.3);
-                vst4q_u16(dst_ptr as *mut u16, store_pixel);
-                _cx += 8;
-            }
-        }
+                ),
+            );
 
-        for x in _cx..width {
-            let px = x * 4;
-            premultiply_pixel_f16!(dst, src, offset + px);
-        }
+            let r_values =
+                xreinterpretq_u16_f16(xcombine_f16(xvcvt_f16_f32(low_r), xvcvt_f16_f32(high_r)));
+            let g_values =
+                xreinterpretq_u16_f16(xcombine_f16(xvcvt_f16_f32(low_g), xvcvt_f16_f32(high_g)));
+            let b_values =
+                xreinterpretq_u16_f16(xcombine_f16(xvcvt_f16_f32(low_b), xvcvt_f16_f32(high_b)));
 
-        offset += 4 * width;
+            let dst_ptr = dst.as_mut_ptr().add(pixel_offset);
+            let store_pixel = uint16x8x4_t(r_values, g_values, b_values, pixel.3);
+            vst4q_u16(dst_ptr as *mut u16, store_pixel);
+            _cx += 8;
+        }
+    }
+
+    for x in _cx..width {
+        let px = x * 4;
+        let pixel_offset = offset + px;
+        unpremultiply_pixel_f16!(dst, src, pixel_offset);
     }
 }
 
@@ -112,105 +221,25 @@ pub fn neon_unpremultiply_alpha_rgba_f16(
     src: &[half::f16],
     width: usize,
     height: usize,
+    threading_policy: ThreadingPolicy,
 ) {
-    let mut _cy = 0usize;
+    let allowed_threading = threading_policy.allowed_threading();
 
-    let mut offset = 0usize;
-    offset += _cy * width * 4;
+    if allowed_threading {
+        src.par_chunks_exact(width * 4)
+            .zip(dst.par_chunks_exact_mut(width * 4))
+            .for_each(|(src, dst)| unsafe {
+                neon_unpremultiply_alpha_rgba_row_f16(dst, src, width, 0);
+            });
+    } else {
+        let mut offset = 0usize;
 
-    for _ in _cy..height {
-        let mut _cx = 0usize;
-
-        unsafe {
-            while _cx + 8 < width {
-                let px = _cx * 4;
-                let pixel_offset = offset + px;
-                let src_ptr = src.as_ptr().add(pixel_offset);
-                let pixel = vld4q_u16(src_ptr as *const u16);
-
-                let low_alpha = xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.3)));
-                let low_zero_mask = vceqzq_f32(low_alpha);
-                let zeros = vdupq_n_f32(0.);
-
-                let low_r = vbslq_f32(
-                    low_zero_mask,
-                    zeros,
-                    vdivq_f32(
-                        xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.0))),
-                        low_alpha,
-                    ),
-                );
-                let low_g = vbslq_f32(
-                    low_zero_mask,
-                    zeros,
-                    vdivq_f32(
-                        xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.1))),
-                        low_alpha,
-                    ),
-                );
-                let low_b = vbslq_f32(
-                    low_zero_mask,
-                    zeros,
-                    vdivq_f32(
-                        xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.2))),
-                        low_alpha,
-                    ),
-                );
-
-                let high_alpha = xvcvt_f32_f16(xreinterpret_f16_u16(vget_high_u16(pixel.3)));
-                let high_zero_mask = vceqzq_f32(high_alpha);
-
-                let high_r = vbslq_f32(
-                    high_zero_mask,
-                    zeros,
-                    vdivq_f32(
-                        xvcvt_f32_f16(xreinterpret_f16_u16(vget_high_u16(pixel.0))),
-                        high_alpha,
-                    ),
-                );
-                let high_g = vbslq_f32(
-                    high_zero_mask,
-                    zeros,
-                    vdivq_f32(
-                        xvcvt_f32_f16(xreinterpret_f16_u16(vget_high_u16(pixel.1))),
-                        high_alpha,
-                    ),
-                );
-                let high_b = vbslq_f32(
-                    high_zero_mask,
-                    zeros,
-                    vdivq_f32(
-                        xvcvt_f32_f16(xreinterpret_f16_u16(vget_high_u16(pixel.2))),
-                        high_alpha,
-                    ),
-                );
-
-                let r_values = xreinterpretq_u16_f16(xcombine_f16(
-                    xvcvt_f16_f32(low_r),
-                    xvcvt_f16_f32(high_r),
-                ));
-                let g_values = xreinterpretq_u16_f16(xcombine_f16(
-                    xvcvt_f16_f32(low_g),
-                    xvcvt_f16_f32(high_g),
-                ));
-                let b_values = xreinterpretq_u16_f16(xcombine_f16(
-                    xvcvt_f16_f32(low_b),
-                    xvcvt_f16_f32(high_b),
-                ));
-
-                let dst_ptr = dst.as_mut_ptr().add(pixel_offset);
-                let store_pixel = uint16x8x4_t(r_values, g_values, b_values, pixel.3);
-                vst4q_u16(dst_ptr as *mut u16, store_pixel);
-                _cx += 8;
+        for _ in 0..height {
+            unsafe {
+                neon_unpremultiply_alpha_rgba_row_f16(dst, src, width, offset);
             }
-        }
 
-        for x in _cx..width {
-            let px = x * 4;
-            let pixel_offset = offset + px;
-            unpremultiply_pixel_f16!(dst, src, pixel_offset);
+            offset += 4 * width;
         }
-
-        offset += 4 * width;
     }
 }

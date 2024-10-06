@@ -271,7 +271,7 @@ unsafe fn convolve_vertical_rgb_sse_row_f32_regular<const CHANNELS: usize>(
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1,fma")]
+#[target_feature(enable = "sse4.1", enable = "fma")]
 unsafe fn convolve_vertical_rgb_sse_row_f32_fma<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,
@@ -290,7 +290,7 @@ unsafe fn convolve_vertical_rgb_sse_row_f32_fma<const CHANNELS: usize>(
     );
 }
 
-#[inline]
+#[inline(always)]
 unsafe fn convolve_vertical_rgb_sse_row_f32_impl<const CHANNELS: usize, const FMA: bool>(
     width: usize,
     bounds: &FilterBounds,

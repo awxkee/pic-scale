@@ -27,16 +27,18 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
-#[cfg(target_arch = "x86_64")]
-use std::arch::x86_64::*;
-
 use crate::avx2::utils::{
     _mm256_select_si256, avx2_deinterleave_rgba, avx2_div_by255, avx2_interleave_rgba,
     avx2_pack_s32, avx2_pack_u16,
 };
-use crate::{premultiply_pixel, unpremultiply_pixel};
+use crate::{premultiply_pixel, unpremultiply_pixel, ThreadingPolicy};
+use rayon::iter::{IndexedParallelIterator, ParallelIterator};
+use rayon::prelude::ParallelSliceMut;
+use rayon::slice::ParallelSlice;
+#[cfg(target_arch = "x86")]
+use std::arch::x86::*;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
 
 #[inline(always)]
 unsafe fn avx2_unpremultiply_row(x: __m256i, a: __m256i) -> __m256i {
@@ -92,76 +94,155 @@ unsafe fn avx2_unpremultiply_row(x: __m256i, a: __m256i) -> __m256i {
     _mm256_select_si256(is_zero_mask, zeros, avx2_pack_u16(lo, hi))
 }
 
-pub fn avx_premultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height: usize) {
+pub fn avx_premultiply_alpha_rgba(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    height: usize,
+    threading_policy: ThreadingPolicy,
+) {
     unsafe {
-        avx_premultiply_alpha_rgba_impl(dst, src, width, height);
+        avx_premultiply_alpha_rgba_impl(dst, src, width, height, threading_policy);
+    }
+}
+
+#[target_feature(enable = "avx2")]
+unsafe fn avx_premultiply_alpha_rgba_impl_row(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    offset: usize,
+) {
+    let mut _cx = 0usize;
+
+    unsafe {
+        while _cx + 32 < width {
+            let px = _cx * 4;
+            let src_ptr = src.as_ptr().add(offset + px);
+            let rgba0 = _mm256_loadu_si256(src_ptr as *const __m256i);
+            let rgba1 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
+            let rgba2 = _mm256_loadu_si256(src_ptr.add(64) as *const __m256i);
+            let rgba3 = _mm256_loadu_si256(src_ptr.add(96) as *const __m256i);
+            let (rrr, ggg, bbb, aaa) = avx2_deinterleave_rgba(rgba0, rgba1, rgba2, rgba3);
+
+            let mut rrr_low = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(rrr));
+            let mut rrr_high = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(rrr));
+
+            let mut ggg_low = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(ggg));
+            let mut ggg_high = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(ggg));
+
+            let mut bbb_low = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(bbb));
+            let mut bbb_high = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(bbb));
+
+            let aaa_low = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(aaa));
+            let aaa_high = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(aaa));
+
+            rrr_low = avx2_div_by255(_mm256_mullo_epi16(rrr_low, aaa_low));
+            rrr_high = avx2_div_by255(_mm256_mullo_epi16(rrr_high, aaa_high));
+            ggg_low = avx2_div_by255(_mm256_mullo_epi16(ggg_low, aaa_low));
+            ggg_high = avx2_div_by255(_mm256_mullo_epi16(ggg_high, aaa_high));
+            bbb_low = avx2_div_by255(_mm256_mullo_epi16(bbb_low, aaa_low));
+            bbb_high = avx2_div_by255(_mm256_mullo_epi16(bbb_high, aaa_high));
+
+            let rrr = avx2_pack_u16(rrr_low, rrr_high);
+            let ggg = avx2_pack_u16(ggg_low, ggg_high);
+            let bbb = avx2_pack_u16(bbb_low, bbb_high);
+
+            let (rgba0, rgba1, rgba2, rgba3) = avx2_interleave_rgba(rrr, ggg, bbb, aaa);
+            let dst_ptr = dst.as_mut_ptr().add(offset + px);
+            _mm256_storeu_si256(dst_ptr as *mut __m256i, rgba0);
+            _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, rgba1);
+            _mm256_storeu_si256(dst_ptr.add(64) as *mut __m256i, rgba2);
+            _mm256_storeu_si256(dst_ptr.add(96) as *mut __m256i, rgba3);
+
+            _cx += 32;
+        }
+    }
+
+    for x in _cx..width {
+        let px = x * 4;
+        premultiply_pixel!(dst, src, offset + px);
     }
 }
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn avx_premultiply_alpha_rgba_impl(dst: &mut [u8], src: &[u8], width: usize, height: usize) {
-    let mut offset = 0usize;
+unsafe fn avx_premultiply_alpha_rgba_impl(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    height: usize,
+    threading_policy: ThreadingPolicy,
+) {
+    let allowed_threading = threading_policy.allowed_threading();
 
-    for _ in 0..height {
-        let mut _cx = 0usize;
-
-        unsafe {
-            while _cx + 32 < width {
-                let px = _cx * 4;
-                let src_ptr = src.as_ptr().add(offset + px);
-                let rgba0 = _mm256_loadu_si256(src_ptr as *const __m256i);
-                let rgba1 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
-                let rgba2 = _mm256_loadu_si256(src_ptr.add(64) as *const __m256i);
-                let rgba3 = _mm256_loadu_si256(src_ptr.add(96) as *const __m256i);
-                let (rrr, ggg, bbb, aaa) = avx2_deinterleave_rgba(rgba0, rgba1, rgba2, rgba3);
-
-                let mut rrr_low = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(rrr));
-                let mut rrr_high = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(rrr));
-
-                let mut ggg_low = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(ggg));
-                let mut ggg_high = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(ggg));
-
-                let mut bbb_low = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(bbb));
-                let mut bbb_high = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(bbb));
-
-                let aaa_low = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(aaa));
-                let aaa_high = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(aaa));
-
-                rrr_low = avx2_div_by255(_mm256_mullo_epi16(rrr_low, aaa_low));
-                rrr_high = avx2_div_by255(_mm256_mullo_epi16(rrr_high, aaa_high));
-                ggg_low = avx2_div_by255(_mm256_mullo_epi16(ggg_low, aaa_low));
-                ggg_high = avx2_div_by255(_mm256_mullo_epi16(ggg_high, aaa_high));
-                bbb_low = avx2_div_by255(_mm256_mullo_epi16(bbb_low, aaa_low));
-                bbb_high = avx2_div_by255(_mm256_mullo_epi16(bbb_high, aaa_high));
-
-                let rrr = avx2_pack_u16(rrr_low, rrr_high);
-                let ggg = avx2_pack_u16(ggg_low, ggg_high);
-                let bbb = avx2_pack_u16(bbb_low, bbb_high);
-
-                let (rgba0, rgba1, rgba2, rgba3) = avx2_interleave_rgba(rrr, ggg, bbb, aaa);
-                let dst_ptr = dst.as_mut_ptr().add(offset + px);
-                _mm256_storeu_si256(dst_ptr as *mut __m256i, rgba0);
-                _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, rgba1);
-                _mm256_storeu_si256(dst_ptr.add(64) as *mut __m256i, rgba2);
-                _mm256_storeu_si256(dst_ptr.add(96) as *mut __m256i, rgba3);
-
-                _cx += 32;
-            }
+    if allowed_threading {
+    } else {
+        let mut offset = 0usize;
+        src.par_chunks_exact(width * 4)
+            .zip(dst.par_chunks_exact_mut(width * 4))
+            .for_each(|(src, dst)| unsafe {
+                avx_premultiply_alpha_rgba_impl_row(dst, src, width, 0);
+            });
+        for _ in 0..height {
+            avx_premultiply_alpha_rgba_impl_row(dst, src, width, offset);
+            offset += 4 * width;
         }
-
-        for x in _cx..width {
-            let px = x * 4;
-            premultiply_pixel!(dst, src, offset + px);
-        }
-
-        offset += 4 * width;
     }
 }
 
-pub fn avx_unpremultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height: usize) {
+pub fn avx_unpremultiply_alpha_rgba(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    height: usize,
+    threading_policy: ThreadingPolicy,
+) {
     unsafe {
-        avx_unpremultiply_alpha_rgba_impl(dst, src, width, height);
+        avx_unpremultiply_alpha_rgba_impl(dst, src, width, height, threading_policy);
+    }
+}
+
+#[target_feature(enable = "avx2")]
+unsafe fn avx_unpremultiply_alpha_rgba_impl_row(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    offset: usize,
+) {
+    let mut _cx = 0usize;
+
+    unsafe {
+        while _cx + 32 < width {
+            let px = _cx * 4;
+            let pixel_offset = offset + px;
+            let src_ptr = src.as_ptr().add(pixel_offset);
+            let rgba0 = _mm256_loadu_si256(src_ptr as *const __m256i);
+            let rgba1 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
+            let rgba2 = _mm256_loadu_si256(src_ptr.add(64) as *const __m256i);
+            let rgba3 = _mm256_loadu_si256(src_ptr.add(96) as *const __m256i);
+            let (rrr, ggg, bbb, aaa) = avx2_deinterleave_rgba(rgba0, rgba1, rgba2, rgba3);
+
+            let rrr = avx2_unpremultiply_row(rrr, aaa);
+            let ggg = avx2_unpremultiply_row(ggg, aaa);
+            let bbb = avx2_unpremultiply_row(bbb, aaa);
+
+            let (rgba0, rgba1, rgba2, rgba3) = avx2_interleave_rgba(rrr, ggg, bbb, aaa);
+
+            let dst_ptr = dst.as_mut_ptr().add(pixel_offset);
+            _mm256_storeu_si256(dst_ptr as *mut __m256i, rgba0);
+            _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, rgba1);
+            _mm256_storeu_si256(dst_ptr.add(64) as *mut __m256i, rgba2);
+            _mm256_storeu_si256(dst_ptr.add(96) as *mut __m256i, rgba3);
+
+            _cx += 32;
+        }
+    }
+
+    for x in _cx..width {
+        let px = x * 4;
+        let pixel_offset = offset + px;
+        unpremultiply_pixel!(dst, src, pixel_offset);
     }
 }
 
@@ -172,45 +253,22 @@ unsafe fn avx_unpremultiply_alpha_rgba_impl(
     src: &[u8],
     width: usize,
     height: usize,
+    threading_policy: ThreadingPolicy,
 ) {
-    let mut offset = 0usize;
+    let allowed_threading = threading_policy.allowed_threading();
 
-    for _ in 0..height {
-        let mut _cx = 0usize;
+    if allowed_threading {
+        src.par_chunks_exact(width * 4)
+            .zip(dst.par_chunks_exact_mut(width * 4))
+            .for_each(|(src, dst)| unsafe {
+                avx_unpremultiply_alpha_rgba_impl_row(dst, src, width, 0);
+            });
+    } else {
+        let mut offset = 0usize;
 
-        unsafe {
-            while _cx + 32 < width {
-                let px = _cx * 4;
-                let pixel_offset = offset + px;
-                let src_ptr = src.as_ptr().add(pixel_offset);
-                let rgba0 = _mm256_loadu_si256(src_ptr as *const __m256i);
-                let rgba1 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
-                let rgba2 = _mm256_loadu_si256(src_ptr.add(64) as *const __m256i);
-                let rgba3 = _mm256_loadu_si256(src_ptr.add(96) as *const __m256i);
-                let (rrr, ggg, bbb, aaa) = avx2_deinterleave_rgba(rgba0, rgba1, rgba2, rgba3);
-
-                let rrr = avx2_unpremultiply_row(rrr, aaa);
-                let ggg = avx2_unpremultiply_row(ggg, aaa);
-                let bbb = avx2_unpremultiply_row(bbb, aaa);
-
-                let (rgba0, rgba1, rgba2, rgba3) = avx2_interleave_rgba(rrr, ggg, bbb, aaa);
-
-                let dst_ptr = dst.as_mut_ptr().add(pixel_offset);
-                _mm256_storeu_si256(dst_ptr as *mut __m256i, rgba0);
-                _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, rgba1);
-                _mm256_storeu_si256(dst_ptr.add(64) as *mut __m256i, rgba2);
-                _mm256_storeu_si256(dst_ptr.add(96) as *mut __m256i, rgba3);
-
-                _cx += 32;
-            }
+        for _ in 0..height {
+            avx_unpremultiply_alpha_rgba_impl_row(dst, src, width, offset);
+            offset += 4 * width;
         }
-
-        for x in _cx..width {
-            let px = x * 4;
-            let pixel_offset = offset + px;
-            unpremultiply_pixel!(dst, src, pixel_offset);
-        }
-
-        offset += 4 * width;
     }
 }

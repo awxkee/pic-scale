@@ -274,7 +274,7 @@ unsafe fn consume_u16_4(
     std::ptr::copy_nonoverlapping(&store_u16 as *const _ as *const u8, dst_ptr as *mut u8, 8);
 }
 
-#[inline(never)]
+#[inline(always)]
 unsafe fn consume_u16_1(
     start_y: usize,
     start_x: usize,

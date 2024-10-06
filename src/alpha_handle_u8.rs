@@ -26,7 +26,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::avx2::{avx_premultiply_alpha_rgba, avx_unpremultiply_alpha_rgba};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -39,7 +38,11 @@ use crate::risc::{risc_premultiply_alpha_rgba_u8, risc_unpremultiply_alpha_rgba_
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::*;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-use crate::wasm32::{wasm_unpremultiply_alpha_rgba, wasm_premultiply_alpha_rgba};
+use crate::wasm32::{wasm_premultiply_alpha_rgba, wasm_unpremultiply_alpha_rgba};
+use crate::ThreadingPolicy;
+use rayon::iter::IndexedParallelIterator;
+use rayon::iter::ParallelIterator;
+use rayon::slice::{ParallelSlice, ParallelSliceMut};
 
 #[macro_export]
 macro_rules! unpremultiply_pixel {
@@ -84,35 +87,78 @@ macro_rules! premultiply_pixel {
     }};
 }
 
-fn premultiply_alpha_rgba_impl(dst: &mut [u8], src: &[u8], width: usize, height: usize) {
-    let mut offset = 0usize;
+fn premultiply_alpha_rgba_impl(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    height: usize,
+    threading_policy: ThreadingPolicy,
+) {
+    let allowed_threading = threading_policy.allowed_threading();
 
-    for _ in 0..height {
-        for x in 0..width {
-            let px = x * 4;
-            premultiply_pixel!(dst, src, offset + px);
+    if allowed_threading {
+        src.par_chunks_exact(width * 4)
+            .zip(dst.par_chunks_exact_mut(width * 4))
+            .for_each(|(src, dst)| {
+                for x in 0..width {
+                    let px = x * 4;
+                    premultiply_pixel!(dst, src, px);
+                }
+            });
+    } else {
+        let mut offset = 0usize;
+
+        for _ in 0..height {
+            for x in 0..width {
+                let px = x * 4;
+                premultiply_pixel!(dst, src, offset + px);
+            }
+
+            offset += 4 * width;
         }
-
-        offset += 4 * width;
     }
 }
 
-fn unpremultiply_alpha_rgba_impl(dst: &mut [u8], src: &[u8], width: usize, height: usize) {
-    let mut offset = 0usize;
+fn unpremultiply_alpha_rgba_impl(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    height: usize,
+    threading_policy: ThreadingPolicy,
+) {
+    let allowed_threading = threading_policy.allowed_threading();
+    if allowed_threading {
+        src.par_chunks_exact(width * 4)
+            .zip(dst.par_chunks_exact_mut(width * 4))
+            .for_each(|(src, dst)| {
+                for x in 0..width {
+                    let px = x * 4;
+                    unpremultiply_pixel!(dst, src, px);
+                }
+            });
+    } else {
+        let mut offset = 0usize;
+        for _ in 0..height {
+            for x in 0..width {
+                let px = x * 4;
+                let pixel_offset = offset + px;
+                unpremultiply_pixel!(dst, src, pixel_offset);
+            }
 
-    for _ in 0..height {
-        for x in 0..width {
-            let px = x * 4;
-            let pixel_offset = offset + px;
-            unpremultiply_pixel!(dst, src, pixel_offset);
+            offset += 4 * width;
         }
-
-        offset += 4 * width;
     }
 }
 
-pub fn premultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height: usize) {
-    let mut _dispatcher: fn(&mut [u8], &[u8], usize, usize) = premultiply_alpha_rgba_impl;
+pub fn premultiply_alpha_rgba(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    height: usize,
+    threading_policy: ThreadingPolicy,
+) {
+    let mut _dispatcher: fn(&mut [u8], &[u8], usize, usize, ThreadingPolicy) =
+        premultiply_alpha_rgba_impl;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
         _dispatcher = neon_premultiply_alpha_rgba;
@@ -142,11 +188,18 @@ pub fn premultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height: 
     {
         _dispatcher = wasm_premultiply_alpha_rgba;
     }
-    _dispatcher(dst, src, width, height);
+    _dispatcher(dst, src, width, height, threading_policy);
 }
 
-pub fn unpremultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height: usize) {
-    let mut _dispatcher: fn(&mut [u8], &[u8], usize, usize) = unpremultiply_alpha_rgba_impl;
+pub fn unpremultiply_alpha_rgba(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    height: usize,
+    threading_policy: ThreadingPolicy,
+) {
+    let mut _dispatcher: fn(&mut [u8], &[u8], usize, usize, ThreadingPolicy) =
+        unpremultiply_alpha_rgba_impl;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
         _dispatcher = neon_unpremultiply_alpha_rgba;
@@ -176,5 +229,5 @@ pub fn unpremultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height
     {
         _dispatcher = wasm_unpremultiply_alpha_rgba;
     }
-    _dispatcher(dst, src, width, height);
+    _dispatcher(dst, src, width, height, threading_policy);
 }

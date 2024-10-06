@@ -49,8 +49,7 @@ unsafe fn convolve_horizontal_parts_one_rgba_sse(
     let rgba_pixel = _mm_cvtsi32_si128(src_ptr_32.read_unaligned());
     let lo = _mm_cvtepu8_epi16(rgba_pixel);
 
-    let acc = _mm_add_epi32(store_0, _mm_madd_epi16(_mm_cvtepi16_epi32(lo), weight0));
-    acc
+    _mm_add_epi32(store_0, _mm_madd_epi16(_mm_cvtepi16_epi32(lo), weight0))
 }
 
 pub fn convolve_horizontal_rgba_sse_rows_4(

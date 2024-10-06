@@ -28,9 +28,43 @@
  */
 
 use crate::risc::xvsetvlmax_f16m1;
-use crate::{premultiply_pixel_f16, unpremultiply_pixel_f16};
+use crate::{premultiply_pixel_f16, unpremultiply_pixel_f16, ThreadingPolicy};
 use half::f16;
+use rayon::iter::{IndexedParallelIterator, ParallelIterator};
+use rayon::prelude::ParallelSliceMut;
+use rayon::slice::ParallelSlice;
 use std::arch::asm;
+
+#[target_feature(enable = "v")]
+unsafe fn risc_premultiply_alpha_rgba_f16_row_impl(
+    dst: &mut [f16],
+    src: &[f16],
+    width: usize,
+    offset: usize,
+) {
+    let mut _cx = 0usize;
+
+    unsafe {
+        let iter_width = xvsetvlmax_f16m1();
+        while _cx + iter_width < width {
+            let px = _cx * 4;
+            let src_ptr = src.as_ptr().add(offset + px);
+            let dst_ptr = dst.as_mut_ptr().add(offset + px);
+            asm!(include_str!("premultiply_alpha_f16.asm"),
+                     in(reg) src_ptr,
+                     in(reg) dst_ptr,
+                     t1 = out(reg) _,
+                     out("v0") _, out("v1") _,
+                     out("v2") _, out("v3") _);
+            _cx += iter_width;
+        }
+    }
+
+    for x in _cx..width {
+        let px = x * 4;
+        premultiply_pixel_f16!(dst, src, offset + px);
+    }
+}
 
 #[target_feature(enable = "v")]
 unsafe fn risc_premultiply_alpha_rgba_f16_impl(
@@ -38,43 +72,70 @@ unsafe fn risc_premultiply_alpha_rgba_f16_impl(
     src: &[f16],
     width: usize,
     height: usize,
+    threading_policy: ThreadingPolicy,
 ) {
-    let mut _cy = 0usize;
-    let src_stride = 4 * width;
+    let allowed_threading = threading_policy.allowed_threading();
 
-    let mut offset = _cy * src_stride;
+    if allowed_threading {
+        src.par_chunks_exact(width * 4)
+            .zip(dst.par_chunks_exact_mut(width * 4))
+            .for_each(|(src, dst)| unsafe {
+                risc_premultiply_alpha_rgba_f16_row_impl(dst, src, width, 0);
+            });
+    } else {
+        let mut offset = 0usize;
 
-    for _ in _cy..height {
-        let mut _cx = 0usize;
+        for _ in 0..height {
+            risc_premultiply_alpha_rgba_f16_row_impl(dst, src, width, offset);
 
-        unsafe {
-            let iter_width = xvsetvlmax_f16m1();
-            while _cx + iter_width < width {
-                let px = _cx * 4;
-                let src_ptr = src.as_ptr().add(offset + px);
-                let dst_ptr = dst.as_mut_ptr().add(offset + px);
-                asm!(include_str!("premultiply_alpha_f16.asm"),
-                     in(reg) src_ptr,
-                     in(reg) dst_ptr,
-                     t1 = out(reg) _,
-                     out("v0") _, out("v1") _,
-                     out("v2") _, out("v3") _);
-                _cx += iter_width;
-            }
+            offset += 4 * width;
         }
-
-        for x in _cx..width {
-            let px = x * 4;
-            premultiply_pixel_f16!(dst, src, offset + px);
-        }
-
-        offset += 4 * width;
     }
 }
 
-pub fn risc_premultiply_alpha_rgba_f16(dst: &mut [f16], src: &[f16], width: usize, height: usize) {
+pub fn risc_premultiply_alpha_rgba_f16(
+    dst: &mut [f16],
+    src: &[f16],
+    width: usize,
+    height: usize,
+    threading_policy: ThreadingPolicy,
+) {
     unsafe {
-        risc_premultiply_alpha_rgba_f16_impl(dst, src, width, height);
+        risc_premultiply_alpha_rgba_f16_impl(dst, src, width, height, threading_policy);
+    }
+}
+
+#[target_feature(enable = "v")]
+unsafe fn risc_unpremultiply_alpha_rgba_f16_row_impl(
+    dst: &mut [f16],
+    src: &[f16],
+    width: usize,
+    offset: usize,
+) {
+    let mut _cx = 0usize;
+
+    unsafe {
+        let iter_width = xvsetvlmax_f16m1();
+        while _cx + iter_width < width {
+            let px = _cx * 4;
+            let src_ptr = src.as_ptr().add(offset + px);
+            let dst_ptr = dst.as_mut_ptr().add(offset + px);
+            asm!(include_str!("unpremultiply_alpha_f16.asm"), in(reg) src_ptr,
+                     in(reg) dst_ptr,
+                     t1 = out(reg) _,
+                     ft1 = out(freg) _,
+                     a7 = out(reg) _,
+                     out("v0") _,
+                     out("v1") _, out("v2") _, out("v3") _, out("v4") _, out("v5") _,
+                     out("v7") _, out("v8") _);
+            _cx += iter_width;
+        }
+    }
+
+    for x in _cx..width {
+        let px = x * 4;
+        let pixel_offset = offset + px;
+        unpremultiply_pixel_f16!(dst, src, pixel_offset);
     }
 }
 
@@ -84,40 +145,25 @@ unsafe fn risc_unpremultiply_alpha_rgba_f16_impl(
     src: &[f16],
     width: usize,
     height: usize,
+    threading_policy: ThreadingPolicy,
 ) {
-    let mut _cy = 0usize;
+    let allowed_threading = threading_policy.allowed_threading();
 
-    let mut offset = 0usize;
-    offset += _cy * width * 4;
+    if allowed_threading {
+        src.par_chunks_exact(width * 4)
+            .zip(dst.par_chunks_exact_mut(width * 4))
+            .for_each(|(src, dst)| unsafe {
+                risc_unpremultiply_alpha_rgba_f16_row_impl(dst, src, width, 0);
+            });
+    } else {
+        let mut offset = 0usize;
 
-    for _ in _cy..height {
-        let mut _cx = 0usize;
-
-        unsafe {
-            let iter_width = xvsetvlmax_f16m1();
-            while _cx + iter_width < width {
-                let px = _cx * 4;
-                let src_ptr = src.as_ptr().add(offset + px);
-                let dst_ptr = dst.as_mut_ptr().add(offset + px);
-                asm!(include_str!("unpremultiply_alpha_f16.asm"), in(reg) src_ptr,
-                     in(reg) dst_ptr,
-                     t1 = out(reg) _,
-                     ft1 = out(freg) _,
-                     a7 = out(reg) _,
-                     out("v0") _,
-                     out("v1") _, out("v2") _, out("v3") _, out("v4") _, out("v5") _,
-                     out("v7") _, out("v8") _);
-                _cx += iter_width;
+        for _ in 0..height {
+            unsafe {
+                risc_unpremultiply_alpha_rgba_f16_row_impl(dst, src, width, offset);
             }
+            offset += 4 * width;
         }
-
-        for x in _cx..width {
-            let px = x * 4;
-            let pixel_offset = offset + px;
-            unpremultiply_pixel_f16!(dst, src, pixel_offset);
-        }
-
-        offset += 4 * width;
     }
 }
 
@@ -126,8 +172,9 @@ pub fn risc_unpremultiply_alpha_rgba_f16(
     src: &[f16],
     width: usize,
     height: usize,
+    threading_policy: ThreadingPolicy,
 ) {
     unsafe {
-        risc_unpremultiply_alpha_rgba_f16_impl(dst, src, width, height);
+        risc_unpremultiply_alpha_rgba_f16_impl(dst, src, width, height, threading_policy);
     }
 }

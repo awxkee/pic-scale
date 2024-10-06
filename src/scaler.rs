@@ -91,7 +91,6 @@ pub trait ScalingU16 {
     ) -> ImageStore<u16, 1>;
 
     /// Performs rescaling for RGB, channel order does not matter
-
     ///
     /// # Arguments
     /// `new_size` - New image size
@@ -302,7 +301,7 @@ impl Scaling for Scaler {
         if is_alpha_premultiplied {
             let mut premultiplied_store =
                 ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
-            src_store.unpremultiply_alpha(&mut premultiplied_store);
+            src_store.unpremultiply_alpha(&mut premultiplied_store, self.threading_policy);
             src_store = premultiplied_store;
         }
         if self.function == Nearest {
@@ -318,7 +317,7 @@ impl Scaling for Scaler {
             if is_alpha_premultiplied {
                 let mut premultiplied_store =
                     ImageStore::<u8, 4>::alloc(new_image.width, new_image.height);
-                new_image.premultiply_alpha(&mut premultiplied_store);
+                new_image.premultiply_alpha(&mut premultiplied_store, self.threading_policy);
                 return premultiplied_store;
             }
             return new_image;
@@ -342,7 +341,7 @@ impl Scaling for Scaler {
         if is_alpha_premultiplied {
             let mut premultiplied_store =
                 ImageStore::<u8, 4>::alloc(new_image_horizontal.width, new_image_horizontal.height);
-            new_image_horizontal.premultiply_alpha(&mut premultiplied_store);
+            new_image_horizontal.premultiply_alpha(&mut premultiplied_store, self.threading_policy);
             return premultiplied_store;
         }
         new_image_horizontal
@@ -400,7 +399,7 @@ impl ScalingF32 for Scaler {
         if is_alpha_premultiplied {
             let mut premultiplied_store =
                 ImageStore::<f32, 4>::alloc(src_store.width, src_store.height);
-            src_store.unpremultiply_alpha(&mut premultiplied_store);
+            src_store.unpremultiply_alpha(&mut premultiplied_store, self.threading_policy);
             src_store = premultiplied_store;
         }
 
@@ -421,7 +420,7 @@ impl ScalingF32 for Scaler {
             if is_alpha_premultiplied {
                 let mut premultiplied_store =
                     ImageStore::<f32, 4>::alloc(new_image.width, new_image.height);
-                new_image.premultiply_alpha(&mut premultiplied_store);
+                new_image.premultiply_alpha(&mut premultiplied_store, self.threading_policy);
                 return premultiplied_store;
             }
 
@@ -455,7 +454,7 @@ impl ScalingF32 for Scaler {
                 new_image_horizontal.width,
                 new_image_horizontal.height,
             );
-            new_image_horizontal.premultiply_alpha(&mut premultiplied_store);
+            new_image_horizontal.premultiply_alpha(&mut premultiplied_store, self.threading_policy);
             return premultiplied_store;
         }
 
@@ -622,7 +621,7 @@ impl ScalingU16 for Scaler {
                 ImageStore::<u16, 4>::alloc(src_store.width, src_store.height);
             src_store.bit_depth = bit_depth;
             premultiplied_store.bit_depth = bit_depth;
-            src_store.unpremultiply_alpha(&mut premultiplied_store);
+            src_store.unpremultiply_alpha(&mut premultiplied_store, self.threading_policy);
             src_store = premultiplied_store;
         }
         if self.function == Nearest {
@@ -640,7 +639,7 @@ impl ScalingU16 for Scaler {
                 let mut premultiplied_store =
                     ImageStore::<u16, 4>::alloc(new_image.width, new_image.height);
                 premultiplied_store.bit_depth = bit_depth;
-                new_image.premultiply_alpha(&mut premultiplied_store);
+                new_image.premultiply_alpha(&mut premultiplied_store, self.threading_policy);
                 return premultiplied_store;
             }
             return new_image;
@@ -674,7 +673,7 @@ impl ScalingU16 for Scaler {
                 new_image_horizontal.height,
             );
             premultiplied_store.bit_depth = bit_depth;
-            new_image_horizontal.premultiply_alpha(&mut premultiplied_store);
+            new_image_horizontal.premultiply_alpha(&mut premultiplied_store, self.threading_policy);
             return premultiplied_store;
         }
         new_image_horizontal

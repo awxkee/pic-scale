@@ -419,7 +419,6 @@ pub fn convolve_vertical_rgb_avx_row_u16<const CHANNELS: usize>(
     }
 }
 
-#[inline]
 #[target_feature(enable = "avx2")]
 unsafe fn convolve_vertical_rgb_avx_row_u16_impl<const CHANNELS: usize>(
     width: usize,

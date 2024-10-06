@@ -263,7 +263,7 @@ unsafe fn convolve_vertical_avx_row_f16_fma<const CHANNELS: usize>(
     );
 }
 
-#[inline]
+#[inline(always)]
 pub fn convolve_vertical_avx_row_f16_impl<const CHANNELS: usize, const FMA: bool>(
     width: usize,
     bounds: &FilterBounds,

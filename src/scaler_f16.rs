@@ -46,7 +46,7 @@ impl Scaler {
         if is_alpha_premultiplied {
             let mut premultiplied_store =
                 ImageStore::<f16, 4>::alloc(src_store.width, src_store.height);
-            src_store.unpremultiply_alpha(&mut premultiplied_store);
+            src_store.unpremultiply_alpha(&mut premultiplied_store, self.threading_policy);
             src_store = premultiplied_store;
         }
 
@@ -68,7 +68,7 @@ impl Scaler {
             if is_alpha_premultiplied {
                 let mut premultiplied_store =
                     ImageStore::<f16, 4>::alloc(new_image.width, new_image.height);
-                new_image.premultiply_alpha(&mut premultiplied_store);
+                new_image.premultiply_alpha(&mut premultiplied_store, self.threading_policy);
                 return premultiplied_store;
             }
 
@@ -104,7 +104,7 @@ impl Scaler {
                 new_image_horizontal.width,
                 new_image_horizontal.height,
             );
-            new_image_horizontal.premultiply_alpha(&mut premultiplied_store);
+            new_image_horizontal.premultiply_alpha(&mut premultiplied_store, self.threading_policy);
             return premultiplied_store;
         }
 

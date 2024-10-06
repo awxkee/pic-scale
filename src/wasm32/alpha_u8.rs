@@ -28,10 +28,16 @@
  */
 use crate::wasm32::transpose::{wasm_load_deinterleave_u8x4, wasm_store_interleave_u8x4};
 use crate::wasm32::utils::*;
-use crate::{premultiply_pixel, unpremultiply_pixel};
+use crate::{premultiply_pixel, unpremultiply_pixel, ThreadingPolicy};
 use std::arch::wasm32::*;
 
-pub fn wasm_unpremultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height: usize) {
+pub fn wasm_unpremultiply_alpha_rgba(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    height: usize,
+    _: ThreadingPolicy,
+) {
     unsafe {
         wasm_unpremultiply_alpha_rgba_impl(dst, src, width, height);
     }
@@ -125,7 +131,13 @@ unsafe fn wasm_unpremultiply_alpha_rgba_impl(
     }
 }
 
-pub fn wasm_premultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height: usize) {
+pub fn wasm_premultiply_alpha_rgba(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    height: usize,
+    _: ThreadingPolicy,
+) {
     unsafe {
         wasm_premultiply_alpha_rgba_impl(dst, src, width, height);
     }

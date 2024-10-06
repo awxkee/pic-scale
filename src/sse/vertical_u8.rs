@@ -34,6 +34,7 @@ use std::arch::x86_64::*;
 use crate::filter_weights::FilterBounds;
 use crate::support::{PRECISION, ROUNDING_APPROX};
 
+#[inline(always)]
 pub(crate) unsafe fn convolve_vertical_part_sse_32(
     start_y: usize,
     start_x: usize,
@@ -159,6 +160,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_32(
     _mm_storeu_si128(dst_ptr as *mut __m128i, rgb);
 }
 
+#[inline(always)]
 pub(crate) unsafe fn convolve_vertical_part_sse_16(
     start_y: usize,
     start_x: usize,
@@ -220,6 +222,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_16(
     _mm_storeu_si128(dst_ptr as *mut __m128i, item);
 }
 
+#[inline(always)]
 pub(crate) unsafe fn convolve_vertical_part_sse_8(
     start_y: usize,
     start_x: usize,
@@ -268,6 +271,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_8(
     std::ptr::copy_nonoverlapping(&item as *const _ as *const u8, dst_ptr, 8);
 }
 
+#[inline(always)]
 pub(crate) unsafe fn convolve_vertical_part_sse(
     start_y: usize,
     start_x: usize,

@@ -202,7 +202,6 @@ pub fn convolve_vertical_avx_row_f32<const CHANNELS: usize, const FMA: bool>(
     }
 }
 
-#[inline]
 #[target_feature(enable = "avx2")]
 unsafe fn convolve_vertical_avx_row_f32_regular<const CHANNELS: usize>(
     width: usize,
@@ -222,8 +221,7 @@ unsafe fn convolve_vertical_avx_row_f32_regular<const CHANNELS: usize>(
     );
 }
 
-#[inline]
-#[target_feature(enable = "avx2,fma")]
+#[target_feature(enable = "avx2", enable = "fma")]
 unsafe fn convolve_vertical_avx_row_f32_fma<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,
@@ -242,7 +240,7 @@ unsafe fn convolve_vertical_avx_row_f32_fma<const CHANNELS: usize>(
     );
 }
 
-#[inline]
+#[inline(always)]
 unsafe fn convolve_vertical_avx_row_f32_impl<const CHANNELS: usize, const FMA: bool>(
     width: usize,
     bounds: &FilterBounds,

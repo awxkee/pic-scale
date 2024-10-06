@@ -171,9 +171,32 @@ pub fn xconvolve_horizontal_rgb_neon_rows_4_f16(
     dst_width: usize,
     src_width: usize,
     filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const half::f16,
+    unsafe_source_ptr_0: *const f16,
     src_stride: usize,
-    unsafe_destination_ptr_0: *mut half::f16,
+    unsafe_destination_ptr_0: *mut f16,
+    dst_stride: usize,
+) {
+    unsafe {
+        xconvolve_horizontal_rgb_neon_rows_4_f16_impl(
+            dst_width,
+            src_width,
+            filter_weights,
+            unsafe_source_ptr_0,
+            src_stride,
+            unsafe_destination_ptr_0,
+            dst_stride,
+        );
+    }
+}
+
+#[target_feature(enable = "fp16")]
+unsafe fn xconvolve_horizontal_rgb_neon_rows_4_f16_impl(
+    dst_width: usize,
+    src_width: usize,
+    filter_weights: &FilterWeights<f32>,
+    unsafe_source_ptr_0: *const f16,
+    src_stride: usize,
+    unsafe_destination_ptr_0: *mut f16,
     dst_stride: usize,
 ) {
     unsafe {

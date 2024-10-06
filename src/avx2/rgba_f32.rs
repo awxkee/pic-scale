@@ -47,12 +47,11 @@ unsafe fn convolve_horizontal_parts_one_rgba_f32<const FMA: bool>(
     const COMPONENTS: usize = 4;
     let src_ptr = src.add(start_x * COMPONENTS);
     let rgb_pixel = _mm_loadu_ps(src_ptr);
-    let acc = _mm256_fma_ps::<FMA>(
+    _mm256_fma_ps::<FMA>(
         store_0,
         avx_combine_ps(rgb_pixel, _mm_setzero_ps()),
         weight0,
-    );
-    acc
+    )
 }
 
 #[inline(always)]
@@ -111,8 +110,7 @@ unsafe fn convolve_horizontal_parts_2_rgba_f32<const FMA: bool>(
 
     let rgb_pixel = _mm256_loadu_ps(src_ptr);
 
-    let acc = _mm256_fma_ps::<FMA>(store_0, rgb_pixel, weight0);
-    acc
+    _mm256_fma_ps::<FMA>(store_0, rgb_pixel, weight0)
 }
 
 pub fn convolve_horizontal_rgba_avx_rows_4_f32<const FMA: bool>(
@@ -149,7 +147,6 @@ pub fn convolve_horizontal_rgba_avx_rows_4_f32<const FMA: bool>(
     }
 }
 
-#[inline]
 #[target_feature(enable = "avx2")]
 unsafe fn convolve_horizontal_rgba_avx_rows_4_f32_regular(
     dst_width: usize,
@@ -171,7 +168,6 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_f32_regular(
     );
 }
 
-#[inline]
 #[target_feature(enable = "avx2,fma")]
 unsafe fn convolve_horizontal_rgba_avx_rows_4_f32_fma(
     dst_width: usize,
@@ -193,6 +189,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_f32_fma(
     );
 }
 
+#[inline(always)]
 unsafe fn convolve_horizontal_rgba_avx_rows_4_f32_impl<const FMA: bool>(
     dst_width: usize,
     _: usize,
@@ -464,7 +461,7 @@ unsafe fn convolve_horizontal_rgba_avx_row_one_f32_fma(
     );
 }
 
-#[inline]
+#[inline(always)]
 unsafe fn convolve_horizontal_rgba_avx_row_one_f32_impl<const FMA: bool>(
     dst_width: usize,
     _: usize,

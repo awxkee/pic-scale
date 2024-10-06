@@ -75,10 +75,6 @@ pub(crate) fn convolve_vertical_part_u16<const BUFFER_SIZE: usize>(
     }
 }
 
-/**
-   Routine
-**/
-
 macro_rules! make_naive_sum {
     ($sum_r:expr, $sum_g:expr, $sum_b:expr, $sum_a:expr, $weight: expr,
         $src:expr, $channels:expr) => {{

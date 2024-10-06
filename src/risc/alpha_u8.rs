@@ -28,30 +28,27 @@
  */
 
 use crate::risc::xvsetvlmax_e8m1;
-use crate::{premultiply_pixel, unpremultiply_pixel};
+use crate::{premultiply_pixel, unpremultiply_pixel, ThreadingPolicy};
+use rayon::iter::{IndexedParallelIterator, ParallelIterator};
+use rayon::prelude::ParallelSliceMut;
+use rayon::slice::ParallelSlice;
 use std::arch::asm;
 
 #[target_feature(enable = "v")]
-unsafe fn risc_premultiply_alpha_rgba_u8_impl(
+unsafe fn riscv_premultiply_alpha_rgba_impl_row(
     dst: &mut [u8],
     src: &[u8],
     width: usize,
-    height: usize,
+    offset: usize,
 ) {
-    let mut _cy = 0usize;
-    let src_stride = 4 * width;
+    let mut _cx = 0usize;
 
-    let mut offset = _cy * src_stride;
-
-    for _ in _cy..height {
-        let mut _cx = 0usize;
-
-        let iter_width = xvsetvlmax_e8m1();
-        while _cx + iter_width < width {
-            let px = _cx * 4;
-            let src_ptr = src.as_ptr().add(offset + px);
-            let dst_ptr = dst.as_mut_ptr().add(offset + px);
-            asm!(include_str!("premultiply_alpha_u8.asm"),
+    let iter_width = xvsetvlmax_e8m1();
+    while _cx + iter_width < width {
+        let px = _cx * 4;
+        let src_ptr = src.as_ptr().add(offset + px);
+        let dst_ptr = dst.as_mut_ptr().add(offset + px);
+        asm!(include_str!("premultiply_alpha_u8.asm"),
                      in(reg) src_ptr,
                      in(reg) dst_ptr,
                      t0 = out(reg) _,
@@ -60,21 +57,87 @@ unsafe fn risc_premultiply_alpha_rgba_u8_impl(
                      out("v1") _, out("v2") _, out("v3") _, out("v4") _, out("v5") _,
                      out("v7") _, out("v8") _, out("v9") _, out("v10") _, out("v11") _,
                      out("v12") _, out("v13") _);
-            _cx += iter_width;
-        }
+        _cx += iter_width;
+    }
 
-        for x in _cx..width {
-            let px = x * 4;
-            premultiply_pixel!(dst, src, offset + px);
-        }
-
-        offset += 4 * width;
+    for x in _cx..width {
+        let px = x * 4;
+        premultiply_pixel!(dst, src, offset + px);
     }
 }
 
-pub fn risc_premultiply_alpha_rgba_u8(dst: &mut [u8], src: &[u8], width: usize, height: usize) {
+#[target_feature(enable = "v")]
+unsafe fn risc_premultiply_alpha_rgba_u8_impl(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    height: usize,
+    threading_policy: ThreadingPolicy,
+) {
+    let allowed_threading = threading_policy.allowed_threading();
+
+    if allowed_threading {
+        src.par_chunks_exact(width * 4)
+            .zip(dst.par_chunks_exact_mut(width * 4))
+            .for_each(|(src, dst)| unsafe {
+                riscv_premultiply_alpha_rgba_impl_row(dst, src, width, 0);
+            });
+    } else {
+        let mut offset = 0usize;
+
+        for _ in 0..height {
+            unsafe {
+                riscv_premultiply_alpha_rgba_impl_row(dst, src, width, offset);
+            }
+
+            offset += 4 * width;
+        }
+    }
+}
+
+pub fn risc_premultiply_alpha_rgba_u8(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    height: usize,
+    threading_policy: ThreadingPolicy,
+) {
     unsafe {
-        risc_premultiply_alpha_rgba_u8_impl(dst, src, width, height);
+        risc_premultiply_alpha_rgba_u8_impl(dst, src, width, height, threading_policy);
+    }
+}
+
+#[target_feature(enable = "v")]
+unsafe fn riscv_unpremultiply_alpha_rgba_impl_row(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    offset: usize,
+) {
+    let mut _cx = 0usize;
+
+    let iter_width = xvsetvlmax_e8m1();
+
+    while _cx + iter_width < width {
+        let px = _cx * 4;
+        let src_ptr = src.as_ptr().add(offset + px);
+        let dst_ptr = dst.as_mut_ptr().add(offset + px);
+        asm!(include_str!("unpremultiply_alpha_u8.asm"),
+                in(reg) src_ptr,
+                in(reg) dst_ptr,
+                in(reg) iter_width,
+                t4 = out(reg) _,
+                t5 = out(reg) _,
+                out("v0") _,
+                out("v1") _, out("v2") _, out("v3") _, out("v4") _, out("v5") _,
+                out("v7") _, out("v8") _, out("v9") _, out("v10") _, out("v11") _);
+        _cx += iter_width;
+    }
+
+    for x in _cx..width {
+        let px = x * 4;
+        let pixel_offset = offset + px;
+        unpremultiply_pixel!(dst, src, pixel_offset);
     }
 }
 
@@ -84,45 +147,34 @@ unsafe fn risc_unpremultiply_alpha_rgba_u8_impl(
     src: &[u8],
     width: usize,
     height: usize,
+    threading_policy: ThreadingPolicy,
 ) {
-    let mut _cy = 0usize;
+    let allowed_threading = threading_policy.allowed_threading();
 
-    let mut offset = 0usize;
-    offset += _cy * width * 4;
+    if allowed_threading {
+        src.par_chunks_exact(width * 4)
+            .zip(dst.par_chunks_exact_mut(width * 4))
+            .for_each(|(src, dst)| unsafe {
+                riscv_unpremultiply_alpha_rgba_impl_row(dst, src, width, 0);
+            });
+    } else {
+        let mut offset = 0usize;
 
-    let iter_width = xvsetvlmax_e8m1();
-
-    for _ in _cy..height {
-        let mut _cx = 0usize;
-
-        while _cx + iter_width < width {
-            let px = _cx * 4;
-            let src_ptr = src.as_ptr().add(offset + px);
-            let dst_ptr = dst.as_mut_ptr().add(offset + px);
-            asm!(include_str!("unpremultiply_alpha_u8.asm"),
-                in(reg) src_ptr,
-                in(reg) dst_ptr,
-                in(reg) iter_width,
-                t4 = out(reg) _,
-                t5 = out(reg) _,
-                out("v0") _,
-                out("v1") _, out("v2") _, out("v3") _, out("v4") _, out("v5") _,
-                out("v7") _, out("v8") _, out("v9") _, out("v10") _, out("v11") _);
-            _cx += iter_width;
+        for _ in 0..height {
+            riscv_unpremultiply_alpha_rgba_impl_row(dst, src, width, offset);
+            offset += 4 * width;
         }
-
-        for x in _cx..width {
-            let px = x * 4;
-            let pixel_offset = offset + px;
-            unpremultiply_pixel!(dst, src, pixel_offset);
-        }
-
-        offset += 4 * width;
     }
 }
 
-pub fn risc_unpremultiply_alpha_rgba_u8(dst: &mut [u8], src: &[u8], width: usize, height: usize) {
+pub fn risc_unpremultiply_alpha_rgba_u8(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    height: usize,
+    threading_policy: ThreadingPolicy,
+) {
     unsafe {
-        risc_unpremultiply_alpha_rgba_u8_impl(dst, src, width, height);
+        risc_unpremultiply_alpha_rgba_u8_impl(dst, src, width, height, threading_policy);
     }
 }

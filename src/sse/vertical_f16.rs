@@ -252,7 +252,7 @@ unsafe fn convolve_vertical_sse_row_f16_regular<const CHANNELS: usize>(
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1,f16c,fma")]
+#[target_feature(enable = "sse4.1", enable = "f16c", enable = "fma")]
 unsafe fn convolve_vertical_sse_row_f16c_fma<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,
@@ -272,7 +272,7 @@ unsafe fn convolve_vertical_sse_row_f16c_fma<const CHANNELS: usize>(
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1,f16c")]
+#[target_feature(enable = "sse4.1", enable = "f16c")]
 unsafe fn convolve_vertical_sse_row_f16c<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,
@@ -291,7 +291,7 @@ unsafe fn convolve_vertical_sse_row_f16c<const CHANNELS: usize>(
     );
 }
 
-#[inline]
+#[inline(always)]
 unsafe fn convolve_vertical_sse_row_f16_impl<
     const CHANNELS: usize,
     const FMA: bool,

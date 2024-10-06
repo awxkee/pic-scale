@@ -77,7 +77,7 @@ impl FilterWeights<f32> {
         alignment: usize,
     ) -> FilterWeights<i16> {
         let align = if alignment != 0 {
-            ((self.kernel_size + (alignment - 1)) / alignment) * alignment
+            (self.kernel_size.div_ceil(alignment)) * alignment
         } else {
             self.kernel_size
         };
@@ -99,10 +99,9 @@ impl FilterWeights<f32> {
         }
 
         let mut new_bounds = vec![FilterBounds::new(0, 0); self.bounds.len()];
-        for i in 0..self.bounds.len() {
-            unsafe {
-                *new_bounds.get_unchecked_mut(i) = *self.bounds.get_unchecked(i);
-            }
+
+        for (dst, src) in new_bounds.iter_mut().zip(self.bounds.iter()) {
+            *dst = *src;
         }
 
         FilterWeights::new(

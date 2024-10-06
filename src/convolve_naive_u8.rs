@@ -75,10 +75,6 @@ pub(crate) unsafe fn convolve_vertical_part<
     }
 }
 
-/**
-    Routine
-**/
-
 macro_rules! make_naive_sum {
     ($sum_r:expr, $sum_g:expr, $sum_b:expr, $sum_a:expr, $weight: expr,
         $src:expr, $channels:expr) => {{

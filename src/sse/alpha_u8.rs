@@ -28,7 +28,10 @@
  */
 
 use crate::sse::{sse_deinterleave_rgba, sse_interleave_rgba};
-use crate::{premultiply_pixel, unpremultiply_pixel};
+use crate::{premultiply_pixel, unpremultiply_pixel, ThreadingPolicy};
+use rayon::iter::{IndexedParallelIterator, ParallelIterator};
+use rayon::prelude::ParallelSliceMut;
+use rayon::slice::ParallelSlice;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -87,133 +90,188 @@ unsafe fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
     _mm_select_si128(is_zero_mask, _mm_setzero_si128(), _mm_packus_epi16(lo, hi))
 }
 
-pub fn sse_premultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height: usize) {
+pub fn sse_premultiply_alpha_rgba(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    height: usize,
+    threading_policy: ThreadingPolicy,
+) {
     unsafe {
-        sse_premultiply_alpha_rgba_impl(dst, src, width, height);
+        sse_premultiply_alpha_rgba_impl(dst, src, width, height, threading_policy);
+    }
+}
+
+#[target_feature(enable = "sse4.1")]
+unsafe fn sse_premultiply_alpha_rgba_impl_row(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    offset: usize,
+) {
+    let mut _cx = 0usize;
+
+    unsafe {
+        let zeros = _mm_setzero_si128();
+        while _cx + 16 < width {
+            let px = _cx * 4;
+            let src_ptr = src.as_ptr().add(offset + px);
+            let rgba0 = _mm_loadu_si128(src_ptr as *const __m128i);
+            let rgba1 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
+            let rgba2 = _mm_loadu_si128(src_ptr.add(32) as *const __m128i);
+            let rgba3 = _mm_loadu_si128(src_ptr.add(48) as *const __m128i);
+            let (rrr, ggg, bbb, aaa) = sse_deinterleave_rgba(rgba0, rgba1, rgba2, rgba3);
+
+            let mut rrr_low = _mm_cvtepu8_epi16(rrr);
+            let mut rrr_high = _mm_unpackhi_epi8(rrr, zeros);
+
+            let mut ggg_low = _mm_cvtepu8_epi16(ggg);
+            let mut ggg_high = _mm_unpackhi_epi8(ggg, zeros);
+
+            let mut bbb_low = _mm_cvtepu8_epi16(bbb);
+            let mut bbb_high = _mm_unpackhi_epi8(bbb, zeros);
+
+            let aaa_low = _mm_cvtepu8_epi16(aaa);
+            let aaa_high = _mm_unpackhi_epi8(aaa, zeros);
+
+            rrr_low = sse_div_by255(_mm_mullo_epi16(rrr_low, aaa_low));
+            rrr_high = sse_div_by255(_mm_mullo_epi16(rrr_high, aaa_high));
+            ggg_low = sse_div_by255(_mm_mullo_epi16(ggg_low, aaa_low));
+            ggg_high = sse_div_by255(_mm_mullo_epi16(ggg_high, aaa_high));
+            bbb_low = sse_div_by255(_mm_mullo_epi16(bbb_low, aaa_low));
+            bbb_high = sse_div_by255(_mm_mullo_epi16(bbb_high, aaa_high));
+
+            let rrr = _mm_packus_epi16(rrr_low, rrr_high);
+            let ggg = _mm_packus_epi16(ggg_low, ggg_high);
+            let bbb = _mm_packus_epi16(bbb_low, bbb_high);
+
+            let (rgba0, rgba1, rgba2, rgba3) = sse_interleave_rgba(rrr, ggg, bbb, aaa);
+
+            let dst_ptr = dst.as_mut_ptr().add(offset + px);
+            _mm_storeu_si128(dst_ptr as *mut __m128i, rgba0);
+            _mm_storeu_si128(dst_ptr.add(16) as *mut __m128i, rgba1);
+            _mm_storeu_si128(dst_ptr.add(32) as *mut __m128i, rgba2);
+            _mm_storeu_si128(dst_ptr.add(48) as *mut __m128i, rgba3);
+
+            _cx += 16;
+        }
+    }
+
+    for x in _cx..width {
+        let px = x * 4;
+        premultiply_pixel!(dst, src, offset + px);
     }
 }
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
-unsafe fn sse_premultiply_alpha_rgba_impl(dst: &mut [u8], src: &[u8], width: usize, height: usize) {
-    let mut _cy = 0usize;
-    let src_stride = 4 * width;
+unsafe fn sse_premultiply_alpha_rgba_impl(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    height: usize,
+    threading_policy: ThreadingPolicy,
+) {
+    let allowed_threading = threading_policy.allowed_threading();
 
-    let mut offset = _cy * src_stride;
+    if allowed_threading {
+        src.par_chunks_exact(width * 4)
+            .zip(dst.par_chunks_exact_mut(width * 4))
+            .for_each(|(src, dst)| unsafe {
+                sse_premultiply_alpha_rgba_impl_row(dst, src, width, 0);
+            });
+    } else {
+        let mut _cy = 0usize;
+        let src_stride = 4 * width;
 
-    for _ in _cy..height {
-        let mut _cx = 0usize;
+        let mut offset = _cy * src_stride;
 
-        unsafe {
-            let zeros = _mm_setzero_si128();
-            while _cx + 16 < width {
-                let px = _cx * 4;
-                let src_ptr = src.as_ptr().add(offset + px);
-                let rgba0 = _mm_loadu_si128(src_ptr as *const __m128i);
-                let rgba1 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
-                let rgba2 = _mm_loadu_si128(src_ptr.add(32) as *const __m128i);
-                let rgba3 = _mm_loadu_si128(src_ptr.add(48) as *const __m128i);
-                let (rrr, ggg, bbb, aaa) = sse_deinterleave_rgba(rgba0, rgba1, rgba2, rgba3);
-
-                let mut rrr_low = _mm_cvtepu8_epi16(rrr);
-                let mut rrr_high = _mm_unpackhi_epi8(rrr, zeros);
-
-                let mut ggg_low = _mm_cvtepu8_epi16(ggg);
-                let mut ggg_high = _mm_unpackhi_epi8(ggg, zeros);
-
-                let mut bbb_low = _mm_cvtepu8_epi16(bbb);
-                let mut bbb_high = _mm_unpackhi_epi8(bbb, zeros);
-
-                let aaa_low = _mm_cvtepu8_epi16(aaa);
-                let aaa_high = _mm_unpackhi_epi8(aaa, zeros);
-
-                rrr_low = sse_div_by255(_mm_mullo_epi16(rrr_low, aaa_low));
-                rrr_high = sse_div_by255(_mm_mullo_epi16(rrr_high, aaa_high));
-                ggg_low = sse_div_by255(_mm_mullo_epi16(ggg_low, aaa_low));
-                ggg_high = sse_div_by255(_mm_mullo_epi16(ggg_high, aaa_high));
-                bbb_low = sse_div_by255(_mm_mullo_epi16(bbb_low, aaa_low));
-                bbb_high = sse_div_by255(_mm_mullo_epi16(bbb_high, aaa_high));
-
-                let rrr = _mm_packus_epi16(rrr_low, rrr_high);
-                let ggg = _mm_packus_epi16(ggg_low, ggg_high);
-                let bbb = _mm_packus_epi16(bbb_low, bbb_high);
-
-                let (rgba0, rgba1, rgba2, rgba3) = sse_interleave_rgba(rrr, ggg, bbb, aaa);
-
-                let dst_ptr = dst.as_mut_ptr().add(offset + px);
-                _mm_storeu_si128(dst_ptr as *mut __m128i, rgba0);
-                _mm_storeu_si128(dst_ptr.add(16) as *mut __m128i, rgba1);
-                _mm_storeu_si128(dst_ptr.add(32) as *mut __m128i, rgba2);
-                _mm_storeu_si128(dst_ptr.add(48) as *mut __m128i, rgba3);
-
-                _cx += 16;
+        for _ in _cy..height {
+            unsafe {
+                sse_premultiply_alpha_rgba_impl_row(dst, src, width, offset);
             }
+            offset += 4 * width;
         }
-
-        for x in _cx..width {
-            let px = x * 4;
-            premultiply_pixel!(dst, src, offset + px);
-        }
-
-        offset += 4 * width;
     }
 }
 
-pub fn sse_unpremultiply_alpha_rgba(dst: &mut [u8], src: &[u8], width: usize, height: usize) {
+pub fn sse_unpremultiply_alpha_rgba(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    height: usize,
+    threading_policy: ThreadingPolicy,
+) {
     unsafe {
-        sse_unpremultiply_alpha_rgba_impl(dst, src, width, height);
+        sse_unpremultiply_alpha_rgba_impl(dst, src, width, height, threading_policy);
     }
 }
 
-#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn sse_unpremultiply_alpha_rgba_impl_row(
+    dst: &mut [u8],
+    src: &[u8],
+    width: usize,
+    offset: usize,
+) {
+    let mut _cx = 0usize;
+
+    unsafe {
+        while _cx + 16 < width {
+            let px = _cx * 4;
+            let pixel_offset = offset + px;
+            let src_ptr = src.as_ptr().add(pixel_offset);
+            let rgba0 = _mm_loadu_si128(src_ptr as *const __m128i);
+            let rgba1 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
+            let rgba2 = _mm_loadu_si128(src_ptr.add(32) as *const __m128i);
+            let rgba3 = _mm_loadu_si128(src_ptr.add(48) as *const __m128i);
+            let (rrr, ggg, bbb, aaa) = sse_deinterleave_rgba(rgba0, rgba1, rgba2, rgba3);
+
+            let rrr = sse_unpremultiply_row(rrr, aaa);
+            let ggg = sse_unpremultiply_row(ggg, aaa);
+            let bbb = sse_unpremultiply_row(bbb, aaa);
+
+            let (rgba0, rgba1, rgba2, rgba3) = sse_interleave_rgba(rrr, ggg, bbb, aaa);
+
+            let dst_ptr = dst.as_mut_ptr().add(offset + px);
+            _mm_storeu_si128(dst_ptr as *mut __m128i, rgba0);
+            _mm_storeu_si128(dst_ptr.add(16) as *mut __m128i, rgba1);
+            _mm_storeu_si128(dst_ptr.add(32) as *mut __m128i, rgba2);
+            _mm_storeu_si128(dst_ptr.add(48) as *mut __m128i, rgba3);
+
+            _cx += 16;
+        }
+    }
+
+    for x in _cx..width {
+        let px = x * 4;
+        let pixel_offset = offset + px;
+        unpremultiply_pixel!(dst, src, pixel_offset);
+    }
+}
+
 #[target_feature(enable = "sse4.1")]
 unsafe fn sse_unpremultiply_alpha_rgba_impl(
     dst: &mut [u8],
     src: &[u8],
     width: usize,
     height: usize,
+    threading_policy: ThreadingPolicy,
 ) {
-    let mut _cy = 0usize;
+    let allowed_threading = threading_policy.allowed_threading();
 
-    let mut offset = 0usize;
-    offset += _cy * width * 4;
+    if allowed_threading {
+        src.par_chunks_exact(width * 4)
+            .zip(dst.par_chunks_exact_mut(width * 4))
+            .for_each(|(src, dst)| unsafe {
+                sse_unpremultiply_alpha_rgba_impl_row(dst, src, width, 0);
+            });
+    } else {
+        let mut offset = 0usize;
 
-    for _ in _cy..height {
-        let mut _cx = 0usize;
-
-        unsafe {
-            while _cx + 16 < width {
-                let px = _cx * 4;
-                let pixel_offset = offset + px;
-                let src_ptr = src.as_ptr().add(pixel_offset);
-                let rgba0 = _mm_loadu_si128(src_ptr as *const __m128i);
-                let rgba1 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
-                let rgba2 = _mm_loadu_si128(src_ptr.add(32) as *const __m128i);
-                let rgba3 = _mm_loadu_si128(src_ptr.add(48) as *const __m128i);
-                let (rrr, ggg, bbb, aaa) = sse_deinterleave_rgba(rgba0, rgba1, rgba2, rgba3);
-
-                let rrr = sse_unpremultiply_row(rrr, aaa);
-                let ggg = sse_unpremultiply_row(ggg, aaa);
-                let bbb = sse_unpremultiply_row(bbb, aaa);
-
-                let (rgba0, rgba1, rgba2, rgba3) = sse_interleave_rgba(rrr, ggg, bbb, aaa);
-
-                let dst_ptr = dst.as_mut_ptr().add(offset + px);
-                _mm_storeu_si128(dst_ptr as *mut __m128i, rgba0);
-                _mm_storeu_si128(dst_ptr.add(16) as *mut __m128i, rgba1);
-                _mm_storeu_si128(dst_ptr.add(32) as *mut __m128i, rgba2);
-                _mm_storeu_si128(dst_ptr.add(48) as *mut __m128i, rgba3);
-
-                _cx += 16;
-            }
+        for _ in 0..height {
+            sse_unpremultiply_alpha_rgba_impl_row(dst, src, width, offset);
+            offset += 4 * width;
         }
-
-        for x in _cx..width {
-            let px = x * 4;
-            let pixel_offset = offset + px;
-            unpremultiply_pixel!(dst, src, pixel_offset);
-        }
-
-        offset += 4 * width;
     }
 }

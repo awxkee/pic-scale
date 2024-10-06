@@ -149,7 +149,7 @@ pub unsafe fn _mm_hsum_ps(v: __m128) -> f32 {
     let mut sums = _mm_add_ps(v, shuf);
     shuf = _mm_movehl_ps(shuf, sums);
     sums = _mm_add_ss(sums, shuf);
-    return _mm_cvtss_f32(sums);
+    _mm_cvtss_f32(sums)
 }
 
 #[inline(always)]
@@ -208,7 +208,7 @@ pub(crate) unsafe fn _mm_hsum_epi32(x: __m128i) -> i32 {
     const SM: i32 = shuffle(1, 0, 3, 2);
     let hi32 = _mm_shufflelo_epi16::<SM>(sum64);
     let sum32 = _mm_add_epi32(sum64, hi32);
-    return _mm_cvtsi128_si32(sum32);
+    _mm_cvtsi128_si32(sum32)
 }
 
 #[inline(always)]
@@ -221,8 +221,7 @@ pub(crate) unsafe fn _mm_muladd_epi32(a: __m128i, b: __m128i, c: __m128i) -> __m
 pub unsafe fn _mm_srai_epi64x<const IMM8: i32>(a: __m128i) -> __m128i {
     let m = _mm_set1_epi64x(1 << (64 - 1));
     let x = _mm_srli_epi64::<IMM8>(a);
-    let result = _mm_sub_epi64(_mm_xor_si128(x, m), m); //result = x^m - m
-    return result;
+    _mm_sub_epi64(_mm_xor_si128(x, m), m)
 }
 
 #[inline]
@@ -231,8 +230,7 @@ pub(crate) unsafe fn _mm_packus_epi64(a: __m128i, b: __m128i) -> __m128i {
     const SHUFFLE_MASK: i32 = shuffle(3, 1, 2, 0);
     let a = _mm_shuffle_epi32::<SHUFFLE_MASK>(a);
     let b1 = _mm_shuffle_epi32::<SHUFFLE_MASK>(b);
-    let moved = _mm_castps_si128(_mm_movelh_ps(_mm_castsi128_ps(a), _mm_castsi128_ps(b1)));
-    moved
+    _mm_castps_si128(_mm_movelh_ps(_mm_castsi128_ps(a), _mm_castsi128_ps(b1)))
 }
 
 #[inline(always)]
@@ -240,11 +238,11 @@ pub(crate) unsafe fn _mm_packus_epi64(a: __m128i, b: __m128i) -> __m128i {
 pub unsafe fn _mm_extract_epi64x<const IMM: i32>(d: __m128i) -> i64 {
     #[cfg(target_arch = "x86_64")]
     {
-        return if IMM == 0 {
+        if IMM == 0 {
             _mm_cvtsi128_si64(d)
         } else {
             _mm_extract_epi64::<IMM>(d)
-        };
+        }
     }
     #[cfg(target_arch = "x86")]
     {
@@ -256,7 +254,7 @@ pub unsafe fn _mm_extract_epi64x<const IMM: i32>(d: __m128i) -> i64 {
             low = _mm_cvtsi128_si32(_mm_srli_si128::<8>(d));
             high = _mm_cvtsi128_si32(_mm_srli_si128::<12>(d));
         }
-        return ((high as i64) << 32) | low as i64;
+        ((high as i64) << 32) | low as i64
     }
 }
 
