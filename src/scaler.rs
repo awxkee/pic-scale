@@ -203,11 +203,13 @@ impl Scaler {
                     let dx = dx.abs();
                     weight = resampling_function(dx * filter_scale);
                 }
-                weights_sum += weight;
-                unsafe {
-                    *local_filters.get_unchecked_mut(local_filter_iteration) = weight;
+                if weight != 0. {
+                    weights_sum += weight;
+                    unsafe {
+                        *local_filters.get_unchecked_mut(local_filter_iteration) = weight;
+                    }
+                    local_filter_iteration += 1;
                 }
-                local_filter_iteration += 1;
             }
 
             const ALPHA: f32 = 0.7f32;
@@ -231,11 +233,14 @@ impl Scaler {
 
             if weights_sum != 0f32 {
                 let recpeq = 1f32 / weights_sum;
-                for i in 0..size {
-                    unsafe {
-                        *weights.get_unchecked_mut(filter_position + i) =
-                            *local_filters.get_unchecked(i) * recpeq;
-                    }
+
+                for (dst, src) in weights
+                    .iter_mut()
+                    .skip(filter_position)
+                    .take(size)
+                    .zip(local_filters.iter().take(size))
+                {
+                    *dst = *src * recpeq;
                 }
             }
 

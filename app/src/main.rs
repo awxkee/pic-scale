@@ -28,10 +28,7 @@ fn main() {
     let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
-    let mut choke: Vec<u16> = bytes
-        .iter()
-        .map(|&x| x as u16)
-        .collect();
+    let mut choke: Vec<u16> = bytes.iter().map(|&x| x as u16).collect();
 
     let start_time = Instant::now();
     let store =
@@ -39,11 +36,16 @@ fn main() {
             .unwrap();
     let resized = scaler.resize_rgba_u16(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-        store,8,
+        store,
+        8,
         true,
     );
 
-    let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| x as u8).collect::<Vec<_>>();
+    let dst: Vec<u8> = resized
+        .as_bytes()
+        .iter()
+        .map(|&x| x as u8)
+        .collect::<Vec<_>>();
     // println!("f1 {}, f2 {}, f3 {}, f4 {}", dst[0], dst[1], dst[2], dst[3]);
     // let dst: Vec<u8> = resized
     //     .as_bytes()
@@ -229,8 +231,8 @@ fn test_fast_image() {
         image::save_buffer(
             "fast_image.jpg",
             &dst,
-            dst_image.width() as u32,
-            dst_image.height() as u32,
+            dst_image.width(),
+            dst_image.height(),
             image::ColorType::Rgb8,
         )
         .unwrap();
@@ -238,8 +240,8 @@ fn test_fast_image() {
         image::save_buffer(
             "fast_image.png",
             &dst,
-            dst_image.width() as u32,
-            dst_image.height() as u32,
+            dst_image.width(),
+            dst_image.height(),
             image::ColorType::Rgba8,
         )
         .unwrap();
