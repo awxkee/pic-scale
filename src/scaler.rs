@@ -33,14 +33,15 @@ use crate::image_store::ImageStore;
 use crate::nearest_sampler::resize_nearest;
 use crate::threading_policy::ThreadingPolicy;
 use crate::ResamplingFunction::Nearest;
-use crate::{ResamplingFilter, ResamplingFunction};
+use crate::{ConstPI, ConstSqrt2, Jinc, ResamplingFunction};
+use num_traits::{AsPrimitive, Float, Signed};
 use rayon::ThreadPool;
 use std::fmt::Debug;
+use std::ops::{AddAssign, MulAssign, Neg};
 
 #[derive(Debug, Copy, Clone)]
 /// Represents base scaling structure
 pub struct Scaler {
-    pub(crate) resampling_filter: ResamplingFilter,
     pub(crate) function: ResamplingFunction,
     pub(crate) threading_policy: ThreadingPolicy,
 }
@@ -129,81 +130,104 @@ impl Scaler {
     /// Creates new Scaler instance with corresponding filter
     pub fn new(filter: ResamplingFunction) -> Self {
         Scaler {
-            resampling_filter: filter.get_resampling_filter(),
             function: filter,
             threading_policy: ThreadingPolicy::Single,
         }
     }
 
-    pub(crate) fn generate_weights(&self, in_size: usize, out_size: usize) -> FilterWeights<f32> {
-        let scale = in_size as f32 / out_size as f32;
-        let is_resizable_kernel = self.resampling_filter.is_resizable_kernel;
+    pub(crate) fn generate_weights<T>(&self, in_size: usize, out_size: usize) -> FilterWeights<T>
+    where
+        T: Copy
+            + Neg
+            + Signed
+            + Float
+            + 'static
+            + ConstPI
+            + MulAssign<T>
+            + AddAssign<T>
+            + AsPrimitive<f64>
+            + AsPrimitive<usize>
+            + Jinc<T>
+            + ConstSqrt2
+            + Default
+            + AsPrimitive<i32>,
+        f32: AsPrimitive<T>,
+        f64: AsPrimitive<T>,
+        usize: AsPrimitive<T>,
+    {
+        let resampling_filter = self.function.get_resampling_filter();
+        let scale = in_size.as_() / out_size.as_();
+        let is_resizable_kernel = resampling_filter.is_resizable_kernel;
         let filter_scale_cutoff = match is_resizable_kernel {
-            true => scale.max(1f32),
-            false => 1f32,
+            true => scale.max(1f32.as_()),
+            false => 1f32.as_(),
         };
-        let filter_base_size = self.resampling_filter.min_kernel_size;
-        let resampling_function = self.resampling_filter.kernel;
-        let window_func = self.resampling_filter.window;
-        let base_size = (filter_base_size * filter_scale_cutoff).round() as usize;
+        let filter_base_size = resampling_filter.min_kernel_size;
+        let resampling_function = resampling_filter.kernel;
+        let window_func = resampling_filter.window;
+        let base_size: usize = (filter_base_size.as_() * filter_scale_cutoff).round().as_();
         // Kernel size must be always odd
         let kernel_size = base_size * 2 + 1usize;
-        let filter_radius = base_size as f32;
-        let filter_scale = 1f32 / filter_scale_cutoff;
-        let mut weights: Vec<f32> = vec![0f32; kernel_size * out_size];
-        let mut local_filters = vec![0f32; kernel_size];
+        let filter_radius = base_size.as_();
+        let filter_scale = 1f32.as_() / filter_scale_cutoff;
+        let mut weights: Vec<T> = vec![T::default(); kernel_size * out_size];
+        let mut local_filters = vec![T::default(); kernel_size];
         let mut filter_position = 0usize;
         let blur_scale = match window_func {
-            None => 1f32,
+            None => 1f32.as_(),
             Some(window) => {
-                if window.blur > 0f32 {
-                    1f32 / window.blur
+                if window.blur.as_() > 0f32.as_() {
+                    1f32.as_() / window.blur.as_()
                 } else {
-                    0f32
+                    0f32.as_()
                 }
             }
         };
 
         let mut bounds: Vec<FilterBounds> = vec![FilterBounds::new(0, 0); out_size];
         for i in 0..out_size {
-            let center_x = ((i as f32 + 0.5f32) * scale).min(in_size as f32);
-            let mut weights_sum: f32 = 0f32;
+            let center_x = ((i.as_() + 0.5f32.as_()) * scale).min(in_size.as_());
+            let mut weights_sum: T = 0f32.as_();
             let mut local_filter_iteration = 0usize;
 
-            let start = (center_x - filter_radius).floor().max(0f32) as usize;
-            let end = ((center_x + filter_radius).ceil().min(in_size as f32) as usize)
-                .min(start + kernel_size);
+            let start: usize = (center_x - filter_radius).floor().max(0f32.as_()).as_();
+            let end: usize = (center_x + filter_radius)
+                .ceil()
+                .min(in_size.as_())
+                .min(start.as_() + kernel_size.as_())
+                .as_();
 
-            let center = center_x - 0.5f32;
+            let center = center_x - 0.5f32.as_();
 
             for k in start..end {
-                let dx = k as f32 - center;
+                let dx = k.as_() - center;
                 let weight;
                 if let Some(resampling_window) = window_func {
                     let mut x = dx.abs();
-                    x = if resampling_window.blur > 0f32 {
+                    x = if resampling_window.blur.as_() > 0f32.as_() {
                         x * blur_scale
                     } else {
                         x
                     };
-                    x = if x <= resampling_window.taper {
-                        0f32
+                    x = if x <= resampling_window.taper.as_() {
+                        0f32.as_()
                     } else {
-                        (x - resampling_window.taper) / (1f32 - resampling_window.taper)
+                        (x - resampling_window.taper.as_())
+                            / (1f32.as_() - resampling_window.taper.as_())
                     };
                     let window_producer = resampling_window.window;
                     let x_kernel_scaled = x * filter_scale;
-                    let window = if x < resampling_window.window_size {
-                        window_producer(x_kernel_scaled * resampling_window.window_size)
+                    let window = if x < resampling_window.window_size.as_() {
+                        window_producer(x_kernel_scaled * resampling_window.window_size.as_())
                     } else {
-                        0f32
+                        0f32.as_()
                     };
                     weight = window * resampling_function(x_kernel_scaled);
                 } else {
                     let dx = dx.abs();
                     weight = resampling_function(dx * filter_scale);
                 }
-                if weight != 0. {
+                if weight != 0f32.as_() {
                     weights_sum += weight;
                     unsafe {
                         *local_filters.get_unchecked_mut(local_filter_iteration) = weight;
@@ -212,12 +236,12 @@ impl Scaler {
                 }
             }
 
-            const ALPHA: f32 = 0.7f32;
-            if self.resampling_filter.is_ewa && !local_filters.is_empty() {
+            let alpha: T = 0.7f32.as_();
+            if resampling_filter.is_ewa && !local_filters.is_empty() {
                 weights_sum = unsafe { *local_filters.get_unchecked(0) };
                 for j in 1..local_filter_iteration {
-                    let new_weight = ALPHA * unsafe { *local_filters.get_unchecked(j) }
-                        + (1f32 - ALPHA) * unsafe { *local_filters.get_unchecked(j - 1) };
+                    let new_weight = alpha * unsafe { *local_filters.get_unchecked(j) }
+                        + (1f32.as_() - alpha) * unsafe { *local_filters.get_unchecked(j - 1) };
                     unsafe {
                         *local_filters.get_unchecked_mut(j) = new_weight;
                     }
@@ -231,8 +255,8 @@ impl Scaler {
                 *bounds.get_unchecked_mut(i) = FilterBounds::new(start, size);
             }
 
-            if weights_sum != 0f32 {
-                let recpeq = 1f32 / weights_sum;
+            if weights_sum != 0f32.as_() {
+                let recpeq = 1f32.as_() / weights_sum;
 
                 for (dst, src) in weights
                     .iter_mut()
@@ -247,12 +271,12 @@ impl Scaler {
             filter_position += kernel_size;
         }
 
-        FilterWeights::<f32>::new(
+        FilterWeights::<T>::new(
             weights,
             kernel_size,
             kernel_size,
             out_size,
-            filter_radius as i32,
+            filter_radius.as_(),
             bounds,
         )
     }

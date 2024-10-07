@@ -331,7 +331,7 @@ fn qone(x: f64) -> f64 {
 }
 
 #[inline]
-pub fn jinc(x: f64) -> f64 {
+pub fn jinc_f64(x: f64) -> f64 {
     if x == 0f64 {
         return 0f64;
     }
@@ -344,4 +344,20 @@ pub fn jinc_f32(x: f32) -> f32 {
         return 0f32;
     }
     (j1(x as f64) / x as f64) as f32
+}
+
+pub trait Jinc<T> {
+    fn jinc() -> fn(T) -> T;
+}
+
+impl Jinc<f64> for f64 {
+    fn jinc() -> fn(f64) -> f64 {
+        jinc_f64
+    }
+}
+
+impl Jinc<f32> for f32 {
+    fn jinc() -> fn(f32) -> f32 {
+        jinc_f32
+    }
 }

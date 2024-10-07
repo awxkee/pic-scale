@@ -27,15 +27,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![allow(clippy::excessive_precision)]
-use crate::jinc;
 use crate::math::consts::ConstPI;
 use crate::sinc::sinc;
+use crate::Jinc;
 use num_traits::{AsPrimitive, Float};
 use std::ops::Div;
 
 #[inline(always)]
 pub fn lanczos_jinc<
-    V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI + AsPrimitive<f64>,
+    V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI + AsPrimitive<f64> + Jinc<V>,
 >(
     x: V,
     a: V,
@@ -49,15 +49,16 @@ where
         return 0f32.as_();
     }
     if x.abs() < a {
+        let jinc = V::jinc();
         let d = V::const_pi() * x;
-        return (jinc(d.as_()) * jinc((d * scale_a).as_())).as_();
+        return jinc(d) * jinc(d * scale_a);
     }
     0f32.as_()
 }
 
 #[inline(always)]
 pub fn lanczos3_jinc<
-    V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI + AsPrimitive<f64>,
+    V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI + AsPrimitive<f64> + Jinc<V>,
 >(
     x: V,
 ) -> V
@@ -70,7 +71,7 @@ where
 
 #[inline(always)]
 pub fn lanczos2_jinc<
-    V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI + AsPrimitive<f64>,
+    V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI + AsPrimitive<f64> + Jinc<V>,
 >(
     x: V,
 ) -> V
@@ -83,7 +84,7 @@ where
 
 #[inline(always)]
 pub fn lanczos4_jinc<
-    V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI + AsPrimitive<f64>,
+    V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI + AsPrimitive<f64> + Jinc<V>,
 >(
     x: V,
 ) -> V
@@ -95,9 +96,17 @@ where
 }
 
 #[inline(always)]
-pub fn lanczos6_jinc(x: f32) -> f32 {
+pub fn lanczos6_jinc<
+    V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI + AsPrimitive<f64> + Jinc<V>,
+>(
+    x: V,
+) -> V
+where
+    f32: AsPrimitive<V>,
+    f64: AsPrimitive<V>,
+{
     const A: f32 = 6f32;
-    lanczos_jinc(x, A)
+    lanczos_jinc(x, A.as_())
 }
 
 #[inline(always)]
@@ -117,7 +126,11 @@ where
 }
 
 #[inline(always)]
-pub fn lanczos3(x: f32) -> f32 {
+pub fn lanczos3<V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI>(x: V) -> V
+where
+    f32: AsPrimitive<V>,
+    f64: AsPrimitive<V>,
+{
     lanczos_sinc(x, 3f32.as_())
 }
 
