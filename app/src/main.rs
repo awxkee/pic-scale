@@ -40,11 +40,7 @@ fn main() {
         true,
     );
 
-    let dst: Vec<u8> = resized
-        .as_bytes()
-        .iter()
-        .map(|&x| x)
-        .collect::<Vec<_>>();
+    let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| x).collect::<Vec<_>>();
     // println!("f1 {}, f2 {}, f3 {}, f4 {}", dst[0], dst[1], dst[2], dst[3]);
     // let dst: Vec<u8> = resized
     //     .as_bytes()

@@ -127,7 +127,7 @@ fn unpremultiply_alpha_rgba_impl(
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
-        pool.install(move || {
+        pool.install(|| {
             src.par_chunks_exact(width * 4)
                 .zip(dst.par_chunks_exact_mut(width * 4))
                 .for_each(|(src, dst)| {
