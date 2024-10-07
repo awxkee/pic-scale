@@ -64,7 +64,10 @@ unsafe fn convolve_vertical_part_avx_f16<const FMA: bool>(
     }
 
     let dst_ptr = dst.add(px);
-    let converted = _mm256_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(store_0);
+
+    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+
+    let converted = _mm256_cvtps_ph::<ROUNDING_FLAGS>(store_0);
     let first_item = _mm_extract_epi16::<0>(converted) as u16;
     (dst_ptr as *mut u16).write_unaligned(first_item);
 }
@@ -95,8 +98,10 @@ unsafe fn convolve_vertical_part_avx_4_f16<const FMA: bool>(
         store_0 = _mm256_fma_ps::<FMA>(store_0, _mm256_cvtph_ps(item_row_0), v_weight);
     }
 
+    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+
     let dst_ptr = dst.add(px);
-    let acc = _mm256_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(store_0);
+    let acc = _mm256_cvtps_ph::<ROUNDING_FLAGS>(store_0);
     std::ptr::copy_nonoverlapping(&acc as *const _ as *const u8, dst_ptr as *mut u8, 8);
 }
 
@@ -140,13 +145,15 @@ unsafe fn convolve_vertical_part_avx_32_f16<const FMA: bool>(
 
     let dst_ptr = dst.add(px);
 
+    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+
     let acc0 = avx_combine_epi(
-        _mm256_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(store_0),
-        _mm256_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(store_1),
+        _mm256_cvtps_ph::<ROUNDING_FLAGS>(store_0),
+        _mm256_cvtps_ph::<ROUNDING_FLAGS>(store_1),
     );
     let acc1 = avx_combine_epi(
-        _mm256_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(store_2),
-        _mm256_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(store_3),
+        _mm256_cvtps_ph::<ROUNDING_FLAGS>(store_2),
+        _mm256_cvtps_ph::<ROUNDING_FLAGS>(store_3),
     );
 
     _mm256_storeu_si256(dst_ptr as *mut __m256i, acc0);
@@ -184,10 +191,12 @@ unsafe fn convolve_vertical_part_avx_16_f16<const FMA: bool>(
         store_1 = _mm256_fma_ps::<FMA>(store_1, items1, v_weight);
     }
 
+    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+
     let dst_ptr = dst.add(px);
     let acc0 = avx_combine_epi(
-        _mm256_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(store_0),
-        _mm256_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(store_1),
+        _mm256_cvtps_ph::<ROUNDING_FLAGS>(store_0),
+        _mm256_cvtps_ph::<ROUNDING_FLAGS>(store_1),
     );
     _mm256_storeu_si256(dst_ptr as *mut __m256i, acc0);
 }
@@ -224,7 +233,7 @@ pub fn convolve_vertical_avx_row_f16<const CHANNELS: usize, const FMA: bool>(
 }
 
 #[inline]
-#[target_feature(enable = "avx2,f16c")]
+#[target_feature(enable = "avx2", enable = "f16c")]
 unsafe fn convolve_vertical_avx_row_f16_regular<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,
@@ -244,7 +253,7 @@ unsafe fn convolve_vertical_avx_row_f16_regular<const CHANNELS: usize>(
 }
 
 #[inline]
-#[target_feature(enable = "avx2,fma,f16c")]
+#[target_feature(enable = "avx2", enable = "fma", enable = "f16c")]
 unsafe fn convolve_vertical_avx_row_f16_fma<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,

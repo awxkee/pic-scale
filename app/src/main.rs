@@ -25,7 +25,7 @@ fn main() {
     let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
-    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    let mut scaler = Scaler::new(ResamplingFunction::MitchellNetravalli);
     scaler.set_threading_policy(ThreadingPolicy::Adaptive);
 
     let mut choke: Vec<u8> = bytes.iter().map(|&x| x).collect();
