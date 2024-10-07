@@ -95,6 +95,7 @@ mod threading_policy;
 mod unsafe_slice;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 mod wasm32;
+mod color_group;
 
 pub use colors::JzazbzScaler;
 pub use colors::LChScaler;

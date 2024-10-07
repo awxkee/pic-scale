@@ -50,7 +50,7 @@ pub(crate) fn convolve_vertical_part_u16<const BUFFER_SIZE: usize>(
     bit_depth: usize,
 ) {
     unsafe {
-        let max_colors = 2i64.pow(bit_depth as u32) - 1;
+        let max_colors = (1 << bit_depth) - 1;
         let mut store: [i64; BUFFER_SIZE] = [ROUNDING_CONST.as_(); BUFFER_SIZE];
 
         for j in 0..bounds.size {
@@ -116,10 +116,10 @@ pub(crate) fn convolve_horizontal_rgba_native_row_u16<const CHANNELS: usize>(
     unsafe_destination_ptr_0: *mut u16,
     bit_depth: usize,
 ) {
-    let max_colors = 2i64.pow(bit_depth as u32) - 1i64;
+    let max_colors = (1 << bit_depth) - 1;
     unsafe {
         let mut filter_offset = 0usize;
-        let weights_ptr = filter_weights.weights.as_ptr();
+        let weights = &filter_weights.weights;
 
         for x in 0..dst_width {
             let mut sum_r: i64 = ROUNDING_CONST as i64;
@@ -131,7 +131,7 @@ pub(crate) fn convolve_horizontal_rgba_native_row_u16<const CHANNELS: usize>(
             let start_x = bounds.start;
             for j in 0..bounds.size {
                 let px = (start_x + j) * CHANNELS;
-                let weight: i64 = weights_ptr.add(j + filter_offset).read_unaligned() as i64;
+                let weight: i64 = (*weights.get_unchecked(j + filter_offset)) as i64;
                 let src = unsafe_source_ptr_0.add(px);
                 make_naive_sum!(sum_r, sum_g, sum_b, sum_a, weight, src, CHANNELS);
             }
@@ -158,10 +158,10 @@ pub(crate) fn convolve_horizontal_rgba_native_4_row_u16<const CHANNELS: usize>(
     dst_stride: usize,
     bit_depth: usize,
 ) {
-    let max_colors = 2i64.pow(bit_depth as u32) - 1i64;
+    let max_colors = (1 << bit_depth) - 1;
     unsafe {
         let mut filter_offset = 0usize;
-        let weights_ptr = filter_weights.weights.as_ptr();
+        let weights = &filter_weights.weights;
 
         let src_row0 = unsafe_source_ptr_0;
         let src_row1 = unsafe_source_ptr_0.add(src_stride);
@@ -195,7 +195,7 @@ pub(crate) fn convolve_horizontal_rgba_native_4_row_u16<const CHANNELS: usize>(
             let start_x = bounds.start;
             for j in 0..bounds.size {
                 let px = (start_x + j) * CHANNELS;
-                let weight = weights_ptr.add(j + filter_offset).read_unaligned() as i64;
+                let weight = (*weights.get_unchecked(j + filter_offset)) as i64;
 
                 let src0 = src_row0.add(px);
                 make_naive_sum!(sum_r_0, sum_g_0, sum_b_0, sum_a_0, weight, src0, CHANNELS);

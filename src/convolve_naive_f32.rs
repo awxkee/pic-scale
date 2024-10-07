@@ -110,7 +110,7 @@ pub(crate) fn convolve_horizontal_rgb_native_row<
     f32: AsPrimitive<T>,
 {
     unsafe {
-        let weights_ptr = filter_weights.weights.as_ptr();
+        let weights_ptr = &filter_weights.weights;
         let mut filter_offset = 0usize;
 
         for x in 0..dst_width {
@@ -123,7 +123,7 @@ pub(crate) fn convolve_horizontal_rgb_native_row<
             let start_x = bounds.start;
             for j in 0..bounds.size {
                 let px = (start_x + j) * CHANNELS;
-                let weight = weights_ptr.add(j + filter_offset).read_unaligned();
+                let weight = *weights_ptr.get_unchecked(j + filter_offset);
                 let src = unsafe_source_ptr_0.add(px);
                 make_naive_sum!(_sum_r, _sum_g, _sum_b, _sum_a, weight, src, CHANNELS);
             }
@@ -153,7 +153,7 @@ pub(crate) fn convolve_horizontal_rgba_4_row_f32<
 {
     unsafe {
         let mut filter_offset = 0usize;
-        let weights_ptr = filter_weights.weights.as_ptr();
+        let weights = &filter_weights.weights;
 
         let src_row0 = unsafe_source_ptr_0;
         let src_row1 = unsafe_source_ptr_0.add(src_stride);
@@ -187,7 +187,7 @@ pub(crate) fn convolve_horizontal_rgba_4_row_f32<
             let start_x = bounds.start;
             for j in 0..bounds.size {
                 let px = (start_x + j) * CHANNELS;
-                let weight = weights_ptr.add(j + filter_offset).read_unaligned();
+                let weight = *weights.get_unchecked(j + filter_offset);
 
                 let src0 = src_row0.add(px);
                 make_naive_sum!(sum_r_0, sum_g_0, sum_b_0, sum_a_0, weight, src0, CHANNELS);
