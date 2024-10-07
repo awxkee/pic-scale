@@ -26,8 +26,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::color_group::ColorGroup;
 use crate::filter_weights::{FilterBounds, FilterWeights};
-use num_traits::AsPrimitive;
+use num_traits::{AsPrimitive, MulAdd};
 
 pub(crate) unsafe fn convolve_vertical_part_f32<
     T: Copy + 'static + AsPrimitive<f32>,
@@ -65,40 +66,10 @@ pub(crate) unsafe fn convolve_vertical_part_f32<
     }
 }
 
-macro_rules! make_naive_sum {
-    ($sum_r:expr, $sum_g:expr, $sum_b:expr, $sum_a:expr, $weight: expr,
-        $src:expr, $channels:expr) => {{
-        $sum_r += $src.read_unaligned().as_() * $weight;
-        if $channels > 1 {
-            $sum_g += $src.add(1).read_unaligned().as_() * $weight;
-        }
-        if $channels > 2 {
-            $sum_b += $src.add(2).read_unaligned().as_() * $weight;
-        }
-        if $channels == 4 {
-            $sum_a += $src.add(3).read_unaligned().as_() * $weight;
-        }
-    }};
-}
-
-macro_rules! write_out_pixels {
-    ($sum_r:expr, $sum_g:expr, $sum_b:expr, $sum_a:expr, $dst:expr, $channels:expr) => {{
-        $dst.write_unaligned($sum_r.as_());
-        if $channels > 1 {
-            $dst.add(1).write_unaligned($sum_g.as_());
-        }
-        if $channels > 2 {
-            $dst.add(2).write_unaligned($sum_b.as_());
-        }
-        if $channels == 4 {
-            $dst.add(3).write_unaligned($sum_a.as_());
-        }
-    }};
-}
-
 #[inline]
 pub(crate) fn convolve_horizontal_rgb_native_row<
-    T: Copy + 'static + AsPrimitive<f32>,
+    T: Copy + 'static + AsPrimitive<I>,
+    I: Copy + 'static + Default + MulAdd<I, Output = I> + AsPrimitive<T>,
     const CHANNELS: usize,
 >(
     dst_width: usize,
@@ -107,38 +78,38 @@ pub(crate) fn convolve_horizontal_rgb_native_row<
     unsafe_source_ptr_0: *const T,
     unsafe_destination_ptr_0: *mut T,
 ) where
-    f32: AsPrimitive<T>,
+    f32: AsPrimitive<T> + AsPrimitive<I>,
 {
     unsafe {
         let weights_ptr = &filter_weights.weights;
         let mut filter_offset = 0usize;
 
         for x in 0..dst_width {
-            let mut _sum_r = 0f32;
-            let mut _sum_g = 0f32;
-            let mut _sum_b = 0f32;
-            let mut _sum_a = 0f32;
+            let mut sums = ColorGroup::<CHANNELS, I>::dup(0f32.as_());
 
             let bounds = filter_weights.bounds.get_unchecked(x);
             let start_x = bounds.start;
             for j in 0..bounds.size {
                 let px = (start_x + j) * CHANNELS;
                 let weight = *weights_ptr.get_unchecked(j + filter_offset);
-                let src = unsafe_source_ptr_0.add(px);
-                make_naive_sum!(_sum_r, _sum_g, _sum_b, _sum_a, weight, src, CHANNELS);
+
+                let new_px = ColorGroup::<CHANNELS, I>::from_ptr(unsafe_source_ptr_0, px);
+
+                sums = sums.mul_add(new_px, weight.as_());
             }
 
             let px = x * CHANNELS;
 
-            let dest_ptr = unsafe_destination_ptr_0.add(px);
-            write_out_pixels!(_sum_r, _sum_g, _sum_b, _sum_a, dest_ptr, CHANNELS);
+            sums.as_ptr(unsafe_destination_ptr_0, px);
+
             filter_offset += filter_weights.aligned_size;
         }
     }
 }
 
 pub(crate) fn convolve_horizontal_rgba_4_row_f32<
-    T: Copy + 'static + AsPrimitive<f32>,
+    T: Copy + 'static + AsPrimitive<I>,
+    I: Copy + 'static + Default + MulAdd<I, Output = I> + AsPrimitive<T>,
     const CHANNELS: usize,
 >(
     dst_width: usize,
@@ -149,7 +120,7 @@ pub(crate) fn convolve_horizontal_rgba_4_row_f32<
     unsafe_destination_ptr_0: *mut T,
     dst_stride: usize,
 ) where
-    f32: AsPrimitive<T>,
+    f32: AsPrimitive<T> + AsPrimitive<I>,
 {
     unsafe {
         let mut filter_offset = 0usize;
@@ -166,22 +137,10 @@ pub(crate) fn convolve_horizontal_rgba_4_row_f32<
         let dst_row3 = unsafe_destination_ptr_0.add(dst_stride * 3);
 
         for x in 0..dst_width {
-            let mut sum_r_0 = 0f32;
-            let mut sum_g_0 = 0f32;
-            let mut sum_b_0 = 0f32;
-            let mut sum_a_0 = 0f32;
-            let mut sum_r_1 = 0f32;
-            let mut sum_g_1 = 0f32;
-            let mut sum_b_1 = 0f32;
-            let mut sum_a_1 = 0f32;
-            let mut sum_r_2 = 0f32;
-            let mut sum_g_2 = 0f32;
-            let mut sum_b_2 = 0f32;
-            let mut sum_a_2 = 0f32;
-            let mut sum_r_3 = 0f32;
-            let mut sum_g_3 = 0f32;
-            let mut sum_b_3 = 0f32;
-            let mut sum_a_3 = 0f32;
+            let mut sums0 = ColorGroup::<CHANNELS, I>::dup(0f32.as_());
+            let mut sums1 = ColorGroup::<CHANNELS, I>::dup(0f32.as_());
+            let mut sums2 = ColorGroup::<CHANNELS, I>::dup(0f32.as_());
+            let mut sums3 = ColorGroup::<CHANNELS, I>::dup(0f32.as_());
 
             let bounds = filter_weights.bounds.get_unchecked(x);
             let start_x = bounds.start;
@@ -189,30 +148,25 @@ pub(crate) fn convolve_horizontal_rgba_4_row_f32<
                 let px = (start_x + j) * CHANNELS;
                 let weight = *weights.get_unchecked(j + filter_offset);
 
-                let src0 = src_row0.add(px);
-                make_naive_sum!(sum_r_0, sum_g_0, sum_b_0, sum_a_0, weight, src0, CHANNELS);
+                let new_px0 = ColorGroup::<CHANNELS, I>::from_ptr(src_row0, px);
+                sums0 = sums0.mul_add(new_px0, weight.as_());
 
-                let src1 = src_row1.add(px);
-                make_naive_sum!(sum_r_1, sum_g_1, sum_b_1, sum_a_1, weight, src1, CHANNELS);
+                let new_px1 = ColorGroup::<CHANNELS, I>::from_ptr(src_row1, px);
+                sums1 = sums1.mul_add(new_px1, weight.as_());
 
-                let src2 = src_row2.add(px);
-                make_naive_sum!(sum_r_2, sum_g_2, sum_b_2, sum_a_2, weight, src2, CHANNELS);
+                let new_px2 = ColorGroup::<CHANNELS, I>::from_ptr(src_row2, px);
+                sums2 = sums2.mul_add(new_px2, weight.as_());
 
-                let src3 = src_row3.add(px);
-                make_naive_sum!(sum_r_3, sum_g_3, sum_b_3, sum_a_3, weight, src3, CHANNELS);
+                let new_px3 = ColorGroup::<CHANNELS, I>::from_ptr(src_row3, px);
+                sums3 = sums3.mul_add(new_px3, weight.as_());
             }
 
             let px = x * CHANNELS;
 
-            let dest_ptr_0 = dst_row0.add(px);
-            let dest_ptr_1 = dst_row1.add(px);
-            let dest_ptr_2 = dst_row2.add(px);
-            let dest_ptr_3 = dst_row3.add(px);
-
-            write_out_pixels!(sum_r_0, sum_g_0, sum_b_0, sum_a_0, dest_ptr_0, CHANNELS);
-            write_out_pixels!(sum_r_1, sum_g_1, sum_b_1, sum_a_1, dest_ptr_1, CHANNELS);
-            write_out_pixels!(sum_r_2, sum_g_2, sum_b_2, sum_a_2, dest_ptr_2, CHANNELS);
-            write_out_pixels!(sum_r_3, sum_g_3, sum_b_3, sum_a_3, dest_ptr_3, CHANNELS);
+            sums0.as_ptr(dst_row0, px);
+            sums1.as_ptr(dst_row1, px);
+            sums2.as_ptr(dst_row2, px);
+            sums3.as_ptr(dst_row3, px);
 
             filter_offset += filter_weights.aligned_size;
         }

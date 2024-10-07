@@ -171,6 +171,26 @@ where
             }
         }
     }
+
+    #[inline]
+    pub fn as_ptr<V: Copy + 'static>(self, ptr: *mut V, offset: usize)
+    where
+        J: Copy + AsPrimitive<V>,
+    {
+        unsafe {
+            let s_ptr = ptr.add(offset);
+            s_ptr.write_unaligned(self.r.as_());
+            if COMPS > 1 {
+                s_ptr.add(1).write_unaligned(self.g.as_());
+            }
+            if COMPS > 2 {
+                s_ptr.add(2).write_unaligned(self.b.as_());
+            }
+            if COMPS == 4 {
+                s_ptr.add(3).write_unaligned(self.a.as_());
+            }
+        }
+    }
 }
 
 impl<const COMPS: usize, J> Mul<J> for ColorGroup<COMPS, J>

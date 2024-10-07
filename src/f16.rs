@@ -82,9 +82,9 @@ impl<'a> HorizontalConvolutionPass<f16, 4> for ImageStore<'a, f16, 4> {
     ) {
         let mut _dispatcher_4_rows: Option<
             fn(usize, usize, &FilterWeights<f32>, *const f16, usize, *mut f16, usize),
-        > = Some(convolve_horizontal_rgba_4_row_f32::<f16, 4>);
+        > = Some(convolve_horizontal_rgba_4_row_f32::<f16, f32, 4>);
         let mut _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, *const f16, *mut f16) =
-            convolve_horizontal_rgb_native_row::<f16, 4>;
+            convolve_horizontal_rgb_native_row::<f16, f32, 4>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if is_aarch_f16c_supported() {
@@ -208,9 +208,9 @@ impl<'a> HorizontalConvolutionPass<f16, 3> for ImageStore<'a, f16, 3> {
     ) {
         let mut _dispatcher_4_rows: Option<
             fn(usize, usize, &FilterWeights<f32>, *const f16, usize, *mut f16, usize),
-        > = Some(convolve_horizontal_rgba_4_row_f32::<f16, 3>);
+        > = Some(convolve_horizontal_rgba_4_row_f32::<f16, f32, 3>);
         let mut _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, *const f16, *mut f16) =
-            convolve_horizontal_rgb_native_row::<f16, 3>;
+            convolve_horizontal_rgb_native_row::<f16, f32, 3>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if is_aarch_f16c_supported() {
@@ -314,9 +314,9 @@ impl<'a> HorizontalConvolutionPass<f16, 1> for ImageStore<'a, f16, 1> {
     ) {
         let _dispatcher_4_rows: Option<
             fn(usize, usize, &FilterWeights<f32>, *const f16, usize, *mut f16, usize),
-        > = Some(convolve_horizontal_rgba_4_row_f32::<f16, 1>);
+        > = Some(convolve_horizontal_rgba_4_row_f32::<f16, f32, 1>);
         let _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, *const f16, *mut f16) =
-            convolve_horizontal_rgb_native_row::<f16, 1>;
+            convolve_horizontal_rgb_native_row::<f16, f32, 1>;
         convolve_horizontal_dispatch_f16(
             self,
             filter_weights,

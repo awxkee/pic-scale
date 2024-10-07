@@ -68,9 +68,9 @@ impl HorizontalConvolutionPass<f32, 4> for ImageStore<'_, f32, 4> {
     ) {
         let mut _dispatcher_4_rows: Option<
             fn(usize, usize, &FilterWeights<f32>, *const f32, usize, *mut f32, usize),
-        > = Some(convolve_horizontal_rgba_4_row_f32::<f32, 4>);
+        > = Some(convolve_horizontal_rgba_4_row_f32::<f32, f32, 4>);
         let mut _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, *const f32, *mut f32) =
-            convolve_horizontal_rgb_native_row::<f32, 4>;
+            convolve_horizontal_rgb_native_row::<f32, f32, 4>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             _dispatcher_4_rows = Some(convolve_horizontal_rgba_neon_rows_4);
