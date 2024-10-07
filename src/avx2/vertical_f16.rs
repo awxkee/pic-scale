@@ -65,7 +65,7 @@ unsafe fn convolve_vertical_part_avx_f16<const FMA: bool>(
 
     let dst_ptr = dst.add(px);
 
-    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT;
 
     let converted = _mm256_cvtps_ph::<ROUNDING_FLAGS>(store_0);
     let first_item = _mm_extract_epi16::<0>(converted) as u16;
@@ -98,7 +98,7 @@ unsafe fn convolve_vertical_part_avx_4_f16<const FMA: bool>(
         store_0 = _mm256_fma_ps::<FMA>(store_0, _mm256_cvtph_ps(item_row_0), v_weight);
     }
 
-    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT;
 
     let dst_ptr = dst.add(px);
     let acc = _mm256_cvtps_ph::<ROUNDING_FLAGS>(store_0);
@@ -145,7 +145,7 @@ unsafe fn convolve_vertical_part_avx_32_f16<const FMA: bool>(
 
     let dst_ptr = dst.add(px);
 
-    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT;
 
     let acc0 = avx_combine_epi(
         _mm256_cvtps_ph::<ROUNDING_FLAGS>(store_0),
@@ -191,7 +191,7 @@ unsafe fn convolve_vertical_part_avx_16_f16<const FMA: bool>(
         store_1 = _mm256_fma_ps::<FMA>(store_1, items1, v_weight);
     }
 
-    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT;
 
     let dst_ptr = dst.add(px);
     let acc0 = avx_combine_epi(
