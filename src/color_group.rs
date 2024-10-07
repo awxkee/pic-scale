@@ -156,7 +156,7 @@ where
     }
 
     #[inline]
-    pub fn to_ptr(&self, ptr: *mut J, offset: usize) {
+    pub fn to_ptr(self, ptr: *mut J, offset: usize) {
         unsafe {
             let s_ptr = ptr.add(offset);
             s_ptr.write_unaligned(self.r);

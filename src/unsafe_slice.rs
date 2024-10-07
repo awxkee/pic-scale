@@ -28,16 +28,15 @@
  */
 
 use std::cell::UnsafeCell;
-use std::ops::Index;
 
 #[derive(Copy, Clone)]
 pub struct UnsafeSlice<'a, T> {
     pub slice: &'a [UnsafeCell<T>],
 }
 
-unsafe impl<'a, T: Send + Sync> Send for UnsafeSlice<'a, T> {}
+unsafe impl<T: Send + Sync> Send for UnsafeSlice<'_, T> {}
 
-unsafe impl<'a, T: Send + Sync> Sync for UnsafeSlice<'a, T> {}
+unsafe impl<T: Send + Sync> Sync for UnsafeSlice<'_, T> {}
 
 impl<'a, T> UnsafeSlice<'a, T> {
     pub fn new(slice: &'a mut [T]) -> Self {
@@ -66,14 +65,5 @@ impl<'a, T> UnsafeSlice<'a, T> {
     #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.slice.len()
-    }
-}
-
-impl<'a, T> Index<usize> for UnsafeSlice<'a, T> {
-    type Output = T;
-    #[allow(dead_code)]
-    fn index(&self, index: usize) -> &Self::Output {
-        let ptr = self.slice[index].get();
-        unsafe { &*ptr }
     }
 }

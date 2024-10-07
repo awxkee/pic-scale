@@ -49,7 +49,7 @@ use crate::sse::{
 use crate::ImageStore;
 use rayon::ThreadPool;
 
-impl<'a> HorizontalConvolutionPass<u16, 4> for ImageStore<'a, u16, 4> {
+impl HorizontalConvolutionPass<u16, 4> for ImageStore<'_, u16, 4> {
     #[allow(clippy::type_complexity)]
     fn convolve_horizontal(
         &self,
@@ -91,7 +91,7 @@ impl<'a> HorizontalConvolutionPass<u16, 4> for ImageStore<'a, u16, 4> {
     }
 }
 
-impl<'a> VerticalConvolutionPass<u16, 4> for ImageStore<'a, u16, 4> {
+impl VerticalConvolutionPass<u16, 4> for ImageStore<'_, u16, 4> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,

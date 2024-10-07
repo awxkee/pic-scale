@@ -49,6 +49,7 @@ mod alpha_handle_u8;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod avx2;
 mod chunking;
+mod color_group;
 mod colors;
 mod convolution;
 mod convolve_naive_f32;
@@ -95,7 +96,6 @@ mod threading_policy;
 mod unsafe_slice;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 mod wasm32;
-mod color_group;
 
 pub use colors::JzazbzScaler;
 pub use colors::LChScaler;

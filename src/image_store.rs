@@ -67,7 +67,7 @@ pub(crate) enum BufferStore<'a, T: Copy + Debug> {
     Owned(Vec<T>),
 }
 
-impl<'a, T: Copy + Debug> BufferStore<'a, T> {
+impl<T: Copy + Debug> BufferStore<'_, T> {
     pub fn borrow(&self) -> &[T] {
         match self {
             Self::Borrowed(p_ref) => p_ref,
@@ -165,7 +165,7 @@ where
     }
 }
 
-impl<'a> ImageStore<'a, u8, 4> {
+impl ImageStore<'_, u8, 4> {
     pub fn unpremultiply_alpha(&self, into: &mut ImageStore<u8, 4>, pool: &Option<ThreadPool>) {
         let dst = into.buffer.borrow_mut();
         let src = self.buffer.borrow();
@@ -179,7 +179,7 @@ impl<'a> ImageStore<'a, u8, 4> {
     }
 }
 
-impl<'a> ImageStore<'a, u16, 4> {
+impl ImageStore<'_, u16, 4> {
     pub fn unpremultiply_alpha(&self, into: &mut ImageStore<u16, 4>, pool: &Option<ThreadPool>) {
         let dst = into.buffer.borrow_mut();
         let src = self.buffer.borrow();
@@ -193,7 +193,7 @@ impl<'a> ImageStore<'a, u16, 4> {
     }
 }
 
-impl<'a> ImageStore<'a, f32, 4> {
+impl ImageStore<'_, f32, 4> {
     pub fn unpremultiply_alpha(&self, into: &mut ImageStore<f32, 4>, pool: &Option<ThreadPool>) {
         let dst = into.buffer.borrow_mut();
         let src = self.buffer.borrow();

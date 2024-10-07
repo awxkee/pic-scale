@@ -190,7 +190,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_u8<
     }
 }
 
-impl<'a> HorizontalConvolutionPass<u8, 3> for ImageStore<'a, u8, 3> {
+impl HorizontalConvolutionPass<u8, 3> for ImageStore<'_, u8, 3> {
     #[allow(clippy::type_complexity)]
     fn convolve_horizontal(
         &self,
@@ -231,7 +231,7 @@ impl<'a> HorizontalConvolutionPass<u8, 3> for ImageStore<'a, u8, 3> {
     }
 }
 
-impl<'a> VerticalConvolutionPass<u8, 3> for ImageStore<'a, u8, 3> {
+impl VerticalConvolutionPass<u8, 3> for ImageStore<'_, u8, 3> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,
