@@ -128,7 +128,7 @@ unsafe fn avx_premultiply_alpha_rgba_u16_impl(
     dst: &mut [u16],
     src: &[u16],
     width: usize,
-    height: usize,
+    _: usize,
     bit_depth: usize,
     pool: &Option<ThreadPool>,
 ) {

@@ -28,7 +28,7 @@
  */
 
 use crate::risc::xvsetvlmax_f32m1;
-use crate::{premultiply_pixel_f32, unpremultiply_pixel_f32, ThreadingPolicy};
+use crate::{premultiply_pixel_f32, unpremultiply_pixel_f32};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::slice::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
