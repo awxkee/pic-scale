@@ -31,8 +31,9 @@ use crate::filter_weights::{FilterBounds, FilterWeights};
 use num_traits::{AsPrimitive, MulAdd};
 
 pub(crate) unsafe fn convolve_vertical_part_f32<
-    T: Copy + 'static + AsPrimitive<f32>,
-    const BUFFER_SIZE: usize,
+    T: Copy + 'static + AsPrimitive<I>,
+    I: Copy + 'static + AsPrimitive<T> + Default + MulAdd<I, Output = I>,
+    const CHANNELS: usize,
 >(
     start_y: usize,
     start_x: usize,
@@ -42,28 +43,67 @@ pub(crate) unsafe fn convolve_vertical_part_f32<
     filter: &[f32],
     bounds: &FilterBounds,
 ) where
-    f32: AsPrimitive<T>,
+    f32: AsPrimitive<I>,
 {
-    let mut store: [f32; BUFFER_SIZE] = [0f32; BUFFER_SIZE];
+    let mut sums0 = ColorGroup::<CHANNELS, I>::dup(I::default());
+
+    let v_start_px = start_x * CHANNELS;
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = *filter.get_unchecked(j);
+        let weight: I = filter.get_unchecked(j).as_();
         let src_ptr = src.add(src_stride * py);
-        for x in 0..BUFFER_SIZE {
-            let px = start_x + x;
-            let s_ptr = src_ptr.add(px);
-            let store_p = store.get_unchecked_mut(x);
-            *store_p += s_ptr.read_unaligned().as_() * weight;
-        }
+
+        let new_px0 = ColorGroup::<CHANNELS, I>::from_ptr(src_ptr, v_start_px);
+
+        sums0 = sums0.mul_add(new_px0, weight);
     }
 
-    for x in 0..BUFFER_SIZE {
-        let px = start_x + x;
-        let dst_ptr = dst.add(px);
-        let vl = *store.get_unchecked_mut(x);
-        dst_ptr.write_unaligned(vl.as_());
+    sums0.as_ptr(dst, v_start_px);
+}
+
+pub(crate) unsafe fn convolve_vertical_part_4_f32<
+    T: Copy + 'static + AsPrimitive<I>,
+    I: Copy + 'static + AsPrimitive<T> + Default + MulAdd<I, Output = I>,
+    const CHANNELS: usize,
+>(
+    start_y: usize,
+    start_x: usize,
+    src: *const T,
+    src_stride: usize,
+    dst: *mut T,
+    filter: &[f32],
+    bounds: &FilterBounds,
+) where
+    f32: AsPrimitive<I>,
+{
+    let mut sums0 = ColorGroup::<CHANNELS, I>::dup(I::default());
+    let mut sums1 = ColorGroup::<CHANNELS, I>::dup(I::default());
+    let mut sums2 = ColorGroup::<CHANNELS, I>::dup(I::default());
+    let mut sums3 = ColorGroup::<CHANNELS, I>::dup(I::default());
+
+    let v_start_px = start_x * CHANNELS;
+
+    for j in 0..bounds.size {
+        let py = start_y + j;
+        let weight: I = filter.get_unchecked(j).as_();
+        let src_ptr = src.add(src_stride * py);
+
+        let new_px0 = ColorGroup::<CHANNELS, I>::from_ptr(src_ptr, v_start_px);
+        let new_px1 = ColorGroup::<CHANNELS, I>::from_ptr(src_ptr, v_start_px + CHANNELS);
+        let new_px2 = ColorGroup::<CHANNELS, I>::from_ptr(src_ptr, v_start_px + CHANNELS * 2);
+        let new_px3 = ColorGroup::<CHANNELS, I>::from_ptr(src_ptr, v_start_px + CHANNELS * 3);
+
+        sums0 = sums0.mul_add(new_px0, weight);
+        sums1 = sums1.mul_add(new_px1, weight);
+        sums2 = sums2.mul_add(new_px2, weight);
+        sums3 = sums3.mul_add(new_px3, weight);
     }
+
+    sums0.as_ptr(dst, v_start_px);
+    sums0.as_ptr(dst, v_start_px + CHANNELS);
+    sums0.as_ptr(dst, v_start_px + CHANNELS * 2);
+    sums0.as_ptr(dst, v_start_px + CHANNELS * 3);
 }
 
 #[inline]

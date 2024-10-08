@@ -48,7 +48,6 @@ mod alpha_handle_u16;
 mod alpha_handle_u8;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod avx2;
-mod chunking;
 mod color_group;
 mod colors;
 mod convolution;

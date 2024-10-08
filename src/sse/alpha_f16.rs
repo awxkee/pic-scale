@@ -140,7 +140,7 @@ unsafe fn sse_premultiply_alpha_rgba_f16_impl<const F16C: bool>(
     dst: &mut [half::f16],
     src: &[half::f16],
     width: usize,
-    height: usize,
+    _: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
@@ -152,13 +152,13 @@ unsafe fn sse_premultiply_alpha_rgba_f16_impl<const F16C: bool>(
                 });
         });
     } else {
-        let mut offset = 0usize;
-
-        for _ in 0..height {
+        for (dst_row, src_row) in dst
+            .chunks_exact_mut(4 * width)
+            .zip(src.chunks_exact(4 * width))
+        {
             unsafe {
-                sse_premultiply_alpha_rgba_row_f16_impl::<F16C>(dst, src, width, offset);
+                sse_premultiply_alpha_rgba_row_f16_impl::<F16C>(dst_row, src_row, width, 0);
             }
-            offset += 4 * width;
         }
     }
 }
@@ -296,7 +296,7 @@ unsafe fn sse_unpremultiply_alpha_rgba_f16_impl<const F16C: bool>(
     dst: &mut [half::f16],
     src: &[half::f16],
     width: usize,
-    height: usize,
+    _: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
@@ -308,14 +308,13 @@ unsafe fn sse_unpremultiply_alpha_rgba_f16_impl<const F16C: bool>(
                 });
         });
     } else {
-        let mut offset = 0usize;
-
-        for _ in 0..height {
+        for (dst_row, src_row) in dst
+            .chunks_exact_mut(4 * width)
+            .zip(src.chunks_exact(4 * width))
+        {
             unsafe {
-                sse_unpremultiply_alpha_rgba_f16_row_impl::<F16C>(dst, src, width, offset);
+                sse_unpremultiply_alpha_rgba_f16_row_impl::<F16C>(dst_row, src_row, width, 0);
             }
-
-            offset += 4 * width;
         }
     }
 }

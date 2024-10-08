@@ -57,7 +57,7 @@ unsafe fn convolve_vertical_risc_row_impl<const CHANNELS: usize>(
     unsafe_source_ptr_0: *const u8,
     unsafe_destination_ptr_0: *mut u8,
     src_stride: usize,
-    weight: &[i16],
+    weights: &[i16],
 ) {
     let mut cx = 0usize;
     let dst_width = width * CHANNELS;

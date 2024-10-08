@@ -47,14 +47,18 @@ use rayon::ThreadPool;
 #[macro_export]
 macro_rules! unpremultiply_pixel {
     ($dst: expr, $src: expr, $pixel_offset: expr) => {{
-        let mut r = *unsafe { $src.get_unchecked($pixel_offset) } as i32;
-        let mut g = *unsafe { $src.get_unchecked($pixel_offset + 1) } as i32;
-        let mut b = *unsafe { $src.get_unchecked($pixel_offset + 2) } as i32;
-        let a = *unsafe { $src.get_unchecked($pixel_offset + 3) } as i32;
+        let mut r = *unsafe { $src.get_unchecked($pixel_offset) } as i16;
+        let mut g = *unsafe { $src.get_unchecked($pixel_offset + 1) } as i16;
+        let mut b = *unsafe { $src.get_unchecked($pixel_offset + 2) } as i16;
+        let a = *unsafe { $src.get_unchecked($pixel_offset + 3) } as i16;
         if a != 0 {
             r = (r * 255) / a;
             g = (g * 255) / a;
             b = (b * 255) / a;
+        } else {
+            r = 0;
+            g = 0;
+            b = 0;
         }
         unsafe {
             *$dst.get_unchecked_mut($pixel_offset) = r as u8;
@@ -68,10 +72,10 @@ macro_rules! unpremultiply_pixel {
 #[macro_export]
 macro_rules! premultiply_pixel {
     ($dst: expr, $src: expr, $pixel_offset: expr) => {{
-        let mut r = *unsafe { $src.get_unchecked($pixel_offset) } as i32;
-        let mut g = *unsafe { $src.get_unchecked($pixel_offset + 1) } as i32;
-        let mut b = *unsafe { $src.get_unchecked($pixel_offset + 2) } as i32;
-        let a = *unsafe { $src.get_unchecked($pixel_offset + 3) } as i32;
+        let mut r = *unsafe { $src.get_unchecked($pixel_offset) } as i16;
+        let mut g = *unsafe { $src.get_unchecked($pixel_offset + 1) } as i16;
+        let mut b = *unsafe { $src.get_unchecked($pixel_offset + 2) } as i16;
+        let a = *unsafe { $src.get_unchecked($pixel_offset + 3) } as i16;
         r *= a;
         g *= a;
         b *= a;
@@ -87,11 +91,30 @@ macro_rules! premultiply_pixel {
     }};
 }
 
+fn premultiply_alpha_rgba_row_impl(dst: &mut [u8], src: &[u8]) {
+    for (dst_chunk, src_chunk) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+        let mut r = src_chunk[0] as i16;
+        let mut g = src_chunk[1] as i16;
+        let mut b = src_chunk[2] as i16;
+        let a = src_chunk[3] as i16;
+        r *= a;
+        g *= a;
+        b *= a;
+        r /= 255;
+        g /= 255;
+        b /= 255;
+        dst_chunk[0] = r as u8;
+        dst_chunk[1] = g as u8;
+        dst_chunk[2] = b as u8;
+        dst_chunk[3] = a as u8;
+    }
+}
+
 fn premultiply_alpha_rgba_impl(
     dst: &mut [u8],
     src: &[u8],
     width: usize,
-    height: usize,
+    _: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
@@ -99,23 +122,38 @@ fn premultiply_alpha_rgba_impl(
             src.par_chunks_exact(width * 4)
                 .zip(dst.par_chunks_exact_mut(width * 4))
                 .for_each(|(src, dst)| {
-                    for x in 0..width {
-                        let px = x * 4;
-                        premultiply_pixel!(dst, src, px);
-                    }
+                    premultiply_alpha_rgba_row_impl(dst, src);
                 });
         });
     } else {
-        let mut offset = 0usize;
-
-        for _ in 0..height {
-            for x in 0..width {
-                let px = x * 4;
-                premultiply_pixel!(dst, src, offset + px);
-            }
-
-            offset += 4 * width;
+        for (dst_row, src_row) in dst
+            .chunks_exact_mut(width * 4)
+            .zip(src.chunks_exact(4 * width))
+        {
+            premultiply_alpha_rgba_row_impl(dst_row, src_row);
         }
+    }
+}
+
+fn unpremultiply_alpha_rgba_row_impl(dst: &mut [u8], src: &[u8]) {
+    for (dst_chunk, src_chunk) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+        let mut r = src_chunk[0] as i16;
+        let mut g = src_chunk[1] as i16;
+        let mut b = src_chunk[2] as i16;
+        let a = src_chunk[3] as i16;
+        if a != 0 {
+            r = (r * 255) / a;
+            g = (g * 255) / a;
+            b = (b * 255) / a;
+        } else {
+            r = 0;
+            g = 0;
+            b = 0;
+        }
+        dst_chunk[0] = r as u8;
+        dst_chunk[1] = g as u8;
+        dst_chunk[2] = b as u8;
+        dst_chunk[3] = a as u8;
     }
 }
 
@@ -123,7 +161,7 @@ fn unpremultiply_alpha_rgba_impl(
     dst: &mut [u8],
     src: &[u8],
     width: usize,
-    height: usize,
+    _: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
@@ -131,22 +169,15 @@ fn unpremultiply_alpha_rgba_impl(
             src.par_chunks_exact(width * 4)
                 .zip(dst.par_chunks_exact_mut(width * 4))
                 .for_each(|(src, dst)| {
-                    for x in 0..width {
-                        let px = x * 4;
-                        unpremultiply_pixel!(dst, src, px);
-                    }
+                    unpremultiply_alpha_rgba_row_impl(dst, src);
                 });
         });
     } else {
-        let mut offset = 0usize;
-        for _ in 0..height {
-            for x in 0..width {
-                let px = x * 4;
-                let pixel_offset = offset + px;
-                unpremultiply_pixel!(dst, src, pixel_offset);
-            }
-
-            offset += 4 * width;
+        for (dst_row, src_row) in dst
+            .chunks_exact_mut(width * 4)
+            .zip(src.chunks_exact(4 * width))
+        {
+            unpremultiply_alpha_rgba_row_impl(dst_row, src_row);
         }
     }
 }

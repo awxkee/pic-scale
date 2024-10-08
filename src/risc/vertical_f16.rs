@@ -37,7 +37,7 @@ pub fn convolve_vertical_risc_row_f16<const CHANNELS: usize>(
     unsafe_source_ptr_0: *const f16,
     unsafe_destination_ptr_0: *mut f16,
     src_stride: usize,
-    weight_ptr: *const f32,
+    weight_ptr: &[f32],
 ) {
     unsafe {
         convolve_vertical_risc_row_f16_impl::<CHANNELS>(
@@ -59,7 +59,7 @@ unsafe fn convolve_vertical_risc_row_f16_impl<const CHANNELS: usize>(
     unsafe_source_ptr_0: *const f16,
     unsafe_destination_ptr_0: *mut f16,
     src_stride: usize,
-    weight_ptr: *const f32,
+    weight_ptr: &[f32],
 ) {
     let mut cx = 0usize;
     let dst_width = width * CHANNELS;
@@ -76,7 +76,7 @@ unsafe fn convolve_vertical_risc_row_f16_impl<const CHANNELS: usize>(
              in(reg) unsafe_source_ptr_0,
              in(reg) src_stride,
              in(reg) unsafe_destination_ptr_0,
-             in(reg) weight_ptr,
+             in(reg) weight_ptr.as_ptr(),
              in(reg) bounds_size,
              t1 = out(reg) _,
              ft1 = out(freg) _,
@@ -99,7 +99,7 @@ unsafe fn convolve_vertical_risc_row_f16_impl<const CHANNELS: usize>(
                  in(reg) unsafe_source_ptr_0,
                  in(reg) src_stride,
                  in(reg) unsafe_destination_ptr_0,
-                 in(reg) weight_ptr,
+                 in(reg) weight_ptr.as_ptr(),
                  in(reg) bounds_size,
                  t1 = out(reg) _,
                  t2 = out(reg) _,
@@ -122,7 +122,7 @@ unsafe fn convolve_vertical_risc_row_f16_impl<const CHANNELS: usize>(
                  in(reg) unsafe_source_ptr_0,
                  in(reg) src_stride,
                  in(reg) unsafe_destination_ptr_0,
-                 in(reg) weight_ptr,
+                 in(reg) weight_ptr.as_ptr(),
                  in(reg) bounds_size,
                  t1 = out(reg) _,
                  t2 = out(reg) _,

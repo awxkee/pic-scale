@@ -141,14 +141,13 @@ unsafe fn avx_premultiply_alpha_rgba_u16_impl(
                 });
         });
     } else {
-        let mut offset = 0;
-
-        for _ in 0..height {
+        for (dst_row, src_row) in dst
+            .chunks_exact_mut(4 * width)
+            .zip(src.chunks_exact(4 * width))
+        {
             unsafe {
-                avx_premultiply_alpha_rgba_u16_row(dst, src, width, offset, bit_depth);
+                avx_premultiply_alpha_rgba_u16_row(dst_row, src_row, width, 0, bit_depth);
             }
-
-            offset += 4 * width;
         }
     }
 }
@@ -238,7 +237,7 @@ unsafe fn avx_unpremultiply_alpha_rgba_u16_impl(
     dst: &mut [u16],
     src: &[u16],
     width: usize,
-    height: usize,
+    _: usize,
     bit_depth: usize,
     pool: &Option<ThreadPool>,
 ) {
@@ -251,14 +250,13 @@ unsafe fn avx_unpremultiply_alpha_rgba_u16_impl(
                 });
         });
     } else {
-        let mut offset = 0usize;
-
-        for _ in 0..height {
+        for (dst_row, src_row) in dst
+            .chunks_exact_mut(4 * width)
+            .zip(src.chunks_exact(4 * width))
+        {
             unsafe {
-                avx_unpremultiply_alpha_rgba_u16_row(dst, src, width, offset, bit_depth);
+                avx_unpremultiply_alpha_rgba_u16_row(dst_row, src_row, width, 0, bit_depth);
             }
-
-            offset += 4 * width;
         }
     }
 }

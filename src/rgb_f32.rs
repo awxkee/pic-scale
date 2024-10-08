@@ -65,11 +65,9 @@ pub(crate) fn convolve_vertical_rgb_native_row_f32<
 {
     let mut cx = 0usize;
 
-    let total_width = dst_width * COMPONENTS;
-
-    while cx + 64 < total_width {
+    while cx + 4 < dst_width {
         unsafe {
-            convolve_vertical_part_f32::<T, 64>(
+            convolve_vertical_part_4_f32::<T, f32, COMPONENTS>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -80,76 +78,12 @@ pub(crate) fn convolve_vertical_rgb_native_row_f32<
             );
         }
 
-        cx += 64;
+        cx += 4;
     }
 
-    while cx + 32 < total_width {
+    while cx < dst_width {
         unsafe {
-            convolve_vertical_part_f32::<T, 32>(
-                bounds.start,
-                cx,
-                unsafe_source_ptr_0,
-                src_stride,
-                unsafe_destination_ptr_0,
-                weight,
-                bounds,
-            );
-        }
-
-        cx += 32;
-    }
-
-    while cx + 24 < total_width {
-        unsafe {
-            convolve_vertical_part_f32::<T, 24>(
-                bounds.start,
-                cx,
-                unsafe_source_ptr_0,
-                src_stride,
-                unsafe_destination_ptr_0,
-                weight,
-                bounds,
-            );
-        }
-
-        cx += 24;
-    }
-
-    while cx + 12 < total_width {
-        unsafe {
-            convolve_vertical_part_f32::<T, 12>(
-                bounds.start,
-                cx,
-                unsafe_source_ptr_0,
-                src_stride,
-                unsafe_destination_ptr_0,
-                weight,
-                bounds,
-            );
-        }
-
-        cx += 12;
-    }
-
-    while cx + 8 < total_width {
-        unsafe {
-            convolve_vertical_part_f32::<T, 8>(
-                bounds.start,
-                cx,
-                unsafe_source_ptr_0,
-                src_stride,
-                unsafe_destination_ptr_0,
-                weight,
-                bounds,
-            );
-        }
-
-        cx += 8;
-    }
-
-    while cx < total_width {
-        unsafe {
-            convolve_vertical_part_f32::<T, 1>(
+            convolve_vertical_part_f32::<T, f32, COMPONENTS>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,

@@ -27,8 +27,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::chunking::chunked;
-
 #[derive(Debug, Clone)]
 pub struct FilterWeights<T> {
     pub weights: Vec<T>,
@@ -87,12 +85,12 @@ impl FilterWeights<f32> {
 
         let mut chunk_position = 0usize;
 
-        for chunk in chunked(&self.weights, self.kernel_size) {
+        for chunk in self.weights.chunks_exact(self.kernel_size) {
             for (i, _) in chunk.iter().enumerate() {
                 let k = chunk_position + i;
                 unsafe {
                     *output_kernel.get_unchecked_mut(k) =
-                        ((*chunk[i]) * precision_scale).round() as i16;
+                        (chunk[i] * precision_scale).round() as i16;
                 }
             }
             chunk_position += align;

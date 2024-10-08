@@ -73,7 +73,7 @@ pub fn neon_premultiply_alpha_rgba_f32(
     dst: &mut [f32],
     src: &[f32],
     width: usize,
-    height: usize,
+    _: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
@@ -85,13 +85,13 @@ pub fn neon_premultiply_alpha_rgba_f32(
                 });
         });
     } else {
-        let mut offset = 0usize;
-
-        for _ in 0..height {
+        for (dst_row, src_row) in dst
+            .chunks_exact_mut(4 * width)
+            .zip(src.chunks_exact(4 * width))
+        {
             unsafe {
-                neon_premultiply_alpha_rgba_row_f32(dst, src, width, offset);
+                neon_premultiply_alpha_rgba_row_f32(dst_row, src_row, width, 0);
             }
-            offset += 4 * width;
         }
     }
 }
@@ -130,7 +130,7 @@ pub fn neon_unpremultiply_alpha_rgba_f32(
     dst: &mut [f32],
     src: &[f32],
     width: usize,
-    height: usize,
+    _: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
@@ -142,13 +142,13 @@ pub fn neon_unpremultiply_alpha_rgba_f32(
                 });
         });
     } else {
-        let mut offset = 0usize;
-
-        for _ in 0..height {
+        for (dst_row, src_row) in dst
+            .chunks_exact_mut(4 * width)
+            .zip(src.chunks_exact(4 * width))
+        {
             unsafe {
-                neon_unpremultiply_alpha_rgba_f32_row(dst, src, width, offset);
+                neon_unpremultiply_alpha_rgba_f32_row(dst_row, src_row, width, 0);
             }
-            offset += 4 * width;
         }
     }
 }

@@ -92,11 +92,50 @@ macro_rules! unpremultiply_pixel_f16 {
     }};
 }
 
+fn unpremultiply_pixel_f16_row(dst: &mut [half::f16], src: &[half::f16]) {
+    for (dst_chunk, src_chunk) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+        let mut r = src_chunk[0].to_f32();
+        let mut g = src_chunk[1].to_f32();
+        let mut b = src_chunk[2].to_f32();
+        let a = src_chunk[3].to_f32();
+        if a != 0. {
+            let scale_alpha = 1. / a;
+            r = r * scale_alpha;
+            g = g * scale_alpha;
+            b = b * scale_alpha;
+        } else {
+            r = 0.;
+            g = 0.;
+            b = 0.;
+        }
+        dst_chunk[0] = half::f16::from_f32(r);
+        dst_chunk[1] = half::f16::from_f32(g);
+        dst_chunk[2] = half::f16::from_f32(b);
+        dst_chunk[3] = half::f16::from_f32(a);
+    }
+}
+
+fn premultiply_pixel_f16_row(dst: &mut [half::f16], src: &[half::f16]) {
+    for (dst_chunk, src_chunk) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+        let mut r = src_chunk[0].to_f32();
+        let mut g = src_chunk[1].to_f32();
+        let mut b = src_chunk[2].to_f32();
+        let a = src_chunk[3].to_f32();
+        r *= a;
+        g *= a;
+        b *= a;
+        dst_chunk[0] = half::f16::from_f32(r);
+        dst_chunk[1] = half::f16::from_f32(g);
+        dst_chunk[2] = half::f16::from_f32(b);
+        dst_chunk[3] = half::f16::from_f32(a);
+    }
+}
+
 fn premultiply_alpha_rgba_impl_f16(
     dst: &mut [half::f16],
     src: &[half::f16],
     width: usize,
-    height: usize,
+    _: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
@@ -104,26 +143,15 @@ fn premultiply_alpha_rgba_impl_f16(
             src.par_chunks_exact(width * 4)
                 .zip(dst.par_chunks_exact_mut(width * 4))
                 .for_each(|(src, dst)| {
-                    let mut _cx = 0usize;
-
-                    for x in _cx..width {
-                        let px = x * 4;
-                        premultiply_pixel_f16!(dst, src, px);
-                    }
+                    premultiply_pixel_f16_row(dst, src);
                 });
         });
     } else {
-        let mut offset = 0usize;
-
-        for _ in 0..height {
-            let mut _cx = 0usize;
-
-            for x in _cx..width {
-                let px = x * 4;
-                premultiply_pixel_f16!(dst, src, offset + px);
-            }
-
-            offset += 4 * width;
+        for (dst_row, src_row) in dst
+            .chunks_exact_mut(width * 4)
+            .zip(src.chunks_exact(4 * width))
+        {
+            premultiply_pixel_f16_row(dst_row, src_row);
         }
     }
 }
@@ -132,7 +160,7 @@ fn unpremultiply_alpha_rgba_impl_f16(
     dst: &mut [half::f16],
     src: &[half::f16],
     width: usize,
-    height: usize,
+    _: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
@@ -140,26 +168,15 @@ fn unpremultiply_alpha_rgba_impl_f16(
             src.par_chunks_exact(width * 4)
                 .zip(dst.par_chunks_exact_mut(width * 4))
                 .for_each(|(src, dst)| {
-                    for x in 0..width {
-                        let px = x * 4;
-                        let pixel_offset = px;
-                        unpremultiply_pixel_f16!(dst, src, pixel_offset);
-                    }
+                    unpremultiply_pixel_f16_row(dst, src);
                 });
         });
     } else {
-        let mut offset = 0usize;
-
-        for _ in 0..height {
-            let mut _cx = 0usize;
-
-            for x in _cx..width {
-                let px = x * 4;
-                let pixel_offset = offset + px;
-                unpremultiply_pixel_f16!(dst, src, pixel_offset);
-            }
-
-            offset += 4 * width;
+        for (dst_row, src_row) in dst
+            .chunks_exact_mut(width * 4)
+            .zip(src.chunks_exact(4 * width))
+        {
+            unpremultiply_pixel_f16_row(dst_row, src_row);
         }
     }
 }

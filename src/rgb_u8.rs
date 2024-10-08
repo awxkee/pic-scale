@@ -59,8 +59,8 @@ use std::ops::{AddAssign, Mul};
 /// `T` - template buffer type
 /// `J` - accumulator type
 pub(crate) fn convolve_vertical_rgb_native_row_u8<
-    T: Copy + 'static + AsPrimitive<J>,
-    J: Copy + 'static + AsPrimitive<T> + Mul<Output = J> + AddAssign + SaturateNarrow<T>,
+    T: Copy + 'static + AsPrimitive<J> + Default,
+    J: Copy + 'static + AsPrimitive<T> + Mul<Output = J> + AddAssign + SaturateNarrow<T> + Default,
     const COMPONENTS: usize,
 >(
     dst_width: usize,
@@ -75,11 +75,9 @@ pub(crate) fn convolve_vertical_rgb_native_row_u8<
 {
     let mut cx = 0usize;
 
-    let total_width = COMPONENTS * dst_width;
-
-    while cx + 64 < total_width {
+    while cx + 4 < dst_width {
         unsafe {
-            convolve_vertical_part::<T, J, 64>(
+            convolve_vertical_part_4::<T, J, COMPONENTS>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,
@@ -90,92 +88,12 @@ pub(crate) fn convolve_vertical_rgb_native_row_u8<
             );
         }
 
-        cx += 64;
+        cx += 4;
     }
 
-    while cx + 48 < total_width {
+    while cx < dst_width {
         unsafe {
-            convolve_vertical_part::<T, J, 48>(
-                bounds.start,
-                cx,
-                unsafe_source_ptr_0,
-                src_stride,
-                unsafe_destination_ptr_0,
-                weight_ptr,
-                bounds,
-            );
-        }
-
-        cx += 48;
-    }
-
-    while cx + 36 < total_width {
-        unsafe {
-            convolve_vertical_part::<T, J, 36>(
-                bounds.start,
-                cx,
-                unsafe_source_ptr_0,
-                src_stride,
-                unsafe_destination_ptr_0,
-                weight_ptr,
-                bounds,
-            );
-        }
-
-        cx += 36;
-    }
-
-    while cx + 24 < total_width {
-        unsafe {
-            convolve_vertical_part::<T, J, 24>(
-                bounds.start,
-                cx,
-                unsafe_source_ptr_0,
-                src_stride,
-                unsafe_destination_ptr_0,
-                weight_ptr,
-                bounds,
-            );
-        }
-
-        cx += 24;
-    }
-
-    while cx + 12 < total_width {
-        unsafe {
-            convolve_vertical_part::<T, J, 12>(
-                bounds.start,
-                cx,
-                unsafe_source_ptr_0,
-                src_stride,
-                unsafe_destination_ptr_0,
-                weight_ptr,
-                bounds,
-            );
-        }
-
-        cx += 12;
-    }
-
-    while cx + 8 < total_width {
-        unsafe {
-            convolve_vertical_part::<T, J, 8>(
-                bounds.start,
-                cx,
-                unsafe_source_ptr_0,
-                src_stride,
-                unsafe_destination_ptr_0,
-                weight_ptr,
-                bounds,
-            );
-        }
-
-        cx += 8;
-    }
-
-    while cx < total_width {
-        unsafe {
-            convolve_vertical_part::<T, J, 1>(
+            convolve_vertical_part::<T, J, COMPONENTS>(
                 bounds.start,
                 cx,
                 unsafe_source_ptr_0,

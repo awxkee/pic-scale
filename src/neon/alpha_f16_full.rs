@@ -78,7 +78,7 @@ pub fn neon_premultiply_alpha_rgba_f16_full(
     dst: &mut [half::f16],
     src: &[half::f16],
     width: usize,
-    height: usize,
+    _: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
@@ -90,13 +90,13 @@ pub fn neon_premultiply_alpha_rgba_f16_full(
                 });
         });
     } else {
-        let mut offset = 0usize;
-
-        for _ in 0..height {
+        for (dst_row, src_row) in dst
+            .chunks_exact_mut(4 * width)
+            .zip(src.chunks_exact(4 * width))
+        {
             unsafe {
-                neon_premultiply_alpha_rgba_row_f16_full(dst, src, width, offset);
+                neon_premultiply_alpha_rgba_row_f16_full(dst_row, src_row, width, 0);
             }
-            offset += 4 * width;
         }
     }
 }
@@ -159,7 +159,7 @@ pub fn neon_unpremultiply_alpha_rgba_f16_full(
     dst: &mut [half::f16],
     src: &[half::f16],
     width: usize,
-    height: usize,
+    _: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
@@ -171,12 +171,13 @@ pub fn neon_unpremultiply_alpha_rgba_f16_full(
                 });
         });
     } else {
-        let mut offset = 0usize;
-        for _ in 0..height {
+        for (dst_row, src_row) in dst
+            .chunks_exact_mut(4 * width)
+            .zip(src.chunks_exact(4 * width))
+        {
             unsafe {
-                neon_unpremultiply_alpha_rgba_f16_row_full(dst, src, width, offset);
+                neon_unpremultiply_alpha_rgba_f16_row_full(dst_row, src_row, width, 0);
             }
-            offset += 4 * width;
         }
     }
 }

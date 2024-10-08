@@ -118,7 +118,7 @@ unsafe fn unpremultiply_alpha_sse_rgba_u16_impl(
     dst: &mut [u16],
     src: &[u16],
     width: usize,
-    height: usize,
+    _: usize,
     bit_depth: usize,
     pool: &Option<ThreadPool>,
 ) {
@@ -131,14 +131,13 @@ unsafe fn unpremultiply_alpha_sse_rgba_u16_impl(
                 });
         });
     } else {
-        let mut offset = 0usize;
-
-        for _ in 0..height {
+        for (dst_row, src_row) in dst
+            .chunks_exact_mut(4 * width)
+            .zip(src.chunks_exact(4 * width))
+        {
             unsafe {
-                unpremultiply_alpha_sse_rgba_u16_row_impl(dst, src, width, offset, bit_depth);
+                unpremultiply_alpha_sse_rgba_u16_row_impl(dst_row, src_row, width, 0, bit_depth);
             }
-
-            offset += 4 * width;
         }
     }
 }
@@ -241,7 +240,7 @@ unsafe fn premultiply_alpha_sse_rgba_u16_impl(
     dst: &mut [u16],
     src: &[u16],
     width: usize,
-    height: usize,
+    _: usize,
     bit_depth: usize,
     pool: &Option<ThreadPool>,
 ) {
@@ -254,14 +253,13 @@ unsafe fn premultiply_alpha_sse_rgba_u16_impl(
                 });
         });
     } else {
-        let mut offset = 0usize;
-
-        for _ in 0..height {
+        for (dst_row, src_row) in dst
+            .chunks_exact_mut(4 * width)
+            .zip(src.chunks_exact(4 * width))
+        {
             unsafe {
-                premultiply_alpha_sse_rgba_u16_row_impl(dst, src, width, offset, bit_depth);
+                premultiply_alpha_sse_rgba_u16_row_impl(dst_row, src_row, width, 0, bit_depth);
             }
-
-            offset += 4 * width;
         }
     }
 }

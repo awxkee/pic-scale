@@ -49,6 +49,10 @@ macro_rules! unpremultiply_pixel_u16 {
             r = ((r * $max_colors) / a);
             g = ((g * $max_colors) / a);
             b = ((b * $max_colors) / a);
+        } else {
+            r = 0;
+            g = 0;
+            b = 0;
         }
         unsafe {
             *$dst.get_unchecked_mut($pixel_offset) = r as u16;
