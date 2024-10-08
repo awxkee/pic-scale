@@ -39,7 +39,7 @@ pub(crate) unsafe fn convolve_vertical_part_f32<
     src: *const T,
     src_stride: usize,
     dst: *mut T,
-    filter: *const f32,
+    filter: &[f32],
     bounds: &FilterBounds,
 ) where
     f32: AsPrimitive<T>,
@@ -48,13 +48,13 @@ pub(crate) unsafe fn convolve_vertical_part_f32<
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = unsafe { filter.add(j).read_unaligned() };
+        let weight = *filter.get_unchecked(j);
         let src_ptr = src.add(src_stride * py);
         for x in 0..BUFFER_SIZE {
             let px = start_x + x;
             let s_ptr = src_ptr.add(px);
             let store_p = store.get_unchecked_mut(x);
-            *store_p += unsafe { s_ptr.read_unaligned().as_() } * weight;
+            *store_p += s_ptr.read_unaligned().as_() * weight;
         }
     }
 

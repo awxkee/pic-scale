@@ -152,7 +152,7 @@ impl<'a> VerticalConvolutionPass<f16, 4> for ImageStore<'a, f16, 4> {
         destination: &mut ImageStore<f16, 4>,
         pool: &Option<ThreadPool>,
     ) {
-        let mut _dispatcher: fn(usize, &FilterBounds, *const f16, *mut f16, usize, *const f32) =
+        let mut _dispatcher: fn(usize, &FilterBounds, *const f16, *mut f16, usize, &[f32]) =
             convolve_vertical_rgb_native_row_f32::<f16, 4>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
@@ -258,7 +258,7 @@ impl<'a> VerticalConvolutionPass<f16, 3> for ImageStore<'a, f16, 3> {
         destination: &mut ImageStore<f16, 3>,
         pool: &Option<ThreadPool>,
     ) {
-        let mut _dispatcher: fn(usize, &FilterBounds, *const f16, *mut f16, usize, *const f32) =
+        let mut _dispatcher: fn(usize, &FilterBounds, *const f16, *mut f16, usize, &[f32]) =
             convolve_vertical_rgb_native_row_f32::<f16, 3>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
@@ -335,7 +335,7 @@ impl<'a> VerticalConvolutionPass<f16, 1> for ImageStore<'a, f16, 1> {
         destination: &mut ImageStore<f16, 1>,
         pool: &Option<ThreadPool>,
     ) {
-        let mut _dispatcher: fn(usize, &FilterBounds, *const f16, *mut f16, usize, *const f32) =
+        let mut _dispatcher: fn(usize, &FilterBounds, *const f16, *mut f16, usize, &[f32]) =
             convolve_vertical_rgb_native_row_f32::<f16, 1>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {

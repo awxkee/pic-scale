@@ -43,7 +43,7 @@ unsafe fn consume_u16_32(
     src: *const u16,
     src_stride: usize,
     dst: *mut u16,
-    filter: *const i16,
+    filter: &[i16],
     bounds: &FilterBounds,
     max_colors: i32,
 ) {
@@ -63,7 +63,7 @@ unsafe fn consume_u16_32(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j).read_unaligned();
+        let weight = *filter.get_unchecked(j);
         let v_weight = _mm256_set1_epi32(weight as i32);
         let src_ptr = src.add(src_stride * py);
 
@@ -175,7 +175,7 @@ unsafe fn consume_u16_16(
     src: *const u16,
     src_stride: usize,
     dst: *mut u16,
-    filter: *const i16,
+    filter: &[i16],
     bounds: &FilterBounds,
     max_colors: i32,
 ) {
@@ -191,7 +191,7 @@ unsafe fn consume_u16_16(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j).read_unaligned();
+        let weight = *filter.get_unchecked(j);
         let v_weight = _mm256_set1_epi32(weight as i32);
         let src_ptr = src.add(src_stride * py);
 
@@ -257,7 +257,7 @@ unsafe fn consume_u16_8(
     src: *const u16,
     src_stride: usize,
     dst: *mut u16,
-    filter: *const i16,
+    filter: &[i16],
     bounds: &FilterBounds,
     max_colors: i32,
 ) {
@@ -271,7 +271,7 @@ unsafe fn consume_u16_8(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j).read_unaligned();
+        let weight = *filter.get_unchecked(j);
         let v_weight = _mm256_set1_epi32(weight as i32);
         let src_ptr = src.add(src_stride * py);
 
@@ -316,7 +316,7 @@ unsafe fn consume_u16_4(
     src: *const u16,
     src_stride: usize,
     dst: *mut u16,
-    filter: *const i16,
+    filter: &[i16],
     bounds: &FilterBounds,
     max_colors: i32,
 ) {
@@ -329,7 +329,7 @@ unsafe fn consume_u16_4(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j).read_unaligned();
+        let weight = *filter.get_unchecked(j);
         let v_weight = _mm256_set1_epi32(weight as i32);
         let src_ptr = src.add(src_stride * py);
 
@@ -362,7 +362,7 @@ unsafe fn consume_u16_1(
     src: *const u16,
     src_stride: usize,
     dst: *mut u16,
-    filter: *const i16,
+    filter: &[i16],
     bounds: &FilterBounds,
     max_colors: i32,
 ) {
@@ -375,7 +375,7 @@ unsafe fn consume_u16_1(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j).read_unaligned();
+        let weight = *filter.get_unchecked(j);
         let v_weight = _mm256_set1_epi32(weight as i32);
         let src_ptr = src.add(src_stride * py);
 
@@ -403,7 +403,7 @@ pub fn convolve_vertical_rgb_avx_row_u16<const CHANNELS: usize>(
     unsafe_source_ptr_0: *const u16,
     unsafe_destination_ptr_0: *mut u16,
     src_stride: usize,
-    weight_ptr: *const i16,
+    weight_ptr: &[i16],
     bit_depth: usize,
 ) {
     unsafe {
@@ -426,10 +426,10 @@ unsafe fn convolve_vertical_rgb_avx_row_u16_impl<const CHANNELS: usize>(
     unsafe_source_ptr_0: *const u16,
     unsafe_destination_ptr_0: *mut u16,
     src_stride: usize,
-    weight_ptr: *const i16,
+    weight_ptr: &[i16],
     bit_depth: usize,
 ) {
-    let max_colors = 2i32.pow(bit_depth as u32) - 1i32;
+    let max_colors = (1 << bit_depth) - 1;
     let mut cx = 0usize;
     let dst_width = width * CHANNELS;
 

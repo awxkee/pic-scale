@@ -59,7 +59,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_f32<
     unsafe_source_ptr_0: *const T,
     unsafe_destination_ptr_0: *mut T,
     src_stride: usize,
-    weight_ptr: *const f32,
+    weight: &[f32],
 ) where
     f32: AsPrimitive<T>,
 {
@@ -75,7 +75,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_f32<
                 unsafe_source_ptr_0,
                 src_stride,
                 unsafe_destination_ptr_0,
-                weight_ptr,
+                weight,
                 bounds,
             );
         }
@@ -91,7 +91,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_f32<
                 unsafe_source_ptr_0,
                 src_stride,
                 unsafe_destination_ptr_0,
-                weight_ptr,
+                weight,
                 bounds,
             );
         }
@@ -107,7 +107,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_f32<
                 unsafe_source_ptr_0,
                 src_stride,
                 unsafe_destination_ptr_0,
-                weight_ptr,
+                weight,
                 bounds,
             );
         }
@@ -123,7 +123,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_f32<
                 unsafe_source_ptr_0,
                 src_stride,
                 unsafe_destination_ptr_0,
-                weight_ptr,
+                weight,
                 bounds,
             );
         }
@@ -139,7 +139,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_f32<
                 unsafe_source_ptr_0,
                 src_stride,
                 unsafe_destination_ptr_0,
-                weight_ptr,
+                weight,
                 bounds,
             );
         }
@@ -155,7 +155,7 @@ pub(crate) fn convolve_vertical_rgb_native_row_f32<
                 unsafe_source_ptr_0,
                 src_stride,
                 unsafe_destination_ptr_0,
-                weight_ptr,
+                weight,
                 bounds,
             );
         }
@@ -211,7 +211,7 @@ impl VerticalConvolutionPass<f32, 3> for ImageStore<'_, f32, 3> {
         destination: &mut ImageStore<f32, 3>,
         pool: &Option<ThreadPool>,
     ) {
-        let mut _dispatcher: fn(usize, &FilterBounds, *const f32, *mut f32, usize, *const f32) =
+        let mut _dispatcher: fn(usize, &FilterBounds, *const f32, *mut f32, usize, &[f32]) =
             convolve_vertical_rgb_native_row_f32::<f32, 3>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {

@@ -41,7 +41,7 @@ unsafe fn convolve_vertical_part_avx_64(
     src: *const u8,
     src_stride: usize,
     dst: *mut u8,
-    filter: *const i16,
+    filter: &[i16],
     bounds: &FilterBounds,
 ) {
     let zeros = _mm256_setzero_si256();
@@ -61,7 +61,7 @@ unsafe fn convolve_vertical_part_avx_64(
 
     while jj < bounds.size.saturating_sub(2) {
         let py = start_y + jj;
-        let f_ptr = filter.add(jj) as *const i32;
+        let f_ptr = unsafe { *filter.get_unchecked(jj) } as *const i32;
         let v_weight_2 = _mm256_set1_epi32(f_ptr.read_unaligned());
         let src_ptr = src.add(src_stride * py);
 
@@ -103,7 +103,7 @@ unsafe fn convolve_vertical_part_avx_64(
 
     for j in jj..bounds.size {
         let py = start_y + j;
-        let weight = unsafe { filter.add(j).read_unaligned() };
+        let weight = unsafe { *filter.get_unchecked(j) };
         let v_weight = _mm256_set1_epi32(weight as i32);
         let src_ptr = src.add(src_stride * py);
 
@@ -167,7 +167,7 @@ unsafe fn convolve_vertical_part_avx_32(
     src: *const u8,
     src_stride: usize,
     dst: *mut u8,
-    filter: *const i16,
+    filter: &[i16],
     bounds: &FilterBounds,
 ) {
     let vld = _mm256_set1_epi32(ROUNDING_CONST);
@@ -182,7 +182,7 @@ unsafe fn convolve_vertical_part_avx_32(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = unsafe { filter.add(j).read_unaligned() };
+        let weight = unsafe { *filter.get_unchecked(j) };
         let v_weight = _mm256_set1_epi32(weight as i32);
         let src_ptr = src.add(src_stride * py);
 
@@ -222,7 +222,7 @@ unsafe fn convolve_vertical_part_8_avx(
     src: *const u8,
     src_stride: usize,
     dst: *mut u8,
-    filter: *const i16,
+    filter: &[i16],
     bounds: &FilterBounds,
 ) {
     let vld = _mm256_set1_epi32(ROUNDING_CONST);
@@ -234,7 +234,7 @@ unsafe fn convolve_vertical_part_8_avx(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = unsafe { filter.add(j).read_unaligned() };
+        let weight = unsafe { *filter.get_unchecked(j) };
         let v_weight = _mm256_set1_epi32(weight as i32);
         let src_ptr = src.add(src_stride * py);
 
@@ -267,7 +267,7 @@ unsafe fn convolve_vertical_part_avx(
     src: *const u8,
     src_stride: usize,
     dst: *mut u8,
-    filter: *const i16,
+    filter: &[i16],
     bounds: &FilterBounds,
 ) {
     let vld = _mm256_set1_epi32(ROUNDING_CONST);
@@ -279,7 +279,7 @@ unsafe fn convolve_vertical_part_avx(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = unsafe { filter.add(j).read_unaligned() };
+        let weight = unsafe { *filter.get_unchecked(j) };
         let v_weight = _mm256_set1_epi32(weight as i32);
         let src_ptr = src.add(src_stride * py);
 
@@ -305,7 +305,7 @@ pub fn convolve_vertical_avx_row<const CHANNELS: usize>(
     unsafe_source_ptr_0: *const u8,
     unsafe_destination_ptr_0: *mut u8,
     src_stride: usize,
-    weight_ptr: *const i16,
+    weight_ptr: &[i16],
 ) {
     unsafe {
         convolve_vertical_avx_row_impl::<CHANNELS>(
@@ -327,7 +327,7 @@ unsafe fn convolve_vertical_avx_row_impl<const CHANNELS: usize>(
     unsafe_source_ptr_0: *const u8,
     unsafe_destination_ptr_0: *mut u8,
     src_stride: usize,
-    weight_ptr: *const i16,
+    weight_ptr: &[i16],
 ) {
     let mut cx = 0usize;
     let total_width = width * CHANNELS;

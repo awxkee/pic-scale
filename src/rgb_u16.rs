@@ -103,7 +103,7 @@ impl VerticalConvolutionPass<u16, 3> for ImageStore<'_, u16, 3> {
             unsafe_source_ptr_0: *const u16,
             unsafe_destination_ptr_0: *mut u16,
             src_stride: usize,
-            weight_ptr: *const i16,
+            weight_ptr: &[i16],
             usize,
         ) = convolve_vertical_rgb_native_row_u16::<3>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]

@@ -38,7 +38,7 @@ unsafe fn consume_u8_32(
     src: *const u8,
     src_stride: usize,
     dst: *mut u8,
-    filter: *const i16,
+    filter: &[i16],
     bounds: &FilterBounds,
 ) {
     let vld = i32x4_splat(ROUNDING_CONST);
@@ -55,7 +55,7 @@ unsafe fn consume_u8_32(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j);
+        let weight = *filter.get_unchecked(j);
         let v_weight = v128_load16_splat(weight as *const u16);
         let src_ptr = src.add(src_stride * py);
 
@@ -122,7 +122,7 @@ unsafe fn consume_u8_16(
     src: *const u8,
     src_stride: usize,
     dst: *mut u8,
-    filter: *const i16,
+    filter: &[i16],
     bounds: &FilterBounds,
 ) {
     let vld = i32x4_splat(ROUNDING_CONST);
@@ -135,7 +135,7 @@ unsafe fn consume_u8_16(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j);
+        let weight = *filter.get_unchecked(j);
         let v_weight = v128_load16_splat(weight as *const u16);
         let src_ptr = src.add(src_stride * py);
 
@@ -179,7 +179,7 @@ unsafe fn consume_u8_8(
     src: *const u8,
     src_stride: usize,
     dst: *mut u8,
-    filter: *const i16,
+    filter: &[i16],
     bounds: &FilterBounds,
 ) {
     let vld = i32x4_splat(ROUNDING_CONST);
@@ -190,7 +190,7 @@ unsafe fn consume_u8_8(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j);
+        let weight = *filter.get_unchecked(j);
         let v_weight = v128_load16_splat(weight as *const u16);
         let src_ptr = src.add(src_stride * py);
 
@@ -225,7 +225,7 @@ unsafe fn consume_u8_1(
     src: *const u8,
     src_stride: usize,
     dst: *mut u8,
-    filter: *const i16,
+    filter: &[i16],
     bounds: &FilterBounds,
 ) {
     let vld = i32x4_splat(ROUNDING_CONST);
@@ -235,7 +235,7 @@ unsafe fn consume_u8_1(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j);
+        let weight = *filter.get_unchecked(j);
         let v_weight = v128_load16_splat(weight as *const u16);
         let src_ptr = src.add(src_stride * py);
 
@@ -266,7 +266,7 @@ pub fn wasm_vertical_neon_row<const CHANNELS: usize>(
     unsafe_source_ptr_0: *const u8,
     unsafe_destination_ptr_0: *mut u8,
     src_stride: usize,
-    weight_ptr: *const i16,
+    weight_ptr: &[i16],
 ) {
     unsafe {
         convolve_vertical_neon_row_impl::<CHANNELS>(
@@ -288,7 +288,7 @@ unsafe fn convolve_vertical_neon_row_impl<const CHANNELS: usize>(
     unsafe_source_ptr_0: *const u8,
     unsafe_destination_ptr_0: *mut u8,
     src_stride: usize,
-    weight_ptr: *const i16,
+    weight_ptr: &[i16],
 ) {
     let mut cx = 0usize;
     let dst_width = width * CHANNELS;

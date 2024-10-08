@@ -86,8 +86,8 @@ macro_rules! consume_64_u8 {
 
         for j in 0..$bounds.size {
             let py = $start_y + j;
-            let weight = $filter.add(j);
-            let v_weight = vld1q_dup_s16(weight);
+            let weight = $filter.get_unchecked(j..);
+            let v_weight = vld1q_dup_s16(weight.as_ptr());
             let src_ptr = $src.add($src_stride * py);
 
             let s_ptr = src_ptr.add(px);
@@ -127,8 +127,8 @@ macro_rules! consume_32_u8 {
 
         for j in 0..$bounds.size {
             let py = $start_y + j;
-            let weight = $filter.add(j);
-            let v_weight = vld1q_dup_s16(weight);
+            let weight = $filter.get_unchecked(j..);
+            let v_weight = vld1q_dup_s16(weight.as_ptr());
             let src_ptr = $src.add($src_stride * py);
 
             let s_ptr = src_ptr.add(px);
@@ -160,8 +160,8 @@ macro_rules! consume_16_u8 {
 
         for j in 0..$bounds.size {
             let py = $start_y + j;
-            let weight = $filter.add(j);
-            let v_weight = vld1q_dup_s16(weight);
+            let weight = $filter.get_unchecked(j..);
+            let v_weight = vld1q_dup_s16(weight.as_ptr());
             let src_ptr = $src.add($src_stride * py);
 
             let s_ptr = src_ptr.add(px);
@@ -186,8 +186,8 @@ macro_rules! consume_u8_8 {
 
         for j in 0..$bounds.size {
             let py = $start_y + j;
-            let weight = $filter.add(j);
-            let v_weight = vld1q_dup_s16(weight);
+            let weight = $filter.get_unchecked(j..);
+            let v_weight = vld1q_dup_s16(weight.as_ptr());
             let src_ptr = $src.add($src_stride * py);
 
             let s_ptr = src_ptr.add(px);
@@ -222,8 +222,8 @@ macro_rules! consume_u8_1 {
 
         for j in 0..$bounds.size {
             let py = $start_y + j;
-            let weight = $filter.add(j);
-            let v_weight = vld1q_dup_s16(weight);
+            let weight = $filter.get_unchecked(j..);
+            let v_weight = vld1q_dup_s16(weight.as_ptr());
             let src_ptr = $src.add($src_stride * py);
 
             let s_ptr = src_ptr.add(px);
@@ -256,7 +256,7 @@ pub fn convolve_vertical_neon_row<const CHANNELS: usize>(
     unsafe_source_ptr_0: *const u8,
     unsafe_destination_ptr_0: *mut u8,
     src_stride: usize,
-    weight_ptr: *const i16,
+    weight_ptr: &[i16],
 ) {
     let mut cx = 0usize;
     let dst_width = width * CHANNELS;

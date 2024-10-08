@@ -41,7 +41,7 @@ pub(crate) unsafe fn convolve_vertical_part_avx_32_f32<const FMA: bool>(
     src: *const f32,
     src_stride: usize,
     dst: *mut f32,
-    filter: *const f32,
+    filter: &[f32],
     bounds: &FilterBounds,
 ) {
     let mut store_0 = _mm256_setzero_ps();
@@ -53,7 +53,7 @@ pub(crate) unsafe fn convolve_vertical_part_avx_32_f32<const FMA: bool>(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = unsafe { filter.add(j).read_unaligned() };
+        let weight = *filter.get_unchecked(j);
         let v_weight = _mm256_set1_ps(weight);
         let src_ptr = src.add(src_stride * py);
 
@@ -83,7 +83,7 @@ pub(crate) unsafe fn convolve_vertical_part_avx_16_f32<const FMA: bool>(
     src: *const f32,
     src_stride: usize,
     dst: *mut f32,
-    filter: *const f32,
+    filter: &[f32],
     bounds: &FilterBounds,
 ) {
     let mut store_0 = _mm256_setzero_ps();
@@ -93,7 +93,7 @@ pub(crate) unsafe fn convolve_vertical_part_avx_16_f32<const FMA: bool>(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = unsafe { filter.add(j).read_unaligned() };
+        let weight = *filter.get_unchecked(j);
         let v_weight = _mm256_set1_ps(weight);
         let src_ptr = src.add(src_stride * py);
 
@@ -117,7 +117,7 @@ pub(crate) unsafe fn convolve_vertical_part_avx_8_f32<const FMA: bool>(
     src: *const f32,
     src_stride: usize,
     dst: *mut f32,
-    filter: *const f32,
+    filter: &[f32],
     bounds: &FilterBounds,
 ) {
     let mut store_0 = _mm256_setzero_ps();
@@ -126,7 +126,7 @@ pub(crate) unsafe fn convolve_vertical_part_avx_8_f32<const FMA: bool>(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = unsafe { filter.add(j).read_unaligned() };
+        let weight = *filter.get_unchecked(j);
         let v_weight = _mm256_set1_ps(weight);
         let src_ptr = src.add(src_stride * py);
 
@@ -147,7 +147,7 @@ pub(crate) unsafe fn convolve_vertical_part_avx_f32<const FMA: bool>(
     src: *const f32,
     src_stride: usize,
     dst: *mut f32,
-    filter: *const f32,
+    filter: &[f32],
     bounds: &FilterBounds,
 ) {
     let mut store_0 = _mm256_setzero_ps();
@@ -156,7 +156,7 @@ pub(crate) unsafe fn convolve_vertical_part_avx_f32<const FMA: bool>(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = unsafe { filter.add(j).read_unaligned() };
+        let weight = *filter.get_unchecked(j);
         let v_weight = _mm256_set1_ps(weight);
         let src_ptr = src.add(src_stride * py);
 
@@ -177,7 +177,7 @@ pub fn convolve_vertical_avx_row_f32<const CHANNELS: usize, const FMA: bool>(
     unsafe_source_ptr_0: *const f32,
     unsafe_destination_ptr_0: *mut f32,
     src_stride: usize,
-    weight_ptr: *const f32,
+    weight_ptr: &[f32],
 ) {
     unsafe {
         if FMA {
@@ -209,7 +209,7 @@ unsafe fn convolve_vertical_avx_row_f32_regular<const CHANNELS: usize>(
     unsafe_source_ptr_0: *const f32,
     unsafe_destination_ptr_0: *mut f32,
     src_stride: usize,
-    weight_ptr: *const f32,
+    weight_ptr: &[f32],
 ) {
     convolve_vertical_avx_row_f32_impl::<CHANNELS, false>(
         width,
@@ -228,7 +228,7 @@ unsafe fn convolve_vertical_avx_row_f32_fma<const CHANNELS: usize>(
     unsafe_source_ptr_0: *const f32,
     unsafe_destination_ptr_0: *mut f32,
     src_stride: usize,
-    weight_ptr: *const f32,
+    weight_ptr: &[f32],
 ) {
     convolve_vertical_avx_row_f32_impl::<CHANNELS, true>(
         width,
@@ -247,7 +247,7 @@ unsafe fn convolve_vertical_avx_row_f32_impl<const CHANNELS: usize, const FMA: b
     unsafe_source_ptr_0: *const f32,
     unsafe_destination_ptr_0: *mut f32,
     src_stride: usize,
-    weight_ptr: *const f32,
+    weight_ptr: &[f32],
 ) {
     let mut cx = 0usize;
     let dst_width = CHANNELS * width;

@@ -38,7 +38,7 @@ pub(crate) unsafe fn xconvolve_vertical_part_neon_8_f16<const USE_BLENDING: bool
     src: *const half::f16,
     src_stride: usize,
     dst: *mut half::f16,
-    filter: *const f32,
+    filter: &[f32],
     bounds: &FilterBounds,
     blend_length: usize,
 ) {
@@ -48,8 +48,8 @@ pub(crate) unsafe fn xconvolve_vertical_part_neon_8_f16<const USE_BLENDING: bool
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j);
-        let v_weight_h = xvcvt_f16_f32(vld1q_dup_f32(weight));
+        let weight = filter.get_unchecked(j..);
+        let v_weight_h = xvcvt_f16_f32(vld1q_dup_f32(weight.as_ptr()));
         let v_weight = xvcombine_f16(v_weight_h, v_weight_h);
         let src_ptr = src.add(src_stride * py);
 
@@ -85,7 +85,7 @@ macro_rules! conv_vertical_part_neon_16_f16 {
 
             for j in 0..$bounds.size {
                 let py = $start_y + j;
-                let v_weight_h = xvcvt_f16_f32(vld1q_dup_f32($filter.add(j)));
+                let v_weight_h = xvcvt_f16_f32(vld1q_dup_f32($filter.get_unchecked(j..).as_ptr()));
                 let v_weight = xvcombine_f16(v_weight_h, v_weight_h);
                 let src_ptr = $src.add($src_stride * py);
 
@@ -115,7 +115,7 @@ macro_rules! conv_vertical_part_neon_32_f16 {
 
             for j in 0..$bounds.size {
                 let py = $start_y + j;
-                let v_weight_h = xvcvt_f16_f32(vld1q_dup_f32($filter.add(j)));
+                let v_weight_h = xvcvt_f16_f32(vld1q_dup_f32($filter.get_unchecked(j..).as_ptr()));
                 let v_weight = xvcombine_f16(v_weight_h, v_weight_h);
                 let src_ptr = $src.add($src_stride * py);
 
@@ -150,7 +150,7 @@ macro_rules! conv_vertical_part_neon_48_f16 {
 
             for j in 0..$bounds.size {
                 let py = $start_y + j;
-                let v_weight_h = xvcvt_f16_f32(vld1q_dup_f32($filter.add(j)));
+                let v_weight_h = xvcvt_f16_f32(vld1q_dup_f32($filter.get_unchecked(j..).as_ptr()));
                 let v_weight = xvcombine_f16(v_weight_h, v_weight_h);
                 let src_ptr = $src.add($src_stride * py);
 
@@ -184,7 +184,7 @@ pub fn xconvolve_vertical_rgb_neon_row_f16<const CHANNELS: usize>(
     unsafe_source_ptr_0: *const half::f16,
     unsafe_destination_ptr_0: *mut half::f16,
     src_stride: usize,
-    weight_ptr: *const f32,
+    weight_ptr: &[f32],
 ) {
     unsafe {
         xconvolve_vertical_rgb_neon_row_f16_impl::<CHANNELS>(
@@ -205,7 +205,7 @@ pub unsafe fn xconvolve_vertical_rgb_neon_row_f16_impl<const CHANNELS: usize>(
     unsafe_source_ptr_0: *const half::f16,
     unsafe_destination_ptr_0: *mut half::f16,
     src_stride: usize,
-    weight_ptr: *const f32,
+    weight_ptr: &[f32],
 ) {
     let mut cx = 0usize;
     let dst_width = width * CHANNELS;

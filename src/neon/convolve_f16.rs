@@ -39,7 +39,7 @@ pub(crate) unsafe fn convolve_vertical_part_neon_8_f16<const USE_BLENDING: bool>
     src: *const half::f16,
     src_stride: usize,
     dst: *mut half::f16,
-    filter: *const f32,
+    filter: &[f32],
     bounds: &FilterBounds,
     blend_length: usize,
 ) {
@@ -50,8 +50,8 @@ pub(crate) unsafe fn convolve_vertical_part_neon_8_f16<const USE_BLENDING: bool>
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j);
-        let v_weight = vld1q_dup_f32(weight);
+        let weight = filter.get_unchecked(j..);
+        let v_weight = vld1q_dup_f32(weight.as_ptr());
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);

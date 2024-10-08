@@ -137,7 +137,7 @@ pub(crate) fn convolve_vertical_dispatch_u8<'a, const COMPONENTS: usize>(
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStore<'a, u8, COMPONENTS>,
     pool: &Option<ThreadPool>,
-    dispatcher: fn(usize, &FilterBounds, *const u8, *mut u8, usize, *const i16),
+    dispatcher: fn(usize, &FilterBounds, *const u8, *mut u8, usize, &[i16]),
 ) {
     let approx_weights = filter_weights.numerical_approximation_i16::<PRECISION>(0);
 
@@ -156,7 +156,7 @@ pub(crate) fn convolve_vertical_dispatch_u8<'a, const COMPONENTS: usize>(
                 scope.spawn(move |_| {
                     let bounds = unsafe { weights.bounds.get_unchecked(y) };
                     let weight_ptr =
-                        unsafe { weights.weights.as_ptr().add(weights.aligned_size * y) };
+                        unsafe { weights.weights.get_unchecked((weights.aligned_size * y)..) };
                     let unsafe_source_ptr_0 = image_store.buffer.borrow().as_ptr();
                     let dst_ptr = unsafe_slice.mut_ptr();
                     let unsafe_destination_ptr_0 = unsafe { dst_ptr.add(dst_stride * y) };
@@ -177,7 +177,7 @@ pub(crate) fn convolve_vertical_dispatch_u8<'a, const COMPONENTS: usize>(
         let mut filter_offset = 0usize;
         for y in 0..destination.height {
             let bounds = unsafe { approx_weights.bounds.get_unchecked(y) };
-            let weight_ptr = unsafe { approx_weights.weights.as_ptr().add(filter_offset) };
+            let weight_ptr = unsafe { approx_weights.weights.get_unchecked(filter_offset..) };
             dispatcher(
                 dst_width,
                 bounds,

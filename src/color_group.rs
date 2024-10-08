@@ -28,11 +28,11 @@
  */
 #![allow(dead_code)]
 use crate::saturate_narrow::SaturateNarrow;
-use num_traits::{AsPrimitive, FromPrimitive, MulAdd};
-use std::ops::{Add, AddAssign, Mul, Shr, Sub, SubAssign};
+use num_traits::{AsPrimitive, FromPrimitive, MulAdd, Num};
+use std::ops::{Add, AddAssign, Mul, Shr, ShrAssign, Sub, SubAssign};
 
 #[repr(C)]
-#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct ColorGroup<const COMPS: usize, J: Copy> {
     pub r: J,
     pub g: J,
@@ -189,6 +189,67 @@ where
             if COMPS == 4 {
                 s_ptr.add(3).write_unaligned(self.a.as_());
             }
+        }
+    }
+}
+
+impl<const COMPS: usize, J> ColorGroup<COMPS, J>
+where
+    J: Copy + Default + 'static + Num + Ord,
+{
+    #[inline]
+    pub fn min_scalar(&self, other: J) -> ColorGroup<COMPS, J> {
+        if COMPS == 1 {
+            ColorGroup::from_components(self.r.min(other), J::default(), J::default(), J::default())
+        } else if COMPS == 2 {
+            ColorGroup::from_components(
+                self.r.min(other),
+                self.g.min(other),
+                J::default(),
+                J::default(),
+            )
+        } else if COMPS == 3 {
+            ColorGroup::from_components(
+                self.r.min(other),
+                self.g.min(other),
+                self.b.min(other),
+                J::default(),
+            )
+        } else {
+            ColorGroup::from_components(
+                self.r.min(other),
+                self.g.min(other),
+                self.b.min(other),
+                self.a.min(other),
+            )
+        }
+    }
+
+    #[inline]
+    pub(crate) fn max_scalar(&self, other: J) -> ColorGroup<COMPS, J> {
+        if COMPS == 1 {
+            ColorGroup::from_components(self.r.max(other), J::default(), J::default(), J::default())
+        } else if COMPS == 2 {
+            ColorGroup::from_components(
+                self.r.max(other),
+                self.g.max(other),
+                J::default(),
+                J::default(),
+            )
+        } else if COMPS == 3 {
+            ColorGroup::from_components(
+                self.r.max(other),
+                self.g.max(other),
+                self.b.max(other),
+                J::default(),
+            )
+        } else {
+            ColorGroup::from_components(
+                self.r.max(other),
+                self.g.max(other),
+                self.b.max(other),
+                self.a.max(other),
+            )
         }
     }
 }
@@ -400,6 +461,30 @@ where
             ColorGroup::from_components(self.r >> rhs, self.g >> rhs, self.b >> rhs, self.a >> rhs)
         } else {
             panic!("Not implemented.");
+        }
+    }
+}
+
+impl<const COMPS: usize, J> ShrAssign<J> for ColorGroup<COMPS, J>
+where
+    J: Copy + ShrAssign<J> + Default + 'static,
+{
+    #[inline]
+    fn shr_assign(&mut self, rhs: J) {
+        if COMPS == 1 {
+            self.r >>= rhs;
+        } else if COMPS == 2 {
+            self.r >>= rhs;
+            self.g >>= rhs;
+        } else if COMPS == 3 {
+            self.r >>= rhs;
+            self.g >>= rhs;
+            self.b >>= rhs;
+        } else if COMPS == 4 {
+            self.r >>= rhs;
+            self.g >>= rhs;
+            self.b >>= rhs;
+            self.a >>= rhs;
         }
     }
 }

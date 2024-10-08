@@ -40,7 +40,7 @@ unsafe fn convolve_vertical_part_sse_24_f32<const FMA: bool>(
     src: *const f32,
     src_stride: usize,
     dst: *mut f32,
-    filter: *const f32,
+    filter: &[f32],
     bounds: &FilterBounds,
 ) {
     let mut store_0 = _mm_setzero_ps();
@@ -54,8 +54,8 @@ unsafe fn convolve_vertical_part_sse_24_f32<const FMA: bool>(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j);
-        let v_weight = _mm_load1_ps(weight);
+        let weight = filter.get_unchecked(j..);
+        let v_weight = _mm_load1_ps(weight.as_ptr());
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -90,7 +90,7 @@ unsafe fn convolve_vertical_part_sse_16_f32<const FMA: bool>(
     src: *const f32,
     src_stride: usize,
     dst: *mut f32,
-    filter: *const f32,
+    filter: &[f32],
     bounds: &FilterBounds,
 ) {
     let mut store_0 = _mm_setzero_ps();
@@ -102,8 +102,8 @@ unsafe fn convolve_vertical_part_sse_16_f32<const FMA: bool>(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j);
-        let v_weight = _mm_load1_ps(weight);
+        let weight = filter.get_unchecked(j..);
+        let v_weight = _mm_load1_ps(weight.as_ptr());
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -132,7 +132,7 @@ unsafe fn convolve_vertical_part_sse_8_f32<const FMA: bool>(
     src: *const f32,
     src_stride: usize,
     dst: *mut f32,
-    filter: *const f32,
+    filter: &[f32],
     bounds: &FilterBounds,
 ) {
     let mut store_0 = _mm_setzero_ps();
@@ -142,8 +142,8 @@ unsafe fn convolve_vertical_part_sse_8_f32<const FMA: bool>(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j);
-        let v_weight = _mm_load1_ps(weight);
+        let weight = filter.get_unchecked(j..);
+        let v_weight = _mm_load1_ps(weight.as_ptr());
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -166,7 +166,7 @@ unsafe fn convolve_vertical_part_sse_4_f32<const FMA: bool>(
     src: *const f32,
     src_stride: usize,
     dst: *mut f32,
-    filter: *const f32,
+    filter: &[f32],
     bounds: &FilterBounds,
 ) {
     let mut store_0 = _mm_setzero_ps();
@@ -175,8 +175,8 @@ unsafe fn convolve_vertical_part_sse_4_f32<const FMA: bool>(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j);
-        let v_weight = _mm_load1_ps(weight);
+        let weight = filter.get_unchecked(j..);
+        let v_weight = _mm_load1_ps(weight.as_ptr());
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -196,7 +196,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_f32<const FMA: bool>(
     src: *const f32,
     src_stride: usize,
     dst: *mut f32,
-    filter: *const f32,
+    filter: &[f32],
     bounds: &FilterBounds,
 ) {
     let mut store_0 = _mm_setzero_ps();
@@ -205,8 +205,8 @@ pub(crate) unsafe fn convolve_vertical_part_sse_f32<const FMA: bool>(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j);
-        let v_weight = _mm_load1_ps(weight);
+        let weight = filter.get_unchecked(j..);
+        let v_weight = _mm_load1_ps(weight.as_ptr());
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -225,7 +225,7 @@ pub fn convolve_vertical_rgb_sse_row_f32<const CHANNELS: usize, const FMA: bool>
     unsafe_source_ptr_0: *const f32,
     unsafe_destination_ptr_0: *mut f32,
     src_stride: usize,
-    weight_ptr: *const f32,
+    weight_ptr: &[f32],
 ) {
     unsafe {
         if FMA {
@@ -258,7 +258,7 @@ unsafe fn convolve_vertical_rgb_sse_row_f32_regular<const CHANNELS: usize>(
     unsafe_source_ptr_0: *const f32,
     unsafe_destination_ptr_0: *mut f32,
     src_stride: usize,
-    weight_ptr: *const f32,
+    weight_ptr: &[f32],
 ) {
     convolve_vertical_rgb_sse_row_f32_impl::<CHANNELS, false>(
         width,
@@ -278,7 +278,7 @@ unsafe fn convolve_vertical_rgb_sse_row_f32_fma<const CHANNELS: usize>(
     unsafe_source_ptr_0: *const f32,
     unsafe_destination_ptr_0: *mut f32,
     src_stride: usize,
-    weight_ptr: *const f32,
+    weight_ptr: &[f32],
 ) {
     convolve_vertical_rgb_sse_row_f32_impl::<CHANNELS, true>(
         width,
@@ -297,7 +297,7 @@ unsafe fn convolve_vertical_rgb_sse_row_f32_impl<const CHANNELS: usize, const FM
     unsafe_source_ptr_0: *const f32,
     unsafe_destination_ptr_0: *mut f32,
     src_stride: usize,
-    weight_ptr: *const f32,
+    weight_ptr: &[f32],
 ) {
     let mut cx = 0usize;
     let dst_width = CHANNELS * width;

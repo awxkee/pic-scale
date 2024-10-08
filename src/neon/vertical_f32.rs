@@ -42,7 +42,7 @@ macro_rules! conv_vertical_part_neon_16_f32 {
 
             for j in 0..$bounds.size {
                 let py = $start_y + j;
-                let v_weight = vld1q_dup_f32($filter.add(j));
+                let v_weight = vld1q_dup_f32($filter.get_unchecked(j..).as_ptr());
                 let src_ptr = $src.add($src_stride * py);
 
                 let s_ptr = src_ptr.add(px);
@@ -77,7 +77,7 @@ macro_rules! conv_vertical_part_neon_32_f32 {
 
             for j in 0..$bounds.size {
                 let py = $start_y + j;
-                let v_weight = vld1q_dup_f32($filter.add(j));
+                let v_weight = vld1q_dup_f32($filter.get_unchecked(j..).as_ptr());
                 let src_ptr = $src.add($src_stride * py);
 
                 let s_ptr = src_ptr.add(px);
@@ -127,7 +127,7 @@ macro_rules! conv_vertical_part_neon_48_f32 {
 
             for j in 0..$bounds.size {
                 let py = $start_y + j;
-                let v_weight = vld1q_dup_f32($filter.add(j));
+                let v_weight = vld1q_dup_f32($filter.get_unchecked(j..).as_ptr());
                 let src_ptr = $src.add($src_stride * py);
 
                 let s_ptr = src_ptr.add(px);
@@ -171,7 +171,7 @@ unsafe fn convolve_vertical_part_neon_8_f32(
     src: *const f32,
     src_stride: usize,
     dst: *mut f32,
-    filter: *const f32,
+    filter: &[f32],
     bounds: &FilterBounds,
 ) {
     let mut store_0 = vdupq_n_f32(0.);
@@ -181,8 +181,8 @@ unsafe fn convolve_vertical_part_neon_8_f32(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j);
-        let v_weight = vld1q_dup_f32(weight);
+        let weight = filter.get_unchecked(j..);
+        let v_weight = vld1q_dup_f32(weight.as_ptr());
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -205,7 +205,7 @@ unsafe fn convolve_vertical_part_neon_4_f32(
     src: *const f32,
     src_stride: usize,
     dst: *mut f32,
-    filter: *const f32,
+    filter: &[f32],
     bounds: &FilterBounds,
 ) {
     let mut store_0 = vdupq_n_f32(0.);
@@ -214,8 +214,8 @@ unsafe fn convolve_vertical_part_neon_4_f32(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j);
-        let v_weight = vld1q_dup_f32(weight);
+        let weight = filter.get_unchecked(j..);
+        let v_weight = vld1q_dup_f32(weight.as_ptr());
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -235,7 +235,7 @@ unsafe fn convolve_vertical_part_neon_1_f32(
     src: *const f32,
     src_stride: usize,
     dst: *mut f32,
-    filter: *const f32,
+    filter: &[f32],
     bounds: &FilterBounds,
 ) {
     let mut store_0 = vdupq_n_f32(0.);
@@ -244,8 +244,8 @@ unsafe fn convolve_vertical_part_neon_1_f32(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = filter.add(j);
-        let v_weight = vld1q_dup_f32(weight);
+        let weight = filter.get_unchecked(j..);
+        let v_weight = vld1q_dup_f32(weight.as_ptr());
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -264,7 +264,7 @@ pub fn convolve_vertical_rgb_neon_row_f32<const CHANNELS: usize>(
     unsafe_source_ptr_0: *const f32,
     unsafe_destination_ptr_0: *mut f32,
     src_stride: usize,
-    weight_ptr: *const f32,
+    weight_ptr: &[f32],
 ) {
     let mut cx = 0usize;
     let dst_width = width * CHANNELS;
