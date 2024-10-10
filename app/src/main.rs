@@ -11,8 +11,8 @@ use fast_image_resize::{
 use half::f16;
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
-    ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ScalingF32, ScalingU16,
-    ThreadingPolicy,
+    ImageSize, ImageStore, LabScaler, LinearApproxScaler, LinearScaler, LuvScaler, OklabScaler,
+    ResamplingFunction, Scaler, Scaling, ScalingF32, ScalingU16, ThreadingPolicy, TransferFunction,
 };
 
 fn main() {
@@ -26,26 +26,21 @@ fn main() {
     let mut bytes = Vec::from(transient.as_bytes());
 
     let mut scaler = Scaler::new(ResamplingFunction::MitchellNetravalli);
-    scaler.set_threading_policy(ThreadingPolicy::Single);
+    scaler.set_threading_policy(ThreadingPolicy::Adaptive);
 
-    let mut choke: Vec<u16> = bytes.iter().map(|&x| x as u16).collect();
+    let mut choke: Vec<u8> = bytes.iter().map(|&x| x).collect();
 
     let start_time = Instant::now();
     let store =
-        ImageStore::<u16, 4>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
+        ImageStore::<u8, 4>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
-    let resized = scaler.resize_rgba_u16(
+    let resized = scaler.resize_rgba(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
         store,
-        8,
         true,
     );
 
-    let dst: Vec<u8> = resized
-        .as_bytes()
-        .iter()
-        .map(|&x| x as u8)
-        .collect::<Vec<_>>();
+    let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| x).collect::<Vec<_>>();
     // println!("f1 {}, f2 {}, f3 {}, f4 {}", dst[0], dst[1], dst[2], dst[3]);
     // let dst: Vec<u8> = resized
     //     .as_bytes()

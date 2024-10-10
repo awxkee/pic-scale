@@ -59,8 +59,10 @@ pub use alpha_f16::{sse_premultiply_alpha_rgba_f16, sse_unpremultiply_alpha_rgba
 pub use alpha_f32::sse_premultiply_alpha_rgba_f32;
 pub use alpha_f32::sse_unpremultiply_alpha_rgba_f32;
 pub use alpha_u16::{premultiply_alpha_sse_rgba_u16, unpremultiply_alpha_sse_rgba_u16};
-pub use alpha_u8::sse_premultiply_alpha_rgba;
-pub use alpha_u8::sse_unpremultiply_alpha_rgba;
+pub use alpha_u8::{
+    _mm_div_by_255_epi16, sse_premultiply_alpha_rgba, sse_unpremultiply_alpha_rgba,
+    sse_unpremultiply_row,
+};
 pub use plane_f32::convolve_horizontal_plane_sse_row_one;
 pub use plane_f32::convolve_horizontal_plane_sse_rows_4;
 pub use plane_u8::{convolve_horizontal_plane_sse_row, convolve_horizontal_plane_sse_rows_4_u8};

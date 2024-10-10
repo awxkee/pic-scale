@@ -36,8 +36,7 @@ use std::arch::aarch64::*;
 
 #[inline]
 pub unsafe fn neon_div_by_255_n(v: uint16x8_t) -> uint8x8_t {
-    let addition = vdupq_n_u16(127);
-    vqshrn_n_u16::<8>(vrsraq_n_u16::<8>(vaddq_u16(v, addition), v))
+    vqrshrn_n_u16::<8>(vrsraq_n_u16::<8>(v, v))
 }
 
 macro_rules! premultiply_vec {

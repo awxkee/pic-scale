@@ -33,7 +33,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 use crate::filter_weights::FilterWeights;
-use crate::sse::{_mm_hsum_epi32, _mm_muladd_epi32};
+use crate::sse::{_mm_hsum_epi32, _mm_muladd_wide_epi16};
 use crate::support::{PRECISION, ROUNDING_CONST};
 
 macro_rules! s_accumulate_8_horiz {
@@ -43,8 +43,8 @@ macro_rules! s_accumulate_8_horiz {
         let px_lo = _mm_unpacklo_epi16(px_16, _mm_setzero_si128());
         let px_hi = _mm_unpackhi_epi16(px_16, _mm_setzero_si128());
 
-        $store = _mm_muladd_epi32($store, px_lo, $weights.0);
-        $store = _mm_muladd_epi32($store, px_hi, $weights.1);
+        $store = _mm_muladd_wide_epi16($store, px_lo, $weights.0);
+        $store = _mm_muladd_wide_epi16($store, px_hi, $weights.1);
     }};
 }
 
@@ -56,14 +56,14 @@ macro_rules! s_accumulate_4_horiz {
             $ptr.add(2).read_unaligned() as i32,
             $ptr.add(3).read_unaligned() as i32,
         );
-        $store = _mm_muladd_epi32($store, pixel_colors, $weights);
+        $store = _mm_muladd_wide_epi16($store, pixel_colors, $weights);
     }};
 }
 
 macro_rules! s_accumulate_1_horiz {
     ($store: expr, $ptr: expr, $weight: expr) => {{
         let pixel_colors = _mm_setr_epi32($ptr.read_unaligned() as i32, 0, 0, 0);
-        $store = _mm_muladd_epi32($store, pixel_colors, $weight);
+        $store = _mm_muladd_wide_epi16($store, pixel_colors, $weight);
     }};
 }
 

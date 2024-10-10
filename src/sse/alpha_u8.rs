@@ -47,7 +47,7 @@ pub unsafe fn _mm_select_si128(mask: __m128i, true_vals: __m128i, false_vals: __
 }
 
 #[inline(always)]
-pub unsafe fn sse_div_by255(v: __m128i) -> __m128i {
+pub unsafe fn _mm_div_by_255_epi16(v: __m128i) -> __m128i {
     let addition = _mm_set1_epi16(127);
     _mm_srli_epi16::<8>(_mm_add_epi16(
         _mm_add_epi16(v, addition),
@@ -56,7 +56,7 @@ pub unsafe fn sse_div_by255(v: __m128i) -> __m128i {
 }
 
 #[inline(always)]
-unsafe fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
+pub unsafe fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
     let zeros = _mm_setzero_si128();
     let lo = _mm_cvtepu8_epi16(x);
     let hi = _mm_unpackhi_epi8(x, zeros);
@@ -135,12 +135,12 @@ unsafe fn sse_premultiply_alpha_rgba_impl_row(
             let aaa_low = _mm_cvtepu8_epi16(aaa);
             let aaa_high = _mm_unpackhi_epi8(aaa, zeros);
 
-            rrr_low = sse_div_by255(_mm_mullo_epi16(rrr_low, aaa_low));
-            rrr_high = sse_div_by255(_mm_mullo_epi16(rrr_high, aaa_high));
-            ggg_low = sse_div_by255(_mm_mullo_epi16(ggg_low, aaa_low));
-            ggg_high = sse_div_by255(_mm_mullo_epi16(ggg_high, aaa_high));
-            bbb_low = sse_div_by255(_mm_mullo_epi16(bbb_low, aaa_low));
-            bbb_high = sse_div_by255(_mm_mullo_epi16(bbb_high, aaa_high));
+            rrr_low = _mm_div_by_255_epi16(_mm_mullo_epi16(rrr_low, aaa_low));
+            rrr_high = _mm_div_by_255_epi16(_mm_mullo_epi16(rrr_high, aaa_high));
+            ggg_low = _mm_div_by_255_epi16(_mm_mullo_epi16(ggg_low, aaa_low));
+            ggg_high = _mm_div_by_255_epi16(_mm_mullo_epi16(ggg_high, aaa_high));
+            bbb_low = _mm_div_by_255_epi16(_mm_mullo_epi16(bbb_low, aaa_low));
+            bbb_high = _mm_div_by_255_epi16(_mm_mullo_epi16(bbb_high, aaa_high));
 
             let rrr = _mm_packus_epi16(rrr_low, rrr_high);
             let ggg = _mm_packus_epi16(ggg_low, ggg_high);

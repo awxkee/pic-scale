@@ -7,7 +7,7 @@ edition = "2021"
 description = "High performance image scaling"
 readme = "README.md"
 keywords = ["scale", "resize", "image-resize"]
-license = "Apache-2.0 OR BSD-3-Clause"
+license = "BSD-3-Clause OR Apache-2.0"
 authors = ["Radzivon Bartoshyk"]
 documentation = "https://github.com/awxkee/pic-scale"
 categories = ["multimedia::images", "multimedia::video"]
@@ -16,7 +16,7 @@ repository = "https://github.com/awxkee/pic-scale"
 exclude = ["*.jpg", "/assets", "*.png", "*.sh"]
 
 [dependencies]
-colorutils-rs = "0.5.8"
+colorutils-rs = "0.6.1"
 half = { version = "2.4.1", optional = true, features = ["alloc", "std", "num-traits"] }
 num-traits = { version = "0.2.19", features = ["std"] }
 rayon = "1.10.0"

@@ -212,8 +212,8 @@ pub(crate) unsafe fn _mm_hsum_epi32(x: __m128i) -> i32 {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_muladd_epi32(a: __m128i, b: __m128i, c: __m128i) -> __m128i {
-    _mm_add_epi32(a, _mm_mullo_epi32(b, c))
+pub(crate) unsafe fn _mm_muladd_wide_epi16(a: __m128i, b: __m128i, c: __m128i) -> __m128i {
+    _mm_add_epi32(a, _mm_madd_epi16(b, c))
 }
 
 #[inline]

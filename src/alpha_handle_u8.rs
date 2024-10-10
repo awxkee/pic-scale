@@ -47,10 +47,10 @@ use rayon::ThreadPool;
 #[macro_export]
 macro_rules! unpremultiply_pixel {
     ($dst: expr, $src: expr, $pixel_offset: expr) => {{
-        let mut r = *unsafe { $src.get_unchecked($pixel_offset) } as i16;
-        let mut g = *unsafe { $src.get_unchecked($pixel_offset + 1) } as i16;
-        let mut b = *unsafe { $src.get_unchecked($pixel_offset + 2) } as i16;
-        let a = *unsafe { $src.get_unchecked($pixel_offset + 3) } as i16;
+        let mut r = *unsafe { $src.get_unchecked($pixel_offset) } as u16;
+        let mut g = *unsafe { $src.get_unchecked($pixel_offset + 1) } as u16;
+        let mut b = *unsafe { $src.get_unchecked($pixel_offset + 2) } as u16;
+        let a = *unsafe { $src.get_unchecked($pixel_offset + 3) } as u16;
         if a != 0 {
             r = (r * 255) / a;
             g = (g * 255) / a;
@@ -72,10 +72,10 @@ macro_rules! unpremultiply_pixel {
 #[macro_export]
 macro_rules! premultiply_pixel {
     ($dst: expr, $src: expr, $pixel_offset: expr) => {{
-        let mut r = *unsafe { $src.get_unchecked($pixel_offset) } as i16;
-        let mut g = *unsafe { $src.get_unchecked($pixel_offset + 1) } as i16;
-        let mut b = *unsafe { $src.get_unchecked($pixel_offset + 2) } as i16;
-        let a = *unsafe { $src.get_unchecked($pixel_offset + 3) } as i16;
+        let mut r = *unsafe { $src.get_unchecked($pixel_offset) } as u16;
+        let mut g = *unsafe { $src.get_unchecked($pixel_offset + 1) } as u16;
+        let mut b = *unsafe { $src.get_unchecked($pixel_offset + 2) } as u16;
+        let a = *unsafe { $src.get_unchecked($pixel_offset + 3) } as u16;
         r *= a;
         g *= a;
         b *= a;
@@ -93,10 +93,10 @@ macro_rules! premultiply_pixel {
 
 fn premultiply_alpha_rgba_row_impl(dst: &mut [u8], src: &[u8]) {
     for (dst_chunk, src_chunk) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
-        let mut r = src_chunk[0] as i16;
-        let mut g = src_chunk[1] as i16;
-        let mut b = src_chunk[2] as i16;
-        let a = src_chunk[3] as i16;
+        let mut r = src_chunk[0] as u16;
+        let mut g = src_chunk[1] as u16;
+        let mut b = src_chunk[2] as u16;
+        let a = src_chunk[3] as u16;
         r *= a;
         g *= a;
         b *= a;
@@ -137,10 +137,10 @@ fn premultiply_alpha_rgba_impl(
 
 fn unpremultiply_alpha_rgba_row_impl(dst: &mut [u8], src: &[u8]) {
     for (dst_chunk, src_chunk) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
-        let mut r = src_chunk[0] as i16;
-        let mut g = src_chunk[1] as i16;
-        let mut b = src_chunk[2] as i16;
-        let a = src_chunk[3] as i16;
+        let mut r = src_chunk[0] as u16;
+        let mut g = src_chunk[1] as u16;
+        let mut b = src_chunk[2] as u16;
+        let a = src_chunk[3] as u16;
         if a != 0 {
             r = (r * 255) / a;
             g = (g * 255) / a;
