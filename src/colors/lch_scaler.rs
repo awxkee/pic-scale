@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use colorutils_rs::{lch_to_rgb, lch_with_alpha_to_rgba, rgb_to_lch, rgba_to_lch_with_alpha};
+use colorutils_rs::{lch_to_rgb, lch_with_alpha_to_rgba, rgb_to_lch, rgba_to_lch_with_alpha, TransferFunction, SRGB_TO_XYZ_D65, XYZ_TO_SRGB_D65};
 
 use crate::scaler::ScalingF32;
 use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
@@ -55,6 +55,8 @@ impl LChScaler {
             lab_stride,
             store.width as u32,
             store.height as u32,
+            &SRGB_TO_XYZ_D65,
+            TransferFunction::Srgb,
         );
         new_store
     }
@@ -68,6 +70,8 @@ impl LChScaler {
             store.width as u32 * 4u32,
             store.width as u32,
             store.height as u32,
+            &XYZ_TO_SRGB_D65,
+            TransferFunction::Srgb,
         );
         new_store
     }
@@ -90,6 +94,8 @@ impl Scaling for LChScaler {
             lab_stride,
             lab_store.width as u32,
             lab_store.height as u32,
+            &SRGB_TO_XYZ_D65,
+            TransferFunction::Srgb,
         );
         let new_store = self.scaler.resize_rgb_f32(new_size, lab_store);
         let mut new_u8_store = ImageStore::<u8, COMPONENTS>::alloc(new_size.width, new_size.height);
@@ -102,6 +108,8 @@ impl Scaling for LChScaler {
             new_u8_store.width as u32 * COMPONENTS as u32,
             new_store.width as u32,
             new_store.height as u32,
+            &XYZ_TO_SRGB_D65,
+            TransferFunction::Srgb,
         );
         new_u8_store
     }

@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use colorutils_rs::{rgba_to_xyz_with_alpha, srgb_to_xyz, xyz_to_srgb, xyz_with_alpha_to_rgba};
+use colorutils_rs::{rgba_to_xyz_with_alpha, srgb_to_xyz, xyz_to_srgb, xyz_with_alpha_to_rgba, TransferFunction, SRGB_TO_XYZ_D65, XYZ_TO_SRGB_D65};
 
 use crate::scaler::{Scaling, ScalingF32};
 use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, ThreadingPolicy};
@@ -55,6 +55,8 @@ impl XYZScaler {
             lab_stride,
             store.width as u32,
             store.height as u32,
+            &SRGB_TO_XYZ_D65,
+            TransferFunction::Srgb,
         );
         new_store
     }
@@ -68,6 +70,8 @@ impl XYZScaler {
             store.width as u32 * 4u32,
             store.width as u32,
             store.height as u32,
+            &XYZ_TO_SRGB_D65,
+            TransferFunction::Srgb,
         );
         new_store
     }
