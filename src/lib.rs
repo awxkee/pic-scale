@@ -52,6 +52,7 @@ mod alpha_handle_u8;
 ))]
 mod avx2;
 mod color_group;
+#[cfg(feature = "colorspaces")]
 mod colors;
 mod convolution;
 mod convolve_naive_f32;
@@ -111,15 +112,9 @@ mod unsafe_slice;
 ))]
 mod wasm32;
 
-pub use colors::JzazbzScaler;
-pub use colors::LChScaler;
-pub use colors::LabScaler;
-pub use colors::LinearApproxScaler;
-pub use colors::LinearScaler;
-pub use colors::OklabScaler;
-pub use colors::SigmoidalScaler;
-pub use colors::XYZScaler;
+#[cfg(feature = "colorspaces")]
 pub use colors::*;
+#[cfg(feature = "colorspaces")]
 pub use colorutils_rs::TransferFunction;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 pub use cpu_features::{is_aarch_f16_supported, is_aarch_f16c_supported};
