@@ -27,7 +27,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use colorutils_rs::{lab_to_srgb, lab_with_alpha_to_rgba, rgb_to_lab, rgba_to_lab_with_alpha, TransferFunction, SRGB_TO_XYZ_D65, XYZ_TO_SRGB_D65};
+use colorutils_rs::{
+    lab_to_srgb, lab_with_alpha_to_rgba, rgb_to_lab, rgba_to_lab_with_alpha, TransferFunction,
+    SRGB_TO_XYZ_D65, XYZ_TO_SRGB_D65,
+};
 
 use crate::scaler::{Scaling, ScalingF32};
 use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, ThreadingPolicy};

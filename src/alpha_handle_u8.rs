@@ -26,18 +26,33 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    not(feature = "disable_simd")
+))]
 use crate::avx2::{avx_premultiply_alpha_rgba, avx_unpremultiply_alpha_rgba};
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(
+    target_arch = "aarch64",
+    target_feature = "neon",
+    not(feature = "disable_simd")
+))]
 use crate::neon::{neon_premultiply_alpha_rgba, neon_unpremultiply_alpha_rgba};
 #[cfg(all(
     any(target_arch = "riscv64", target_arch = "riscv32"),
-    feature = "riscv"
+    feature = "riscv",
+    not(feature = "disable_simd")
 ))]
 use crate::risc::{risc_premultiply_alpha_rgba_u8, risc_unpremultiply_alpha_rgba_u8};
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    not(feature = "disable_simd")
+))]
 use crate::sse::*;
-#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[cfg(all(
+    target_arch = "wasm32",
+    target_feature = "simd128",
+    not(feature = "disable_simd")
+))]
 use crate::wasm32::{wasm_premultiply_alpha_rgba, wasm_unpremultiply_alpha_rgba};
 use rayon::iter::IndexedParallelIterator;
 use rayon::iter::ParallelIterator;
@@ -191,34 +206,37 @@ pub fn premultiply_alpha_rgba(
 ) {
     let mut _dispatcher: fn(&mut [u8], &[u8], usize, usize, &Option<ThreadPool>) =
         premultiply_alpha_rgba_impl;
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(not(feature = "disable_simd"))]
     {
-        _dispatcher = neon_premultiply_alpha_rgba;
-    }
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    {
-        if is_x86_feature_detected!("sse4.1") {
-            _dispatcher = sse_premultiply_alpha_rgba;
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            _dispatcher = neon_premultiply_alpha_rgba;
         }
-    }
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    {
-        if is_x86_feature_detected!("avx2") {
-            _dispatcher = avx_premultiply_alpha_rgba;
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            if is_x86_feature_detected!("sse4.1") {
+                _dispatcher = sse_premultiply_alpha_rgba;
+            }
         }
-    }
-    #[cfg(all(
-        any(target_arch = "riscv64", target_arch = "riscv32"),
-        feature = "riscv"
-    ))]
-    {
-        if std::arch::is_riscv_feature_detected!("v") {
-            _dispatcher = risc_premultiply_alpha_rgba_u8;
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            if is_x86_feature_detected!("avx2") {
+                _dispatcher = avx_premultiply_alpha_rgba;
+            }
         }
-    }
-    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-    {
-        _dispatcher = wasm_premultiply_alpha_rgba;
+        #[cfg(all(
+            any(target_arch = "riscv64", target_arch = "riscv32"),
+            feature = "riscv"
+        ))]
+        {
+            if std::arch::is_riscv_feature_detected!("v") {
+                _dispatcher = risc_premultiply_alpha_rgba_u8;
+            }
+        }
+        #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+        {
+            _dispatcher = wasm_premultiply_alpha_rgba;
+        }
     }
     _dispatcher(dst, src, width, height, pool);
 }
@@ -232,34 +250,37 @@ pub fn unpremultiply_alpha_rgba(
 ) {
     let mut _dispatcher: fn(&mut [u8], &[u8], usize, usize, &Option<ThreadPool>) =
         unpremultiply_alpha_rgba_impl;
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(not(feature = "disable_simd"))]
     {
-        _dispatcher = neon_unpremultiply_alpha_rgba;
-    }
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    {
-        if is_x86_feature_detected!("sse4.1") {
-            _dispatcher = sse_unpremultiply_alpha_rgba;
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            _dispatcher = neon_unpremultiply_alpha_rgba;
         }
-    }
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    {
-        if is_x86_feature_detected!("avx2") {
-            _dispatcher = avx_unpremultiply_alpha_rgba;
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            if is_x86_feature_detected!("sse4.1") {
+                _dispatcher = sse_unpremultiply_alpha_rgba;
+            }
         }
-    }
-    #[cfg(all(
-        any(target_arch = "riscv64", target_arch = "riscv32"),
-        feature = "riscv"
-    ))]
-    {
-        if std::arch::is_riscv_feature_detected!("v") {
-            _dispatcher = risc_unpremultiply_alpha_rgba_u8;
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            if is_x86_feature_detected!("avx2") {
+                _dispatcher = avx_unpremultiply_alpha_rgba;
+            }
         }
-    }
-    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-    {
-        _dispatcher = wasm_unpremultiply_alpha_rgba;
+        #[cfg(all(
+            any(target_arch = "riscv64", target_arch = "riscv32"),
+            feature = "riscv"
+        ))]
+        {
+            if std::arch::is_riscv_feature_detected!("v") {
+                _dispatcher = risc_unpremultiply_alpha_rgba_u8;
+            }
+        }
+        #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+        {
+            _dispatcher = wasm_unpremultiply_alpha_rgba;
+        }
     }
     _dispatcher(dst, src, width, height, pool);
 }

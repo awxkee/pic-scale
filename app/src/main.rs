@@ -10,7 +10,11 @@ use fast_image_resize::{
 };
 use half::f16;
 use image::{EncodableLayout, GenericImageView, ImageReader};
-use pic_scale::{ImageSize, ImageStore, JzazbzScaler, LChScaler, LabScaler, LinearApproxScaler, LinearScaler, LuvScaler, OklabScaler, ResamplingFunction, Scaler, Scaling, ScalingF32, ScalingU16, ThreadingPolicy, TransferFunction, XYZScaler};
+use pic_scale::{
+    ImageSize, ImageStore, JzazbzScaler, LChScaler, LabScaler, LinearApproxScaler, LinearScaler,
+    LuvScaler, OklabScaler, ResamplingFunction, Scaler, Scaling, ScalingF32, ScalingU16,
+    ThreadingPolicy, TransferFunction, XYZScaler,
+};
 
 fn main() {
     // test_fast_image();
@@ -22,7 +26,11 @@ fn main() {
     let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
-    let mut scaler = JzazbzScaler::new(ResamplingFunction::MitchellNetravalli, 200., TransferFunction::Srgb);
+    let mut scaler = JzazbzScaler::new(
+        ResamplingFunction::MitchellNetravalli,
+        200.,
+        TransferFunction::Srgb,
+    );
     scaler.set_threading_policy(ThreadingPolicy::Adaptive);
 
     let mut choke: Vec<u8> = bytes.iter().map(|&x| x).collect();

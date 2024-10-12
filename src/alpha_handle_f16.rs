@@ -26,22 +26,41 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    not(feature = "disable_simd")
+))]
 use crate::avx2::{avx_premultiply_alpha_rgba_f16, avx_unpremultiply_alpha_rgba_f16};
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(
+    target_arch = "aarch64",
+    target_feature = "neon",
+    not(feature = "disable_simd")
+))]
 use crate::cpu_features::is_aarch_f16_supported;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(
+    target_arch = "aarch64",
+    target_feature = "neon",
+    not(feature = "disable_simd")
+))]
 use crate::neon::{neon_premultiply_alpha_rgba_f16, neon_unpremultiply_alpha_rgba_f16};
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(
+    target_arch = "aarch64",
+    target_feature = "neon",
+    not(feature = "disable_simd")
+))]
 use crate::neon::{neon_premultiply_alpha_rgba_f16_full, neon_unpremultiply_alpha_rgba_f16_full};
 #[cfg(all(
     any(target_arch = "riscv64", target_arch = "riscv32"),
-    feature = "riscv"
+    feature = "riscv",
+    not(feature = "disable_simd")
 ))]
 use crate::risc::{
     risc_is_feature_supported, risc_premultiply_alpha_rgba_f16, risc_unpremultiply_alpha_rgba_f16,
 };
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    not(feature = "disable_simd")
+))]
 use crate::sse::{sse_premultiply_alpha_rgba_f16, sse_unpremultiply_alpha_rgba_f16};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::ParallelSliceMut;
@@ -190,32 +209,35 @@ pub fn premultiply_alpha_rgba_f16(
 ) {
     let mut _dispatcher: fn(&mut [half::f16], &[half::f16], usize, usize, &Option<ThreadPool>) =
         premultiply_alpha_rgba_impl_f16;
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(not(feature = "disable_simd"))]
     {
-        _dispatcher = neon_premultiply_alpha_rgba_f16;
-        if is_aarch_f16_supported() {
-            _dispatcher = neon_premultiply_alpha_rgba_f16_full;
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            _dispatcher = neon_premultiply_alpha_rgba_f16;
+            if is_aarch_f16_supported() {
+                _dispatcher = neon_premultiply_alpha_rgba_f16_full;
+            }
         }
-    }
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    {
-        if is_x86_feature_detected!("sse4.1") {
-            _dispatcher = sse_premultiply_alpha_rgba_f16;
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            if is_x86_feature_detected!("sse4.1") {
+                _dispatcher = sse_premultiply_alpha_rgba_f16;
+            }
         }
-    }
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    {
-        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("f16c") {
-            _dispatcher = avx_premultiply_alpha_rgba_f16;
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("f16c") {
+                _dispatcher = avx_premultiply_alpha_rgba_f16;
+            }
         }
-    }
-    #[cfg(all(
-        any(target_arch = "riscv64", target_arch = "riscv32"),
-        feature = "riscv"
-    ))]
-    {
-        if std::arch::is_riscv_feature_detected!("v") && risc_is_feature_supported("zvfh") {
-            _dispatcher = risc_unpremultiply_alpha_rgba_f16;
+        #[cfg(all(
+            any(target_arch = "riscv64", target_arch = "riscv32"),
+            feature = "riscv"
+        ))]
+        {
+            if std::arch::is_riscv_feature_detected!("v") && risc_is_feature_supported("zvfh") {
+                _dispatcher = risc_unpremultiply_alpha_rgba_f16;
+            }
         }
     }
     _dispatcher(dst, src, width, height, pool);
@@ -230,32 +252,35 @@ pub fn unpremultiply_alpha_rgba_f16(
 ) {
     let mut _dispatcher: fn(&mut [half::f16], &[half::f16], usize, usize, &Option<ThreadPool>) =
         unpremultiply_alpha_rgba_impl_f16;
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(not(feature = "disable_simd"))]
     {
-        _dispatcher = neon_unpremultiply_alpha_rgba_f16;
-        if is_aarch_f16_supported() {
-            _dispatcher = neon_unpremultiply_alpha_rgba_f16_full;
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            _dispatcher = neon_unpremultiply_alpha_rgba_f16;
+            if is_aarch_f16_supported() {
+                _dispatcher = neon_unpremultiply_alpha_rgba_f16_full;
+            }
         }
-    }
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    {
-        if is_x86_feature_detected!("sse4.1") {
-            _dispatcher = sse_unpremultiply_alpha_rgba_f16;
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            if is_x86_feature_detected!("sse4.1") {
+                _dispatcher = sse_unpremultiply_alpha_rgba_f16;
+            }
         }
-    }
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    {
-        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("f16c") {
-            _dispatcher = avx_unpremultiply_alpha_rgba_f16;
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("f16c") {
+                _dispatcher = avx_unpremultiply_alpha_rgba_f16;
+            }
         }
-    }
-    #[cfg(all(
-        any(target_arch = "riscv64", target_arch = "riscv32"),
-        feature = "riscv"
-    ))]
-    {
-        if std::arch::is_riscv_feature_detected!("v") && risc_is_feature_supported("zvfh") {
-            _dispatcher = risc_premultiply_alpha_rgba_f16;
+        #[cfg(all(
+            any(target_arch = "riscv64", target_arch = "riscv32"),
+            feature = "riscv"
+        ))]
+        {
+            if std::arch::is_riscv_feature_detected!("v") && risc_is_feature_supported("zvfh") {
+                _dispatcher = risc_premultiply_alpha_rgba_f16;
+            }
         }
     }
     _dispatcher(dst, src, width, height, pool);

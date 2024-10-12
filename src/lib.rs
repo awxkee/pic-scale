@@ -46,7 +46,10 @@ mod alpha_handle_f16;
 mod alpha_handle_f32;
 mod alpha_handle_u16;
 mod alpha_handle_u8;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(
+    not(feature = "disable_simd"),
+    any(target_arch = "x86_64", target_arch = "x86")
+))]
 mod avx2;
 mod color_group;
 mod colors;
@@ -67,7 +70,11 @@ mod image_size;
 mod image_store;
 mod math;
 mod nearest_sampler;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(
+    target_arch = "aarch64",
+    target_feature = "neon",
+    not(feature = "disable_simd")
+))]
 mod neon;
 mod plane_f32;
 mod plane_u16;
@@ -80,7 +87,8 @@ mod rgba_u16;
 mod rgba_u8;
 #[cfg(all(
     any(target_arch = "riscv64", target_arch = "riscv32"),
-    feature = "riscv"
+    feature = "riscv",
+    not(feature = "disable_simd")
 ))]
 mod risc;
 mod sampler;
@@ -88,12 +96,19 @@ mod saturate_narrow;
 mod scaler;
 #[cfg(feature = "half")]
 mod scaler_f16;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    not(feature = "disable_simd")
+))]
 mod sse;
 mod support;
 mod threading_policy;
 mod unsafe_slice;
-#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[cfg(all(
+    target_arch = "wasm32",
+    target_feature = "simd128",
+    not(feature = "disable_simd")
+))]
 mod wasm32;
 
 pub use colors::JzazbzScaler;

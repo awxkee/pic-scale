@@ -2,7 +2,7 @@ workspace = { members = ["app", "wasm"] }
 
 [package]
 name = "pic-scale"
-version = "0.2.10"
+version = "0.2.11"
 edition = "2021"
 description = "High performance image scaling"
 readme = "README.md"
@@ -16,7 +16,7 @@ repository = "https://github.com/awxkee/pic-scale"
 exclude = ["*.jpg", "/assets", "*.png", "*.sh"]
 
 [dependencies]
-colorutils-rs = "0.7.0"
+colorutils-rs = {version = "0.7.0", optional = true}
 half = { version = "2.4.1", optional = true, features = ["alloc", "std", "num-traits"] }
 num-traits = { version = "0.2.19", features = ["std"] }
 rayon = "1.10.0"
@@ -25,5 +25,7 @@ rayon = "1.10.0"
 libc = "0.2.158"
 
 [features]
-default = []
+default = ["colorspaces"]
+colorspaces = ["dep:colorutils-rs"]
 riscv = []
+disable_simd = []
