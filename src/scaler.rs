@@ -112,11 +112,11 @@ pub trait ScalingU16 {
     /// # Arguments
     /// `new_size` - New image size
     /// `store` - original image store
-    /// `bit_depth` - image bit depth, this is required for u16 image
+    /// `bit_depth` - image bit-depth, this is required for u16 image
     /// `is_alpha_premultiplied` - flags is alpha is premultiplied
     ///
     /// # Panics
-    /// Panic if bit depth < 1 or bit depth > 16
+    /// Panic if bit-depth < 1 or bit-depth > 16
     fn resize_rgba_u16(
         &self,
         new_size: ImageSize,
@@ -186,7 +186,7 @@ impl Scaler {
 
         let mut bounds: Vec<FilterBounds> = vec![FilterBounds::new(0, 0); out_size];
         for i in 0..out_size {
-            let center_x = ((i.as_() + 0.5f32.as_()) * scale).min(in_size.as_());
+            let center_x = ((i.as_() + 0.5.as_()) * scale).min(in_size.as_());
             let mut weights_sum: T = 0f32.as_();
             let mut local_filter_iteration = 0usize;
 
@@ -197,7 +197,7 @@ impl Scaler {
                 .min(start.as_() + kernel_size.as_())
                 .as_();
 
-            let center = center_x - 0.5f32.as_();
+            let center = center_x - 0.5.as_();
 
             for k in start..end {
                 let dx = k.as_() - center;
@@ -227,13 +227,11 @@ impl Scaler {
                     let dx = dx.abs();
                     weight = resampling_function(dx * filter_scale);
                 }
-                if weight != 0f32.as_() {
-                    weights_sum += weight;
-                    unsafe {
-                        *local_filters.get_unchecked_mut(local_filter_iteration) = weight;
-                    }
-                    local_filter_iteration += 1;
+                weights_sum += weight;
+                unsafe {
+                    *local_filters.get_unchecked_mut(local_filter_iteration) = weight;
                 }
+                local_filter_iteration += 1;
             }
 
             let alpha: T = 0.7f32.as_();

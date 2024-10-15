@@ -6,11 +6,12 @@ use std::time::Instant;
 use fast_image_resize::images::Image;
 use fast_image_resize::FilterType::Lanczos3;
 use fast_image_resize::{
-    CpuExtensions, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
+    CpuExtensions, FilterType, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
-use half::f16;
 use image::{EncodableLayout, GenericImageView, ImageReader};
-use pic_scale::{ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
+use pic_scale::{
+    ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ScalingU16, ThreadingPolicy,
+};
 
 fn main() {
     // test_fast_image();
@@ -22,24 +23,22 @@ fn main() {
     let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
-    let mut scaler = Scaler::new(
-        ResamplingFunction::MitchellNetravalli,
-    );
+    let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
     scaler.set_threading_policy(ThreadingPolicy::Adaptive);
 
-    let mut choke: Vec<u8> = bytes.iter().map(|&x| x).collect();
+    let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 8).collect();
 
     let start_time = Instant::now();
     let store =
-        ImageStore::<u8, 4>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
+        ImageStore::<u16, 4>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
-    let resized = scaler.resize_rgba(
-        ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-        store,
-        true,
-    );
+    let resized = scaler.resize_rgba_u16(ImageSize::new(350, 200), store, 16, true);
 
-    let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| x).collect::<Vec<_>>();
+    let dst: Vec<u8> = resized
+        .as_bytes()
+        .iter()
+        .map(|&x| (x >> 8) as u8)
+        .collect::<Vec<_>>();
     // println!("f1 {}, f2 {}, f3 {}, f4 {}", dst[0], dst[1], dst[2], dst[3]);
     // let dst: Vec<u8> = resized
     //     .as_bytes()
@@ -192,7 +191,7 @@ fn test_fast_image() {
 
     let src_image = Image::from_vec_u8(dimensions.0, dimensions.1, vc, pixel_type).unwrap();
 
-    let mut dst_image = Image::new(dimensions.0 / 2, dimensions.1 / 2, pixel_type);
+    let mut dst_image = Image::new(350, 200, pixel_type);
 
     let mut resizer = Resizer::new();
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -208,7 +207,7 @@ fn test_fast_image() {
             &src_image,
             &mut dst_image,
             &ResizeOptions::new()
-                .resize_alg(ResizeAlg::Convolution(Lanczos3))
+                .resize_alg(ResizeAlg::Convolution(FilterType::Bilinear))
                 .use_alpha(false),
         )
         .unwrap();
@@ -219,7 +218,7 @@ fn test_fast_image() {
 
     let converted_16 = dst_image.buffer(); // Vec::from(u8_to_u16(dst_image.buffer()));
 
-    let dst: Vec<u8> = converted_16.iter().map(|&x| (x >> 2) as u8).collect();
+    let dst: Vec<u8> = converted_16.iter().map(|&x| x).collect();
 
     if pixel_type == PixelType::U8x3 || pixel_type == PixelType::U16x3 {
         image::save_buffer(

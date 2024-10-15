@@ -50,9 +50,9 @@ pub fn resize_nearest<T: Copy + Send + Sync, const CHANNELS: usize>(
 
     if let Some(pool) = pool {
         pool.install(|| {
-            dst.par_chunks_exact_mut(dst_width * CHANNELS)
+            dst.par_chunks_exact_mut(dst_stride)
                 .enumerate()
-                .for_each(|(y, dst_chunk)| {
+                .for_each(|(y, dst_chunk)| unsafe {
                     for x in 0..dst_width {
                         let src_x =
                             (x as f32 * x_scale + 0.5f32).min(clip_width).max(0f32) as usize;
@@ -61,36 +61,30 @@ pub fn resize_nearest<T: Copy + Send + Sync, const CHANNELS: usize>(
                         let src_offset_y = src_y * src_stride;
                         let src_px = src_x * CHANNELS;
                         let dst_px = x * CHANNELS;
-                        unsafe {
-                            std::ptr::copy_nonoverlapping(
-                                src.as_ptr().add(src_offset_y + src_px),
-                                dst_chunk.as_mut_ptr().add(dst_px),
-                                CHANNELS,
-                            );
-                        }
+                        std::ptr::copy_nonoverlapping(
+                            src.as_ptr().add(src_offset_y + src_px),
+                            dst_chunk.as_mut_ptr().add(dst_px),
+                            CHANNELS,
+                        );
                     }
                 });
         });
     } else {
-        let mut dst_offset = 0usize;
-
-        for y in 0..dst_height {
-            for x in 0..dst_width {
-                let src_x = (x as f32 * x_scale + 0.5f32).min(clip_width).max(0f32) as usize;
-                let src_y = (y as f32 * y_scale + 0.5f32).min(clip_height).max(0f32) as usize;
-                let src_offset_y = src_y * src_stride;
-                let src_px = src_x * CHANNELS;
-                let dst_px = x * CHANNELS;
-                unsafe {
+        dst.chunks_exact_mut(dst_stride)
+            .enumerate()
+            .for_each(|(y, dst_chunk)| unsafe {
+                for x in 0..dst_width {
+                    let src_x = (x as f32 * x_scale + 0.5f32).min(clip_width).max(0f32) as usize;
+                    let src_y = (y as f32 * y_scale + 0.5f32).min(clip_height).max(0f32) as usize;
+                    let src_offset_y = src_y * src_stride;
+                    let src_px = src_x * CHANNELS;
+                    let dst_px = x * CHANNELS;
                     std::ptr::copy_nonoverlapping(
                         src.as_ptr().add(src_offset_y + src_px),
-                        dst.as_mut_ptr().add(dst_offset + dst_px),
+                        dst_chunk.as_mut_ptr().add(dst_px),
                         CHANNELS,
                     );
                 }
-            }
-
-            dst_offset += dst_stride;
-        }
+            });
     }
 }
