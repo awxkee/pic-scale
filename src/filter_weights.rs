@@ -83,17 +83,14 @@ impl FilterWeights<f32> {
 
         let mut output_kernel = vec![0i16; self.distinct_elements * align];
 
-        let mut chunk_position = 0usize;
-
-        for chunk in self.weights.chunks_exact(self.kernel_size) {
-            for (i, _) in chunk.iter().enumerate() {
-                let k = chunk_position + i;
-                unsafe {
-                    *output_kernel.get_unchecked_mut(k) =
-                        (chunk[i] * precision_scale).round() as i16;
-                }
+        for (chunk, kernel_chunk) in self
+            .weights
+            .chunks_exact(self.kernel_size)
+            .zip(output_kernel.chunks_exact_mut(align))
+        {
+            for (&weight, kernel) in chunk.iter().zip(kernel_chunk) {
+                *kernel = (weight * precision_scale).round() as i16;
             }
-            chunk_position += align;
         }
 
         let mut new_bounds = vec![FilterBounds::new(0, 0); self.bounds.len()];

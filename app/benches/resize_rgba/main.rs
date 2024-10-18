@@ -113,7 +113,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             let mut resizer = Resizer::new();
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             unsafe {
-                resizer.set_cpu_extensions(CpuExtensions::Neon);
+                resizer.set_cpu_extensions(CpuExtensions::None);
             }
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             unsafe {

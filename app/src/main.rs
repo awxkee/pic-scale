@@ -15,7 +15,7 @@ use pic_scale::{
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/asset_5.png")
+    let img = ImageReader::open("./assets/nasa-4928x3279.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -23,8 +23,8 @@ fn main() {
     let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
-    let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-    scaler.set_threading_policy(ThreadingPolicy::Adaptive);
+    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    scaler.set_threading_policy(ThreadingPolicy::Single);
 
     let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 8).collect();
 
@@ -32,7 +32,11 @@ fn main() {
     let store =
         ImageStore::<u16, 4>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
-    let resized = scaler.resize_rgba_u16(ImageSize::new(350, 200), store, 16, true);
+    let resized = scaler.resize_rgba_u16(ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2), store, 16,false);
+
+    let elapsed_time = start_time.elapsed();
+    // Print the elapsed time in milliseconds
+    println!("Scaler: {:.2?}", elapsed_time);
 
     let dst: Vec<u8> = resized
         .as_bytes()
@@ -90,10 +94,6 @@ fn main() {
     // );
 
     //
-
-    let elapsed_time = start_time.elapsed();
-    // Print the elapsed time in milliseconds
-    println!("Scaler: {:.2?}", elapsed_time);
 
     // let dst: Vec<u8> = resized
     //     .as_bytes()
