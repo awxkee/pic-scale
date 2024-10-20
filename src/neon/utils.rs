@@ -95,11 +95,3 @@ pub(crate) struct Float32x5T(
     pub float32x4_t,
     pub float32x4_t,
 );
-
-#[inline(always)]
-pub(crate) unsafe fn vsave3_u16(ptr: *mut u16, v: uint16x4_t) {
-    let p_1 = vget_lane_u32::<0>(vreinterpret_u32_u16(v));
-    let p_3 = vget_lane_u16::<2>(v);
-    (ptr as *mut u32).write_unaligned(p_1);
-    ptr.add(2).write_unaligned(p_3);
-}

@@ -29,10 +29,17 @@
 use crate::color_group::ColorGroup;
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use num_traits::{AsPrimitive, MulAdd};
+use std::ops::{Add, Mul};
 
 pub(crate) unsafe fn convolve_vertical_part_f32<
     T: Copy + 'static + AsPrimitive<I>,
-    I: Copy + 'static + AsPrimitive<T> + Default + MulAdd<I, Output = I>,
+    I: Copy
+        + 'static
+        + AsPrimitive<T>
+        + Default
+        + MulAdd<I, Output = I>
+        + Mul<I, Output = I>
+        + Add<I, Output = I>,
     const CHANNELS: usize,
 >(
     start_y: usize,
@@ -64,7 +71,13 @@ pub(crate) unsafe fn convolve_vertical_part_f32<
 
 pub(crate) unsafe fn convolve_vertical_part_4_f32<
     T: Copy + 'static + AsPrimitive<I>,
-    I: Copy + 'static + AsPrimitive<T> + Default + MulAdd<I, Output = I>,
+    I: Copy
+        + 'static
+        + AsPrimitive<T>
+        + Default
+        + MulAdd<I, Output = I>
+        + Mul<I, Output = I>
+        + Add<I, Output = I>,
     const CHANNELS: usize,
 >(
     start_y: usize,
@@ -109,7 +122,13 @@ pub(crate) unsafe fn convolve_vertical_part_4_f32<
 #[inline]
 pub(crate) fn convolve_horizontal_rgb_native_row<
     T: Copy + 'static + AsPrimitive<I>,
-    I: Copy + 'static + Default + MulAdd<I, Output = I> + AsPrimitive<T>,
+    I: Copy
+        + 'static
+        + Default
+        + MulAdd<I, Output = I>
+        + AsPrimitive<T>
+        + Mul<I, Output = I>
+        + Add<I, Output = I>,
     const CHANNELS: usize,
 >(
     dst_width: usize,
@@ -149,7 +168,13 @@ pub(crate) fn convolve_horizontal_rgb_native_row<
 
 pub(crate) fn convolve_horizontal_rgba_4_row_f32<
     T: Copy + 'static + AsPrimitive<I>,
-    I: Copy + 'static + Default + MulAdd<I, Output = I> + AsPrimitive<T>,
+    I: Copy
+        + 'static
+        + Default
+        + MulAdd<I, Output = I>
+        + AsPrimitive<T>
+        + Mul<I, Output = I>
+        + Add<I, Output = I>,
     const CHANNELS: usize,
 >(
     dst_width: usize,

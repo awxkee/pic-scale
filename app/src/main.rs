@@ -4,7 +4,6 @@ mod split;
 use std::time::Instant;
 
 use fast_image_resize::images::Image;
-use fast_image_resize::FilterType::Lanczos3;
 use fast_image_resize::{
     CpuExtensions, FilterType, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
@@ -15,34 +14,34 @@ use pic_scale::{
 
 fn main() {
     // test_fast_image();
+
     let img = ImageReader::open("./assets/nasa-4928x3279.png")
         .unwrap()
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
-    let transient = img.to_rgba8();
+    let transient = img.to_rgb8();
     let mut bytes = Vec::from(transient.as_bytes());
 
     let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
-    let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 8).collect();
+    let mut choke: Vec<u8> = bytes.iter().map(|&x| x).collect();
 
-    let start_time = Instant::now();
     let store =
-        ImageStore::<u16, 4>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
+        ImageStore::<u8, 3>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
-    let resized = scaler.resize_rgba_u16(ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2), store, 16,false);
+    let start_time = Instant::now();
+    let resized = scaler.resize_rgb(
+        ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+        store,
+    );
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
     println!("Scaler: {:.2?}", elapsed_time);
 
-    let dst: Vec<u8> = resized
-        .as_bytes()
-        .iter()
-        .map(|&x| (x >> 8) as u8)
-        .collect::<Vec<_>>();
+    let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| x).collect::<Vec<_>>();
     // println!("f1 {}, f2 {}, f3 {}, f4 {}", dst[0], dst[1], dst[2], dst[3]);
     // let dst: Vec<u8> = resized
     //     .as_bytes()
@@ -173,30 +172,31 @@ fn u8_to_u16(u8_buffer: &[u8]) -> &[u16] {
 }
 
 fn test_fast_image() {
-    let img = ImageReader::open("./assets/asset_5.png")
+    let img = ImageReader::open("./assets/nasa-4928x3279.png")
         .unwrap()
         .decode()
         .unwrap();
+    let img = img.to_rgba16();
     let dimensions = img.dimensions();
 
     let mut vc = Vec::from(img.as_bytes());
 
-    // let mut converted_bytes: Vec<u16> = vc.iter().map(|&x| (x as u16) << 2).collect();
+    let mut converted_bytes: Vec<u16> = vc.iter().map(|&x| (x as u16) << 8).collect();
 
-    // let mut chokidar = Vec::from(u16_to_u8(&converted_bytes));
+    let mut chokidar = Vec::from(u16_to_u8(&converted_bytes));
 
     let start_time = Instant::now();
 
-    let pixel_type: PixelType = PixelType::U8x4;
+    let pixel_type: PixelType = PixelType::U16x4;
 
-    let src_image = Image::from_vec_u8(dimensions.0, dimensions.1, vc, pixel_type).unwrap();
+    let src_image = Image::from_vec_u8(dimensions.0, dimensions.1, chokidar, pixel_type).unwrap();
 
-    let mut dst_image = Image::new(350, 200, pixel_type);
+    let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
 
     let mut resizer = Resizer::new();
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     unsafe {
-        resizer.set_cpu_extensions(CpuExtensions::Neon);
+        resizer.set_cpu_extensions(CpuExtensions::None);
     }
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     unsafe {
@@ -207,7 +207,7 @@ fn test_fast_image() {
             &src_image,
             &mut dst_image,
             &ResizeOptions::new()
-                .resize_alg(ResizeAlg::Convolution(FilterType::Bilinear))
+                .resize_alg(ResizeAlg::Convolution(FilterType::Lanczos3))
                 .use_alpha(false),
         )
         .unwrap();
@@ -216,9 +216,12 @@ fn test_fast_image() {
     // Print the elapsed time in milliseconds
     println!("Fast image resize: {:.2?}", elapsed_time);
 
-    let converted_16 = dst_image.buffer(); // Vec::from(u8_to_u16(dst_image.buffer()));
+    let converted_16 = Vec::from(u8_to_u16(dst_image.buffer()));
 
-    let dst: Vec<u8> = converted_16.iter().map(|&x| x).collect();
+    let dst: Vec<u8> = converted_16
+        .iter()
+        .map(|&x| (x >> 8) as u8)
+        .collect::<Vec<_>>();
 
     if pixel_type == PixelType::U8x3 || pixel_type == PixelType::U16x3 {
         image::save_buffer(

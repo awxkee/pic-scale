@@ -30,13 +30,13 @@
 use crate::support::PRECISION;
 
 pub trait SaturateNarrow<J> {
-    fn saturate_narrow(self) -> J;
+    fn saturate_narrow(self, bit_depth: u32) -> J;
 }
 
 impl SaturateNarrow<u8> for i32 {
     #[inline(always)]
     #[allow(clippy::manual_clamp)]
-    fn saturate_narrow(self) -> u8 {
+    fn saturate_narrow(self, _: u32) -> u8 {
         (self >> PRECISION).max(0).min(255) as u8
     }
 }
@@ -44,7 +44,7 @@ impl SaturateNarrow<u8> for i32 {
 impl SaturateNarrow<u8> for i64 {
     #[inline(always)]
     #[allow(clippy::manual_clamp)]
-    fn saturate_narrow(self) -> u8 {
+    fn saturate_narrow(self, _: u32) -> u8 {
         (self >> PRECISION).max(0).min(255) as u8
     }
 }
