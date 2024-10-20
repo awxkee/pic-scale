@@ -57,7 +57,7 @@ pub trait Scaling {
         &self,
         new_size: ImageSize,
         store: ImageStore<u8, 4>,
-        is_alpha_premultiplied: bool,
+        premultiply_alpha: bool,
     ) -> ImageStore<u8, 4>;
 }
 
@@ -70,7 +70,7 @@ pub trait ScalingF32 {
         &self,
         new_size: ImageSize,
         store: ImageStore<f32, 4>,
-        is_alpha_premultiplied: bool,
+        premultiply_alpha: bool,
     ) -> ImageStore<f32, 4>;
 }
 
@@ -113,7 +113,7 @@ pub trait ScalingU16 {
     /// `new_size` - New image size
     /// `store` - original image store
     /// `bit_depth` - image bit-depth, this is required for u16 image
-    /// `is_alpha_premultiplied` - flags is alpha is premultiplied
+    /// `premultiply_alpha` - flags is alpha is premultiplied
     ///
     /// # Panics
     /// Panic if bit-depth < 1 or bit-depth > 16
@@ -122,7 +122,7 @@ pub trait ScalingU16 {
         new_size: ImageSize,
         store: ImageStore<u16, 4>,
         bit_depth: usize,
-        is_alpha_premultiplied: bool,
+        premultiply_alpha: bool,
     ) -> ImageStore<u16, 4>;
 }
 
@@ -285,7 +285,7 @@ impl Scaler {
         &self,
         new_size: ImageSize,
         store: ImageStore<u8, 4>,
-        is_alpha_premultiplied: bool,
+        premultiply_alpha: bool,
         pool: &Option<ThreadPool>,
     ) -> ImageStore<u8, 4> {
         let mut src_store = store;
@@ -303,10 +303,10 @@ impl Scaler {
             return new_image;
         }
 
-        if is_alpha_premultiplied {
+        if premultiply_alpha {
             let mut premultiplied_store =
                 ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
-            src_store.unpremultiply_alpha(&mut premultiplied_store, pool);
+            src_store.premultiply_alpha(&mut premultiplied_store, pool);
             src_store = premultiplied_store;
         }
 
@@ -317,10 +317,10 @@ impl Scaler {
 
         let mut new_image_horizontal = ImageStore::<u8, 4>::alloc(new_size.width, new_size.height);
         new_image_vertical.convolve_horizontal(horizontal_filters, &mut new_image_horizontal, pool);
-        if is_alpha_premultiplied {
+        if premultiply_alpha {
             let mut premultiplied_store =
                 ImageStore::<u8, 4>::alloc(new_image_horizontal.width, new_image_horizontal.height);
-            new_image_horizontal.premultiply_alpha(&mut premultiplied_store, pool);
+            new_image_horizontal.unpremultiply_alpha(&mut premultiplied_store, pool);
             return premultiplied_store;
         }
         new_image_horizontal
@@ -370,12 +370,12 @@ impl Scaling for Scaler {
         &self,
         new_size: ImageSize,
         store: ImageStore<u8, 4>,
-        is_alpha_premultiplied: bool,
+        premultiply_alpha: bool,
     ) -> ImageStore<u8, 4> {
         let pool = self
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
-        self.resize_rgba_impl(new_size, store, is_alpha_premultiplied, &pool)
+        self.resize_rgba_impl(new_size, store, premultiply_alpha, &pool)
     }
 }
 
@@ -384,7 +384,7 @@ impl Scaler {
         &self,
         new_size: ImageSize,
         store: ImageStore<f32, 4>,
-        is_alpha_premultiplied: bool,
+        premultiply_alpha: bool,
         pool: &Option<ThreadPool>,
     ) -> ImageStore<f32, 4> {
         let mut src_store = store;
@@ -404,10 +404,10 @@ impl Scaler {
             return new_image;
         }
 
-        if is_alpha_premultiplied {
+        if premultiply_alpha {
             let mut premultiplied_store =
                 ImageStore::<f32, 4>::alloc(src_store.width, src_store.height);
-            src_store.unpremultiply_alpha(&mut premultiplied_store, pool);
+            src_store.premultiply_alpha(&mut premultiplied_store, pool);
             src_store = premultiplied_store;
         }
 
@@ -425,12 +425,12 @@ impl Scaler {
                 .unwrap();
         new_image_vertical.convolve_horizontal(horizontal_filters, &mut new_image_horizontal, pool);
 
-        if is_alpha_premultiplied {
+        if premultiply_alpha {
             let mut premultiplied_store = ImageStore::<f32, 4>::alloc(
                 new_image_horizontal.width,
                 new_image_horizontal.height,
             );
-            new_image_horizontal.premultiply_alpha(&mut premultiplied_store, pool);
+            new_image_horizontal.unpremultiply_alpha(&mut premultiplied_store, pool);
             return premultiplied_store;
         }
 
@@ -484,12 +484,12 @@ impl ScalingF32 for Scaler {
         &self,
         new_size: ImageSize,
         store: ImageStore<f32, 4>,
-        is_alpha_premultiplied: bool,
+        premultiply_alpha: bool,
     ) -> ImageStore<f32, 4> {
         let pool = self
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
-        self.resize_rgba_f32_impl(new_size, store, is_alpha_premultiplied, &pool)
+        self.resize_rgba_f32_impl(new_size, store, premultiply_alpha, &pool)
     }
 }
 
@@ -638,7 +638,7 @@ impl ScalingU16 for Scaler {
     /// `new_size` - New image size
     /// `store` - original image store
     /// `bit_depth` - image bit depth, this is required for u16 image
-    /// `is_alpha_premultiplied` - flags is alpha is premultiplied
+    /// `premultiply_alpha` - flags is alpha is premultiplied
     ///
     /// # Panics
     /// Panic if bit depth < 1 or bit depth > 16
@@ -647,7 +647,7 @@ impl ScalingU16 for Scaler {
         new_size: ImageSize,
         store: ImageStore<u16, 4>,
         bit_depth: usize,
-        is_alpha_premultiplied: bool,
+        premultiply_alpha: bool,
     ) -> ImageStore<u16, 4> {
         let mut src_store = store;
 
@@ -670,12 +670,12 @@ impl ScalingU16 for Scaler {
             return new_image;
         }
 
-        if is_alpha_premultiplied {
+        if premultiply_alpha {
             let mut premultiplied_store =
                 ImageStore::<u16, 4>::alloc(src_store.width, src_store.height);
             src_store.bit_depth = bit_depth;
             premultiplied_store.bit_depth = bit_depth;
-            src_store.unpremultiply_alpha(&mut premultiplied_store, &pool);
+            src_store.premultiply_alpha(&mut premultiplied_store, &pool);
             src_store = premultiplied_store;
         }
 
@@ -698,13 +698,13 @@ impl ScalingU16 for Scaler {
             &pool,
         );
 
-        if is_alpha_premultiplied {
+        if premultiply_alpha {
             let mut premultiplied_store = ImageStore::<u16, 4>::alloc(
                 new_image_horizontal.width,
                 new_image_horizontal.height,
             );
             premultiplied_store.bit_depth = bit_depth;
-            new_image_horizontal.premultiply_alpha(&mut premultiplied_store, &pool);
+            new_image_horizontal.unpremultiply_alpha(&mut premultiplied_store, &pool);
             return premultiplied_store;
         }
         new_image_horizontal

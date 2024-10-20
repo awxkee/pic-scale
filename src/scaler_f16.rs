@@ -40,7 +40,7 @@ impl Scaler {
         &self,
         new_size: ImageSize,
         store: ImageStore<f16, 4>,
-        is_alpha_premultiplied: bool,
+        premultiply_alpha: bool,
     ) -> ImageStore<f16, 4> {
         let mut src_store = store;
 
@@ -67,10 +67,10 @@ impl Scaler {
             return new_image;
         }
 
-        if is_alpha_premultiplied {
+        if premultiply_alpha {
             let mut premultiplied_store =
                 ImageStore::<f16, 4>::alloc(src_store.width, src_store.height);
-            src_store.unpremultiply_alpha(&mut premultiplied_store, &pool);
+            src_store.premultiply_alpha(&mut premultiplied_store, &pool);
             src_store = premultiplied_store;
         }
 
@@ -94,12 +94,12 @@ impl Scaler {
             &pool,
         );
 
-        if is_alpha_premultiplied {
+        if premultiply_alpha {
             let mut premultiplied_store = ImageStore::<f16, 4>::alloc(
                 new_image_horizontal.width,
                 new_image_horizontal.height,
             );
-            new_image_horizontal.premultiply_alpha(&mut premultiplied_store, &pool);
+            new_image_horizontal.unpremultiply_alpha(&mut premultiplied_store, &pool);
             return premultiplied_store;
         }
 

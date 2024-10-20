@@ -99,7 +99,7 @@ impl Scaling for LinearApproxScaler {
         &self,
         new_size: ImageSize,
         store: ImageStore<u8, 4>,
-        is_alpha_premultiplied: bool,
+        premultiply_alpha: bool,
     ) -> ImageStore<u8, 4> {
         const CHANNELS: usize = 4;
         let mut src_store = store;
@@ -109,10 +109,10 @@ impl Scaling for LinearApproxScaler {
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
 
-        if is_alpha_premultiplied {
+        if premultiply_alpha {
             let mut premultiplied_store =
                 ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
-            src_store.unpremultiply_alpha(&mut premultiplied_store, &pool);
+            src_store.premultiply_alpha(&mut premultiplied_store, &pool);
             src_store = premultiplied_store;
         }
         let mut linear_store = ImageStore::<u8, CHANNELS>::alloc(src_store.width, src_store.height);
@@ -140,10 +140,10 @@ impl Scaling for LinearApproxScaler {
             gamma_store.height as u32,
             self.transfer_function,
         );
-        if is_alpha_premultiplied {
+        if premultiply_alpha {
             let mut premultiplied_store =
                 ImageStore::<u8, 4>::alloc(gamma_store.width, gamma_store.height);
-            gamma_store.premultiply_alpha(&mut premultiplied_store, &pool);
+            gamma_store.unpremultiply_alpha(&mut premultiplied_store, &pool);
             return premultiplied_store;
         }
         gamma_store
