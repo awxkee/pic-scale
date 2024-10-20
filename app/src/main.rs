@@ -13,7 +13,7 @@ use pic_scale::{
 };
 
 fn main() {
-    // test_fast_image();
+    test_fast_image();
 
     let img = ImageReader::open("./assets/nasa-4928x3279.png")
         .unwrap()
@@ -176,20 +176,20 @@ fn test_fast_image() {
         .unwrap()
         .decode()
         .unwrap();
-    let img = img.to_rgba16();
+    let img = img.to_rgb8();
     let dimensions = img.dimensions();
 
     let mut vc = Vec::from(img.as_bytes());
 
-    let mut converted_bytes: Vec<u16> = vc.iter().map(|&x| (x as u16) << 8).collect();
-
-    let mut chokidar = Vec::from(u16_to_u8(&converted_bytes));
+    // let mut converted_bytes: Vec<u16> = vc.iter().map(|&x| (x as u16) << 8).collect();
+    //
+    // let mut chokidar = Vec::from(u16_to_u8(&converted_bytes));
 
     let start_time = Instant::now();
 
-    let pixel_type: PixelType = PixelType::U16x4;
+    let pixel_type: PixelType = PixelType::U8x3;
 
-    let src_image = Image::from_vec_u8(dimensions.0, dimensions.1, chokidar, pixel_type).unwrap();
+    let src_image = Image::from_vec_u8(dimensions.0, dimensions.1, vc, pixel_type).unwrap();
 
     let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
 
@@ -216,17 +216,19 @@ fn test_fast_image() {
     // Print the elapsed time in milliseconds
     println!("Fast image resize: {:.2?}", elapsed_time);
 
-    let converted_16 = Vec::from(u8_to_u16(dst_image.buffer()));
+    let vegi = dst_image.buffer().to_vec();
 
-    let dst: Vec<u8> = converted_16
-        .iter()
-        .map(|&x| (x >> 8) as u8)
-        .collect::<Vec<_>>();
+    // let converted_16 = Vec::from(u8_to_u16(dst_image.buffer()));
+    //
+    // let dst: Vec<u8> = converted_16
+    //     .iter()
+    //     .map(|&x| (x >> 8) as u8)
+    //     .collect::<Vec<_>>();
 
     if pixel_type == PixelType::U8x3 || pixel_type == PixelType::U16x3 {
         image::save_buffer(
             "fast_image.jpg",
-            &dst,
+            &vegi,
             dst_image.width(),
             dst_image.height(),
             image::ColorType::Rgb8,
@@ -235,7 +237,7 @@ fn test_fast_image() {
     } else {
         image::save_buffer(
             "fast_image.png",
-            &dst,
+            &vegi,
             dst_image.width(),
             dst_image.height(),
             image::ColorType::Rgba8,
