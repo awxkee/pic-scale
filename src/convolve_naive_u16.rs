@@ -26,247 +26,46 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::color_group::ColorGroup;
-use crate::filter_weights::{FilterBounds, FilterWeights};
-use crate::support::{PRECISION, ROUNDING_CONST};
-use num_traits::AsPrimitive;
+use crate::filter_weights::FilterBounds;
+use crate::floating_point_vertical::{
+    convolve_column_handler_floating_point, convolve_column_handler_floating_point_4,
+};
 
-#[inline]
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn convolve_vertical_part_u16<const COMPONENTS: usize>(
-    start_y: usize,
-    start_x: usize,
-    src: *const u16,
-    src_stride: usize,
-    dst: *mut u16,
-    filter: &[i16],
-    bounds: &FilterBounds,
-    bit_depth: usize,
-) {
-    unsafe {
-        let max_colors = (1 << bit_depth) - 1;
-        let mut sums = ColorGroup::<COMPONENTS, i64>::dup(ROUNDING_CONST as i64);
-
-        let v_start_px = start_x * COMPONENTS;
-
-        for j in 0..bounds.size {
-            let py = start_y + j;
-            let weight = *filter.get_unchecked(j) as i64;
-            let src_ptr = src.add(src_stride * py);
-
-            let new_px0 = ColorGroup::<COMPONENTS, i64>::from_ptr(src_ptr, v_start_px);
-            sums += new_px0 * weight;
-        }
-
-        sums >>= PRECISION.as_();
-        sums = sums.max_scalar(0).min_scalar(max_colors);
-        sums.as_ptr(dst, v_start_px);
-    }
-}
-
-#[inline]
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn convolve_vertical_part_4_u16<const COMPONENTS: usize>(
-    start_y: usize,
-    start_x: usize,
-    src: *const u16,
-    src_stride: usize,
-    dst: *mut u16,
-    filter: &[i16],
-    bounds: &FilterBounds,
-    bit_depth: usize,
-) {
-    unsafe {
-        let max_colors = (1 << bit_depth) - 1;
-        let mut sums0 = ColorGroup::<COMPONENTS, i64>::dup(ROUNDING_CONST as i64);
-        let mut sums1 = ColorGroup::<COMPONENTS, i64>::dup(ROUNDING_CONST as i64);
-        let mut sums2 = ColorGroup::<COMPONENTS, i64>::dup(ROUNDING_CONST as i64);
-        let mut sums3 = ColorGroup::<COMPONENTS, i64>::dup(ROUNDING_CONST as i64);
-
-        let v_start_px = start_x * COMPONENTS;
-
-        for j in 0..bounds.size {
-            let py = start_y + j;
-            let weight = *filter.get_unchecked(j) as i64;
-            let src_ptr = src.add(src_stride * py);
-
-            let new_px0 = ColorGroup::<COMPONENTS, i64>::from_ptr(src_ptr, v_start_px);
-            sums0 += new_px0 * weight;
-
-            let new_px1 = ColorGroup::<COMPONENTS, i64>::from_ptr(src_ptr, v_start_px + COMPONENTS);
-            sums1 += new_px1 * weight;
-
-            let new_px2 =
-                ColorGroup::<COMPONENTS, i64>::from_ptr(src_ptr, v_start_px + COMPONENTS * 2);
-            sums2 += new_px2 * weight;
-
-            let new_px3 =
-                ColorGroup::<COMPONENTS, i64>::from_ptr(src_ptr, v_start_px + COMPONENTS * 3);
-            sums3 += new_px3 * weight;
-        }
-
-        sums0 >>= PRECISION.as_();
-        sums1 >>= PRECISION.as_();
-        sums2 >>= PRECISION.as_();
-        sums3 >>= PRECISION.as_();
-
-        sums0 = sums0.max_scalar(0).min_scalar(max_colors);
-        sums1 = sums1.max_scalar(0).min_scalar(max_colors);
-        sums2 = sums2.max_scalar(0).min_scalar(max_colors);
-        sums3 = sums3.max_scalar(0).min_scalar(max_colors);
-
-        sums0.as_ptr(dst, v_start_px);
-        sums1.as_ptr(dst, v_start_px + COMPONENTS);
-        sums2.as_ptr(dst, v_start_px + COMPONENTS * 2);
-        sums3.as_ptr(dst, v_start_px + COMPONENTS * 3);
-    }
-}
-
-pub(crate) fn convolve_horizontal_rgba_native_row_u16<const CHANNELS: usize>(
-    dst_width: usize,
-    _: usize,
-    filter_weights: &FilterWeights<i16>,
-    unsafe_source_ptr_0: *const u16,
-    unsafe_destination_ptr_0: *mut u16,
-    bit_depth: usize,
-) {
-    let max_colors = (1 << bit_depth) - 1;
-    unsafe {
-        let mut filter_offset = 0usize;
-        let weights = &filter_weights.weights;
-
-        for x in 0..dst_width {
-            let mut sums = ColorGroup::<CHANNELS, i64>::dup(ROUNDING_CONST as i64);
-
-            let bounds = filter_weights.bounds.get_unchecked(x);
-            let start_x = bounds.start;
-            for j in 0..bounds.size {
-                let px = (start_x + j) * CHANNELS;
-                let weight: i64 = (*weights.get_unchecked(j + filter_offset)) as i64;
-                let new_px0 = ColorGroup::<CHANNELS, i64>::from_ptr(unsafe_source_ptr_0, px);
-                sums += new_px0 * weight;
-            }
-
-            let px = x * CHANNELS;
-
-            sums >>= PRECISION.as_();
-            sums = sums.max_scalar(0).min_scalar(max_colors);
-            sums.as_ptr(unsafe_destination_ptr_0, px);
-
-            filter_offset += filter_weights.aligned_size;
-        }
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn convolve_horizontal_rgba_native_4_row_u16<const CHANNELS: usize>(
-    dst_width: usize,
-    _: usize,
-    filter_weights: &FilterWeights<i16>,
-    unsafe_source_ptr_0: *const u16,
-    src_stride: usize,
-    unsafe_destination_ptr_0: *mut u16,
-    dst_stride: usize,
-    bit_depth: usize,
-) {
-    let max_colors = (1 << bit_depth) - 1;
-    unsafe {
-        let mut filter_offset = 0usize;
-        let weights = &filter_weights.weights;
-
-        let src_row0 = unsafe_source_ptr_0;
-        let src_row1 = unsafe_source_ptr_0.add(src_stride);
-        let src_row2 = unsafe_source_ptr_0.add(src_stride * 2);
-        let src_row3 = unsafe_source_ptr_0.add(src_stride * 3);
-
-        let dst_row0 = unsafe_destination_ptr_0;
-        let dst_row1 = unsafe_destination_ptr_0.add(dst_stride);
-        let dst_row2 = unsafe_destination_ptr_0.add(dst_stride * 2);
-        let dst_row3 = unsafe_destination_ptr_0.add(dst_stride * 3);
-
-        for x in 0..dst_width {
-            let mut sums0 = ColorGroup::<CHANNELS, i64>::dup(ROUNDING_CONST as i64);
-            let mut sums1 = ColorGroup::<CHANNELS, i64>::dup(ROUNDING_CONST as i64);
-            let mut sums2 = ColorGroup::<CHANNELS, i64>::dup(ROUNDING_CONST as i64);
-            let mut sums3 = ColorGroup::<CHANNELS, i64>::dup(ROUNDING_CONST as i64);
-
-            let bounds = filter_weights.bounds.get_unchecked(x);
-            let start_x = bounds.start;
-            for j in 0..bounds.size {
-                let px = (start_x + j) * CHANNELS;
-                let weight = (*weights.get_unchecked(j + filter_offset)) as i64;
-
-                let new_px0 = ColorGroup::<CHANNELS, i64>::from_ptr(src_row0, px);
-                sums0 += new_px0 * weight;
-
-                let new_px1 = ColorGroup::<CHANNELS, i64>::from_ptr(src_row1, px);
-                sums1 += new_px1 * weight;
-
-                let new_px2 = ColorGroup::<CHANNELS, i64>::from_ptr(src_row2, px);
-                sums2 += new_px2 * weight;
-
-                let new_px3 = ColorGroup::<CHANNELS, i64>::from_ptr(src_row3, px);
-                sums3 += new_px3 * weight;
-            }
-
-            let px = x * CHANNELS;
-
-            sums0 >>= PRECISION.as_();
-            sums1 >>= PRECISION.as_();
-            sums2 >>= PRECISION.as_();
-            sums3 >>= PRECISION.as_();
-
-            sums0 = sums0.max_scalar(0).min_scalar(max_colors);
-            sums1 = sums1.max_scalar(0).min_scalar(max_colors);
-            sums2 = sums2.max_scalar(0).min_scalar(max_colors);
-            sums3 = sums3.max_scalar(0).min_scalar(max_colors);
-
-            sums0.as_ptr(dst_row0, px);
-            sums1.as_ptr(dst_row1, px);
-            sums2.as_ptr(dst_row2, px);
-            sums3.as_ptr(dst_row3, px);
-
-            filter_offset += filter_weights.aligned_size;
-        }
-    }
-}
-
+#[allow(dead_code)]
 pub(crate) fn convolve_vertical_rgb_native_row_u16<const COMPONENTS: usize>(
     dst_width: usize,
     bounds: &FilterBounds,
-    unsafe_source_ptr_0: *const u16,
-    unsafe_destination_ptr_0: *mut u16,
+    src: &[u16],
+    dst: &mut [u16],
     src_stride: usize,
-    weight_ptr: &[i16],
+    weight: &[f32],
     bit_depth: usize,
 ) {
     let mut cx = 0usize;
 
     while cx + 4 < dst_width {
-        convolve_vertical_part_4_u16::<COMPONENTS>(
-            bounds.start,
-            cx,
-            unsafe_source_ptr_0,
+        convolve_column_handler_floating_point_4::<u16, f32, f32, COMPONENTS>(
+            src,
             src_stride,
-            unsafe_destination_ptr_0,
-            weight_ptr,
+            dst,
+            weight,
             bounds,
-            bit_depth,
+            bit_depth as u32,
+            cx,
         );
 
         cx += 4;
     }
 
     while cx < dst_width {
-        convolve_vertical_part_u16::<COMPONENTS>(
-            bounds.start,
-            cx,
-            unsafe_source_ptr_0,
+        convolve_column_handler_floating_point::<u16, f32, f32, COMPONENTS>(
+            src,
             src_stride,
-            unsafe_destination_ptr_0,
-            weight_ptr,
+            dst,
+            weight,
             bounds,
-            bit_depth,
+            bit_depth as u32,
+            cx,
         );
 
         cx += 1;

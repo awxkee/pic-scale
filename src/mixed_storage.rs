@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ * Copyright (c) Radzivon Bartoshyk, 10/2024. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -27,35 +27,54 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#[cfg(feature = "half")]
-mod alpha_f16;
-mod alpha_f32;
-mod alpha_u16;
-mod alpha_u8;
-#[cfg(feature = "half")]
-mod rgba_f16;
-mod rgba_f32;
-pub mod utils;
-#[cfg(feature = "half")]
-mod vertical_f16;
-mod vertical_f32;
-mod vertical_u8;
+pub trait MixedStorage<T> {
+    fn to_mixed(self, bit_depth: u32) -> T;
+}
 
-#[cfg(feature = "half")]
-pub use alpha_f16::{avx_premultiply_alpha_rgba_f16, avx_unpremultiply_alpha_rgba_f16};
-pub use alpha_f32::avx_premultiply_alpha_rgba_f32;
-pub use alpha_f32::avx_unpremultiply_alpha_rgba_f32;
-pub use alpha_u16::{avx_premultiply_alpha_rgba_u16, avx_unpremultiply_alpha_rgba_u16};
-pub use alpha_u8::avx_premultiply_alpha_rgba;
-pub use alpha_u8::avx_unpremultiply_alpha_rgba;
-#[cfg(feature = "half")]
-pub use rgba_f16::{
-    convolve_horizontal_rgba_avx_row_one_f16, convolve_horizontal_rgba_avx_rows_4_f16,
-};
-pub use rgba_f32::{
-    convolve_horizontal_rgba_avx_row_one_f32, convolve_horizontal_rgba_avx_rows_4_f32,
-};
-#[cfg(feature = "half")]
-pub use vertical_f16::convolve_vertical_avx_row_f16;
-pub use vertical_f32::convolve_vertical_avx_row_f32;
-pub use vertical_u8::convolve_vertical_avx_row;
+impl MixedStorage<u8> for f32 {
+    #[inline(always)]
+    #[allow(clippy::manual_clamp)]
+    fn to_mixed(self, _: u32) -> u8 {
+        self.ceil().max(0.).min(255.) as u8
+    }
+}
+
+impl MixedStorage<u8> for f64 {
+    #[inline(always)]
+    #[allow(clippy::manual_clamp)]
+    fn to_mixed(self, _: u32) -> u8 {
+        self.ceil().max(0.).min(255.) as u8
+    }
+}
+
+impl MixedStorage<u16> for f32 {
+    #[inline(always)]
+    #[allow(clippy::manual_clamp)]
+    fn to_mixed(self, bit_depth: u32) -> u16 {
+        self.ceil().max(0.).min(((1 << bit_depth) - 1) as f32) as u16
+    }
+}
+
+impl MixedStorage<u16> for f64 {
+    #[inline(always)]
+    #[allow(clippy::manual_clamp)]
+    fn to_mixed(self, bit_depth: u32) -> u16 {
+        self.ceil().max(0.).min(((1 << bit_depth) - 1) as f64) as u16
+    }
+}
+
+impl MixedStorage<f32> for f32 {
+    #[inline(always)]
+    #[allow(clippy::manual_clamp)]
+    fn to_mixed(self, _: u32) -> f32 {
+        self
+    }
+}
+
+impl MixedStorage<f64> for f64 {
+    #[inline(always)]
+    #[allow(clippy::manual_clamp)]
+    fn to_mixed(self, _: u32) -> f64 {
+        self
+    }
+}

@@ -27,6 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![allow(dead_code)]
+use crate::mlaf::mlaf;
 use crate::saturate_narrow::SaturateNarrow;
 use num_traits::{AsPrimitive, FromPrimitive, MulAdd, Num};
 use std::ops::{Add, AddAssign, Mul, Shr, ShrAssign, Sub, SubAssign};
@@ -44,7 +45,7 @@ impl<const COMPS: usize, J> ColorGroup<COMPS, J>
 where
     J: Copy + Default,
 {
-    #[inline]
+    #[inline(always)]
     pub fn new() -> ColorGroup<COMPS, J> {
         ColorGroup {
             r: J::default(),
@@ -54,12 +55,12 @@ where
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn from_components(r: J, g: J, b: J, a: J) -> ColorGroup<COMPS, J> {
         ColorGroup { r, g, b, a }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn dup(v: J) -> ColorGroup<COMPS, J> {
         ColorGroup {
             r: v,
@@ -74,7 +75,7 @@ impl<const COMPS: usize, J> ColorGroup<COMPS, J>
 where
     J: Copy + Default + 'static,
 {
-    #[inline]
+    #[inline(always)]
     pub fn from_slice<T>(store: &[T], offset: usize) -> ColorGroup<COMPS, J>
     where
         T: AsPrimitive<J>,
@@ -114,7 +115,7 @@ where
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn from_ptr<T>(store: *const T, offset: usize) -> ColorGroup<COMPS, J>
     where
         T: AsPrimitive<J>,
@@ -155,7 +156,7 @@ where
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn to_ptr(self, ptr: *mut J, offset: usize) {
         unsafe {
             let s_ptr = ptr.add(offset);
@@ -172,7 +173,7 @@ where
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn as_ptr<V: Copy + 'static>(self, ptr: *mut V, offset: usize)
     where
         J: Copy + AsPrimitive<V>,
@@ -197,7 +198,7 @@ impl<const COMPS: usize, J> ColorGroup<COMPS, J>
 where
     J: Copy + Default + 'static + Num + Ord,
 {
-    #[inline]
+    #[inline(always)]
     pub fn min_scalar(&self, other: J) -> ColorGroup<COMPS, J> {
         if COMPS == 1 {
             ColorGroup::from_components(self.r.min(other), J::default(), J::default(), J::default())
@@ -225,7 +226,7 @@ where
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub(crate) fn max_scalar(&self, other: J) -> ColorGroup<COMPS, J> {
         if COMPS == 1 {
             ColorGroup::from_components(self.r.max(other), J::default(), J::default(), J::default())
@@ -260,7 +261,7 @@ where
 {
     type Output = Self;
 
-    #[inline]
+    #[inline(always)]
     fn mul(self, rhs: J) -> Self::Output {
         if COMPS == 1 {
             ColorGroup::from_components(self.r * rhs, self.g, self.b, self.a)
@@ -280,39 +281,39 @@ impl<const COMPS: usize, J> ColorGroup<COMPS, J>
 where
     J: Copy + Default + 'static,
 {
-    #[inline]
-    pub fn saturate_narrow<V>(&self) -> ColorGroup<COMPS, V>
+    #[inline(always)]
+    pub fn saturate_narrow<V>(&self, bit_depth: u32) -> ColorGroup<COMPS, V>
     where
         V: Copy + Default,
         J: SaturateNarrow<V>,
     {
         if COMPS == 1 {
             ColorGroup::<COMPS, V>::from_components(
-                self.r.saturate_narrow(),
+                self.r.saturate_narrow(bit_depth),
                 V::default(),
                 V::default(),
                 V::default(),
             )
         } else if COMPS == 2 {
             ColorGroup::<COMPS, V>::from_components(
-                self.r.saturate_narrow(),
-                self.g.saturate_narrow(),
+                self.r.saturate_narrow(bit_depth),
+                self.g.saturate_narrow(bit_depth),
                 V::default(),
                 V::default(),
             )
         } else if COMPS == 3 {
             ColorGroup::<COMPS, V>::from_components(
-                self.r.saturate_narrow(),
-                self.g.saturate_narrow(),
-                self.b.saturate_narrow(),
+                self.r.saturate_narrow(bit_depth),
+                self.g.saturate_narrow(bit_depth),
+                self.b.saturate_narrow(bit_depth),
                 V::default(),
             )
         } else {
             ColorGroup::<COMPS, V>::from_components(
-                self.r.saturate_narrow(),
-                self.g.saturate_narrow(),
-                self.b.saturate_narrow(),
-                self.a.saturate_narrow(),
+                self.r.saturate_narrow(bit_depth),
+                self.g.saturate_narrow(bit_depth),
+                self.b.saturate_narrow(bit_depth),
+                self.a.saturate_narrow(bit_depth),
             )
         }
     }
@@ -324,7 +325,7 @@ where
 {
     type Output = Self;
 
-    #[inline]
+    #[inline(always)]
     fn mul(self, rhs: ColorGroup<COMPS, J>) -> Self::Output {
         if COMPS == 1 {
             ColorGroup::from_components(self.r * rhs.r, self.g, self.b, self.a)
@@ -351,7 +352,7 @@ where
 {
     type Output = Self;
 
-    #[inline]
+    #[inline(always)]
     fn sub(self, rhs: J) -> Self::Output {
         if COMPS == 1 {
             ColorGroup::from_components(self.r - rhs, self.g, self.b, self.a)
@@ -373,7 +374,7 @@ where
 {
     type Output = Self;
 
-    #[inline]
+    #[inline(always)]
     fn sub(self, rhs: ColorGroup<COMPS, J>) -> Self::Output {
         if COMPS == 1 {
             ColorGroup::from_components(self.r - rhs.r, self.g, self.b, self.a)
@@ -400,7 +401,7 @@ where
 {
     type Output = Self;
 
-    #[inline]
+    #[inline(always)]
     fn add(self, rhs: ColorGroup<COMPS, J>) -> Self::Output {
         if COMPS == 1 {
             ColorGroup::from_components(self.r + rhs.r, self.g, self.b, self.a)
@@ -427,7 +428,7 @@ where
 {
     type Output = Self;
 
-    #[inline]
+    #[inline(always)]
     fn add(self, rhs: J) -> Self::Output {
         if COMPS == 1 {
             ColorGroup::from_components(self.r + rhs, self.g, self.b, self.a)
@@ -449,7 +450,7 @@ where
 {
     type Output = Self;
 
-    #[inline]
+    #[inline(always)]
     fn shr(self, rhs: J) -> Self::Output {
         if COMPS == 1 {
             ColorGroup::from_components(self.r >> rhs, self.g, self.b, self.a)
@@ -469,7 +470,7 @@ impl<const COMPS: usize, J> ShrAssign<J> for ColorGroup<COMPS, J>
 where
     J: Copy + ShrAssign<J> + Default + 'static,
 {
-    #[inline]
+    #[inline(always)]
     fn shr_assign(&mut self, rhs: J) {
         if COMPS == 1 {
             self.r >>= rhs;
@@ -491,34 +492,29 @@ where
 
 impl<const COMPS: usize, J> MulAdd<ColorGroup<COMPS, J>, J> for ColorGroup<COMPS, J>
 where
-    J: Copy + MulAdd<J, Output = J> + Default + 'static,
+    J: Copy + MulAdd<J, Output = J> + Default + 'static + Mul<J, Output = J> + Add<J, Output = J>,
 {
     type Output = Self;
 
-    #[inline]
+    #[inline(always)]
     fn mul_add(self, a: ColorGroup<COMPS, J>, b: J) -> Self::Output {
         if COMPS == 1 {
-            ColorGroup::from_components(self.r.mul_add(b, a.r), self.g, self.b, self.a)
+            ColorGroup::from_components(mlaf(self.r, a.r, b), self.g, self.b, self.a)
         } else if COMPS == 2 {
-            ColorGroup::from_components(
-                self.r.mul_add(b, a.r),
-                self.g.mul_add(b, a.g),
-                self.b,
-                self.a,
-            )
+            ColorGroup::from_components(mlaf(self.r, a.r, b), mlaf(self.g, a.g, b), self.b, self.a)
         } else if COMPS == 3 {
             ColorGroup::from_components(
-                self.r.mul_add(b, a.r),
-                self.g.mul_add(b, a.g),
-                self.b.mul_add(b, a.b),
+                mlaf(self.r, a.r, b),
+                mlaf(self.g, a.g, b),
+                mlaf(self.b, a.b, b),
                 self.a,
             )
         } else if COMPS == 4 {
             ColorGroup::from_components(
-                self.r.mul_add(b, a.r),
-                self.g.mul_add(b, a.g),
-                self.b.mul_add(b, a.b),
-                self.a.mul_add(b, a.a),
+                mlaf(self.r, a.r, b),
+                mlaf(self.g, a.g, b),
+                mlaf(self.b, a.b, b),
+                mlaf(self.a, a.a, b),
             )
         } else {
             panic!("Not implemented.");
@@ -530,7 +526,7 @@ impl<const COMPS: usize, J> AddAssign<ColorGroup<COMPS, J>> for ColorGroup<COMPS
 where
     J: Copy + AddAssign,
 {
-    #[inline]
+    #[inline(always)]
     fn add_assign(&mut self, rhs: ColorGroup<COMPS, J>) {
         if COMPS == 1 {
             self.r += rhs.r;
@@ -554,7 +550,7 @@ impl<const COMPS: usize, J> SubAssign<ColorGroup<COMPS, J>> for ColorGroup<COMPS
 where
     J: Copy + SubAssign,
 {
-    #[inline]
+    #[inline(always)]
     fn sub_assign(&mut self, rhs: ColorGroup<COMPS, J>) {
         if COMPS == 1 {
             self.r -= rhs.r;
@@ -578,8 +574,114 @@ impl<const COMPS: usize, J> Default for ColorGroup<COMPS, J>
 where
     J: Copy + FromPrimitive + Default,
 {
-    #[inline]
+    #[inline(always)]
     fn default() -> Self {
         ColorGroup::new()
     }
+}
+
+#[macro_export]
+macro_rules! fast_load_color_group {
+    ($store: expr, $channels: expr) => {{
+        if $channels == 1 {
+            ColorGroup {
+                r: $store.get_unchecked(0).as_(),
+                g: 0.as_(),
+                b: 0.as_(),
+                a: 0.as_(),
+            }
+        } else if $channels == 2 {
+            ColorGroup {
+                r: $store.get_unchecked(0).as_(),
+                g: $store.get_unchecked(1).as_(),
+                b: 0.as_(),
+                a: 0.as_(),
+            }
+        } else if $channels == 3 {
+            ColorGroup {
+                r: $store.get_unchecked(0).as_(),
+                g: $store.get_unchecked(1).as_(),
+                b: $store.get_unchecked(2).as_(),
+                a: 0.as_(),
+            }
+        } else if $channels == 4 {
+            ColorGroup {
+                r: $store.get_unchecked(0).as_(),
+                g: $store.get_unchecked(1).as_(),
+                b: $store.get_unchecked(2).as_(),
+                a: $store.get_unchecked(3).as_(),
+            }
+        } else {
+            panic!("Not implemented.")
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! fast_load_color_group_with_offset {
+    ($store: expr, $channels: expr, $offset: expr) => {{
+        if $channels == 1 {
+            ColorGroup {
+                r: $store[$offset].as_(),
+                g: 0.as_(),
+                b: 0.as_(),
+                a: 0.as_(),
+            }
+        } else if $channels == 2 {
+            ColorGroup {
+                r: $store[$offset].as_(),
+                g: $store[$offset + 1].as_(),
+                b: 0.as_(),
+                a: 0.as_(),
+            }
+        } else if $channels == 3 {
+            ColorGroup {
+                r: $store[$offset].as_(),
+                g: $store[$offset + 1].as_(),
+                b: $store[$offset + 2].as_(),
+                a: 0.as_(),
+            }
+        } else if $channels == 4 {
+            ColorGroup {
+                r: $store[$offset].as_(),
+                g: $store[$offset + 1].as_(),
+                b: $store[$offset + 2].as_(),
+                a: $store[$offset + 3].as_(),
+            }
+        } else {
+            panic!("Not implemented.")
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! fast_store_color_group {
+    ($color_group: expr, $store: expr, $components: expr) => {{
+        $store[0] = $color_group.r;
+        if $components > 1 {
+            $store[1] = $color_group.g;
+        }
+        if $components > 2 {
+            $store[2] = $color_group.b;
+        }
+        if $components == 4 {
+            $store[3] = $color_group.a;
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! fast_mixed_store_color_group {
+    ($color_group: expr, $store: expr, $components: expr, $bit_depth: expr) => {{
+        *$store.get_unchecked_mut(0) = $color_group.r.to_mixed($bit_depth);
+        if $components > 1 {
+            *$store.get_unchecked_mut(1) = $color_group.g.to_mixed($bit_depth);
+        }
+        if $components > 2 {
+            *$store.get_unchecked_mut(2) = $color_group.b.to_mixed($bit_depth);
+        }
+        if $components == 4 {
+            *$store.get_unchecked_mut(3) = $color_group.a.to_mixed($bit_depth);
+        }
+    }};
 }

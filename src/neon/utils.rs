@@ -28,7 +28,6 @@
  */
 
 use std::arch::aarch64::*;
-use std::arch::asm;
 
 #[inline(always)]
 pub(crate) unsafe fn prefer_vfmaq_f32(
@@ -48,35 +47,21 @@ pub(crate) unsafe fn prefer_vfmaq_f32(
 
 #[inline(always)]
 pub(crate) unsafe fn load_3b_as_u16x4(src_ptr: *const u8) -> uint16x4_t {
-    let out_reg: uint16x4_t;
-    asm!("\
-         ldrh    {t1:w}, [{0}]
-         ldrb    {t2:w}, [{0}, #2]
-
-         ins {1:v}.s[0], {t1:w}
-         ins {1:v}.h[2], {t2:w}
-    \
-    ",
-    in(reg) src_ptr,
-    out(vreg) out_reg,
-    t1 = out(reg) _,
-    t2 = out(reg) _);
-    out_reg
+    let v_new_value1 = u16::from_le_bytes([src_ptr.read_unaligned(), 0]);
+    let v_new_value2 = u16::from_le_bytes([src_ptr.add(1).read_unaligned(), 0]);
+    let v_new_value3 = u16::from_le_bytes([src_ptr.add(2).read_unaligned(), 0]);
+    let arr = [v_new_value1, v_new_value2, v_new_value3, 0];
+    vld1_u16(arr.as_ptr())
 }
 
 #[inline(always)]
 pub(crate) unsafe fn load_4b_as_u16x4(src_ptr: *const u8) -> uint16x4_t {
-    let out_reg: uint16x4_t;
-    asm!("\
-         ldr {t1:w}, [{0}]
-         mov {1:v}.s[0], {t1:w}
-         uxtl {1:v}.8h, {1:v}.8b
-    \
-    ",
-    in(reg) src_ptr,
-    out(vreg) out_reg,
-    t1 = out(reg) _);
-    out_reg
+    let v_new_value1 = u16::from_le_bytes([src_ptr.read_unaligned(), 0]);
+    let v_new_value2 = u16::from_le_bytes([src_ptr.add(1).read_unaligned(), 0]);
+    let v_new_value3 = u16::from_le_bytes([src_ptr.add(2).read_unaligned(), 0]);
+    let v_new_value4 = u16::from_le_bytes([src_ptr.add(3).read_unaligned(), 0]);
+    let arr = [v_new_value1, v_new_value2, v_new_value3, v_new_value4];
+    vld1_u16(arr.as_ptr())
 }
 
 #[inline(always)]
@@ -95,11 +80,3 @@ pub(crate) struct Float32x5T(
     pub float32x4_t,
     pub float32x4_t,
 );
-
-#[inline(always)]
-pub(crate) unsafe fn vsave3_u16(ptr: *mut u16, v: uint16x4_t) {
-    let p_1 = vget_lane_u32::<0>(vreinterpret_u32_u16(v));
-    let p_3 = vget_lane_u16::<2>(v);
-    (ptr as *mut u32).write_unaligned(p_1);
-    ptr.add(2).write_unaligned(p_3);
-}

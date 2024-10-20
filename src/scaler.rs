@@ -608,7 +608,7 @@ impl ScalingU16 for Scaler {
             return new_image;
         }
 
-        if (1..=16).contains(&bit_depth) {
+        if !(1..=16).contains(&bit_depth) {
             panic!("Bit depth must be in [1, 16] but got {}", bit_depth);
         }
 
@@ -697,6 +697,7 @@ impl ScalingU16 for Scaler {
             &mut new_image_horizontal,
             &pool,
         );
+
         if is_alpha_premultiplied {
             let mut premultiplied_store = ImageStore::<u16, 4>::alloc(
                 new_image_horizontal.width,
@@ -738,7 +739,7 @@ impl ScalingU16 for Scaler {
             return new_image;
         }
 
-        if (1..=16).contains(&bit_depth) {
+        if !(1..=16).contains(&bit_depth) {
             panic!("Bit depth must be in [1, 16] but got {}", bit_depth);
         }
 

@@ -67,7 +67,7 @@ pub(crate) unsafe fn convolve_vertical_part<
         sums += new_px * weight;
     }
 
-    let narrowed = sums.saturate_narrow();
+    let narrowed = sums.saturate_narrow(8);
     narrowed.to_ptr(dst, v_start_px);
 }
 
@@ -114,10 +114,10 @@ pub(crate) unsafe fn convolve_vertical_part_4<
         sums3 += new_px3 * weight;
     }
 
-    let narrow0 = sums0.saturate_narrow();
-    let narrow1 = sums1.saturate_narrow();
-    let narrow2 = sums2.saturate_narrow();
-    let narrow3 = sums3.saturate_narrow();
+    let narrow0 = sums0.saturate_narrow(8);
+    let narrow1 = sums1.saturate_narrow(8);
+    let narrow2 = sums2.saturate_narrow(8);
+    let narrow3 = sums3.saturate_narrow(8);
 
     narrow0.to_ptr(dst, v_start_px);
     narrow1.to_ptr(dst, v_start_px + CHANNELS);
@@ -157,7 +157,7 @@ pub(crate) fn convolve_horizontal_rgba_native_row<
 
             let px = x * CHANNELS;
 
-            let narrowed = sums.saturate_narrow();
+            let narrowed = sums.saturate_narrow(8);
             narrowed.to_ptr(unsafe_destination_ptr_0, px);
 
             filter_offset += filter_weights.aligned_size;
@@ -225,10 +225,10 @@ pub(crate) fn convolve_horizontal_rgba_native_4_row<
 
             let px = x * CHANNELS;
 
-            let narrow0 = sums0.saturate_narrow();
-            let narrow1 = sums1.saturate_narrow();
-            let narrow2 = sums2.saturate_narrow();
-            let narrow3 = sums3.saturate_narrow();
+            let narrow0 = sums0.saturate_narrow(8);
+            let narrow1 = sums1.saturate_narrow(8);
+            let narrow2 = sums2.saturate_narrow(8);
+            let narrow3 = sums3.saturate_narrow(8);
 
             narrow0.to_ptr(dst_row0, px);
             narrow1.to_ptr(dst_row1, px);

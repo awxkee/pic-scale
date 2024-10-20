@@ -67,9 +67,14 @@ mod dispatch_group_u8;
 #[cfg(feature = "half")]
 mod f16;
 mod filter_weights;
+mod floating_point_horizontal;
+mod floating_point_vertical;
+mod handler_provider;
 mod image_size;
 mod image_store;
 mod math;
+mod mixed_storage;
+mod mlaf;
 mod nearest_sampler;
 #[cfg(all(
     target_arch = "aarch64",

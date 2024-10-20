@@ -27,221 +27,150 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter_weights::FilterBounds;
-use crate::support::{PRECISION, ROUNDING_CONST};
+use crate::mlaf::mlaf;
+use crate::neon::utils::prefer_vfmaq_f32;
 use std::arch::aarch64::*;
 
 #[inline(always)]
-#[allow(clippy::too_many_arguments)]
-unsafe fn consume_u16_8(
-    start_y: usize,
-    start_x: usize,
-    src: *const u16,
-    src_stride: usize,
-    dst: *mut u16,
-    filter: &[i16],
+pub fn convolve_column_u16<const CHANNELS: usize>(
+    _: usize,
     bounds: &FilterBounds,
-    max_colors: i32,
-) {
-    let vld = vdupq_n_s64(ROUNDING_CONST as i64);
-    let mut store_0 = vld;
-    let mut store_1 = vld;
-    let mut store_2 = vld;
-    let mut store_3 = vld;
-
-    let px = start_x;
-
-    for j in 0..bounds.size {
-        let py = start_y + j;
-        let weight = filter.get_unchecked(j..);
-        let v_weight = vmovl_s16(vld1_dup_s16(weight.as_ptr()));
-        let src_ptr = src.add(src_stride * py);
-
-        let s_ptr = src_ptr.add(px);
-        let item_row = vld1q_u16(s_ptr);
-
-        let item_low = vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row)));
-        let item_high = vreinterpretq_s32_u32(vmovl_high_u16(item_row));
-
-        store_0 = vmlal_s32(store_0, vget_low_s32(item_low), vget_low_s32(v_weight));
-        store_1 = vmlal_high_s32(store_1, item_low, v_weight);
-
-        store_2 = vmlal_s32(store_2, vget_low_s32(item_high), vget_low_s32(v_weight));
-        store_3 = vmlal_high_s32(store_3, item_high, v_weight);
-    }
-
-    let zeros = vdupq_n_s32(0);
-    let v_max_colors = vdupq_n_s32(max_colors);
-    let n_store_0 = vqshrn_n_s64::<PRECISION>(store_0);
-    let n_store_1 = vqshrn_n_s64::<PRECISION>(store_1);
-    let n_store_2 = vqshrn_n_s64::<PRECISION>(store_2);
-    let n_store_3 = vqshrn_n_s64::<PRECISION>(store_3);
-
-    let mut new_store_0 = vcombine_s32(n_store_0, n_store_1);
-    new_store_0 = vminq_s32(vmaxq_s32(new_store_0, zeros), v_max_colors);
-
-    let mut new_store_1 = vcombine_s32(n_store_2, n_store_3);
-    new_store_1 = vminq_s32(vmaxq_s32(new_store_1, zeros), v_max_colors);
-
-    let store_u16 = vcombine_u16(
-        vmovn_u32(vreinterpretq_u32_s32(new_store_0)),
-        vmovn_u32(vreinterpretq_u32_s32(new_store_1)),
-    );
-
-    let dst_ptr = dst.add(px);
-    vst1q_u16(dst_ptr, store_u16);
-}
-
-#[inline(always)]
-#[allow(clippy::too_many_arguments)]
-unsafe fn consume_u16_4(
-    start_y: usize,
-    start_x: usize,
-    src: *const u16,
+    src: &[u16],
+    dst: &mut [u16],
     src_stride: usize,
-    dst: *mut u16,
-    filter: &[i16],
-    bounds: &FilterBounds,
-    max_colors: i32,
+    weight: &[f32],
+    bit_depth: u32,
 ) {
-    let vld = vdupq_n_s64(ROUNDING_CONST as i64);
-    let mut store_0 = vld;
-    let mut store_1 = vld;
+    unsafe {
+        let max_colors = (1 << bit_depth) - 1;
+        let mut cx = 0usize;
 
-    let px = start_x;
+        let zeros = vdupq_n_f32(0.);
 
-    for j in 0..bounds.size {
-        let py = start_y + j;
-        let weight = filter.get_unchecked(j..);
-        let v_weight = vmovl_s16(vld1_dup_s16(weight.as_ptr()));
-        let src_ptr = src.add(src_stride * py);
+        let v_max_colors = vdupq_n_u32(max_colors);
 
-        let s_ptr = src_ptr.add(px);
-        let item_row = vld1_u16(s_ptr);
+        let v_px = cx;
 
-        let item_row_rescaled = vreinterpretq_s32_u32(vmovl_u16(item_row));
+        let iter16 = dst.chunks_exact_mut(16);
 
-        store_0 = vmlal_s32(
-            store_0,
-            vget_low_s32(item_row_rescaled),
-            vget_low_s32(v_weight),
-        );
-        store_1 = vmlal_high_s32(store_1, item_row_rescaled, v_weight);
-    }
+        for (x, dst) in iter16.enumerate() {
+            let mut store0 = zeros;
+            let mut store1 = zeros;
+            let mut store2 = zeros;
+            let mut store3 = zeros;
 
-    let zeros = vdupq_n_s32(0);
-    let v_max_colors = vdupq_n_s32(max_colors);
-    let n_store_0 = vqshrn_n_s64::<PRECISION>(store_0);
-    let n_store_1 = vqshrn_n_s64::<PRECISION>(store_1);
-    let mut new_store = vcombine_s32(n_store_0, n_store_1);
-    new_store = vminq_s32(vmaxq_s32(new_store, zeros), v_max_colors);
+            for (j, &k_weight) in weight.iter().take(bounds.size).enumerate() {
+                let py = bounds.start + j;
+                let offset = src_stride * py + cx;
+                let src_ptr = src.get_unchecked(offset..);
 
-    let store_u16 = vmovn_u32(vreinterpretq_u32_s32(new_store));
+                let v_weight = vdupq_n_f32(k_weight);
 
-    let dst_ptr = dst.add(px);
-    vst1_u16(dst_ptr, store_u16);
-}
+                let item_row0 = vld1q_u16(src_ptr.as_ptr());
+                let item_row1 = vld1q_u16(src_ptr.as_ptr().add(8));
 
-#[inline(always)]
-#[allow(clippy::too_many_arguments)]
-unsafe fn consume_u16_1(
-    start_y: usize,
-    start_x: usize,
-    src: *const u16,
-    src_stride: usize,
-    dst: *mut u16,
-    filter: &[i16],
-    bounds: &FilterBounds,
-    max_colors: i32,
-) {
-    let vld = vdupq_n_s64(ROUNDING_CONST as i64);
-    let mut store = vld;
+                let lo0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(item_row0)));
+                let hi0 = vcvtq_f32_u32(vmovl_high_u16(item_row0));
+                let lo1 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(item_row1)));
+                let hi1 = vcvtq_f32_u32(vmovl_high_u16(item_row1));
+                store0 = prefer_vfmaq_f32(store0, lo0, v_weight);
+                store1 = prefer_vfmaq_f32(store1, hi0, v_weight);
+                store2 = prefer_vfmaq_f32(store2, lo1, v_weight);
+                store3 = prefer_vfmaq_f32(store3, hi1, v_weight);
+            }
 
-    let px = start_x;
+            let u_store0 = vminq_u32(vcvtaq_u32_f32(vmaxq_f32(store0, zeros)), v_max_colors);
+            let u_store1 = vminq_u32(vcvtaq_u32_f32(vmaxq_f32(store1, zeros)), v_max_colors);
+            let u_store2 = vminq_u32(vcvtaq_u32_f32(vmaxq_f32(store2, zeros)), v_max_colors);
+            let u_store3 = vminq_u32(vcvtaq_u32_f32(vmaxq_f32(store3, zeros)), v_max_colors);
 
-    for j in 0..bounds.size {
-        let py = start_y + j;
-        let weight = filter.get_unchecked(j..);
-        let v_weight = vmovl_s16(vld1_dup_s16(weight.as_ptr()));
-        let src_ptr = src.add(src_stride * py);
+            let item0 = vcombine_u16(vqmovn_u32(u_store0), vqmovn_u32(u_store1));
+            vst1q_u16(dst.as_mut_ptr(), item0);
+            let item1 = vcombine_u16(vqmovn_u32(u_store2), vqmovn_u32(u_store3));
+            vst1q_u16(dst.as_mut_ptr().add(8), item1);
 
-        let s_ptr = src_ptr.add(px);
-        let item_row = vld1_dup_u16(s_ptr);
-
-        let low = vreinterpretq_s32_u32(vmovl_u16(item_row));
-        store = vmlal_s32(store, vget_low_s32(low), vget_low_s32(v_weight));
-    }
-
-    let zeros = vdup_n_s32(0);
-    let v_max_colors = vdup_n_s32(max_colors);
-
-    let mut shrinked_store = vqshrn_n_s64::<PRECISION>(store);
-    shrinked_store = vmin_s32(vmax_s32(shrinked_store, zeros), v_max_colors);
-    let dst_ptr = dst.add(px);
-    let value = vget_lane_s32::<0>(shrinked_store);
-    dst_ptr.write_unaligned(value as u16);
-}
-
-#[inline(always)]
-pub fn convolve_vertical_rgb_neon_row_u16<const CHANNELS: usize>(
-    width: usize,
-    bounds: &FilterBounds,
-    unsafe_source_ptr_0: *const u16,
-    unsafe_destination_ptr_0: *mut u16,
-    src_stride: usize,
-    weight_ptr: &[i16],
-    bit_depth: usize,
-) {
-    let max_colors = (1 << bit_depth) - 1;
-    let mut cx = 0usize;
-    let dst_width = width * CHANNELS;
-
-    while cx + 8 < dst_width {
-        unsafe {
-            consume_u16_8(
-                bounds.start,
-                cx,
-                unsafe_source_ptr_0,
-                src_stride,
-                unsafe_destination_ptr_0,
-                weight_ptr,
-                bounds,
-                max_colors,
-            );
+            cx = v_px + x * 16;
         }
 
-        cx += 8;
-    }
+        let tail16 = dst.chunks_exact_mut(16).into_remainder();
+        let iter8 = tail16.chunks_exact_mut(8);
 
-    while cx + 4 < dst_width {
-        unsafe {
-            consume_u16_4(
-                bounds.start,
-                cx,
-                unsafe_source_ptr_0,
-                src_stride,
-                unsafe_destination_ptr_0,
-                weight_ptr,
-                bounds,
-                max_colors,
-            );
+        let v_px = cx;
+
+        for (x, dst) in iter8.enumerate() {
+            let mut store0 = zeros;
+            let mut store1 = zeros;
+
+            for (j, &k_weight) in weight.iter().take(bounds.size).enumerate() {
+                let py = bounds.start + j;
+                let offset = src_stride * py + cx;
+                let src_ptr = src.get_unchecked(offset..);
+
+                let v_weight = vdupq_n_f32(k_weight);
+
+                let item_row = vld1q_u16(src_ptr.as_ptr());
+
+                let lo = vcvtq_f32_u32(vmovl_u16(vget_low_u16(item_row)));
+                let hi = vcvtq_f32_u32(vmovl_high_u16(item_row));
+                store0 = prefer_vfmaq_f32(store0, lo, v_weight);
+                store1 = prefer_vfmaq_f32(store1, hi, v_weight);
+            }
+
+            let u_store0 = vminq_u32(vcvtaq_u32_f32(vmaxq_f32(store0, zeros)), v_max_colors);
+            let u_store1 = vminq_u32(vcvtaq_u32_f32(vmaxq_f32(store1, zeros)), v_max_colors);
+
+            let item = vcombine_u16(vqmovn_u32(u_store0), vqmovn_u32(u_store1));
+            vst1q_u16(dst.as_mut_ptr(), item);
+
+            cx = v_px + x * 8;
         }
 
-        cx += 4;
-    }
+        let tail8 = tail16.chunks_exact_mut(8).into_remainder();
+        let iter4 = tail8.chunks_exact_mut(4);
 
-    while cx < dst_width {
-        unsafe {
-            consume_u16_1(
-                bounds.start,
-                cx,
-                unsafe_source_ptr_0,
-                src_stride,
-                unsafe_destination_ptr_0,
-                weight_ptr,
-                bounds,
-                max_colors,
-            );
+        let v_cx = cx;
+
+        for (x, dst) in iter4.enumerate() {
+            let mut store0 = zeros;
+
+            for (j, &k_weight) in weight.iter().take(bounds.size).enumerate() {
+                let py = bounds.start + j;
+                let offset = src_stride * py + cx;
+                let src_ptr = src.get_unchecked(offset..);
+
+                let v_weight = vdupq_n_f32(k_weight);
+
+                let item_row = vld1_u16(src_ptr.as_ptr());
+
+                let lo = vcvtq_f32_u32(vmovl_u16(item_row));
+                store0 = prefer_vfmaq_f32(store0, lo, v_weight);
+            }
+
+            let u_store0 = vminq_u32(vcvtaq_u32_f32(vmaxq_f32(store0, zeros)), v_max_colors);
+
+            vst1_u16(dst.as_mut_ptr(), vqmovn_u32(u_store0));
+
+            cx = v_cx + x * 4;
         }
-        cx += 1;
+
+        let tail4 = tail8.chunks_exact_mut(4).into_remainder();
+
+        let mut a_px = cx;
+
+        for (x, dst) in tail4.iter_mut().enumerate() {
+            let mut store0 = 0.;
+
+            for (j, &k_weight) in weight.iter().take(bounds.size).enumerate() {
+                let py = bounds.start + j;
+                let offset = src_stride * py + a_px;
+                let src_ptr = src.get_unchecked(offset..(offset + 1));
+
+                store0 = mlaf(store0, src_ptr[0] as f32, k_weight);
+            }
+
+            *dst = store0.round().max(0.).min(max_colors as f32) as u16;
+
+            a_px += x;
+        }
     }
 }
