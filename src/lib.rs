@@ -116,6 +116,7 @@ mod unsafe_slice;
     not(feature = "disable_simd")
 ))]
 mod wasm32;
+mod alpha_check;
 
 #[cfg(feature = "colorspaces")]
 pub use colors::*;

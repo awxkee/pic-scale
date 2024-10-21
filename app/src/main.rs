@@ -13,8 +13,8 @@ use pic_scale::{
 };
 
 fn main() {
-    test_fast_image();
 
+    // test_fast_image();
     let img = ImageReader::open("./assets/abstract_alpha.png")
         .unwrap()
         .decode()
@@ -173,11 +173,11 @@ fn u8_to_u16(u8_buffer: &[u8]) -> &[u16] {
 }
 
 fn test_fast_image() {
-    let img = ImageReader::open("./assets/nasa-4928x3279.png")
+    let img = ImageReader::open("./assets/asset_6.png")
         .unwrap()
         .decode()
         .unwrap();
-    let img = img.to_rgb8();
+    let img = img.to_rgba8();
     let dimensions = img.dimensions();
 
     let mut vc = Vec::from(img.as_bytes());
@@ -188,7 +188,7 @@ fn test_fast_image() {
 
     let start_time = Instant::now();
 
-    let pixel_type: PixelType = PixelType::U8x3;
+    let pixel_type: PixelType = PixelType::U8x4;
 
     let src_image = Image::from_vec_u8(dimensions.0, dimensions.1, vc, pixel_type).unwrap();
 
@@ -209,7 +209,7 @@ fn test_fast_image() {
             &mut dst_image,
             &ResizeOptions::new()
                 .resize_alg(ResizeAlg::Convolution(FilterType::Lanczos3))
-                .use_alpha(false),
+                .use_alpha(true),
         )
         .unwrap();
 

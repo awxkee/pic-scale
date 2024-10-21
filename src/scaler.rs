@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::alpha_check::has_non_constant_cap_alpha;
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::image_size::ImageSize;
@@ -303,11 +304,21 @@ impl Scaler {
             return new_image;
         }
 
+        let mut has_alpha_premultiplied = false;
+
         if premultiply_alpha {
-            let mut premultiplied_store =
-                ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
-            src_store.premultiply_alpha(&mut premultiplied_store, pool);
-            src_store = premultiplied_store;
+            let is_alpha_premultiplication_reasonable = has_non_constant_cap_alpha::<u8, 3, 4>(
+                src_store.buffer.borrow(),
+                src_store.width,
+                8,
+            );
+            if is_alpha_premultiplication_reasonable {
+                let mut premultiplied_store =
+                    ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
+                src_store.premultiply_alpha(&mut premultiplied_store, pool);
+                src_store = premultiplied_store;
+                has_alpha_premultiplied = true;
+            }
         }
 
         let mut new_image_vertical = ImageStore::<u8, 4>::alloc(src_store.width, new_size.height);
@@ -317,7 +328,7 @@ impl Scaler {
 
         let mut new_image_horizontal = ImageStore::<u8, 4>::alloc(new_size.width, new_size.height);
         new_image_vertical.convolve_horizontal(horizontal_filters, &mut new_image_horizontal, pool);
-        if premultiply_alpha {
+        if premultiply_alpha && has_alpha_premultiplied {
             let mut premultiplied_store =
                 ImageStore::<u8, 4>::alloc(new_image_horizontal.width, new_image_horizontal.height);
             new_image_horizontal.unpremultiply_alpha(&mut premultiplied_store, pool);
@@ -670,13 +681,23 @@ impl ScalingU16 for Scaler {
             return new_image;
         }
 
+        let mut has_alpha_premultiplied = false;
+
         if premultiply_alpha {
-            let mut premultiplied_store =
-                ImageStore::<u16, 4>::alloc(src_store.width, src_store.height);
-            src_store.bit_depth = bit_depth;
-            premultiplied_store.bit_depth = bit_depth;
-            src_store.premultiply_alpha(&mut premultiplied_store, &pool);
-            src_store = premultiplied_store;
+            let is_alpha_premultiplication_reasonable = has_non_constant_cap_alpha::<u16, 3, 4>(
+                src_store.buffer.borrow(),
+                src_store.width,
+                bit_depth as u32,
+            );
+            if is_alpha_premultiplication_reasonable {
+                let mut premultiplied_store =
+                    ImageStore::<u16, 4>::alloc(src_store.width, src_store.height);
+                src_store.bit_depth = bit_depth;
+                premultiplied_store.bit_depth = bit_depth;
+                src_store.premultiply_alpha(&mut premultiplied_store, &pool);
+                src_store = premultiplied_store;
+                has_alpha_premultiplied = true;
+            }
         }
 
         if !(1..=16).contains(&bit_depth) {
@@ -698,7 +719,7 @@ impl ScalingU16 for Scaler {
             &pool,
         );
 
-        if premultiply_alpha {
+        if premultiply_alpha & has_alpha_premultiplied {
             let mut premultiplied_store = ImageStore::<u16, 4>::alloc(
                 new_image_horizontal.width,
                 new_image_horizontal.height,
