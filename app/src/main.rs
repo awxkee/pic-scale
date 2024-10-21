@@ -13,14 +13,14 @@ use pic_scale::{
 };
 
 fn main() {
-    test_fast_image();
 
-    let img = ImageReader::open("./assets/nasa-4928x3279.png")
+    // test_fast_image();
+    let img = ImageReader::open("./assets/abstract_alpha.png")
         .unwrap()
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
-    let transient = img.to_rgb8();
+    let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
     let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
@@ -29,12 +29,13 @@ fn main() {
     let mut choke: Vec<u8> = bytes.iter().map(|&x| x).collect();
 
     let store =
-        ImageStore::<u8, 3>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
+        ImageStore::<u8, 4>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
     let start_time = Instant::now();
-    let resized = scaler.resize_rgb(
-        ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+    let resized = scaler.resize_rgba(
+        ImageSize::new(dimensions.0 as usize / 3, dimensions.1 as usize / 3),
         store,
+        true,
     );
 
     let elapsed_time = start_time.elapsed();
@@ -172,11 +173,11 @@ fn u8_to_u16(u8_buffer: &[u8]) -> &[u16] {
 }
 
 fn test_fast_image() {
-    let img = ImageReader::open("./assets/nasa-4928x3279.png")
+    let img = ImageReader::open("./assets/asset_6.png")
         .unwrap()
         .decode()
         .unwrap();
-    let img = img.to_rgb8();
+    let img = img.to_rgba8();
     let dimensions = img.dimensions();
 
     let mut vc = Vec::from(img.as_bytes());
@@ -187,7 +188,7 @@ fn test_fast_image() {
 
     let start_time = Instant::now();
 
-    let pixel_type: PixelType = PixelType::U8x3;
+    let pixel_type: PixelType = PixelType::U8x4;
 
     let src_image = Image::from_vec_u8(dimensions.0, dimensions.1, vc, pixel_type).unwrap();
 
@@ -208,7 +209,7 @@ fn test_fast_image() {
             &mut dst_image,
             &ResizeOptions::new()
                 .resize_alg(ResizeAlg::Convolution(FilterType::Lanczos3))
-                .use_alpha(false),
+                .use_alpha(true),
         )
         .unwrap();
 

@@ -130,7 +130,7 @@ impl Scaling for LinearScaler {
         &self,
         new_size: ImageSize,
         store: ImageStore<u8, 4>,
-        is_alpha_premultiplied: bool,
+        premultiply_alpha: bool,
     ) -> ImageStore<u8, 4> {
         let mut src_store = store;
 
@@ -139,10 +139,10 @@ impl Scaling for LinearScaler {
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
 
-        if is_alpha_premultiplied {
+        if premultiply_alpha {
             let mut premultiplied_store =
                 ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
-            src_store.unpremultiply_alpha(&mut premultiplied_store, &pool);
+            src_store.premultiply_alpha(&mut premultiplied_store, &pool);
             src_store = premultiplied_store;
         }
         let lab_store = self.rgba_to_linear(src_store);
@@ -150,10 +150,10 @@ impl Scaling for LinearScaler {
             .scaler
             .resize_rgba_f32_impl(new_size, lab_store, false, &pool);
         let rgba_store = self.linear_to_rgba(new_store);
-        if is_alpha_premultiplied {
+        if premultiply_alpha {
             let mut premultiplied_store =
                 ImageStore::<u8, 4>::alloc(rgba_store.width, rgba_store.height);
-            rgba_store.premultiply_alpha(&mut premultiplied_store, &pool);
+            rgba_store.unpremultiply_alpha(&mut premultiplied_store, &pool);
             return premultiplied_store;
         }
         rgba_store
