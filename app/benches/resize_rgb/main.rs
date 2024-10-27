@@ -28,7 +28,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             )
             .unwrap();
             _ = scaler.resize_rgb(
-                ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
                 store,
             );
         })
@@ -48,7 +48,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             )
             .unwrap();
             _ = scaler.resize_rgb_f32(
-                ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
                 store,
             );
         })
@@ -60,7 +60,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             let pixel_type: PixelType = PixelType::U8x3;
             let src_image =
                 Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
-            let mut dst_image = Image::new(dimensions.0 / 2, dimensions.1 / 2, pixel_type);
+            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
 
             let mut resizer = Resizer::new();
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
