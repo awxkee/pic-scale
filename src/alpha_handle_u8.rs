@@ -39,6 +39,11 @@ use rayon::iter::ParallelIterator;
 use rayon::slice::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
 
+#[inline]
+fn div_by_255(v: u16) -> u8 {
+    ((((v + 0x80) >> 8) + v + 0x80) >> 8).min(255) as u8
+}
+
 #[macro_export]
 macro_rules! unpremultiply_pixel {
     ($dst: expr, $src: expr, $pixel_offset: expr) => {{
@@ -88,20 +93,11 @@ macro_rules! premultiply_pixel {
 
 fn premultiply_alpha_rgba_row_impl(dst: &mut [u8], src: &[u8]) {
     for (dst_chunk, src_chunk) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
-        let mut r = src_chunk[0] as u16;
-        let mut g = src_chunk[1] as u16;
-        let mut b = src_chunk[2] as u16;
         let a = src_chunk[3] as u16;
-        r *= a;
-        g *= a;
-        b *= a;
-        r /= 255;
-        g /= 255;
-        b /= 255;
-        dst_chunk[0] = r as u8;
-        dst_chunk[1] = g as u8;
-        dst_chunk[2] = b as u8;
-        dst_chunk[3] = a as u8;
+        dst_chunk[0] = div_by_255(src_chunk[0] as u16 * a);
+        dst_chunk[1] = div_by_255(src_chunk[1] as u16 * a);
+        dst_chunk[2] = div_by_255(src_chunk[2] as u16 * a);
+        dst_chunk[3] = div_by_255(a * a);
     }
 }
 
@@ -132,23 +128,14 @@ fn premultiply_alpha_rgba_impl(
 
 fn unpremultiply_alpha_rgba_row_impl(dst: &mut [u8], src: &[u8]) {
     for (dst_chunk, src_chunk) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
-        let mut r = src_chunk[0] as u16;
-        let mut g = src_chunk[1] as u16;
-        let mut b = src_chunk[2] as u16;
-        let a = src_chunk[3] as u16;
+        let a = src_chunk[3];
         if a != 0 {
-            r = (r * 255) / a;
-            g = (g * 255) / a;
-            b = (b * 255) / a;
-        } else {
-            r = 0;
-            g = 0;
-            b = 0;
+            let a_recip = 1. / a as f32;
+            dst_chunk[0] = ((src_chunk[0] as f32 * 255.) * a_recip) as u8;
+            dst_chunk[1] = ((src_chunk[1] as f32 * 255.) * a_recip) as u8;
+            dst_chunk[2] = ((src_chunk[2] as f32 * 255.) * a_recip) as u8;
+            dst_chunk[3] = ((a as f32 * 255.) * a_recip) as u8;
         }
-        dst_chunk[0] = r as u8;
-        dst_chunk[1] = g as u8;
-        dst_chunk[2] = b as u8;
-        dst_chunk[3] = a as u8;
     }
 }
 

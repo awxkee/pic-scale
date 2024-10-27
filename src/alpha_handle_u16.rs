@@ -85,43 +85,26 @@ macro_rules! premultiply_pixel_u16 {
 }
 
 fn premultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], max_colors: u32) {
+    let recip_max_colors = 1. / max_colors as f32;
     for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
-        let mut r = src[0] as u32;
-        let mut g = src[1] as u32;
-        let mut b = src[2] as u32;
         let a = src[3] as u32;
-        r *= a;
-        g *= a;
-        b *= a;
-        r /= max_colors;
-        g /= max_colors;
-        b /= max_colors;
-        dst[0] = r as u16;
-        dst[1] = g as u16;
-        dst[2] = b as u16;
-        dst[3] = a as u16;
+        dst[0] = (((src[0] as u32 * a) as f32 * recip_max_colors) as u32).min(max_colors) as u16;
+        dst[1] = (((src[1] as u32 * a) as f32 * recip_max_colors) as u32).min(max_colors) as u16;
+        dst[2] = (((src[2] as u32 * a) as f32 * recip_max_colors) as u32).min(max_colors) as u16;
+        dst[3] = (((a * a) as f32 * recip_max_colors) as u32).min(max_colors) as u16;
     }
 }
 
 fn unpremultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], max_colors: u32) {
     for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
-        let mut r = src[0] as u32;
-        let mut g = src[1] as u32;
-        let mut b = src[2] as u32;
         let a = src[3] as u32;
         if a != 0 {
-            r = (r * max_colors) / a;
-            g = (g * max_colors) / a;
-            b = (b * max_colors) / a;
-        } else {
-            r = 0;
-            g = 0;
-            b = 0;
+            let a_recip = 1. / a as f32;
+            dst[0] = ((src[0] as u32 * max_colors) as f32 * a_recip) as u16;
+            dst[1] = ((src[1] as u32 * max_colors) as f32 * a_recip) as u16;
+            dst[2] = ((src[2] as u32 * max_colors) as f32 * a_recip) as u16;
+            dst[3] = ((a * max_colors) as f32 * a_recip) as u16;
         }
-        dst[0] = r as u16;
-        dst[1] = g as u16;
-        dst[2] = b as u16;
-        dst[3] = a as u16;
     }
 }
 
