@@ -103,55 +103,53 @@ pub(crate) fn convolve_horizontal_dispatch_u16<const CHANNELS: usize>(
                     });
             }
         });
+    } else if bit_depth > 12 {
+        dst.chunks_exact_mut(dst_stride * 4)
+            .zip(src.chunks_exact(src_stride * 4))
+            .for_each(|(dst, src)| {
+                u16::handle_row_4::<CHANNELS>(
+                    src,
+                    src_stride,
+                    dst,
+                    dst_stride,
+                    &filter_weights,
+                    bit_depth as u32,
+                );
+            });
+
+        let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
+        let src_remainder = src.chunks_exact(src_stride * 4).remainder();
+
+        remainder
+            .chunks_exact_mut(dst_stride)
+            .zip(src_remainder.chunks_exact(src_stride))
+            .for_each(|(dst, src)| {
+                u16::handle_row::<CHANNELS>(src, dst, &filter_weights, bit_depth as u32);
+            });
     } else {
-        if bit_depth > 12 {
-            dst.chunks_exact_mut(dst_stride * 4)
-                .zip(src.chunks_exact(src_stride * 4))
-                .for_each(|(dst, src)| {
-                    u16::handle_row_4::<CHANNELS>(
-                        src,
-                        src_stride,
-                        dst,
-                        dst_stride,
-                        &filter_weights,
-                        bit_depth as u32,
-                    );
-                });
+        let approx = filter_weights.numerical_approximation_i16::<PRECISION>(0);
+        dst.chunks_exact_mut(dst_stride * 4)
+            .zip(src.chunks_exact(src_stride * 4))
+            .for_each(|(dst, src)| {
+                u16::handle_fixed_row_4::<i32, CHANNELS>(
+                    src,
+                    src_stride,
+                    dst,
+                    dst_stride,
+                    &approx,
+                    bit_depth as u32,
+                );
+            });
 
-            let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
-            let src_remainder = src.chunks_exact(src_stride * 4).remainder();
+        let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
+        let src_remainder = src.chunks_exact(src_stride * 4).remainder();
 
-            remainder
-                .chunks_exact_mut(dst_stride)
-                .zip(src_remainder.chunks_exact(src_stride))
-                .for_each(|(dst, src)| {
-                    u16::handle_row::<CHANNELS>(src, dst, &filter_weights, bit_depth as u32);
-                });
-        } else {
-            let approx = filter_weights.numerical_approximation_i16::<PRECISION>(0);
-            dst.chunks_exact_mut(dst_stride * 4)
-                .zip(src.chunks_exact(src_stride * 4))
-                .for_each(|(dst, src)| {
-                    u16::handle_fixed_row_4::<i32, CHANNELS>(
-                        src,
-                        src_stride,
-                        dst,
-                        dst_stride,
-                        &approx,
-                        bit_depth as u32,
-                    );
-                });
-
-            let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
-            let src_remainder = src.chunks_exact(src_stride * 4).remainder();
-
-            remainder
-                .chunks_exact_mut(dst_stride)
-                .zip(src_remainder.chunks_exact(src_stride))
-                .for_each(|(dst, src)| {
-                    u16::handle_fixed_row::<i32, CHANNELS>(src, dst, &approx, bit_depth as u32);
-                });
-        }
+        remainder
+            .chunks_exact_mut(dst_stride)
+            .zip(src_remainder.chunks_exact(src_stride))
+            .for_each(|(dst, src)| {
+                u16::handle_fixed_row::<i32, CHANNELS>(src, dst, &approx, bit_depth as u32);
+            });
     }
 }
 

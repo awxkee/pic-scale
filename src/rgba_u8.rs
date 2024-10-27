@@ -97,6 +97,7 @@ impl VerticalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
         destination: &mut ImageStore<u8, 4>,
         pool: &Option<ThreadPool>,
     ) {
+        #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(usize, &FilterBounds, &[u8], &mut [u8], usize, &[i16]) =
             handle_fixed_column_u8;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]

@@ -2,7 +2,7 @@
 
 Rust image scale in different color spaces using SIMD and multithreading.
 
-Supported NEON, SSE, AVX-2, RISC-V (Vector Extension), WASM.
+Supported NEON, SSE, AVX-2, WASM.
 
 ### Colorspace
 
