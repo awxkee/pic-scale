@@ -266,7 +266,7 @@ impl ResamplingFunction {
             ResamplingFunction::Bilinear => ResamplingFilter::new(bilinear, 2f32, false),
             ResamplingFunction::Nearest => {
                 // Just a stab for nearest
-                ResamplingFilter::new(bilinear, 1f32, false)
+                ResamplingFilter::new(bilinear, 2f32, false)
             }
             ResamplingFunction::Cubic => ResamplingFilter::new(cubic_spline::<T>, 2f32, false),
             ResamplingFunction::MitchellNetravalli => {
@@ -289,8 +289,8 @@ impl ResamplingFunction {
                 true,
             ),
             ResamplingFunction::Welch => ResamplingFilter::new(welch, 1f32, false),
-            ResamplingFunction::Quadric => ResamplingFilter::new(quadric, 1.5f32, false),
-            ResamplingFunction::EwaQuadric => ResamplingFilter::new(quadric, 1.5f32, true),
+            ResamplingFunction::Quadric => ResamplingFilter::new(quadric, 3f32, false),
+            ResamplingFunction::EwaQuadric => ResamplingFilter::new(quadric, 3f32, true),
             ResamplingFunction::Gaussian => ResamplingFilter::new(gaussian, 2f32, false),
             ResamplingFunction::Sphinx => ResamplingFilter::new(sphinx, 2f32, false),
             ResamplingFunction::Bartlett => ResamplingFilter::new(bartlett, 1f32, false),
@@ -313,7 +313,7 @@ impl ResamplingFunction {
             }
             ResamplingFunction::Kaiser => ResamplingFilter::new(kaiser, 2f32, false),
             ResamplingFunction::BartlettHann => ResamplingFilter::new(bartlett_hann, 2f32, false),
-            ResamplingFunction::Box => ResamplingFilter::new(box_weight, 0.5f32, false),
+            ResamplingFunction::Box => ResamplingFilter::new(box_weight, 2f32, false),
             ResamplingFunction::Bohman => ResamplingFilter::new(bohman, 2f32, false),
             ResamplingFunction::Lanczos2Jinc => ResamplingFilter::new(lanczos2_jinc, 2f32, false),
             ResamplingFunction::Lanczos3Jinc => ResamplingFilter::new(lanczos3_jinc, 3f32, false),

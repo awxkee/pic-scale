@@ -27,18 +27,20 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter_weights::{FilterBounds, FilterWeights};
+use crate::fixed_point_horizontal::{
+    convolve_row_handler_fixed_point, convolve_row_handler_fixed_point_4,
+};
+use crate::fixed_point_vertical::column_handler_fixed_point;
 use crate::floating_point_horizontal::{
     convolve_row_handler_floating_point, convolve_row_handler_floating_point_4,
 };
 use crate::floating_point_vertical::column_handler_floating_point;
 use crate::mixed_storage::MixedStorage;
-#[cfg(all(
-    target_arch = "aarch64",
-    target_feature = "neon",
-    not(feature = "disable_simd")
-))]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
 use crate::neon::convolve_column_u16;
+use crate::saturate_narrow::SaturateNarrow;
 use num_traits::{AsPrimitive, Float, MulAdd};
+use std::ops::{Add, AddAssign, Mul};
 
 pub trait ColumnHandlerFloatingPoint<T, J, F>
 where
@@ -83,10 +85,7 @@ macro_rules! default_floating_column_handler {
     };
 }
 
-#[cfg(any(
-    feature = "disable_simd",
-    not(all(target_arch = "aarch64", target_feature = "neon"))
-))]
+#[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
 impl ColumnHandlerFloatingPoint<u16, f32, f32> for u16 {
     fn handle_floating_column<const COMPONENTS: usize>(
         dst_width: usize,
@@ -103,10 +102,7 @@ impl ColumnHandlerFloatingPoint<u16, f32, f32> for u16 {
     }
 }
 
-#[cfg(all(
-    not(feature = "disable_simd"),
-    all(target_arch = "aarch64", target_feature = "neon")
-))]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 impl ColumnHandlerFloatingPoint<u16, f32, f32> for u16 {
     fn handle_floating_column<const COMPONENTS: usize>(
         dst_width: usize,
@@ -182,5 +178,147 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
             filter_weights,
             bit_depth,
         )
+    }
+}
+
+pub trait ColumnHandlerFixedPoint<T> {
+    fn handle_fixed_column<J, const COMPONENTS: usize>(
+        dst_width: usize,
+        bounds: &FilterBounds,
+        src: &[T],
+        dst: &mut [T],
+        src_stride: usize,
+        weight: &[i16],
+        bit_depth: u32,
+    ) where
+        T: Copy + 'static + AsPrimitive<J> + Default,
+        J: Copy
+            + 'static
+            + AsPrimitive<T>
+            + Mul<Output = J>
+            + AddAssign
+            + SaturateNarrow<T>
+            + Default,
+        i32: AsPrimitive<J>,
+        i16: AsPrimitive<J>;
+}
+
+pub trait RowHandlerFixedPoint<T> {
+    fn handle_fixed_row_4<J, const COMPONENTS: usize>(
+        src: &[T],
+        src_stride: usize,
+        dst: &mut [T],
+        dst_stride: usize,
+        filter_weights: &FilterWeights<i16>,
+        bit_depth: u32,
+    ) where
+        T: Copy + 'static + AsPrimitive<J> + Default,
+        J: Copy
+            + 'static
+            + AsPrimitive<T>
+            + Mul<Output = J>
+            + AddAssign
+            + SaturateNarrow<T>
+            + Default
+            + Add<J, Output = J>,
+        i32: AsPrimitive<J>,
+        i16: AsPrimitive<J>;
+
+    fn handle_fixed_row<J, const COMPONENTS: usize>(
+        src: &[T],
+        dst: &mut [T],
+        filter_weights: &FilterWeights<i16>,
+        bit_depth: u32,
+    ) where
+        T: Copy + 'static + AsPrimitive<J> + Default,
+        J: Copy
+            + 'static
+            + AsPrimitive<T>
+            + Mul<Output = J>
+            + AddAssign
+            + SaturateNarrow<T>
+            + Default
+            + Add<J, Output = J>,
+        i32: AsPrimitive<J>,
+        i16: AsPrimitive<J>;
+}
+
+impl RowHandlerFixedPoint<u16> for u16 {
+    fn handle_fixed_row_4<J, const COMPONENTS: usize>(
+        src: &[u16],
+        src_stride: usize,
+        dst: &mut [u16],
+        dst_stride: usize,
+        filter_weights: &FilterWeights<i16>,
+        bit_depth: u32,
+    ) where
+        J: Copy
+            + 'static
+            + AsPrimitive<u16>
+            + Mul<Output = J>
+            + AddAssign
+            + SaturateNarrow<u16>
+            + Default
+            + Add<J, Output = J>,
+        i32: AsPrimitive<J>,
+        i16: AsPrimitive<J>,
+        u16: AsPrimitive<J>,
+    {
+        convolve_row_handler_fixed_point_4::<u16, J, COMPONENTS>(
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+            filter_weights,
+            bit_depth,
+        )
+    }
+
+    fn handle_fixed_row<J, const COMPONENTS: usize>(
+        src: &[u16],
+        dst: &mut [u16],
+        filter_weights: &FilterWeights<i16>,
+        bit_depth: u32,
+    ) where
+        J: Copy
+            + 'static
+            + AsPrimitive<u16>
+            + Mul<Output = J>
+            + AddAssign
+            + SaturateNarrow<u16>
+            + Default
+            + Add<J, Output = J>,
+        i32: AsPrimitive<J>,
+        i16: AsPrimitive<J>,
+        u16: AsPrimitive<J>,
+    {
+        convolve_row_handler_fixed_point::<u16, J, COMPONENTS>(src, dst, filter_weights, bit_depth)
+    }
+}
+
+impl ColumnHandlerFixedPoint<u16> for u16 {
+    fn handle_fixed_column<J, const COMPONENTS: usize>(
+        dst_width: usize,
+        bounds: &FilterBounds,
+        src: &[u16],
+        dst: &mut [u16],
+        src_stride: usize,
+        weight: &[i16],
+        bit_depth: u32,
+    ) where
+        u16: Copy + 'static + AsPrimitive<J> + Default,
+        J: Copy
+            + 'static
+            + AsPrimitive<u16>
+            + Mul<Output = J>
+            + AddAssign
+            + SaturateNarrow<u16>
+            + Default,
+        i32: AsPrimitive<J>,
+        i16: AsPrimitive<J>,
+    {
+        column_handler_fixed_point::<u16, J, COMPONENTS>(
+            dst_width, bounds, src, dst, src_stride, weight, bit_depth,
+        );
     }
 }

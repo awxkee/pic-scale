@@ -13,9 +13,8 @@ use pic_scale::{
 };
 
 fn main() {
-
     // test_fast_image();
-    let img = ImageReader::open("./assets/abstract_alpha.png")
+    let img = ImageReader::open("./assets/nasa-4928x3279.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -33,7 +32,7 @@ fn main() {
             .unwrap();
     let start_time = Instant::now();
     let resized = scaler.resize_rgba(
-        ImageSize::new(dimensions.0 as usize / 3, dimensions.1 as usize / 3),
+        ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
         store,
         true,
     );

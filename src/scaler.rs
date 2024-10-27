@@ -168,8 +168,8 @@ impl Scaler {
         let window_func = resampling_filter.window;
         let base_size: usize = (filter_base_size.as_() * filter_scale_cutoff).round().as_();
         // Kernel size must be always odd
-        let kernel_size = base_size * 2 + 1usize;
-        let filter_radius = base_size.as_();
+        let kernel_size = base_size;
+        let filter_radius = base_size.as_() / 2.as_();
         let filter_scale = 1f32.as_() / filter_scale_cutoff;
         let mut weights: Vec<T> = vec![T::default(); kernel_size * out_size];
         let mut local_filters = vec![T::default(); kernel_size];

@@ -48,3 +48,19 @@ impl SaturateNarrow<u8> for i64 {
         (self >> PRECISION).max(0).min(255) as u8
     }
 }
+
+impl SaturateNarrow<u16> for i32 {
+    #[inline(always)]
+    #[allow(clippy::manual_clamp)]
+    fn saturate_narrow(self, bit_depth: u32) -> u16 {
+        (self >> PRECISION).max(0).min((1 << bit_depth) - 1) as u16
+    }
+}
+
+impl SaturateNarrow<u16> for i64 {
+    #[inline(always)]
+    #[allow(clippy::manual_clamp)]
+    fn saturate_narrow(self, bit_depth: u32) -> u16 {
+        (self >> PRECISION).max(0).min((1 << bit_depth) - 1) as u16
+    }
+}

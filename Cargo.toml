@@ -27,5 +27,3 @@ libc = "0.2.158"
 [features]
 default = ["colorspaces"]
 colorspaces = ["dep:colorutils-rs"]
-riscv = []
-disable_simd = []

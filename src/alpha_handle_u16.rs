@@ -27,21 +27,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    not(feature = "disable_simd")
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::avx2::{avx_premultiply_alpha_rgba_u16, avx_unpremultiply_alpha_rgba_u16};
-#[cfg(all(
-    target_arch = "aarch64",
-    target_feature = "neon",
-    not(feature = "disable_simd")
-))]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
 use crate::neon::{neon_premultiply_alpha_rgba_u16, neon_unpremultiply_alpha_rgba_u16};
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    not(feature = "disable_simd")
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{premultiply_alpha_sse_rgba_u16, unpremultiply_alpha_sse_rgba_u16};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::slice::{ParallelSlice, ParallelSliceMut};
@@ -200,24 +190,21 @@ pub fn premultiply_alpha_rgba_u16(
     #[allow(clippy::type_complexity)]
     let mut _dispatcher: fn(&mut [u16], &[u16], usize, usize, usize, &Option<ThreadPool>) =
         premultiply_alpha_rgba_impl;
-    #[cfg(not(feature = "disable_simd"))]
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        {
-            if is_x86_feature_detected!("sse4.1") {
-                _dispatcher = premultiply_alpha_sse_rgba_u16;
-            }
+        if is_x86_feature_detected!("sse4.1") {
+            _dispatcher = premultiply_alpha_sse_rgba_u16;
         }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        {
-            if is_x86_feature_detected!("avx2") {
-                _dispatcher = avx_premultiply_alpha_rgba_u16;
-            }
+    }
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    {
+        if is_x86_feature_detected!("avx2") {
+            _dispatcher = avx_premultiply_alpha_rgba_u16;
         }
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            _dispatcher = neon_premultiply_alpha_rgba_u16;
-        }
+    }
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    {
+        _dispatcher = neon_premultiply_alpha_rgba_u16;
     }
     _dispatcher(dst, src, width, height, bit_depth, pool);
 }
@@ -233,24 +220,21 @@ pub fn unpremultiply_alpha_rgba_u16(
     #[allow(clippy::type_complexity)]
     let mut _dispatcher: fn(&mut [u16], &[u16], usize, usize, usize, &Option<ThreadPool>) =
         unpremultiply_alpha_rgba_impl;
-    #[cfg(not(feature = "disable_simd"))]
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        {
-            if is_x86_feature_detected!("sse4.1") {
-                _dispatcher = unpremultiply_alpha_sse_rgba_u16;
-            }
+        if is_x86_feature_detected!("sse4.1") {
+            _dispatcher = unpremultiply_alpha_sse_rgba_u16;
         }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        {
-            if is_x86_feature_detected!("avx2") {
-                _dispatcher = avx_unpremultiply_alpha_rgba_u16;
-            }
+    }
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    {
+        if is_x86_feature_detected!("avx2") {
+            _dispatcher = avx_unpremultiply_alpha_rgba_u16;
         }
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            _dispatcher = neon_unpremultiply_alpha_rgba_u16;
-        }
+    }
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    {
+        _dispatcher = neon_unpremultiply_alpha_rgba_u16;
     }
     _dispatcher(dst, src, width, height, bit_depth, pool);
 }
