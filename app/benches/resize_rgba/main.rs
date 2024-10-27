@@ -18,7 +18,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         let mut copied: Vec<u8> = Vec::from(src_bytes);
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Adaptive);
+            scaler.set_threading_policy(ThreadingPolicy::Single);
             let store = ImageStore::<u8, 4>::from_slice(
                 &mut copied,
                 dimensions.0 as usize,
@@ -39,7 +39,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         let mut copied: Vec<f32> = Vec::from(f32_image.clone());
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Adaptive);
+            scaler.set_threading_policy(ThreadingPolicy::Single);
             let store = ImageStore::<f32, 4>::from_slice(
                 &mut copied,
                 dimensions.0 as usize,
@@ -86,7 +86,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("Pic scale RGBA without alpha: Lanczos 3", |b| {
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Adaptive);
+            scaler.set_threading_policy(ThreadingPolicy::Single);
             let mut copied: Vec<u8> = Vec::from(src_bytes);
             let store = ImageStore::<u8, 4>::from_slice(
                 &mut copied,

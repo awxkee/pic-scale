@@ -171,11 +171,11 @@ fn u8_to_u16(u8_buffer: &[u8]) -> &[u16] {
 }
 
 fn test_fast_image() {
-    let img = ImageReader::open("./assets/asset_6.png")
+    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
         .unwrap()
         .decode()
         .unwrap();
-    let img = img.to_rgba8();
+    let img = img.to_rgb8();
     let dimensions = img.dimensions();
 
     let mut vc = Vec::from(img.as_bytes());
@@ -186,16 +186,16 @@ fn test_fast_image() {
 
     let start_time = Instant::now();
 
-    let pixel_type: PixelType = PixelType::U8x4;
+    let pixel_type: PixelType = PixelType::U8x3;
 
     let src_image = Image::from_vec_u8(dimensions.0, dimensions.1, vc, pixel_type).unwrap();
 
-    let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
+    let mut dst_image = Image::new(dimensions.0 / 2, dimensions.1 / 2, pixel_type);
 
     let mut resizer = Resizer::new();
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     unsafe {
-        resizer.set_cpu_extensions(CpuExtensions::None);
+        resizer.set_cpu_extensions(CpuExtensions::Neon);
     }
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     unsafe {
@@ -206,8 +206,8 @@ fn test_fast_image() {
             &src_image,
             &mut dst_image,
             &ResizeOptions::new()
-                .resize_alg(ResizeAlg::Convolution(FilterType::Lanczos3))
-                .use_alpha(true),
+                .resize_alg(ResizeAlg::Convolution(FilterType::Bilinear))
+                .use_alpha(false),
         )
         .unwrap();
 

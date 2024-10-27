@@ -55,39 +55,43 @@ pub(crate) fn convolve_horizontal_dispatch_u8<const CHANNELS: usize>(
     if let Some(pool) = pool {
         let arc_weights = Arc::new(approx_weights);
         pool.install(|| {
+            let mut rem = dst;
+            let mut src_rem = src;
             if let Some(dispatcher_4) = dispatcher_4_rows {
-                dst.par_chunks_exact_mut(dst_stride * 4)
-                    .zip(src.par_chunks_exact(src_stride * 4))
+                rem.par_chunks_exact_mut(dst_stride * 4)
+                    .zip(src_rem.par_chunks_exact(src_stride * 4))
                     .for_each(|(dst, src)| {
                         dispatcher_4(src, src_stride, dst, dst_stride, &arc_weights);
                     });
+
+                rem = rem.chunks_exact_mut(dst_stride * 4).into_remainder();
+                src_rem = src_rem.chunks_exact(src_stride * 4).remainder();
             }
 
-            let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
-            let src_remainder = src.chunks_exact(src_stride * 4).remainder();
-
-            remainder
+            rem
                 .par_chunks_exact_mut(dst_stride)
-                .zip(src_remainder.par_chunks_exact(src_stride))
+                .zip(src_rem.par_chunks_exact(src_stride))
                 .for_each(|(dst, src)| {
                     dispatcher_1_row(src, dst, &arc_weights);
                 });
         });
     } else {
+        let mut rem = dst;
+        let mut src_rem = src;
         if let Some(dispatcher_4) = dispatcher_4_rows {
-            dst.chunks_exact_mut(dst_stride * 4)
-                .zip(src.chunks_exact(src_stride * 4))
+            rem.chunks_exact_mut(dst_stride * 4)
+                .zip(src_rem.chunks_exact(src_stride * 4))
                 .for_each(|(dst, src)| {
                     dispatcher_4(src, src_stride, dst, dst_stride, &approx_weights);
                 });
+
+            rem = rem.chunks_exact_mut(dst_stride * 4).into_remainder();
+            src_rem = src_rem.chunks_exact(src_stride * 4).remainder();
         }
 
-        let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
-        let src_remainder = src.chunks_exact(src_stride * 4).remainder();
-
-        remainder
+        rem
             .chunks_exact_mut(dst_stride)
-            .zip(src_remainder.chunks_exact(src_stride))
+            .zip(src_rem.chunks_exact(src_stride))
             .for_each(|(dst, src)| {
                 dispatcher_1_row(src, dst, &approx_weights);
             });

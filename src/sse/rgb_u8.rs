@@ -142,7 +142,7 @@ unsafe fn convolve_horizontal_rgb_sse_rows_4_impl(
                 let weight01 = _mm_shuffle_epi32::<SHUFFLE_01>(weights);
                 const SHUFFLE_23: i32 = shuffle(1, 1, 1, 1);
                 let weight23 = _mm_shuffle_epi32::<SHUFFLE_23>(weights);
-                let bounds_start = bounds.start + jx;
+                let bounds_start = (bounds.start + jx) * CHANNELS;
 
                 let rgb_pixel_0 = load_rgb_x4(src0.get_unchecked(bounds_start..));
                 let rgb_pixel_1 = load_rgb_x4(src1.get_unchecked(bounds_start..));
@@ -174,7 +174,7 @@ unsafe fn convolve_horizontal_rgb_sse_rows_4_impl(
 
             while jx + 2 < bounds.size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 2));
-                let bounds_start = bounds.start + jx;
+                let bounds_start = (bounds.start + jx) * CHANNELS;
                 let weight01 = _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
 
                 let rgb_pixel_0 = load_rgb_x2(src0.get_unchecked(bounds_start..));
