@@ -113,7 +113,7 @@ impl ColumnHandlerFloatingPoint<u16, f32, f32> for u16 {
         weight: &[f32],
         bit_depth: u32,
     ) {
-        convolve_column_u16::<COMPONENTS>(
+        convolve_column_u16(
             dst_width, bounds, src, dst, src_stride, weight, bit_depth,
         )
     }
@@ -332,4 +332,29 @@ pub(crate) fn handle_fixed_column_u8(
     weight: &[i16],
 ) {
     column_handler_fixed_point::<u8, i32>(dst_width, bounds, src, dst, src_stride, weight, 8);
+}
+
+pub(crate) fn handle_fixed_row_u8<const CHANNELS: usize>(
+    src: &[u8],
+    dst: &mut [u8],
+    filter_weights: &FilterWeights<i16>,
+) {
+    convolve_row_handler_fixed_point::<u8, i32, CHANNELS>(src, dst, filter_weights, 8);
+}
+
+pub(crate) fn handle_fixed_rows_4_u8<const CHANNELS: usize>(
+    src: &[u8],
+    src_stride: usize,
+    dst: &mut [u8],
+    dst_stride: usize,
+    filter_weights: &FilterWeights<i16>,
+) {
+    convolve_row_handler_fixed_point_4::<u8, i32, CHANNELS>(
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+        filter_weights,
+        8,
+    );
 }

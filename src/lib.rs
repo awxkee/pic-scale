@@ -41,7 +41,6 @@ mod colors;
 mod convolution;
 mod convolve_naive_f32;
 mod convolve_naive_u16;
-mod convolve_naive_u8;
 mod cpu_features;
 #[cfg(feature = "half")]
 mod dispatch_group_f16;

@@ -29,10 +29,9 @@
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::avx2::convolve_vertical_avx_row;
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
-use crate::convolve_naive_u8::convolve_horizontal_rgba_native_row;
 use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertical_dispatch_u8};
 use crate::filter_weights::{FilterBounds, FilterWeights};
-use crate::handler_provider::handle_fixed_column_u8;
+use crate::handler_provider::{handle_fixed_column_u8, handle_fixed_row_u8};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::convolve_vertical_neon_row;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
@@ -56,10 +55,10 @@ impl HorizontalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
         _pool: &Option<ThreadPool>,
     ) {
         let mut _dispatcher_4_rows: Option<
-            fn(usize, usize, &FilterWeights<i16>, *const u8, usize, *mut u8, usize),
+            fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>),
         > = None;
-        let mut _dispatcher_1_row: fn(usize, usize, &FilterWeights<i16>, *const u8, *mut u8) =
-            convolve_horizontal_rgba_native_row::<u8, i32, 1>;
+        let mut _dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i16>) =
+            handle_fixed_row_u8::<1>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             _dispatcher_4_rows = Some(convolve_horizontal_plane_neon_rows_4_u8);
@@ -90,6 +89,7 @@ impl VerticalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
         destination: &mut ImageStore<u8, 1>,
         pool: &Option<ThreadPool>,
     ) {
+        #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(usize, &FilterBounds, &[u8], &mut [u8], usize, &[i16]) =
             handle_fixed_column_u8;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]

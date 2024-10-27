@@ -186,7 +186,8 @@ impl Scaler {
         };
 
         let mut bounds: Vec<FilterBounds> = vec![FilterBounds::new(0, 0); out_size];
-        for i in 0..out_size {
+
+        for (i, bound) in bounds.iter_mut().enumerate() {
             let center_x = ((i.as_() + 0.5.as_()) * scale).min(in_size.as_());
             let mut weights_sum: T = 0f32.as_();
             let mut local_filter_iteration = 0usize;
@@ -250,9 +251,7 @@ impl Scaler {
 
             let size = end - start;
 
-            unsafe {
-                *bounds.get_unchecked_mut(i) = FilterBounds::new(start, size);
-            }
+            *bound = FilterBounds::new(start, size);
 
             if weights_sum != 0f32.as_() {
                 let recpeq = 1f32.as_() / weights_sum;

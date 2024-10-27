@@ -269,14 +269,7 @@ pub fn wasm_vertical_neon_row(
     weight: &[i16],
 ) {
     unsafe {
-        convolve_vertical_neon_row_impl(
-            dst_width,
-            bounds,
-            src,
-            dst,
-            src_stride,
-            weight,
-        );
+        convolve_vertical_neon_row_impl(dst_width, bounds, src, dst, src_stride, weight);
     }
 }
 

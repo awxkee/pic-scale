@@ -29,10 +29,9 @@
 
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::support::PRECISION;
-use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageStore;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::ParallelSliceMut;
+use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
 use std::sync::Arc;
 
@@ -42,98 +41,60 @@ pub(crate) fn convolve_horizontal_dispatch_u8<const CHANNELS: usize>(
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStore<u8, CHANNELS>,
     pool: &Option<ThreadPool>,
-    dispatcher_4_rows: Option<
-        fn(usize, usize, &FilterWeights<i16>, *const u8, usize, *mut u8, usize),
-    >,
-    dispatcher_1_row: fn(usize, usize, &FilterWeights<i16>, *const u8, *mut u8),
+    dispatcher_4_rows: Option<fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>)>,
+    dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i16>),
 ) {
     let approx_weights = filter_weights.numerical_approximation_i16::<PRECISION>(0);
 
-    let mut unsafe_source_ptr_0 = image_store.buffer.borrow().as_ptr();
-    let mut unsafe_destination_ptr_0 = destination.buffer.borrow_mut().as_mut_ptr();
+    let src = image_store.buffer.borrow();
+    let dst = destination.buffer.borrow_mut();
 
     let src_stride = image_store.width * image_store.channels;
     let dst_stride = destination.width * image_store.channels;
-    let dst_width = destination.width;
-    let src_width = image_store.width;
 
     if let Some(pool) = pool {
         let arc_weights = Arc::new(approx_weights);
-        let borrowed = destination.buffer.borrow_mut();
-        let unsafe_slice = UnsafeSlice::new(borrowed);
-        pool.scope(|scope| {
-            let mut yy = 0usize;
-            if let Some(dispatcher) = dispatcher_4_rows {
-                for y in (0..destination.height.saturating_sub(4)).step_by(4) {
-                    let weights = arc_weights.clone();
-                    scope.spawn(move |_| {
-                        let unsafe_source_ptr_0 =
-                            unsafe { image_store.buffer.borrow().as_ptr().add(src_stride * y) };
-                        let dst_ptr = unsafe_slice.mut_ptr();
-                        let unsafe_destination_ptr_0 = unsafe { dst_ptr.add(dst_stride * y) };
-                        dispatcher(
-                            dst_width,
-                            src_width,
-                            &weights,
-                            unsafe_source_ptr_0,
-                            src_stride,
-                            unsafe_destination_ptr_0,
-                            dst_stride,
-                        );
+        pool.install(|| {
+            if let Some(dispatcher_4) = dispatcher_4_rows {
+                dst.par_chunks_exact_mut(dst_stride * 4)
+                    .zip(src.par_chunks_exact(src_stride * 4))
+                    .for_each(|(dst, src)| {
+                        dispatcher_4(src, src_stride, dst, dst_stride, &arc_weights);
                     });
-                    yy = y;
-                }
             }
-            for y in yy..destination.height {
-                let weights = arc_weights.clone();
-                scope.spawn(move |_| {
-                    let unsafe_source_ptr_0 =
-                        unsafe { image_store.buffer.borrow().as_ptr().add(src_stride * y) };
-                    let dst_ptr = unsafe_slice.mut_ptr();
-                    let unsafe_destination_ptr_0 = unsafe { dst_ptr.add(dst_stride * y) };
-                    dispatcher_1_row(
-                        dst_width,
-                        src_width,
-                        &weights,
-                        unsafe_source_ptr_0,
-                        unsafe_destination_ptr_0,
-                    );
+
+            let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
+            let src_remainder = src.chunks_exact(src_stride * 4).remainder();
+
+            remainder
+                .par_chunks_exact_mut(dst_stride)
+                .zip(src_remainder.par_chunks_exact(src_stride))
+                .for_each(|(dst, src)| {
+                    dispatcher_1_row(src, dst, &arc_weights);
                 });
-            }
         });
     } else {
-        let mut yy = 0usize;
-        if let Some(dispatcher) = dispatcher_4_rows {
-            while yy + 4 < destination.height {
-                dispatcher(
-                    dst_width,
-                    src_width,
-                    &approx_weights,
-                    unsafe_source_ptr_0,
-                    src_stride,
-                    unsafe_destination_ptr_0,
-                    dst_stride,
-                );
-                unsafe_source_ptr_0 = unsafe { unsafe_source_ptr_0.add(src_stride * 4) };
-                unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride * 4) };
-                yy += 4;
-            }
+        if let Some(dispatcher_4) = dispatcher_4_rows {
+            dst.chunks_exact_mut(dst_stride * 4)
+                .zip(src.chunks_exact(src_stride * 4))
+                .for_each(|(dst, src)| {
+                    dispatcher_4(src, src_stride, dst, dst_stride, &approx_weights);
+                });
         }
 
-        for _ in yy..destination.height {
-            dispatcher_1_row(
-                dst_width,
-                src_width,
-                &approx_weights,
-                unsafe_source_ptr_0,
-                unsafe_destination_ptr_0,
-            );
-            unsafe_source_ptr_0 = unsafe { unsafe_source_ptr_0.add(src_stride) };
-            unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
-        }
+        let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
+        let src_remainder = src.chunks_exact(src_stride * 4).remainder();
+
+        remainder
+            .chunks_exact_mut(dst_stride)
+            .zip(src_remainder.chunks_exact(src_stride))
+            .for_each(|(dst, src)| {
+                dispatcher_1_row(src, dst, &approx_weights);
+            });
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub(crate) fn convolve_vertical_dispatch_u8<'a, const COMPONENTS: usize>(
     image_store: &ImageStore<u8, COMPONENTS>,
     filter_weights: FilterWeights<f32>,

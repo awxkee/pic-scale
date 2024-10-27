@@ -40,7 +40,7 @@ use rayon::slice::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
 
 #[inline]
-fn div_by_255(v: u16) -> u8 {
+pub fn div_by_255(v: u16) -> u8 {
     ((((v + 0x80) >> 8) + v + 0x80) >> 8).min(255) as u8
 }
 

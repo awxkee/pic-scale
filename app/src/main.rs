@@ -19,7 +19,7 @@ fn main() {
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
-    let transient = img.to_rgba8();
+    let transient = img.to_rgb8();
     let mut bytes = Vec::from(transient.as_bytes());
 
     let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
@@ -28,13 +28,12 @@ fn main() {
     let mut choke: Vec<u8> = bytes.iter().map(|&x| x).collect();
 
     let store =
-        ImageStore::<u8, 4>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
+        ImageStore::<u8, 3>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
     let start_time = Instant::now();
-    let resized = scaler.resize_rgba(
+    let resized = scaler.resize_rgb(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
         store,
-        false,
     );
 
     let elapsed_time = start_time.elapsed();
