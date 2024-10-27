@@ -22,7 +22,7 @@ fn main() {
     let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
-    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
     let mut choke: Vec<u8> = bytes.iter().map(|&x| x).collect();
@@ -34,7 +34,7 @@ fn main() {
     let resized = scaler.resize_rgba(
         ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
         store,
-        true,
+        false,
     );
 
     let elapsed_time = start_time.elapsed();

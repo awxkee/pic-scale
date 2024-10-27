@@ -31,6 +31,8 @@ use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::support::PRECISION;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageStore;
+use rayon::iter::{IndexedParallelIterator, ParallelIterator};
+use rayon::prelude::ParallelSliceMut;
 use rayon::ThreadPool;
 use std::sync::Arc;
 
@@ -137,58 +139,40 @@ pub(crate) fn convolve_vertical_dispatch_u8<'a, const COMPONENTS: usize>(
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStore<'a, u8, COMPONENTS>,
     pool: &Option<ThreadPool>,
-    dispatcher: fn(usize, &FilterBounds, *const u8, *mut u8, usize, &[i16]),
+    dispatcher: fn(usize, &FilterBounds, &[u8], &mut [u8], usize, &[i16]),
 ) {
-    let approx_weights = filter_weights.numerical_approximation_i16::<PRECISION>(0);
-
     let src_stride = image_store.width * image_store.channels;
     let dst_stride = destination.width * image_store.channels;
 
     let dst_width = destination.width;
 
     if let Some(pool) = pool {
-        let arc_weights = Arc::new(approx_weights);
-        let borrowed = destination.buffer.borrow_mut();
-        let unsafe_slice = UnsafeSlice::new(borrowed);
-        pool.scope(|scope| {
-            for y in 0..destination.height {
-                let weights = arc_weights.clone();
-                scope.spawn(move |_| {
-                    let bounds = unsafe { weights.bounds.get_unchecked(y) };
-                    let weight_ptr =
-                        unsafe { weights.weights.get_unchecked((weights.aligned_size * y)..) };
-                    let unsafe_source_ptr_0 = image_store.buffer.borrow().as_ptr();
-                    let dst_ptr = unsafe_slice.mut_ptr();
-                    let unsafe_destination_ptr_0 = unsafe { dst_ptr.add(dst_stride * y) };
-                    dispatcher(
-                        dst_width,
-                        bounds,
-                        unsafe_source_ptr_0,
-                        unsafe_destination_ptr_0,
-                        src_stride,
-                        weight_ptr,
-                    );
+        pool.install(|| {
+            let destination_image = destination.buffer.borrow_mut();
+            let approx = filter_weights.numerical_approximation_i16::<PRECISION>(0);
+            destination_image
+                .par_chunks_exact_mut(dst_stride)
+                .enumerate()
+                .for_each(|(y, row)| {
+                    let bounds = filter_weights.bounds[y];
+                    let filter_offset = y * filter_weights.aligned_size;
+                    let weights = &approx.weights[filter_offset..];
+                    let source_buffer = image_store.buffer.borrow();
+                    dispatcher(dst_width, &bounds, source_buffer, row, src_stride, weights);
                 });
-            }
         });
     } else {
-        let unsafe_source_ptr_0 = image_store.buffer.borrow().as_ptr();
-        let mut unsafe_destination_ptr_0 = destination.buffer.borrow_mut().as_mut_ptr();
-        let mut filter_offset = 0usize;
-        for y in 0..destination.height {
-            let bounds = unsafe { approx_weights.bounds.get_unchecked(y) };
-            let weight_ptr = unsafe { approx_weights.weights.get_unchecked(filter_offset..) };
-            dispatcher(
-                dst_width,
-                bounds,
-                unsafe_source_ptr_0,
-                unsafe_destination_ptr_0,
-                src_stride,
-                weight_ptr,
-            );
-
-            filter_offset += approx_weights.aligned_size;
-            unsafe_destination_ptr_0 = unsafe { unsafe_destination_ptr_0.add(dst_stride) };
-        }
+        let destination_image = destination.buffer.borrow_mut();
+        let approx = filter_weights.numerical_approximation_i16::<PRECISION>(0);
+        destination_image
+            .chunks_exact_mut(dst_stride)
+            .enumerate()
+            .for_each(|(y, row)| {
+                let bounds = filter_weights.bounds[y];
+                let filter_offset = y * filter_weights.aligned_size;
+                let weights = &approx.weights[filter_offset..];
+                let source_buffer = image_store.buffer.borrow();
+                dispatcher(dst_width, &bounds, source_buffer, row, src_stride, weights);
+            });
     }
 }

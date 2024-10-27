@@ -259,9 +259,8 @@ pub(crate) fn convolve_column_handler_fixed_point_direct_buffer_four<
 pub(crate) fn column_handler_fixed_point<
     T: Copy + 'static + AsPrimitive<J> + Default,
     J: Copy + 'static + AsPrimitive<T> + Mul<Output = J> + AddAssign + SaturateNarrow<T> + Default,
-    const COMPONENTS: usize,
 >(
-    dst_width: usize,
+    _: usize,
     bounds: &FilterBounds,
     src: &[T],
     dst: &mut [T],
@@ -274,7 +273,7 @@ pub(crate) fn column_handler_fixed_point<
 {
     let mut cx = 0usize;
 
-    let total_width = COMPONENTS * dst_width;
+    let total_width = dst.len();
 
     while cx + 64 < total_width {
         convolve_column_handler_fixed_point_direct_buffer_four::<T, J, 16>(

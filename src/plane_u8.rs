@@ -32,11 +32,11 @@ use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_naive_u8::convolve_horizontal_rgba_native_row;
 use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertical_dispatch_u8};
 use crate::filter_weights::{FilterBounds, FilterWeights};
+use crate::handler_provider::handle_fixed_column_u8;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::convolve_vertical_neon_row;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
 use crate::neon::{convolve_horizontal_plane_neon_row, convolve_horizontal_plane_neon_rows_4_u8};
-use crate::rgb_u8::convolve_vertical_rgb_native_row_u8;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{
     convolve_horizontal_plane_sse_row, convolve_horizontal_plane_sse_rows_4_u8,
@@ -90,30 +90,24 @@ impl VerticalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
         destination: &mut ImageStore<u8, 1>,
         pool: &Option<ThreadPool>,
     ) {
-        let mut _dispatcher: fn(
-            dst_width: usize,
-            bounds: &FilterBounds,
-            unsafe_source_ptr_0: *const u8,
-            unsafe_destination_ptr_0: *mut u8,
-            src_stride: usize,
-            weight_ptr: &[i16],
-        ) = convolve_vertical_rgb_native_row_u8::<u8, i32, 1>;
+        let mut _dispatcher: fn(usize, &FilterBounds, &[u8], &mut [u8], usize, &[i16]) =
+            handle_fixed_column_u8;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            _dispatcher = convolve_vertical_neon_row::<1>;
+            _dispatcher = convolve_vertical_neon_row;
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
             if is_x86_feature_detected!("sse4.1") {
-                _dispatcher = convolve_vertical_sse_row::<1>;
+                _dispatcher = convolve_vertical_sse_row;
             }
             if is_x86_feature_detected!("avx2") {
-                _dispatcher = convolve_vertical_avx_row::<1>;
+                _dispatcher = convolve_vertical_avx_row;
             }
         }
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
         {
-            _dispatcher = wasm_vertical_neon_row::<1>;
+            _dispatcher = wasm_vertical_neon_row;
         }
         convolve_vertical_dispatch_u8(self, filter_weights, destination, pool, _dispatcher);
     }

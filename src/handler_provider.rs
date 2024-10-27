@@ -317,8 +317,19 @@ impl ColumnHandlerFixedPoint<u16> for u16 {
         i32: AsPrimitive<J>,
         i16: AsPrimitive<J>,
     {
-        column_handler_fixed_point::<u16, J, COMPONENTS>(
+        column_handler_fixed_point::<u16, J>(
             dst_width, bounds, src, dst, src_stride, weight, bit_depth,
         );
     }
+}
+
+pub(crate) fn handle_fixed_column_u8(
+    dst_width: usize,
+    bounds: &FilterBounds,
+    src: &[u8],
+    dst: &mut [u8],
+    src_stride: usize,
+    weight: &[i16],
+) {
+    column_handler_fixed_point::<u8, i32>(dst_width, bounds, src, dst, src_stride, weight, 8);
 }

@@ -260,47 +260,47 @@ unsafe fn consume_u8_1(
 }
 
 #[inline]
-pub fn wasm_vertical_neon_row<const CHANNELS: usize>(
-    width: usize,
+pub fn wasm_vertical_neon_row(
+    dst_width: usize,
     bounds: &FilterBounds,
-    unsafe_source_ptr_0: *const u8,
-    unsafe_destination_ptr_0: *mut u8,
+    src: &[u8],
+    dst: &mut [u8],
     src_stride: usize,
-    weight_ptr: &[i16],
+    weight: &[i16],
 ) {
     unsafe {
-        convolve_vertical_neon_row_impl::<CHANNELS>(
-            width,
+        convolve_vertical_neon_row_impl(
+            dst_width,
             bounds,
-            unsafe_source_ptr_0,
-            unsafe_destination_ptr_0,
+            src,
+            dst,
             src_stride,
-            weight_ptr,
+            weight,
         );
     }
 }
 
 #[inline]
 #[target_feature(enable = "simd128")]
-unsafe fn convolve_vertical_neon_row_impl<const CHANNELS: usize>(
-    width: usize,
+unsafe fn convolve_vertical_neon_row_impl(
+    _: usize,
     bounds: &FilterBounds,
-    unsafe_source_ptr_0: *const u8,
-    unsafe_destination_ptr_0: *mut u8,
+    src: &[u8],
+    dst: &mut [u8],
     src_stride: usize,
-    weight_ptr: &[i16],
+    weight: &[i16],
 ) {
     let mut cx = 0usize;
-    let dst_width = width * CHANNELS;
+    let dst_width = dst.len();
 
     while cx + 32 < dst_width {
         consume_u8_32(
             bounds.start,
             cx,
-            unsafe_source_ptr_0,
+            src.as_ptr(),
             src_stride,
-            unsafe_destination_ptr_0,
-            weight_ptr,
+            dst.as_mut_ptr(),
+            weight,
             bounds,
         );
 
@@ -311,10 +311,10 @@ unsafe fn convolve_vertical_neon_row_impl<const CHANNELS: usize>(
         consume_u8_16(
             bounds.start,
             cx,
-            unsafe_source_ptr_0,
+            src.as_ptr(),
             src_stride,
-            unsafe_destination_ptr_0,
-            weight_ptr,
+            dst.as_mut_ptr(),
+            weight,
             bounds,
         );
 
@@ -325,10 +325,10 @@ unsafe fn convolve_vertical_neon_row_impl<const CHANNELS: usize>(
         consume_u8_8(
             bounds.start,
             cx,
-            unsafe_source_ptr_0,
+            src.as_ptr(),
             src_stride,
-            unsafe_destination_ptr_0,
-            weight_ptr,
+            dst.as_mut_ptr(),
+            weight,
             bounds,
         );
 
@@ -339,10 +339,10 @@ unsafe fn convolve_vertical_neon_row_impl<const CHANNELS: usize>(
         consume_u8_1(
             bounds.start,
             cx,
-            unsafe_source_ptr_0,
+            src.as_ptr(),
             src_stride,
-            unsafe_destination_ptr_0,
-            weight_ptr,
+            dst.as_mut_ptr(),
+            weight,
             bounds,
         );
         cx += 1;

@@ -38,9 +38,9 @@ use crate::support::{PRECISION, ROUNDING_CONST};
 pub(crate) unsafe fn convolve_vertical_part_sse_32(
     start_y: usize,
     start_x: usize,
-    src: *const u8,
+    src: &[u8],
+    dst: &mut [u8],
     src_stride: usize,
-    dst: *mut u8,
     filter: &[i16],
     bounds: &FilterBounds,
 ) {
@@ -63,12 +63,10 @@ pub(crate) unsafe fn convolve_vertical_part_sse_32(
         let py = start_y + jj;
         let f_ptr = filter.get_unchecked(jj..).as_ptr() as *const i32;
         let v_weight_2 = _mm_set1_epi32(f_ptr.read_unaligned());
-        let src_ptr = src.add(src_stride * py);
+        let src_ptr = src.get_unchecked((src_stride * py + px)..);
+        let s_ptr_next = src_ptr.as_ptr().add(src_stride);
 
-        let s_ptr = src_ptr.add(px);
-        let s_ptr_next = s_ptr.add(src_stride);
-
-        let item_row_0 = _mm_loadu_si128(s_ptr as *const __m128i);
+        let item_row_0 = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
         let item_row_1 = _mm_loadu_si128(s_ptr_next as *const __m128i);
 
         let interleaved = _mm_unpacklo_epi8(item_row_0, item_row_1);
@@ -83,7 +81,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_32(
         let pix = _mm_unpackhi_epi8(interleaved, zeros);
         store_3 = _mm_add_epi32(store_3, _mm_madd_epi16(pix, v_weight_2));
 
-        let item_row_0 = _mm_loadu_si128(s_ptr.add(16) as *const __m128i);
+        let item_row_0 = _mm_loadu_si128(src_ptr.as_ptr().add(16) as *const __m128i);
         let item_row_1 = _mm_loadu_si128(s_ptr_next.add(16) as *const __m128i);
 
         let interleaved = _mm_unpacklo_epi8(item_row_0, item_row_1);
@@ -105,11 +103,9 @@ pub(crate) unsafe fn convolve_vertical_part_sse_32(
         let py = start_y + j;
         let weight = *filter.get_unchecked(j);
         let v_weight = _mm_set1_epi32(weight as i32);
-        let src_ptr = src.add(src_stride * py);
-
-        let s_ptr = src_ptr.add(px);
-        let item_row_0 = _mm_loadu_si128(s_ptr as *const __m128i);
-        let item_row_1 = _mm_loadu_si128(s_ptr.add(16) as *const __m128i);
+        let src_ptr = src.get_unchecked((src_stride * py + px)..);
+        let item_row_0 = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
+        let item_row_1 = _mm_loadu_si128(src_ptr.as_ptr().add(16) as *const __m128i);
 
         let interleaved = _mm_unpacklo_epi8(item_row_0, zeros);
         let pix = _mm_unpacklo_epi8(interleaved, zeros);
@@ -149,24 +145,24 @@ pub(crate) unsafe fn convolve_vertical_part_sse_32(
     let rgb2 = _mm_packs_epi32(store_2, store_3);
     let rgb = _mm_packus_epi16(rgb0, rgb2);
 
-    let dst_ptr = dst.add(px);
-    _mm_storeu_si128(dst_ptr as *mut __m128i, rgb);
+    let dst_ptr = dst.get_unchecked_mut(px..);
+    _mm_storeu_si128(dst_ptr.as_mut_ptr() as *mut __m128i, rgb);
 
     let rgb0 = _mm_packs_epi32(store_4, store_5);
     let rgb2 = _mm_packs_epi32(store_6, store_7);
     let rgb = _mm_packus_epi16(rgb0, rgb2);
 
-    let dst_ptr = dst.add(px + 16);
-    _mm_storeu_si128(dst_ptr as *mut __m128i, rgb);
+    let dst_ptr = dst.get_unchecked_mut((px + 16)..);
+    _mm_storeu_si128(dst_ptr.as_mut_ptr() as *mut __m128i, rgb);
 }
 
 #[inline(always)]
 pub(crate) unsafe fn convolve_vertical_part_sse_16(
     start_y: usize,
     start_x: usize,
-    src: *const u8,
+    src: &[u8],
+    dst: &mut [u8],
     src_stride: usize,
-    dst: *mut u8,
     filter: &[i16],
     bounds: &FilterBounds,
 ) {
@@ -184,10 +180,8 @@ pub(crate) unsafe fn convolve_vertical_part_sse_16(
         let py = start_y + j;
         let weight = unsafe { *filter.get_unchecked(j) };
         let v_weight = _mm_set1_epi32(weight as i32);
-        let src_ptr = src.add(src_stride * py);
-
-        let s_ptr = src_ptr.add(px);
-        let item_row = _mm_loadu_si128(s_ptr as *const __m128i);
+        let src_ptr = src.get_unchecked((src_stride * py + px)..);
+        let item_row = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
 
         let interleaved = _mm_unpacklo_epi8(item_row, zeros);
         let pix = _mm_unpacklo_epi8(interleaved, zeros);
@@ -218,17 +212,17 @@ pub(crate) unsafe fn convolve_vertical_part_sse_16(
 
     let item = _mm_packus_epi16(low_16, high_16);
 
-    let dst_ptr = dst.add(px);
-    _mm_storeu_si128(dst_ptr as *mut __m128i, item);
+    let dst_ptr = dst.get_unchecked_mut(px..);
+    _mm_storeu_si128(dst_ptr.as_mut_ptr() as *mut __m128i, item);
 }
 
 #[inline(always)]
 pub(crate) unsafe fn convolve_vertical_part_sse_8(
     start_y: usize,
     start_x: usize,
-    src: *const u8,
+    src: &[u8],
+    dst: &mut [u8],
     src_stride: usize,
-    dst: *mut u8,
     filter: &[i16],
     bounds: &FilterBounds,
 ) {
@@ -244,10 +238,8 @@ pub(crate) unsafe fn convolve_vertical_part_sse_8(
         let py = start_y + j;
         let weight = unsafe { *filter.get_unchecked(j) };
         let v_weight = _mm_set1_epi32(weight as i32);
-        let src_ptr = src.add(src_stride * py);
-
-        let s_ptr = src_ptr.add(px);
-        let item_row = _mm_loadu_si64(s_ptr);
+        let src_ptr = src.get_unchecked((src_stride * py + px)..);
+        let item_row = _mm_loadu_si64(src_ptr.as_ptr());
 
         let low = _mm_cvtepu8_epi16(item_row);
         store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(_mm_cvtepi16_epi32(low), v_weight));
@@ -267,17 +259,17 @@ pub(crate) unsafe fn convolve_vertical_part_sse_8(
 
     let item = _mm_packus_epi16(low_16, low_16);
 
-    let dst_ptr = dst.add(px);
-    std::ptr::copy_nonoverlapping(&item as *const _ as *const u8, dst_ptr, 8);
+    let dst_ptr = dst.get_unchecked_mut(px..);
+    std::ptr::copy_nonoverlapping(&item as *const _ as *const u8, dst_ptr.as_mut_ptr(), 8);
 }
 
 #[inline(always)]
 pub(crate) unsafe fn convolve_vertical_part_sse(
     start_y: usize,
     start_x: usize,
-    src: *const u8,
+    src: &[u8],
+    dst: &mut [u8],
     src_stride: usize,
-    dst: *mut u8,
     filter: &[i16],
     bounds: &FilterBounds,
 ) {
@@ -292,10 +284,8 @@ pub(crate) unsafe fn convolve_vertical_part_sse(
         let py = start_y + j;
         let weight = unsafe { *filter.get_unchecked(j) };
         let v_weight = _mm_set1_epi32(weight as i32);
-        let src_ptr = src.add(src_stride * py);
-
-        let s_ptr = src_ptr.add(px);
-        let item_row = _mm_setr_epi32(s_ptr.read_unaligned() as i32, 0, 0, 0);
+        let src_ptr = src.get_unchecked((src_stride * py + px)..);
+        let item_row = _mm_setr_epi32(*src_ptr.get_unchecked(0) as i32, 0, 0, 0);
 
         store = _mm_add_epi32(store, _mm_mullo_epi32(item_row, v_weight));
     }
@@ -308,54 +298,39 @@ pub(crate) unsafe fn convolve_vertical_part_sse(
 
     let item = _mm_packus_epi16(low_16, low_16);
 
-    let dst_ptr = dst.add(px);
-    dst_ptr.write_unaligned(_mm_extract_epi8::<0>(item) as u8);
+    let dst_ptr = dst.get_unchecked_mut(px);
+    *dst_ptr = _mm_extract_epi8::<0>(item) as u8;
 }
 
-pub fn convolve_vertical_sse_row<const CHANNELS: usize>(
-    width: usize,
+pub fn convolve_vertical_sse_row(
+    dst_width: usize,
     bounds: &FilterBounds,
-    unsafe_source_ptr_0: *const u8,
-    unsafe_destination_ptr_0: *mut u8,
+    src: &[u8],
+    dst: &mut [u8],
     src_stride: usize,
-    weight_ptr: &[i16],
+    weights: &[i16],
 ) {
     unsafe {
-        convolve_vertical_sse_row_impl::<CHANNELS>(
-            width,
-            bounds,
-            unsafe_source_ptr_0,
-            unsafe_destination_ptr_0,
-            src_stride,
-            weight_ptr,
-        );
+        convolve_vertical_sse_row_impl(dst_width, bounds, src, dst, src_stride, weights);
     }
 }
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
-unsafe fn convolve_vertical_sse_row_impl<const CHANNELS: usize>(
-    width: usize,
+unsafe fn convolve_vertical_sse_row_impl(
+    _: usize,
     bounds: &FilterBounds,
-    unsafe_source_ptr_0: *const u8,
-    unsafe_destination_ptr_0: *mut u8,
+    src: &[u8],
+    dst: &mut [u8],
     src_stride: usize,
-    weight_ptr: &[i16],
+    weights: &[i16],
 ) {
     let mut cx = 0usize;
-    let total_width = width * CHANNELS;
+    let total_width = dst.len();
 
     while cx + 32 < total_width {
         unsafe {
-            convolve_vertical_part_sse_32(
-                bounds.start,
-                cx,
-                unsafe_source_ptr_0,
-                src_stride,
-                unsafe_destination_ptr_0,
-                weight_ptr,
-                bounds,
-            );
+            convolve_vertical_part_sse_32(bounds.start, cx, src, dst, src_stride, weights, bounds);
         }
 
         cx += 32;
@@ -363,15 +338,7 @@ unsafe fn convolve_vertical_sse_row_impl<const CHANNELS: usize>(
 
     while cx + 16 < total_width {
         unsafe {
-            convolve_vertical_part_sse_16(
-                bounds.start,
-                cx,
-                unsafe_source_ptr_0,
-                src_stride,
-                unsafe_destination_ptr_0,
-                weight_ptr,
-                bounds,
-            );
+            convolve_vertical_part_sse_16(bounds.start, cx, src, dst, src_stride, weights, bounds);
         }
 
         cx += 16;
@@ -379,15 +346,7 @@ unsafe fn convolve_vertical_sse_row_impl<const CHANNELS: usize>(
 
     while cx + 8 < total_width {
         unsafe {
-            convolve_vertical_part_sse_8(
-                bounds.start,
-                cx,
-                unsafe_source_ptr_0,
-                src_stride,
-                unsafe_destination_ptr_0,
-                weight_ptr,
-                bounds,
-            );
+            convolve_vertical_part_sse_8(bounds.start, cx, src, dst, src_stride, weights, bounds);
         }
 
         cx += 8;
@@ -395,15 +354,7 @@ unsafe fn convolve_vertical_sse_row_impl<const CHANNELS: usize>(
 
     while cx < total_width {
         unsafe {
-            convolve_vertical_part_sse(
-                bounds.start,
-                cx,
-                unsafe_source_ptr_0,
-                src_stride,
-                unsafe_destination_ptr_0,
-                weight_ptr,
-                bounds,
-            );
+            convolve_vertical_part_sse(bounds.start, cx, src, dst, src_stride, weights, bounds);
         }
 
         cx += 1;
