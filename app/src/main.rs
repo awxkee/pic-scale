@@ -3,6 +3,8 @@ mod split;
 
 use std::time::Instant;
 
+use crate::merge::merge_channels_3;
+use crate::split::split_channels_3;
 use fast_image_resize::images::Image;
 use fast_image_resize::{
     CpuExtensions, FilterType, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
@@ -32,7 +34,7 @@ fn main() {
             .unwrap();
     let start_time = Instant::now();
     let resized = scaler.resize_rgb(
-        ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
+        ImageSize::new(dimensions.0 as usize / 7, dimensions.1 as usize / 5),
         store,
     );
 
@@ -40,7 +42,7 @@ fn main() {
     // Print the elapsed time in milliseconds
     println!("Scaler: {:.2?}", elapsed_time);
 
-    let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| x).collect::<Vec<_>>();
+    // let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| x).collect::<Vec<_>>();
     // println!("f1 {}, f2 {}, f3 {}, f4 {}", dst[0], dst[1], dst[2], dst[3]);
     // let dst: Vec<u8> = resized
     //     .as_bytes()
@@ -61,21 +63,21 @@ fn main() {
     // );
     //
     // let store =
-    //     ImageStore::<u8, 1>::from_slice(&mut r_chan, dimensions.0 as usize, dimensions.1 as usize);
+    //     ImageStore::<u8, 1>::from_slice(&mut r_chan, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     // let resized = scaler.resize_plane(
     //     ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
     //     store,
     // );
     //
     // let store1 =
-    //     ImageStore::<u8, 1>::from_slice(&mut g_chan, dimensions.0 as usize, dimensions.1 as usize);
+    //     ImageStore::<u8, 1>::from_slice(&mut g_chan, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     // let resized1 = scaler.resize_plane(
     //     ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
     //     store1,
     // );
     //
     // let store2 =
-    //     ImageStore::<u8, 1>::from_slice(&mut b_chan, dimensions.0 as usize, dimensions.1 as usize);
+    //     ImageStore::<u8, 1>::from_slice(&mut b_chan, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     // let resized2 = scaler.resize_plane(
     //     ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
     //     store2,
@@ -101,7 +103,7 @@ fn main() {
 
     // let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 2) as u8).collect();
     //
-    // let dst = resized.as_bytes();
+    let dst = resized.as_bytes();
 
     if resized.channels == 4 {
         image::save_buffer(

@@ -94,8 +94,8 @@ Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 ima
 
 | Lanczos3  |  AVX  | NEON  |
 |-----------|:-----:|:-----:|
-| pic-scale | 16.67 | 16.48 |
-| fir       | 22.83 | 32.77 |
+| pic-scale | 16.67 | 10.88 |
+| fir       | 22.83 | 24.97 |
 
 Example comparison time for downscale RGBA 4928x3279 image in two times with premultiplying alpha.
 

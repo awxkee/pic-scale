@@ -68,8 +68,7 @@ pub(crate) fn convolve_horizontal_dispatch_u8<const CHANNELS: usize>(
                 src_rem = src_rem.chunks_exact(src_stride * 4).remainder();
             }
 
-            rem
-                .par_chunks_exact_mut(dst_stride)
+            rem.par_chunks_exact_mut(dst_stride)
                 .zip(src_rem.par_chunks_exact(src_stride))
                 .for_each(|(dst, src)| {
                     dispatcher_1_row(src, dst, &arc_weights);
@@ -89,8 +88,7 @@ pub(crate) fn convolve_horizontal_dispatch_u8<const CHANNELS: usize>(
             src_rem = src_rem.chunks_exact(src_stride * 4).remainder();
         }
 
-        rem
-            .chunks_exact_mut(dst_stride)
+        rem.chunks_exact_mut(dst_stride)
             .zip(src_rem.chunks_exact(src_stride))
             .for_each(|(dst, src)| {
                 dispatcher_1_row(src, dst, &approx_weights);

@@ -113,9 +113,7 @@ impl ColumnHandlerFloatingPoint<u16, f32, f32> for u16 {
         weight: &[f32],
         bit_depth: u32,
     ) {
-        convolve_column_u16(
-            dst_width, bounds, src, dst, src_stride, weight, bit_depth,
-        )
+        convolve_column_u16(dst_width, bounds, src, dst, src_stride, weight, bit_depth)
     }
 }
 
