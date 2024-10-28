@@ -104,19 +104,17 @@ pub fn sse_premultiply_alpha_rgba(
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn sse_premultiply_alpha_rgba_impl_row(
-    dst: &mut [u8],
-    src: &[u8],
-    width: usize,
-    offset: usize,
-) {
-    let mut _cx = 0usize;
+unsafe fn sse_premultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8]) {
+    let mut rem = dst;
+    let mut src_rem = src;
 
     unsafe {
         let zeros = _mm_setzero_si128();
-        while _cx + 16 < width {
-            let px = _cx * 4;
-            let src_ptr = src.as_ptr().add(offset + px);
+        for (dst, src) in rem
+            .chunks_exact_mut(16 * 4)
+            .zip(src_rem.chunks_exact(16 * 4))
+        {
+            let src_ptr = src.as_ptr();
             let rgba0 = _mm_loadu_si128(src_ptr as *const __m128i);
             let rgba1 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
             let rgba2 = _mm_loadu_si128(src_ptr.add(32) as *const __m128i);
@@ -148,19 +146,26 @@ unsafe fn sse_premultiply_alpha_rgba_impl_row(
 
             let (rgba0, rgba1, rgba2, rgba3) = sse_interleave_rgba(rrr, ggg, bbb, aaa);
 
-            let dst_ptr = dst.as_mut_ptr().add(offset + px);
+            let dst_ptr = dst.as_mut_ptr();
             _mm_storeu_si128(dst_ptr as *mut __m128i, rgba0);
             _mm_storeu_si128(dst_ptr.add(16) as *mut __m128i, rgba1);
             _mm_storeu_si128(dst_ptr.add(32) as *mut __m128i, rgba2);
             _mm_storeu_si128(dst_ptr.add(48) as *mut __m128i, rgba3);
-
-            _cx += 16;
         }
+
+        rem = rem.chunks_exact_mut(16 * 4).into_remainder();
+        src_rem = src_rem.chunks_exact(16 * 4).remainder();
     }
 
-    for x in _cx..width {
-        let px = x * 4;
-        premultiply_pixel!(dst, src, offset + px);
+    for (dst, src) in rem.chunks_exact_mut(4).zip(src_rem.chunks_exact(4)) {
+        let a = src[3];
+        if a != 0 {
+            let a_recip = 1. / a as f32;
+            dst[0] = ((src[0] as f32 * 255.) * a_recip) as u8;
+            dst[1] = ((src[1] as f32 * 255.) * a_recip) as u8;
+            dst[2] = ((src[2] as f32 * 255.) * a_recip) as u8;
+            dst[3] = ((a as f32 * 255.) * a_recip) as u8;
+        }
     }
 }
 
@@ -178,7 +183,7 @@ unsafe fn sse_premultiply_alpha_rgba_impl(
             src.par_chunks_exact(width * 4)
                 .zip(dst.par_chunks_exact_mut(width * 4))
                 .for_each(|(src, dst)| unsafe {
-                    sse_premultiply_alpha_rgba_impl_row(dst, src, width, 0);
+                    sse_premultiply_alpha_rgba_impl_row(dst, src);
                 });
         });
     } else {
@@ -187,7 +192,7 @@ unsafe fn sse_premultiply_alpha_rgba_impl(
             .zip(src.chunks_exact(4 * width))
         {
             unsafe {
-                sse_premultiply_alpha_rgba_impl_row(dst_row, src_row, width, 0);
+                sse_premultiply_alpha_rgba_impl_row(dst_row, src_row);
             }
         }
     }
@@ -206,19 +211,12 @@ pub fn sse_unpremultiply_alpha_rgba(
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn sse_unpremultiply_alpha_rgba_impl_row(
-    dst: &mut [u8],
-    src: &[u8],
-    width: usize,
-    offset: usize,
-) {
-    let mut _cx = 0usize;
-
+unsafe fn sse_unpremultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8]) {
+    let mut rem = dst;
+    let mut src_rem = src;
     unsafe {
-        while _cx + 16 < width {
-            let px = _cx * 4;
-            let pixel_offset = offset + px;
-            let src_ptr = src.as_ptr().add(pixel_offset);
+        for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
+            let src_ptr = src.as_ptr();
             let rgba0 = _mm_loadu_si128(src_ptr as *const __m128i);
             let rgba1 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
             let rgba2 = _mm_loadu_si128(src_ptr.add(32) as *const __m128i);
@@ -231,20 +229,26 @@ unsafe fn sse_unpremultiply_alpha_rgba_impl_row(
 
             let (rgba0, rgba1, rgba2, rgba3) = sse_interleave_rgba(rrr, ggg, bbb, aaa);
 
-            let dst_ptr = dst.as_mut_ptr().add(offset + px);
+            let dst_ptr = dst.as_mut_ptr();
             _mm_storeu_si128(dst_ptr as *mut __m128i, rgba0);
             _mm_storeu_si128(dst_ptr.add(16) as *mut __m128i, rgba1);
             _mm_storeu_si128(dst_ptr.add(32) as *mut __m128i, rgba2);
             _mm_storeu_si128(dst_ptr.add(48) as *mut __m128i, rgba3);
-
-            _cx += 16;
         }
+
+        rem = rem.chunks_exact_mut(8 * 4).into_remainder();
+        src_rem = src_rem.chunks_exact(8 * 4).remainder();
     }
 
-    for x in _cx..width {
-        let px = x * 4;
-        let pixel_offset = offset + px;
-        unpremultiply_pixel!(dst, src, pixel_offset);
+    for (dst, src) in rem.chunks_exact_mut(4).zip(src_rem.chunks_exact(4)) {
+        let a = src[3];
+        if a != 0 {
+            let a_recip = 1. / a as f32;
+            dst[0] = ((src[0] as f32 * 255.) * a_recip) as u8;
+            dst[1] = ((src[1] as f32 * 255.) * a_recip) as u8;
+            dst[2] = ((src[2] as f32 * 255.) * a_recip) as u8;
+            dst[3] = ((a as f32 * 255.) * a_recip) as u8;
+        }
     }
 }
 
@@ -261,7 +265,7 @@ unsafe fn sse_unpremultiply_alpha_rgba_impl(
             src.par_chunks_exact(width * 4)
                 .zip(dst.par_chunks_exact_mut(width * 4))
                 .for_each(|(src, dst)| unsafe {
-                    sse_unpremultiply_alpha_rgba_impl_row(dst, src, width, 0);
+                    sse_unpremultiply_alpha_rgba_impl_row(dst, src);
                 });
         });
     } else {
@@ -270,7 +274,7 @@ unsafe fn sse_unpremultiply_alpha_rgba_impl(
             .zip(src.chunks_exact(4 * width))
         {
             unsafe {
-                sse_unpremultiply_alpha_rgba_impl_row(dst_row, src_row, width, 0);
+                sse_unpremultiply_alpha_rgba_impl_row(dst_row, src_row);
             }
         }
     }

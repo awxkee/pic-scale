@@ -26,11 +26,25 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#![forbid(unsafe_code)]
 use num_traits::AsPrimitive;
 use std::ops::{AddAssign, BitXor};
 
+pub(crate) fn has_non_constant_cap_alpha_rgba8(store: &[u8], width: usize) -> bool {
+    has_non_constant_cap_alpha::<u8, u32, 3, 4>(store, width, 8)
+}
+
+pub(crate) fn has_non_constant_cap_alpha_rgba16(
+    store: &[u16],
+    width: usize,
+    bit_depth: u32,
+) -> bool {
+    has_non_constant_cap_alpha::<u16, u64, 3, 4>(store, width, bit_depth)
+}
+
 pub(crate) fn has_non_constant_cap_alpha<
-    V: Copy + PartialEq + BitXor<V, Output = V> + AddAssign + 'static + AsPrimitive<u32>,
+    V: Copy + PartialEq + BitXor<V, Output = V> + 'static + AsPrimitive<J> + 'static,
+    J: Copy + AddAssign + Default + 'static + Eq + Ord,
     const ALPHA_CHANNEL_INDEX: usize,
     const CHANNELS: usize,
 >(
@@ -40,7 +54,7 @@ pub(crate) fn has_non_constant_cap_alpha<
 ) -> bool
 where
     i32: AsPrimitive<V>,
-    u32: AsPrimitive<V>,
+    u32: AsPrimitive<V> + AsPrimitive<J>,
 {
     assert!(ALPHA_CHANNEL_INDEX < CHANNELS);
     assert!(CHANNELS <= 4);
@@ -51,7 +65,7 @@ where
     if max != store[ALPHA_CHANNEL_INDEX] {
         return true;
     }
-    let mut row_sums: u32 = 0u32;
+    let mut row_sums: J = 0u32.as_();
     for row in store.chunks_exact(width * CHANNELS) {
         for color in row.chunks_exact(CHANNELS) {
             row_sums += color[ALPHA_CHANNEL_INDEX].bitxor(max).as_();

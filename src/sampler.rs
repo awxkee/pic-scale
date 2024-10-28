@@ -268,16 +268,16 @@ impl ResamplingFunction {
                 // Just a stab for nearest
                 ResamplingFilter::new(bilinear, 2f32, false)
             }
-            ResamplingFunction::Cubic => ResamplingFilter::new(cubic_spline::<T>, 2f32, false),
+            ResamplingFunction::Cubic => ResamplingFilter::new(cubic_spline, 2f32, false),
             ResamplingFunction::MitchellNetravalli => {
-                ResamplingFilter::new(mitchell_netravalli::<T>, 2f32, false)
+                ResamplingFilter::new(mitchell_netravalli, 2f32, false)
             }
             ResamplingFunction::Lanczos3 => ResamplingFilter::new(lanczos3, 3f32, false),
-            ResamplingFunction::CatmullRom => ResamplingFilter::new(catmull_rom::<T>, 2f32, false),
-            ResamplingFunction::Hermite => ResamplingFilter::new(hermite_spline::<T>, 2f32, false),
-            ResamplingFunction::BSpline => ResamplingFilter::new(b_spline::<T>, 2f32, false),
+            ResamplingFunction::CatmullRom => ResamplingFilter::new(catmull_rom, 2f32, false),
+            ResamplingFunction::Hermite => ResamplingFilter::new(hermite_spline, 2f32, false),
+            ResamplingFunction::BSpline => ResamplingFilter::new(b_spline, 2f32, false),
             ResamplingFunction::Hann => ResamplingFilter::new(hann, 3f32, false),
-            ResamplingFunction::Bicubic => ResamplingFilter::new(bicubic_spline::<T>, 2f32, false),
+            ResamplingFunction::Bicubic => ResamplingFilter::new(bicubic_spline, 2f32, false),
             ResamplingFunction::Lanczos4 => ResamplingFilter::new(lanczos4, 4f32, false),
             ResamplingFunction::Lanczos2 => ResamplingFilter::new(lanczos2, 2f32, false),
             ResamplingFunction::Hamming => ResamplingFilter::new(hamming, 2f32, false),
@@ -294,13 +294,11 @@ impl ResamplingFunction {
             ResamplingFunction::Gaussian => ResamplingFilter::new(gaussian, 2f32, false),
             ResamplingFunction::Sphinx => ResamplingFilter::new(sphinx, 2f32, false),
             ResamplingFunction::Bartlett => ResamplingFilter::new(bartlett, 2f32, false),
-            ResamplingFunction::Robidoux => ResamplingFilter::new(robidoux::<T>, 2f32, false),
-            ResamplingFunction::EwaRobidoux => ResamplingFilter::new(robidoux::<T>, 2f32, true),
-            ResamplingFunction::RobidouxSharp => {
-                ResamplingFilter::new(robidoux_sharp::<T>, 2f32, false)
-            }
+            ResamplingFunction::Robidoux => ResamplingFilter::new(robidoux, 2f32, false),
+            ResamplingFunction::EwaRobidoux => ResamplingFilter::new(robidoux, 2f32, true),
+            ResamplingFunction::RobidouxSharp => ResamplingFilter::new(robidoux_sharp, 2f32, false),
             ResamplingFunction::EwaRobidouxSharp => {
-                ResamplingFilter::new(robidoux_sharp::<T>, 2f32, true)
+                ResamplingFilter::new(robidoux_sharp, 2f32, true)
             }
             ResamplingFunction::Spline16 => {
                 ResamplingFilter::new_with_fixed_kernel(spline16, 2f32, false)

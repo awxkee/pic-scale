@@ -27,16 +27,19 @@ fn main() {
     let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
-    let mut choke: Vec<u8> = bytes.iter().map(|&x| x).collect();
+    let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 2).collect();
 
     let store =
-        ImageStore::<u8, 3>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
+        ImageStore::<u16, 3>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
     let start_time = Instant::now();
-    let resized = scaler.resize_rgb(
-        ImageSize::new(dimensions.0 as usize / 7, dimensions.1 as usize / 5),
-        store,
-    );
+    let resized = scaler
+        .resize_rgb_u16(
+            ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
+            store,
+            10,
+        )
+        .unwrap();
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
@@ -101,9 +104,9 @@ fn main() {
     //     .map(|&x| (x * 255f32) as u8)
     //     .collect();
 
-    // let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 2) as u8).collect();
+    let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 2) as u8).collect();
     //
-    let dst = resized.as_bytes();
+    // let dst = resized.as_bytes();
 
     if resized.channels == 4 {
         image::save_buffer(

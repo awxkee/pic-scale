@@ -163,6 +163,16 @@ where
             bit_depth: 0,
         })
     }
+
+    pub fn copied<'b>(&self) -> ImageStore<'b, T, N> {
+        ImageStore::<T, N> {
+            buffer: BufferStore::Owned(self.buffer.borrow().to_vec()),
+            channels: N,
+            width: self.width,
+            height: self.height,
+            bit_depth: self.bit_depth,
+        }
+    }
 }
 
 impl ImageStore<'_, u8, 4> {

@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#![forbid(unsafe_code)]
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::dispatch_group_u16::{convolve_horizontal_dispatch_u16, convolve_vertical_dispatch_u16};
 use crate::filter_weights::FilterWeights;

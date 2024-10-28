@@ -26,14 +26,14 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::alpha_check::has_non_constant_cap_alpha;
+use crate::alpha_check::{has_non_constant_cap_alpha_rgba16, has_non_constant_cap_alpha_rgba8};
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::image_size::ImageSize;
 use crate::image_store::ImageStore;
 use crate::nearest_sampler::resize_nearest;
+use crate::support::check_image_size_overflow;
 use crate::threading_policy::ThreadingPolicy;
-use crate::ResamplingFunction::Nearest;
 use crate::{ConstPI, ConstSqrt2, Jinc, ResamplingFunction};
 use num_traits::{AsPrimitive, Float, Signed};
 use rayon::ThreadPool;
@@ -51,7 +51,11 @@ pub trait Scaling {
     fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy);
 
     /// Performs rescaling for RGB, channel order does not matter
-    fn resize_rgb(&self, new_size: ImageSize, store: ImageStore<u8, 3>) -> ImageStore<u8, 3>;
+    fn resize_rgb(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<u8, 3>,
+    ) -> Result<ImageStore<u8, 3>, String>;
 
     /// Performs rescaling for RGBA, for pre-multiplying alpha, converting to LUV or LAB alpha must be last channel
     fn resize_rgba(
@@ -59,12 +63,16 @@ pub trait Scaling {
         new_size: ImageSize,
         store: ImageStore<u8, 4>,
         premultiply_alpha: bool,
-    ) -> ImageStore<u8, 4>;
+    ) -> Result<ImageStore<u8, 4>, String>;
 }
 
 pub trait ScalingF32 {
     /// Performs rescaling for RGB f32, channel order does not matter
-    fn resize_rgb_f32(&self, new_size: ImageSize, store: ImageStore<f32, 3>) -> ImageStore<f32, 3>;
+    fn resize_rgb_f32(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<f32, 3>,
+    ) -> Result<ImageStore<f32, 3>, String>;
 
     /// Performs rescaling for RGBA f32, alpha expected to be last
     fn resize_rgba_f32(
@@ -72,7 +80,7 @@ pub trait ScalingF32 {
         new_size: ImageSize,
         store: ImageStore<f32, 4>,
         premultiply_alpha: bool,
-    ) -> ImageStore<f32, 4>;
+    ) -> Result<ImageStore<f32, 4>, String>;
 }
 
 pub trait ScalingU16 {
@@ -90,7 +98,7 @@ pub trait ScalingU16 {
         new_size: ImageSize,
         store: ImageStore<u16, 1>,
         bit_depth: usize,
-    ) -> ImageStore<u16, 1>;
+    ) -> Result<ImageStore<u16, 1>, String>;
 
     /// Performs rescaling for RGB, channel order does not matter
     ///
@@ -106,7 +114,7 @@ pub trait ScalingU16 {
         new_size: ImageSize,
         store: ImageStore<u16, 3>,
         bit_depth: usize,
-    ) -> ImageStore<u16, 3>;
+    ) -> Result<ImageStore<u16, 3>, String>;
 
     /// Performs rescaling for RGBA, for pre-multiplying alpha should be last
     ///
@@ -124,7 +132,7 @@ pub trait ScalingU16 {
         store: ImageStore<u16, 4>,
         bit_depth: usize,
         premultiply_alpha: bool,
-    ) -> ImageStore<u16, 4>;
+    ) -> Result<ImageStore<u16, 4>, String>;
 }
 
 impl Scaler {
@@ -167,7 +175,6 @@ impl Scaler {
         let resampling_function = resampling_filter.kernel;
         let window_func = resampling_filter.window;
         let base_size: usize = (filter_base_size.as_() * filter_scale_cutoff).round().as_();
-        // Kernel size must be always odd
         let kernel_size = base_size;
         let filter_radius = base_size.as_() / 2.as_();
         let filter_scale = 1f32.as_() / filter_scale_cutoff;
@@ -287,9 +294,25 @@ impl Scaler {
         store: ImageStore<u8, 4>,
         premultiply_alpha: bool,
         pool: &Option<ThreadPool>,
-    ) -> ImageStore<u8, 4> {
+    ) -> Result<ImageStore<u8, 4>, String> {
+        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
+            return Err("One of image dimensions is 0, this should not happen".to_string());
+        }
+
+        if check_image_size_overflow(store.width, store.height, store.channels) {
+            return Err("Input image larger than memory capabilities".to_string());
+        }
+
+        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
+            return Err("Destination image larger than memory capabilities".to_string());
+        }
+
+        if store.width == new_size.width && store.height == new_size.height {
+            return Ok(store.copied());
+        }
+
         let mut src_store = store;
-        if self.function == Nearest {
+        if self.function == ResamplingFunction::Nearest {
             let mut new_image = ImageStore::<u8, 4>::alloc(new_size.width, new_size.height);
             resize_nearest::<u8, 4>(
                 src_store.buffer.borrow(),
@@ -300,17 +323,14 @@ impl Scaler {
                 new_size.height,
                 pool,
             );
-            return new_image;
+            return Ok(new_image);
         }
 
         let mut has_alpha_premultiplied = false;
 
         if premultiply_alpha {
-            let is_alpha_premultiplication_reasonable = has_non_constant_cap_alpha::<u8, 3, 4>(
-                src_store.buffer.borrow(),
-                src_store.width,
-                8,
-            );
+            let is_alpha_premultiplication_reasonable =
+                has_non_constant_cap_alpha_rgba8(src_store.buffer.borrow(), src_store.width);
             if is_alpha_premultiplication_reasonable {
                 let mut premultiplied_store =
                     ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
@@ -331,9 +351,9 @@ impl Scaler {
             let mut premultiplied_store =
                 ImageStore::<u8, 4>::alloc(new_image_horizontal.width, new_image_horizontal.height);
             new_image_horizontal.unpremultiply_alpha(&mut premultiplied_store, pool);
-            return premultiplied_store;
+            return Ok(premultiplied_store);
         }
-        new_image_horizontal
+        Ok(new_image_horizontal)
     }
 }
 
@@ -342,12 +362,32 @@ impl Scaling for Scaler {
         self.threading_policy = threading_policy;
     }
 
-    fn resize_rgb(&self, new_size: ImageSize, store: ImageStore<u8, 3>) -> ImageStore<u8, 3> {
+    fn resize_rgb(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<u8, 3>,
+    ) -> Result<ImageStore<u8, 3>, String> {
+        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
+            return Err("One of image dimensions is 0, this should not happen".to_string());
+        }
+
+        if check_image_size_overflow(store.width, store.height, store.channels) {
+            return Err("Input image larger than memory capabilities".to_string());
+        }
+
+        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
+            return Err("Destination image larger than memory capabilities".to_string());
+        }
+
+        if store.width == new_size.width && store.height == new_size.height {
+            return Ok(store.copied());
+        }
+
         let pool = self
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
 
-        if self.function == Nearest {
+        if self.function == ResamplingFunction::Nearest {
             let mut allocated_store: Vec<u8> = vec![0u8; new_size.width * 3 * new_size.height];
             resize_nearest::<u8, 3>(
                 store.buffer.borrow(),
@@ -358,9 +398,11 @@ impl Scaling for Scaler {
                 new_size.height,
                 &pool,
             );
-            let new_image =
-                ImageStore::<u8, 3>::new(allocated_store, new_size.width, new_size.height);
-            return new_image.unwrap();
+            return Ok(ImageStore::<u8, 3>::new(
+                allocated_store,
+                new_size.width,
+                new_size.height,
+            )?);
         }
         let vertical_filters = self.generate_weights(store.height, new_size.height);
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
@@ -373,7 +415,7 @@ impl Scaling for Scaler {
             &mut new_image_horizontal,
             &pool,
         );
-        new_image_horizontal
+        Ok(new_image_horizontal)
     }
 
     fn resize_rgba(
@@ -381,7 +423,7 @@ impl Scaling for Scaler {
         new_size: ImageSize,
         store: ImageStore<u8, 4>,
         premultiply_alpha: bool,
-    ) -> ImageStore<u8, 4> {
+    ) -> Result<ImageStore<u8, 4>, String> {
         let pool = self
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
@@ -396,9 +438,25 @@ impl Scaler {
         store: ImageStore<f32, 4>,
         premultiply_alpha: bool,
         pool: &Option<ThreadPool>,
-    ) -> ImageStore<f32, 4> {
+    ) -> Result<ImageStore<f32, 4>, String> {
+        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
+            return Err("One of image dimensions is 0, this should not happen".to_string());
+        }
+
+        if check_image_size_overflow(store.width, store.height, store.channels) {
+            return Err("Input image larger than memory capabilities".to_string());
+        }
+
+        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
+            return Err("Destination image larger than memory capabilities".to_string());
+        }
+
+        if store.width == new_size.width && store.height == new_size.height {
+            return Ok(store.copied());
+        }
+
         let mut src_store = store;
-        if self.function == Nearest {
+        if self.function == ResamplingFunction::Nearest {
             let mut allocated_store: Vec<f32> = vec![0f32; new_size.width * 4 * new_size.height];
             resize_nearest::<f32, 4>(
                 src_store.buffer.borrow(),
@@ -409,9 +467,8 @@ impl Scaler {
                 new_size.height,
                 pool,
             );
-            let new_image =
-                ImageStore::new(allocated_store, new_size.width, new_size.height).unwrap();
-            return new_image;
+            let new_image = ImageStore::new(allocated_store, new_size.width, new_size.height)?;
+            return Ok(new_image);
         }
 
         if premultiply_alpha {
@@ -423,16 +480,14 @@ impl Scaler {
 
         let allocated_store_vertical: Vec<f32> = vec![0f32; src_store.width * 4 * new_size.height];
         let mut new_image_vertical =
-            ImageStore::<f32, 4>::new(allocated_store_vertical, src_store.width, new_size.height)
-                .unwrap();
+            ImageStore::<f32, 4>::new(allocated_store_vertical, src_store.width, new_size.height)?;
         let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
         let vertical_filters = self.generate_weights(src_store.height, new_image_vertical.height);
         src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, pool);
 
         let allocated_store_horizontal: Vec<f32> = vec![0f32; new_size.width * 4 * new_size.height];
         let mut new_image_horizontal =
-            ImageStore::<f32, 4>::new(allocated_store_horizontal, new_size.width, new_size.height)
-                .unwrap();
+            ImageStore::<f32, 4>::new(allocated_store_horizontal, new_size.width, new_size.height)?;
         new_image_vertical.convolve_horizontal(horizontal_filters, &mut new_image_horizontal, pool);
 
         if premultiply_alpha {
@@ -441,20 +496,40 @@ impl Scaler {
                 new_image_horizontal.height,
             );
             new_image_horizontal.unpremultiply_alpha(&mut premultiplied_store, pool);
-            return premultiplied_store;
+            return Ok(premultiplied_store);
         }
 
-        new_image_horizontal
+        Ok(new_image_horizontal)
     }
 }
 
 impl ScalingF32 for Scaler {
-    fn resize_rgb_f32(&self, new_size: ImageSize, store: ImageStore<f32, 3>) -> ImageStore<f32, 3> {
+    fn resize_rgb_f32(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<f32, 3>,
+    ) -> Result<ImageStore<f32, 3>, String> {
+        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
+            return Err("One of image dimensions is 0, this should not happen".to_string());
+        }
+
+        if check_image_size_overflow(store.width, store.height, store.channels) {
+            return Err("Input image larger than memory capabilities".to_string());
+        }
+
+        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
+            return Err("Destination image larger than memory capabilities".to_string());
+        }
+
+        if store.width == new_size.width && store.height == new_size.height {
+            return Ok(store.copied());
+        }
+
         let pool = self
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
 
-        if self.function == Nearest {
+        if self.function == ResamplingFunction::Nearest {
             let mut allocated_store: Vec<f32> = vec![0f32; new_size.width * 3 * new_size.height];
             resize_nearest::<f32, 3>(
                 store.buffer.borrow(),
@@ -467,27 +542,25 @@ impl ScalingF32 for Scaler {
             );
             let new_image =
                 ImageStore::<f32, 3>::new(allocated_store, new_size.width, new_size.height);
-            return new_image.unwrap();
+            return Ok(new_image?);
         }
 
         let allocated_store_vertical: Vec<f32> = vec![0f32; store.width * 3 * new_size.height];
         let mut new_image_vertical =
-            ImageStore::<f32, 3>::new(allocated_store_vertical, store.width, new_size.height)
-                .unwrap();
+            ImageStore::<f32, 3>::new(allocated_store_vertical, store.width, new_size.height)?;
         let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
         store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
 
         let allocated_store_horizontal: Vec<f32> = vec![0f32; new_size.width * 3 * new_size.height];
         let mut new_image_horizontal =
-            ImageStore::<f32, 3>::new(allocated_store_horizontal, new_size.width, new_size.height)
-                .unwrap();
+            ImageStore::<f32, 3>::new(allocated_store_horizontal, new_size.width, new_size.height)?;
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
         new_image_vertical.convolve_horizontal(
             horizontal_filters,
             &mut new_image_horizontal,
             &pool,
         );
-        new_image_horizontal
+        Ok(new_image_horizontal)
     }
 
     fn resize_rgba_f32(
@@ -495,7 +568,7 @@ impl ScalingF32 for Scaler {
         new_size: ImageSize,
         store: ImageStore<f32, 4>,
         premultiply_alpha: bool,
-    ) -> ImageStore<f32, 4> {
+    ) -> Result<ImageStore<f32, 4>, String> {
         let pool = self
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
@@ -509,12 +582,28 @@ impl Scaler {
         &self,
         new_size: ImageSize,
         store: ImageStore<f32, 1>,
-    ) -> ImageStore<f32, 1> {
+    ) -> Result<ImageStore<f32, 1>, String> {
+        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
+            return Err("One of image dimensions is 0, this should not happen".to_string());
+        }
+
+        if check_image_size_overflow(store.width, store.height, store.channels) {
+            return Err("Input image larger than memory capabilities".to_string());
+        }
+
+        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
+            return Err("Destination image larger than memory capabilities".to_string());
+        }
+
+        if store.width == new_size.width && store.height == new_size.height {
+            return Ok(store.copied());
+        }
+
         let pool = self
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
 
-        if self.function == Nearest {
+        if self.function == ResamplingFunction::Nearest {
             let mut allocated_store: Vec<f32> = vec![0f32; new_size.width * new_size.height];
             resize_nearest::<f32, 1>(
                 store.buffer.borrow(),
@@ -526,40 +615,57 @@ impl Scaler {
                 &pool,
             );
             let new_image =
-                ImageStore::<f32, 1>::new(allocated_store, new_size.width, new_size.height)
-                    .unwrap();
-            return new_image;
+                ImageStore::<f32, 1>::new(allocated_store, new_size.width, new_size.height)?;
+            return Ok(new_image);
         }
 
         let allocated_store_vertical: Vec<f32> = vec![0f32; store.width * new_size.height];
         let mut new_image_vertical =
-            ImageStore::<f32, 1>::new(allocated_store_vertical, store.width, new_size.height)
-                .unwrap();
+            ImageStore::<f32, 1>::new(allocated_store_vertical, store.width, new_size.height)?;
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
         let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
         store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
 
         let allocated_store_horizontal: Vec<f32> = vec![0f32; new_size.width * new_size.height];
         let mut new_image_horizontal =
-            ImageStore::<f32, 1>::new(allocated_store_horizontal, new_size.width, new_size.height)
-                .unwrap();
+            ImageStore::<f32, 1>::new(allocated_store_horizontal, new_size.width, new_size.height)?;
         new_image_vertical.convolve_horizontal(
             horizontal_filters,
             &mut new_image_horizontal,
             &pool,
         );
-        new_image_horizontal
+        Ok(new_image_horizontal)
     }
 }
 
 impl Scaler {
     /// Performs rescaling for u8 plane
-    pub fn resize_plane(&self, new_size: ImageSize, store: ImageStore<u8, 1>) -> ImageStore<u8, 1> {
+    pub fn resize_plane(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<u8, 1>,
+    ) -> Result<ImageStore<u8, 1>, String> {
+        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
+            return Err("One of image dimensions is 0, this should not happen".to_string());
+        }
+
+        if check_image_size_overflow(store.width, store.height, store.channels) {
+            return Err("Input image larger than memory capabilities".to_string());
+        }
+
+        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
+            return Err("Destination image larger than memory capabilities".to_string());
+        }
+
+        if store.width == new_size.width && store.height == new_size.height {
+            return Ok(store.copied());
+        }
+
         let pool = self
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
 
-        if self.function == Nearest {
+        if self.function == ResamplingFunction::Nearest {
             let mut allocated_store: Vec<u8> = vec![0u8; new_size.width * new_size.height];
             resize_nearest::<u8, 1>(
                 store.buffer.borrow(),
@@ -571,8 +677,8 @@ impl Scaler {
                 &pool,
             );
             let new_image =
-                ImageStore::<u8, 1>::new(allocated_store, new_size.width, new_size.height).unwrap();
-            return new_image;
+                ImageStore::<u8, 1>::new(allocated_store, new_size.width, new_size.height)?;
+            return Ok(new_image);
         }
         let vertical_filters = self.generate_weights(store.height, new_size.height);
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
@@ -585,7 +691,7 @@ impl Scaler {
             &mut new_image_horizontal,
             &pool,
         );
-        new_image_horizontal
+        Ok(new_image_horizontal)
     }
 }
 
@@ -595,12 +701,35 @@ impl ScalingU16 for Scaler {
         new_size: ImageSize,
         store: ImageStore<u16, 3>,
         bit_depth: usize,
-    ) -> ImageStore<u16, 3> {
+    ) -> Result<ImageStore<u16, 3>, String> {
+        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
+            return Err("One of image dimensions is 0, this should not happen".to_string());
+        }
+
+        if check_image_size_overflow(store.width, store.height, store.channels) {
+            return Err("Input image larger than memory capabilities".to_string());
+        }
+
+        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
+            return Err("Destination image larger than memory capabilities".to_string());
+        }
+
+        if store.width == new_size.width && store.height == new_size.height {
+            return Ok(store.copied());
+        }
+
+        if !(1..=16).contains(&bit_depth) {
+            return Err(format!(
+                "Bit depth must be in [1, 16] but got {}",
+                bit_depth
+            ));
+        }
+
         let pool = self
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
 
-        if self.function == Nearest {
+        if self.function == ResamplingFunction::Nearest {
             let mut allocated_store: Vec<u16> = vec![0u16; new_size.width * 3 * new_size.height];
             resize_nearest::<u16, 3>(
                 store.buffer.borrow(),
@@ -612,14 +741,9 @@ impl ScalingU16 for Scaler {
                 &pool,
             );
             let mut new_image =
-                ImageStore::<u16, 3>::new(allocated_store, new_size.width, new_size.height)
-                    .unwrap();
+                ImageStore::<u16, 3>::new(allocated_store, new_size.width, new_size.height)?;
             new_image.bit_depth = bit_depth;
-            return new_image;
-        }
-
-        if !(1..=16).contains(&bit_depth) {
-            panic!("Bit depth must be in [1, 16] but got {}", bit_depth);
+            return Ok(new_image);
         }
 
         let vertical_filters = self.generate_weights(store.height, new_size.height);
@@ -639,7 +763,7 @@ impl ScalingU16 for Scaler {
             &mut new_image_horizontal,
             &pool,
         );
-        new_image_horizontal
+        Ok(new_image_horizontal)
     }
 
     /// Resizes u16 image
@@ -658,14 +782,37 @@ impl ScalingU16 for Scaler {
         store: ImageStore<u16, 4>,
         bit_depth: usize,
         premultiply_alpha: bool,
-    ) -> ImageStore<u16, 4> {
+    ) -> Result<ImageStore<u16, 4>, String> {
+        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
+            return Err("One of image dimensions is 0, this should not happen".to_string());
+        }
+
+        if check_image_size_overflow(store.width, store.height, store.channels) {
+            return Err("Input image larger than memory capabilities".to_string());
+        }
+
+        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
+            return Err("Destination image larger than memory capabilities".to_string());
+        }
+
+        if store.width == new_size.width && store.height == new_size.height {
+            return Ok(store.copied());
+        }
+
+        if !(1..=16).contains(&bit_depth) {
+            return Err(format!(
+                "Bit depth must be in [1, 16] but got {}",
+                bit_depth
+            ));
+        }
+
         let mut src_store = store;
 
         let pool = self
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
 
-        if self.function == Nearest {
+        if self.function == ResamplingFunction::Nearest {
             let mut new_image = ImageStore::<u16, 4>::alloc(new_size.width, new_size.height);
             resize_nearest::<u16, 4>(
                 src_store.buffer.borrow(),
@@ -677,13 +824,13 @@ impl ScalingU16 for Scaler {
                 &pool,
             );
             new_image.bit_depth = bit_depth;
-            return new_image;
+            return Ok(new_image);
         }
 
         let mut has_alpha_premultiplied = false;
 
         if premultiply_alpha {
-            let is_alpha_premultiplication_reasonable = has_non_constant_cap_alpha::<u16, 3, 4>(
+            let is_alpha_premultiplication_reasonable = has_non_constant_cap_alpha_rgba16(
                 src_store.buffer.borrow(),
                 src_store.width,
                 bit_depth as u32,
@@ -697,10 +844,6 @@ impl ScalingU16 for Scaler {
                 src_store = premultiplied_store;
                 has_alpha_premultiplied = true;
             }
-        }
-
-        if !(1..=16).contains(&bit_depth) {
-            panic!("Bit depth must be in [1, 16] but got {}", bit_depth);
         }
 
         let mut new_image_vertical = ImageStore::<u16, 4>::alloc(src_store.width, new_size.height);
@@ -725,9 +868,9 @@ impl ScalingU16 for Scaler {
             );
             premultiplied_store.bit_depth = bit_depth;
             new_image_horizontal.unpremultiply_alpha(&mut premultiplied_store, &pool);
-            return premultiplied_store;
+            return Ok(premultiplied_store);
         }
-        new_image_horizontal
+        Ok(new_image_horizontal)
     }
 
     /// Performs rescaling for u16 plane
@@ -736,12 +879,35 @@ impl ScalingU16 for Scaler {
         new_size: ImageSize,
         store: ImageStore<u16, 1>,
         bit_depth: usize,
-    ) -> ImageStore<u16, 1> {
+    ) -> Result<ImageStore<u16, 1>, String> {
+        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
+            return Err("One of image dimensions is 0, this should not happen".to_string());
+        }
+
+        if check_image_size_overflow(store.width, store.height, store.channels) {
+            return Err("Input image larger than memory capabilities".to_string());
+        }
+
+        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
+            return Err("Destination image larger than memory capabilities".to_string());
+        }
+
+        if store.width == new_size.width && store.height == new_size.height {
+            return Ok(store.copied());
+        }
+
+        if !(1..=16).contains(&bit_depth) {
+            return Err(format!(
+                "Bit depth must be in [1, 16] but got {}",
+                bit_depth
+            ));
+        }
+
         let pool = self
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
 
-        if self.function == Nearest {
+        if self.function == ResamplingFunction::Nearest {
             let mut allocated_store: Vec<u16> = vec![0u16; new_size.width * new_size.height];
             resize_nearest::<u16, 1>(
                 store.buffer.borrow(),
@@ -753,14 +919,9 @@ impl ScalingU16 for Scaler {
                 &pool,
             );
             let mut new_image =
-                ImageStore::<u16, 1>::new(allocated_store, new_size.width, new_size.height)
-                    .unwrap();
+                ImageStore::<u16, 1>::new(allocated_store, new_size.width, new_size.height)?;
             new_image.bit_depth = bit_depth;
-            return new_image;
-        }
-
-        if !(1..=16).contains(&bit_depth) {
-            panic!("Bit depth must be in [1, 16] but got {}", bit_depth);
+            return Ok(new_image);
         }
 
         let vertical_filters = self.generate_weights(store.height, new_size.height);
@@ -780,6 +941,6 @@ impl ScalingU16 for Scaler {
             &mut new_image_horizontal,
             &pool,
         );
-        new_image_horizontal
+        Ok(new_image_horizontal)
     }
 }

@@ -27,7 +27,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+use crate::alpha_check::has_non_constant_cap_alpha_rgba8;
 use crate::scaler::ScalingF32;
+use crate::support::check_image_size_overflow;
 use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
 use colorutils_rs::{rgb_to_sigmoidal, rgba_to_sigmoidal, sigmoidal_to_rgb, sigmoidal_to_rgba};
 
@@ -77,7 +79,27 @@ impl Scaling for SigmoidalScaler {
         self.scaler.set_threading_policy(threading_policy)
     }
 
-    fn resize_rgb(&self, new_size: ImageSize, store: ImageStore<u8, 3>) -> ImageStore<u8, 3> {
+    fn resize_rgb(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<u8, 3>,
+    ) -> Result<ImageStore<u8, 3>, String> {
+        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
+            return Err("One of image dimensions is 0, this should not happen".to_string());
+        }
+
+        if check_image_size_overflow(store.width, store.height, store.channels) {
+            return Err("Input image larger than memory capabilities".to_string());
+        }
+
+        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
+            return Err("Destination image larger than memory capabilities".to_string());
+        }
+
+        if store.width == new_size.width && store.height == new_size.height {
+            return Ok(store.copied());
+        }
+
         const COMPONENTS: usize = 3;
         let mut lab_store = ImageStore::<f32, COMPONENTS>::alloc(store.width, store.height);
         let lab_stride =
@@ -90,7 +112,7 @@ impl Scaling for SigmoidalScaler {
             lab_store.width as u32,
             lab_store.height as u32,
         );
-        let new_store = self.scaler.resize_rgb_f32(new_size, lab_store);
+        let new_store = self.scaler.resize_rgb_f32(new_size, lab_store)?;
         let mut new_u8_store = ImageStore::<u8, COMPONENTS>::alloc(new_size.width, new_size.height);
         let new_lab_stride =
             new_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<f32>() as u32;
@@ -102,7 +124,7 @@ impl Scaling for SigmoidalScaler {
             new_store.width as u32,
             new_store.height as u32,
         );
-        new_u8_store
+        Ok(new_u8_store)
     }
 
     fn resize_rgba(
@@ -110,7 +132,23 @@ impl Scaling for SigmoidalScaler {
         new_size: ImageSize,
         store: ImageStore<u8, 4>,
         premultiply_alpha: bool,
-    ) -> ImageStore<u8, 4> {
+    ) -> Result<ImageStore<u8, 4>, String> {
+        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
+            return Err("One of image dimensions is 0, this should not happen".to_string());
+        }
+
+        if check_image_size_overflow(store.width, store.height, store.channels) {
+            return Err("Input image larger than memory capabilities".to_string());
+        }
+
+        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
+            return Err("Destination image larger than memory capabilities".to_string());
+        }
+
+        if store.width == new_size.width && store.height == new_size.height {
+            return Ok(store.copied());
+        }
+
         let mut src_store = store;
 
         let pool = self
@@ -118,23 +156,30 @@ impl Scaling for SigmoidalScaler {
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
 
+        let mut has_alpha_premultiplied = false;
+
         if premultiply_alpha {
-            let mut premultiplied_store =
-                ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
-            src_store.premultiply_alpha(&mut premultiplied_store, &pool);
-            src_store = premultiplied_store;
+            let is_alpha_premultiplication_reasonable =
+                has_non_constant_cap_alpha_rgba8(src_store.buffer.borrow(), src_store.width);
+            if is_alpha_premultiplication_reasonable {
+                let mut premultiplied_store =
+                    ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
+                src_store.premultiply_alpha(&mut premultiplied_store, &pool);
+                src_store = premultiplied_store;
+                has_alpha_premultiplied = true;
+            }
         }
         let lab_store = Self::rgba_to_sigmoidal(src_store);
         let new_store = self
             .scaler
-            .resize_rgba_f32_impl(new_size, lab_store, false, &pool);
+            .resize_rgba_f32_impl(new_size, lab_store, false, &pool)?;
         let rgba_store = Self::sigmoidal_to_rgba(new_store);
-        if premultiply_alpha {
+        if premultiply_alpha && has_alpha_premultiplied {
             let mut premultiplied_store =
                 ImageStore::<u8, 4>::alloc(rgba_store.width, rgba_store.height);
             rgba_store.unpremultiply_alpha(&mut premultiplied_store, &pool);
-            return premultiplied_store;
+            return Ok(premultiplied_store);
         }
-        rgba_store
+        Ok(rgba_store)
     }
 }
