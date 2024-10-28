@@ -28,7 +28,6 @@
  */
 
 use crate::sse::{sse_deinterleave_rgba, sse_interleave_rgba};
-use crate::{premultiply_pixel, unpremultiply_pixel};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::ParallelSliceMut;
 use rayon::slice::ParallelSlice;

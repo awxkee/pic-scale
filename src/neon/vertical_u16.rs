@@ -43,7 +43,7 @@ pub fn convolve_column_u16(
 ) {
     unsafe {
         let max_colors = (1 << bit_depth) - 1;
-        let mut cx = 0usize;
+        let mut k_cx = 0usize;
 
         let bounds_size = bounds.size;
 
@@ -51,7 +51,7 @@ pub fn convolve_column_u16(
 
         let v_max_colors = vdupq_n_u32(max_colors);
 
-        let v_px = cx;
+        let v_px = k_cx;
 
         let iter16 = dst.chunks_exact_mut(16);
 
@@ -61,11 +61,13 @@ pub fn convolve_column_u16(
             let mut store2 = zeros;
             let mut store3 = zeros;
 
+            let v_dx = v_px + x * 16;
+
             if bounds_size == 2 {
                 let weights = weight.get_unchecked(0..2);
                 let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + cx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + cx)..);
+                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
+                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
 
                 let v_weight0 = vdupq_n_f32(weights[0]);
                 let v_weight1 = vdupq_n_f32(weights[1]);
@@ -96,9 +98,9 @@ pub fn convolve_column_u16(
             } else if bounds_size == 3 {
                 let weights = weight.get_unchecked(0..3);
                 let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + cx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + cx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + cx)..);
+                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
+                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
+                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
 
                 let v_weight0 = vdupq_n_f32(weights[0]);
                 let v_weight1 = vdupq_n_f32(weights[1]);
@@ -142,10 +144,10 @@ pub fn convolve_column_u16(
             } else if bounds_size == 4 {
                 let weights = weight.get_unchecked(0..4);
                 let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + cx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + cx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + cx)..);
-                let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + cx)..);
+                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
+                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
+                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
+                let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + v_dx)..);
 
                 let v_weight0 = vdupq_n_f32(weights[0]);
                 let v_weight1 = vdupq_n_f32(weights[1]);
@@ -202,7 +204,7 @@ pub fn convolve_column_u16(
             } else {
                 for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
                     let py = bounds.start + j;
-                    let src_ptr = src.get_unchecked((src_stride * py + cx)..);
+                    let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
 
                     let v_weight = vdupq_n_f32(k_weight);
 
@@ -229,23 +231,25 @@ pub fn convolve_column_u16(
             let item1 = vcombine_u16(vqmovn_u32(u_store2), vqmovn_u32(u_store3));
             vst1q_u16(dst.as_mut_ptr().add(8), item1);
 
-            cx = v_px + x * 16;
+            k_cx = v_dx;
         }
 
         let tail16 = dst.chunks_exact_mut(16).into_remainder();
         let iter8 = tail16.chunks_exact_mut(8);
 
-        let v_px = cx;
+        let v_px = k_cx;
 
         for (x, dst) in iter8.enumerate() {
             let mut store0 = zeros;
             let mut store1 = zeros;
 
+            let v_dx = v_px + x * 8;
+
             if bounds_size == 2 {
                 let weights = weight.get_unchecked(0..2);
                 let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + cx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + cx)..);
+                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
+                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
 
                 let v_weight0 = vdupq_n_f32(weights[0]);
                 let v_weight1 = vdupq_n_f32(weights[1]);
@@ -265,9 +269,9 @@ pub fn convolve_column_u16(
             } else if bounds_size == 3 {
                 let weights = weight.get_unchecked(0..3);
                 let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + cx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + cx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + cx)..);
+                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
+                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
+                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
 
                 let v_weight0 = vdupq_n_f32(weights[0]);
                 let v_weight1 = vdupq_n_f32(weights[1]);
@@ -294,10 +298,10 @@ pub fn convolve_column_u16(
             } else if bounds_size == 4 {
                 let weights = weight.get_unchecked(0..4);
                 let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + cx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + cx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + cx)..);
-                let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + cx)..);
+                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
+                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
+                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
+                let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + v_dx)..);
 
                 let v_weight0 = vdupq_n_f32(weights[0]);
                 let v_weight1 = vdupq_n_f32(weights[1]);
@@ -331,7 +335,7 @@ pub fn convolve_column_u16(
             } else {
                 for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
                     let py = bounds.start + j;
-                    let src_ptr = src.get_unchecked((src_stride * py + cx)..);
+                    let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
 
                     let v_weight = vdupq_n_f32(k_weight);
 
@@ -350,22 +354,24 @@ pub fn convolve_column_u16(
             let item = vcombine_u16(vqmovn_u32(u_store0), vqmovn_u32(u_store1));
             vst1q_u16(dst.as_mut_ptr(), item);
 
-            cx = v_px + x * 8;
+            k_cx = v_dx;
         }
 
         let tail8 = tail16.chunks_exact_mut(8).into_remainder();
         let iter4 = tail8.chunks_exact_mut(4);
 
-        let v_cx = cx;
+        let v_cx = k_cx;
 
         for (x, dst) in iter4.enumerate() {
             let mut store0 = zeros;
 
+            let v_dx = v_cx + x * 4;
+
             if bounds_size == 2 {
                 let weights = weight.get_unchecked(0..2);
                 let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + cx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + cx)..);
+                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
+                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
 
                 let v_weight0 = vdupq_n_f32(weights[0]);
                 let v_weight1 = vdupq_n_f32(weights[1]);
@@ -380,9 +386,9 @@ pub fn convolve_column_u16(
             } else if bounds_size == 3 {
                 let weights = weight.get_unchecked(0..3);
                 let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + cx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + cx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + cx)..);
+                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
+                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
+                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
 
                 let v_weight0 = vdupq_n_f32(weights[0]);
                 let v_weight1 = vdupq_n_f32(weights[1]);
@@ -401,10 +407,10 @@ pub fn convolve_column_u16(
             } else if bounds_size == 4 {
                 let weights = weight.get_unchecked(0..4);
                 let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + cx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + cx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + cx)..);
-                let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + cx)..);
+                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
+                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
+                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
+                let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + v_dx)..);
 
                 let v_weight0 = vdupq_n_f32(weights[0]);
                 let v_weight1 = vdupq_n_f32(weights[1]);
@@ -427,7 +433,7 @@ pub fn convolve_column_u16(
             } else {
                 for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
                     let py = bounds.start + j;
-                    let src_ptr = src.get_unchecked((src_stride * py + cx)..);
+                    let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
 
                     let v_weight = vdupq_n_f32(k_weight);
 
@@ -442,12 +448,12 @@ pub fn convolve_column_u16(
 
             vst1_u16(dst.as_mut_ptr(), vqmovn_u32(u_store0));
 
-            cx = v_cx + x * 4;
+            k_cx = v_dx;
         }
 
         let tail4 = tail8.chunks_exact_mut(4).into_remainder();
 
-        let a_px = cx;
+        let a_px = k_cx;
 
         for (x, dst) in tail4.iter_mut().enumerate() {
             let mut store0 = 0.;

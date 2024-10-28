@@ -36,8 +36,11 @@ use crate::floating_point_horizontal::{
 };
 use crate::floating_point_vertical::column_handler_floating_point;
 use crate::mixed_storage::MixedStorage;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
-use crate::neon::convolve_column_u16;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::neon::{
+    convolve_column_lb_u16, convolve_column_u16, convolve_horizontal_rgba_neon_rows_4_lb_u8,
+    convolve_horizontal_rgba_neon_u16_lb_row,
+};
 use crate::saturate_narrow::SaturateNarrow;
 use num_traits::{AsPrimitive, Float, MulAdd};
 use std::ops::{Add, AddAssign, Mul};
@@ -242,6 +245,7 @@ pub trait RowHandlerFixedPoint<T> {
 }
 
 impl RowHandlerFixedPoint<u16> for u16 {
+    #[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
     fn handle_fixed_row_4<J, const COMPONENTS: usize>(
         src: &[u16],
         src_stride: usize,
@@ -272,6 +276,49 @@ impl RowHandlerFixedPoint<u16> for u16 {
         )
     }
 
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    fn handle_fixed_row_4<J, const COMPONENTS: usize>(
+        src: &[u16],
+        src_stride: usize,
+        dst: &mut [u16],
+        dst_stride: usize,
+        filter_weights: &FilterWeights<i16>,
+        bit_depth: u32,
+    ) where
+        J: Copy
+            + 'static
+            + AsPrimitive<u16>
+            + Mul<Output = J>
+            + AddAssign
+            + SaturateNarrow<u16>
+            + Default
+            + Add<J, Output = J>,
+        i32: AsPrimitive<J>,
+        i16: AsPrimitive<J>,
+        u16: AsPrimitive<J>,
+    {
+        if COMPONENTS == 4 {
+            convolve_horizontal_rgba_neon_rows_4_lb_u8(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                filter_weights,
+                bit_depth,
+            )
+        } else {
+            convolve_row_handler_fixed_point_4::<u16, J, COMPONENTS>(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                filter_weights,
+                bit_depth,
+            )
+        }
+    }
+
+    #[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
     fn handle_fixed_row<J, const COMPONENTS: usize>(
         src: &[u16],
         dst: &mut [u16],
@@ -292,9 +339,41 @@ impl RowHandlerFixedPoint<u16> for u16 {
     {
         convolve_row_handler_fixed_point::<u16, J, COMPONENTS>(src, dst, filter_weights, bit_depth)
     }
+
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    fn handle_fixed_row<J, const COMPONENTS: usize>(
+        src: &[u16],
+        dst: &mut [u16],
+        filter_weights: &FilterWeights<i16>,
+        bit_depth: u32,
+    ) where
+        J: Copy
+            + 'static
+            + AsPrimitive<u16>
+            + Mul<Output = J>
+            + AddAssign
+            + SaturateNarrow<u16>
+            + Default
+            + Add<J, Output = J>,
+        i32: AsPrimitive<J>,
+        i16: AsPrimitive<J>,
+        u16: AsPrimitive<J>,
+    {
+        if COMPONENTS == 4 {
+            convolve_horizontal_rgba_neon_u16_lb_row(src, dst, filter_weights, bit_depth)
+        } else {
+            convolve_row_handler_fixed_point::<u16, J, COMPONENTS>(
+                src,
+                dst,
+                filter_weights,
+                bit_depth,
+            )
+        }
+    }
 }
 
 impl ColumnHandlerFixedPoint<u16> for u16 {
+    #[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
     fn handle_fixed_column<J, const COMPONENTS: usize>(
         dst_width: usize,
         bounds: &FilterBounds,
@@ -318,6 +397,30 @@ impl ColumnHandlerFixedPoint<u16> for u16 {
         column_handler_fixed_point::<u16, J>(
             dst_width, bounds, src, dst, src_stride, weight, bit_depth,
         );
+    }
+
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    fn handle_fixed_column<J, const COMPONENTS: usize>(
+        dst_width: usize,
+        bounds: &FilterBounds,
+        src: &[u16],
+        dst: &mut [u16],
+        src_stride: usize,
+        weight: &[i16],
+        bit_depth: u32,
+    ) where
+        u16: Copy + 'static + AsPrimitive<J> + Default,
+        J: Copy
+            + 'static
+            + AsPrimitive<u16>
+            + Mul<Output = J>
+            + AddAssign
+            + SaturateNarrow<u16>
+            + Default,
+        i32: AsPrimitive<J>,
+        i16: AsPrimitive<J>,
+    {
+        convolve_column_lb_u16(dst_width, bounds, src, dst, src_stride, weight, bit_depth);
     }
 }
 

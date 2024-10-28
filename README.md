@@ -115,14 +115,14 @@ Example comparison time for downscale RGBA 4928x3279 10 bit image in two times w
 
 | Lanczos3  |  SSE   | NEON  |
 |-----------|:------:|:-----:|
-| pic-scale | 156.90 | 48.37 |
+| pic-scale | 156.90 | 38.92 |
 | fir       | 150.65 | 91.08 |
 
 RGBA 4928x3279 10 bit downscale in two times without premultiplying alpha 
 
 | Lanczos3  |  SSE   | NEON  |
 |-----------|:------:|:-----:|
-| pic-scale | 156.90 | 42.49 |
+| pic-scale | 156.90 | 17.85 |
 | fir       | 150.65 | 73.82 |
 
 Example comparison time for downscale RGB 4000x6000 10 bit image in two times using *NEON*.
