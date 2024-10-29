@@ -31,15 +31,15 @@ use num_traits::AsPrimitive;
 use std::ops::{AddAssign, BitXor};
 
 pub(crate) fn has_non_constant_cap_alpha_rgba8(store: &[u8], width: usize) -> bool {
-    has_non_constant_cap_alpha::<u8, u32, 3, 4>(store, width, 8)
+    has_non_constant_cap_alpha::<u8, u32, 3, 4>(store, width)
 }
 
-pub(crate) fn has_non_constant_cap_alpha_rgba16(
-    store: &[u16],
-    width: usize,
-    bit_depth: u32,
-) -> bool {
-    has_non_constant_cap_alpha::<u16, u64, 3, 4>(store, width, bit_depth)
+pub(crate) fn has_non_constant_cap_alpha_rgba16(store: &[u16], width: usize) -> bool {
+    has_non_constant_cap_alpha::<u16, u64, 3, 4>(store, width)
+}
+
+pub(crate) fn has_non_constant_cap_alpha_rgba_f32(store: &[f32], width: usize) -> bool {
+    has_non_constant_cap_alpha_f32_impl::<3, 4>(store, width)
 }
 
 pub(crate) fn has_non_constant_cap_alpha<
@@ -50,7 +50,6 @@ pub(crate) fn has_non_constant_cap_alpha<
 >(
     store: &[V],
     width: usize,
-    bit_depth: u32,
 ) -> bool
 where
     i32: AsPrimitive<V>,
@@ -61,14 +60,11 @@ where
     if store.is_empty() {
         return false;
     }
-    let max = ((1 << bit_depth) - 1).as_();
-    if max != store[ALPHA_CHANNEL_INDEX] {
-        return true;
-    }
+    let first = store[0];
     let mut row_sums: J = 0u32.as_();
     for row in store.chunks_exact(width * CHANNELS) {
         for color in row.chunks_exact(CHANNELS) {
-            row_sums += color[ALPHA_CHANNEL_INDEX].bitxor(max).as_();
+            row_sums += color[ALPHA_CHANNEL_INDEX].bitxor(first).as_();
         }
         if row_sums != 0.as_() {
             return true;
@@ -76,6 +72,31 @@ where
     }
 
     let zeros = 0.as_();
+
+    row_sums.ne(&zeros)
+}
+
+fn has_non_constant_cap_alpha_f32_impl<const ALPHA_CHANNEL_INDEX: usize, const CHANNELS: usize>(
+    store: &[f32],
+    width: usize,
+) -> bool {
+    assert!(ALPHA_CHANNEL_INDEX < CHANNELS);
+    assert!(CHANNELS <= 4);
+    if store.is_empty() {
+        return false;
+    }
+    let first = store[0].to_bits() as u32;
+    let mut row_sums: u64 = 0u64;
+    for row in store.chunks_exact(width * CHANNELS) {
+        for color in row.chunks_exact(CHANNELS) {
+            row_sums += color[ALPHA_CHANNEL_INDEX].to_bits().bitxor(first) as u64;
+        }
+        if row_sums != 0 {
+            return true;
+        }
+    }
+
+    let zeros = 0;
 
     row_sums.ne(&zeros)
 }
