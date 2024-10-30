@@ -54,36 +54,36 @@ pub trait Scaling {
     fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy);
 
     /// Performs rescaling for RGB, channel order does not matter
-    fn resize_rgb(
-        &self,
+    fn resize_rgb<'a>(
+        &'a self,
         new_size: ImageSize,
-        store: ImageStore<u8, 3>,
-    ) -> Result<ImageStore<u8, 3>, String>;
+        store: ImageStore<'a, u8, 3>,
+    ) -> Result<ImageStore<'a, u8, 3>, String>;
 
     /// Performs rescaling for RGBA, for pre-multiplying alpha, converting to LUV or LAB alpha must be last channel
-    fn resize_rgba(
-        &self,
+    fn resize_rgba<'a>(
+        &'a self,
         new_size: ImageSize,
-        store: ImageStore<u8, 4>,
+        store: ImageStore<'a, u8, 4>,
         premultiply_alpha: bool,
-    ) -> Result<ImageStore<u8, 4>, String>;
+    ) -> Result<ImageStore<'a, u8, 4>, String>;
 }
 
 pub trait ScalingF32 {
     /// Performs rescaling for RGB f32, channel order does not matter
-    fn resize_rgb_f32(
-        &self,
+    fn resize_rgb_f32<'a>(
+        &'a self,
         new_size: ImageSize,
-        store: ImageStore<f32, 3>,
-    ) -> Result<ImageStore<f32, 3>, String>;
+        store: ImageStore<'a, f32, 3>,
+    ) -> Result<ImageStore<'a, f32, 3>, String>;
 
     /// Performs rescaling for RGBA f32, alpha expected to be last
-    fn resize_rgba_f32(
-        &self,
+    fn resize_rgba_f32<'a>(
+        &'a self,
         new_size: ImageSize,
-        store: ImageStore<f32, 4>,
+        store: ImageStore<'a, f32, 4>,
         premultiply_alpha: bool,
-    ) -> Result<ImageStore<f32, 4>, String>;
+    ) -> Result<ImageStore<'a, f32, 4>, String>;
 }
 
 pub trait ScalingU16 {
@@ -92,32 +92,32 @@ pub trait ScalingU16 {
     /// # Arguments
     /// `new_size` - New image size
     /// `store` - original image store
-    /// `bit_depth` - image bit depth, this is required for u16 image
+    /// `bit_depth` - image bit-depth, this is required for u16 image
     ///
     /// # Panics
-    /// Panic if bit depth < 1 or bit depth > 16
-    fn resize_plane_u16(
+    /// Panic if bit-depth < 1 or bit-depth > 16
+    fn resize_plane_u16<'a>(
         &self,
         new_size: ImageSize,
-        store: ImageStore<u16, 1>,
+        store: ImageStore<'a, u16, 1>,
         bit_depth: usize,
-    ) -> Result<ImageStore<u16, 1>, String>;
+    ) -> Result<ImageStore<'a, u16, 1>, String>;
 
     /// Performs rescaling for RGB, channel order does not matter
     ///
     /// # Arguments
     /// `new_size` - New image size
     /// `store` - original image store
-    /// `bit_depth` - image bit depth, this is required for u16 image
+    /// `bit_depth` - image bit-depth, this is required for u16 image
     ///
     /// # Panics
-    /// Panic if bit depth < 1 or bit depth > 16
-    fn resize_rgb_u16(
+    /// Panic if bit-depth < 1 or bit-depth > 16
+    fn resize_rgb_u16<'a>(
         &self,
         new_size: ImageSize,
-        store: ImageStore<u16, 3>,
+        store: ImageStore<'a, u16, 3>,
         bit_depth: usize,
-    ) -> Result<ImageStore<u16, 3>, String>;
+    ) -> Result<ImageStore<'a, u16, 3>, String>;
 
     /// Performs rescaling for RGBA, for pre-multiplying alpha should be last
     ///
@@ -129,13 +129,13 @@ pub trait ScalingU16 {
     ///
     /// # Panics
     /// Panic if bit-depth < 1 or bit-depth > 16
-    fn resize_rgba_u16(
+    fn resize_rgba_u16<'a>(
         &self,
         new_size: ImageSize,
-        store: ImageStore<u16, 4>,
+        store: ImageStore<'a, u16, 4>,
         bit_depth: usize,
         premultiply_alpha: bool,
-    ) -> Result<ImageStore<u16, 4>, String>;
+    ) -> Result<ImageStore<'a, u16, 4>, String>;
 }
 
 impl Scaler {
@@ -291,13 +291,13 @@ impl Scaler {
 }
 
 impl Scaler {
-    pub(crate) fn resize_rgba_impl(
+    pub(crate) fn resize_rgba_impl<'a>(
         &self,
         new_size: ImageSize,
-        store: ImageStore<u8, 4>,
+        store: ImageStore<'a, u8, 4>,
         premultiply_alpha: bool,
         pool: &Option<ThreadPool>,
-    ) -> Result<ImageStore<u8, 4>, String> {
+    ) -> Result<ImageStore<'a, u8, 4>, String> {
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
             return Err("One of image dimensions is 0, this should not happen".to_string());
         }
@@ -314,7 +314,12 @@ impl Scaler {
             return Ok(store.copied());
         }
 
+        let should_do_horizontal = store.width != new_size.width;
+        let should_do_vertical = store.height != new_size.height;
+        assert!(should_do_horizontal || should_do_vertical);
+
         let mut src_store = store;
+
         if self.function == ResamplingFunction::Nearest {
             let mut new_image = ImageStore::<u8, 4>::alloc(new_size.width, new_size.height);
             resize_nearest::<u8, 4>(
@@ -343,20 +348,35 @@ impl Scaler {
             }
         }
 
-        let mut new_image_vertical = ImageStore::<u8, 4>::alloc(src_store.width, new_size.height);
-        let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
-        let vertical_filters = self.generate_weights(src_store.height, new_image_vertical.height);
-        src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, pool);
+        if should_do_vertical {
+            let mut new_image_vertical =
+                ImageStore::<u8, 4>::alloc(src_store.width, new_size.height);
+            let vertical_filters =
+                self.generate_weights(src_store.height, new_image_vertical.height);
+            src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, pool);
+            src_store = new_image_vertical;
+        }
 
-        let mut new_image_horizontal = ImageStore::<u8, 4>::alloc(new_size.width, new_size.height);
-        new_image_vertical.convolve_horizontal(horizontal_filters, &mut new_image_horizontal, pool);
+        assert_eq!(src_store.height, new_size.height);
+
+        if should_do_horizontal {
+            let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
+            let mut new_image_horizontal =
+                ImageStore::<u8, 4>::alloc(new_size.width, new_size.height);
+            src_store.convolve_horizontal(horizontal_filters, &mut new_image_horizontal, pool);
+            src_store = new_image_horizontal;
+        }
+
+        assert_eq!(src_store.width, new_size.width);
+
         if premultiply_alpha && has_alpha_premultiplied {
             let mut premultiplied_store =
-                ImageStore::<u8, 4>::alloc(new_image_horizontal.width, new_image_horizontal.height);
-            new_image_horizontal.unpremultiply_alpha(&mut premultiplied_store, pool);
+                ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
+            src_store.unpremultiply_alpha(&mut premultiplied_store, pool);
             return Ok(premultiplied_store);
         }
-        Ok(new_image_horizontal)
+
+        Ok(src_store)
     }
 }
 
@@ -365,11 +385,11 @@ impl Scaling for Scaler {
         self.threading_policy = threading_policy;
     }
 
-    fn resize_rgb(
-        &self,
+    fn resize_rgb<'a>(
+        &'a self,
         new_size: ImageSize,
-        store: ImageStore<u8, 3>,
-    ) -> Result<ImageStore<u8, 3>, String> {
+        store: ImageStore<'a, u8, 3>,
+    ) -> Result<ImageStore<'a, u8, 3>, String> {
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
             return Err("One of image dimensions is 0, this should not happen".to_string());
         }
@@ -401,32 +421,44 @@ impl Scaling for Scaler {
                 new_size.height,
                 &pool,
             );
-            return Ok(ImageStore::<u8, 3>::new(
-                allocated_store,
-                new_size.width,
-                new_size.height,
-            )?);
+            return ImageStore::<u8, 3>::new(allocated_store, new_size.width, new_size.height);
         }
-        let vertical_filters = self.generate_weights(store.height, new_size.height);
-        let horizontal_filters = self.generate_weights(store.width, new_size.width);
 
-        let mut new_image_vertical = ImageStore::<u8, 3>::alloc(store.width, new_size.height);
-        store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
-        let mut new_image_horizontal = ImageStore::<u8, 3>::alloc(new_size.width, new_size.height);
-        new_image_vertical.convolve_horizontal(
-            horizontal_filters,
-            &mut new_image_horizontal,
-            &pool,
-        );
-        Ok(new_image_horizontal)
+        let should_do_horizontal = store.width != new_size.width;
+        let should_do_vertical = store.height != new_size.height;
+        assert!(should_do_horizontal || should_do_vertical);
+
+        let mut src_store = store;
+
+        if should_do_vertical {
+            let vertical_filters = self.generate_weights(src_store.height, new_size.height);
+            let mut new_image_vertical =
+                ImageStore::<u8, 3>::alloc(src_store.width, new_size.height);
+            src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+            src_store = new_image_vertical;
+        }
+
+        assert_eq!(src_store.height, new_size.height);
+
+        if should_do_horizontal {
+            let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
+            let mut new_image_horizontal =
+                ImageStore::<u8, 3>::alloc(new_size.width, new_size.height);
+            src_store.convolve_horizontal(horizontal_filters, &mut new_image_horizontal, &pool);
+            src_store = new_image_horizontal;
+        }
+
+        assert_eq!(src_store.width, new_size.width);
+
+        Ok(src_store)
     }
 
-    fn resize_rgba(
+    fn resize_rgba<'a>(
         &self,
         new_size: ImageSize,
-        store: ImageStore<u8, 4>,
+        store: ImageStore<'a, u8, 4>,
         premultiply_alpha: bool,
-    ) -> Result<ImageStore<u8, 4>, String> {
+    ) -> Result<ImageStore<'a, u8, 4>, String> {
         let pool = self
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
@@ -435,13 +467,13 @@ impl Scaling for Scaler {
 }
 
 impl Scaler {
-    pub(crate) fn resize_rgba_f32_impl(
-        &self,
+    pub(crate) fn resize_rgba_f32_impl<'a>(
+        &'a self,
         new_size: ImageSize,
-        store: ImageStore<f32, 4>,
+        store: ImageStore<'a, f32, 4>,
         premultiply_alpha: bool,
         pool: &Option<ThreadPool>,
-    ) -> Result<ImageStore<f32, 4>, String> {
+    ) -> Result<ImageStore<'a, f32, 4>, String> {
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
             return Err("One of image dimensions is 0, this should not happen".to_string());
         }
@@ -459,6 +491,7 @@ impl Scaler {
         }
 
         let mut src_store = store;
+
         if self.function == ResamplingFunction::Nearest {
             let mut allocated_store: Vec<f32> = vec![0f32; new_size.width * 4 * new_size.height];
             resize_nearest::<f32, 4>(
@@ -474,6 +507,10 @@ impl Scaler {
             return Ok(new_image);
         }
 
+        let should_do_horizontal = src_store.width != new_size.width;
+        let should_do_vertical = src_store.height != new_size.height;
+        assert!(should_do_horizontal || should_do_vertical);
+
         let mut has_alpha_premultiplied = false;
 
         if premultiply_alpha {
@@ -488,37 +525,54 @@ impl Scaler {
             }
         }
 
-        let allocated_store_vertical: Vec<f32> = vec![0f32; src_store.width * 4 * new_size.height];
-        let mut new_image_vertical =
-            ImageStore::<f32, 4>::new(allocated_store_vertical, src_store.width, new_size.height)?;
-        let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
-        let vertical_filters = self.generate_weights(src_store.height, new_image_vertical.height);
-        src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, pool);
+        if should_do_vertical {
+            let allocated_store_vertical: Vec<f32> =
+                vec![0f32; src_store.width * 4 * new_size.height];
+            let mut new_image_vertical = ImageStore::<f32, 4>::new(
+                allocated_store_vertical,
+                src_store.width,
+                new_size.height,
+            )?;
+            let vertical_filters =
+                self.generate_weights(src_store.height, new_image_vertical.height);
+            src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, pool);
+            src_store = new_image_vertical;
+        }
 
-        let allocated_store_horizontal: Vec<f32> = vec![0f32; new_size.width * 4 * new_size.height];
-        let mut new_image_horizontal =
-            ImageStore::<f32, 4>::new(allocated_store_horizontal, new_size.width, new_size.height)?;
-        new_image_vertical.convolve_horizontal(horizontal_filters, &mut new_image_horizontal, pool);
+        assert_eq!(src_store.height, new_size.height);
+
+        if should_do_horizontal {
+            let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
+            let allocated_store_horizontal: Vec<f32> =
+                vec![0f32; new_size.width * 4 * new_size.height];
+            let mut new_image_horizontal = ImageStore::<f32, 4>::new(
+                allocated_store_horizontal,
+                new_size.width,
+                new_size.height,
+            )?;
+            src_store.convolve_horizontal(horizontal_filters, &mut new_image_horizontal, pool);
+            src_store = new_image_horizontal;
+        }
+
+        assert_eq!(src_store.width, new_size.width);
 
         if premultiply_alpha && has_alpha_premultiplied {
-            let mut premultiplied_store = ImageStore::<f32, 4>::alloc(
-                new_image_horizontal.width,
-                new_image_horizontal.height,
-            );
-            new_image_horizontal.unpremultiply_alpha(&mut premultiplied_store, pool);
+            let mut premultiplied_store =
+                ImageStore::<f32, 4>::alloc(src_store.width, src_store.height);
+            src_store.unpremultiply_alpha(&mut premultiplied_store, pool);
             return Ok(premultiplied_store);
         }
 
-        Ok(new_image_horizontal)
+        Ok(src_store)
     }
 }
 
 impl ScalingF32 for Scaler {
-    fn resize_rgb_f32(
-        &self,
+    fn resize_rgb_f32<'a>(
+        &'a self,
         new_size: ImageSize,
-        store: ImageStore<f32, 3>,
-    ) -> Result<ImageStore<f32, 3>, String> {
+        store: ImageStore<'a, f32, 3>,
+    ) -> Result<ImageStore<'a, f32, 3>, String> {
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
             return Err("One of image dimensions is 0, this should not happen".to_string());
         }
@@ -552,33 +606,55 @@ impl ScalingF32 for Scaler {
             );
             let new_image =
                 ImageStore::<f32, 3>::new(allocated_store, new_size.width, new_size.height);
-            return Ok(new_image?);
+            return new_image;
         }
 
-        let allocated_store_vertical: Vec<f32> = vec![0f32; store.width * 3 * new_size.height];
-        let mut new_image_vertical =
-            ImageStore::<f32, 3>::new(allocated_store_vertical, store.width, new_size.height)?;
-        let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
-        store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+        let mut src_store = store;
 
-        let allocated_store_horizontal: Vec<f32> = vec![0f32; new_size.width * 3 * new_size.height];
-        let mut new_image_horizontal =
-            ImageStore::<f32, 3>::new(allocated_store_horizontal, new_size.width, new_size.height)?;
-        let horizontal_filters = self.generate_weights(store.width, new_size.width);
-        new_image_vertical.convolve_horizontal(
-            horizontal_filters,
-            &mut new_image_horizontal,
-            &pool,
-        );
-        Ok(new_image_horizontal)
+        let should_do_horizontal = src_store.width != new_size.width;
+        let should_do_vertical = src_store.height != new_size.height;
+        assert!(should_do_horizontal || should_do_vertical);
+
+        if should_do_vertical {
+            let allocated_store_vertical: Vec<f32> =
+                vec![0f32; src_store.width * 3 * new_size.height];
+            let mut new_image_vertical = ImageStore::<f32, 3>::new(
+                allocated_store_vertical,
+                src_store.width,
+                new_size.height,
+            )?;
+            let vertical_filters =
+                self.generate_weights(src_store.height, new_image_vertical.height);
+            src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+            src_store = new_image_vertical;
+        }
+
+        assert_eq!(src_store.height, new_size.height);
+
+        if should_do_horizontal {
+            let allocated_store_horizontal: Vec<f32> =
+                vec![0f32; new_size.width * 3 * new_size.height];
+            let mut new_image_horizontal = ImageStore::<f32, 3>::new(
+                allocated_store_horizontal,
+                new_size.width,
+                new_size.height,
+            )?;
+            let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
+            src_store.convolve_horizontal(horizontal_filters, &mut new_image_horizontal, &pool);
+            src_store = new_image_horizontal;
+        }
+
+        assert_eq!(src_store.width, new_size.width);
+
+        Ok(src_store)
     }
 
-    fn resize_rgba_f32(
-        &self,
+    fn resize_rgba_f32<'a>(
+        &'a self,
         new_size: ImageSize,
-        store: ImageStore<f32, 4>,
+        store: ImageStore<'a, f32, 4>,
         premultiply_alpha: bool,
-    ) -> Result<ImageStore<f32, 4>, String> {
+    ) -> Result<ImageStore<'a, f32, 4>, String> {
         let pool = self
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
@@ -650,11 +726,11 @@ impl Scaler {
 
 impl Scaler {
     /// Performs rescaling for u8 plane
-    pub fn resize_plane(
-        &self,
+    pub fn resize_plane<'a>(
+        &'a self,
         new_size: ImageSize,
-        store: ImageStore<u8, 1>,
-    ) -> Result<ImageStore<u8, 1>, String> {
+        store: ImageStore<'a, u8, 1>,
+    ) -> Result<ImageStore<'a, u8, 1>, String> {
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
             return Err("One of image dimensions is 0, this should not happen".to_string());
         }
@@ -690,28 +766,44 @@ impl Scaler {
                 ImageStore::<u8, 1>::new(allocated_store, new_size.width, new_size.height)?;
             return Ok(new_image);
         }
-        let vertical_filters = self.generate_weights(store.height, new_size.height);
-        let horizontal_filters = self.generate_weights(store.width, new_size.width);
 
-        let mut new_image_vertical = ImageStore::<u8, 1>::alloc(store.width, new_size.height);
-        store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
-        let mut new_image_horizontal = ImageStore::<u8, 1>::alloc(new_size.width, new_size.height);
-        new_image_vertical.convolve_horizontal(
-            horizontal_filters,
-            &mut new_image_horizontal,
-            &pool,
-        );
-        Ok(new_image_horizontal)
+        let should_do_horizontal = store.width != new_size.width;
+        let should_do_vertical = store.height != new_size.height;
+        assert!(should_do_horizontal || should_do_vertical);
+
+        let mut src_store = store;
+
+        if should_do_vertical {
+            let vertical_filters = self.generate_weights(src_store.height, new_size.height);
+            let mut new_image_vertical =
+                ImageStore::<u8, 1>::alloc(src_store.width, new_size.height);
+            src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+            src_store = new_image_vertical;
+        }
+
+        assert_eq!(src_store.height, new_size.height);
+
+        if should_do_horizontal {
+            let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
+            let mut new_image_horizontal =
+                ImageStore::<u8, 1>::alloc(new_size.width, new_size.height);
+            src_store.convolve_horizontal(horizontal_filters, &mut new_image_horizontal, &pool);
+            src_store = new_image_horizontal;
+        }
+
+        assert_eq!(src_store.width, new_size.width);
+
+        Ok(src_store)
     }
 }
 
 impl ScalingU16 for Scaler {
-    fn resize_rgb_u16(
+    fn resize_rgb_u16<'a>(
         &self,
         new_size: ImageSize,
-        store: ImageStore<u16, 3>,
+        store: ImageStore<'a, u16, 3>,
         bit_depth: usize,
-    ) -> Result<ImageStore<u16, 3>, String> {
+    ) -> Result<ImageStore<'a, u16, 3>, String> {
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
             return Err("One of image dimensions is 0, this should not happen".to_string());
         }
@@ -735,6 +827,10 @@ impl ScalingU16 for Scaler {
             ));
         }
 
+        let should_do_horizontal = store.width != new_size.width;
+        let should_do_vertical = store.height != new_size.height;
+        assert!(should_do_horizontal || should_do_vertical);
+
         let pool = self
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
@@ -756,24 +852,32 @@ impl ScalingU16 for Scaler {
             return Ok(new_image);
         }
 
-        let vertical_filters = self.generate_weights(store.height, new_size.height);
-        let horizontal_filters = self.generate_weights(store.width, new_size.width);
+        let mut src_store = store;
 
-        let mut copied_store = store;
+        if should_do_vertical {
+            let vertical_filters = self.generate_weights(src_store.height, new_size.height);
+            let mut new_image_vertical =
+                ImageStore::<u16, 3>::alloc(src_store.width, new_size.height);
+            new_image_vertical.bit_depth = bit_depth;
+            src_store.bit_depth = bit_depth;
+            src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+            src_store = new_image_vertical;
+        }
 
-        let mut new_image_vertical =
-            ImageStore::<u16, 3>::alloc(copied_store.width, new_size.height);
-        new_image_vertical.bit_depth = bit_depth;
-        copied_store.bit_depth = bit_depth;
-        copied_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
-        let mut new_image_horizontal = ImageStore::<u16, 3>::alloc(new_size.width, new_size.height);
-        new_image_horizontal.bit_depth = bit_depth;
-        new_image_vertical.convolve_horizontal(
-            horizontal_filters,
-            &mut new_image_horizontal,
-            &pool,
-        );
-        Ok(new_image_horizontal)
+        assert_eq!(src_store.height, new_size.height);
+
+        if should_do_horizontal {
+            let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
+            let mut new_image_horizontal =
+                ImageStore::<u16, 3>::alloc(new_size.width, new_size.height);
+            new_image_horizontal.bit_depth = bit_depth;
+            src_store.convolve_horizontal(horizontal_filters, &mut new_image_horizontal, &pool);
+            src_store = new_image_horizontal;
+        }
+
+        assert_eq!(src_store.width, new_size.width);
+
+        Ok(src_store)
     }
 
     /// Resizes u16 image
@@ -786,13 +890,13 @@ impl ScalingU16 for Scaler {
     ///
     /// # Panics
     /// Panic if bit depth < 1 or bit depth > 16
-    fn resize_rgba_u16(
+    fn resize_rgba_u16<'a>(
         &self,
         new_size: ImageSize,
-        store: ImageStore<u16, 4>,
+        store: ImageStore<'a, u16, 4>,
         bit_depth: usize,
         premultiply_alpha: bool,
-    ) -> Result<ImageStore<u16, 4>, String> {
+    ) -> Result<ImageStore<'a, u16, 4>, String> {
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
             return Err("One of image dimensions is 0, this should not happen".to_string());
         }
@@ -808,6 +912,10 @@ impl ScalingU16 for Scaler {
         if store.width == new_size.width && store.height == new_size.height {
             return Ok(store.copied());
         }
+
+        let should_do_horizontal = store.width != new_size.width;
+        let should_do_vertical = store.height != new_size.height;
+        assert!(should_do_horizontal || should_do_vertical);
 
         if !(1..=16).contains(&bit_depth) {
             return Err(format!(
@@ -853,40 +961,47 @@ impl ScalingU16 for Scaler {
             }
         }
 
-        let mut new_image_vertical = ImageStore::<u16, 4>::alloc(src_store.width, new_size.height);
-        let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
-        let vertical_filters = self.generate_weights(src_store.height, new_image_vertical.height);
-        src_store.bit_depth = bit_depth;
-        new_image_vertical.bit_depth = bit_depth;
-        src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+        if should_do_vertical {
+            let mut new_image_vertical =
+                ImageStore::<u16, 4>::alloc(src_store.width, new_size.height);
+            let vertical_filters =
+                self.generate_weights(src_store.height, new_image_vertical.height);
+            src_store.bit_depth = bit_depth;
+            new_image_vertical.bit_depth = bit_depth;
+            src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+            src_store = new_image_vertical;
+        }
 
-        let mut new_image_horizontal = ImageStore::<u16, 4>::alloc(new_size.width, new_size.height);
-        new_image_horizontal.bit_depth = bit_depth;
-        new_image_vertical.convolve_horizontal(
-            horizontal_filters,
-            &mut new_image_horizontal,
-            &pool,
-        );
+        assert_eq!(src_store.height, new_size.height);
 
-        if premultiply_alpha & has_alpha_premultiplied {
-            let mut premultiplied_store = ImageStore::<u16, 4>::alloc(
-                new_image_horizontal.width,
-                new_image_horizontal.height,
-            );
+        if should_do_horizontal {
+            let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
+            let mut new_image_horizontal =
+                ImageStore::<u16, 4>::alloc(new_size.width, new_size.height);
+            new_image_horizontal.bit_depth = bit_depth;
+            src_store.convolve_horizontal(horizontal_filters, &mut new_image_horizontal, &pool);
+            src_store = new_image_horizontal;
+        }
+
+        assert_eq!(src_store.width, new_size.width);
+
+        if premultiply_alpha && has_alpha_premultiplied {
+            let mut premultiplied_store =
+                ImageStore::<u16, 4>::alloc(src_store.width, src_store.height);
             premultiplied_store.bit_depth = bit_depth;
-            new_image_horizontal.unpremultiply_alpha(&mut premultiplied_store, &pool);
+            src_store.unpremultiply_alpha(&mut premultiplied_store, &pool);
             return Ok(premultiplied_store);
         }
-        Ok(new_image_horizontal)
+        Ok(src_store)
     }
 
     /// Performs rescaling for u16 plane
-    fn resize_plane_u16(
+    fn resize_plane_u16<'a>(
         &self,
         new_size: ImageSize,
-        store: ImageStore<u16, 1>,
+        store: ImageStore<'a, u16, 1>,
         bit_depth: usize,
-    ) -> Result<ImageStore<u16, 1>, String> {
+    ) -> Result<ImageStore<'a, u16, 1>, String> {
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
             return Err("One of image dimensions is 0, this should not happen".to_string());
         }
@@ -909,6 +1024,10 @@ impl ScalingU16 for Scaler {
                 bit_depth
             ));
         }
+
+        let should_do_horizontal = store.width != new_size.width;
+        let should_do_vertical = store.height != new_size.height;
+        assert!(should_do_horizontal || should_do_vertical);
 
         let pool = self
             .threading_policy
@@ -934,20 +1053,28 @@ impl ScalingU16 for Scaler {
         let vertical_filters = self.generate_weights(store.height, new_size.height);
         let horizontal_filters = self.generate_weights(store.width, new_size.width);
 
-        let mut copied_store = store;
-        copied_store.bit_depth = bit_depth;
+        let mut src_store = store;
+        src_store.bit_depth = bit_depth;
 
-        let mut new_image_vertical =
-            ImageStore::<u16, 1>::alloc(copied_store.width, new_size.height);
-        new_image_vertical.bit_depth = bit_depth;
-        copied_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
-        let mut new_image_horizontal = ImageStore::<u16, 1>::alloc(new_size.width, new_size.height);
-        new_image_horizontal.bit_depth = bit_depth;
-        new_image_vertical.convolve_horizontal(
-            horizontal_filters,
-            &mut new_image_horizontal,
-            &pool,
-        );
-        Ok(new_image_horizontal)
+        if should_do_vertical {
+            let mut new_image_vertical =
+                ImageStore::<u16, 1>::alloc(src_store.width, new_size.height);
+            new_image_vertical.bit_depth = bit_depth;
+            src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+            src_store = new_image_vertical;
+        }
+
+        assert_eq!(src_store.height, new_size.height);
+
+        if should_do_horizontal {
+            let mut new_image_horizontal =
+                ImageStore::<u16, 1>::alloc(new_size.width, new_size.height);
+            new_image_horizontal.bit_depth = bit_depth;
+            src_store.convolve_horizontal(horizontal_filters, &mut new_image_horizontal, &pool);
+            src_store = new_image_horizontal;
+        }
+        assert_eq!(src_store.width, new_size.width);
+
+        Ok(src_store)
     }
 }

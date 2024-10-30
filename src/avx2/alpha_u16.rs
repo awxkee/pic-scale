@@ -27,10 +27,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+use crate::alpha_handle_u16::{premultiply_alpha_rgba_row, unpremultiply_alpha_rgba_row};
 use crate::avx2::utils::{
     _mm256_select_si256, avx2_pack_u32, avx_deinterleave_rgba_epi16, avx_interleave_rgba_epi16,
 };
-use crate::{premultiply_pixel_u16, unpremultiply_pixel_u16};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::ParallelSliceMut;
 use rayon::slice::ParallelSlice;
@@ -51,6 +51,30 @@ unsafe fn _mm256_scale_by_alpha(px: __m256i, low_low_a: __m256, low_high_a: __m2
     avx2_pack_u32(new_ll, new_lh)
 }
 
+#[inline(always)]
+pub unsafe fn _mm256_div_by_1023_epi32(v: __m256i) -> __m256i {
+    const DIVIDING_BY: i32 = 10;
+    let addition = _mm256_set1_epi32(1 << (DIVIDING_BY - 1));
+    let v = _mm256_add_epi32(v, addition);
+    _mm256_srli_epi32::<DIVIDING_BY>(_mm256_add_epi32(v, _mm256_srli_epi32::<DIVIDING_BY>(v)))
+}
+
+#[inline(always)]
+pub unsafe fn _mm256_div_by_4095_epi32(v: __m256i) -> __m256i {
+    const DIVIDING_BY: i32 = 12;
+    let addition = _mm256_set1_epi32(1 << (DIVIDING_BY - 1));
+    let v = _mm256_add_epi32(v, addition);
+    _mm256_srli_epi32::<DIVIDING_BY>(_mm256_add_epi32(v, _mm256_srli_epi32::<DIVIDING_BY>(v)))
+}
+
+#[inline(always)]
+pub unsafe fn _mm256_div_by_65535_epi32(v: __m256i) -> __m256i {
+    const DIVIDING_BY: i32 = 16;
+    let addition = _mm256_set1_epi32(1 << (DIVIDING_BY - 1));
+    let v = _mm256_add_epi32(v, addition);
+    _mm256_srli_epi32::<DIVIDING_BY>(_mm256_add_epi32(v, _mm256_srli_epi32::<DIVIDING_BY>(v)))
+}
+
 pub fn avx_premultiply_alpha_rgba_u16(
     dst: &mut [u16],
     src: &[u16],
@@ -65,62 +89,229 @@ pub fn avx_premultiply_alpha_rgba_u16(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn avx_premultiply_alpha_rgba_u16_row(
-    dst: &mut [u16],
-    src: &[u16],
-    width: usize,
-    offset: usize,
-    bit_depth: usize,
-) {
+unsafe fn avx_premultiply_alpha_rgba_u16_row(dst: &mut [u16], src: &[u16], bit_depth: usize) {
     let max_colors = (1 << bit_depth) - 1;
 
-    let v_scale_colors = unsafe { _mm256_set1_ps((1. / max_colors as f64) as f32) };
-
-    let mut _cx = 0usize;
+    let mut rem = dst;
+    let mut src_rem = src;
 
     unsafe {
-        while _cx + 16 < width {
-            let px = _cx * 4;
-            let src_ptr = src.as_ptr().add(offset + px);
-            let lane0 = _mm256_loadu_si256(src_ptr as *const __m256i);
-            let lane1 = _mm256_loadu_si256(src_ptr.add(16) as *const __m256i);
-            let lane2 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
-            let lane3 = _mm256_loadu_si256(src_ptr.add(48) as *const __m256i);
+        if bit_depth == 10 {
+            for (dst, src) in rem
+                .chunks_exact_mut(16 * 4)
+                .zip(src_rem.chunks_exact(16 * 4))
+            {
+                let src_ptr = src.as_ptr();
+                let lane0 = _mm256_loadu_si256(src_ptr as *const __m256i);
+                let lane1 = _mm256_loadu_si256(src_ptr.add(16) as *const __m256i);
+                let lane2 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
+                let lane3 = _mm256_loadu_si256(src_ptr.add(48) as *const __m256i);
 
-            let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
+                let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
 
-            let low_alpha = _mm256_mul_ps(
-                _mm256_cvtepi32_ps(_mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.3))),
-                v_scale_colors,
-            );
-            let high_alpha = _mm256_mul_ps(
-                _mm256_cvtepi32_ps(_mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(
-                    pixel.3,
-                ))),
-                v_scale_colors,
-            );
+                let low_alpha = _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.3));
+                let high_alpha = _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.3));
 
-            let new_rrr = _mm256_scale_by_alpha(pixel.0, low_alpha, high_alpha);
-            let new_ggg = _mm256_scale_by_alpha(pixel.1, low_alpha, high_alpha);
-            let new_bbb = _mm256_scale_by_alpha(pixel.2, low_alpha, high_alpha);
+                let new_rrr = avx2_pack_u32(
+                    _mm256_div_by_1023_epi32(_mm256_madd_epi16(
+                        _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.0)),
+                        low_alpha,
+                    )),
+                    _mm256_div_by_1023_epi32(_mm256_madd_epi16(
+                        _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.0)),
+                        high_alpha,
+                    )),
+                );
+                let new_ggg = avx2_pack_u32(
+                    _mm256_div_by_1023_epi32(_mm256_madd_epi16(
+                        _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.1)),
+                        low_alpha,
+                    )),
+                    _mm256_div_by_1023_epi32(_mm256_madd_epi16(
+                        _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.1)),
+                        high_alpha,
+                    )),
+                );
+                let new_bbb = avx2_pack_u32(
+                    _mm256_div_by_1023_epi32(_mm256_madd_epi16(
+                        _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.2)),
+                        low_alpha,
+                    )),
+                    _mm256_div_by_1023_epi32(_mm256_madd_epi16(
+                        _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.2)),
+                        high_alpha,
+                    )),
+                );
 
-            let dst_ptr = dst.as_mut_ptr().add(offset + px);
+                let dst_ptr = dst.as_mut_ptr();
 
-            let (d_lane0, d_lane1, d_lane2, d_lane3) =
-                avx_interleave_rgba_epi16(new_rrr, new_ggg, new_bbb, pixel.3);
+                let (d_lane0, d_lane1, d_lane2, d_lane3) =
+                    avx_interleave_rgba_epi16(new_rrr, new_ggg, new_bbb, pixel.3);
 
-            _mm256_storeu_si256(dst_ptr as *mut __m256i, d_lane0);
-            _mm256_storeu_si256(dst_ptr.add(16) as *mut __m256i, d_lane1);
-            _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, d_lane2);
-            _mm256_storeu_si256(dst_ptr.add(48) as *mut __m256i, d_lane3);
-            _cx += 16;
+                _mm256_storeu_si256(dst_ptr as *mut __m256i, d_lane0);
+                _mm256_storeu_si256(dst_ptr.add(16) as *mut __m256i, d_lane1);
+                _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, d_lane2);
+                _mm256_storeu_si256(dst_ptr.add(48) as *mut __m256i, d_lane3);
+            }
+        } else if bit_depth == 12 {
+            for (dst, src) in rem
+                .chunks_exact_mut(16 * 4)
+                .zip(src_rem.chunks_exact(16 * 4))
+            {
+                let src_ptr = src.as_ptr();
+                let lane0 = _mm256_loadu_si256(src_ptr as *const __m256i);
+                let lane1 = _mm256_loadu_si256(src_ptr.add(16) as *const __m256i);
+                let lane2 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
+                let lane3 = _mm256_loadu_si256(src_ptr.add(48) as *const __m256i);
+
+                let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
+
+                let low_alpha = _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.3));
+                let high_alpha = _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.3));
+
+                let new_rrr = avx2_pack_u32(
+                    _mm256_div_by_4095_epi32(_mm256_madd_epi16(
+                        _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.0)),
+                        low_alpha,
+                    )),
+                    _mm256_div_by_4095_epi32(_mm256_madd_epi16(
+                        _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.0)),
+                        high_alpha,
+                    )),
+                );
+                let new_ggg = avx2_pack_u32(
+                    _mm256_div_by_4095_epi32(_mm256_madd_epi16(
+                        _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.1)),
+                        low_alpha,
+                    )),
+                    _mm256_div_by_4095_epi32(_mm256_madd_epi16(
+                        _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.1)),
+                        high_alpha,
+                    )),
+                );
+                let new_bbb = avx2_pack_u32(
+                    _mm256_div_by_4095_epi32(_mm256_madd_epi16(
+                        _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.2)),
+                        low_alpha,
+                    )),
+                    _mm256_div_by_4095_epi32(_mm256_madd_epi16(
+                        _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.2)),
+                        high_alpha,
+                    )),
+                );
+
+                let dst_ptr = dst.as_mut_ptr();
+
+                let (d_lane0, d_lane1, d_lane2, d_lane3) =
+                    avx_interleave_rgba_epi16(new_rrr, new_ggg, new_bbb, pixel.3);
+
+                _mm256_storeu_si256(dst_ptr as *mut __m256i, d_lane0);
+                _mm256_storeu_si256(dst_ptr.add(16) as *mut __m256i, d_lane1);
+                _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, d_lane2);
+                _mm256_storeu_si256(dst_ptr.add(48) as *mut __m256i, d_lane3);
+            }
+        } else if bit_depth == 16 {
+            for (dst, src) in rem
+                .chunks_exact_mut(16 * 4)
+                .zip(src_rem.chunks_exact(16 * 4))
+            {
+                let src_ptr = src.as_ptr();
+                let lane0 = _mm256_loadu_si256(src_ptr as *const __m256i);
+                let lane1 = _mm256_loadu_si256(src_ptr.add(16) as *const __m256i);
+                let lane2 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
+                let lane3 = _mm256_loadu_si256(src_ptr.add(48) as *const __m256i);
+
+                let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
+
+                let low_alpha = _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.3));
+                let high_alpha = _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.3));
+
+                let new_rrr = avx2_pack_u32(
+                    _mm256_div_by_65535_epi32(_mm256_mullo_epi32(
+                        _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.0)),
+                        low_alpha,
+                    )),
+                    _mm256_div_by_65535_epi32(_mm256_mullo_epi32(
+                        _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.0)),
+                        high_alpha,
+                    )),
+                );
+                let new_ggg = avx2_pack_u32(
+                    _mm256_div_by_65535_epi32(_mm256_mullo_epi32(
+                        _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.1)),
+                        low_alpha,
+                    )),
+                    _mm256_div_by_65535_epi32(_mm256_mullo_epi32(
+                        _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.1)),
+                        high_alpha,
+                    )),
+                );
+                let new_bbb = avx2_pack_u32(
+                    _mm256_div_by_65535_epi32(_mm256_mullo_epi32(
+                        _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.2)),
+                        low_alpha,
+                    )),
+                    _mm256_div_by_65535_epi32(_mm256_mullo_epi32(
+                        _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.2)),
+                        high_alpha,
+                    )),
+                );
+
+                let dst_ptr = dst.as_mut_ptr();
+
+                let (d_lane0, d_lane1, d_lane2, d_lane3) =
+                    avx_interleave_rgba_epi16(new_rrr, new_ggg, new_bbb, pixel.3);
+
+                _mm256_storeu_si256(dst_ptr as *mut __m256i, d_lane0);
+                _mm256_storeu_si256(dst_ptr.add(16) as *mut __m256i, d_lane1);
+                _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, d_lane2);
+                _mm256_storeu_si256(dst_ptr.add(48) as *mut __m256i, d_lane3);
+            }
+        } else {
+            let v_scale_colors = _mm256_set1_ps((1. / max_colors as f64) as f32);
+            for (dst, src) in rem
+                .chunks_exact_mut(16 * 4)
+                .zip(src_rem.chunks_exact(16 * 4))
+            {
+                let src_ptr = src.as_ptr();
+                let lane0 = _mm256_loadu_si256(src_ptr as *const __m256i);
+                let lane1 = _mm256_loadu_si256(src_ptr.add(16) as *const __m256i);
+                let lane2 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
+                let lane3 = _mm256_loadu_si256(src_ptr.add(48) as *const __m256i);
+
+                let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
+
+                let low_alpha = _mm256_mul_ps(
+                    _mm256_cvtepi32_ps(_mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.3))),
+                    v_scale_colors,
+                );
+                let high_alpha = _mm256_mul_ps(
+                    _mm256_cvtepi32_ps(_mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(
+                        pixel.3,
+                    ))),
+                    v_scale_colors,
+                );
+
+                let new_rrr = _mm256_scale_by_alpha(pixel.0, low_alpha, high_alpha);
+                let new_ggg = _mm256_scale_by_alpha(pixel.1, low_alpha, high_alpha);
+                let new_bbb = _mm256_scale_by_alpha(pixel.2, low_alpha, high_alpha);
+
+                let dst_ptr = dst.as_mut_ptr();
+
+                let (d_lane0, d_lane1, d_lane2, d_lane3) =
+                    avx_interleave_rgba_epi16(new_rrr, new_ggg, new_bbb, pixel.3);
+
+                _mm256_storeu_si256(dst_ptr as *mut __m256i, d_lane0);
+                _mm256_storeu_si256(dst_ptr.add(16) as *mut __m256i, d_lane1);
+                _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, d_lane2);
+                _mm256_storeu_si256(dst_ptr.add(48) as *mut __m256i, d_lane3);
+            }
         }
+        rem = rem.chunks_exact_mut(16 * 4).into_remainder();
+        src_rem = src_rem.chunks_exact(16 * 4).remainder();
     }
 
-    for x in _cx..width {
-        let px = x * 4;
-        premultiply_pixel_u16!(dst, src, offset + px, max_colors);
-    }
+    premultiply_alpha_rgba_row(rem, src_rem, max_colors);
 }
 
 #[target_feature(enable = "avx2")]
@@ -137,7 +328,7 @@ unsafe fn avx_premultiply_alpha_rgba_u16_impl(
             src.par_chunks_exact(width * 4)
                 .zip(dst.par_chunks_exact_mut(width * 4))
                 .for_each(|(src, dst)| unsafe {
-                    avx_premultiply_alpha_rgba_u16_row(dst, src, width, 0, bit_depth);
+                    avx_premultiply_alpha_rgba_u16_row(dst, src, bit_depth);
                 });
         });
     } else {
@@ -146,7 +337,7 @@ unsafe fn avx_premultiply_alpha_rgba_u16_impl(
             .zip(src.chunks_exact(4 * width))
         {
             unsafe {
-                avx_premultiply_alpha_rgba_u16_row(dst_row, src_row, width, 0, bit_depth);
+                avx_premultiply_alpha_rgba_u16_row(dst_row, src_row, bit_depth);
             }
         }
     }
@@ -167,23 +358,20 @@ pub fn avx_unpremultiply_alpha_rgba_u16(
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn avx_unpremultiply_alpha_rgba_u16_row(
-    dst: &mut [u16],
-    src: &[u16],
-    width: usize,
-    offset: usize,
-    bit_depth: usize,
-) {
+unsafe fn avx_unpremultiply_alpha_rgba_u16_row(dst: &mut [u16], src: &[u16], bit_depth: usize) {
     let max_colors = (1 << bit_depth) - 1;
 
     let v_scale_colors = unsafe { _mm256_set1_ps(max_colors as f32) };
 
-    let mut _cx = 0usize;
+    let mut rem = dst;
+    let mut src_rem = src;
 
     unsafe {
-        while _cx + 16 < width {
-            let px = _cx * 4;
-            let src_ptr = src.as_ptr().add(offset + px);
+        for (dst, src) in rem
+            .chunks_exact_mut(16 * 4)
+            .zip(src_rem.chunks_exact(16 * 4))
+        {
+            let src_ptr = src.as_ptr();
             let lane0 = _mm256_loadu_si256(src_ptr as *const __m256i);
             let lane1 = _mm256_loadu_si256(src_ptr.add(16) as *const __m256i);
             let lane2 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
@@ -212,7 +400,7 @@ unsafe fn avx_unpremultiply_alpha_rgba_u16_row(
             let mut new_bbb = _mm256_scale_by_alpha(pixel.2, low_alpha, high_alpha);
             new_bbb = _mm256_select_si256(is_zero_alpha_mask, pixel.2, new_bbb);
 
-            let dst_ptr = dst.as_mut_ptr().add(offset + px);
+            let dst_ptr = dst.as_mut_ptr();
             let (d_lane0, d_lane1, d_lane2, d_lane3) =
                 avx_interleave_rgba_epi16(new_rrr, new_ggg, new_bbb, pixel.3);
 
@@ -220,15 +408,13 @@ unsafe fn avx_unpremultiply_alpha_rgba_u16_row(
             _mm256_storeu_si256(dst_ptr.add(16) as *mut __m256i, d_lane1);
             _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, d_lane2);
             _mm256_storeu_si256(dst_ptr.add(48) as *mut __m256i, d_lane3);
-            _cx += 16;
         }
+
+        rem = rem.chunks_exact_mut(16 * 4).into_remainder();
+        src_rem = src_rem.chunks_exact(16 * 4).remainder();
     }
 
-    for x in _cx..width {
-        let px = x * 4;
-        let pixel_offset = offset + px;
-        unpremultiply_pixel_u16!(dst, src, pixel_offset, max_colors);
-    }
+    unpremultiply_alpha_rgba_row(rem, src_rem, bit_depth as u32);
 }
 
 #[inline]
@@ -246,7 +432,7 @@ unsafe fn avx_unpremultiply_alpha_rgba_u16_impl(
             src.par_chunks_exact(width * 4)
                 .zip(dst.par_chunks_exact_mut(width * 4))
                 .for_each(|(src, dst)| unsafe {
-                    avx_unpremultiply_alpha_rgba_u16_row(dst, src, width, 0, bit_depth);
+                    avx_unpremultiply_alpha_rgba_u16_row(dst, src, bit_depth);
                 });
         });
     } else {
@@ -255,7 +441,7 @@ unsafe fn avx_unpremultiply_alpha_rgba_u16_impl(
             .zip(src.chunks_exact(4 * width))
         {
             unsafe {
-                avx_unpremultiply_alpha_rgba_u16_row(dst_row, src_row, width, 0, bit_depth);
+                avx_unpremultiply_alpha_rgba_u16_row(dst_row, src_row, bit_depth);
             }
         }
     }

@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+use crate::alpha_handle_u16::{premultiply_alpha_rgba_row, unpremultiply_alpha_rgba_row};
 use crate::sse::alpha_u8::_mm_select_si128;
 use crate::sse::{sse_deinterleave_rgba_epi16, sse_interleave_rgba_epi16};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
@@ -64,6 +65,30 @@ unsafe fn sse_unpremultiply_row_u16(
     _mm_select_si128(is_zero_mask, x, pixel)
 }
 
+#[inline(always)]
+pub unsafe fn _mm_div_by_1023_epi32(v: __m128i) -> __m128i {
+    const DIVIDING_BY: i32 = 10;
+    let addition = _mm_set1_epi32(1 << (DIVIDING_BY - 1));
+    let v = _mm_add_epi32(v, addition);
+    _mm_srli_epi32::<DIVIDING_BY>(_mm_add_epi32(v, _mm_srli_epi32::<DIVIDING_BY>(v)))
+}
+
+#[inline(always)]
+pub unsafe fn _mm_div_by_4095_epi32(v: __m128i) -> __m128i {
+    const DIVIDING_BY: i32 = 12;
+    let addition = _mm_set1_epi32(1 << (DIVIDING_BY - 1));
+    let v = _mm_add_epi32(v, addition);
+    _mm_srli_epi32::<DIVIDING_BY>(_mm_add_epi32(v, _mm_srli_epi32::<DIVIDING_BY>(v)))
+}
+
+#[inline(always)]
+pub unsafe fn _mm_div_by_65535_epi32(v: __m128i) -> __m128i {
+    const DIVIDING_BY: i32 = 16;
+    let addition = _mm_set1_epi32(1 << (DIVIDING_BY - 1));
+    let v = _mm_add_epi32(v, addition);
+    _mm_srli_epi32::<DIVIDING_BY>(_mm_add_epi32(v, _mm_srli_epi32::<DIVIDING_BY>(v)))
+}
+
 pub fn unpremultiply_alpha_sse_rgba_u16(
     dst: &mut [u16],
     src: &[u16],
@@ -77,7 +102,6 @@ pub fn unpremultiply_alpha_sse_rgba_u16(
     }
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1")]
 unsafe fn unpremultiply_alpha_sse_rgba_u16_row_impl(
     dst: &mut [u16],
@@ -90,8 +114,6 @@ unsafe fn unpremultiply_alpha_sse_rgba_u16_row_impl(
 
     let mut rem = dst;
     let mut src_rem = src;
-
-    let recip_max_colors = 1. / max_colors as f32;
 
     unsafe {
         for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
@@ -133,16 +155,7 @@ unsafe fn unpremultiply_alpha_sse_rgba_u16_row_impl(
         src_rem = src_rem.chunks_exact(8 * 4).remainder();
     }
 
-    for (dst, src) in rem.chunks_exact_mut(4).zip(src_rem.chunks_exact(4)) {
-        let a = src[3] as u32;
-        dst[0] =
-            (((src[0] as u32 * a) as f32 * recip_max_colors) as u32).min(max_colors as u32) as u16;
-        dst[1] =
-            (((src[1] as u32 * a) as f32 * recip_max_colors) as u32).min(max_colors as u32) as u16;
-        dst[2] =
-            (((src[2] as u32 * a) as f32 * recip_max_colors) as u32).min(max_colors as u32) as u16;
-        dst[3] = (((a * a) as f32 * recip_max_colors) as u32).min(max_colors as u32) as u16;
-    }
+    unpremultiply_alpha_rgba_row(rem, src_rem, bit_depth as u32);
 }
 
 #[inline]
@@ -211,61 +224,173 @@ pub fn premultiply_alpha_sse_rgba_u16(
     }
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1")]
 unsafe fn premultiply_alpha_sse_rgba_u16_row_impl(dst: &mut [u16], src: &[u16], bit_depth: usize) {
     let max_colors = (1 << bit_depth) - 1;
-
-    let v_max_colors_scale = unsafe {
-        _mm_div_ps(
-            _mm_set1_ps(1.),
-            _mm_cvtepi32_ps(_mm_set1_epi32(max_colors as i32)),
-        )
-    };
 
     let mut rem = dst;
     let mut src_rem = src;
 
     unsafe {
-        for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
-            let src_ptr = src.as_ptr();
-            let row0 = _mm_loadu_si128(src_ptr as *const __m128i);
-            let row1 = _mm_loadu_si128(src_ptr.add(8) as *const __m128i);
-            let row2 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
-            let row3 = _mm_loadu_si128(src_ptr.add(24) as *const __m128i);
-            let (rrrr, gggg, bbbb, aaaa) = sse_deinterleave_rgba_epi16(row0, row1, row2, row3);
+        if bit_depth == 10 {
+            let zeros = _mm_setzero_si128();
+            for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
+                let src_ptr = src.as_ptr();
+                let row0 = _mm_loadu_si128(src_ptr as *const __m128i);
+                let row1 = _mm_loadu_si128(src_ptr.add(8) as *const __m128i);
+                let row2 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
+                let row3 = _mm_loadu_si128(src_ptr.add(24) as *const __m128i);
+                let (rrrr, gggg, bbbb, aaaa) = sse_deinterleave_rgba_epi16(row0, row1, row2, row3);
 
-            let a_lo_f = _mm_cvtepi32_ps(_mm_cvtepu16_epi32(aaaa));
-            let a_hi_f = _mm_cvtepi32_ps(_mm_unpackhi_epi16(aaaa, _mm_setzero_si128()));
+                let a_lo_f = _mm_cvtepu16_epi32(aaaa);
+                let a_hi_f = _mm_unpackhi_epi16(aaaa, zeros);
 
-            let new_rrrr = sse_premultiply_row_u16(rrrr, a_lo_f, a_hi_f, v_max_colors_scale);
-            let new_gggg = sse_premultiply_row_u16(gggg, a_lo_f, a_hi_f, v_max_colors_scale);
-            let new_bbbb = sse_premultiply_row_u16(bbbb, a_lo_f, a_hi_f, v_max_colors_scale);
+                let new_rrrr = _mm_packus_epi32(
+                    _mm_div_by_1023_epi32(_mm_madd_epi16(_mm_unpacklo_epi16(rrrr, zeros), a_lo_f)),
+                    _mm_div_by_1023_epi32(_mm_madd_epi16(_mm_unpackhi_epi16(rrrr, zeros), a_hi_f)),
+                );
+                let new_gggg = _mm_packus_epi32(
+                    _mm_div_by_1023_epi32(_mm_madd_epi16(_mm_unpacklo_epi16(gggg, zeros), a_lo_f)),
+                    _mm_div_by_1023_epi32(_mm_madd_epi16(_mm_unpackhi_epi16(gggg, zeros), a_hi_f)),
+                );
+                let new_bbbb = _mm_packus_epi32(
+                    _mm_div_by_1023_epi32(_mm_madd_epi16(_mm_unpacklo_epi16(bbbb, zeros), a_lo_f)),
+                    _mm_div_by_1023_epi32(_mm_madd_epi16(_mm_unpackhi_epi16(bbbb, zeros), a_hi_f)),
+                );
 
-            let (rgba0, rgba1, rgba2, rgba3) =
-                sse_interleave_rgba_epi16(new_rrrr, new_gggg, new_bbbb, aaaa);
+                let (rgba0, rgba1, rgba2, rgba3) =
+                    sse_interleave_rgba_epi16(new_rrrr, new_gggg, new_bbbb, aaaa);
 
-            let dst_ptr = dst.as_mut_ptr();
-            _mm_storeu_si128(dst_ptr as *mut __m128i, rgba0);
-            _mm_storeu_si128(dst_ptr.add(8) as *mut __m128i, rgba1);
-            _mm_storeu_si128(dst_ptr.add(16) as *mut __m128i, rgba2);
-            _mm_storeu_si128(dst_ptr.add(24) as *mut __m128i, rgba3);
+                let dst_ptr = dst.as_mut_ptr();
+                _mm_storeu_si128(dst_ptr as *mut __m128i, rgba0);
+                _mm_storeu_si128(dst_ptr.add(8) as *mut __m128i, rgba1);
+                _mm_storeu_si128(dst_ptr.add(16) as *mut __m128i, rgba2);
+                _mm_storeu_si128(dst_ptr.add(24) as *mut __m128i, rgba3);
+            }
+        } else if bit_depth == 12 {
+            let zeros = _mm_setzero_si128();
+            for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
+                let src_ptr = src.as_ptr();
+                let row0 = _mm_loadu_si128(src_ptr as *const __m128i);
+                let row1 = _mm_loadu_si128(src_ptr.add(8) as *const __m128i);
+                let row2 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
+                let row3 = _mm_loadu_si128(src_ptr.add(24) as *const __m128i);
+                let (rrrr, gggg, bbbb, aaaa) = sse_deinterleave_rgba_epi16(row0, row1, row2, row3);
+
+                let a_lo_f = _mm_cvtepu16_epi32(aaaa);
+                let a_hi_f = _mm_unpackhi_epi16(aaaa, zeros);
+
+                let new_rrrr = _mm_packus_epi32(
+                    _mm_div_by_4095_epi32(_mm_madd_epi16(_mm_unpacklo_epi16(rrrr, zeros), a_lo_f)),
+                    _mm_div_by_4095_epi32(_mm_madd_epi16(_mm_unpackhi_epi16(rrrr, zeros), a_hi_f)),
+                );
+                let new_gggg = _mm_packus_epi32(
+                    _mm_div_by_4095_epi32(_mm_madd_epi16(_mm_unpacklo_epi16(gggg, zeros), a_lo_f)),
+                    _mm_div_by_4095_epi32(_mm_madd_epi16(_mm_unpackhi_epi16(gggg, zeros), a_hi_f)),
+                );
+                let new_bbbb = _mm_packus_epi32(
+                    _mm_div_by_4095_epi32(_mm_madd_epi16(_mm_unpacklo_epi16(bbbb, zeros), a_lo_f)),
+                    _mm_div_by_4095_epi32(_mm_madd_epi16(_mm_unpackhi_epi16(bbbb, zeros), a_hi_f)),
+                );
+
+                let (rgba0, rgba1, rgba2, rgba3) =
+                    sse_interleave_rgba_epi16(new_rrrr, new_gggg, new_bbbb, aaaa);
+
+                let dst_ptr = dst.as_mut_ptr();
+                _mm_storeu_si128(dst_ptr as *mut __m128i, rgba0);
+                _mm_storeu_si128(dst_ptr.add(8) as *mut __m128i, rgba1);
+                _mm_storeu_si128(dst_ptr.add(16) as *mut __m128i, rgba2);
+                _mm_storeu_si128(dst_ptr.add(24) as *mut __m128i, rgba3);
+            }
+        } else if bit_depth == 16 {
+            let zeros = _mm_setzero_si128();
+            for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
+                let src_ptr = src.as_ptr();
+                let row0 = _mm_loadu_si128(src_ptr as *const __m128i);
+                let row1 = _mm_loadu_si128(src_ptr.add(8) as *const __m128i);
+                let row2 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
+                let row3 = _mm_loadu_si128(src_ptr.add(24) as *const __m128i);
+                let (rrrr, gggg, bbbb, aaaa) = sse_deinterleave_rgba_epi16(row0, row1, row2, row3);
+
+                let a_lo_f = _mm_cvtepu16_epi32(aaaa);
+                let a_hi_f = _mm_unpackhi_epi16(aaaa, zeros);
+
+                let new_rrrr = _mm_packus_epi32(
+                    _mm_div_by_65535_epi32(_mm_mullo_epi32(
+                        _mm_unpacklo_epi16(rrrr, zeros),
+                        a_lo_f,
+                    )),
+                    _mm_div_by_65535_epi32(_mm_mullo_epi32(
+                        _mm_unpackhi_epi16(rrrr, zeros),
+                        a_hi_f,
+                    )),
+                );
+                let new_gggg = _mm_packus_epi32(
+                    _mm_div_by_65535_epi32(_mm_mullo_epi32(
+                        _mm_unpacklo_epi16(gggg, zeros),
+                        a_lo_f,
+                    )),
+                    _mm_div_by_65535_epi32(_mm_mullo_epi32(
+                        _mm_unpackhi_epi16(gggg, zeros),
+                        a_hi_f,
+                    )),
+                );
+                let new_bbbb = _mm_packus_epi32(
+                    _mm_div_by_65535_epi32(_mm_mullo_epi32(
+                        _mm_unpacklo_epi16(bbbb, zeros),
+                        a_lo_f,
+                    )),
+                    _mm_div_by_65535_epi32(_mm_mullo_epi32(
+                        _mm_unpackhi_epi16(bbbb, zeros),
+                        a_hi_f,
+                    )),
+                );
+
+                let (rgba0, rgba1, rgba2, rgba3) =
+                    sse_interleave_rgba_epi16(new_rrrr, new_gggg, new_bbbb, aaaa);
+
+                let dst_ptr = dst.as_mut_ptr();
+                _mm_storeu_si128(dst_ptr as *mut __m128i, rgba0);
+                _mm_storeu_si128(dst_ptr.add(8) as *mut __m128i, rgba1);
+                _mm_storeu_si128(dst_ptr.add(16) as *mut __m128i, rgba2);
+                _mm_storeu_si128(dst_ptr.add(24) as *mut __m128i, rgba3);
+            }
+        } else {
+            let v_max_colors_scale = _mm_div_ps(
+                _mm_set1_ps(1.),
+                _mm_cvtepi32_ps(_mm_set1_epi32(max_colors as i32)),
+            );
+            for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
+                let src_ptr = src.as_ptr();
+                let row0 = _mm_loadu_si128(src_ptr as *const __m128i);
+                let row1 = _mm_loadu_si128(src_ptr.add(8) as *const __m128i);
+                let row2 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
+                let row3 = _mm_loadu_si128(src_ptr.add(24) as *const __m128i);
+                let (rrrr, gggg, bbbb, aaaa) = sse_deinterleave_rgba_epi16(row0, row1, row2, row3);
+
+                let a_lo_f = _mm_cvtepi32_ps(_mm_cvtepu16_epi32(aaaa));
+                let a_hi_f = _mm_cvtepi32_ps(_mm_unpackhi_epi16(aaaa, _mm_setzero_si128()));
+
+                let new_rrrr = sse_premultiply_row_u16(rrrr, a_lo_f, a_hi_f, v_max_colors_scale);
+                let new_gggg = sse_premultiply_row_u16(gggg, a_lo_f, a_hi_f, v_max_colors_scale);
+                let new_bbbb = sse_premultiply_row_u16(bbbb, a_lo_f, a_hi_f, v_max_colors_scale);
+
+                let (rgba0, rgba1, rgba2, rgba3) =
+                    sse_interleave_rgba_epi16(new_rrrr, new_gggg, new_bbbb, aaaa);
+
+                let dst_ptr = dst.as_mut_ptr();
+                _mm_storeu_si128(dst_ptr as *mut __m128i, rgba0);
+                _mm_storeu_si128(dst_ptr.add(8) as *mut __m128i, rgba1);
+                _mm_storeu_si128(dst_ptr.add(16) as *mut __m128i, rgba2);
+                _mm_storeu_si128(dst_ptr.add(24) as *mut __m128i, rgba3);
+            }
         }
 
         rem = rem.chunks_exact_mut(8 * 4).into_remainder();
         src_rem = src_rem.chunks_exact(8 * 4).remainder();
     }
 
-    for (dst, src) in rem.chunks_exact_mut(4).zip(src_rem.chunks_exact(4)) {
-        let a = src[3] as u32;
-        if a != 0 {
-            let a_recip = 1. / a as f32;
-            dst[0] = ((src[0] as u32 * max_colors) as f32 * a_recip) as u16;
-            dst[1] = ((src[1] as u32 * max_colors) as f32 * a_recip) as u16;
-            dst[2] = ((src[2] as u32 * max_colors) as f32 * a_recip) as u16;
-            dst[3] = ((a * max_colors) as f32 * a_recip) as u16;
-        }
-    }
+    premultiply_alpha_rgba_row(rem, src_rem, max_colors);
 }
 
 #[inline]

@@ -37,6 +37,28 @@ use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::slice::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
 
+#[inline]
+pub fn div_by_1023(v: u32) -> u16 {
+    let round = 1 << 9;
+    let v = v + round;
+    (((v >> 10) + v) >> 10) as u16
+}
+
+#[inline]
+pub fn div_by_4095(v: u32) -> u16 {
+    let round = 1 << 11;
+    let v = v + round;
+    (((v >> 12) + v) >> 12) as u16
+}
+
+#[inline]
+pub fn div_by_65535(v: u32) -> u16 {
+    let round = 1 << 15;
+    let v_expand = v;
+    let v = v_expand + round;
+    (((v >> 16) + v) >> 16) as u16
+}
+
 #[macro_export]
 macro_rules! unpremultiply_pixel_u16 {
     ($dst: expr, $src: expr, $pixel_offset: expr, $max_colors: expr) => {{
@@ -62,40 +84,48 @@ macro_rules! unpremultiply_pixel_u16 {
     }};
 }
 
-#[macro_export]
-macro_rules! premultiply_pixel_u16 {
-    ($dst: expr, $src: expr, $pixel_offset: expr, $max_colors: expr) => {{
-        let mut r = *unsafe { $src.get_unchecked($pixel_offset) } as u32;
-        let mut g = *unsafe { $src.get_unchecked($pixel_offset + 1) } as u32;
-        let mut b = *unsafe { $src.get_unchecked($pixel_offset + 2) } as u32;
-        let a = *unsafe { $src.get_unchecked($pixel_offset + 3) } as u32;
-        r *= a;
-        g *= a;
-        b *= a;
-        r /= $max_colors;
-        g /= $max_colors;
-        b /= $max_colors;
-        unsafe {
-            *$dst.get_unchecked_mut($pixel_offset) = r as u16;
-            *$dst.get_unchecked_mut($pixel_offset + 1) = g as u16;
-            *$dst.get_unchecked_mut($pixel_offset + 2) = b as u16;
-            *$dst.get_unchecked_mut($pixel_offset + 3) = a as u16;
+#[inline(always)]
+pub(crate) fn premultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], max_colors: u32) {
+    if max_colors == 1023 {
+        for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+            let a = src[3] as u32;
+            dst[0] = div_by_1023(src[0] as u32 * a);
+            dst[1] = div_by_1023(src[1] as u32 * a);
+            dst[2] = div_by_1023(src[2] as u32 * a);
+            dst[3] = div_by_1023(src[3] as u32 * a);
         }
-    }};
-}
-
-fn premultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], max_colors: u32) {
-    let recip_max_colors = 1. / max_colors as f32;
-    for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
-        let a = src[3] as u32;
-        dst[0] = (((src[0] as u32 * a) as f32 * recip_max_colors) as u32).min(max_colors) as u16;
-        dst[1] = (((src[1] as u32 * a) as f32 * recip_max_colors) as u32).min(max_colors) as u16;
-        dst[2] = (((src[2] as u32 * a) as f32 * recip_max_colors) as u32).min(max_colors) as u16;
-        dst[3] = (((a * a) as f32 * recip_max_colors) as u32).min(max_colors) as u16;
+    } else if max_colors == 4096 {
+        for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+            let a = src[3] as u32;
+            dst[0] = div_by_4095(src[0] as u32 * a);
+            dst[1] = div_by_4095(src[1] as u32 * a);
+            dst[2] = div_by_4095(src[2] as u32 * a);
+            dst[3] = div_by_4095(src[3] as u32 * a);
+        }
+    } else if max_colors == 65535 {
+        for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+            let a = src[3] as u32;
+            dst[0] = div_by_65535(src[0] as u32 * a);
+            dst[1] = div_by_65535(src[1] as u32 * a);
+            dst[2] = div_by_65535(src[2] as u32 * a);
+            dst[3] = div_by_65535(src[3] as u32 * a);
+        }
+    } else {
+        let recip_max_colors = 1. / max_colors as f32;
+        for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+            let a = src[3] as u32;
+            dst[0] =
+                (((src[0] as u32 * a) as f32 * recip_max_colors) as u32).min(max_colors) as u16;
+            dst[1] =
+                (((src[1] as u32 * a) as f32 * recip_max_colors) as u32).min(max_colors) as u16;
+            dst[2] =
+                (((src[2] as u32 * a) as f32 * recip_max_colors) as u32).min(max_colors) as u16;
+            dst[3] = (((a * a) as f32 * recip_max_colors) as u32).min(max_colors) as u16;
+        }
     }
 }
 
-fn unpremultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], max_colors: u32) {
+pub fn unpremultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], max_colors: u32) {
     for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
         let a = src[3] as u32;
         if a != 0 {

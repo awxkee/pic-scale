@@ -117,12 +117,12 @@ impl Scaling for LinearApproxScaler {
         Ok(gamma_store)
     }
 
-    fn resize_rgba(
+    fn resize_rgba<'a>(
         &self,
         new_size: ImageSize,
-        store: ImageStore<u8, 4>,
+        store: ImageStore<'a, u8, 4>,
         premultiply_alpha: bool,
-    ) -> Result<ImageStore<u8, 4>, String> {
+    ) -> Result<ImageStore<'a, u8, 4>, String> {
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
             return Err("One of image dimensions is 0, this should not happen".to_string());
         }

@@ -43,6 +43,7 @@ mod rgb_u8;
 #[cfg(feature = "half")]
 mod rgba_f16;
 mod rgba_f32;
+mod rgba_u16;
 mod rgba_u16_lb;
 mod rgba_u8;
 mod routines;
@@ -51,6 +52,7 @@ mod utils;
 #[cfg(feature = "half")]
 mod vertical_f16;
 mod vertical_f32;
+mod vertical_u16;
 mod vertical_u16_lb;
 mod vertical_u8;
 
@@ -81,6 +83,7 @@ pub use rgba_f16::{
 pub use rgba_f32::{
     convolve_horizontal_rgba_sse_row_one_f32, convolve_horizontal_rgba_sse_rows_4_f32,
 };
+pub use rgba_u16::{convolve_horizontal_rgba_sse_rows_4_u16, convolve_horizontal_rgba_sse_u16_row};
 pub use rgba_u16_lb::{
     convolve_horizontal_rgba_sse_rows_4_lb_u8, convolve_horizontal_rgba_sse_u16_lb_row,
 };
@@ -90,6 +93,7 @@ pub use utils::*;
 #[cfg(feature = "half")]
 pub use vertical_f16::convolve_vertical_sse_row_f16;
 pub use vertical_f32::convolve_vertical_rgb_sse_row_f32;
+pub use vertical_u16::convolve_column_sse_u16;
 pub use vertical_u16_lb::convolve_column_lb_sse_u16;
 pub use vertical_u8::convolve_vertical_sse_row;
 

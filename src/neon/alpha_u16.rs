@@ -26,11 +26,27 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::alpha_handle_u16::premultiply_alpha_rgba_row;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::ParallelSliceMut;
 use rayon::slice::ParallelSlice;
 use rayon::ThreadPool;
 use std::arch::aarch64::*;
+
+#[inline]
+unsafe fn neon_div_by_1023_n(v: uint32x4_t) -> uint16x4_t {
+    vqrshrn_n_u32::<10>(vrsraq_n_u32::<10>(v, v))
+}
+
+#[inline]
+unsafe fn neon_div_by_4095_n(v: uint32x4_t) -> uint16x4_t {
+    vqrshrn_n_u32::<12>(vrsraq_n_u32::<12>(v, v))
+}
+
+#[inline]
+unsafe fn neon_div_by_65535_n(v: uint32x4_t) -> uint16x4_t {
+    vqrshrn_n_u32::<16>(vrsraq_n_u32::<16>(v, v))
+}
 
 pub fn neon_premultiply_alpha_rgba_row_u16(dst: &mut [u16], src: &[u16], bit_depth: usize) {
     let max_colors = (1 << bit_depth) - 1;
@@ -40,43 +56,109 @@ pub fn neon_premultiply_alpha_rgba_row_u16(dst: &mut [u16], src: &[u16], bit_dep
     let mut rem = dst;
     let mut src_rem = src;
 
-    let recip_max_colors = 1. / max_colors as f32;
-
     unsafe {
-        for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
-            let pixel = vld4q_u16(src.as_ptr());
+        if bit_depth == 10 {
+            for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
+                let pixel = vld4q_u16(src.as_ptr());
 
-            let low_a = vmovl_u16(vget_low_u16(pixel.3));
-            let high_a = vmovl_high_u16(pixel.3);
+                let low_a = vget_low_u16(pixel.3);
 
-            let low_a = vmulq_f32(vcvtq_f32_u32(low_a), v_max_colors_scale);
-            let hi_a = vmulq_f32(vcvtq_f32_u32(high_a), v_max_colors_scale);
+                let new_r = vcombine_u16(
+                    neon_div_by_1023_n(vmull_u16(vget_low_u16(pixel.0), low_a)),
+                    neon_div_by_1023_n(vmull_high_u16(pixel.0, pixel.3)),
+                );
 
-            let new_r = v_scale_by_alpha(pixel.0, low_a, hi_a);
+                let new_g = vcombine_u16(
+                    neon_div_by_1023_n(vmull_u16(vget_low_u16(pixel.1), low_a)),
+                    neon_div_by_1023_n(vmull_high_u16(pixel.1, pixel.3)),
+                );
 
-            let new_g = v_scale_by_alpha(pixel.1, low_a, hi_a);
+                let new_b = vcombine_u16(
+                    neon_div_by_1023_n(vmull_u16(vget_low_u16(pixel.2), low_a)),
+                    neon_div_by_1023_n(vmull_high_u16(pixel.2, pixel.3)),
+                );
 
-            let new_b = v_scale_by_alpha(pixel.2, low_a, hi_a);
+                let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
 
-            let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
+                vst4q_u16(dst.as_mut_ptr(), new_px);
+            }
+        } else if bit_depth == 12 {
+            for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
+                let pixel = vld4q_u16(src.as_ptr());
 
-            vst4q_u16(dst.as_mut_ptr(), new_px);
+                let low_a = vget_low_u16(pixel.3);
+
+                let new_r = vcombine_u16(
+                    neon_div_by_4095_n(vmull_u16(vget_low_u16(pixel.0), low_a)),
+                    neon_div_by_4095_n(vmull_high_u16(pixel.0, pixel.3)),
+                );
+
+                let new_g = vcombine_u16(
+                    neon_div_by_4095_n(vmull_u16(vget_low_u16(pixel.1), low_a)),
+                    neon_div_by_4095_n(vmull_high_u16(pixel.1, pixel.3)),
+                );
+
+                let new_b = vcombine_u16(
+                    neon_div_by_4095_n(vmull_u16(vget_low_u16(pixel.2), low_a)),
+                    neon_div_by_4095_n(vmull_high_u16(pixel.2, pixel.3)),
+                );
+
+                let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
+
+                vst4q_u16(dst.as_mut_ptr(), new_px);
+            }
+        } else if bit_depth == 16 {
+            for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
+                let pixel = vld4q_u16(src.as_ptr());
+
+                let low_a = vget_low_u16(pixel.3);
+
+                let new_r = vcombine_u16(
+                    neon_div_by_65535_n(vmull_u16(vget_low_u16(pixel.0), low_a)),
+                    neon_div_by_65535_n(vmull_high_u16(pixel.0, pixel.3)),
+                );
+
+                let new_g = vcombine_u16(
+                    neon_div_by_65535_n(vmull_u16(vget_low_u16(pixel.1), low_a)),
+                    neon_div_by_65535_n(vmull_high_u16(pixel.1, pixel.3)),
+                );
+
+                let new_b = vcombine_u16(
+                    neon_div_by_65535_n(vmull_u16(vget_low_u16(pixel.2), low_a)),
+                    neon_div_by_65535_n(vmull_high_u16(pixel.2, pixel.3)),
+                );
+
+                let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
+
+                vst4q_u16(dst.as_mut_ptr(), new_px);
+            }
+        } else {
+            for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
+                let pixel = vld4q_u16(src.as_ptr());
+
+                let low_a = vmovl_u16(vget_low_u16(pixel.3));
+                let high_a = vmovl_high_u16(pixel.3);
+
+                let low_a = vmulq_f32(vcvtq_f32_u32(low_a), v_max_colors_scale);
+                let hi_a = vmulq_f32(vcvtq_f32_u32(high_a), v_max_colors_scale);
+
+                let new_r = v_scale_by_alpha(pixel.0, low_a, hi_a);
+
+                let new_g = v_scale_by_alpha(pixel.1, low_a, hi_a);
+
+                let new_b = v_scale_by_alpha(pixel.2, low_a, hi_a);
+
+                let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
+
+                vst4q_u16(dst.as_mut_ptr(), new_px);
+            }
         }
 
         rem = rem.chunks_exact_mut(8 * 4).into_remainder();
         src_rem = src_rem.chunks_exact(8 * 4).remainder();
     }
 
-    for (dst, src) in rem.chunks_exact_mut(4).zip(src_rem.chunks_exact(4)) {
-        let a = src[3] as u32;
-        dst[0] =
-            (((src[0] as u32 * a) as f32 * recip_max_colors) as u32).min(max_colors as u32) as u16;
-        dst[1] =
-            (((src[1] as u32 * a) as f32 * recip_max_colors) as u32).min(max_colors as u32) as u16;
-        dst[2] =
-            (((src[2] as u32 * a) as f32 * recip_max_colors) as u32).min(max_colors as u32) as u16;
-        dst[3] = (((a * a) as f32 * recip_max_colors) as u32).min(max_colors as u32) as u16;
-    }
+    premultiply_alpha_rgba_row(rem, src_rem, max_colors);
 }
 
 pub fn neon_premultiply_alpha_rgba_u16(

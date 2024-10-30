@@ -44,8 +44,9 @@ use crate::neon::{
 use crate::saturate_narrow::SaturateNarrow;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{
-    convolve_column_lb_sse_u16, convolve_horizontal_rgba_sse_rows_4_lb_u8,
-    convolve_horizontal_rgba_sse_u16_lb_row,
+    convolve_column_lb_sse_u16, convolve_column_sse_u16, convolve_horizontal_rgba_sse_rows_4_lb_u8,
+    convolve_horizontal_rgba_sse_rows_4_u16, convolve_horizontal_rgba_sse_u16_lb_row,
+    convolve_horizontal_rgba_sse_u16_row,
 };
 use num_traits::{AsPrimitive, Float, MulAdd};
 use std::ops::{Add, AddAssign, Mul};
@@ -93,7 +94,10 @@ macro_rules! default_floating_column_handler {
     };
 }
 
-#[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
+#[cfg(not(any(
+    all(target_arch = "aarch64", target_feature = "neon"),
+    any(target_arch = "x86_64", target_arch = "x86")
+)))]
 impl ColumnHandlerFloatingPoint<u16, f32, f32> for u16 {
     fn handle_floating_column<const COMPONENTS: usize>(
         dst_width: usize,
@@ -122,6 +126,27 @@ impl ColumnHandlerFloatingPoint<u16, f32, f32> for u16 {
         bit_depth: u32,
     ) {
         convolve_column_u16(dst_width, bounds, src, dst, src_stride, weight, bit_depth)
+    }
+}
+
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+impl ColumnHandlerFloatingPoint<u16, f32, f32> for u16 {
+    fn handle_floating_column<const COMPONENTS: usize>(
+        dst_width: usize,
+        bounds: &FilterBounds,
+        src: &[u16],
+        dst: &mut [u16],
+        src_stride: usize,
+        weight: &[f32],
+        bit_depth: u32,
+    ) {
+        if std::arch::is_x86_feature_detected!("sse4.1") {
+            convolve_column_sse_u16(dst_width, bounds, src, dst, src_stride, weight, bit_depth);
+        } else {
+            column_handler_floating_point::<u16, f32, f32, COMPONENTS>(
+                dst_width, bounds, src, dst, src_stride, weight, bit_depth,
+            );
+        }
     }
 }
 
@@ -154,6 +179,7 @@ where
 }
 
 impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
     fn handle_row<const COMPONENTS: usize>(
         src: &[u16],
         dst: &mut [u16],
@@ -168,6 +194,26 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
         )
     }
 
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    fn handle_row<const COMPONENTS: usize>(
+        src: &[u16],
+        dst: &mut [u16],
+        filter_weights: &FilterWeights<f32>,
+        bit_depth: u32,
+    ) {
+        if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("sse4.1") {
+            convolve_horizontal_rgba_sse_u16_row(src, dst, filter_weights, bit_depth);
+        } else {
+            convolve_row_handler_floating_point::<u16, f32, f32, COMPONENTS>(
+                src,
+                dst,
+                filter_weights,
+                bit_depth,
+            )
+        }
+    }
+
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
     fn handle_row_4<const COMPONENTS: usize>(
         src: &[u16],
         src_stride: usize,
@@ -184,6 +230,36 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
             filter_weights,
             bit_depth,
         )
+    }
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    fn handle_row_4<const COMPONENTS: usize>(
+        src: &[u16],
+        src_stride: usize,
+        dst: &mut [u16],
+        dst_stride: usize,
+        filter_weights: &FilterWeights<f32>,
+        bit_depth: u32,
+    ) {
+        if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("sse4.1") {
+            convolve_horizontal_rgba_sse_rows_4_u16(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                filter_weights,
+                bit_depth,
+            );
+        } else {
+            convolve_row_handler_floating_point_4::<u16, f32, f32, COMPONENTS>(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                filter_weights,
+                bit_depth,
+            )
+        }
     }
 }
 

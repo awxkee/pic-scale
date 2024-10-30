@@ -16,7 +16,7 @@ use pic_scale::{
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/hato-wide-gamut-8bit.avif")
+    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -27,8 +27,8 @@ fn main() {
     let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
-    let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 2).collect();
-
+    let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 8).collect();
+    //
     let store =
         ImageStore::<u16, 4>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
@@ -37,7 +37,7 @@ fn main() {
         .resize_rgba_u16(
             ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
             store,
-            10,
+            16,
             false,
         )
         .unwrap();
@@ -105,7 +105,7 @@ fn main() {
     //     .map(|&x| (x * 255f32) as u8)
     //     .collect();
 
-    let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 2) as u8).collect();
+    let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 8) as u8).collect();
     //
     // let dst = resized.as_bytes();
 

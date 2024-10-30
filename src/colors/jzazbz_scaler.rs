@@ -59,7 +59,7 @@ impl JzazbzScaler {
         }
     }
 
-    fn rgba_to_laba(&self, store: ImageStore<u8, 4>) -> ImageStore<f32, 4> {
+    fn rgba_to_laba<'a>(&self, store: ImageStore<'a, u8, 4>) -> ImageStore<'a, f32, 4> {
         let mut new_store = ImageStore::<f32, 4>::alloc(store.width, store.height);
         let lab_stride = store.width as u32 * 4u32 * std::mem::size_of::<f32>() as u32;
         rgba_to_jzazbz(
@@ -75,7 +75,7 @@ impl JzazbzScaler {
         new_store
     }
 
-    fn laba_to_srgba(&self, store: ImageStore<f32, 4>) -> ImageStore<u8, 4> {
+    fn laba_to_srgba<'a>(&self, store: ImageStore<'a, f32, 4>) -> ImageStore<'a, u8, 4> {
         let mut new_store = ImageStore::<u8, 4>::alloc(store.width, store.height);
         jzazbz_to_rgba(
             store.buffer.borrow(),
@@ -148,12 +148,12 @@ impl Scaling for JzazbzScaler {
         Ok(new_u8_store)
     }
 
-    fn resize_rgba(
-        &self,
+    fn resize_rgba<'a>(
+        &'a self,
         new_size: ImageSize,
-        store: ImageStore<u8, 4>,
+        store: ImageStore<'a, u8, 4>,
         premultiply_alpha: bool,
-    ) -> Result<ImageStore<u8, 4>, String> {
+    ) -> Result<ImageStore<'a, u8, 4>, String> {
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
             return Err("One of image dimensions is 0, this should not happen".to_string());
         }

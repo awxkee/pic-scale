@@ -432,8 +432,8 @@ pub(crate) fn convolve_column_handler_floating_point<
             let weight1 = weights[1].as_();
             let offset0 = src_stride * bounds_start + v_start_px;
             let offset1 = src_stride * (bounds_start + 1) + v_start_px;
-            let src_ptr0 = &src[offset0..(offset0 + CHANNELS * 4)];
-            let src_ptr1 = &src[offset1..(offset1 + CHANNELS * 4)];
+            let src_ptr0 = &src[offset0..(offset0 + CHANNELS)];
+            let src_ptr1 = &src[offset1..(offset1 + CHANNELS)];
 
             sums0 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
                 .mul_add(
@@ -448,9 +448,9 @@ pub(crate) fn convolve_column_handler_floating_point<
             let offset0 = src_stride * bounds_start + v_start_px;
             let offset1 = src_stride * (bounds_start + 1) + v_start_px;
             let offset2 = src_stride * (bounds_start + 2) + v_start_px;
-            let src_ptr0 = &src[offset0..(offset0 + CHANNELS * 4)];
-            let src_ptr1 = &src[offset1..(offset1 + CHANNELS * 4)];
-            let src_ptr2 = &src[offset2..(offset2 + CHANNELS * 4)];
+            let src_ptr0 = &src[offset0..(offset0 + CHANNELS)];
+            let src_ptr1 = &src[offset1..(offset1 + CHANNELS)];
+            let src_ptr2 = &src[offset2..(offset2 + CHANNELS)];
 
             sums0 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
                 .mul_add(
@@ -471,10 +471,10 @@ pub(crate) fn convolve_column_handler_floating_point<
             let offset1 = src_stride * (bounds_start + 1) + v_start_px;
             let offset2 = src_stride * (bounds_start + 2) + v_start_px;
             let offset3 = src_stride * (bounds_start + 3) + v_start_px;
-            let src_ptr0 = &src[offset0..(offset0 + CHANNELS * 4)];
-            let src_ptr1 = &src[offset1..(offset1 + CHANNELS * 4)];
-            let src_ptr2 = &src[offset2..(offset2 + CHANNELS * 4)];
-            let src_ptr3 = &src[offset3..(offset3 + CHANNELS * 4)];
+            let src_ptr0 = &src[offset0..(offset0 + CHANNELS)];
+            let src_ptr1 = &src[offset1..(offset1 + CHANNELS)];
+            let src_ptr2 = &src[offset2..(offset2 + CHANNELS)];
+            let src_ptr3 = &src[offset3..(offset3 + CHANNELS)];
 
             sums0 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
                 .mul_add(
@@ -503,12 +503,12 @@ pub(crate) fn convolve_column_handler_floating_point<
             let offset3 = src_stride * (bounds_start + 3) + v_start_px;
             let offset4 = src_stride * (bounds_start + 4) + v_start_px;
             let offset5 = src_stride * (bounds_start + 5) + v_start_px;
-            let src_ptr0 = &src[offset0..(offset0 + CHANNELS * 4)];
-            let src_ptr1 = &src[offset1..(offset1 + CHANNELS * 4)];
-            let src_ptr2 = &src[offset2..(offset2 + CHANNELS * 4)];
-            let src_ptr3 = &src[offset3..(offset3 + CHANNELS * 4)];
-            let src_ptr4 = &src[offset4..(offset4 + CHANNELS * 4)];
-            let src_ptr5 = &src[offset5..(offset5 + CHANNELS * 4)];
+            let src_ptr0 = &src[offset0..(offset0 + CHANNELS)];
+            let src_ptr1 = &src[offset1..(offset1 + CHANNELS)];
+            let src_ptr2 = &src[offset2..(offset2 + CHANNELS)];
+            let src_ptr3 = &src[offset3..(offset3 + CHANNELS)];
+            let src_ptr4 = &src[offset4..(offset4 + CHANNELS)];
+            let src_ptr5 = &src[offset5..(offset5 + CHANNELS)];
 
             sums0 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
                 .mul_add(

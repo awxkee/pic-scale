@@ -140,7 +140,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_32(
             dot_prod(store_0, store_1, store_2, store_3, item_row_20, v_weight2);
         (store_4, store_5, store_6, store_7) =
             dot_prod(store_4, store_5, store_6, store_7, item_row_21, v_weight2);
-    } else if bounds_size == 3 {
+    } else if bounds_size == 4 {
         let py = start_y;
         let weight = filter.get_unchecked(0..4);
         let v_weight0 = _mm_set1_epi32(weight[0] as i32);
