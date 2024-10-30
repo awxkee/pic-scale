@@ -113,6 +113,8 @@ pub enum ResamplingFunction {
     Lagrange3,
     Lanczos6,
     Lanczos6Jinc,
+    /// This method replicates `INTER_AREA` behaviour from OpenCV
+    Area,
 }
 
 impl From<u32> for ResamplingFunction {
@@ -166,6 +168,7 @@ impl From<u32> for ResamplingFunction {
             45 => ResamplingFunction::Lagrange3,
             46 => ResamplingFunction::Lanczos6,
             47 => ResamplingFunction::Lanczos6Jinc,
+            48 => ResamplingFunction::Area,
             _ => ResamplingFunction::Bilinear,
         }
     }
@@ -197,6 +200,7 @@ pub struct ResamplingFilter<T> {
     pub min_kernel_size: f32,
     pub is_ewa: bool,
     pub is_resizable_kernel: bool,
+    pub is_area: bool,
 }
 
 impl<T> ResamplingFilter<T> {
@@ -207,6 +211,7 @@ impl<T> ResamplingFilter<T> {
             min_kernel_size,
             is_ewa,
             is_resizable_kernel: true,
+            is_area: false,
         }
     }
 
@@ -222,6 +227,7 @@ impl<T> ResamplingFilter<T> {
             min_kernel_size,
             is_ewa,
             is_resizable_kernel: true,
+            is_area: false,
         }
     }
 
@@ -236,6 +242,18 @@ impl<T> ResamplingFilter<T> {
             min_kernel_size,
             is_ewa,
             is_resizable_kernel: false,
+            is_area: false,
+        }
+    }
+
+    fn new_with_area(kernel: fn(T) -> T, min_kernel_size: f32) -> ResamplingFilter<T> {
+        ResamplingFilter {
+            kernel,
+            window: None,
+            min_kernel_size,
+            is_ewa: false,
+            is_resizable_kernel: true,
+            is_area: true,
         }
     }
 }
@@ -312,6 +330,7 @@ impl ResamplingFunction {
             ResamplingFunction::Kaiser => ResamplingFilter::new(kaiser, 2f32, false),
             ResamplingFunction::BartlettHann => ResamplingFilter::new(bartlett_hann, 2f32, false),
             ResamplingFunction::Box => ResamplingFilter::new(box_weight, 2f32, false),
+            ResamplingFunction::Area => ResamplingFilter::new_with_area(box_weight, 2f32),
             ResamplingFunction::Bohman => ResamplingFilter::new(bohman, 2f32, false),
             ResamplingFunction::Lanczos2Jinc => ResamplingFilter::new(lanczos2_jinc, 2f32, false),
             ResamplingFunction::Lanczos3Jinc => ResamplingFilter::new(lanczos3_jinc, 3f32, false),

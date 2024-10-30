@@ -16,7 +16,7 @@ use pic_scale::{
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
+    let img = ImageReader::open("./assets/blue_lights.avif")
         .unwrap()
         .decode()
         .unwrap();
@@ -38,7 +38,7 @@ fn main() {
             ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
             store,
             16,
-            false,
+            true,
         )
         .unwrap();
 

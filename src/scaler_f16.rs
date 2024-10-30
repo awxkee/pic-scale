@@ -265,7 +265,7 @@ impl Scaler {
 
         if should_do_vertical {
             let allocated_store_vertical: Vec<f16> =
-                vec![f16::from_f32(0.); src_store.width * 1 * new_size.height];
+                vec![f16::from_f32(0.); src_store.width * new_size.height];
             let mut new_image_vertical = ImageStore::<f16, 1>::new(
                 allocated_store_vertical,
                 src_store.width,
@@ -279,7 +279,7 @@ impl Scaler {
 
         if should_do_horizontal {
             let allocated_store_horizontal: Vec<f16> =
-                vec![f16::from_f32(0.); new_size.width * 1 * new_size.height];
+                vec![f16::from_f32(0.); new_size.width * new_size.height];
             let mut new_image_horizontal = ImageStore::<f16, 1>::new(
                 allocated_store_horizontal,
                 new_size.width,
