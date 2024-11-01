@@ -31,6 +31,7 @@ use crate::alpha_handle_f16::{premultiply_alpha_rgba_f16, unpremultiply_alpha_rg
 use crate::alpha_handle_f32::{premultiply_alpha_rgba_f32, unpremultiply_alpha_rgba_f32};
 use crate::alpha_handle_u16::{premultiply_alpha_rgba_u16, unpremultiply_alpha_rgba_u16};
 use crate::alpha_handle_u8::{premultiply_alpha_rgba, unpremultiply_alpha_rgba};
+use crate::pic_scale_error::{PicScaleBufferMismatch, PicScaleError};
 use crate::ImageSize;
 use num_traits::FromPrimitive;
 use rayon::ThreadPool;
@@ -91,17 +92,16 @@ where
         slice_ref: Vec<T>,
         width: usize,
         height: usize,
-    ) -> Result<ImageStore<'static, T, N>, String> {
+    ) -> Result<ImageStore<'static, T, N>, PicScaleError> {
         let expected_size = width * height * N;
         if slice_ref.len() != width * height * N {
-            return Err(format!(
-                "Image buffer len expected to be {} [w({})*h({})*channels({})] but received {}",
-                expected_size,
+            return Err(PicScaleError::BufferMismatch(PicScaleBufferMismatch {
+                expected: expected_size,
                 width,
                 height,
-                N,
-                slice_ref.len()
-            ));
+                channels: N,
+                slice_len: slice_ref.len(),
+            }));
         }
         Ok(ImageStore::<T, N> {
             buffer: BufferStore::Owned(slice_ref),
@@ -143,17 +143,16 @@ where
         slice_ref: &'a mut [T],
         width: usize,
         height: usize,
-    ) -> Result<ImageStore<'a, T, N>, String> {
+    ) -> Result<ImageStore<'a, T, N>, PicScaleError> {
         let expected_size = width * height * N;
         if slice_ref.len() != width * height * N {
-            return Err(format!(
-                "Image buffer len expected to be {} [w({})*h({})*channels({})] but received {}",
-                expected_size,
+            return Err(PicScaleError::BufferMismatch(PicScaleBufferMismatch {
+                expected: expected_size,
                 width,
                 height,
-                N,
-                slice_ref.len()
-            ));
+                channels: N,
+                slice_len: slice_ref.len(),
+            }));
         }
         Ok(ImageStore::<T, N> {
             buffer: BufferStore::Borrowed(slice_ref),
@@ -176,13 +175,12 @@ where
 }
 
 impl ImageStore<'_, u8, 4> {
-    pub fn unpremultiply_alpha(&self, into: &mut ImageStore<u8, 4>, pool: &Option<ThreadPool>) {
-        let dst = into.buffer.borrow_mut();
-        let src = self.buffer.borrow();
-        unpremultiply_alpha_rgba(dst, src, self.width, self.height, pool);
+    pub fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
+        let dst = self.buffer.borrow_mut();
+        unpremultiply_alpha_rgba(dst, self.width, self.height, pool);
     }
 
-    pub fn premultiply_alpha(&self, into: &mut ImageStore<u8, 4>, pool: &Option<ThreadPool>) {
+    pub fn premultiply_alpha(&self, into: &mut ImageStore<'_, u8, 4>, pool: &Option<ThreadPool>) {
         let dst = into.buffer.borrow_mut();
         let src = self.buffer.borrow();
         premultiply_alpha_rgba(dst, src, self.width, self.height, pool);
@@ -190,13 +188,12 @@ impl ImageStore<'_, u8, 4> {
 }
 
 impl ImageStore<'_, u16, 4> {
-    pub fn unpremultiply_alpha(&self, into: &mut ImageStore<u16, 4>, pool: &Option<ThreadPool>) {
-        let dst = into.buffer.borrow_mut();
-        let src = self.buffer.borrow();
-        unpremultiply_alpha_rgba_u16(dst, src, self.width, self.height, self.bit_depth, pool);
+    pub fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
+        let in_place = self.buffer.borrow_mut();
+        unpremultiply_alpha_rgba_u16(in_place, self.width, self.height, self.bit_depth, pool);
     }
 
-    pub fn premultiply_alpha(&self, into: &mut ImageStore<u16, 4>, pool: &Option<ThreadPool>) {
+    pub fn premultiply_alpha(&self, into: &mut ImageStore<'_, u16, 4>, pool: &Option<ThreadPool>) {
         let dst = into.buffer.borrow_mut();
         let src = self.buffer.borrow();
         premultiply_alpha_rgba_u16(dst, src, self.width, self.height, self.bit_depth, pool);
@@ -204,13 +201,12 @@ impl ImageStore<'_, u16, 4> {
 }
 
 impl ImageStore<'_, f32, 4> {
-    pub fn unpremultiply_alpha(&self, into: &mut ImageStore<f32, 4>, pool: &Option<ThreadPool>) {
-        let dst = into.buffer.borrow_mut();
-        let src = self.buffer.borrow();
-        unpremultiply_alpha_rgba_f32(dst, src, self.width, self.height, pool);
+    pub fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
+        let dst = self.buffer.borrow_mut();
+        unpremultiply_alpha_rgba_f32(dst, self.width, self.height, pool);
     }
 
-    pub fn premultiply_alpha(&self, into: &mut ImageStore<f32, 4>, pool: &Option<ThreadPool>) {
+    pub fn premultiply_alpha(&self, into: &mut ImageStore<'_, f32, 4>, pool: &Option<ThreadPool>) {
         let dst = into.buffer.borrow_mut();
         let src = self.buffer.borrow();
         premultiply_alpha_rgba_f32(dst, src, self.width, self.height, pool);
@@ -219,19 +215,14 @@ impl ImageStore<'_, f32, 4> {
 
 #[cfg(feature = "half")]
 impl<'a> ImageStore<'a, half::f16, 4> {
-    pub fn unpremultiply_alpha(
-        &self,
-        into: &mut ImageStore<half::f16, 4>,
-        pool: &Option<ThreadPool>,
-    ) {
-        let dst = into.buffer.borrow_mut();
-        let src = self.buffer.borrow();
-        unpremultiply_alpha_rgba_f16(dst, src, self.width, self.height, pool);
+    pub fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
+        let dst = self.buffer.borrow_mut();
+        unpremultiply_alpha_rgba_f16(dst, self.width, self.height, pool);
     }
 
     pub fn premultiply_alpha(
         &self,
-        into: &mut ImageStore<half::f16, 4>,
+        into: &mut ImageStore<'_, half::f16, 4>,
         pool: &Option<ThreadPool>,
     ) {
         let dst = into.buffer.borrow_mut();

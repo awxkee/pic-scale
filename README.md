@@ -101,7 +101,7 @@ Example comparison time for downscale RGBA 4928x3279 image in two times with pre
 
 | Lanczos3  |  SSE  |  AVX  | NEON  |
 |-----------|:-----:|:-----:|:-----:|
-| pic-scale | 68.51 | 35.82 | 20.70 |
+| pic-scale | 68.51 | 35.82 | 21.28 |
 | fir       | 73.28 | 54.40 | 45.62 |
 
 Example comparison time for downscale RGBA 4928x3279 image in two times without premultiplying alpha.

@@ -11,12 +11,13 @@ use fast_image_resize::{
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
-    ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ScalingU16, ThreadingPolicy,
+    ImageSize, ImageStore, LinearApproxScaler, ResamplingFunction, Scaler, Scaling, ScalingU16,
+    ThreadingPolicy,
 };
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/blue_lights.avif")
+    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -24,20 +25,19 @@ fn main() {
     let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
-    let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+    let mut scaler = LinearApproxScaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
-    let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 8).collect();
+    // let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 8).collect();
     //
     let store =
-        ImageStore::<u16, 4>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
+        ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
     let start_time = Instant::now();
     let resized = scaler
-        .resize_rgba_u16(
+        .resize_rgba(
             ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
             store,
-            16,
             true,
         )
         .unwrap();
@@ -105,9 +105,9 @@ fn main() {
     //     .map(|&x| (x * 255f32) as u8)
     //     .collect();
 
-    let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 8) as u8).collect();
+    // let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 8) as u8).collect();
     //
-    // let dst = resized.as_bytes();
+    let dst = resized.as_bytes();
 
     if resized.channels == 4 {
         image::save_buffer(

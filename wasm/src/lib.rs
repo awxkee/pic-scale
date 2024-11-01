@@ -41,10 +41,12 @@ pub fn process(image: Uint8Array) -> Uint8Array {
         ImageStore::<u8, 3>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
 
-    let resized = scaler.resize_rgb(
-        ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-        store,
-    );
+    let resized = scaler
+        .resize_rgb(
+            ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
+            store,
+        )
+        .unwrap();
 
     let dst: Vec<u8> = Vec::from(resized.as_bytes());
 

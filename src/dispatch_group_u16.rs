@@ -177,7 +177,7 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
                         let filter_offset = y * filter_weights.aligned_size;
                         let weights = &filter_weights.weights[filter_offset..];
                         let source_buffer = image_store.buffer.borrow();
-                        u16::handle_floating_column::<COMPONENTS>(
+                        u16::handle_floating_column(
                             dst_width,
                             &bounds,
                             source_buffer,
@@ -219,7 +219,7 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
                 let filter_offset = y * filter_weights.aligned_size;
                 let weights = &filter_weights.weights[filter_offset..];
                 let source_buffer = image_store.buffer.borrow();
-                u16::handle_floating_column::<COMPONENTS>(
+                u16::handle_floating_column(
                     dst_width,
                     &bounds,
                     source_buffer,

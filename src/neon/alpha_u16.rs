@@ -28,8 +28,7 @@
  */
 use crate::alpha_handle_u16::premultiply_alpha_rgba_row;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::ParallelSliceMut;
-use rayon::slice::ParallelSlice;
+use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
 use std::arch::aarch64::*;
 
@@ -171,19 +170,18 @@ pub fn neon_premultiply_alpha_rgba_u16(
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            src.par_chunks_exact(width * 4)
-                .zip(dst.par_chunks_exact_mut(width * 4))
-                .for_each(|(src, dst)| {
+            dst.par_chunks_exact_mut(width * 4)
+                .zip(src.par_chunks_exact(width * 4))
+                .for_each(|(dst, src)| {
                     neon_premultiply_alpha_rgba_row_u16(dst, src, bit_depth);
                 });
         });
     } else {
-        for (dst_row, src_row) in dst
-            .chunks_exact_mut(width * 4)
-            .zip(src.chunks_exact(4 * width))
-        {
-            neon_premultiply_alpha_rgba_row_u16(dst_row, src_row, bit_depth);
-        }
+        dst.chunks_exact_mut(width * 4)
+            .zip(src.chunks_exact(width * 4))
+            .for_each(|(dst, src)| {
+                neon_premultiply_alpha_rgba_row_u16(dst, src, bit_depth);
+            });
     }
 }
 
@@ -205,17 +203,16 @@ unsafe fn v_scale_by_alpha(
     vcombine_u16(vmovn_u32(new_ll), vmovn_u32(new_lh))
 }
 
-fn neon_unpremultiply_alpha_rgba_row_u16(dst: &mut [u16], src: &[u16], bit_depth: usize) {
+fn neon_unpremultiply_alpha_rgba_row_u16(in_place: &mut [u16], bit_depth: usize) {
     let max_colors = (1 << bit_depth) - 1;
 
-    let mut rem = dst;
-    let mut src_rem = src;
+    let mut rem = in_place;
 
     unsafe {
         let v_max_colors_f = vdupq_n_f32(max_colors as f32);
         let ones = vdupq_n_f32(1.);
-        for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
-            let pixel = vld4q_u16(src.as_ptr());
+        for dst in rem.chunks_exact_mut(8 * 4) {
+            let pixel = vld4q_u16(dst.as_ptr());
 
             let is_alpha_zero_mask = vceqzq_u16(pixel.3);
 
@@ -249,24 +246,22 @@ fn neon_unpremultiply_alpha_rgba_row_u16(dst: &mut [u16], src: &[u16], bit_depth
         }
 
         rem = rem.chunks_exact_mut(8 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(8 * 4).remainder();
     }
 
-    for (dst, src) in rem.chunks_exact_mut(4).zip(src_rem.chunks_exact(4)) {
-        let a = src[3] as u32;
+    for dst in rem.chunks_exact_mut(4) {
+        let a = dst[3] as u32;
         if a != 0 {
             let a_recip = 1. / a as f32;
-            dst[0] = ((src[0] as u32 * max_colors) as f32 * a_recip) as u16;
-            dst[1] = ((src[1] as u32 * max_colors) as f32 * a_recip) as u16;
-            dst[2] = ((src[2] as u32 * max_colors) as f32 * a_recip) as u16;
+            dst[0] = ((dst[0] as u32 * max_colors) as f32 * a_recip) as u16;
+            dst[1] = ((dst[1] as u32 * max_colors) as f32 * a_recip) as u16;
+            dst[2] = ((dst[2] as u32 * max_colors) as f32 * a_recip) as u16;
             dst[3] = ((a * max_colors) as f32 * a_recip) as u16;
         }
     }
 }
 
 pub fn neon_unpremultiply_alpha_rgba_u16(
-    dst: &mut [u16],
-    src: &[u16],
+    in_place: &mut [u16],
     width: usize,
     _: usize,
     bit_depth: usize,
@@ -274,18 +269,13 @@ pub fn neon_unpremultiply_alpha_rgba_u16(
 ) {
     if let Some(pool) = pool.as_ref() {
         pool.install(|| {
-            src.par_chunks_exact(width * 4)
-                .zip(dst.par_chunks_exact_mut(width * 4))
-                .for_each(|(src, dst)| {
-                    neon_unpremultiply_alpha_rgba_row_u16(dst, src, bit_depth);
-                });
+            in_place.par_chunks_exact_mut(width * 4).for_each(|row| {
+                neon_unpremultiply_alpha_rgba_row_u16(row, bit_depth);
+            });
         });
     } else {
-        for (dst_row, src_row) in dst
-            .chunks_exact_mut(width * 4)
-            .zip(src.chunks_exact(4 * width))
-        {
-            neon_unpremultiply_alpha_rgba_row_u16(dst_row, src_row, bit_depth);
-        }
+        in_place.chunks_exact_mut(width * 4).for_each(|row| {
+            neon_unpremultiply_alpha_rgba_row_u16(row, bit_depth);
+        });
     }
 }

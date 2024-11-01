@@ -59,7 +59,7 @@ where
     i32: AsPrimitive<J>,
     f32: AsPrimitive<J>,
 {
-    fn handle_floating_column<const COMPONENTS: usize>(
+    fn handle_floating_column(
         dst_width: usize,
         bounds: &FilterBounds,
         src: &[T],
@@ -77,8 +77,8 @@ macro_rules! default_floating_column_handler {
             F: Copy + 'static + Float + AsPrimitive<f32>,
             $column_type: AsPrimitive<f32>,
         {
-            fn handle_floating_column<const COMPONENTS: usize>(
-                dst_width: usize,
+            fn handle_floating_column(
+                _: usize,
                 bounds: &FilterBounds,
                 src: &[$column_type],
                 dst: &mut [$column_type],
@@ -86,8 +86,8 @@ macro_rules! default_floating_column_handler {
                 weight: &[F],
                 bit_depth: u32,
             ) {
-                column_handler_floating_point::<$column_type, f32, F, COMPONENTS>(
-                    dst_width, bounds, src, dst, src_stride, weight, bit_depth,
+                column_handler_floating_point::<$column_type, f32, F>(
+                    bounds, src, dst, src_stride, weight, bit_depth,
                 )
             }
         }
@@ -99,8 +99,8 @@ macro_rules! default_floating_column_handler {
     any(target_arch = "x86_64", target_arch = "x86")
 )))]
 impl ColumnHandlerFloatingPoint<u16, f32, f32> for u16 {
-    fn handle_floating_column<const COMPONENTS: usize>(
-        dst_width: usize,
+    fn handle_floating_column(
+        _: usize,
         bounds: &FilterBounds,
         src: &[u16],
         dst: &mut [u16],
@@ -108,15 +108,15 @@ impl ColumnHandlerFloatingPoint<u16, f32, f32> for u16 {
         weight: &[f32],
         bit_depth: u32,
     ) {
-        column_handler_floating_point::<u16, f32, f32, COMPONENTS>(
-            dst_width, bounds, src, dst, src_stride, weight, bit_depth,
+        column_handler_floating_point::<u16, f32, f32>(
+            bounds, src, dst, src_stride, weight, bit_depth,
         )
     }
 }
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 impl ColumnHandlerFloatingPoint<u16, f32, f32> for u16 {
-    fn handle_floating_column<const COMPONENTS: usize>(
+    fn handle_floating_column(
         dst_width: usize,
         bounds: &FilterBounds,
         src: &[u16],
@@ -131,7 +131,7 @@ impl ColumnHandlerFloatingPoint<u16, f32, f32> for u16 {
 
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 impl ColumnHandlerFloatingPoint<u16, f32, f32> for u16 {
-    fn handle_floating_column<const COMPONENTS: usize>(
+    fn handle_floating_column(
         dst_width: usize,
         bounds: &FilterBounds,
         src: &[u16],
@@ -143,8 +143,8 @@ impl ColumnHandlerFloatingPoint<u16, f32, f32> for u16 {
         if std::arch::is_x86_feature_detected!("sse4.1") {
             convolve_column_sse_u16(dst_width, bounds, src, dst, src_stride, weight, bit_depth);
         } else {
-            column_handler_floating_point::<u16, f32, f32, COMPONENTS>(
-                dst_width, bounds, src, dst, src_stride, weight, bit_depth,
+            column_handler_floating_point::<u16, f32, f32>(
+                bounds, src, dst, src_stride, weight, bit_depth,
             );
         }
     }

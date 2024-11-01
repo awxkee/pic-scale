@@ -32,8 +32,7 @@ use crate::avx2::utils::{
     _mm256_select_si256, avx2_pack_u32, avx_deinterleave_rgba_epi16, avx_interleave_rgba_epi16,
 };
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::ParallelSliceMut;
-use rayon::slice::ParallelSlice;
+use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
@@ -325,53 +324,45 @@ unsafe fn avx_premultiply_alpha_rgba_u16_impl(
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            src.par_chunks_exact(width * 4)
-                .zip(dst.par_chunks_exact_mut(width * 4))
-                .for_each(|(src, dst)| unsafe {
+            dst.par_chunks_exact_mut(width * 4)
+                .zip(src.par_chunks_exact(width * 4))
+                .for_each(|(dst, src)| unsafe {
                     avx_premultiply_alpha_rgba_u16_row(dst, src, bit_depth);
                 });
         });
     } else {
-        for (dst_row, src_row) in dst
-            .chunks_exact_mut(4 * width)
-            .zip(src.chunks_exact(4 * width))
-        {
-            unsafe {
-                avx_premultiply_alpha_rgba_u16_row(dst_row, src_row, bit_depth);
-            }
-        }
+        dst.chunks_exact_mut(width * 4)
+            .zip(src.chunks_exact(width * 4))
+            .for_each(|(dst, src)| unsafe {
+                avx_premultiply_alpha_rgba_u16_row(dst, src, bit_depth);
+            });
     }
 }
 
 pub fn avx_unpremultiply_alpha_rgba_u16(
-    dst: &mut [u16],
-    src: &[u16],
+    in_place: &mut [u16],
     width: usize,
     height: usize,
     bit_depth: usize,
     pool: &Option<ThreadPool>,
 ) {
     unsafe {
-        avx_unpremultiply_alpha_rgba_u16_impl(dst, src, width, height, bit_depth, pool);
+        avx_unpremultiply_alpha_rgba_u16_impl(in_place, width, height, bit_depth, pool);
     }
 }
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn avx_unpremultiply_alpha_rgba_u16_row(dst: &mut [u16], src: &[u16], bit_depth: usize) {
+unsafe fn avx_unpremultiply_alpha_rgba_u16_row(in_place: &mut [u16], bit_depth: usize) {
     let max_colors = (1 << bit_depth) - 1;
 
     let v_scale_colors = unsafe { _mm256_set1_ps(max_colors as f32) };
 
-    let mut rem = dst;
-    let mut src_rem = src;
+    let mut rem = in_place;
 
     unsafe {
-        for (dst, src) in rem
-            .chunks_exact_mut(16 * 4)
-            .zip(src_rem.chunks_exact(16 * 4))
-        {
-            let src_ptr = src.as_ptr();
+        for dst in rem.chunks_exact_mut(16 * 4) {
+            let src_ptr = dst.as_ptr();
             let lane0 = _mm256_loadu_si256(src_ptr as *const __m256i);
             let lane1 = _mm256_loadu_si256(src_ptr.add(16) as *const __m256i);
             let lane2 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
@@ -411,17 +402,15 @@ unsafe fn avx_unpremultiply_alpha_rgba_u16_row(dst: &mut [u16], src: &[u16], bit
         }
 
         rem = rem.chunks_exact_mut(16 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(16 * 4).remainder();
     }
 
-    unpremultiply_alpha_rgba_row(rem, src_rem, bit_depth as u32);
+    unpremultiply_alpha_rgba_row(rem, bit_depth as u32);
 }
 
 #[inline]
 #[target_feature(enable = "avx2")]
 unsafe fn avx_unpremultiply_alpha_rgba_u16_impl(
-    dst: &mut [u16],
-    src: &[u16],
+    in_place: &mut [u16],
     width: usize,
     _: usize,
     bit_depth: usize,
@@ -429,20 +418,15 @@ unsafe fn avx_unpremultiply_alpha_rgba_u16_impl(
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            src.par_chunks_exact(width * 4)
-                .zip(dst.par_chunks_exact_mut(width * 4))
-                .for_each(|(src, dst)| unsafe {
-                    avx_unpremultiply_alpha_rgba_u16_row(dst, src, bit_depth);
+            in_place
+                .par_chunks_exact_mut(width * 4)
+                .for_each(|row| unsafe {
+                    avx_unpremultiply_alpha_rgba_u16_row(row, bit_depth);
                 });
         });
     } else {
-        for (dst_row, src_row) in dst
-            .chunks_exact_mut(4 * width)
-            .zip(src.chunks_exact(4 * width))
-        {
-            unsafe {
-                avx_unpremultiply_alpha_rgba_u16_row(dst_row, src_row, bit_depth);
-            }
-        }
+        in_place.chunks_exact_mut(width * 4).for_each(|row| unsafe {
+            avx_unpremultiply_alpha_rgba_u16_row(row, bit_depth);
+        });
     }
 }

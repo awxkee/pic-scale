@@ -29,6 +29,7 @@
 
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::nearest_sampler::resize_nearest;
+use crate::pic_scale_error::PicScaleError;
 use crate::support::check_image_size_overflow;
 use crate::ResamplingFunction::Nearest;
 use crate::{ImageSize, ImageStore, Scaler};
@@ -42,17 +43,17 @@ impl Scaler {
         new_size: ImageSize,
         store: ImageStore<'a, f16, 4>,
         premultiply_alpha: bool,
-    ) -> Result<ImageStore<'a, f16, 4>, String> {
+    ) -> Result<ImageStore<'a, f16, 4>, PicScaleError> {
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
-            return Err("One of image dimensions is 0, this should not happen".to_string());
+            return Err(PicScaleError::ZeroImageDimensions);
         }
 
         if check_image_size_overflow(store.width, store.height, store.channels) {
-            return Err("Input image larger than memory capabilities".to_string());
+            return Err(PicScaleError::SourceImageIsTooLarge);
         }
 
         if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
-            return Err("Destination image larger than memory capabilities".to_string());
+            return Err(PicScaleError::DestinationImageIsTooLarge);
         }
 
         if store.width == new_size.width && store.height == new_size.height {
@@ -88,10 +89,9 @@ impl Scaler {
         assert!(should_do_horizontal || should_do_vertical);
 
         if premultiply_alpha {
-            let mut premultiplied_store =
-                ImageStore::<f16, 4>::alloc(src_store.width, src_store.height);
-            src_store.premultiply_alpha(&mut premultiplied_store, &pool);
-            src_store = premultiplied_store;
+            let mut new_store = ImageStore::alloc(src_store.width, src_store.height);
+            src_store.premultiply_alpha(&mut new_store, &pool);
+            src_store = new_store;
         }
 
         if should_do_vertical {
@@ -126,10 +126,7 @@ impl Scaler {
         assert_eq!(src_store.width, new_size.width);
 
         if premultiply_alpha {
-            let mut premultiplied_store =
-                ImageStore::<f16, 4>::alloc(src_store.width, src_store.height);
-            src_store.unpremultiply_alpha(&mut premultiplied_store, &pool);
-            return Ok(premultiplied_store);
+            src_store.unpremultiply_alpha(&pool);
         }
 
         Ok(src_store)
@@ -140,17 +137,17 @@ impl Scaler {
         &self,
         new_size: ImageSize,
         store: ImageStore<'a, f16, 3>,
-    ) -> Result<ImageStore<'a, f16, 3>, String> {
+    ) -> Result<ImageStore<'a, f16, 3>, PicScaleError> {
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
-            return Err("One of image dimensions is 0, this should not happen".to_string());
+            return Err(PicScaleError::ZeroImageDimensions);
         }
 
         if check_image_size_overflow(store.width, store.height, store.channels) {
-            return Err("Input image larger than memory capabilities".to_string());
+            return Err(PicScaleError::SourceImageIsTooLarge);
         }
 
         if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
-            return Err("Destination image larger than memory capabilities".to_string());
+            return Err(PicScaleError::DestinationImageIsTooLarge);
         }
 
         if store.width == new_size.width && store.height == new_size.height {
@@ -219,17 +216,17 @@ impl Scaler {
         &self,
         new_size: ImageSize,
         store: ImageStore<'a, f16, 1>,
-    ) -> Result<ImageStore<'a, f16, 1>, String> {
+    ) -> Result<ImageStore<'a, f16, 1>, PicScaleError> {
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
-            return Err("One of image dimensions is 0, this should not happen".to_string());
+            return Err(PicScaleError::ZeroImageDimensions);
         }
 
         if check_image_size_overflow(store.width, store.height, store.channels) {
-            return Err("Input image larger than memory capabilities".to_string());
+            return Err(PicScaleError::SourceImageIsTooLarge);
         }
 
         if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
-            return Err("Destination image larger than memory capabilities".to_string());
+            return Err(PicScaleError::DestinationImageIsTooLarge);
         }
 
         if store.width == new_size.width && store.height == new_size.height {

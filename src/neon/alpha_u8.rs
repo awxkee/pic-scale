@@ -27,10 +27,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::alpha_handle_u8::div_by_255;
+use crate::alpha_handle_u8::premultiply_alpha_rgba_row_impl;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::ParallelSliceMut;
-use rayon::slice::ParallelSlice;
+use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
 use std::arch::aarch64::*;
 
@@ -76,7 +75,7 @@ macro_rules! unpremultiply_vec {
     }};
 }
 
-unsafe fn neon_premultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8], _: usize, _: usize) {
+unsafe fn neon_premultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8]) {
     let mut rem = dst;
     let mut src_rem = src;
 
@@ -132,13 +131,7 @@ unsafe fn neon_premultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8], _: us
         src_rem = src_rem.chunks_exact(16 * 4).remainder();
     }
 
-    for (dst, src) in rem.chunks_exact_mut(4).zip(src_rem.chunks_exact(4)) {
-        let a = src[3] as u16;
-        dst[0] = div_by_255(src[0] as u16 * a);
-        dst[1] = div_by_255(src[1] as u16 * a);
-        dst[2] = div_by_255(src[2] as u16 * a);
-        dst[3] = div_by_255(a * a);
-    }
+    premultiply_alpha_rgba_row_impl(rem, src_rem);
 }
 
 pub fn neon_premultiply_alpha_rgba(
@@ -150,34 +143,27 @@ pub fn neon_premultiply_alpha_rgba(
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            src.par_chunks_exact(width * 4)
-                .zip(dst.par_chunks_exact_mut(width * 4))
-                .for_each(|(src, dst)| unsafe {
-                    neon_premultiply_alpha_rgba_impl_row(dst, src, width, 0);
+            dst.par_chunks_exact_mut(width * 4)
+                .zip(src.par_chunks_exact(width * 4))
+                .for_each(|(dst, src)| unsafe {
+                    neon_premultiply_alpha_rgba_impl_row(dst, src);
                 });
         });
     } else {
-        for (dst_row, src_row) in dst
-            .chunks_exact_mut(4 * width)
-            .zip(src.chunks_exact(4 * width))
-        {
-            unsafe {
-                neon_premultiply_alpha_rgba_impl_row(dst_row, src_row, width, 0);
-            }
-        }
+        dst.chunks_exact_mut(width * 4)
+            .zip(src.chunks_exact(width * 4))
+            .for_each(|(dst, src)| unsafe {
+                neon_premultiply_alpha_rgba_impl_row(dst, src);
+            });
     }
 }
 
-unsafe fn neon_unpremultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8], _: usize, _: usize) {
-    let mut rem = dst;
-    let mut src_rem = src;
+unsafe fn neon_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8]) {
+    let mut rem = in_place;
 
     unsafe {
-        for (dst, src) in rem
-            .chunks_exact_mut(16 * 4)
-            .zip(src_rem.chunks_exact(16 * 4))
-        {
-            let src_ptr = src.as_ptr();
+        for dst in rem.chunks_exact_mut(16 * 4) {
+            let src_ptr = dst.as_ptr();
             let mut pixel = vld4q_u8(src_ptr);
             pixel.0 = unpremultiply_vec!(pixel.0, pixel.3);
             pixel.1 = unpremultiply_vec!(pixel.1, pixel.3);
@@ -187,44 +173,37 @@ unsafe fn neon_unpremultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8], _: 
         }
 
         rem = rem.chunks_exact_mut(16 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(16 * 4).remainder();
     }
 
-    for (dst, src) in rem.chunks_exact_mut(4).zip(src_rem.chunks_exact(4)) {
-        let a = src[3];
+    for dst in rem.chunks_exact_mut(4) {
+        let a = dst[3];
         if a != 0 {
             let a_recip = 1. / a as f32;
-            dst[0] = ((src[0] as f32 * 255.) * a_recip) as u8;
-            dst[1] = ((src[1] as f32 * 255.) * a_recip) as u8;
-            dst[2] = ((src[2] as f32 * 255.) * a_recip) as u8;
+            dst[0] = ((dst[0] as f32 * 255.) * a_recip) as u8;
+            dst[1] = ((dst[1] as f32 * 255.) * a_recip) as u8;
+            dst[2] = ((dst[2] as f32 * 255.) * a_recip) as u8;
             dst[3] = ((a as f32 * 255.) * a_recip) as u8;
         }
     }
 }
 
 pub fn neon_unpremultiply_alpha_rgba(
-    dst: &mut [u8],
-    src: &[u8],
+    in_place: &mut [u8],
     width: usize,
     _: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            src.par_chunks_exact(width * 4)
-                .zip(dst.par_chunks_exact_mut(width * 4))
-                .for_each(|(src, dst)| unsafe {
-                    neon_unpremultiply_alpha_rgba_impl_row(dst, src, width, 0);
+            in_place
+                .par_chunks_exact_mut(width * 4)
+                .for_each(|row| unsafe {
+                    neon_unpremultiply_alpha_rgba_impl_row(row);
                 });
         });
     } else {
-        for (dst_row, src_row) in dst
-            .chunks_exact_mut(4 * width)
-            .zip(src.chunks_exact(4 * width))
-        {
-            unsafe {
-                neon_unpremultiply_alpha_rgba_impl_row(dst_row, src_row, width, 0);
-            }
-        }
+        in_place.chunks_exact_mut(width * 4).for_each(|row| unsafe {
+            neon_unpremultiply_alpha_rgba_impl_row(row);
+        });
     }
 }

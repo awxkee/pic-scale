@@ -37,8 +37,7 @@ use crate::neon::{neon_premultiply_alpha_rgba_f16_full, neon_unpremultiply_alpha
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"),))]
 use crate::sse::{sse_premultiply_alpha_rgba_f16, sse_unpremultiply_alpha_rgba_f16};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::ParallelSliceMut;
-use rayon::slice::ParallelSlice;
+use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
 
 #[macro_export]
@@ -85,12 +84,13 @@ macro_rules! unpremultiply_pixel_f16 {
     }};
 }
 
-fn unpremultiply_pixel_f16_row(dst: &mut [half::f16], src: &[half::f16]) {
-    for (dst_chunk, src_chunk) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
-        let mut r = src_chunk[0].to_f32();
-        let mut g = src_chunk[1].to_f32();
-        let mut b = src_chunk[2].to_f32();
-        let a = src_chunk[3].to_f32();
+#[inline]
+pub(crate) fn unpremultiply_pixel_f16_row(in_place: &mut [half::f16]) {
+    for dst in in_place.chunks_exact_mut(4) {
+        let mut r = dst[0].to_f32();
+        let mut g = dst[1].to_f32();
+        let mut b = dst[2].to_f32();
+        let a = dst[3].to_f32();
         if a != 0. {
             let scale_alpha = 1. / a;
             r = r * scale_alpha;
@@ -101,26 +101,26 @@ fn unpremultiply_pixel_f16_row(dst: &mut [half::f16], src: &[half::f16]) {
             g = 0.;
             b = 0.;
         }
-        dst_chunk[0] = half::f16::from_f32(r);
-        dst_chunk[1] = half::f16::from_f32(g);
-        dst_chunk[2] = half::f16::from_f32(b);
-        dst_chunk[3] = half::f16::from_f32(a);
+        dst[0] = half::f16::from_f32(r);
+        dst[1] = half::f16::from_f32(g);
+        dst[2] = half::f16::from_f32(b);
     }
 }
 
-fn premultiply_pixel_f16_row(dst: &mut [half::f16], src: &[half::f16]) {
-    for (dst_chunk, src_chunk) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
-        let mut r = src_chunk[0].to_f32();
-        let mut g = src_chunk[1].to_f32();
-        let mut b = src_chunk[2].to_f32();
-        let a = src_chunk[3].to_f32();
+#[inline]
+pub(crate) fn premultiply_pixel_f16_row(dst: &mut [half::f16], src: &[half::f16]) {
+    for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+        let mut r = src[0].to_f32();
+        let mut g = src[1].to_f32();
+        let mut b = src[2].to_f32();
+        let a = src[3].to_f32();
         r *= a;
         g *= a;
         b *= a;
-        dst_chunk[0] = half::f16::from_f32(r);
-        dst_chunk[1] = half::f16::from_f32(g);
-        dst_chunk[2] = half::f16::from_f32(b);
-        dst_chunk[3] = half::f16::from_f32(a);
+        dst[0] = half::f16::from_f32(r);
+        dst[1] = half::f16::from_f32(g);
+        dst[2] = half::f16::from_f32(b);
+        dst[3] = half::f16::from_f32(a);
     }
 }
 
@@ -133,44 +133,37 @@ fn premultiply_alpha_rgba_impl_f16(
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            src.par_chunks_exact(width * 4)
-                .zip(dst.par_chunks_exact_mut(width * 4))
-                .for_each(|(src, dst)| {
+            dst.par_chunks_exact_mut(width * 4)
+                .zip(src.par_chunks_exact(width * 4))
+                .for_each(|(dst, src)| {
                     premultiply_pixel_f16_row(dst, src);
                 });
         });
     } else {
-        for (dst_row, src_row) in dst
-            .chunks_exact_mut(width * 4)
-            .zip(src.chunks_exact(4 * width))
-        {
-            premultiply_pixel_f16_row(dst_row, src_row);
-        }
+        dst.chunks_exact_mut(width * 4)
+            .zip(src.chunks_exact(width * 4))
+            .for_each(|(dst, src)| {
+                premultiply_pixel_f16_row(dst, src);
+            });
     }
 }
 
 fn unpremultiply_alpha_rgba_impl_f16(
     dst: &mut [half::f16],
-    src: &[half::f16],
     width: usize,
     _: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            src.par_chunks_exact(width * 4)
-                .zip(dst.par_chunks_exact_mut(width * 4))
-                .for_each(|(src, dst)| {
-                    unpremultiply_pixel_f16_row(dst, src);
-                });
+            dst.par_chunks_exact_mut(width * 4).for_each(|row| {
+                unpremultiply_pixel_f16_row(row);
+            });
         });
     } else {
-        for (dst_row, src_row) in dst
-            .chunks_exact_mut(width * 4)
-            .zip(src.chunks_exact(4 * width))
-        {
-            unpremultiply_pixel_f16_row(dst_row, src_row);
-        }
+        dst.chunks_exact_mut(width * 4).for_each(|row| {
+            unpremultiply_pixel_f16_row(row);
+        });
     }
 }
 
@@ -206,13 +199,12 @@ pub fn premultiply_alpha_rgba_f16(
 }
 
 pub fn unpremultiply_alpha_rgba_f16(
-    dst: &mut [half::f16],
-    src: &[half::f16],
+    in_place: &mut [half::f16],
     width: usize,
     height: usize,
     pool: &Option<ThreadPool>,
 ) {
-    let mut _dispatcher: fn(&mut [half::f16], &[half::f16], usize, usize, &Option<ThreadPool>) =
+    let mut _dispatcher: fn(&mut [half::f16], usize, usize, &Option<ThreadPool>) =
         unpremultiply_alpha_rgba_impl_f16;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
@@ -233,5 +225,5 @@ pub fn unpremultiply_alpha_rgba_f16(
             _dispatcher = avx_unpremultiply_alpha_rgba_f16;
         }
     }
-    _dispatcher(dst, src, width, height, pool);
+    _dispatcher(in_place, width, height, pool);
 }

@@ -31,8 +31,7 @@ use crate::alpha_handle_u16::{premultiply_alpha_rgba_row, unpremultiply_alpha_rg
 use crate::sse::alpha_u8::_mm_select_si128;
 use crate::sse::{sse_deinterleave_rgba_epi16, sse_interleave_rgba_epi16};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::ParallelSliceMut;
-use rayon::slice::ParallelSlice;
+use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
@@ -90,34 +89,28 @@ pub unsafe fn _mm_div_by_65535_epi32(v: __m128i) -> __m128i {
 }
 
 pub fn unpremultiply_alpha_sse_rgba_u16(
-    dst: &mut [u16],
-    src: &[u16],
+    in_place: &mut [u16],
     width: usize,
     height: usize,
     bit_depth: usize,
     pool: &Option<ThreadPool>,
 ) {
     unsafe {
-        unpremultiply_alpha_sse_rgba_u16_impl(dst, src, width, height, bit_depth, pool);
+        unpremultiply_alpha_sse_rgba_u16_impl(in_place, width, height, bit_depth, pool);
     }
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn unpremultiply_alpha_sse_rgba_u16_row_impl(
-    dst: &mut [u16],
-    src: &[u16],
-    bit_depth: usize,
-) {
+unsafe fn unpremultiply_alpha_sse_rgba_u16_row_impl(in_place: &mut [u16], bit_depth: usize) {
     let max_colors = (1 << bit_depth) - 1;
 
     let v_max_colors = unsafe { _mm_set1_ps(max_colors as f32) };
 
-    let mut rem = dst;
-    let mut src_rem = src;
+    let mut rem = in_place;
 
     unsafe {
-        for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
-            let src_ptr = src.as_ptr();
+        for dst in rem.chunks_exact_mut(8 * 4) {
+            let src_ptr = dst.as_ptr();
             let row0 = _mm_loadu_si128(src_ptr as *const __m128i);
             let row1 = _mm_loadu_si128(src_ptr.add(8) as *const __m128i);
             let row2 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
@@ -152,17 +145,15 @@ unsafe fn unpremultiply_alpha_sse_rgba_u16_row_impl(
         }
 
         rem = rem.chunks_exact_mut(8 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(8 * 4).remainder();
     }
 
-    unpremultiply_alpha_rgba_row(rem, src_rem, bit_depth as u32);
+    unpremultiply_alpha_rgba_row(rem, bit_depth as u32);
 }
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
 unsafe fn unpremultiply_alpha_sse_rgba_u16_impl(
-    dst: &mut [u16],
-    src: &[u16],
+    in_place: &mut [u16],
     width: usize,
     _: usize,
     bit_depth: usize,
@@ -170,21 +161,18 @@ unsafe fn unpremultiply_alpha_sse_rgba_u16_impl(
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            src.par_chunks_exact(width * 4)
-                .zip(dst.par_chunks_exact_mut(width * 4))
-                .for_each(|(src, dst)| unsafe {
-                    unpremultiply_alpha_sse_rgba_u16_row_impl(dst, src, bit_depth);
+            in_place
+                .par_chunks_exact_mut(width * 4)
+                .for_each(|row| unsafe {
+                    unpremultiply_alpha_sse_rgba_u16_row_impl(row, bit_depth);
                 });
         });
     } else {
-        for (dst_row, src_row) in dst
-            .chunks_exact_mut(4 * width)
-            .zip(src.chunks_exact(4 * width))
-        {
-            unsafe {
-                unpremultiply_alpha_sse_rgba_u16_row_impl(dst_row, src_row, bit_depth);
-            }
-        }
+        in_place
+            .par_chunks_exact_mut(width * 4)
+            .for_each(|row| unsafe {
+                unpremultiply_alpha_sse_rgba_u16_row_impl(row, bit_depth);
+            });
     }
 }
 
@@ -356,10 +344,8 @@ unsafe fn premultiply_alpha_sse_rgba_u16_row_impl(dst: &mut [u16], src: &[u16], 
                 _mm_storeu_si128(dst_ptr.add(24) as *mut __m128i, rgba3);
             }
         } else {
-            let v_max_colors_scale = _mm_div_ps(
-                _mm_set1_ps(1.),
-                _mm_cvtepi32_ps(_mm_set1_epi32(max_colors as i32)),
-            );
+            let v_max_colors_scale =
+                _mm_div_ps(_mm_set1_ps(1.), _mm_cvtepi32_ps(_mm_set1_epi32(max_colors)));
             for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
                 let src_ptr = src.as_ptr();
                 let row0 = _mm_loadu_si128(src_ptr as *const __m128i);
@@ -390,7 +376,7 @@ unsafe fn premultiply_alpha_sse_rgba_u16_row_impl(dst: &mut [u16], src: &[u16], 
         src_rem = src_rem.chunks_exact(8 * 4).remainder();
     }
 
-    premultiply_alpha_rgba_row(rem, src_rem, max_colors);
+    premultiply_alpha_rgba_row(rem, src_rem, max_colors as u32);
 }
 
 #[inline]
@@ -405,20 +391,17 @@ unsafe fn premultiply_alpha_sse_rgba_u16_impl(
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            src.par_chunks_exact(width * 4)
-                .zip(dst.par_chunks_exact_mut(width * 4))
-                .for_each(|(src, dst)| unsafe {
+            dst.par_chunks_exact_mut(width * 4)
+                .zip(src.par_chunks_exact(width * 4))
+                .for_each(|(dst, src)| unsafe {
                     premultiply_alpha_sse_rgba_u16_row_impl(dst, src, bit_depth);
                 });
         });
     } else {
-        for (dst_row, src_row) in dst
-            .chunks_exact_mut(4 * width)
-            .zip(src.chunks_exact(4 * width))
-        {
-            unsafe {
-                premultiply_alpha_sse_rgba_u16_row_impl(dst_row, src_row, bit_depth);
-            }
-        }
+        dst.chunks_exact_mut(width * 4)
+            .zip(src.chunks_exact(width * 4))
+            .for_each(|(dst, src)| unsafe {
+                premultiply_alpha_sse_rgba_u16_row_impl(dst, src, bit_depth);
+            });
     }
 }

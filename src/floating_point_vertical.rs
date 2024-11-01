@@ -69,7 +69,7 @@ pub(crate) fn convolve_column_handler_floating_point_4<
         let mut sums2 = ColorGroup::<CHANNELS, J>::dup(0.as_());
         let mut sums3 = ColorGroup::<CHANNELS, J>::dup(0.as_());
 
-        let v_start_px = x * CHANNELS;
+        let v_start_px = x;
 
         let bounds_start = bounds.start;
         let bounds_size = bounds.size;
@@ -421,7 +421,7 @@ pub(crate) fn convolve_column_handler_floating_point<
     unsafe {
         let mut sums0 = ColorGroup::<CHANNELS, J>::dup(0.as_());
 
-        let v_start_px = x * CHANNELS;
+        let v_start_px = x;
 
         let bounds_size = bounds.size;
         let bounds_start = bounds.start;
@@ -568,9 +568,7 @@ pub(crate) fn column_handler_floating_point<
         + MixedStorage<T>
         + Default,
     F: Copy + 'static + Float + AsPrimitive<J>,
-    const COMPONENTS: usize,
 >(
-    dst_width: usize,
     bounds: &FilterBounds,
     src: &[T],
     dst: &mut [T],
@@ -582,16 +580,26 @@ pub(crate) fn column_handler_floating_point<
 {
     let mut cx = 0usize;
 
-    while cx + 4 < dst_width {
-        convolve_column_handler_floating_point_4::<T, J, F, COMPONENTS>(
+    let total_width = dst.len();
+
+    while cx + 16 < total_width {
+        convolve_column_handler_floating_point_4::<T, J, F, 4>(
+            src, src_stride, dst, weight, bounds, bit_depth, cx,
+        );
+
+        cx += 16;
+    }
+
+    while cx + 4 < total_width {
+        convolve_column_handler_floating_point::<T, J, F, 4>(
             src, src_stride, dst, weight, bounds, bit_depth, cx,
         );
 
         cx += 4;
     }
 
-    while cx < dst_width {
-        convolve_column_handler_floating_point::<T, J, F, COMPONENTS>(
+    while cx < total_width {
+        convolve_column_handler_floating_point::<T, J, F, 1>(
             src, src_stride, dst, weight, bounds, bit_depth, cx,
         );
 

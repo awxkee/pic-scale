@@ -33,7 +33,8 @@ use crate::neon::{neon_premultiply_alpha_rgba_f32, neon_unpremultiply_alpha_rgba
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{sse_premultiply_alpha_rgba_f32, sse_unpremultiply_alpha_rgba_f32};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::slice::{ParallelSlice, ParallelSliceMut};
+use rayon::prelude::ParallelSlice;
+use rayon::slice::ParallelSliceMut;
 use rayon::ThreadPool;
 
 #[macro_export]
@@ -81,12 +82,12 @@ macro_rules! unpremultiply_pixel_f32 {
     }};
 }
 
-fn unpremultiply_pixel_f32_row(dst: &mut [f32], src: &[f32]) {
-    for (dst_chunk, src_chunk) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
-        let mut r = src_chunk[0];
-        let mut g = src_chunk[1];
-        let mut b = src_chunk[2];
-        let a = src_chunk[3];
+pub(crate) fn unpremultiply_pixel_f32_row(in_place: &mut [f32]) {
+    for dst in in_place.chunks_exact_mut(4) {
+        let mut r = dst[0];
+        let mut g = dst[1];
+        let mut b = dst[2];
+        let a = dst[3];
         if a != 0. {
             let scale_alpha = 1. / a;
             r *= scale_alpha;
@@ -97,26 +98,26 @@ fn unpremultiply_pixel_f32_row(dst: &mut [f32], src: &[f32]) {
             g = 0.;
             b = 0.;
         }
-        dst_chunk[0] = r;
-        dst_chunk[1] = g;
-        dst_chunk[2] = b;
-        dst_chunk[3] = a;
+        dst[0] = r;
+        dst[1] = g;
+        dst[2] = b;
+        dst[3] = a;
     }
 }
 
-fn premultiply_pixel_f32_row(dst: &mut [f32], src: &[f32]) {
-    for (dst_chunk, src_chunk) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
-        let mut r = src_chunk[0];
-        let mut g = src_chunk[1];
-        let mut b = src_chunk[2];
-        let a = src_chunk[3];
+pub(crate) fn premultiply_pixel_f32_row(dst: &mut [f32], src: &[f32]) {
+    for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+        let mut r = src[0];
+        let mut g = src[1];
+        let mut b = src[2];
+        let a = src[3];
         r *= a;
         g *= a;
         b *= a;
-        dst_chunk[0] = r;
-        dst_chunk[1] = g;
-        dst_chunk[2] = b;
-        dst_chunk[3] = a;
+        dst[0] = r;
+        dst[1] = g;
+        dst[2] = b;
+        dst[3] = a;
     }
 }
 
@@ -129,44 +130,37 @@ fn premultiply_alpha_rgba_impl_f32(
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            src.par_chunks_exact(width * 4)
-                .zip(dst.par_chunks_exact_mut(width * 4))
-                .for_each(|(src, dst)| {
+            dst.par_chunks_exact_mut(width * 4)
+                .zip(src.par_chunks_exact(width * 4))
+                .for_each(|(dst, src)| {
                     premultiply_pixel_f32_row(dst, src);
                 });
         });
     } else {
-        for (dst_row, src_row) in dst
-            .chunks_exact_mut(width * 4)
-            .zip(src.chunks_exact(4 * width))
-        {
-            premultiply_pixel_f32_row(dst_row, src_row);
-        }
+        dst.chunks_exact_mut(width * 4)
+            .zip(src.chunks_exact(width * 4))
+            .for_each(|(dst, src)| {
+                premultiply_pixel_f32_row(dst, src);
+            });
     }
 }
 
 fn unpremultiply_alpha_rgba_impl_f32(
-    dst: &mut [f32],
-    src: &[f32],
+    in_place: &mut [f32],
     width: usize,
     _: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            src.par_chunks_exact(width * 4)
-                .zip(dst.par_chunks_exact_mut(width * 4))
-                .for_each(|(src, dst)| {
-                    unpremultiply_pixel_f32_row(dst, src);
-                });
+            in_place.par_chunks_exact_mut(width * 4).for_each(|row| {
+                unpremultiply_pixel_f32_row(row);
+            });
         });
     } else {
-        for (dst_row, src_row) in dst
-            .chunks_exact_mut(width * 4)
-            .zip(src.chunks_exact(4 * width))
-        {
-            unpremultiply_pixel_f32_row(dst_row, src_row);
-        }
+        in_place.chunks_exact_mut(width * 4).for_each(|row| {
+            unpremultiply_pixel_f32_row(row);
+        });
     }
 }
 
@@ -199,13 +193,12 @@ pub fn premultiply_alpha_rgba_f32(
 }
 
 pub fn unpremultiply_alpha_rgba_f32(
-    dst: &mut [f32],
-    src: &[f32],
+    in_place: &mut [f32],
     width: usize,
     height: usize,
     pool: &Option<ThreadPool>,
 ) {
-    let mut _dispatcher: fn(&mut [f32], &[f32], usize, usize, &Option<ThreadPool>) =
+    let mut _dispatcher: fn(&mut [f32], usize, usize, &Option<ThreadPool>) =
         unpremultiply_alpha_rgba_impl_f32;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
@@ -223,5 +216,5 @@ pub fn unpremultiply_alpha_rgba_f32(
             _dispatcher = avx_unpremultiply_alpha_rgba_f32;
         }
     }
-    _dispatcher(dst, src, width, height, pool);
+    _dispatcher(in_place, width, height, pool);
 }
