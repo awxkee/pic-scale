@@ -63,6 +63,30 @@ pub fn convolve_horizontal_rgba_sse_rows_4_lb(
 }
 
 #[inline(always)]
+unsafe fn hdot4<const SCALE: i32>(
+    store: __m128i,
+    v0: __m128i,
+    v1: __m128i,
+    w01: __m128i,
+    w23: __m128i,
+    w45: __m128i,
+    w67: __m128i,
+) -> __m128i {
+    let zeros = _mm_setzero_si128();
+    let lo0 = _mm_slli_epi16::<SCALE>(_mm_unpacklo_epi8(v0, zeros));
+    let hi0 = _mm_slli_epi16::<SCALE>(_mm_unpackhi_epi8(v0, zeros));
+    let lo1 = _mm_slli_epi16::<SCALE>(_mm_unpacklo_epi8(v1, zeros));
+    let hi1 = _mm_slli_epi16::<SCALE>(_mm_unpackhi_epi8(v1, zeros));
+    let mut p = _mm_mulhi_epi16(lo0, w01);
+    p = _mm_add_epi16(p, _mm_mulhi_epi16(hi0, w23));
+    p = _mm_add_epi16(p, _mm_mulhi_epi16(lo1, w45));
+    p = _mm_add_epi16(p, _mm_mulhi_epi16(hi1, w67));
+    let hi_part = _mm_unpackhi_epi64(p, p);
+    p = _mm_add_epi16(hi_part, p);
+    _mm_add_epi16(store, p)
+}
+
+#[inline(always)]
 unsafe fn hdot2<const SCALE: i32>(
     store: __m128i,
     v: __m128i,
@@ -140,6 +164,105 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_impl(
             let src1 = src0.get_unchecked(src_stride..);
             let src2 = src1.get_unchecked(src_stride..);
             let src3 = src2.get_unchecked(src_stride..);
+
+            while jx + 8 < bounds.size {
+                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+
+                let weight01 = _mm_shuffle_epi8(
+                    _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned()),
+                    shuffle_weights,
+                );
+                let weight23 = _mm_shuffle_epi8(
+                    _mm_set1_epi32(
+                        (w_ptr.get_unchecked(2..).as_ptr() as *const i32).read_unaligned(),
+                    ),
+                    shuffle_weights,
+                );
+
+                let weight45 = _mm_shuffle_epi8(
+                    _mm_set1_epi32(
+                        (w_ptr.get_unchecked(4..).as_ptr() as *const i32).read_unaligned(),
+                    ),
+                    shuffle_weights,
+                );
+
+                let weight67 = _mm_shuffle_epi8(
+                    _mm_set1_epi32(
+                        (w_ptr.get_unchecked(6..).as_ptr() as *const i32).read_unaligned(),
+                    ),
+                    shuffle_weights,
+                );
+
+                let start_bounds = bounds.start + jx;
+
+                let rgb_pixel_0 = _mm_loadu_si128(
+                    src0.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
+                );
+                let rgb_pixel_0_1 = _mm_loadu_si128(
+                    src0.get_unchecked((start_bounds * CHANNELS + 16)..)
+                        .as_ptr() as *const __m128i,
+                );
+                let rgb_pixel_1 = _mm_loadu_si128(
+                    src1.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
+                );
+                let rgb_pixel_1_0 = _mm_loadu_si128(
+                    src1.get_unchecked((start_bounds * CHANNELS + 16)..)
+                        .as_ptr() as *const __m128i,
+                );
+                let rgb_pixel_2 = _mm_loadu_si128(
+                    src2.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
+                );
+                let rgb_pixel_2_1 = _mm_loadu_si128(
+                    src2.get_unchecked((start_bounds * CHANNELS + 16)..)
+                        .as_ptr() as *const __m128i,
+                );
+                let rgb_pixel_3 = _mm_loadu_si128(
+                    src3.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
+                );
+                let rgb_pixel_3_1 = _mm_loadu_si128(
+                    src3.get_unchecked((start_bounds * CHANNELS + 16)..)
+                        .as_ptr() as *const __m128i,
+                );
+
+                store_0 = hdot4::<SCALE>(
+                    store_0,
+                    rgb_pixel_0,
+                    rgb_pixel_0_1,
+                    weight01,
+                    weight23,
+                    weight45,
+                    weight67,
+                );
+                store_1 = hdot4::<SCALE>(
+                    store_1,
+                    rgb_pixel_1,
+                    rgb_pixel_1_0,
+                    weight01,
+                    weight23,
+                    weight45,
+                    weight67,
+                );
+                store_2 = hdot4::<SCALE>(
+                    store_2,
+                    rgb_pixel_2,
+                    rgb_pixel_2_1,
+                    weight01,
+                    weight23,
+                    weight45,
+                    weight67,
+                );
+                store_3 = hdot4::<SCALE>(
+                    store_3,
+                    rgb_pixel_3,
+                    rgb_pixel_3_1,
+                    weight01,
+                    weight23,
+                    weight45,
+                    weight67,
+                );
+
+                jx += 8;
+            }
 
             while jx + 4 < bounds.size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 4));
@@ -301,6 +424,50 @@ unsafe fn convolve_horizontal_rgba_sse_rows_one_impl(
     {
         let mut jx = 0usize;
         let mut store = vld;
+
+        while jx + 8 < bounds.size {
+            let w_ptr = weights.get_unchecked(jx..(jx + 8));
+
+            let weight01 = _mm_shuffle_epi8(
+                _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned()),
+                shuffle_weights,
+            );
+            let weight23 = _mm_shuffle_epi8(
+                _mm_set1_epi32((w_ptr.get_unchecked(2..).as_ptr() as *const i32).read_unaligned()),
+                shuffle_weights,
+            );
+
+            let weight45 = _mm_shuffle_epi8(
+                _mm_set1_epi32((w_ptr.get_unchecked(4..).as_ptr() as *const i32).read_unaligned()),
+                shuffle_weights,
+            );
+
+            let weight67 = _mm_shuffle_epi8(
+                _mm_set1_epi32((w_ptr.get_unchecked(6..).as_ptr() as *const i32).read_unaligned()),
+                shuffle_weights,
+            );
+
+            let start_bounds = bounds.start + jx;
+
+            let rgb_pixel_0 = _mm_loadu_si128(
+                src.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
+            );
+            let rgb_pixel_0_1 = _mm_loadu_si128(
+                src.get_unchecked((start_bounds * CHANNELS + 16)..).as_ptr() as *const __m128i,
+            );
+
+            store = hdot4::<SCALE>(
+                store,
+                rgb_pixel_0,
+                rgb_pixel_0_1,
+                weight01,
+                weight23,
+                weight45,
+                weight67,
+            );
+
+            jx += 8;
+        }
 
         while jx + 4 < bounds.size {
             let w_ptr = weights.get_unchecked(jx..(jx + 4));
