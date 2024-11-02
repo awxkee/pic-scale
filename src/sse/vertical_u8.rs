@@ -644,7 +644,6 @@ pub fn convolve_vertical_sse_row(
     }
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1")]
 unsafe fn convolve_vertical_sse_row_impl(
     _: usize,

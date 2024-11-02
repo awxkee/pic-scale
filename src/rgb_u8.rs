@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::avx2::convolve_vertical_avx_row;
+use crate::avx2::{convolve_vertical_avx_row, convolve_vertical_avx_row_lp};
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertical_dispatch_u8};
 use crate::filter_weights::{FilterBounds, FilterWeights};
@@ -40,7 +40,7 @@ use crate::neon::*;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{
     convolve_horizontal_rgb_sse_row_one, convolve_horizontal_rgb_sse_rows_4,
-    convolve_vertical_sse_row,
+    convolve_vertical_sse_row, convolve_vertical_sse_row_lp,
 };
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 use crate::wasm32::wasm_vertical_neon_row;
@@ -89,14 +89,14 @@ impl VerticalConvolutionPass<u8, 3> for ImageStore<'_, u8, 3> {
         destination: &mut ImageStore<u8, 3>,
         pool: &Option<ThreadPool>,
     ) {
-        let scale_factor = self.height as f32 / destination.height as f32;
+        let _scale_factor = self.height as f32 / destination.height as f32;
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(usize, &FilterBounds, &[u8], &mut [u8], usize, &[i16]) =
             handle_fixed_column_u8;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             // For more downscaling better to use more precise version
-            if scale_factor < 8. {
+            if _scale_factor < 8. {
                 _dispatcher = convolve_vertical_neon_i16_precision;
             } else {
                 _dispatcher = convolve_vertical_neon_i32_precision;
@@ -105,10 +105,18 @@ impl VerticalConvolutionPass<u8, 3> for ImageStore<'_, u8, 3> {
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
             if is_x86_feature_detected!("sse4.1") {
-                _dispatcher = convolve_vertical_sse_row;
+                if _scale_factor < 8. {
+                    _dispatcher = convolve_vertical_sse_row_lp;
+                } else {
+                    _dispatcher = convolve_vertical_sse_row;
+                }
             }
             if is_x86_feature_detected!("avx2") {
-                _dispatcher = convolve_vertical_avx_row;
+                if _scale_factor < 8. {
+                    _dispatcher = convolve_vertical_avx_row_lp;
+                } else {
+                    _dispatcher = convolve_vertical_avx_row;
+                }
             }
         }
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]

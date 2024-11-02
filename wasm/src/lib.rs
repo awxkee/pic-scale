@@ -1,5 +1,4 @@
 extern crate wee_alloc;
-use image::imageops::resize;
 use image::{DynamicImage, EncodableLayout, GenericImageView, ImageBuffer, ImageReader};
 use js_sys::Uint8Array;
 use pic_scale::{ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
