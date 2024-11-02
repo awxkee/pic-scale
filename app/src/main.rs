@@ -25,7 +25,7 @@ fn main() {
     let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
-    let mut scaler = LinearApproxScaler::new(ResamplingFunction::Lanczos3);
+    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
     // let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 8).collect();
@@ -36,7 +36,7 @@ fn main() {
     let start_time = Instant::now();
     let resized = scaler
         .resize_rgba(
-            ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
+            ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
             store,
             true,
         )
