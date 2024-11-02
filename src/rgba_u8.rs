@@ -40,7 +40,8 @@ use crate::handler_provider::{
 use crate::neon::*;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{
-    convolve_horizontal_rgba_sse_rows_4, convolve_horizontal_rgba_sse_rows_one,
+    convolve_horizontal_rgba_sse_rows_4, convolve_horizontal_rgba_sse_rows_4_lb,
+    convolve_horizontal_rgba_sse_rows_one, convolve_horizontal_rgba_sse_rows_one_lb,
     convolve_vertical_sse_row, convolve_vertical_sse_row_lp,
 };
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
@@ -75,8 +76,13 @@ impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
             if is_x86_feature_detected!("sse4.1") {
-                _dispatcher_4_rows = Some(convolve_horizontal_rgba_sse_rows_4);
-                _dispatcher_1_row = convolve_horizontal_rgba_sse_rows_one;
+                if _scale_factor < 8. {
+                    _dispatcher_4_rows = Some(convolve_horizontal_rgba_sse_rows_4_lb);
+                    _dispatcher_1_row = convolve_horizontal_rgba_sse_rows_one_lb;
+                } else {
+                    _dispatcher_4_rows = Some(convolve_horizontal_rgba_sse_rows_4);
+                    _dispatcher_1_row = convolve_horizontal_rgba_sse_rows_one;
+                }
             }
         }
         convolve_horizontal_dispatch_u8(

@@ -46,6 +46,7 @@ mod rgba_f32;
 mod rgba_u16;
 mod rgba_u16_lb;
 mod rgba_u8;
+mod rgba_u8_lb;
 mod routines;
 mod u8_utils;
 mod utils;
@@ -89,6 +90,9 @@ pub use rgba_u16_lb::{
     convolve_horizontal_rgba_sse_rows_4_lb_u8, convolve_horizontal_rgba_sse_u16_lb_row,
 };
 pub use rgba_u8::{convolve_horizontal_rgba_sse_rows_4, convolve_horizontal_rgba_sse_rows_one};
+pub use rgba_u8_lb::{
+    convolve_horizontal_rgba_sse_rows_4_lb, convolve_horizontal_rgba_sse_rows_one_lb,
+};
 pub use u8_utils::*;
 pub use utils::*;
 #[cfg(feature = "half")]
