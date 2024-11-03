@@ -29,6 +29,8 @@
 
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::nearest_sampler::resize_nearest;
+use crate::pic_scale_error::PicScaleError;
+use crate::support::check_image_size_overflow;
 use crate::ResamplingFunction::Nearest;
 use crate::{ImageSize, ImageStore, Scaler};
 use half::f16;
@@ -36,12 +38,28 @@ use half::f16;
 // f16
 impl Scaler {
     /// Resize f16 RGBA image
-    pub fn resize_rgba_f16(
-        &self,
+    pub fn resize_rgba_f16<'a>(
+        &'a self,
         new_size: ImageSize,
-        store: ImageStore<f16, 4>,
+        store: ImageStore<'a, f16, 4>,
         premultiply_alpha: bool,
-    ) -> ImageStore<f16, 4> {
+    ) -> Result<ImageStore<'a, f16, 4>, PicScaleError> {
+        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
+            return Err(PicScaleError::ZeroImageDimensions);
+        }
+
+        if check_image_size_overflow(store.width, store.height, store.channels) {
+            return Err(PicScaleError::SourceImageIsTooLarge);
+        }
+
+        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
+            return Err(PicScaleError::DestinationImageIsTooLarge);
+        }
+
+        if store.width == new_size.width && store.height == new_size.height {
+            return Ok(store.copied());
+        }
+
         let mut src_store = store;
 
         let pool = self
@@ -61,57 +79,81 @@ impl Scaler {
                 &pool,
             );
             let new_image =
-                ImageStore::<f16, 4>::new(allocated_store, new_size.width, new_size.height)
-                    .unwrap();
+                ImageStore::<f16, 4>::new(allocated_store, new_size.width, new_size.height)?;
 
-            return new_image;
+            return Ok(new_image);
         }
+
+        let should_do_horizontal = src_store.width != new_size.width;
+        let should_do_vertical = src_store.height != new_size.height;
+        assert!(should_do_horizontal || should_do_vertical);
 
         if premultiply_alpha {
-            let mut premultiplied_store =
-                ImageStore::<f16, 4>::alloc(src_store.width, src_store.height);
-            src_store.premultiply_alpha(&mut premultiplied_store, &pool);
-            src_store = premultiplied_store;
+            let mut new_store = ImageStore::alloc(src_store.width, src_store.height);
+            src_store.premultiply_alpha(&mut new_store, &pool);
+            src_store = new_store;
         }
 
-        let allocated_store_vertical: Vec<f16> =
-            vec![f16::from_f32(0.); src_store.width * 4 * new_size.height];
-        let mut new_image_vertical =
-            ImageStore::<f16, 4>::new(allocated_store_vertical, src_store.width, new_size.height)
-                .unwrap();
-        let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
-        let vertical_filters = self.generate_weights(src_store.height, new_image_vertical.height);
-        src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+        if should_do_vertical {
+            let allocated_store_vertical: Vec<f16> =
+                vec![f16::from_f32(0.); src_store.width * 4 * new_size.height];
+            let mut new_image_vertical = ImageStore::<f16, 4>::new(
+                allocated_store_vertical,
+                src_store.width,
+                new_size.height,
+            )?;
+            let vertical_filters =
+                self.generate_weights(src_store.height, new_image_vertical.height);
+            src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+            src_store = new_image_vertical;
+        }
 
-        let allocated_store_horizontal: Vec<f16> =
-            vec![f16::from_f32(0.); new_size.width * 4 * new_size.height];
-        let mut new_image_horizontal =
-            ImageStore::<f16, 4>::new(allocated_store_horizontal, new_size.width, new_size.height)
-                .unwrap();
-        new_image_vertical.convolve_horizontal(
-            horizontal_filters,
-            &mut new_image_horizontal,
-            &pool,
-        );
+        assert_eq!(src_store.height, new_size.height);
+
+        if should_do_horizontal {
+            let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
+            let allocated_store_horizontal: Vec<f16> =
+                vec![f16::from_f32(0.); new_size.width * 4 * new_size.height];
+            let mut new_image_horizontal = ImageStore::<f16, 4>::new(
+                allocated_store_horizontal,
+                new_size.width,
+                new_size.height,
+            )?;
+            src_store.convolve_horizontal(horizontal_filters, &mut new_image_horizontal, &pool);
+            src_store = new_image_horizontal;
+        }
+
+        assert_eq!(src_store.width, new_size.width);
 
         if premultiply_alpha {
-            let mut premultiplied_store = ImageStore::<f16, 4>::alloc(
-                new_image_horizontal.width,
-                new_image_horizontal.height,
-            );
-            new_image_horizontal.unpremultiply_alpha(&mut premultiplied_store, &pool);
-            return premultiplied_store;
+            src_store.unpremultiply_alpha(&pool);
         }
 
-        new_image_horizontal
+        Ok(src_store)
     }
 
     /// Resize f16 RGB image
-    pub fn resize_rgb_f16(
+    pub fn resize_rgb_f16<'a>(
         &self,
         new_size: ImageSize,
-        store: ImageStore<f16, 3>,
-    ) -> ImageStore<f16, 3> {
+        store: ImageStore<'a, f16, 3>,
+    ) -> Result<ImageStore<'a, f16, 3>, PicScaleError> {
+        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
+            return Err(PicScaleError::ZeroImageDimensions);
+        }
+
+        if check_image_size_overflow(store.width, store.height, store.channels) {
+            return Err(PicScaleError::SourceImageIsTooLarge);
+        }
+
+        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
+            return Err(PicScaleError::DestinationImageIsTooLarge);
+        }
+
+        if store.width == new_size.width && store.height == new_size.height {
+            return Ok(store.copied());
+        }
+
         let pool = self
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
@@ -129,39 +171,68 @@ impl Scaler {
                 &pool,
             );
             let new_image =
-                ImageStore::<f16, 3>::new(allocated_store, new_size.width, new_size.height)
-                    .unwrap();
-            return new_image;
+                ImageStore::<f16, 3>::new(allocated_store, new_size.width, new_size.height)?;
+            return Ok(new_image);
         }
 
-        let allocated_store_vertical: Vec<f16> =
-            vec![f16::from_f32(0.); store.width * 3 * new_size.height];
-        let mut new_image_vertical =
-            ImageStore::<f16, 3>::new(allocated_store_vertical, store.width, new_size.height)
-                .unwrap();
-        let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
-        store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+        let mut src_store = store;
 
-        let allocated_store_horizontal: Vec<f16> =
-            vec![f16::from_f32(0.); new_size.width * 3 * new_size.height];
-        let mut new_image_horizontal =
-            ImageStore::<f16, 3>::new(allocated_store_horizontal, new_size.width, new_size.height)
-                .unwrap();
-        let horizontal_filters = self.generate_weights(store.width, new_size.width);
-        new_image_vertical.convolve_horizontal(
-            horizontal_filters,
-            &mut new_image_horizontal,
-            &pool,
-        );
-        new_image_horizontal
+        let should_do_horizontal = src_store.width != new_size.width;
+        let should_do_vertical = src_store.height != new_size.height;
+        assert!(should_do_horizontal || should_do_vertical);
+
+        if should_do_vertical {
+            let allocated_store_vertical: Vec<f16> =
+                vec![f16::from_f32(0.); src_store.width * 3 * new_size.height];
+            let mut new_image_vertical = ImageStore::<f16, 3>::new(
+                allocated_store_vertical,
+                src_store.width,
+                new_size.height,
+            )?;
+            let vertical_filters =
+                self.generate_weights(src_store.height, new_image_vertical.height);
+            src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+            src_store = new_image_vertical;
+        }
+
+        if should_do_horizontal {
+            let allocated_store_horizontal: Vec<f16> =
+                vec![f16::from_f32(0.); new_size.width * 3 * new_size.height];
+            let mut new_image_horizontal = ImageStore::<f16, 3>::new(
+                allocated_store_horizontal,
+                new_size.width,
+                new_size.height,
+            )?;
+            let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
+            src_store.convolve_horizontal(horizontal_filters, &mut new_image_horizontal, &pool);
+            src_store = new_image_horizontal;
+        }
+
+        Ok(src_store)
     }
 
     /// Resize f16 plane
-    pub fn resize_plane_f16(
+    pub fn resize_plane_f16<'a>(
         &self,
         new_size: ImageSize,
-        store: ImageStore<f16, 1>,
-    ) -> ImageStore<f16, 1> {
+        store: ImageStore<'a, f16, 1>,
+    ) -> Result<ImageStore<'a, f16, 1>, PicScaleError> {
+        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
+            return Err(PicScaleError::ZeroImageDimensions);
+        }
+
+        if check_image_size_overflow(store.width, store.height, store.channels) {
+            return Err(PicScaleError::SourceImageIsTooLarge);
+        }
+
+        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
+            return Err(PicScaleError::DestinationImageIsTooLarge);
+        }
+
+        if store.width == new_size.width && store.height == new_size.height {
+            return Ok(store.copied());
+        }
+
         let pool = self
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
@@ -179,30 +250,43 @@ impl Scaler {
                 &pool,
             );
             let new_image =
-                ImageStore::<f16, 1>::new(allocated_store, new_size.width, new_size.height)
-                    .unwrap();
-            return new_image;
+                ImageStore::<f16, 1>::new(allocated_store, new_size.width, new_size.height)?;
+            return Ok(new_image);
         }
 
-        let allocated_store_vertical: Vec<f16> =
-            vec![f16::from_f32(0.); store.width * 1 * new_size.height];
-        let mut new_image_vertical =
-            ImageStore::<f16, 1>::new(allocated_store_vertical, store.width, new_size.height)
-                .unwrap();
-        let vertical_filters = self.generate_weights(store.height, new_image_vertical.height);
-        store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+        let mut src_store = store;
 
-        let allocated_store_horizontal: Vec<f16> =
-            vec![f16::from_f32(0.); new_size.width * 1 * new_size.height];
-        let mut new_image_horizontal =
-            ImageStore::<f16, 1>::new(allocated_store_horizontal, new_size.width, new_size.height)
-                .unwrap();
-        let horizontal_filters = self.generate_weights(store.width, new_size.width);
-        new_image_vertical.convolve_horizontal(
-            horizontal_filters,
-            &mut new_image_horizontal,
-            &pool,
-        );
-        new_image_horizontal
+        let should_do_horizontal = src_store.width != new_size.width;
+        let should_do_vertical = src_store.height != new_size.height;
+        assert!(should_do_horizontal || should_do_vertical);
+
+        if should_do_vertical {
+            let allocated_store_vertical: Vec<f16> =
+                vec![f16::from_f32(0.); src_store.width * new_size.height];
+            let mut new_image_vertical = ImageStore::<f16, 1>::new(
+                allocated_store_vertical,
+                src_store.width,
+                new_size.height,
+            )?;
+            let vertical_filters =
+                self.generate_weights(src_store.height, new_image_vertical.height);
+            src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+            src_store = new_image_vertical;
+        }
+
+        if should_do_horizontal {
+            let allocated_store_horizontal: Vec<f16> =
+                vec![f16::from_f32(0.); new_size.width * new_size.height];
+            let mut new_image_horizontal = ImageStore::<f16, 1>::new(
+                allocated_store_horizontal,
+                new_size.width,
+                new_size.height,
+            )?;
+            let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
+            src_store.convolve_horizontal(horizontal_filters, &mut new_image_horizontal, &pool);
+            src_store = new_image_horizontal;
+        }
+
+        Ok(src_store)
     }
 }

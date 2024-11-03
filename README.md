@@ -2,7 +2,7 @@
 
 Rust image scale in different color spaces using SIMD and multithreading.
 
-Supported NEON, SSE, AVX-2, RISC-V (Vector Extension), WASM.
+Supported NEON, SSE, AVX-2, WASM.
 
 ### Colorspace
 
@@ -43,20 +43,20 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 
 `~` - Partially implemented
 
-|                | NEON | SSE | AVX | RISC-V | WASM | 
-|----------------|------|-----|-----|--------|------| 
-| RGBA (8 bit)   | x    | x   | ~   | x      | x    | 
-| RGB (8 bit)    | x    | x   | ~   | ~      | x    | 
-| Plane (8 bit)  | x    | x   | ~   | ~      | ~    | 
-| RGBA (8+ bit)  | x    | x   | ~   | -      | -    | 
-| RGB (8+ bit)   | x    | x   | ~   | -      | -    | 
-| Plane (8+ bit) | ~    | ~   | ~   | -      | -    | 
-| RGBA (f32)     | x    | x   | x   | x      | -    | 
-| RGB (f32)      | x    | x   | ~   | ~      | -    | 
-| Plane (f32)    | x    | x   | ~   | ~      | -    | 
-| RGBA (f16)     | x    | x   | x   | x      | -    | 
-| RGB (f16)      | x    | ~   | ~   | ~      | -    | 
-| Plane (f16)    | ~    | ~   | ~   | ~      | -    | 
+|                | NEON | SSE | AVX | WASM | 
+|----------------|------|-----|-----|------| 
+| RGBA (8 bit)   | x    | x   | ~   | ~    | 
+| RGB (8 bit)    | x    | x   | ~   | ~    | 
+| Plane (8 bit)  | x    | x   | ~   | ~    | 
+| RGBA (8+ bit)  | x    | x   | ~   | -    | 
+| RGB (8+ bit)   | x    | x   | ~   | -    | 
+| Plane (8+ bit) | ~    | ~   | ~   | -    | 
+| RGBA (f32)     | x    | x   | x   | -    | 
+| RGB (f32)      | x    | x   | ~   | -    | 
+| Plane (f32)    | x    | x   | ~   | -    | 
+| RGBA (f16)     | x    | x   | x   | -    | 
+| RGB (f16)      | x    | ~   | ~   | -    | 
+| Plane (f16)    | ~    | ~   | ~   | -    |
 
 #### Features
 
@@ -72,8 +72,6 @@ To enable support of `f16` the feature `half` should be activated.
 
 `fullfp16` NEON target detection performed in runtime, when available best the best paths for *f16* images are available on ARM.
 
-RISC-V `V (vector extension)` will be detected in runtime if available when feature `riscv` is enabled. *Nightly* rust channel is required.
-
 WASM `simd128` target feature activating is mandatory in build flags
 
 ##### About f16
@@ -83,50 +81,55 @@ For NEON `f16` feature use runtime detection, if CPU supports this feature then 
 
 Even when `half` feature activated but platform do not support or features not enabled for `f16` speed will be slow
 
-For RISC-V `V` and `zfh` along `zvfh` is required on cpu support for fastest paths
-
 ### Performance
 
-Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 image in two times.
+Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 image in 4 times.
 
 | Lanczos3  |  SSE  |  AVX  | NEON  |
 |-----------|:-----:|:-----:|:-----:|
-| pic-scale | 43.84 | 33.98 | 23.48 |
-| fir       | 45.36 | 36.05 | 36.69 |
+| pic-scale | 43.84 | 28.46 | 8.56  |
+| fir       | 45.36 | 32.07 | 32.77 |
+
+Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 image in 4 times.
+
+| Lanczos3  |  AVX  | NEON  |
+|-----------|:-----:|:-----:|
+| pic-scale | 16.67 | 10.88 |
+| fir       | 22.83 | 24.97 |
 
 Example comparison time for downscale RGBA 4928x3279 image in two times with premultiplying alpha.
 
 | Lanczos3  |  SSE  |  AVX  | NEON  |
 |-----------|:-----:|:-----:|:-----:|
-| pic-scale | 68.51 | 47.33 | 35.67 |
-| fir       | 73.28 | 54.66 | 54.66 |
+| pic-scale | 68.51 | 35.82 | 17.27 |
+| fir       | 73.28 | 54.40 | 45.62 |
 
 Example comparison time for downscale RGBA 4928x3279 image in two times without premultiplying alpha.
 
 | Lanczos3  |  SSE  |  AVX  | NEON  |
 |-----------|:-----:|:-----:|:-----:|
-| pic-scale | 52.42 | 38.37 | 28.75 |
-| fir       | 51.89 | 39.82 | 44.54 |
+| pic-scale | 52.42 | 29.96 | 13.84 |
+| fir       | 51.89 | 35.07 | 36.50 |
 
 Example comparison time for downscale RGBA 4928x3279 10 bit image in two times with premultiplying alpha.
 
 | Lanczos3  |  SSE   | NEON  |
 |-----------|:------:|:-----:|
-| pic-scale | 156.90 | 48.37 |
+| pic-scale | 156.90 | 38.92 |
 | fir       | 150.65 | 91.08 |
 
 RGBA 4928x3279 10 bit downscale in two times without premultiplying alpha 
 
 | Lanczos3  |  SSE   | NEON  |
 |-----------|:------:|:-----:|
-| pic-scale | 156.90 | 42.49 |
+| pic-scale | 156.90 | 17.85 |
 | fir       | 150.65 | 73.82 |
 
 Example comparison time for downscale RGB 4000x6000 10 bit image in two times using *NEON*.
 
 | Lanczos3  |  SSE   |  NEON  |
 |-----------|:------:|:------:|
-| pic-scale | 138.75 | 30.79  |
+| pic-scale | 138.75 | 25.31  |
 | fir       | 125.85 | 100.36 |
 
 #### Example in sRGB

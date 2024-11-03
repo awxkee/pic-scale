@@ -40,6 +40,7 @@ pub mod utils;
 mod vertical_f16;
 mod vertical_f32;
 mod vertical_u8;
+mod vertical_u8_lp;
 
 #[cfg(feature = "half")]
 pub use alpha_f16::{avx_premultiply_alpha_rgba_f16, avx_unpremultiply_alpha_rgba_f16};
@@ -59,3 +60,4 @@ pub use rgba_f32::{
 pub use vertical_f16::convolve_vertical_avx_row_f16;
 pub use vertical_f32::convolve_vertical_avx_row_f32;
 pub use vertical_u8::convolve_vertical_avx_row;
+pub use vertical_u8_lp::convolve_vertical_avx_row_lp;

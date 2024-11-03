@@ -26,49 +26,26 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#![forbid(unsafe_code)]
 
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    not(feature = "disable_simd")
-))]
-use crate::avx2::convolve_vertical_avx_row;
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+use crate::avx2::{convolve_vertical_avx_row, convolve_vertical_avx_row_lp};
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
-use crate::convolve_naive_u8::*;
 use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertical_dispatch_u8};
 use crate::filter_weights::{FilterBounds, FilterWeights};
-#[cfg(all(
-    target_arch = "aarch64",
-    target_feature = "neon",
-    not(feature = "disable_simd")
-))]
+use crate::handler_provider::{
+    handle_fixed_column_u8, handle_fixed_row_u8, handle_fixed_rows_4_u8,
+};
+#[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
 use crate::neon::*;
-use crate::rgb_u8::*;
-#[cfg(all(
-    any(target_arch = "riscv64", target_arch = "riscv32"),
-    feature = "riscv",
-    not(feature = "disable_simd")
-))]
-use crate::risc::{
-    convolve_horizontal_rgba_risc_row_one_u8, convolve_horizontal_rgba_risc_rows_4_u8,
-    convolve_vertical_risc_row,
-};
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    not(feature = "disable_simd")
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{
-    convolve_horizontal_rgba_sse_rows_4, convolve_horizontal_rgba_sse_rows_one,
-    convolve_vertical_sse_row,
+    convolve_horizontal_rgba_sse_rows_4, convolve_horizontal_rgba_sse_rows_4_lb,
+    convolve_horizontal_rgba_sse_rows_one, convolve_horizontal_rgba_sse_rows_one_lb,
+    convolve_vertical_sse_row, convolve_vertical_sse_row_lp,
 };
-#[cfg(all(
-    target_arch = "wasm32",
-    target_feature = "simd128",
-    not(feature = "disable_simd")
-))]
-use crate::wasm32::{
-    convolve_horizontal_rgba_wasm_rows_4, convolve_horizontal_rgba_wasm_rows_one,
-    wasm_vertical_neon_row,
-};
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+use crate::wasm32::wasm_vertical_neon_row;
 use crate::ImageStore;
 use rayon::ThreadPool;
 
@@ -80,39 +57,32 @@ impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
         destination: &mut ImageStore<u8, 4>,
         _pool: &Option<ThreadPool>,
     ) {
+        let _scale_factor = self.width as f32 / destination.width as f32;
         let mut _dispatcher_4_rows: Option<
-            fn(usize, usize, &FilterWeights<i16>, *const u8, usize, *mut u8, usize),
-        > = Some(convolve_horizontal_rgba_native_4_row::<u8, i32, 4>);
-        let mut _dispatcher_1_row: fn(usize, usize, &FilterWeights<i16>, *const u8, *mut u8) =
-            convolve_horizontal_rgba_native_row::<u8, i32, 4>;
-        #[cfg(not(feature = "disable_simd"))]
+            fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>),
+        > = Some(handle_fixed_rows_4_u8::<4>);
+        let mut _dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i16>) =
+            handle_fixed_row_u8::<4>;
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            {
+            if _scale_factor < 8. {
+                _dispatcher_4_rows = Some(convolve_horizontal_rgba_neon_rows_4_u8_i16);
+                _dispatcher_1_row = convolve_horizontal_rgba_neon_row_i16;
+            } else {
                 _dispatcher_4_rows = Some(convolve_horizontal_rgba_neon_rows_4_u8);
                 _dispatcher_1_row = convolve_horizontal_rgba_neon_row;
             }
-            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            {
-                if is_x86_feature_detected!("sse4.1") {
+        }
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            if is_x86_feature_detected!("sse4.1") {
+                if _scale_factor < 8. {
+                    _dispatcher_4_rows = Some(convolve_horizontal_rgba_sse_rows_4_lb);
+                    _dispatcher_1_row = convolve_horizontal_rgba_sse_rows_one_lb;
+                } else {
                     _dispatcher_4_rows = Some(convolve_horizontal_rgba_sse_rows_4);
                     _dispatcher_1_row = convolve_horizontal_rgba_sse_rows_one;
                 }
-            }
-            #[cfg(all(
-                any(target_arch = "riscv64", target_arch = "riscv32"),
-                feature = "riscv"
-            ))]
-            {
-                if std::arch::is_riscv_feature_detected!("v") {
-                    _dispatcher_4_rows = Some(convolve_horizontal_rgba_risc_rows_4_u8);
-                    _dispatcher_1_row = convolve_horizontal_rgba_risc_row_one_u8;
-                }
-            }
-            #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-            {
-                _dispatcher_4_rows = Some(convolve_horizontal_rgba_wasm_rows_4);
-                _dispatcher_1_row = convolve_horizontal_rgba_wasm_rows_one;
             }
         }
         convolve_horizontal_dispatch_u8(
@@ -133,42 +103,39 @@ impl VerticalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
         destination: &mut ImageStore<u8, 4>,
         pool: &Option<ThreadPool>,
     ) {
-        let mut _dispatcher: fn(
-            dst_width: usize,
-            bounds: &FilterBounds,
-            unsafe_source_ptr_0: *const u8,
-            unsafe_destination_ptr_0: *mut u8,
-            src_stride: usize,
-            weight_ptr: &[i16],
-        ) = convolve_vertical_rgb_native_row_u8::<u8, i32, 4>;
-        #[cfg(not(feature = "disable_simd"))]
+        let _scale_factor = self.height as f32 / destination.height as f32;
+        #[allow(clippy::type_complexity)]
+        let mut _dispatcher: fn(usize, &FilterBounds, &[u8], &mut [u8], usize, &[i16]) =
+            handle_fixed_column_u8;
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            {
-                _dispatcher = convolve_vertical_neon_row::<4>;
+            // For more downscaling better to use more precise version
+            if _scale_factor < 8. {
+                _dispatcher = convolve_vertical_neon_i16_precision;
+            } else {
+                _dispatcher = convolve_vertical_neon_i32_precision;
             }
-            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            {
-                if is_x86_feature_detected!("sse4.1") {
-                    _dispatcher = convolve_vertical_sse_row::<4>;
-                }
-                if is_x86_feature_detected!("avx2") {
-                    _dispatcher = convolve_vertical_avx_row::<4>;
-                }
-            }
-            #[cfg(all(
-                any(target_arch = "riscv64", target_arch = "riscv32"),
-                feature = "riscv"
-            ))]
-            {
-                if std::arch::is_riscv_feature_detected!("v") {
-                    _dispatcher = convolve_vertical_risc_row::<4>;
+        }
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            if is_x86_feature_detected!("sse4.1") {
+                if _scale_factor < 8. {
+                    _dispatcher = convolve_vertical_sse_row_lp;
+                } else {
+                    _dispatcher = convolve_vertical_sse_row;
                 }
             }
-            #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-            {
-                _dispatcher = wasm_vertical_neon_row::<4>;
+            if is_x86_feature_detected!("avx2") {
+                if _scale_factor < 8. {
+                    _dispatcher = convolve_vertical_avx_row_lp;
+                } else {
+                    _dispatcher = convolve_vertical_avx_row;
+                }
             }
+        }
+        #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+        {
+            _dispatcher = wasm_vertical_neon_row;
         }
         convolve_vertical_dispatch_u8(self, filter_weights, destination, pool, _dispatcher);
     }

@@ -27,12 +27,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+use crate::alpha_handle_f16::{premultiply_pixel_f16_row, unpremultiply_pixel_f16_row};
 use crate::sse::f16_utils::{_mm_cvtph_psx, _mm_cvtps_phx};
 use crate::sse::{sse_deinterleave_rgba_epi16, sse_interleave_rgba_epi16};
-use crate::{premultiply_pixel_f16, unpremultiply_pixel_f16};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::ParallelSliceMut;
-use rayon::slice::ParallelSlice;
+use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
@@ -81,14 +80,12 @@ unsafe fn sse_premultiply_alpha_rgba_f16c(
 unsafe fn sse_premultiply_alpha_rgba_row_f16_impl<const F16C: bool>(
     dst: &mut [half::f16],
     src: &[half::f16],
-    width: usize,
-    offset: usize,
 ) {
-    let mut _cx = 0usize;
+    let mut rem = dst;
+    let mut src_rem = src;
 
-    while _cx + 8 < width {
-        let px = _cx * 4;
-        let src_ptr = src.as_ptr().add(offset + px);
+    for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
+        let src_ptr = src.as_ptr();
         let lane0 = _mm_loadu_si128(src_ptr as *const __m128i);
         let lane1 = _mm_loadu_si128(src_ptr.add(8) as *const __m128i);
         let lane2 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
@@ -119,20 +116,19 @@ unsafe fn sse_premultiply_alpha_rgba_row_f16_impl<const F16C: bool>(
             _mm_unpacklo_epi64(_mm_cvtps_phx::<F16C>(low_g), _mm_cvtps_phx::<F16C>(high_g));
         let b_values =
             _mm_unpacklo_epi64(_mm_cvtps_phx::<F16C>(low_b), _mm_cvtps_phx::<F16C>(high_b));
-        let dst_ptr = dst.as_mut_ptr().add(offset + px);
+        let dst_ptr = dst.as_mut_ptr();
         let (d_lane0, d_lane1, d_lane2, d_lane3) =
             sse_interleave_rgba_epi16(r_values, g_values, b_values, pixel.3);
         _mm_storeu_si128(dst_ptr as *mut __m128i, d_lane0);
         _mm_storeu_si128(dst_ptr.add(8) as *mut __m128i, d_lane1);
         _mm_storeu_si128(dst_ptr.add(16) as *mut __m128i, d_lane2);
         _mm_storeu_si128(dst_ptr.add(24) as *mut __m128i, d_lane3);
-        _cx += 8;
     }
 
-    for x in _cx..width {
-        let px = x * 4;
-        premultiply_pixel_f16!(dst, src, offset + px);
-    }
+    rem = rem.chunks_exact_mut(8 * 4).into_remainder();
+    src_rem = src_rem.chunks_exact(8 * 4).remainder();
+
+    premultiply_pixel_f16_row(rem, src_rem);
 }
 
 #[inline(always)]
@@ -145,77 +141,63 @@ unsafe fn sse_premultiply_alpha_rgba_f16_impl<const F16C: bool>(
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            src.par_chunks_exact(width * 4)
-                .zip(dst.par_chunks_exact_mut(width * 4))
-                .for_each(|(src, dst)| unsafe {
-                    sse_premultiply_alpha_rgba_row_f16_impl::<F16C>(dst, src, width, 0);
+            dst.par_chunks_exact_mut(width * 4)
+                .zip(src.par_chunks_exact(width * 4))
+                .for_each(|(dst, src)| unsafe {
+                    sse_premultiply_alpha_rgba_row_f16_impl::<F16C>(dst, src);
                 });
         });
     } else {
-        for (dst_row, src_row) in dst
-            .chunks_exact_mut(4 * width)
-            .zip(src.chunks_exact(4 * width))
-        {
-            unsafe {
-                sse_premultiply_alpha_rgba_row_f16_impl::<F16C>(dst_row, src_row, width, 0);
-            }
-        }
+        dst.chunks_exact_mut(width * 4)
+            .zip(src.chunks_exact(width * 4))
+            .for_each(|(dst, src)| unsafe {
+                sse_premultiply_alpha_rgba_row_f16_impl::<F16C>(dst, src);
+            });
     }
 }
 
 pub fn sse_unpremultiply_alpha_rgba_f16(
-    dst: &mut [half::f16],
-    src: &[half::f16],
+    in_place: &mut [half::f16],
     width: usize,
     height: usize,
     pool: &Option<ThreadPool>,
 ) {
     unsafe {
         if is_x86_feature_detected!("f16c") {
-            sse_unpremultiply_alpha_rgba_f16c(dst, src, width, height, pool);
+            sse_unpremultiply_alpha_rgba_f16c(in_place, width, height, pool);
         } else {
-            sse_unpremultiply_alpha_rgba_f16_regular(dst, src, width, height, pool);
+            sse_unpremultiply_alpha_rgba_f16_regular(in_place, width, height, pool);
         }
     }
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1")]
 unsafe fn sse_unpremultiply_alpha_rgba_f16_regular(
-    dst: &mut [half::f16],
-    src: &[half::f16],
+    in_place: &mut [half::f16],
     width: usize,
     height: usize,
     pool: &Option<ThreadPool>,
 ) {
-    sse_unpremultiply_alpha_rgba_f16_impl::<false>(dst, src, width, height, pool);
+    sse_unpremultiply_alpha_rgba_f16_impl::<false>(in_place, width, height, pool);
 }
 
-#[inline]
-#[target_feature(enable = "sse4.1,f16c")]
+#[target_feature(enable = "sse4.1", enable = "f16c")]
 unsafe fn sse_unpremultiply_alpha_rgba_f16c(
-    dst: &mut [half::f16],
-    src: &[half::f16],
+    in_place: &mut [half::f16],
     width: usize,
     height: usize,
     pool: &Option<ThreadPool>,
 ) {
-    sse_unpremultiply_alpha_rgba_f16_impl::<true>(dst, src, width, height, pool);
+    sse_unpremultiply_alpha_rgba_f16_impl::<true>(in_place, width, height, pool);
 }
 
 #[inline(always)]
-unsafe fn sse_unpremultiply_alpha_rgba_f16_row_impl<const F16C: bool>(
-    dst: &mut [half::f16],
-    src: &[half::f16],
-    width: usize,
-    offset: usize,
-) {
-    let mut _cx = 0usize;
+unsafe fn sse_unpremultiply_alpha_rgba_f16_row_impl<const F16C: bool>(in_place: &mut [half::f16]) {
+    let mut rem = in_place;
 
     unsafe {
-        while _cx + 8 < width {
-            let px = _cx * 4;
-            let src_ptr = src.as_ptr().add(offset + px);
+        for dst in rem.chunks_exact_mut(8 * 4) {
+            let src_ptr = dst.as_ptr();
             let lane0 = _mm_loadu_si128(src_ptr as *const __m128i);
             let lane1 = _mm_loadu_si128(src_ptr.add(8) as *const __m128i);
             let lane2 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
@@ -273,48 +255,39 @@ unsafe fn sse_unpremultiply_alpha_rgba_f16_row_impl<const F16C: bool>(
                 _mm_unpacklo_epi64(_mm_cvtps_phx::<F16C>(low_g), _mm_cvtps_phx::<F16C>(high_g));
             let b_values =
                 _mm_unpacklo_epi64(_mm_cvtps_phx::<F16C>(low_b), _mm_cvtps_phx::<F16C>(high_b));
-            let dst_ptr = dst.as_mut_ptr().add(offset + px);
+            let dst_ptr = dst.as_mut_ptr();
             let (d_lane0, d_lane1, d_lane2, d_lane3) =
                 sse_interleave_rgba_epi16(r_values, g_values, b_values, pixel.3);
             _mm_storeu_si128(dst_ptr as *mut __m128i, d_lane0);
             _mm_storeu_si128(dst_ptr.add(8) as *mut __m128i, d_lane1);
             _mm_storeu_si128(dst_ptr.add(16) as *mut __m128i, d_lane2);
             _mm_storeu_si128(dst_ptr.add(24) as *mut __m128i, d_lane3);
-            _cx += 8;
         }
+
+        rem = rem.chunks_exact_mut(8 * 4).into_remainder();
     }
 
-    for x in _cx..width {
-        let px = x * 4;
-        let pixel_offset = offset + px;
-        unpremultiply_pixel_f16!(dst, src, pixel_offset);
-    }
+    unpremultiply_pixel_f16_row(rem);
 }
 
 #[inline(always)]
 unsafe fn sse_unpremultiply_alpha_rgba_f16_impl<const F16C: bool>(
-    dst: &mut [half::f16],
-    src: &[half::f16],
+    in_place: &mut [half::f16],
     width: usize,
     _: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            src.par_chunks_exact(width * 4)
-                .zip(dst.par_chunks_exact_mut(width * 4))
-                .for_each(|(src, dst)| unsafe {
-                    sse_unpremultiply_alpha_rgba_f16_row_impl::<F16C>(dst, src, width, 0);
+            in_place
+                .par_chunks_exact_mut(width * 4)
+                .for_each(|row| unsafe {
+                    sse_unpremultiply_alpha_rgba_f16_row_impl::<F16C>(row);
                 });
         });
     } else {
-        for (dst_row, src_row) in dst
-            .chunks_exact_mut(4 * width)
-            .zip(src.chunks_exact(4 * width))
-        {
-            unsafe {
-                sse_unpremultiply_alpha_rgba_f16_row_impl::<F16C>(dst_row, src_row, width, 0);
-            }
-        }
+        in_place.chunks_exact_mut(width * 4).for_each(|row| unsafe {
+            sse_unpremultiply_alpha_rgba_f16_row_impl::<F16C>(row);
+        });
     }
 }

@@ -27,8 +27,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 mod alpha_u8;
-mod rgb_u8;
-mod rgba_u8;
 mod transpose;
 mod utils;
 mod vertical_u8;

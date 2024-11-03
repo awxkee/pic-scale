@@ -31,7 +31,10 @@ use colorutils_rs::{
     linear_u8_to_rgb, linear_u8_to_rgba, rgb_to_linear_u8, rgba_to_linear_u8, TransferFunction,
 };
 
+use crate::alpha_check::has_non_constant_cap_alpha_rgba8;
+use crate::pic_scale_error::PicScaleError;
 use crate::scaler::Scaling;
+use crate::support::check_image_size_overflow;
 use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, ThreadingPolicy};
 
 #[derive(Debug, Copy, Clone)]
@@ -67,7 +70,27 @@ impl Scaling for LinearApproxScaler {
         self.scaler.threading_policy = threading_policy;
     }
 
-    fn resize_rgb(&self, new_size: ImageSize, store: ImageStore<u8, 3>) -> ImageStore<u8, 3> {
+    fn resize_rgb(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<u8, 3>,
+    ) -> Result<ImageStore<u8, 3>, PicScaleError> {
+        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
+            return Err(PicScaleError::ZeroImageDimensions);
+        }
+
+        if check_image_size_overflow(store.width, store.height, store.channels) {
+            return Err(PicScaleError::SourceImageIsTooLarge);
+        }
+
+        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
+            return Err(PicScaleError::DestinationImageIsTooLarge);
+        }
+
+        if store.width == new_size.width && store.height == new_size.height {
+            return Ok(store.copied());
+        }
+
         const CHANNELS: usize = 3;
         let mut linear_store = ImageStore::<u8, CHANNELS>::alloc(store.width, store.height);
         rgb_to_linear_u8(
@@ -79,7 +102,7 @@ impl Scaling for LinearApproxScaler {
             linear_store.height as u32,
             self.transfer_function,
         );
-        let new_store = self.scaler.resize_rgb(new_size, linear_store);
+        let new_store = self.scaler.resize_rgb(new_size, linear_store)?;
         let mut gamma_store = ImageStore::<u8, CHANNELS>::alloc(new_store.width, new_store.height);
         let src = new_store.buffer.borrow();
         let gamma_buffer = gamma_store.buffer.borrow_mut();
@@ -92,15 +115,31 @@ impl Scaling for LinearApproxScaler {
             gamma_store.height as u32,
             self.transfer_function,
         );
-        gamma_store
+        Ok(gamma_store)
     }
 
-    fn resize_rgba(
+    fn resize_rgba<'a>(
         &self,
         new_size: ImageSize,
-        store: ImageStore<u8, 4>,
+        store: ImageStore<'a, u8, 4>,
         premultiply_alpha: bool,
-    ) -> ImageStore<u8, 4> {
+    ) -> Result<ImageStore<'a, u8, 4>, PicScaleError> {
+        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
+            return Err(PicScaleError::ZeroImageDimensions);
+        }
+
+        if check_image_size_overflow(store.width, store.height, store.channels) {
+            return Err(PicScaleError::SourceImageIsTooLarge);
+        }
+
+        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
+            return Err(PicScaleError::DestinationImageIsTooLarge);
+        }
+
+        if store.width == new_size.width && store.height == new_size.height {
+            return Ok(store.copied());
+        }
+
         const CHANNELS: usize = 4;
         let mut src_store = store;
 
@@ -109,12 +148,19 @@ impl Scaling for LinearApproxScaler {
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
 
+        let mut has_alpha_premultiplied = false;
+
         if premultiply_alpha {
-            let mut premultiplied_store =
-                ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
-            src_store.premultiply_alpha(&mut premultiplied_store, &pool);
-            src_store = premultiplied_store;
+            let is_alpha_premultiplication_reasonable =
+                has_non_constant_cap_alpha_rgba8(src_store.buffer.borrow(), src_store.width);
+            if is_alpha_premultiplication_reasonable {
+                let mut new_store = ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
+                src_store.premultiply_alpha(&mut new_store, &pool);
+                src_store = new_store;
+                has_alpha_premultiplied = true;
+            }
         }
+
         let mut linear_store = ImageStore::<u8, CHANNELS>::alloc(src_store.width, src_store.height);
         rgba_to_linear_u8(
             src_store.buffer.borrow(),
@@ -127,7 +173,7 @@ impl Scaling for LinearApproxScaler {
         );
         let new_store = self
             .scaler
-            .resize_rgba_impl(new_size, linear_store, false, &pool);
+            .resize_rgba_impl(new_size, linear_store, false, &pool)?;
         let mut gamma_store = ImageStore::<u8, CHANNELS>::alloc(new_store.width, new_store.height);
         let src = new_store.buffer.borrow();
         let gamma_buffer = gamma_store.buffer.borrow_mut();
@@ -140,12 +186,9 @@ impl Scaling for LinearApproxScaler {
             gamma_store.height as u32,
             self.transfer_function,
         );
-        if premultiply_alpha {
-            let mut premultiplied_store =
-                ImageStore::<u8, 4>::alloc(gamma_store.width, gamma_store.height);
-            gamma_store.unpremultiply_alpha(&mut premultiplied_store, &pool);
-            return premultiplied_store;
+        if premultiply_alpha && has_alpha_premultiplied {
+            gamma_store.unpremultiply_alpha(&pool);
         }
-        gamma_store
+        Ok(gamma_store)
     }
 }

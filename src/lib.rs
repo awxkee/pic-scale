@@ -26,30 +26,15 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#![deny(deprecated)]
 #![allow(clippy::too_many_arguments)]
-#![cfg_attr(
-    all(
-        feature = "riscv",
-        any(target_arch = "riscv64", target_arch = "riscv32")
-    ),
-    feature(riscv_target_feature)
-)]
-#![cfg_attr(
-    all(
-        feature = "riscv",
-        any(target_arch = "riscv64", target_arch = "riscv32")
-    ),
-    feature(stdarch_riscv_feature_detection)
-)]
+mod alpha_check;
 #[cfg(feature = "half")]
 mod alpha_handle_f16;
 mod alpha_handle_f32;
 mod alpha_handle_u16;
 mod alpha_handle_u8;
-#[cfg(all(
-    not(feature = "disable_simd"),
-    any(target_arch = "x86_64", target_arch = "x86")
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod avx2;
 mod color_group;
 #[cfg(feature = "colorspaces")]
@@ -57,7 +42,6 @@ mod colors;
 mod convolution;
 mod convolve_naive_f32;
 mod convolve_naive_u16;
-mod convolve_naive_u8;
 mod cpu_features;
 #[cfg(feature = "half")]
 mod dispatch_group_f16;
@@ -67,6 +51,8 @@ mod dispatch_group_u8;
 #[cfg(feature = "half")]
 mod f16;
 mod filter_weights;
+mod fixed_point_horizontal;
+mod fixed_point_vertical;
 mod floating_point_horizontal;
 mod floating_point_vertical;
 mod handler_provider;
@@ -76,12 +62,9 @@ mod math;
 mod mixed_storage;
 mod mlaf;
 mod nearest_sampler;
-#[cfg(all(
-    target_arch = "aarch64",
-    target_feature = "neon",
-    not(feature = "disable_simd")
-))]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
 mod neon;
+mod pic_scale_error;
 mod plane_f32;
 mod plane_u16;
 mod plane_u8;
@@ -91,32 +74,18 @@ mod rgb_u8;
 mod rgba_f32;
 mod rgba_u16;
 mod rgba_u8;
-#[cfg(all(
-    any(target_arch = "riscv64", target_arch = "riscv32"),
-    feature = "riscv",
-    not(feature = "disable_simd")
-))]
-mod risc;
 mod sampler;
 mod saturate_narrow;
 mod scaler;
 #[cfg(feature = "half")]
 mod scaler_f16;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    not(feature = "disable_simd")
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod sse;
 mod support;
 mod threading_policy;
 mod unsafe_slice;
-#[cfg(all(
-    target_arch = "wasm32",
-    target_feature = "simd128",
-    not(feature = "disable_simd")
-))]
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128",))]
 mod wasm32;
-mod alpha_check;
 
 #[cfg(feature = "colorspaces")]
 pub use colors::*;

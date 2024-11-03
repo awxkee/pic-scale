@@ -87,21 +87,33 @@ macro_rules! accumulate_1_horiz {
 }
 
 pub fn convolve_horizontal_plane_neon_rows_4_u8(
-    dst_width: usize,
-    _: usize,
-    filter_weights: &FilterWeights<i16>,
-    unsafe_source_ptr_0: *const u8,
+    src: &[u8],
     src_stride: usize,
-    unsafe_destination_ptr_0: *mut u8,
+    dst: &mut [u8],
     dst_stride: usize,
+    filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        let mut filter_offset = 0usize;
+        let (row0_ref, rest) = dst.split_at_mut(dst_stride);
+        let (row1_ref, rest) = rest.split_at_mut(dst_stride);
+        let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let weights_ptr = filter_weights.weights.as_ptr();
+        let iter_row0 = row0_ref.iter_mut();
+        let iter_row1 = row1_ref.iter_mut();
+        let iter_row2 = row2_ref.iter_mut();
+        let iter_row3 = row3_ref.iter_mut();
 
-        for x in 0..dst_width {
-            let bounds = filter_weights.bounds.get_unchecked(x);
+        for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
+            .zip(iter_row1)
+            .zip(iter_row2)
+            .zip(iter_row3)
+            .zip(filter_weights.bounds.iter())
+            .zip(
+                filter_weights
+                    .weights
+                    .chunks_exact(filter_weights.aligned_size),
+            )
+        {
             let mut jx = 0usize;
             let mut store0 = vdupq_n_s32(0i32);
             store0 = vsetq_lane_s32::<0>(ROUNDING_CONST, store0);
@@ -112,86 +124,87 @@ pub fn convolve_horizontal_plane_neon_rows_4_u8(
             let mut store3 = vdupq_n_s32(0i32);
             store3 = vsetq_lane_s32::<0>(ROUNDING_CONST, store3);
 
-            let row1 = unsafe_source_ptr_0.add(src_stride);
-            let row2 = unsafe_source_ptr_0.add(src_stride * 2);
-            let row3 = unsafe_source_ptr_0.add(src_stride * 3);
+            let src0 = src;
+            let src1 = src0.get_unchecked(src_stride..);
+            let src2 = src1.get_unchecked(src_stride..);
+            let src3 = src2.get_unchecked(src_stride..);
 
             while jx + 16 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let weights = vld1q_s16_x2(ptr);
+                let w_ptr = weights.get_unchecked(jx..(jx + 16));
+                let weights = vld1q_s16_x2(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
 
-                let src_ptr = unsafe_source_ptr_0.add(bounds_start);
-                accumulate_16_horiz!(store0, src_ptr, weights);
+                let src_ptr = src0.get_unchecked(bounds_start..);
+                accumulate_16_horiz!(store0, src_ptr.as_ptr(), weights);
 
-                let src_ptr1 = row1.add(bounds_start);
-                accumulate_16_horiz!(store1, src_ptr1, weights);
+                let src_ptr1 = src1.get_unchecked(bounds_start..);
+                accumulate_16_horiz!(store1, src_ptr1.as_ptr(), weights);
 
-                let src_ptr2 = row2.add(bounds_start);
-                accumulate_16_horiz!(store2, src_ptr2, weights);
+                let src_ptr2 = src2.get_unchecked(bounds_start..);
+                accumulate_16_horiz!(store2, src_ptr2.as_ptr(), weights);
 
-                let src_ptr3 = row3.add(bounds_start);
-                accumulate_16_horiz!(store3, src_ptr3, weights);
+                let src_ptr3 = src3.get_unchecked(bounds_start..);
+                accumulate_16_horiz!(store3, src_ptr3.as_ptr(), weights);
 
                 jx += 16;
             }
 
             while jx + 8 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let weights = vld1q_s16(ptr);
+                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                let weights = vld1q_s16(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
 
-                let src_ptr = unsafe_source_ptr_0.add(bounds_start);
-                accumulate_8_horiz!(store0, src_ptr, weights);
+                let src_ptr = src0.get_unchecked(bounds_start..);
+                accumulate_8_horiz!(store0, src_ptr.as_ptr(), weights);
 
-                let src_ptr1 = row1.add(bounds_start);
-                accumulate_8_horiz!(store1, src_ptr1, weights);
+                let src_ptr1 = src1.get_unchecked(bounds_start..);
+                accumulate_8_horiz!(store1, src_ptr1.as_ptr(), weights);
 
-                let src_ptr2 = row2.add(bounds_start);
-                accumulate_8_horiz!(store2, src_ptr2, weights);
+                let src_ptr2 = src2.get_unchecked(bounds_start..);
+                accumulate_8_horiz!(store2, src_ptr2.as_ptr(), weights);
 
-                let src_ptr3 = row3.add(bounds_start);
-                accumulate_8_horiz!(store3, src_ptr3, weights);
+                let src_ptr3 = src3.get_unchecked(bounds_start..);
+                accumulate_8_horiz!(store3, src_ptr3.as_ptr(), weights);
 
                 jx += 8;
             }
 
             while jx + 4 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let weights = vld1_s16(ptr);
+                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let weights = vld1_s16(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
 
-                let src_ptr = unsafe_source_ptr_0.add(bounds_start);
-                accumulate_4_horiz!(store0, src_ptr, weights);
+                let src_ptr = src0.get_unchecked(bounds_start..);
+                accumulate_4_horiz!(store0, src_ptr.as_ptr(), weights);
 
-                let src_ptr1 = row1.add(bounds_start);
-                accumulate_4_horiz!(store1, src_ptr1, weights);
+                let src_ptr1 = src1.get_unchecked(bounds_start..);
+                accumulate_4_horiz!(store1, src_ptr1.as_ptr(), weights);
 
-                let src_ptr2 = row2.add(bounds_start);
-                accumulate_4_horiz!(store2, src_ptr2, weights);
+                let src_ptr2 = src2.get_unchecked(bounds_start..);
+                accumulate_4_horiz!(store2, src_ptr2.as_ptr(), weights);
 
-                let src_ptr3 = row3.add(bounds_start);
-                accumulate_4_horiz!(store3, src_ptr3, weights);
+                let src_ptr3 = src3.get_unchecked(bounds_start..);
+                accumulate_4_horiz!(store3, src_ptr3.as_ptr(), weights);
 
                 jx += 4;
             }
 
             while jx < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let weight = vld1_lane_s16::<0>(ptr, vdup_n_s16(0));
+                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let weight = vld1_lane_s16::<0>(w_ptr.as_ptr(), vdup_n_s16(0));
                 let bounds_start = bounds.start + jx;
 
-                let src_ptr = unsafe_source_ptr_0.add(bounds_start);
-                accumulate_1_horiz!(store0, src_ptr, weight);
+                let src_ptr = src0.get_unchecked(bounds_start..);
+                accumulate_1_horiz!(store0, src_ptr.as_ptr(), weight);
 
-                let src_ptr1 = row1.add(bounds_start);
-                accumulate_1_horiz!(store1, src_ptr1, weight);
+                let src_ptr1 = src1.get_unchecked(bounds_start..);
+                accumulate_1_horiz!(store1, src_ptr1.as_ptr(), weight);
 
-                let src_ptr2 = row2.add(bounds_start);
-                accumulate_1_horiz!(store2, src_ptr2, weight);
+                let src_ptr2 = src2.get_unchecked(bounds_start..);
+                accumulate_1_horiz!(store2, src_ptr2.as_ptr(), weight);
 
-                let src_ptr3 = row3.add(bounds_start);
-                accumulate_1_horiz!(store3, src_ptr3, weight);
+                let src_ptr3 = src3.get_unchecked(bounds_start..);
+                accumulate_1_horiz!(store3, src_ptr3.as_ptr(), weight);
 
                 jx += 1;
             }
@@ -199,96 +212,81 @@ pub fn convolve_horizontal_plane_neon_rows_4_u8(
             let sums = vfullq_sum_s32!(store0).max(0);
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
-
-            let px = x;
-            let dest_ptr = unsafe_destination_ptr_0.add(px);
-            dest_ptr.write_unaligned(value);
+            *chunk0 = value;
 
             let sums = vfullq_sum_s32!(store1).max(0);
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
-
-            let px = x;
-            let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride);
-            dest_ptr.write_unaligned(value);
+            *chunk1 = value;
 
             let sums = vfullq_sum_s32!(store2).max(0);
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
-
-            let px = x;
-            let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 2);
-            dest_ptr.write_unaligned(value);
+            *chunk2 = value;
 
             let sums = vfullq_sum_s32!(store3).max(0);
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
-
-            let px = x;
-            let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 3);
-            dest_ptr.write_unaligned(value);
-
-            filter_offset += filter_weights.aligned_size;
+            *chunk3 = value;
         }
     }
 }
 
 pub fn convolve_horizontal_plane_neon_row(
-    dst_width: usize,
-    _: usize,
+    src: &[u8],
+    dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
-    unsafe_source_ptr_0: *const u8,
-    unsafe_destination_ptr_0: *mut u8,
 ) {
     unsafe {
-        let mut filter_offset = 0usize;
+        for ((dst, bounds), weights) in dst.iter_mut().zip(filter_weights.bounds.iter()).zip(
+            filter_weights
+                .weights
+                .chunks_exact(filter_weights.aligned_size),
+        ) {
+            let bounds_size = bounds.size;
 
-        let weights_ptr = filter_weights.weights.as_ptr();
-
-        for x in 0..dst_width {
-            let bounds = filter_weights.bounds.get_unchecked(x);
             let mut jx = 0usize;
             let mut store = vdupq_n_s32(0i32);
             store = vsetq_lane_s32::<0>(ROUNDING_CONST, store);
 
-            while jx + 16 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let weights = vld1q_s16_x2(ptr);
+            while jx + 16 < bounds_size {
+                let w_ptr = weights.get_unchecked(jx..(jx + 16));
+                let weights = vld1q_s16_x2(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
 
-                let src_ptr = unsafe_source_ptr_0.add(bounds_start);
+                let src_ptr = src.get_unchecked(bounds_start..).as_ptr();
                 accumulate_16_horiz!(store, src_ptr, weights);
 
                 jx += 16;
             }
 
-            while jx + 8 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let weights = vld1q_s16(ptr);
+            while jx + 8 < bounds_size {
+                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                let weights = vld1q_s16(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
 
-                let src_ptr = unsafe_source_ptr_0.add(bounds_start);
+                let src_ptr = src.get_unchecked(bounds_start..).as_ptr();
                 accumulate_8_horiz!(store, src_ptr, weights);
 
                 jx += 8;
             }
 
-            while jx + 4 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let weights = vld1_s16(ptr);
+            while jx + 4 < bounds_size {
+                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let weights = vld1_s16(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
 
-                let src_ptr = unsafe_source_ptr_0.add(bounds_start);
+                let src_ptr = src.get_unchecked(bounds_start..).as_ptr();
                 accumulate_4_horiz!(store, src_ptr, weights);
 
                 jx += 4;
             }
 
-            while jx < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let weight = vld1_lane_s16::<0>(ptr, vdup_n_s16(0));
+            while jx < bounds_size {
+                let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                let weight = vld1_lane_s16::<0>(w_ptr.as_ptr(), vdup_n_s16(0));
                 let bounds_start = bounds.start + jx;
-                let src_ptr = unsafe_source_ptr_0.add(bounds_start);
+                let src_ptr = src.get_unchecked(bounds_start..).as_ptr();
                 accumulate_1_horiz!(store, src_ptr, weight);
                 jx += 1;
             }
@@ -296,12 +294,7 @@ pub fn convolve_horizontal_plane_neon_row(
             let sums = vfullq_sum_s32!(store).max(0);
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
-
-            let px = x;
-            let dest_ptr = unsafe_destination_ptr_0.add(px);
-            dest_ptr.write_unaligned(value);
-
-            filter_offset += filter_weights.aligned_size;
+            *dst = value;
         }
     }
 }

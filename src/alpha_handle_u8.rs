@@ -26,102 +26,32 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    not(feature = "disable_simd")
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::avx2::{avx_premultiply_alpha_rgba, avx_unpremultiply_alpha_rgba};
-#[cfg(all(
-    target_arch = "aarch64",
-    target_feature = "neon",
-    not(feature = "disable_simd")
-))]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{neon_premultiply_alpha_rgba, neon_unpremultiply_alpha_rgba};
-#[cfg(all(
-    any(target_arch = "riscv64", target_arch = "riscv32"),
-    feature = "riscv",
-    not(feature = "disable_simd")
-))]
-use crate::risc::{risc_premultiply_alpha_rgba_u8, risc_unpremultiply_alpha_rgba_u8};
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    not(feature = "disable_simd")
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::*;
-#[cfg(all(
-    target_arch = "wasm32",
-    target_feature = "simd128",
-    not(feature = "disable_simd")
-))]
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128",))]
 use crate::wasm32::{wasm_premultiply_alpha_rgba, wasm_unpremultiply_alpha_rgba};
-use rayon::iter::IndexedParallelIterator;
-use rayon::iter::ParallelIterator;
-use rayon::slice::{ParallelSlice, ParallelSliceMut};
+use rayon::iter::{IndexedParallelIterator, ParallelIterator};
+use rayon::prelude::ParallelSlice;
+use rayon::slice::ParallelSliceMut;
 use rayon::ThreadPool;
 
-#[macro_export]
-macro_rules! unpremultiply_pixel {
-    ($dst: expr, $src: expr, $pixel_offset: expr) => {{
-        let mut r = *unsafe { $src.get_unchecked($pixel_offset) } as u16;
-        let mut g = *unsafe { $src.get_unchecked($pixel_offset + 1) } as u16;
-        let mut b = *unsafe { $src.get_unchecked($pixel_offset + 2) } as u16;
-        let a = *unsafe { $src.get_unchecked($pixel_offset + 3) } as u16;
-        if a != 0 {
-            r = (r * 255) / a;
-            g = (g * 255) / a;
-            b = (b * 255) / a;
-        } else {
-            r = 0;
-            g = 0;
-            b = 0;
-        }
-        unsafe {
-            *$dst.get_unchecked_mut($pixel_offset) = r as u8;
-            *$dst.get_unchecked_mut($pixel_offset + 1) = g as u8;
-            *$dst.get_unchecked_mut($pixel_offset + 2) = b as u8;
-            *$dst.get_unchecked_mut($pixel_offset + 3) = a as u8;
-        }
-    }};
+#[inline]
+pub fn div_by_255(v: u16) -> u8 {
+    ((((v + 0x80) >> 8) + v + 0x80) >> 8).min(255) as u8
 }
 
-#[macro_export]
-macro_rules! premultiply_pixel {
-    ($dst: expr, $src: expr, $pixel_offset: expr) => {{
-        let mut r = *unsafe { $src.get_unchecked($pixel_offset) } as u16;
-        let mut g = *unsafe { $src.get_unchecked($pixel_offset + 1) } as u16;
-        let mut b = *unsafe { $src.get_unchecked($pixel_offset + 2) } as u16;
-        let a = *unsafe { $src.get_unchecked($pixel_offset + 3) } as u16;
-        r *= a;
-        g *= a;
-        b *= a;
-        r /= 255;
-        g /= 255;
-        b /= 255;
-        unsafe {
-            *$dst.get_unchecked_mut($pixel_offset) = r as u8;
-            *$dst.get_unchecked_mut($pixel_offset + 1) = g as u8;
-            *$dst.get_unchecked_mut($pixel_offset + 2) = b as u8;
-            *$dst.get_unchecked_mut($pixel_offset + 3) = a as u8;
-        }
-    }};
-}
-
-fn premultiply_alpha_rgba_row_impl(dst: &mut [u8], src: &[u8]) {
-    for (dst_chunk, src_chunk) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
-        let mut r = src_chunk[0] as u16;
-        let mut g = src_chunk[1] as u16;
-        let mut b = src_chunk[2] as u16;
-        let a = src_chunk[3] as u16;
-        r *= a;
-        g *= a;
-        b *= a;
-        r /= 255;
-        g /= 255;
-        b /= 255;
-        dst_chunk[0] = r as u8;
-        dst_chunk[1] = g as u8;
-        dst_chunk[2] = b as u8;
-        dst_chunk[3] = a as u8;
+#[inline]
+pub(crate) fn premultiply_alpha_rgba_row_impl(dst: &mut [u8], src: &[u8]) {
+    for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+        let a = src[3] as u16;
+        dst[0] = div_by_255(src[0] as u16 * a);
+        dst[1] = div_by_255(src[1] as u16 * a);
+        dst[2] = div_by_255(src[2] as u16 * a);
+        dst[3] = div_by_255(a * a);
     }
 }
 
@@ -134,66 +64,51 @@ fn premultiply_alpha_rgba_impl(
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            src.par_chunks_exact(width * 4)
-                .zip(dst.par_chunks_exact_mut(width * 4))
-                .for_each(|(src, dst)| {
+            dst.par_chunks_exact_mut(width * 4)
+                .zip(src.par_chunks_exact(width * 4))
+                .for_each(|(dst, src)| {
                     premultiply_alpha_rgba_row_impl(dst, src);
                 });
         });
     } else {
-        for (dst_row, src_row) in dst
-            .chunks_exact_mut(width * 4)
-            .zip(src.chunks_exact(4 * width))
-        {
-            premultiply_alpha_rgba_row_impl(dst_row, src_row);
-        }
+        dst.chunks_exact_mut(width * 4)
+            .zip(src.chunks_exact(width * 4))
+            .for_each(|(dst, src)| {
+                premultiply_alpha_rgba_row_impl(dst, src);
+            });
     }
 }
 
-fn unpremultiply_alpha_rgba_row_impl(dst: &mut [u8], src: &[u8]) {
-    for (dst_chunk, src_chunk) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
-        let mut r = src_chunk[0] as u16;
-        let mut g = src_chunk[1] as u16;
-        let mut b = src_chunk[2] as u16;
-        let a = src_chunk[3] as u16;
+#[inline]
+pub(crate) fn unpremultiply_alpha_rgba_row_impl(in_place: &mut [u8]) {
+    for dst in in_place.chunks_exact_mut(4) {
+        let a = dst[3];
         if a != 0 {
-            r = (r * 255) / a;
-            g = (g * 255) / a;
-            b = (b * 255) / a;
-        } else {
-            r = 0;
-            g = 0;
-            b = 0;
+            let a_recip = 1. / a as f32;
+            dst[0] = ((dst[0] as f32 * 255.) * a_recip) as u8;
+            dst[1] = ((dst[1] as f32 * 255.) * a_recip) as u8;
+            dst[2] = ((dst[2] as f32 * 255.) * a_recip) as u8;
+            dst[3] = ((a as f32 * 255.) * a_recip) as u8;
         }
-        dst_chunk[0] = r as u8;
-        dst_chunk[1] = g as u8;
-        dst_chunk[2] = b as u8;
-        dst_chunk[3] = a as u8;
     }
 }
 
 fn unpremultiply_alpha_rgba_impl(
-    dst: &mut [u8],
-    src: &[u8],
+    in_place: &mut [u8],
     width: usize,
     _: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            src.par_chunks_exact(width * 4)
-                .zip(dst.par_chunks_exact_mut(width * 4))
-                .for_each(|(src, dst)| {
-                    unpremultiply_alpha_rgba_row_impl(dst, src);
-                });
+            in_place.par_chunks_exact_mut(width * 4).for_each(|row| {
+                unpremultiply_alpha_rgba_row_impl(row);
+            });
         });
     } else {
-        for (dst_row, src_row) in dst
-            .chunks_exact_mut(width * 4)
-            .zip(src.chunks_exact(4 * width))
-        {
-            unpremultiply_alpha_rgba_row_impl(dst_row, src_row);
-        }
+        in_place.chunks_exact_mut(width * 4).for_each(|row| {
+            unpremultiply_alpha_rgba_row_impl(row);
+        });
     }
 }
 
@@ -206,81 +121,56 @@ pub fn premultiply_alpha_rgba(
 ) {
     let mut _dispatcher: fn(&mut [u8], &[u8], usize, usize, &Option<ThreadPool>) =
         premultiply_alpha_rgba_impl;
-    #[cfg(not(feature = "disable_simd"))]
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            _dispatcher = neon_premultiply_alpha_rgba;
+        _dispatcher = neon_premultiply_alpha_rgba;
+    }
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    {
+        if is_x86_feature_detected!("sse4.1") {
+            _dispatcher = sse_premultiply_alpha_rgba;
         }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        {
-            if is_x86_feature_detected!("sse4.1") {
-                _dispatcher = sse_premultiply_alpha_rgba;
-            }
+    }
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    {
+        if is_x86_feature_detected!("avx2") {
+            _dispatcher = avx_premultiply_alpha_rgba;
         }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        {
-            if is_x86_feature_detected!("avx2") {
-                _dispatcher = avx_premultiply_alpha_rgba;
-            }
-        }
-        #[cfg(all(
-            any(target_arch = "riscv64", target_arch = "riscv32"),
-            feature = "riscv"
-        ))]
-        {
-            if std::arch::is_riscv_feature_detected!("v") {
-                _dispatcher = risc_premultiply_alpha_rgba_u8;
-            }
-        }
-        #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-        {
-            _dispatcher = wasm_premultiply_alpha_rgba;
-        }
+    }
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    {
+        _dispatcher = wasm_premultiply_alpha_rgba;
     }
     _dispatcher(dst, src, width, height, pool);
 }
 
 pub fn unpremultiply_alpha_rgba(
-    dst: &mut [u8],
-    src: &[u8],
+    in_place: &mut [u8],
     width: usize,
     height: usize,
     pool: &Option<ThreadPool>,
 ) {
-    let mut _dispatcher: fn(&mut [u8], &[u8], usize, usize, &Option<ThreadPool>) =
+    let mut _dispatcher: fn(&mut [u8], usize, usize, &Option<ThreadPool>) =
         unpremultiply_alpha_rgba_impl;
-    #[cfg(not(feature = "disable_simd"))]
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            _dispatcher = neon_unpremultiply_alpha_rgba;
-        }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        {
-            if is_x86_feature_detected!("sse4.1") {
-                _dispatcher = sse_unpremultiply_alpha_rgba;
-            }
-        }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        {
-            if is_x86_feature_detected!("avx2") {
-                _dispatcher = avx_unpremultiply_alpha_rgba;
-            }
-        }
-        #[cfg(all(
-            any(target_arch = "riscv64", target_arch = "riscv32"),
-            feature = "riscv"
-        ))]
-        {
-            if std::arch::is_riscv_feature_detected!("v") {
-                _dispatcher = risc_unpremultiply_alpha_rgba_u8;
-            }
-        }
-        #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-        {
-            _dispatcher = wasm_unpremultiply_alpha_rgba;
+        _dispatcher = neon_unpremultiply_alpha_rgba;
+    }
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    {
+        if is_x86_feature_detected!("sse4.1") {
+            _dispatcher = sse_unpremultiply_alpha_rgba;
         }
     }
-    _dispatcher(dst, src, width, height, pool);
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    {
+        if is_x86_feature_detected!("avx2") {
+            _dispatcher = avx_unpremultiply_alpha_rgba;
+        }
+    }
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    {
+        _dispatcher = wasm_unpremultiply_alpha_rgba;
+    }
+    _dispatcher(in_place, width, height, pool);
 }

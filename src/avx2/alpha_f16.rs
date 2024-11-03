@@ -27,11 +27,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+use crate::alpha_handle_f16::{premultiply_pixel_f16_row, unpremultiply_pixel_f16_row};
 use crate::avx2::utils::{avx_combine_epi, avx_deinterleave_rgba_epi16, avx_interleave_rgba_epi16};
-use crate::{premultiply_pixel_f16, unpremultiply_pixel_f16};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::ParallelSliceMut;
-use rayon::slice::ParallelSlice;
+use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
@@ -51,18 +50,16 @@ pub fn avx_premultiply_alpha_rgba_f16(
 }
 
 #[target_feature(enable = "avx2", enable = "f16c")]
-unsafe fn avx_premultiply_alpha_rgba_f16_row_impl(
-    dst: &mut [half::f16],
-    src: &[half::f16],
-    width: usize,
-    offset: usize,
-) {
-    let mut _cx = 0usize;
+unsafe fn avx_premultiply_alpha_rgba_f16_row_impl(dst: &mut [half::f16], src: &[half::f16]) {
+    let mut rem = dst;
+    let mut src_rem = src;
 
     unsafe {
-        while _cx + 16 < width {
-            let px = _cx * 4;
-            let src_ptr = src.as_ptr().add(offset + px);
+        for (dst, src) in rem
+            .chunks_exact_mut(16 * 4)
+            .zip(src_rem.chunks_exact(16 * 4))
+        {
+            let src_ptr = src.as_ptr();
             let lane0 = _mm256_loadu_si256(src_ptr as *const __m256i);
             let lane1 = _mm256_loadu_si256(src_ptr.add(16) as *const __m256i);
             let lane2 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
@@ -99,21 +96,20 @@ unsafe fn avx_premultiply_alpha_rgba_f16_row_impl(
                 _mm256_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(low_b),
                 _mm256_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(high_b),
             );
-            let dst_ptr = dst.as_mut_ptr().add(offset + px);
+            let dst_ptr = dst.as_mut_ptr();
             let (d_lane0, d_lane1, d_lane2, d_lane3) =
                 avx_interleave_rgba_epi16(r_values, g_values, b_values, pixel.3);
             _mm256_storeu_si256(dst_ptr as *mut __m256i, d_lane0);
             _mm256_storeu_si256(dst_ptr.add(16) as *mut __m256i, d_lane1);
             _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, d_lane2);
             _mm256_storeu_si256(dst_ptr.add(48) as *mut __m256i, d_lane3);
-            _cx += 16;
         }
+
+        rem = rem.chunks_exact_mut(16 * 4).into_remainder();
+        src_rem = src_rem.chunks_exact(16 * 4).remainder();
     }
 
-    for x in _cx..width {
-        let px = x * 4;
-        premultiply_pixel_f16!(dst, src, offset + px);
-    }
+    premultiply_pixel_f16_row(rem, src_rem);
 }
 
 #[inline]
@@ -127,49 +123,39 @@ unsafe fn avx_premultiply_alpha_rgba_f16_impl(
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            src.par_chunks_exact(width * 4)
-                .zip(dst.par_chunks_exact_mut(width * 4))
-                .for_each(|(src, dst)| unsafe {
-                    avx_premultiply_alpha_rgba_f16_row_impl(dst, src, width, 0);
+            dst.par_chunks_exact_mut(width * 4)
+                .zip(src.par_chunks_exact(width * 4))
+                .for_each(|(dst, src)| unsafe {
+                    avx_premultiply_alpha_rgba_f16_row_impl(dst, src);
                 });
         });
     } else {
-        for (dst_row, src_row) in dst
-            .chunks_exact_mut(4 * width)
-            .zip(src.chunks_exact(4 * width))
-        {
-            unsafe {
-                avx_premultiply_alpha_rgba_f16_row_impl(dst_row, src_row, width, 0);
-            }
-        }
+        dst.chunks_exact_mut(width * 4)
+            .zip(src.chunks_exact(width * 4))
+            .for_each(|(dst, src)| unsafe {
+                avx_premultiply_alpha_rgba_f16_row_impl(dst, src);
+            });
     }
 }
 
 pub fn avx_unpremultiply_alpha_rgba_f16(
-    dst: &mut [half::f16],
-    src: &[half::f16],
+    in_place: &mut [half::f16],
     width: usize,
     height: usize,
     pool: &Option<ThreadPool>,
 ) {
     unsafe {
-        avx_unpremultiply_alpha_rgba_f16_impl(dst, src, width, height, pool);
+        avx_unpremultiply_alpha_rgba_f16_impl(in_place, width, height, pool);
     }
 }
 
 #[target_feature(enable = "avx2", enable = "f16c")]
-unsafe fn avx_unpremultiply_alpha_rgba_f16_row_impl(
-    dst: &mut [half::f16],
-    src: &[half::f16],
-    width: usize,
-    offset: usize,
-) {
-    let mut _cx = 0usize;
+unsafe fn avx_unpremultiply_alpha_rgba_f16_row_impl(in_place: &mut [half::f16]) {
+    let mut rem = in_place;
 
     unsafe {
-        while _cx + 16 < width {
-            let px = _cx * 4;
-            let src_ptr = src.as_ptr().add(offset + px);
+        for dst in rem.chunks_exact_mut(16 * 4) {
+            let src_ptr = dst.as_ptr();
             let lane0 = _mm256_loadu_si256(src_ptr as *const __m256i);
             let lane1 = _mm256_loadu_si256(src_ptr.add(16) as *const __m256i);
             let lane2 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
@@ -233,49 +219,40 @@ unsafe fn avx_unpremultiply_alpha_rgba_f16_row_impl(
                 _mm256_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(low_b),
                 _mm256_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(high_b),
             );
-            let dst_ptr = dst.as_mut_ptr().add(offset + px);
+            let dst_ptr = dst.as_mut_ptr();
             let (d_lane0, d_lane1, d_lane2, d_lane3) =
                 avx_interleave_rgba_epi16(r_values, g_values, b_values, pixel.3);
             _mm256_storeu_si256(dst_ptr as *mut __m256i, d_lane0);
             _mm256_storeu_si256(dst_ptr.add(16) as *mut __m256i, d_lane1);
             _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, d_lane2);
             _mm256_storeu_si256(dst_ptr.add(48) as *mut __m256i, d_lane3);
-            _cx += 16;
         }
+
+        rem = rem.chunks_exact_mut(16 * 4).into_remainder();
     }
 
-    for x in _cx..width {
-        let px = x * 4;
-        let pixel_offset = offset + px;
-        unpremultiply_pixel_f16!(dst, src, pixel_offset);
-    }
+    unpremultiply_pixel_f16_row(rem);
 }
 
 #[inline]
 #[target_feature(enable = "avx2", enable = "f16c")]
 unsafe fn avx_unpremultiply_alpha_rgba_f16_impl(
-    dst: &mut [half::f16],
-    src: &[half::f16],
+    in_place: &mut [half::f16],
     width: usize,
     _: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            src.par_chunks_exact(width * 4)
-                .zip(dst.par_chunks_exact_mut(width * 4))
-                .for_each(|(src, dst)| unsafe {
-                    avx_unpremultiply_alpha_rgba_f16_row_impl(dst, src, width, 0);
+            in_place
+                .par_chunks_exact_mut(width * 4)
+                .for_each(|row| unsafe {
+                    avx_unpremultiply_alpha_rgba_f16_row_impl(row);
                 });
         });
     } else {
-        for (dst_row, src_row) in dst
-            .chunks_exact_mut(4 * width)
-            .zip(src.chunks_exact(4 * width))
-        {
-            unsafe {
-                avx_unpremultiply_alpha_rgba_f16_row_impl(dst_row, src_row, width, 0);
-            }
-        }
+        in_place.chunks_exact_mut(width * 4).for_each(|row| unsafe {
+            avx_unpremultiply_alpha_rgba_f16_row_impl(row);
+        });
     }
 }

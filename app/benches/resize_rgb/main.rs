@@ -19,7 +19,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("Pic scale RGB: Lanczos 3", |b| {
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Adaptive);
+            scaler.set_threading_policy(ThreadingPolicy::Single);
             let mut copied: Vec<u8> = Vec::from(src_bytes);
             let store = ImageStore::<u8, 3>::from_slice(
                 &mut copied,
@@ -28,7 +28,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             )
             .unwrap();
             _ = scaler.resize_rgb(
-                ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
                 store,
             );
         })
@@ -39,7 +39,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("Pic scale RGB f32: Lanczos 3", |b| {
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Adaptive);
+            scaler.set_threading_policy(ThreadingPolicy::Single);
             let mut copied: Vec<f32> = Vec::from(f32_image.clone());
             let store = ImageStore::<f32, 3>::from_slice(
                 &mut copied,
@@ -48,7 +48,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             )
             .unwrap();
             _ = scaler.resize_rgb_f32(
-                ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
                 store,
             );
         })
@@ -60,7 +60,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             let pixel_type: PixelType = PixelType::U8x3;
             let src_image =
                 Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
-            let mut dst_image = Image::new(dimensions.0 / 2, dimensions.1 / 2, pixel_type);
+            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
 
             let mut resizer = Resizer::new();
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]

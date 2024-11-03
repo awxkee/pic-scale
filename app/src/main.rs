@@ -3,19 +3,21 @@ mod split;
 
 use std::time::Instant;
 
+use crate::merge::merge_channels_3;
+use crate::split::split_channels_3;
 use fast_image_resize::images::Image;
 use fast_image_resize::{
     CpuExtensions, FilterType, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
-    ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ScalingU16, ThreadingPolicy,
+    ImageSize, ImageStore, LinearApproxScaler, ResamplingFunction, Scaler, Scaling, ScalingU16,
+    ThreadingPolicy,
 };
 
 fn main() {
-
     // test_fast_image();
-    let img = ImageReader::open("./assets/abstract_alpha.png")
+    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -26,23 +28,25 @@ fn main() {
     let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
-    let mut choke: Vec<u8> = bytes.iter().map(|&x| x).collect();
-
+    // let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 8).collect();
+    //
     let store =
-        ImageStore::<u8, 4>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
+        ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
     let start_time = Instant::now();
-    let resized = scaler.resize_rgba(
-        ImageSize::new(dimensions.0 as usize / 3, dimensions.1 as usize / 3),
-        store,
-        true,
-    );
+    let resized = scaler
+        .resize_rgba(
+            ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+            store,
+            false,
+        )
+        .unwrap();
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
     println!("Scaler: {:.2?}", elapsed_time);
 
-    let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| x).collect::<Vec<_>>();
+    // let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| x).collect::<Vec<_>>();
     // println!("f1 {}, f2 {}, f3 {}, f4 {}", dst[0], dst[1], dst[2], dst[3]);
     // let dst: Vec<u8> = resized
     //     .as_bytes()
@@ -63,21 +67,21 @@ fn main() {
     // );
     //
     // let store =
-    //     ImageStore::<u8, 1>::from_slice(&mut r_chan, dimensions.0 as usize, dimensions.1 as usize);
+    //     ImageStore::<u8, 1>::from_slice(&mut r_chan, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     // let resized = scaler.resize_plane(
     //     ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
     //     store,
     // );
     //
     // let store1 =
-    //     ImageStore::<u8, 1>::from_slice(&mut g_chan, dimensions.0 as usize, dimensions.1 as usize);
+    //     ImageStore::<u8, 1>::from_slice(&mut g_chan, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     // let resized1 = scaler.resize_plane(
     //     ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
     //     store1,
     // );
     //
     // let store2 =
-    //     ImageStore::<u8, 1>::from_slice(&mut b_chan, dimensions.0 as usize, dimensions.1 as usize);
+    //     ImageStore::<u8, 1>::from_slice(&mut b_chan, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     // let resized2 = scaler.resize_plane(
     //     ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
     //     store2,
@@ -101,9 +105,9 @@ fn main() {
     //     .map(|&x| (x * 255f32) as u8)
     //     .collect();
 
-    // let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 2) as u8).collect();
+    // let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 8) as u8).collect();
     //
-    // let dst = resized.as_bytes();
+    let dst = resized.as_bytes();
 
     if resized.channels == 4 {
         image::save_buffer(
@@ -173,11 +177,11 @@ fn u8_to_u16(u8_buffer: &[u8]) -> &[u16] {
 }
 
 fn test_fast_image() {
-    let img = ImageReader::open("./assets/asset_6.png")
+    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
         .unwrap()
         .decode()
         .unwrap();
-    let img = img.to_rgba8();
+    let img = img.to_rgb8();
     let dimensions = img.dimensions();
 
     let mut vc = Vec::from(img.as_bytes());
@@ -188,16 +192,16 @@ fn test_fast_image() {
 
     let start_time = Instant::now();
 
-    let pixel_type: PixelType = PixelType::U8x4;
+    let pixel_type: PixelType = PixelType::U8x3;
 
     let src_image = Image::from_vec_u8(dimensions.0, dimensions.1, vc, pixel_type).unwrap();
 
-    let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
+    let mut dst_image = Image::new(dimensions.0 / 2, dimensions.1 / 2, pixel_type);
 
     let mut resizer = Resizer::new();
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     unsafe {
-        resizer.set_cpu_extensions(CpuExtensions::None);
+        resizer.set_cpu_extensions(CpuExtensions::Neon);
     }
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     unsafe {
@@ -208,8 +212,8 @@ fn test_fast_image() {
             &src_image,
             &mut dst_image,
             &ResizeOptions::new()
-                .resize_alg(ResizeAlg::Convolution(FilterType::Lanczos3))
-                .use_alpha(true),
+                .resize_alg(ResizeAlg::Convolution(FilterType::Bilinear))
+                .use_alpha(false),
         )
         .unwrap();
 

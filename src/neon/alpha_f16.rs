@@ -29,25 +29,19 @@
 
 use std::arch::aarch64::*;
 
+use crate::alpha_handle_f16::{premultiply_pixel_f16_row, unpremultiply_pixel_f16_row};
 use crate::neon::f16_utils::*;
-use crate::{premultiply_pixel_f16, unpremultiply_pixel_f16};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::ParallelSliceMut;
-use rayon::slice::ParallelSlice;
+use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
 
-unsafe fn neon_premultiply_alpha_rgba_row_f16(
-    dst: &mut [half::f16],
-    src: &[half::f16],
-    width: usize,
-    offset: usize,
-) {
-    let mut _cx = 0usize;
+unsafe fn neon_premultiply_alpha_rgba_row_f16(dst: &mut [half::f16], src: &[half::f16]) {
+    let mut rem = dst;
+    let mut src_rem = src;
 
     unsafe {
-        while _cx + 8 < width {
-            let px = _cx * 4;
-            let src_ptr = src.as_ptr().add(offset + px);
+        for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
+            let src_ptr = src.as_ptr();
             let pixel = vld4q_u16(src_ptr as *const u16);
 
             let low_alpha = xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.3)));
@@ -83,17 +77,17 @@ unsafe fn neon_premultiply_alpha_rgba_row_f16(
                 xreinterpretq_u16_f16(xcombine_f16(xvcvt_f16_f32(low_g), xvcvt_f16_f32(high_g)));
             let b_values =
                 xreinterpretq_u16_f16(xcombine_f16(xvcvt_f16_f32(low_b), xvcvt_f16_f32(high_b)));
-            let dst_ptr = dst.as_mut_ptr().add(offset + px);
+
+            let dst_ptr = dst.as_mut_ptr();
             let store_pixel = uint16x8x4_t(r_values, g_values, b_values, pixel.3);
             vst4q_u16(dst_ptr as *mut u16, store_pixel);
-            _cx += 8;
         }
+
+        rem = rem.chunks_exact_mut(8 * 4).into_remainder();
+        src_rem = src_rem.chunks_exact(8 * 4).remainder();
     }
 
-    for x in _cx..width {
-        let px = x * 4;
-        premultiply_pixel_f16!(dst, src, offset + px);
-    }
+    premultiply_pixel_f16_row(rem, src_rem);
 }
 
 pub fn neon_premultiply_alpha_rgba_f16(
@@ -105,37 +99,27 @@ pub fn neon_premultiply_alpha_rgba_f16(
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            src.par_chunks_exact(width * 4)
-                .zip(dst.par_chunks_exact_mut(width * 4))
-                .for_each(|(src, dst)| unsafe {
-                    neon_premultiply_alpha_rgba_row_f16(dst, src, width, 0);
+            dst.par_chunks_exact_mut(width * 4)
+                .zip(src.par_chunks_exact(width * 4))
+                .for_each(|(dst, src)| unsafe {
+                    neon_premultiply_alpha_rgba_row_f16(dst, src);
                 });
         });
     } else {
-        for (dst_row, src_row) in dst
-            .chunks_exact_mut(4 * width)
-            .zip(src.chunks_exact(4 * width))
-        {
-            unsafe {
-                neon_premultiply_alpha_rgba_row_f16(dst_row, src_row, width, 0);
-            }
-        }
+        dst.chunks_exact_mut(width * 4)
+            .zip(src.chunks_exact(width * 4))
+            .for_each(|(dst, src)| unsafe {
+                neon_premultiply_alpha_rgba_row_f16(dst, src);
+            });
     }
 }
 
-unsafe fn neon_unpremultiply_alpha_rgba_row_f16(
-    dst: &mut [half::f16],
-    src: &[half::f16],
-    width: usize,
-    offset: usize,
-) {
-    let mut _cx = 0usize;
+unsafe fn neon_unpremultiply_alpha_rgba_row_f16(in_place: &mut [half::f16]) {
+    let mut rem = in_place;
 
     unsafe {
-        while _cx + 8 < width {
-            let px = _cx * 4;
-            let pixel_offset = offset + px;
-            let src_ptr = src.as_ptr().add(pixel_offset);
+        for dst in rem.chunks_exact_mut(8 * 4) {
+            let src_ptr = dst.as_ptr();
             let pixel = vld4q_u16(src_ptr as *const u16);
 
             let low_alpha = xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.3)));
@@ -202,43 +186,34 @@ unsafe fn neon_unpremultiply_alpha_rgba_row_f16(
             let b_values =
                 xreinterpretq_u16_f16(xcombine_f16(xvcvt_f16_f32(low_b), xvcvt_f16_f32(high_b)));
 
-            let dst_ptr = dst.as_mut_ptr().add(pixel_offset);
+            let dst_ptr = dst.as_mut_ptr();
             let store_pixel = uint16x8x4_t(r_values, g_values, b_values, pixel.3);
             vst4q_u16(dst_ptr as *mut u16, store_pixel);
-            _cx += 8;
         }
+
+        rem = rem.chunks_exact_mut(8 * 4).into_remainder();
     }
 
-    for x in _cx..width {
-        let px = x * 4;
-        let pixel_offset = offset + px;
-        unpremultiply_pixel_f16!(dst, src, pixel_offset);
-    }
+    unpremultiply_pixel_f16_row(rem);
 }
 
 pub fn neon_unpremultiply_alpha_rgba_f16(
-    dst: &mut [half::f16],
-    src: &[half::f16],
+    in_place: &mut [half::f16],
     width: usize,
     _: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            src.par_chunks_exact(width * 4)
-                .zip(dst.par_chunks_exact_mut(width * 4))
-                .for_each(|(src, dst)| unsafe {
-                    neon_unpremultiply_alpha_rgba_row_f16(dst, src, width, 0);
+            in_place
+                .par_chunks_exact_mut(width * 4)
+                .for_each(|row| unsafe {
+                    neon_unpremultiply_alpha_rgba_row_f16(row);
                 });
         });
     } else {
-        for (dst_row, src_row) in dst
-            .chunks_exact_mut(4 * width)
-            .zip(src.chunks_exact(4 * width))
-        {
-            unsafe {
-                neon_unpremultiply_alpha_rgba_row_f16(dst_row, src_row, width, 0);
-            }
-        }
+        in_place.chunks_exact_mut(width * 4).for_each(|row| unsafe {
+            neon_unpremultiply_alpha_rgba_row_f16(row);
+        });
     }
 }

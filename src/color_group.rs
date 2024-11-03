@@ -582,30 +582,30 @@ where
 
 #[macro_export]
 macro_rules! fast_load_color_group {
-    ($store: expr, $channels: expr) => {{
+    ($store: expr, $channels: expr, $vtype: ty) => {{
         if $channels == 1 {
-            ColorGroup {
+            ColorGroup::<$channels, $vtype> {
                 r: $store.get_unchecked(0).as_(),
                 g: 0.as_(),
                 b: 0.as_(),
                 a: 0.as_(),
             }
         } else if $channels == 2 {
-            ColorGroup {
+            ColorGroup::<$channels, $vtype> {
                 r: $store.get_unchecked(0).as_(),
                 g: $store.get_unchecked(1).as_(),
                 b: 0.as_(),
                 a: 0.as_(),
             }
         } else if $channels == 3 {
-            ColorGroup {
+            ColorGroup::<$channels, $vtype> {
                 r: $store.get_unchecked(0).as_(),
                 g: $store.get_unchecked(1).as_(),
                 b: $store.get_unchecked(2).as_(),
                 a: 0.as_(),
             }
         } else if $channels == 4 {
-            ColorGroup {
+            ColorGroup::<$channels, $vtype> {
                 r: $store.get_unchecked(0).as_(),
                 g: $store.get_unchecked(1).as_(),
                 b: $store.get_unchecked(2).as_(),
@@ -619,30 +619,30 @@ macro_rules! fast_load_color_group {
 
 #[macro_export]
 macro_rules! fast_load_color_group_with_offset {
-    ($store: expr, $channels: expr, $offset: expr) => {{
+    ($store: expr, $channels: expr, $offset: expr, $vtype: ty) => {{
         if $channels == 1 {
-            ColorGroup {
+            ColorGroup::<$channels, $vtype> {
                 r: $store[$offset].as_(),
                 g: 0.as_(),
                 b: 0.as_(),
                 a: 0.as_(),
             }
         } else if $channels == 2 {
-            ColorGroup {
+            ColorGroup::<$channels, $vtype> {
                 r: $store[$offset].as_(),
                 g: $store[$offset + 1].as_(),
                 b: 0.as_(),
                 a: 0.as_(),
             }
         } else if $channels == 3 {
-            ColorGroup {
+            ColorGroup::<$channels, $vtype> {
                 r: $store[$offset].as_(),
                 g: $store[$offset + 1].as_(),
                 b: $store[$offset + 2].as_(),
                 a: 0.as_(),
             }
         } else if $channels == 4 {
-            ColorGroup {
+            ColorGroup::<$channels, $vtype> {
                 r: $store[$offset].as_(),
                 g: $store[$offset + 1].as_(),
                 b: $store[$offset + 2].as_(),

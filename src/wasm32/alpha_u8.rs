@@ -26,21 +26,20 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::alpha_handle_u8::premultiply_alpha_rgba_row_impl;
 use crate::wasm32::transpose::{wasm_load_deinterleave_u8x4, wasm_store_interleave_u8x4};
 use crate::wasm32::utils::*;
-use crate::{premultiply_pixel, unpremultiply_pixel};
 use rayon::ThreadPool;
 use std::arch::wasm32::*;
 
 pub fn wasm_unpremultiply_alpha_rgba(
-    dst: &mut [u8],
-    src: &[u8],
+    in_place: &mut [u8],
     width: usize,
-    height: usize,
+    _: usize,
     _: &Option<ThreadPool>,
 ) {
     unsafe {
-        wasm_unpremultiply_alpha_rgba_impl(dst, src, width, height);
+        wasm_unpremultiply_alpha_rgba_impl(in_place, width);
     }
 }
 
@@ -92,93 +91,79 @@ unsafe fn premultiply_vec(pixel: v128, alpha: v128) -> v128 {
 }
 
 #[target_feature(enable = "simd128")]
-unsafe fn wasm_unpremultiply_alpha_rgba_impl(
-    dst: &mut [u8],
-    src: &[u8],
-    width: usize,
-    height: usize,
-) {
-    let mut _cy = 0usize;
+unsafe fn wasm_unpremultiply_alpha_rgba_impl(in_place: &mut [u8], width: usize) {
+    let src_stride = 4 * width;
 
-    let mut offset = 0usize;
-    offset += _cy * width * 4;
+    in_place
+        .chunks_exact_mut(src_stride)
+        .for_each(|row| unsafe {
+            let mut rem = row;
 
-    for _ in _cy..height {
-        let mut _cx = 0usize;
-
-        unsafe {
-            while _cx + 16 < width {
-                let px = _cx * 4;
-                let pixel_offset = offset + px;
-                let src_ptr = src.as_ptr().add(pixel_offset);
+            for dst in rem.chunks_exact_mut(16 * 4) {
+                let src_ptr = dst.as_ptr();
                 let mut pixel = wasm_load_deinterleave_u8x4(src_ptr);
 
                 pixel.0 = unpremultiply_vec(pixel.0, pixel.3);
                 pixel.1 = unpremultiply_vec(pixel.1, pixel.3);
                 pixel.2 = unpremultiply_vec(pixel.2, pixel.3);
-                let dst_ptr = dst.as_mut_ptr().add(pixel_offset);
+                let dst_ptr = dst.as_mut_ptr();
                 wasm_store_interleave_u8x4(dst_ptr, pixel);
-                _cx += 16;
+
+                rem = rem.chunks_exact_mut(16 * 4).into_remainder();
             }
-        }
 
-        for x in _cx..width {
-            let px = x * 4;
-            let pixel_offset = offset + px;
-            unpremultiply_pixel!(dst, src, pixel_offset);
-        }
-
-        offset += 4 * width;
-    }
+            for dst in rem.chunks_exact_mut(4) {
+                let a = dst[3];
+                if a != 0 {
+                    let a_recip = 1. / a as f32;
+                    dst[0] = ((dst[0] as f32 * 255.) * a_recip) as u8;
+                    dst[1] = ((dst[1] as f32 * 255.) * a_recip) as u8;
+                    dst[2] = ((dst[2] as f32 * 255.) * a_recip) as u8;
+                    dst[3] = ((a as f32 * 255.) * a_recip) as u8;
+                }
+            }
+        });
 }
 
 pub fn wasm_premultiply_alpha_rgba(
     dst: &mut [u8],
     src: &[u8],
     width: usize,
-    height: usize,
+    _: usize,
     _: &Option<ThreadPool>,
 ) {
     unsafe {
-        wasm_premultiply_alpha_rgba_impl(dst, src, width, height);
+        wasm_premultiply_alpha_rgba_impl(dst, src, width);
     }
 }
 
 #[inline]
 #[target_feature(enable = "simd128")]
-unsafe fn wasm_premultiply_alpha_rgba_impl(
-    dst: &mut [u8],
-    src: &[u8],
-    width: usize,
-    height: usize,
-) {
-    let mut _cy = 0usize;
+unsafe fn wasm_premultiply_alpha_rgba_impl(dst: &mut [u8], src: &[u8], width: usize) {
     let src_stride = 4 * width;
 
-    let mut offset = _cy * src_stride;
+    dst.chunks_exact_mut(src_stride)
+        .zip(src.chunks_exact(src_stride))
+        .for_each(|(dst, src)| unsafe {
+            let mut rem = src;
+            let mut src_rem = src;
 
-    for _ in _cy..height {
-        let mut _cx = 0usize;
-
-        unsafe {
-            while _cx + 16 < width {
-                let px = _cx * 4;
-                let src_ptr = src.as_ptr().add(offset + px);
+            for dst in rem
+                .chunks_exact_mut(16 * 4)
+                .zip(src_rem.chunks_exact(16 * 4))
+            {
+                let src_ptr = dst.as_ptr();
                 let mut pixel = wasm_load_deinterleave_u8x4(src_ptr);
                 pixel.0 = premultiply_vec(pixel.0, pixel.3);
                 pixel.1 = premultiply_vec(pixel.1, pixel.3);
                 pixel.2 = premultiply_vec(pixel.2, pixel.3);
-                let dst_ptr = dst.as_mut_ptr().add(offset + px);
+                let dst_ptr = dst.as_mut_ptr();
                 wasm_store_interleave_u8x4(dst_ptr, pixel);
-                _cx += 16;
             }
-        }
 
-        for x in _cx..width {
-            let px = x * 4;
-            premultiply_pixel!(dst, src, offset + px);
-        }
+            rem = rem.chunks_exact_mut(16 * 4).into_remainder();
+            src_rem = src_rem.chunks_exact(16 * 4).remainder();
 
-        offset += 4 * width;
-    }
+            premultiply_alpha_rgba_row_impl(dst, src_rem);
+        });
 }

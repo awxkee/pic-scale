@@ -26,6 +26,15 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+#![forbid(unsafe_code)]
 pub const PRECISION: i32 = 15;
 pub const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
+
+pub(crate) fn check_image_size_overflow(width: usize, height: usize, chan: usize) -> bool {
+    let (stride, is_overflowed) = width.overflowing_mul(chan);
+    if is_overflowed {
+        return true;
+    }
+    let (_, is_overflowed) = height.overflowing_mul(stride);
+    is_overflowed
+}

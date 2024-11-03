@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#![forbid(unsafe_code)]
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::ParallelSliceMut;
 use rayon::ThreadPool;
@@ -52,38 +53,46 @@ pub fn resize_nearest<T: Copy + Send + Sync, const CHANNELS: usize>(
         pool.install(|| {
             dst.par_chunks_exact_mut(dst_stride)
                 .enumerate()
-                .for_each(|(y, dst_chunk)| unsafe {
-                    for x in 0..dst_width {
-                        let src_x =
-                            (x as f32 * x_scale + 0.5f32).min(clip_width).max(0f32) as usize;
-                        let src_y =
-                            (y as f32 * y_scale + 0.5f32).min(clip_height).max(0f32) as usize;
+                .for_each(|(y, dst_chunk)| {
+                    for (x, dst) in dst_chunk.chunks_exact_mut(CHANNELS).enumerate() {
+                        let src_x = ((x as f32 + 0.5f32) * x_scale - 0.5f32)
+                            .min(clip_width)
+                            .max(0f32) as usize;
+                        let src_y = ((y as f32 + 0.5f32) * y_scale - 0.5f32)
+                            .min(clip_height)
+                            .max(0f32) as usize;
                         let src_offset_y = src_y * src_stride;
                         let src_px = src_x * CHANNELS;
-                        let dst_px = x * CHANNELS;
-                        std::ptr::copy_nonoverlapping(
-                            src.as_ptr().add(src_offset_y + src_px),
-                            dst_chunk.as_mut_ptr().add(dst_px),
-                            CHANNELS,
-                        );
+                        let offset = src_offset_y + src_px;
+
+                        let src_slice = &src[offset..(offset + CHANNELS)];
+
+                        for (src, dst) in src_slice.iter().zip(dst.iter_mut()) {
+                            *dst = *src;
+                        }
                     }
                 });
         });
     } else {
         dst.chunks_exact_mut(dst_stride)
             .enumerate()
-            .for_each(|(y, dst_chunk)| unsafe {
-                for x in 0..dst_width {
-                    let src_x = (x as f32 * x_scale + 0.5f32).min(clip_width).max(0f32) as usize;
-                    let src_y = (y as f32 * y_scale + 0.5f32).min(clip_height).max(0f32) as usize;
+            .for_each(|(y, dst_chunk)| {
+                for (x, dst) in dst_chunk.chunks_exact_mut(CHANNELS).enumerate() {
+                    let src_x = ((x as f32 + 0.5f32) * x_scale - 0.5f32)
+                        .min(clip_width)
+                        .max(0f32) as usize;
+                    let src_y = ((y as f32 + 0.5f32) * y_scale - 0.5f32)
+                        .min(clip_height)
+                        .max(0f32) as usize;
                     let src_offset_y = src_y * src_stride;
                     let src_px = src_x * CHANNELS;
-                    let dst_px = x * CHANNELS;
-                    std::ptr::copy_nonoverlapping(
-                        src.as_ptr().add(src_offset_y + src_px),
-                        dst_chunk.as_mut_ptr().add(dst_px),
-                        CHANNELS,
-                    );
+                    let offset = src_offset_y + src_px;
+
+                    let src_slice = &src[offset..(offset + CHANNELS)];
+
+                    for (src, dst) in src_slice.iter().zip(dst.iter_mut()) {
+                        *dst = *src;
+                    }
                 }
             });
     }

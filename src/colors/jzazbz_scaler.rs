@@ -30,7 +30,10 @@ use colorutils_rs::{
     jzazbz_to_rgb, jzazbz_to_rgba, rgb_to_jzazbz, rgba_to_jzazbz, TransferFunction,
 };
 
+use crate::alpha_check::has_non_constant_cap_alpha_rgba8;
+use crate::pic_scale_error::PicScaleError;
 use crate::scaler::ScalingF32;
+use crate::support::check_image_size_overflow;
 use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
 
 #[derive(Debug, Copy, Clone)]
@@ -57,7 +60,7 @@ impl JzazbzScaler {
         }
     }
 
-    fn rgba_to_laba(&self, store: ImageStore<u8, 4>) -> ImageStore<f32, 4> {
+    fn rgba_to_laba<'a>(&self, store: ImageStore<'a, u8, 4>) -> ImageStore<'a, f32, 4> {
         let mut new_store = ImageStore::<f32, 4>::alloc(store.width, store.height);
         let lab_stride = store.width as u32 * 4u32 * std::mem::size_of::<f32>() as u32;
         rgba_to_jzazbz(
@@ -73,7 +76,7 @@ impl JzazbzScaler {
         new_store
     }
 
-    fn laba_to_srgba(&self, store: ImageStore<f32, 4>) -> ImageStore<u8, 4> {
+    fn laba_to_srgba<'a>(&self, store: ImageStore<'a, f32, 4>) -> ImageStore<'a, u8, 4> {
         let mut new_store = ImageStore::<u8, 4>::alloc(store.width, store.height);
         jzazbz_to_rgba(
             store.buffer.borrow(),
@@ -94,7 +97,27 @@ impl Scaling for JzazbzScaler {
         self.scaler.threading_policy = threading_policy;
     }
 
-    fn resize_rgb(&self, new_size: ImageSize, store: ImageStore<u8, 3>) -> ImageStore<u8, 3> {
+    fn resize_rgb(
+        &self,
+        new_size: ImageSize,
+        store: ImageStore<u8, 3>,
+    ) -> Result<ImageStore<u8, 3>, PicScaleError> {
+        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
+            return Err(PicScaleError::ZeroImageDimensions);
+        }
+
+        if check_image_size_overflow(store.width, store.height, store.channels) {
+            return Err(PicScaleError::SourceImageIsTooLarge);
+        }
+
+        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
+            return Err(PicScaleError::DestinationImageIsTooLarge);
+        }
+
+        if store.width == new_size.width && store.height == new_size.height {
+            return Ok(store.copied());
+        }
+
         const COMPONENTS: usize = 3;
         let mut lab_store = ImageStore::<f32, COMPONENTS>::alloc(store.width, store.height);
         let lab_stride =
@@ -109,7 +132,7 @@ impl Scaling for JzazbzScaler {
             self.display_luminance,
             self.transfer_function,
         );
-        let new_store = self.scaler.resize_rgb_f32(new_size, lab_store);
+        let new_store = self.scaler.resize_rgb_f32(new_size, lab_store)?;
         let mut new_u8_store = ImageStore::<u8, COMPONENTS>::alloc(new_size.width, new_size.height);
         let new_lab_stride =
             new_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<f32>() as u32;
@@ -123,15 +146,31 @@ impl Scaling for JzazbzScaler {
             self.display_luminance,
             self.transfer_function,
         );
-        new_u8_store
+        Ok(new_u8_store)
     }
 
-    fn resize_rgba(
-        &self,
+    fn resize_rgba<'a>(
+        &'a self,
         new_size: ImageSize,
-        store: ImageStore<u8, 4>,
+        store: ImageStore<'a, u8, 4>,
         premultiply_alpha: bool,
-    ) -> ImageStore<u8, 4> {
+    ) -> Result<ImageStore<'a, u8, 4>, PicScaleError> {
+        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
+            return Err(PicScaleError::ZeroImageDimensions);
+        }
+
+        if check_image_size_overflow(store.width, store.height, store.channels) {
+            return Err(PicScaleError::SourceImageIsTooLarge);
+        }
+
+        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
+            return Err(PicScaleError::DestinationImageIsTooLarge);
+        }
+
+        if store.width == new_size.width && store.height == new_size.height {
+            return Ok(store.copied());
+        }
+
         let mut src_store = store;
 
         let pool = self
@@ -139,23 +178,26 @@ impl Scaling for JzazbzScaler {
             .threading_policy
             .get_pool(ImageSize::new(new_size.width, new_size.height));
 
+        let mut has_alpha_premultiplied = false;
+
         if premultiply_alpha {
-            let mut premultiplied_store =
-                ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
-            src_store.premultiply_alpha(&mut premultiplied_store, &pool);
-            src_store = premultiplied_store;
+            let is_alpha_premultiplication_reasonable =
+                has_non_constant_cap_alpha_rgba8(src_store.buffer.borrow(), src_store.width);
+            if is_alpha_premultiplication_reasonable {
+                let mut new_store = ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
+                src_store.premultiply_alpha(&mut new_store, &pool);
+                src_store = new_store;
+                has_alpha_premultiplied = true;
+            }
         }
         let lab_store = self.rgba_to_laba(src_store);
         let new_store = self
             .scaler
-            .resize_rgba_f32_impl(new_size, lab_store, false, &pool);
-        let rgba_store = self.laba_to_srgba(new_store);
-        if premultiply_alpha {
-            let mut premultiplied_store =
-                ImageStore::<u8, 4>::alloc(rgba_store.width, rgba_store.height);
-            rgba_store.unpremultiply_alpha(&mut premultiplied_store, &pool);
-            return premultiplied_store;
+            .resize_rgba_f32_impl(new_size, lab_store, false, &pool)?;
+        let mut rgba_store = self.laba_to_srgba(new_store);
+        if premultiply_alpha && has_alpha_premultiplied {
+            rgba_store.unpremultiply_alpha(&pool);
         }
-        rgba_store
+        Ok(rgba_store)
     }
 }
