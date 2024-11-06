@@ -580,7 +580,6 @@ where
     }
 }
 
-#[macro_export]
 macro_rules! fast_load_color_group {
     ($store: expr, $channels: expr, $vtype: ty) => {{
         if $channels == 1 {
@@ -617,7 +616,8 @@ macro_rules! fast_load_color_group {
     }};
 }
 
-#[macro_export]
+pub(crate) use fast_load_color_group;
+
 macro_rules! fast_load_color_group_with_offset {
     ($store: expr, $channels: expr, $offset: expr, $vtype: ty) => {{
         if $channels == 1 {
@@ -654,7 +654,8 @@ macro_rules! fast_load_color_group_with_offset {
     }};
 }
 
-#[macro_export]
+pub(crate) use fast_load_color_group_with_offset;
+
 macro_rules! fast_store_color_group {
     ($color_group: expr, $store: expr, $components: expr) => {{
         $store[0] = $color_group.r;
@@ -670,7 +671,8 @@ macro_rules! fast_store_color_group {
     }};
 }
 
-#[macro_export]
+pub(crate) use fast_store_color_group;
+
 macro_rules! fast_mixed_store_color_group {
     ($color_group: expr, $store: expr, $components: expr, $bit_depth: expr) => {{
         *$store.get_unchecked_mut(0) = $color_group.r.to_mixed($bit_depth);
@@ -685,3 +687,5 @@ macro_rules! fast_mixed_store_color_group {
         }
     }};
 }
+
+pub(crate) use fast_mixed_store_color_group;

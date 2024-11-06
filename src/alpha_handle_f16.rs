@@ -40,50 +40,6 @@ use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
 
-#[macro_export]
-macro_rules! premultiply_pixel_f16 {
-    ($dst: expr, $src: expr, $pixel_offset: expr) => {{
-        let mut r = (*unsafe { $src.get_unchecked($pixel_offset) }).to_f32();
-        let mut g = (*unsafe { $src.get_unchecked($pixel_offset + 1) }).to_f32();
-        let mut b = (*unsafe { $src.get_unchecked($pixel_offset + 2) }).to_f32();
-        let a = (*unsafe { $src.get_unchecked($pixel_offset + 3) }).to_f32();
-        r *= a;
-        g *= a;
-        b *= a;
-        unsafe {
-            *$dst.get_unchecked_mut($pixel_offset) = half::f16::from_f32(r);
-            *$dst.get_unchecked_mut($pixel_offset + 1) = half::f16::from_f32(g);
-            *$dst.get_unchecked_mut($pixel_offset + 2) = half::f16::from_f32(b);
-            *$dst.get_unchecked_mut($pixel_offset + 3) = half::f16::from_f32(a);
-        }
-    }};
-}
-
-#[macro_export]
-macro_rules! unpremultiply_pixel_f16 {
-    ($dst: expr, $src: expr, $pixel_offset: expr) => {{
-        let mut r = (*unsafe { $src.get_unchecked($pixel_offset) }).to_f32();
-        let mut g = (*unsafe { $src.get_unchecked($pixel_offset + 1) }).to_f32();
-        let mut b = (*unsafe { $src.get_unchecked($pixel_offset + 2) }).to_f32();
-        let a = (*unsafe { $src.get_unchecked($pixel_offset + 3) }).to_f32();
-        if a != 0. {
-            r = r / a;
-            g = g / a;
-            b = b / a;
-        } else {
-            r = 0.;
-            g = 0.;
-            b = 0.;
-        }
-        unsafe {
-            *$dst.get_unchecked_mut($pixel_offset) = half::f16::from_f32(r);
-            *$dst.get_unchecked_mut($pixel_offset + 1) = half::f16::from_f32(g);
-            *$dst.get_unchecked_mut($pixel_offset + 2) = half::f16::from_f32(b);
-            *$dst.get_unchecked_mut($pixel_offset + 3) = half::f16::from_f32(a);
-        }
-    }};
-}
-
 #[inline]
 pub(crate) fn unpremultiply_pixel_f16_row(in_place: &mut [half::f16]) {
     for dst in in_place.chunks_exact_mut(4) {

@@ -17,7 +17,7 @@ use pic_scale::{
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
+    let img = ImageReader::open("./assets/test_avif_12_bitdepth.avif")
         .unwrap()
         .decode()
         .unwrap();

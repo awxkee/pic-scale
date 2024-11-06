@@ -36,8 +36,7 @@ use half::f16;
 
 use crate::avx2::utils::{_mm256_fma_ps, avx_combine_ps};
 use crate::filter_weights::FilterWeights;
-use crate::sse::shuffle;
-use crate::{load_4_weights_group_2_avx, load_8_weights_group_4_avx};
+use crate::sse::{load_4_weights_group_2_avx, load_8_weights_group_4_avx, shuffle};
 
 #[inline(always)]
 unsafe fn convolve_horizontal_parts_one_rgba_f16<const FMA: bool>(

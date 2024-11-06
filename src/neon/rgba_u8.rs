@@ -332,10 +332,10 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u8_i16(
             let store_16_2 = vreinterpret_u16_s16(vshr_n_s16::<SCALE>(vmax_s16(store_2, zeros)));
             let store_16_3 = vreinterpret_u16_s16(vshr_n_s16::<SCALE>(vmax_s16(store_3, zeros)));
 
-            let store_16_8_0 = vmovn_u16(vcombine_u16(store_16_0, store_16_0));
-            let store_16_8_1 = vmovn_u16(vcombine_u16(store_16_1, store_16_1));
-            let store_16_8_2 = vmovn_u16(vcombine_u16(store_16_2, store_16_2));
-            let store_16_8 = vmovn_u16(vcombine_u16(store_16_3, store_16_3));
+            let store_16_8_0 = vqmovn_u16(vcombine_u16(store_16_0, store_16_0));
+            let store_16_8_1 = vqmovn_u16(vcombine_u16(store_16_1, store_16_1));
+            let store_16_8_2 = vqmovn_u16(vcombine_u16(store_16_2, store_16_2));
+            let store_16_8 = vqmovn_u16(vcombine_u16(store_16_3, store_16_3));
 
             let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8_0));
             let dest_ptr_32 = chunk0.as_mut_ptr() as *mut u32;
