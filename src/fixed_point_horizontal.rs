@@ -26,11 +26,12 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::color_group::ColorGroup;
+use crate::color_group::{
+    fast_load_color_group, fast_load_color_group_with_offset, fast_store_color_group, ColorGroup,
+};
 use crate::filter_weights::FilterWeights;
 use crate::saturate_narrow::SaturateNarrow;
 use crate::support::ROUNDING_CONST;
-use crate::{fast_load_color_group, fast_load_color_group_with_offset, fast_store_color_group};
 use num_traits::AsPrimitive;
 use std::ops::{Add, AddAssign, Mul};
 

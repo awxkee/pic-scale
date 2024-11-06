@@ -93,6 +93,7 @@ pub use rgba_u8::{convolve_horizontal_rgba_sse_rows_4, convolve_horizontal_rgba_
 pub use rgba_u8_lb::{
     convolve_horizontal_rgba_sse_rows_4_lb, convolve_horizontal_rgba_sse_rows_one_lb,
 };
+pub(crate) use routines::{load_4_weights, load_4_weights_group_2_avx, load_8_weights_group_4_avx};
 pub use u8_utils::*;
 pub use utils::*;
 #[cfg(feature = "half")]

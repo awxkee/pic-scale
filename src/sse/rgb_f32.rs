@@ -28,8 +28,7 @@
  */
 
 use crate::filter_weights::FilterWeights;
-use crate::load_4_weights;
-use crate::sse::{_mm_extract_epi64x, _mm_prefer_fma_ps, shuffle};
+use crate::sse::{_mm_extract_epi64x, _mm_prefer_fma_ps, load_4_weights, shuffle};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]

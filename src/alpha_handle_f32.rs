@@ -37,51 +37,6 @@ use rayon::prelude::ParallelSlice;
 use rayon::slice::ParallelSliceMut;
 use rayon::ThreadPool;
 
-#[macro_export]
-macro_rules! premultiply_pixel_f32 {
-    ($dst: expr, $src: expr, $pixel_offset: expr) => {{
-        let mut r = *unsafe { $src.get_unchecked($pixel_offset) } as f32;
-        let mut g = *unsafe { $src.get_unchecked($pixel_offset + 1) } as f32;
-        let mut b = *unsafe { $src.get_unchecked($pixel_offset + 2) } as f32;
-        let a = *unsafe { $src.get_unchecked($pixel_offset + 3) } as f32;
-        r *= a;
-        g *= a;
-        b *= a;
-        unsafe {
-            *$dst.get_unchecked_mut($pixel_offset) = r;
-            *$dst.get_unchecked_mut($pixel_offset + 1) = g;
-            *$dst.get_unchecked_mut($pixel_offset + 2) = b;
-            *$dst.get_unchecked_mut($pixel_offset + 3) = a;
-        }
-    }};
-}
-
-#[macro_export]
-macro_rules! unpremultiply_pixel_f32 {
-    ($dst: expr, $src: expr, $pixel_offset: expr) => {{
-        let mut r = *unsafe { $src.get_unchecked($pixel_offset) } as f32;
-        let mut g = *unsafe { $src.get_unchecked($pixel_offset + 1) } as f32;
-        let mut b = *unsafe { $src.get_unchecked($pixel_offset + 2) } as f32;
-        let a = *unsafe { $src.get_unchecked($pixel_offset + 3) } as f32;
-        if a != 0. {
-            let scale_alpha = 1. / a;
-            r *= scale_alpha;
-            g *= scale_alpha;
-            b *= scale_alpha;
-        } else {
-            r = 0.;
-            g = 0.;
-            b = 0.;
-        }
-        unsafe {
-            *$dst.get_unchecked_mut($pixel_offset) = r;
-            *$dst.get_unchecked_mut($pixel_offset + 1) = g;
-            *$dst.get_unchecked_mut($pixel_offset + 2) = b;
-            *$dst.get_unchecked_mut($pixel_offset + 3) = a;
-        }
-    }};
-}
-
 pub(crate) fn unpremultiply_pixel_f32_row(in_place: &mut [f32]) {
     for dst in in_place.chunks_exact_mut(4) {
         let mut r = dst[0];

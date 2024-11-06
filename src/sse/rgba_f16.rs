@@ -35,9 +35,8 @@ use std::arch::x86_64::*;
 use half::f16;
 
 use crate::filter_weights::FilterWeights;
-use crate::load_4_weights;
 use crate::sse::f16_utils::{_mm_cvtph_psx, _mm_cvtps_phx};
-use crate::sse::{_mm_prefer_fma_ps, shuffle};
+use crate::sse::{_mm_prefer_fma_ps, load_4_weights, shuffle};
 
 #[inline(always)]
 unsafe fn convolve_horizontal_parts_one_rgba_f16<const F16C: bool, const FMA: bool>(

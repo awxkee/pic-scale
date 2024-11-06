@@ -60,31 +60,6 @@ pub fn div_by_65535(v: u32) -> u16 {
     (((v >> 16) + v) >> 16) as u16
 }
 
-#[macro_export]
-macro_rules! unpremultiply_pixel_u16 {
-    ($dst: expr, $src: expr, $pixel_offset: expr, $max_colors: expr) => {{
-        let mut r = *unsafe { $src.get_unchecked($pixel_offset) } as u32;
-        let mut g = *unsafe { $src.get_unchecked($pixel_offset + 1) } as u32;
-        let mut b = *unsafe { $src.get_unchecked($pixel_offset + 2) } as u32;
-        let a = *unsafe { $src.get_unchecked($pixel_offset + 3) } as u32;
-        if a != 0 {
-            r = ((r * $max_colors) / a);
-            g = ((g * $max_colors) / a);
-            b = ((b * $max_colors) / a);
-        } else {
-            r = 0;
-            g = 0;
-            b = 0;
-        }
-        unsafe {
-            *$dst.get_unchecked_mut($pixel_offset) = r as u16;
-            *$dst.get_unchecked_mut($pixel_offset + 1) = g as u16;
-            *$dst.get_unchecked_mut($pixel_offset + 2) = b as u16;
-            *$dst.get_unchecked_mut($pixel_offset + 3) = a as u16;
-        }
-    }};
-}
-
 #[inline(always)]
 pub(crate) fn premultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], max_colors: u32) {
     if max_colors == 1023 {
