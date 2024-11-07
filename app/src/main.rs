@@ -17,7 +17,7 @@ use pic_scale::{
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/test_avif_12_bitdepth.avif")
+    let img = ImageReader::open("./assets/test_5.avif")
         .unwrap()
         .decode()
         .unwrap();
@@ -28,17 +28,18 @@ fn main() {
     let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
-    // let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 8).collect();
+    let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 2).collect();
     //
     let store =
-        ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize)
+        ImageStore::<u16, 4>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
     let start_time = Instant::now();
     let resized = scaler
-        .resize_rgba(
+        .resize_rgba_u16(
             ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
             store,
-            false,
+            10,
+            true,
         )
         .unwrap();
 
@@ -105,9 +106,9 @@ fn main() {
     //     .map(|&x| (x * 255f32) as u8)
     //     .collect();
 
-    // let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 8) as u8).collect();
+    let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 2) as u8).collect();
     //
-    let dst = resized.as_bytes();
+    // let dst = resized.as_bytes();
 
     if resized.channels == 4 {
         image::save_buffer(
@@ -120,7 +121,7 @@ fn main() {
         .unwrap();
     } else {
         image::save_buffer(
-            "converted.jpg",
+            "converted.png",
             &dst,
             resized.width as u32,
             resized.height as u32,

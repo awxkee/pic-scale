@@ -933,6 +933,7 @@ impl ScalingU16 for Scaler {
         }
 
         let mut src_store = store;
+        src_store.bit_depth = bit_depth;
 
         if should_do_vertical {
             let vertical_filters = self.generate_weights(src_store.height, new_size.height);
@@ -1002,6 +1003,7 @@ impl ScalingU16 for Scaler {
         }
 
         let mut src_store = store;
+        src_store.bit_depth = bit_depth;
 
         let pool = self
             .threading_policy
@@ -1029,6 +1031,7 @@ impl ScalingU16 for Scaler {
                 has_non_constant_cap_alpha_rgba16(src_store.buffer.borrow(), src_store.width);
             if is_alpha_premultiplication_reasonable {
                 let mut new_store = ImageStore::<u16, 4>::alloc(src_store.width, src_store.height);
+                new_store.bit_depth = src_store.bit_depth;
                 src_store.premultiply_alpha(&mut new_store, &pool);
                 src_store = new_store;
                 has_alpha_premultiplied = true;
