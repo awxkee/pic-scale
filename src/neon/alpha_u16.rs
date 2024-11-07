@@ -48,6 +48,7 @@ unsafe fn neon_div_by_65535_n(v: uint32x4_t) -> uint16x4_t {
 }
 
 pub fn neon_premultiply_alpha_rgba_row_u16(dst: &mut [u16], src: &[u16], bit_depth: usize) {
+    assert_ne!(bit_depth, 0, "Something goes wrong!");
     let max_colors = (1 << bit_depth) - 1;
 
     let v_max_colors_scale = unsafe { vdupq_n_f32((1. / max_colors as f64) as f32) };
