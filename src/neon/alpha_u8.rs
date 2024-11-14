@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::alpha_handle_u8::premultiply_alpha_rgba_row_impl;
+use crate::alpha_handle_u8::{premultiply_alpha_rgba_row_impl, unpremultiply_alpha_rgba_row_impl};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
@@ -175,16 +175,7 @@ unsafe fn neon_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8]) {
         rem = rem.chunks_exact_mut(16 * 4).into_remainder();
     }
 
-    for dst in rem.chunks_exact_mut(4) {
-        let a = dst[3];
-        if a != 0 {
-            let a_recip = 1. / a as f32;
-            dst[0] = ((dst[0] as f32 * 255.) * a_recip) as u8;
-            dst[1] = ((dst[1] as f32 * 255.) * a_recip) as u8;
-            dst[2] = ((dst[2] as f32 * 255.) * a_recip) as u8;
-            dst[3] = ((a as f32 * 255.) * a_recip) as u8;
-        }
-    }
+    unpremultiply_alpha_rgba_row_impl(rem);
 }
 
 pub fn neon_unpremultiply_alpha_rgba(

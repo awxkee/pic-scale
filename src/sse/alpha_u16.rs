@@ -147,10 +147,9 @@ unsafe fn unpremultiply_alpha_sse_rgba_u16_row_impl(in_place: &mut [u16], bit_de
         rem = rem.chunks_exact_mut(8 * 4).into_remainder();
     }
 
-    unpremultiply_alpha_rgba_row(rem, bit_depth as u32);
+    unpremultiply_alpha_rgba_row(rem, max_colors);
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1")]
 unsafe fn unpremultiply_alpha_sse_rgba_u16_impl(
     in_place: &mut [u16],
@@ -203,12 +202,24 @@ pub fn premultiply_alpha_sse_rgba_u16(
     dst: &mut [u16],
     src: &[u16],
     width: usize,
-    height: usize,
+    _: usize,
     bit_depth: usize,
     pool: &Option<ThreadPool>,
 ) {
-    unsafe {
-        premultiply_alpha_sse_rgba_u16_impl(dst, src, width, height, bit_depth, pool);
+    if let Some(pool) = pool {
+        pool.install(|| {
+            dst.par_chunks_exact_mut(width * 4)
+                .zip(src.par_chunks_exact(width * 4))
+                .for_each(|(dst, src)| unsafe {
+                    premultiply_alpha_sse_rgba_u16_row_impl(dst, src, bit_depth);
+                });
+        });
+    } else {
+        dst.chunks_exact_mut(width * 4)
+            .zip(src.chunks_exact(width * 4))
+            .for_each(|(dst, src)| unsafe {
+                premultiply_alpha_sse_rgba_u16_row_impl(dst, src, bit_depth);
+            });
     }
 }
 
@@ -377,31 +388,4 @@ unsafe fn premultiply_alpha_sse_rgba_u16_row_impl(dst: &mut [u16], src: &[u16], 
     }
 
     premultiply_alpha_rgba_row(rem, src_rem, max_colors as u32);
-}
-
-#[inline]
-#[target_feature(enable = "sse4.1")]
-unsafe fn premultiply_alpha_sse_rgba_u16_impl(
-    dst: &mut [u16],
-    src: &[u16],
-    width: usize,
-    _: usize,
-    bit_depth: usize,
-    pool: &Option<ThreadPool>,
-) {
-    if let Some(pool) = pool {
-        pool.install(|| {
-            dst.par_chunks_exact_mut(width * 4)
-                .zip(src.par_chunks_exact(width * 4))
-                .for_each(|(dst, src)| unsafe {
-                    premultiply_alpha_sse_rgba_u16_row_impl(dst, src, bit_depth);
-                });
-        });
-    } else {
-        dst.chunks_exact_mut(width * 4)
-            .zip(src.chunks_exact(width * 4))
-            .for_each(|(dst, src)| unsafe {
-                premultiply_alpha_sse_rgba_u16_row_impl(dst, src, bit_depth);
-            });
-    }
 }
