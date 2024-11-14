@@ -16,8 +16,8 @@ use pic_scale::{
 };
 
 fn main() {
-    // test_fast_image();
-    let img = ImageReader::open("./assets/beach_horizon.jpg")
+    test_fast_image();
+    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -36,7 +36,7 @@ fn main() {
     let start_time = Instant::now();
     let resized = scaler
         .resize_rgba_u16(
-            ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+            ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
             store,
             10,
             true,
@@ -182,20 +182,20 @@ fn test_fast_image() {
         .unwrap()
         .decode()
         .unwrap();
-    let img = img.to_rgb8();
+    let img = img.to_rgba8();
     let dimensions = img.dimensions();
 
     let mut vc = Vec::from(img.as_bytes());
 
-    // let mut converted_bytes: Vec<u16> = vc.iter().map(|&x| (x as u16) << 8).collect();
+    let mut converted_bytes: Vec<u16> = vc.iter().map(|&x| (x as u16) << 8).collect();
     //
-    // let mut chokidar = Vec::from(u16_to_u8(&converted_bytes));
+    let mut chokidar = Vec::from(u16_to_u8(&converted_bytes));
 
     let start_time = Instant::now();
 
-    let pixel_type: PixelType = PixelType::U8x3;
+    let pixel_type: PixelType = PixelType::U16x4;
 
-    let src_image = Image::from_vec_u8(dimensions.0, dimensions.1, vc, pixel_type).unwrap();
+    let src_image = Image::from_vec_u8(dimensions.0, dimensions.1, chokidar, pixel_type).unwrap();
 
     let mut dst_image = Image::new(dimensions.0 / 2, dimensions.1 / 2, pixel_type);
 
@@ -206,15 +206,15 @@ fn test_fast_image() {
     }
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     unsafe {
-        resizer.set_cpu_extensions(CpuExtensions::Sse4_1);
+        resizer.set_cpu_extensions(CpuExtensions::Avx2);
     }
     resizer
         .resize(
             &src_image,
             &mut dst_image,
             &ResizeOptions::new()
-                .resize_alg(ResizeAlg::Convolution(FilterType::Bilinear))
-                .use_alpha(false),
+                .resize_alg(ResizeAlg::Convolution(FilterType::Lanczos3))
+                .use_alpha(true),
         )
         .unwrap();
 
@@ -231,23 +231,23 @@ fn test_fast_image() {
     //     .map(|&x| (x >> 8) as u8)
     //     .collect::<Vec<_>>();
 
-    if pixel_type == PixelType::U8x3 || pixel_type == PixelType::U16x3 {
-        image::save_buffer(
-            "fast_image.jpg",
-            &vegi,
-            dst_image.width(),
-            dst_image.height(),
-            image::ColorType::Rgb8,
-        )
-        .unwrap();
-    } else {
-        image::save_buffer(
-            "fast_image.png",
-            &vegi,
-            dst_image.width(),
-            dst_image.height(),
-            image::ColorType::Rgba8,
-        )
-        .unwrap();
-    }
+    // if pixel_type == PixelType::U8x3 || pixel_type == PixelType::U16x3 {
+    //     image::save_buffer(
+    //         "fast_image.jpg",
+    //         &vegi,
+    //         dst_image.width(),
+    //         dst_image.height(),
+    //         image::ColorType::Rgb8,
+    //     )
+    //     .unwrap();
+    // } else {
+    //     image::save_buffer(
+    //         "fast_image.png",
+    //         &vegi,
+    //         dst_image.width(),
+    //         dst_image.height(),
+    //         image::ColorType::Rgba8,
+    //     )
+    //     .unwrap();
+    // }
 }
