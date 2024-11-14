@@ -200,7 +200,7 @@ pub fn sse_unpremultiply_alpha_rgba(
 unsafe fn sse_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8]) {
     let mut rem = in_place;
     unsafe {
-        for dst in rem.chunks_exact_mut(8 * 4) {
+        for dst in rem.chunks_exact_mut(16 * 4) {
             let src_ptr = dst.as_ptr();
             let rgba0 = _mm_loadu_si128(src_ptr as *const __m128i);
             let rgba1 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
