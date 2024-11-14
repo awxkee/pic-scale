@@ -119,7 +119,7 @@ fn unpremultiply_alpha_rgba_impl_f32(
     }
 }
 
-pub fn premultiply_alpha_rgba_f32(
+pub(crate) fn premultiply_alpha_rgba_f32(
     dst: &mut [f32],
     src: &[f32],
     width: usize,
@@ -147,7 +147,7 @@ pub fn premultiply_alpha_rgba_f32(
     _dispatcher(dst, src, width, height, pool);
 }
 
-pub fn unpremultiply_alpha_rgba_f32(
+pub(crate) fn unpremultiply_alpha_rgba_f32(
     in_place: &mut [f32],
     width: usize,
     height: usize,

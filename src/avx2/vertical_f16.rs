@@ -201,7 +201,7 @@ unsafe fn convolve_vertical_part_avx_16_f16<const FMA: bool>(
     _mm256_storeu_si256(dst_ptr as *mut __m256i, acc0);
 }
 
-pub fn convolve_vertical_avx_row_f16<const CHANNELS: usize, const FMA: bool>(
+pub(crate) fn convolve_vertical_avx_row_f16<const CHANNELS: usize, const FMA: bool>(
     width: usize,
     bounds: &FilterBounds,
     unsafe_source_ptr_0: *const half::f16,
@@ -273,7 +273,7 @@ unsafe fn convolve_vertical_avx_row_f16_fma<const CHANNELS: usize>(
 }
 
 #[inline(always)]
-pub fn convolve_vertical_avx_row_f16_impl<const CHANNELS: usize, const FMA: bool>(
+pub(crate) fn convolve_vertical_avx_row_f16_impl<const CHANNELS: usize, const FMA: bool>(
     width: usize,
     bounds: &FilterBounds,
     unsafe_source_ptr_0: *const half::f16,

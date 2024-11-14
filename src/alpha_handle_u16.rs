@@ -39,21 +39,21 @@ use rayon::slice::ParallelSliceMut;
 use rayon::ThreadPool;
 
 #[inline]
-pub fn div_by_1023(v: u32) -> u16 {
+pub(crate) fn div_by_1023(v: u32) -> u16 {
     let round = 1 << 9;
     let v = v + round;
     (((v >> 10) + v) >> 10) as u16
 }
 
 #[inline]
-pub fn div_by_4095(v: u32) -> u16 {
+pub(crate) fn div_by_4095(v: u32) -> u16 {
     let round = 1 << 11;
     let v = v + round;
     (((v >> 12) + v) >> 12) as u16
 }
 
 #[inline]
-pub fn div_by_65535(v: u32) -> u16 {
+pub(crate) fn div_by_65535(v: u32) -> u16 {
     let round = 1 << 15;
     let v_expand = v;
     let v = v_expand + round;
@@ -101,7 +101,7 @@ pub(crate) fn premultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], max_color
     }
 }
 
-pub fn unpremultiply_alpha_rgba_row(in_place: &mut [u16], max_colors: u32) {
+pub(crate) fn unpremultiply_alpha_rgba_row(in_place: &mut [u16], max_colors: u32) {
     for dst in in_place.chunks_exact_mut(4) {
         let a = dst[3] as u32;
         if a != 0 {
@@ -161,7 +161,7 @@ fn unpremultiply_alpha_rgba_impl(
     }
 }
 
-pub fn premultiply_alpha_rgba_u16(
+pub(crate) fn premultiply_alpha_rgba_u16(
     dst: &mut [u16],
     src: &[u16],
     width: usize,
@@ -191,7 +191,7 @@ pub fn premultiply_alpha_rgba_u16(
     _dispatcher(dst, src, width, height, bit_depth, pool);
 }
 
-pub fn unpremultiply_alpha_rgba_u16(
+pub(crate) fn unpremultiply_alpha_rgba_u16(
     in_place: &mut [u16],
     width: usize,
     height: usize,

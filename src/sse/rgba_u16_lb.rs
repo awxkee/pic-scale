@@ -162,7 +162,7 @@ unsafe fn conv_horiz_rgba_8_u16(
     acc
 }
 
-pub fn convolve_horizontal_rgba_sse_rows_4_lb_u8(
+pub(crate) fn convolve_horizontal_rgba_sse_rows_4_lb_u8(
     src: &[u16],
     src_stride: usize,
     dst: &mut [u16],
@@ -320,7 +320,7 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_lb_u8_impl(
     }
 }
 
-pub fn convolve_horizontal_rgba_sse_u16_lb_row(
+pub(crate) fn convolve_horizontal_rgba_sse_u16_lb_row(
     src: &[u16],
     dst: &mut [u16],
     filter_weights: &FilterWeights<i16>,

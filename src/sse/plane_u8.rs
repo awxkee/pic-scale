@@ -67,7 +67,7 @@ macro_rules! s_accumulate_1_horiz {
     }};
 }
 
-pub fn convolve_horizontal_plane_sse_rows_4_u8(
+pub(crate) fn convolve_horizontal_plane_sse_rows_4_u8(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -213,7 +213,7 @@ unsafe fn convolve_horizontal_plane_sse_rows_4_u8_impl(
     }
 }
 
-pub fn convolve_horizontal_plane_sse_row(
+pub(crate) fn convolve_horizontal_plane_sse_row(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,

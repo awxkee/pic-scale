@@ -37,7 +37,7 @@ use std::ops::{Add, Mul};
     all(target_arch = "aarch64", target_feature = "neon")
 ))]
 #[inline(always)]
-pub fn mlaf<T: Copy + Mul<T, Output = T> + Add<T, Output = T> + MulAdd<T, Output = T>>(
+pub(crate) fn mlaf<T: Copy + Mul<T, Output = T> + Add<T, Output = T> + MulAdd<T, Output = T>>(
     acc: T,
     a: T,
     b: T,
@@ -53,7 +53,7 @@ pub fn mlaf<T: Copy + Mul<T, Output = T> + Add<T, Output = T> + MulAdd<T, Output
     ),
     all(target_arch = "aarch64", target_feature = "neon")
 )))]
-pub fn mlaf<T: Copy + Mul<T, Output = T> + Add<T, Output = T> + MulAdd<T, Output = T>>(
+pub(crate) fn mlaf<T: Copy + Mul<T, Output = T> + Add<T, Output = T> + MulAdd<T, Output = T>>(
     acc: T,
     a: T,
     b: T,

@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-pub trait MixedStorage<T> {
+pub(crate) trait MixedStorage<T> {
     fn to_mixed(self, bit_depth: u32) -> T;
 }
 

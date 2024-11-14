@@ -50,7 +50,7 @@ unsafe fn convolve_horizontal_parts_one_rgba_sse<const SCALE: i32>(
     _mm_add_epi16(store_0, _mm_mulhi_epi16(lo, weight0))
 }
 
-pub fn convolve_horizontal_rgba_sse_rows_4_lb(
+pub(crate) fn convolve_horizontal_rgba_sse_rows_4_lb(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -385,7 +385,7 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_impl(
     }
 }
 
-pub fn convolve_horizontal_rgba_sse_rows_one_lb(
+pub(crate) fn convolve_horizontal_rgba_sse_rows_one_lb(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,

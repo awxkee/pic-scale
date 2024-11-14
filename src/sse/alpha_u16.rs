@@ -65,7 +65,7 @@ unsafe fn sse_unpremultiply_row_u16(
 }
 
 #[inline(always)]
-pub unsafe fn _mm_div_by_1023_epi32(v: __m128i) -> __m128i {
+pub(crate) unsafe fn _mm_div_by_1023_epi32(v: __m128i) -> __m128i {
     const DIVIDING_BY: i32 = 10;
     let addition = _mm_set1_epi32(1 << (DIVIDING_BY - 1));
     let v = _mm_add_epi32(v, addition);
@@ -73,7 +73,7 @@ pub unsafe fn _mm_div_by_1023_epi32(v: __m128i) -> __m128i {
 }
 
 #[inline(always)]
-pub unsafe fn _mm_div_by_4095_epi32(v: __m128i) -> __m128i {
+pub(crate) unsafe fn _mm_div_by_4095_epi32(v: __m128i) -> __m128i {
     const DIVIDING_BY: i32 = 12;
     let addition = _mm_set1_epi32(1 << (DIVIDING_BY - 1));
     let v = _mm_add_epi32(v, addition);
@@ -81,14 +81,14 @@ pub unsafe fn _mm_div_by_4095_epi32(v: __m128i) -> __m128i {
 }
 
 #[inline(always)]
-pub unsafe fn _mm_div_by_65535_epi32(v: __m128i) -> __m128i {
+pub(crate) unsafe fn _mm_div_by_65535_epi32(v: __m128i) -> __m128i {
     const DIVIDING_BY: i32 = 16;
     let addition = _mm_set1_epi32(1 << (DIVIDING_BY - 1));
     let v = _mm_add_epi32(v, addition);
     _mm_srli_epi32::<DIVIDING_BY>(_mm_add_epi32(v, _mm_srli_epi32::<DIVIDING_BY>(v)))
 }
 
-pub fn unpremultiply_alpha_sse_rgba_u16(
+pub(crate) fn unpremultiply_alpha_sse_rgba_u16(
     in_place: &mut [u16],
     width: usize,
     height: usize,
@@ -198,7 +198,7 @@ unsafe fn sse_premultiply_row_u16(
     _mm_packs_epi32(new_lo, new_hi)
 }
 
-pub fn premultiply_alpha_sse_rgba_u16(
+pub(crate) fn premultiply_alpha_sse_rgba_u16(
     dst: &mut [u16],
     src: &[u16],
     width: usize,

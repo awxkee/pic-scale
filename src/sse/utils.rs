@@ -34,8 +34,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
-pub unsafe fn _mm_prefer_fma_ps<const FMA: bool>(a: __m128, b: __m128, c: __m128) -> __m128 {
+pub(crate) unsafe fn _mm_prefer_fma_ps<const FMA: bool>(a: __m128, b: __m128, c: __m128) -> __m128 {
     if FMA {
         _mm_fma_psx(a, b, c)
     } else {
@@ -44,13 +43,12 @@ pub unsafe fn _mm_prefer_fma_ps<const FMA: bool>(a: __m128, b: __m128, c: __m128
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1,fma")]
 unsafe fn _mm_fma_psx(a: __m128, b: __m128, c: __m128) -> __m128 {
     _mm_fmadd_ps(b, c, a)
 }
 
 #[inline(always)]
-pub unsafe fn sse_deinterleave_rgba_ps(
+pub(crate) unsafe fn sse_deinterleave_rgba_ps(
     v0: __m128,
     v1: __m128,
     v2: __m128,
@@ -68,7 +66,7 @@ pub unsafe fn sse_deinterleave_rgba_ps(
 }
 
 #[inline(always)]
-pub unsafe fn sse_interleave_rgba_ps(
+pub(crate) unsafe fn sse_interleave_rgba_ps(
     v0: __m128,
     v1: __m128,
     v2: __m128,
@@ -87,7 +85,7 @@ pub unsafe fn sse_interleave_rgba_ps(
 }
 
 #[inline(always)]
-pub unsafe fn sse_deinterleave_rgba(
+pub(crate) unsafe fn sse_deinterleave_rgba(
     rgba0: __m128i,
     rgba1: __m128i,
     rgba2: __m128i,
@@ -124,7 +122,7 @@ pub unsafe fn sse_deinterleave_rgba(
 }
 
 #[inline(always)]
-pub unsafe fn sse_interleave_rgba(
+pub(crate) unsafe fn sse_interleave_rgba(
     r: __m128i,
     g: __m128i,
     b: __m128i,
@@ -144,7 +142,7 @@ pub unsafe fn sse_interleave_rgba(
 
 /// Sums all lanes in float32
 #[inline(always)]
-pub unsafe fn _mm_hsum_ps(v: __m128) -> f32 {
+pub(crate) unsafe fn _mm_hsum_ps(v: __m128) -> f32 {
     let mut shuf = _mm_movehdup_ps(v);
     let mut sums = _mm_add_ps(v, shuf);
     shuf = _mm_movehl_ps(shuf, sums);
@@ -154,7 +152,7 @@ pub unsafe fn _mm_hsum_ps(v: __m128) -> f32 {
 
 #[inline(always)]
 #[allow(dead_code)]
-pub unsafe fn sse_deinterleave_rgba_epi16(
+pub(crate) unsafe fn sse_deinterleave_rgba_epi16(
     rgba0: __m128i,
     rgba1: __m128i,
     rgba2: __m128i,
@@ -179,7 +177,7 @@ pub unsafe fn sse_deinterleave_rgba_epi16(
 
 #[inline(always)]
 #[allow(dead_code)]
-pub unsafe fn sse_interleave_rgba_epi16(
+pub(crate) unsafe fn sse_interleave_rgba_epi16(
     a: __m128i,
     b: __m128i,
     c: __m128i,
@@ -218,7 +216,7 @@ pub(crate) unsafe fn _mm_muladd_wide_epi16(a: __m128i, b: __m128i, c: __m128i) -
 
 #[inline]
 /// Arithmetic shift for i64, shifting with sign bits
-pub unsafe fn _mm_srai_epi64x<const IMM8: i32>(a: __m128i) -> __m128i {
+pub(crate) unsafe fn _mm_srai_epi64x<const IMM8: i32>(a: __m128i) -> __m128i {
     let m = _mm_set1_epi64x(1 << (64 - 1));
     let x = _mm_srli_epi64::<IMM8>(a);
     _mm_sub_epi64(_mm_xor_si128(x, m), m)
@@ -235,7 +233,7 @@ pub(crate) unsafe fn _mm_packus_epi64(a: __m128i, b: __m128i) -> __m128i {
 
 #[inline(always)]
 /// Extracts i64 value
-pub unsafe fn _mm_extract_epi64x<const IMM: i32>(d: __m128i) -> i64 {
+pub(crate) unsafe fn _mm_extract_epi64x<const IMM: i32>(d: __m128i) -> i64 {
     #[cfg(target_arch = "x86_64")]
     {
         if IMM == 0 {
@@ -259,7 +257,7 @@ pub unsafe fn _mm_extract_epi64x<const IMM: i32>(d: __m128i) -> i64 {
 }
 
 #[inline]
-pub unsafe fn _mm_store3_u16(ptr: *mut u16, a: __m128i) {
+pub(crate) unsafe fn _mm_store3_u16(ptr: *mut u16, a: __m128i) {
     let low_pixel = _mm_extract_epi32::<0>(a);
     (ptr as *mut i32).write_unaligned(low_pixel);
     (ptr as *mut i16)

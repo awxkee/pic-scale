@@ -520,7 +520,7 @@ unsafe fn convolve_vertical_part_avx(
     *dst_ptr = _mm256_extract_epi8::<0>(item) as u8;
 }
 
-pub fn convolve_vertical_avx_row(
+pub(crate) fn convolve_vertical_avx_row(
     dst_width: usize,
     bounds: &FilterBounds,
     src: &[u8],

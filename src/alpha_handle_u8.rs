@@ -40,7 +40,7 @@ use rayon::slice::ParallelSliceMut;
 use rayon::ThreadPool;
 
 #[inline]
-pub fn div_by_255(v: u16) -> u8 {
+pub(crate) fn div_by_255(v: u16) -> u8 {
     ((((v + 0x80) >> 8) + v + 0x80) >> 8).min(255) as u8
 }
 
@@ -112,7 +112,7 @@ fn unpremultiply_alpha_rgba_impl(
     }
 }
 
-pub fn premultiply_alpha_rgba(
+pub(crate) fn premultiply_alpha_rgba(
     dst: &mut [u8],
     src: &[u8],
     width: usize,
@@ -144,7 +144,7 @@ pub fn premultiply_alpha_rgba(
     _dispatcher(dst, src, width, height, pool);
 }
 
-pub fn unpremultiply_alpha_rgba(
+pub(crate) fn unpremultiply_alpha_rgba(
     in_place: &mut [u8],
     width: usize,
     height: usize,

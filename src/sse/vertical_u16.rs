@@ -37,7 +37,7 @@ use std::arch::x86_64::*;
 
 const ROUNDING: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
 
-pub fn convolve_column_sse_u16(
+pub(crate) fn convolve_column_sse_u16(
     _: usize,
     bounds: &FilterBounds,
     src: &[u16],

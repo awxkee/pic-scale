@@ -33,7 +33,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline]
-pub unsafe fn _mm256_fma_ps<const FMA: bool>(a: __m256, b: __m256, c: __m256) -> __m256 {
+pub(crate) unsafe fn _mm256_fma_ps<const FMA: bool>(a: __m256, b: __m256, c: __m256) -> __m256 {
     if FMA {
         _mm256_fma_psx(a, b, c)
     } else {
@@ -47,12 +47,12 @@ unsafe fn _mm256_fma_psx(a: __m256, b: __m256, c: __m256) -> __m256 {
 }
 
 #[inline(always)]
-pub const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
+pub(crate) const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
     ((z << 6) | (y << 4) | (x << 2) | w) as i32
 }
 
 #[inline(always)]
-pub unsafe fn _mm256_select_si256(
+pub(crate) unsafe fn _mm256_select_si256(
     mask: __m256i,
     true_vals: __m256i,
     false_vals: __m256i,
@@ -64,12 +64,16 @@ pub unsafe fn _mm256_select_si256(
 }
 
 #[inline(always)]
-pub unsafe fn _mm256_selecti_ps(mask: __m256i, true_vals: __m256, false_vals: __m256) -> __m256 {
+pub(crate) unsafe fn _mm256_selecti_ps(
+    mask: __m256i,
+    true_vals: __m256,
+    false_vals: __m256,
+) -> __m256 {
     _mm256_blendv_ps(false_vals, true_vals, _mm256_castsi256_ps(mask))
 }
 
 #[inline(always)]
-pub unsafe fn avx2_div_by255(v: __m256i) -> __m256i {
+pub(crate) unsafe fn avx2_div_by255(v: __m256i) -> __m256i {
     let addition = _mm256_set1_epi16(127);
     _mm256_srli_epi16::<8>(_mm256_add_epi16(
         _mm256_add_epi16(v, addition),
@@ -78,7 +82,7 @@ pub unsafe fn avx2_div_by255(v: __m256i) -> __m256i {
 }
 
 #[inline(always)]
-pub unsafe fn avx2_deinterleave_rgba(
+pub(crate) unsafe fn avx2_deinterleave_rgba(
     rgba0: __m256i,
     rgba1: __m256i,
     rgba2: __m256i,
@@ -118,7 +122,7 @@ pub unsafe fn avx2_deinterleave_rgba(
 }
 
 #[inline(always)]
-pub unsafe fn avx_deinterleave_rgba_epi32(
+pub(crate) unsafe fn avx_deinterleave_rgba_epi32(
     p0: __m256i,
     p1: __m256i,
     p2: __m256i,
@@ -142,7 +146,7 @@ pub unsafe fn avx_deinterleave_rgba_epi32(
 }
 
 #[inline(always)]
-pub unsafe fn avx_interleave_rgba_epi32(
+pub(crate) unsafe fn avx_interleave_rgba_epi32(
     p0: __m256i,
     p1: __m256i,
     p2: __m256i,
@@ -167,7 +171,7 @@ pub unsafe fn avx_interleave_rgba_epi32(
 }
 
 #[inline(always)]
-pub unsafe fn avx_interleave_rgba_epi16(
+pub(crate) unsafe fn avx_interleave_rgba_epi16(
     a: __m256i,
     b: __m256i,
     c: __m256i,
@@ -191,7 +195,7 @@ pub unsafe fn avx_interleave_rgba_epi16(
 }
 
 #[inline(always)]
-pub unsafe fn avx_deinterleave_rgba_epi16(
+pub(crate) unsafe fn avx_deinterleave_rgba_epi16(
     a: __m256i,
     b: __m256i,
     c: __m256i,
@@ -224,7 +228,7 @@ pub unsafe fn avx_deinterleave_rgba_epi16(
 }
 
 #[inline(always)]
-pub unsafe fn avx_deinterleave_rgba_ps(
+pub(crate) unsafe fn avx_deinterleave_rgba_ps(
     p0: __m256,
     p1: __m256,
     p2: __m256,
@@ -245,7 +249,7 @@ pub unsafe fn avx_deinterleave_rgba_ps(
 }
 
 #[inline(always)]
-pub unsafe fn avx_interleave_rgba_ps(
+pub(crate) unsafe fn avx_interleave_rgba_ps(
     p0: __m256,
     p1: __m256,
     p2: __m256,
@@ -266,7 +270,7 @@ pub unsafe fn avx_interleave_rgba_ps(
 }
 
 #[inline(always)]
-pub unsafe fn avx2_interleave_rgba(
+pub(crate) unsafe fn avx2_interleave_rgba(
     r: __m256i,
     g: __m256i,
     b: __m256i,
@@ -290,7 +294,7 @@ pub unsafe fn avx2_interleave_rgba(
 }
 
 #[inline(always)]
-pub unsafe fn avx2_pack_u16(s_1: __m256i, s_2: __m256i) -> __m256i {
+pub(crate) unsafe fn avx2_pack_u16(s_1: __m256i, s_2: __m256i) -> __m256i {
     let packed = _mm256_packus_epi16(s_1, s_2);
     const MASK: i32 = shuffle(3, 1, 2, 0);
     _mm256_permute4x64_epi64::<MASK>(packed)
@@ -298,7 +302,12 @@ pub unsafe fn avx2_pack_u16(s_1: __m256i, s_2: __m256i) -> __m256i {
 
 #[inline]
 #[target_feature(enable = "avx2")]
-pub unsafe fn _mm256_packus_four_epi32(a: __m256i, b: __m256i, c: __m256i, d: __m256i) -> __m256i {
+pub(crate) unsafe fn _mm256_packus_four_epi32(
+    a: __m256i,
+    b: __m256i,
+    c: __m256i,
+    d: __m256i,
+) -> __m256i {
     let ab = _mm256_packs_epi32(a, b);
     let cd = _mm256_packs_epi32(c, d);
 
@@ -309,7 +318,7 @@ pub unsafe fn _mm256_packus_four_epi32(a: __m256i, b: __m256i, c: __m256i, d: __
 }
 
 #[inline(always)]
-pub unsafe fn avx2_pack_u32(s_1: __m256i, s_2: __m256i) -> __m256i {
+pub(crate) unsafe fn avx2_pack_u32(s_1: __m256i, s_2: __m256i) -> __m256i {
     let packed = _mm256_packus_epi32(s_1, s_2);
     const MASK: i32 = shuffle(3, 1, 2, 0);
     _mm256_permute4x64_epi64::<MASK>(packed)
@@ -317,13 +326,13 @@ pub unsafe fn avx2_pack_u32(s_1: __m256i, s_2: __m256i) -> __m256i {
 
 #[inline(always)]
 #[allow(dead_code)]
-pub unsafe fn avx_combine_ps(lo: __m128, hi: __m128) -> __m256 {
+pub(crate) unsafe fn avx_combine_ps(lo: __m128, hi: __m128) -> __m256 {
     _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(lo), hi)
 }
 
 #[inline(always)]
 #[allow(dead_code)]
-pub unsafe fn avx_combine_epi(lo: __m128i, hi: __m128i) -> __m256i {
+pub(crate) unsafe fn avx_combine_epi(lo: __m128i, hi: __m128i) -> __m256i {
     _mm256_castps_si256(_mm256_insertf128_ps::<1>(
         _mm256_castps128_ps256(_mm_castsi128_ps(lo)),
         _mm_castsi128_ps(hi),
@@ -332,7 +341,7 @@ pub unsafe fn avx_combine_epi(lo: __m128i, hi: __m128i) -> __m256i {
 
 #[inline]
 /// Arithmetic shift for i64, shifting with sign bits
-pub unsafe fn _mm256_srai_epi64x<const IMM8: i32>(a: __m256i) -> __m256i {
+pub(crate) unsafe fn _mm256_srai_epi64x<const IMM8: i32>(a: __m256i) -> __m256i {
     let m = _mm256_set1_epi64x(1 << (64 - 1));
     let x = _mm256_srli_epi64::<IMM8>(a);
     _mm256_sub_epi64(_mm256_xor_si256(x, m), m)
@@ -340,7 +349,7 @@ pub unsafe fn _mm256_srai_epi64x<const IMM8: i32>(a: __m256i) -> __m256i {
 
 #[inline]
 /// Pack 64bytes integers into 32 bytes using truncation
-pub unsafe fn _mm256_packts_epi64(a: __m256i, b: __m256i) -> __m256i {
+pub(crate) unsafe fn _mm256_packts_epi64(a: __m256i, b: __m256i) -> __m256i {
     const SHUFFLE_1: i32 = shuffle(2, 0, 2, 0);
     let combined = _mm256_shuffle_ps::<SHUFFLE_1>(_mm256_castsi256_ps(a), _mm256_castsi256_ps(b));
     const SHUFFLE_2: i32 = shuffle(3, 1, 2, 0);
@@ -351,7 +360,7 @@ pub unsafe fn _mm256_packts_epi64(a: __m256i, b: __m256i) -> __m256i {
 #[inline]
 #[allow(dead_code)]
 /// Pack 64bytes integers into 32 bytes
-pub unsafe fn _mm256_cvtepi64_epi32x(v: __m256i) -> __m128i {
+pub(crate) unsafe fn _mm256_cvtepi64_epi32x(v: __m256i) -> __m128i {
     let vf = _mm256_castsi256_ps(v);
     let hi = _mm256_extractf128_ps::<1>(vf);
     let lo = _mm256_castps256_ps128(vf);

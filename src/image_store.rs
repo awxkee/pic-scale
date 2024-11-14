@@ -69,14 +69,14 @@ pub(crate) enum BufferStore<'a, T: Copy + Debug> {
 }
 
 impl<T: Copy + Debug> BufferStore<'_, T> {
-    pub fn borrow(&self) -> &[T] {
+    pub(crate) fn borrow(&self) -> &[T] {
         match self {
             Self::Borrowed(p_ref) => p_ref,
             Self::Owned(vec) => vec,
         }
     }
 
-    pub fn borrow_mut(&mut self) -> &mut [T] {
+    pub(crate) fn borrow_mut(&mut self) -> &mut [T] {
         match self {
             Self::Borrowed(p_ref) => p_ref,
             Self::Owned(vec) => vec,

@@ -99,7 +99,7 @@ unsafe fn avx2_unpremultiply_row(x: __m256i, a: __m256i) -> __m256i {
     )
 }
 
-pub fn avx_premultiply_alpha_rgba(
+pub(crate) fn avx_premultiply_alpha_rgba(
     dst: &mut [u8],
     src: &[u8],
     width: usize,
@@ -239,7 +239,7 @@ unsafe fn avx_premultiply_alpha_rgba_impl(
     }
 }
 
-pub fn avx_unpremultiply_alpha_rgba(
+pub(crate) fn avx_unpremultiply_alpha_rgba(
     in_place: &mut [u8],
     width: usize,
     height: usize,

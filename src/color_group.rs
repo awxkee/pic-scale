@@ -26,10 +26,9 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#![allow(dead_code)]
 use crate::mlaf::mlaf;
 use crate::saturate_narrow::SaturateNarrow;
-use num_traits::{AsPrimitive, FromPrimitive, MulAdd, Num};
+use num_traits::{AsPrimitive, FromPrimitive, MulAdd};
 use std::ops::{Add, AddAssign, Mul, Shr, ShrAssign, Sub, SubAssign};
 
 #[repr(C)]
@@ -46,7 +45,7 @@ where
     J: Copy + Default,
 {
     #[inline(always)]
-    pub fn new() -> ColorGroup<COMPS, J> {
+    pub(crate) fn new() -> ColorGroup<COMPS, J> {
         ColorGroup {
             r: J::default(),
             g: J::default(),
@@ -56,12 +55,12 @@ where
     }
 
     #[inline(always)]
-    pub fn from_components(r: J, g: J, b: J, a: J) -> ColorGroup<COMPS, J> {
+    pub(crate) fn from_components(r: J, g: J, b: J, a: J) -> ColorGroup<COMPS, J> {
         ColorGroup { r, g, b, a }
     }
 
     #[inline(always)]
-    pub fn dup(v: J) -> ColorGroup<COMPS, J> {
+    pub(crate) fn dup(v: J) -> ColorGroup<COMPS, J> {
         ColorGroup {
             r: v,
             g: v,
@@ -76,47 +75,7 @@ where
     J: Copy + Default + 'static,
 {
     #[inline(always)]
-    pub fn from_slice<T>(store: &[T], offset: usize) -> ColorGroup<COMPS, J>
-    where
-        T: AsPrimitive<J>,
-    {
-        unsafe {
-            if COMPS == 1 {
-                ColorGroup {
-                    r: (*store.get_unchecked(offset)).as_(),
-                    g: J::default(),
-                    b: J::default(),
-                    a: J::default(),
-                }
-            } else if COMPS == 2 {
-                ColorGroup {
-                    r: (*store.get_unchecked(offset)).as_(),
-                    g: (*store.get_unchecked(offset + 1)).as_(),
-                    b: J::default(),
-                    a: J::default(),
-                }
-            } else if COMPS == 3 {
-                ColorGroup {
-                    r: (*store.get_unchecked(offset)).as_(),
-                    g: (*store.get_unchecked(offset + 1)).as_(),
-                    b: (*store.get_unchecked(offset + 2)).as_(),
-                    a: J::default(),
-                }
-            } else if COMPS == 4 {
-                ColorGroup {
-                    r: (*store.get_unchecked(offset)).as_(),
-                    g: (*store.get_unchecked(offset + 1)).as_(),
-                    b: (*store.get_unchecked(offset + 2)).as_(),
-                    a: (*store.get_unchecked(offset + 3)).as_(),
-                }
-            } else {
-                panic!("Not implemented.")
-            }
-        }
-    }
-
-    #[inline(always)]
-    pub fn from_ptr<T>(store: *const T, offset: usize) -> ColorGroup<COMPS, J>
+    pub(crate) fn from_ptr<T>(store: *const T, offset: usize) -> ColorGroup<COMPS, J>
     where
         T: AsPrimitive<J>,
     {
@@ -151,30 +110,13 @@ where
                     a: l_ptr.add(3).read_unaligned().as_(),
                 }
             } else {
-                panic!("Not implemented.")
+                unimplemented!("Not implemented.")
             }
         }
     }
 
     #[inline(always)]
-    pub fn to_ptr(self, ptr: *mut J, offset: usize) {
-        unsafe {
-            let s_ptr = ptr.add(offset);
-            s_ptr.write_unaligned(self.r);
-            if COMPS > 1 {
-                s_ptr.add(1).write_unaligned(self.g);
-            }
-            if COMPS > 2 {
-                s_ptr.add(2).write_unaligned(self.b);
-            }
-            if COMPS == 4 {
-                s_ptr.add(3).write_unaligned(self.a);
-            }
-        }
-    }
-
-    #[inline(always)]
-    pub fn as_ptr<V: Copy + 'static>(self, ptr: *mut V, offset: usize)
+    pub(crate) fn as_ptr<V: Copy + 'static>(self, ptr: *mut V, offset: usize)
     where
         J: Copy + AsPrimitive<V>,
     {
@@ -190,67 +132,6 @@ where
             if COMPS == 4 {
                 s_ptr.add(3).write_unaligned(self.a.as_());
             }
-        }
-    }
-}
-
-impl<const COMPS: usize, J> ColorGroup<COMPS, J>
-where
-    J: Copy + Default + 'static + Num + Ord,
-{
-    #[inline(always)]
-    pub fn min_scalar(&self, other: J) -> ColorGroup<COMPS, J> {
-        if COMPS == 1 {
-            ColorGroup::from_components(self.r.min(other), J::default(), J::default(), J::default())
-        } else if COMPS == 2 {
-            ColorGroup::from_components(
-                self.r.min(other),
-                self.g.min(other),
-                J::default(),
-                J::default(),
-            )
-        } else if COMPS == 3 {
-            ColorGroup::from_components(
-                self.r.min(other),
-                self.g.min(other),
-                self.b.min(other),
-                J::default(),
-            )
-        } else {
-            ColorGroup::from_components(
-                self.r.min(other),
-                self.g.min(other),
-                self.b.min(other),
-                self.a.min(other),
-            )
-        }
-    }
-
-    #[inline(always)]
-    pub(crate) fn max_scalar(&self, other: J) -> ColorGroup<COMPS, J> {
-        if COMPS == 1 {
-            ColorGroup::from_components(self.r.max(other), J::default(), J::default(), J::default())
-        } else if COMPS == 2 {
-            ColorGroup::from_components(
-                self.r.max(other),
-                self.g.max(other),
-                J::default(),
-                J::default(),
-            )
-        } else if COMPS == 3 {
-            ColorGroup::from_components(
-                self.r.max(other),
-                self.g.max(other),
-                self.b.max(other),
-                J::default(),
-            )
-        } else {
-            ColorGroup::from_components(
-                self.r.max(other),
-                self.g.max(other),
-                self.b.max(other),
-                self.a.max(other),
-            )
         }
     }
 }
@@ -272,7 +153,7 @@ where
         } else if COMPS == 4 {
             ColorGroup::from_components(self.r * rhs, self.g * rhs, self.b * rhs, self.a * rhs)
         } else {
-            panic!("Not implemented.");
+            unimplemented!("Not implemented.");
         }
     }
 }
@@ -282,7 +163,7 @@ where
     J: Copy + Default + 'static,
 {
     #[inline(always)]
-    pub fn saturate_narrow<V>(&self, bit_depth: u32) -> ColorGroup<COMPS, V>
+    pub(crate) fn saturate_narrow<V>(&self, bit_depth: u32) -> ColorGroup<COMPS, V>
     where
         V: Copy + Default,
         J: SaturateNarrow<V>,
@@ -341,7 +222,7 @@ where
                 self.a * rhs.b,
             )
         } else {
-            panic!("Not implemented.");
+            unimplemented!("Not implemented.");
         }
     }
 }
@@ -363,7 +244,7 @@ where
         } else if COMPS == 4 {
             ColorGroup::from_components(self.r - rhs, self.g - rhs, self.b - rhs, self.a - rhs)
         } else {
-            panic!("Not implemented.");
+            unimplemented!("Not implemented.");
         }
     }
 }
@@ -390,7 +271,7 @@ where
                 self.a - rhs.a,
             )
         } else {
-            panic!("Not implemented.");
+            unimplemented!("Not implemented.");
         }
     }
 }
@@ -417,7 +298,7 @@ where
                 self.a + rhs.a,
             )
         } else {
-            panic!("Not implemented.");
+            unimplemented!("Not implemented.");
         }
     }
 }
@@ -439,7 +320,7 @@ where
         } else if COMPS == 4 {
             ColorGroup::from_components(self.r + rhs, self.g + rhs, self.b + rhs, self.a + rhs)
         } else {
-            panic!("Not implemented.");
+            unimplemented!("Not implemented.");
         }
     }
 }
@@ -461,7 +342,7 @@ where
         } else if COMPS == 4 {
             ColorGroup::from_components(self.r >> rhs, self.g >> rhs, self.b >> rhs, self.a >> rhs)
         } else {
-            panic!("Not implemented.");
+            unimplemented!("Not implemented.");
         }
     }
 }
@@ -517,7 +398,7 @@ where
                 mlaf(self.a, a.a, b),
             )
         } else {
-            panic!("Not implemented.");
+            unimplemented!("Not implemented.");
         }
     }
 }
@@ -611,7 +492,7 @@ macro_rules! fast_load_color_group {
                 a: $store.get_unchecked(3).as_(),
             }
         } else {
-            panic!("Not implemented.")
+            unimplemented!("Not implemented.")
         }
     }};
 }

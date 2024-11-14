@@ -35,7 +35,7 @@ mod alpha_u8;
 #[cfg(feature = "half")]
 mod rgba_f16;
 mod rgba_f32;
-pub mod utils;
+pub(crate) mod utils;
 #[cfg(feature = "half")]
 mod vertical_f16;
 mod vertical_f32;
@@ -43,21 +43,21 @@ mod vertical_u8;
 mod vertical_u8_lp;
 
 #[cfg(feature = "half")]
-pub use alpha_f16::{avx_premultiply_alpha_rgba_f16, avx_unpremultiply_alpha_rgba_f16};
-pub use alpha_f32::avx_premultiply_alpha_rgba_f32;
-pub use alpha_f32::avx_unpremultiply_alpha_rgba_f32;
-pub use alpha_u16::{avx_premultiply_alpha_rgba_u16, avx_unpremultiply_alpha_rgba_u16};
-pub use alpha_u8::avx_premultiply_alpha_rgba;
-pub use alpha_u8::avx_unpremultiply_alpha_rgba;
+pub(crate) use alpha_f16::{avx_premultiply_alpha_rgba_f16, avx_unpremultiply_alpha_rgba_f16};
+pub(crate) use alpha_f32::avx_premultiply_alpha_rgba_f32;
+pub(crate) use alpha_f32::avx_unpremultiply_alpha_rgba_f32;
+pub(crate) use alpha_u16::{avx_premultiply_alpha_rgba_u16, avx_unpremultiply_alpha_rgba_u16};
+pub(crate) use alpha_u8::avx_premultiply_alpha_rgba;
+pub(crate) use alpha_u8::avx_unpremultiply_alpha_rgba;
 #[cfg(feature = "half")]
-pub use rgba_f16::{
+pub(crate) use rgba_f16::{
     convolve_horizontal_rgba_avx_row_one_f16, convolve_horizontal_rgba_avx_rows_4_f16,
 };
-pub use rgba_f32::{
+pub(crate) use rgba_f32::{
     convolve_horizontal_rgba_avx_row_one_f32, convolve_horizontal_rgba_avx_rows_4_f32,
 };
 #[cfg(feature = "half")]
-pub use vertical_f16::convolve_vertical_avx_row_f16;
-pub use vertical_f32::convolve_vertical_avx_row_f32;
-pub use vertical_u8::convolve_vertical_avx_row;
-pub use vertical_u8_lp::convolve_vertical_avx_row_lp;
+pub(crate) use vertical_f16::convolve_vertical_avx_row_f16;
+pub(crate) use vertical_f32::convolve_vertical_avx_row_f32;
+pub(crate) use vertical_u8::convolve_vertical_avx_row;
+pub(crate) use vertical_u8_lp::convolve_vertical_avx_row_lp;
