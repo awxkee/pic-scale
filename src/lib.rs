@@ -91,8 +91,6 @@ mod wasm32;
 pub use colors::*;
 #[cfg(feature = "colorspaces")]
 pub use colorutils_rs::TransferFunction;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-pub use cpu_features::{is_aarch_f16_supported, is_aarch_f16c_supported};
 pub use image_size::ImageSize;
 pub use image_store::ImageStore;
 pub use math::*;

@@ -96,7 +96,7 @@ impl VerticalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             // For more downscaling better to use more precise version
-            if _scale_factor < 8. && std::arch::is_aarch64_feature_detected!("rdm") {
+            if _scale_factor < 8. && crate::cpu_features::is_aarch_rdm_supported() {
                 _dispatcher = convolve_vertical_neon_i16_precision;
             } else {
                 _dispatcher = convolve_vertical_neon_i32_precision;
