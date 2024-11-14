@@ -249,16 +249,7 @@ fn neon_unpremultiply_alpha_rgba_row_u16(in_place: &mut [u16], bit_depth: usize)
         rem = rem.chunks_exact_mut(8 * 4).into_remainder();
     }
 
-    for dst in rem.chunks_exact_mut(4) {
-        let a = dst[3] as u32;
-        if a != 0 {
-            let a_recip = 1. / a as f32;
-            dst[0] = ((dst[0] as u32 * max_colors) as f32 * a_recip) as u16;
-            dst[1] = ((dst[1] as u32 * max_colors) as f32 * a_recip) as u16;
-            dst[2] = ((dst[2] as u32 * max_colors) as f32 * a_recip) as u16;
-            dst[3] = ((a * max_colors) as f32 * a_recip) as u16;
-        }
-    }
+    unpremultiply_alpha_rgba_row(rem, max_colors);
 }
 
 pub fn neon_unpremultiply_alpha_rgba_u16(
