@@ -64,7 +64,7 @@ fn apple_has_cpu_feature(_feature_name: &str) -> bool {
 
 /// Test aarch64 cpu with *fp16* check,
 /// on *Apple* platform [libc](https://developer.apple.com/documentation/kernel/1387446-sysctlbyname/determining_instruction_set_characteristics) be used
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "half"))]
 pub(crate) fn is_aarch_f16_supported() -> bool {
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     {
@@ -80,7 +80,7 @@ pub(crate) fn is_aarch_f16_supported() -> bool {
 /// on *Apple* platform [libc](https://developer.apple.com/documentation/kernel/1387446-sysctlbyname/determining_instruction_set_characteristics) be used
 /// otherwise consider it is always available
 #[allow(clippy::too_long_first_doc_paragraph)]
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "half"))]
 pub(crate) fn is_aarch_f16c_supported() -> bool {
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     {
