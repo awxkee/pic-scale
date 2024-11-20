@@ -227,6 +227,24 @@ where
     }
 }
 
+impl ColorGroup<4, i32> {
+    #[inline(always)]
+    pub(crate) fn saturate_ar30(&self) -> ColorGroup<4, i32> {
+        ColorGroup::from_components(
+            (self.r >> PRECISION).min(1023).max(0),
+            (self.g >> PRECISION).min(1023).max(0),
+            (self.b >> PRECISION).min(1023).max(0),
+            (self.a >> PRECISION).min(3).max(0),
+        )
+    }
+
+    #[inline(always)]
+    pub(crate) fn to_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(&self) -> u32 {
+        let ar30_type: Rgb30 = AR30_TYPE.into();
+        ar30_type.pack_w_a::<AR30_ORDER>(self.r, self.g, self.b, self.a)
+    }
+}
+
 impl<const COMPS: usize, J> Sub<J> for ColorGroup<COMPS, J>
 where
     J: Copy + Sub<Output = J> + Default + 'static,
@@ -461,7 +479,52 @@ where
     }
 }
 
-macro_rules! fast_load_color_group {
+macro_rules! load_ar30 {
+    ($store: expr, $ar_type: expr, $ar_order: ty) => {{
+        let ar_type: crate::ar30::Rgb30 = $ar_type.into();
+        let unpacked = ar_type.unpack::<$ar_order>($store[0]);
+        ColorGroup::<4, i32> {
+            r: unpacked.0 as i32,
+            g: unpacked.1 as i32,
+            b: unpacked.2 as i32,
+            a: unpacked.3 as i32,
+        }
+    }};
+}
+
+pub(crate) use load_ar30;
+
+macro_rules! load_ar30_p {
+    ($store: expr, $ar_type: expr, $ar_order: ty) => {{
+        let ar_type: crate::ar30::Rgb30 = $ar_type.into();
+        let unpacked = ar_type.unpack::<$ar_order>(*$store);
+        ColorGroup::<4, i32> {
+            r: unpacked.0 as i32,
+            g: unpacked.1 as i32,
+            b: unpacked.2 as i32,
+            a: unpacked.3 as i32,
+        }
+    }};
+}
+
+pub(crate) use load_ar30_p;
+
+macro_rules! load_ar30_with_offset {
+    ($store: expr, $ar_type: expr, $ar_order: ty, $offset: expr) => {{
+        let ar_type: crate::ar30::Rgb30 = $ar_type.into();
+        let unpacked = ar_type.unpack::<$ar_order>($store[$offset]);
+        ColorGroup::<4, i32> {
+            r: unpacked.0 as i32,
+            g: unpacked.1 as i32,
+            b: unpacked.2 as i32,
+            a: unpacked.3 as i32,
+        }
+    }};
+}
+
+pub(crate) use load_ar30_with_offset;
+
+macro_rules! load_color_group {
     ($store: expr, $channels: expr, $vtype: ty) => {{
         if $channels == 1 {
             ColorGroup::<$channels, $vtype> {
@@ -497,9 +560,9 @@ macro_rules! fast_load_color_group {
     }};
 }
 
-pub(crate) use fast_load_color_group;
+pub(crate) use load_color_group;
 
-macro_rules! fast_load_color_group_with_offset {
+macro_rules! load_color_group_with_offset {
     ($store: expr, $channels: expr, $offset: expr, $vtype: ty) => {{
         if $channels == 1 {
             ColorGroup::<$channels, $vtype> {
@@ -535,7 +598,7 @@ macro_rules! fast_load_color_group_with_offset {
     }};
 }
 
-pub(crate) use fast_load_color_group_with_offset;
+pub(crate) use load_color_group_with_offset;
 
 macro_rules! fast_store_color_group {
     ($color_group: expr, $store: expr, $components: expr) => {{
@@ -569,4 +632,6 @@ macro_rules! fast_mixed_store_color_group {
     }};
 }
 
+use crate::ar30::Rgb30;
+use crate::support::PRECISION;
 pub(crate) use fast_mixed_store_color_group;

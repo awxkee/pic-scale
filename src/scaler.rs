@@ -30,12 +30,14 @@ use crate::alpha_check::{
     has_non_constant_cap_alpha_rgba16, has_non_constant_cap_alpha_rgba8,
     has_non_constant_cap_alpha_rgba_f32,
 };
+use crate::ar30::{Ar30ByteOrder, Rgb30};
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::image_size::ImageSize;
 use crate::image_store::ImageStore;
 use crate::nearest_sampler::resize_nearest;
 use crate::pic_scale_error::PicScaleError;
+use crate::resize_ar30::resize_ar30_impl;
 use crate::support::check_image_size_overflow;
 use crate::threading_policy::ThreadingPolicy;
 use crate::{ConstPI, ConstSqrt2, Jinc, ResamplingFunction};
@@ -1146,5 +1148,63 @@ impl ScalingU16 for Scaler {
         assert_eq!(src_store.width, new_size.width);
 
         Ok(src_store)
+    }
+}
+
+impl Scaler {
+    /// Resizes RGBA2101010 image
+    ///
+    /// # Arguments
+    /// `src` - source slice
+    /// `src_size` - Source Image size
+    /// `dst` - destination slice
+    /// `new_size` - New image size
+    ///
+    pub fn resize_ar30(
+        &self,
+        src: &[u32],
+        src_size: ImageSize,
+        dst: &mut [u32],
+        new_size: ImageSize,
+        order: Ar30ByteOrder,
+    ) -> Result<(), PicScaleError> {
+        match order {
+            Ar30ByteOrder::Host => resize_ar30_impl::<
+                { Rgb30::Ar30 as usize },
+                { Ar30ByteOrder::Host as usize },
+            >(src, src_size, dst, new_size, self),
+            Ar30ByteOrder::Network => resize_ar30_impl::<
+                { Rgb30::Ar30 as usize },
+                { Ar30ByteOrder::Network as usize },
+            >(src, src_size, dst, new_size, self),
+        }
+    }
+
+    /// Resizes RGBA1010102 image
+    ///
+    /// # Arguments
+    /// `src` - source slice
+    /// `src_size` - Source Image size
+    /// `dst` - destination slice
+    /// `new_size` - New image size
+    ///
+    pub fn resize_ra30(
+        &self,
+        src: &[u32],
+        src_size: ImageSize,
+        dst: &mut [u32],
+        new_size: ImageSize,
+        order: Ar30ByteOrder,
+    ) -> Result<(), PicScaleError> {
+        match order {
+            Ar30ByteOrder::Host => resize_ar30_impl::<
+                { Rgb30::Ra30 as usize },
+                { Ar30ByteOrder::Host as usize },
+            >(src, src_size, dst, new_size, self),
+            Ar30ByteOrder::Network => resize_ar30_impl::<
+                { Rgb30::Ra30 as usize },
+                { Ar30ByteOrder::Network as usize },
+            >(src, src_size, dst, new_size, self),
+        }
     }
 }

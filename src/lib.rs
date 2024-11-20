@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![deny(deprecated)]
-#![deny(unreachable_code, unused)]
+// #![deny(unreachable_code, unused)]
 #![allow(clippy::too_many_arguments)]
 mod alpha_check;
 #[cfg(feature = "half")]
@@ -35,6 +35,7 @@ mod alpha_handle_f16;
 mod alpha_handle_f32;
 mod alpha_handle_u16;
 mod alpha_handle_u8;
+mod ar30;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod avx2;
 mod color_group;
@@ -44,6 +45,7 @@ mod convolution;
 mod convolve_naive_f32;
 mod convolve_naive_u16;
 mod cpu_features;
+mod dispatch_group_ar30;
 #[cfg(feature = "half")]
 mod dispatch_group_f16;
 mod dispatch_group_f32;
@@ -53,7 +55,9 @@ mod dispatch_group_u8;
 mod f16;
 mod filter_weights;
 mod fixed_point_horizontal;
+mod fixed_point_horizontal_ar30;
 mod fixed_point_vertical;
+mod fixed_point_vertical_ar30;
 mod floating_point_horizontal;
 mod floating_point_vertical;
 mod handler_provider;
@@ -69,6 +73,7 @@ mod pic_scale_error;
 mod plane_f32;
 mod plane_u16;
 mod plane_u8;
+mod resize_ar30;
 mod rgb_f32;
 mod rgb_u16;
 mod rgb_u8;
@@ -88,6 +93,7 @@ mod unsafe_slice;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128",))]
 mod wasm32;
 
+pub use ar30::Ar30ByteOrder;
 #[cfg(feature = "colorspaces")]
 pub use colors::*;
 #[cfg(feature = "colorspaces")]
