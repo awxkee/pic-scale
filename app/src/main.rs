@@ -14,10 +14,12 @@ use pic_scale::{
     Ar30ByteOrder, ImageSize, ImageStore, LinearApproxScaler, ResamplingFunction, Scaler, Scaling,
     ScalingU16, ThreadingPolicy,
 };
-use yuvutils_rs::{ar30_to_rgba8, rgb8_to_ar30, rgba8_to_ar30, Rgb30ByteOrder};
+use yuvutils_rs::{
+    ar30_to_rgba8, ra30_to_rgba8, rgb8_to_ar30, rgba8_to_ar30, rgba8_to_ra30, Rgb30ByteOrder,
+};
 
 fn main() {
-    test_fast_image();
+    // test_fast_image();
     let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
         .unwrap()
         .decode()
@@ -26,11 +28,11 @@ fn main() {
     let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
-    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
     let mut ar30_src = vec![0u32; dimensions.0 as usize * dimensions.1 as usize];
-    rgba8_to_ar30(
+    rgba8_to_ra30(
         &mut ar30_src,
         dimensions.0,
         Rgb30ByteOrder::Host,
@@ -51,7 +53,7 @@ fn main() {
     let mut resized_ar = vec![0u32; dst_size.width * dst_size.height];
     let start_time = Instant::now();
     scaler
-        .resize_ar30(
+        .resize_ra30(
             &ar30_src,
             ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
             &mut resized_ar,
@@ -73,7 +75,7 @@ fn main() {
     println!("Scaler: {:.2?}", elapsed_time);
 
     let mut resized = vec![0u8; dst_size.width * dst_size.height * 4];
-    ar30_to_rgba8(
+    ra30_to_rgba8(
         &resized_ar,
         dst_size.width as u32,
         Rgb30ByteOrder::Host,

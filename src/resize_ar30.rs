@@ -81,6 +81,19 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     let should_do_vertical = src_size.height != dst_size.height;
     assert!(should_do_horizontal || should_do_vertical);
 
+    if should_do_vertical && !should_do_horizontal {
+        let vertical_filters = scaler.generate_weights(src_size.height, dst_size.height);
+        convolve_vertical_dispatch_ar30::<AR30_TYPE, AR30_ORDER>(
+            src,
+            src_size.width,
+            vertical_filters,
+            dst,
+            src_size.width,
+            &pool,
+        );
+        return Ok(());
+    }
+
     let working_store = if should_do_vertical {
         let mut target = vec![0u32; src_size.width * dst_size.height];
 

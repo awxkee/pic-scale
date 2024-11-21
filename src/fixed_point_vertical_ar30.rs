@@ -34,7 +34,7 @@ use crate::support::ROUNDING_CONST;
 /// # Generics
 /// `T` - template buffer type
 /// `J` - accumulator type
-fn convolve_column_handler_fixed_point_direct_buffer<
+pub(crate) fn convolve_column_handler_fip_db_ar30<
     const AR30_TYPE: usize,
     const AR30_ORDER: usize,
     const BUFFER_SIZE: usize,
@@ -254,9 +254,6 @@ fn convolve_column_handler_fixed_point_direct_buffer_four<
     }
 }
 
-/// # Generics
-/// `T` - template buffer type
-/// `J` - accumulator type
 pub(crate) fn column_handler_fixed_point_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     bounds: &FilterBounds,
     src: &[u32],
@@ -285,7 +282,7 @@ pub(crate) fn column_handler_fixed_point_ar30<const AR30_TYPE: usize, const AR30
     }
 
     while cx + 16 < total_width {
-        convolve_column_handler_fixed_point_direct_buffer::<AR30_TYPE, AR30_ORDER, 16>(
+        convolve_column_handler_fip_db_ar30::<AR30_TYPE, AR30_ORDER, 16>(
             src, src_stride, dst, weight, bounds, cx,
         );
 
@@ -293,7 +290,7 @@ pub(crate) fn column_handler_fixed_point_ar30<const AR30_TYPE: usize, const AR30
     }
 
     while cx + 8 < total_width {
-        convolve_column_handler_fixed_point_direct_buffer::<AR30_TYPE, AR30_ORDER, 8>(
+        convolve_column_handler_fip_db_ar30::<AR30_TYPE, AR30_ORDER, 8>(
             src, src_stride, dst, weight, bounds, cx,
         );
 
@@ -301,7 +298,7 @@ pub(crate) fn column_handler_fixed_point_ar30<const AR30_TYPE: usize, const AR30
     }
 
     while cx < total_width {
-        convolve_column_handler_fixed_point_direct_buffer::<AR30_TYPE, AR30_ORDER, 1>(
+        convolve_column_handler_fip_db_ar30::<AR30_TYPE, AR30_ORDER, 1>(
             src, src_stride, dst, weight, bounds, cx,
         );
 

@@ -57,6 +57,7 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 | RGBA (f16)     | x    | x   | x   | -    | 
 | RGB (f16)      | x    | ~   | ~   | -    | 
 | Plane (f16)    | ~    | ~   | ~   | -    |
+| AR30/RA30      | x    | -   | -   | -    |
 
 #### Features
 

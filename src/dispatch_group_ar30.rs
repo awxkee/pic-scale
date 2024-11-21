@@ -27,11 +27,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::filter_weights::FilterWeights;
+use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::fixed_point_horizontal_ar30::{
     convolve_row_handler_fixed_point_4_ar30, convolve_row_handler_fixed_point_ar30,
 };
 use crate::fixed_point_vertical_ar30::column_handler_fixed_point_ar30;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::neon::{
+    neon_column_handler_fixed_point_ar30, neon_convolve_horizontal_rgba_rows_4_ar30,
+};
 use crate::support::PRECISION;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
@@ -46,15 +50,22 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
     dst_stride: usize,
     pool: &Option<ThreadPool>,
 ) {
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    let is_rdm_available = std::arch::is_aarch64_feature_detected!("rdm");
     if let Some(pool) = pool {
         pool.install(|| {
             let approx = filter_weights.numerical_approximation_i16::<PRECISION>(0);
             dst.par_chunks_exact_mut(dst_stride * 4)
                 .zip(src.par_chunks_exact(src_stride * 4))
                 .for_each(|(dst, src)| {
-                    convolve_row_handler_fixed_point_4_ar30::<AR30_TYPE, AR30_ORDER>(
-                        src, src_stride, dst, dst_stride, &approx,
-                    );
+                    let mut _dispatch: fn(&[u32], usize, &mut [u32], usize, &FilterWeights<i16>) =
+                        convolve_row_handler_fixed_point_4_ar30::<AR30_TYPE, AR30_ORDER>;
+                    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+                    if is_rdm_available {
+                        _dispatch =
+                            neon_convolve_horizontal_rgba_rows_4_ar30::<AR30_TYPE, AR30_ORDER>;
+                    }
+                    _dispatch(src, src_stride, dst, dst_stride, &approx);
                 });
 
             let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
@@ -74,9 +85,13 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
         dst.chunks_exact_mut(dst_stride * 4)
             .zip(src.chunks_exact(src_stride * 4))
             .for_each(|(dst, src)| {
-                convolve_row_handler_fixed_point_4_ar30::<AR30_TYPE, AR30_ORDER>(
-                    src, src_stride, dst, dst_stride, &approx,
-                );
+                let mut _dispatch: fn(&[u32], usize, &mut [u32], usize, &FilterWeights<i16>) =
+                    convolve_row_handler_fixed_point_4_ar30::<AR30_TYPE, AR30_ORDER>;
+                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+                if is_rdm_available {
+                    _dispatch = neon_convolve_horizontal_rgba_rows_4_ar30::<AR30_TYPE, AR30_ORDER>;
+                }
+                _dispatch(src, src_stride, dst, dst_stride, &approx);
             });
 
         let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
@@ -99,6 +114,8 @@ pub(crate) fn convolve_vertical_dispatch_ar30<const AR30_TYPE: usize, const AR30
     dst_stride: usize,
     pool: &Option<ThreadPool>,
 ) {
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    let is_rdm_available = std::arch::is_aarch64_feature_detected!("rdm");
     if let Some(pool) = pool {
         pool.install(|| {
             let approx = filter_weights.numerical_approximation_i16::<PRECISION>(0);
@@ -108,9 +125,14 @@ pub(crate) fn convolve_vertical_dispatch_ar30<const AR30_TYPE: usize, const AR30
                     let bounds = approx.bounds[y];
                     let filter_offset = y * approx.aligned_size;
                     let weights = &approx.weights[filter_offset..];
-                    column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>(
-                        &bounds, src, row, src_stride, weights,
-                    );
+                    let mut _dispatch: fn(&FilterBounds, &[u32], &mut [u32], usize, &[i16]) =
+                        column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
+                    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+                    if is_rdm_available {
+                        _dispatch = neon_column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
+                    }
+
+                    _dispatch(&bounds, src, row, src_stride, weights);
                 });
         });
     } else {
@@ -121,9 +143,15 @@ pub(crate) fn convolve_vertical_dispatch_ar30<const AR30_TYPE: usize, const AR30
                 let bounds = approx.bounds[y];
                 let filter_offset = y * approx.aligned_size;
                 let weights = &approx.weights[filter_offset..];
-                column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>(
-                    &bounds, src, row, src_stride, weights,
-                );
+
+                let mut _dispatch: fn(&FilterBounds, &[u32], &mut [u32], usize, &[i16]) =
+                    column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
+                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+                if is_rdm_available {
+                    _dispatch = neon_column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
+                }
+
+                _dispatch(&bounds, src, row, src_stride, weights);
             });
     }
 }
