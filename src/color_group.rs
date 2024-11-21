@@ -229,6 +229,7 @@ where
 
 impl ColorGroup<4, i32> {
     #[inline(always)]
+    #[allow(clippy::manual_clamp)]
     pub(crate) fn saturate_ar30(&self) -> ColorGroup<4, i32> {
         ColorGroup::from_components(
             (self.r >> PRECISION).min(1023).max(0),
@@ -239,7 +240,7 @@ impl ColorGroup<4, i32> {
     }
 
     #[inline(always)]
-    pub(crate) fn to_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(&self) -> u32 {
+    pub(crate) fn to_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(self) -> u32 {
         let ar30_type: Rgb30 = AR30_TYPE.into();
         ar30_type.pack_w_a::<AR30_ORDER>(self.r, self.g, self.b, self.a)
     }

@@ -1472,6 +1472,8 @@ dependencies = [
 [[package]]
 name = "yuvutils-rs"
 version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74d0d13bb8e3921f9d76ef4bcb348108578df0402c6cf2695ef0690b4b64c7d9"
 dependencies = [
  "num-traits",
 ]

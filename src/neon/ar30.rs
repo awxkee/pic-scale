@@ -195,8 +195,7 @@ pub(crate) unsafe fn vunzip_4_ar30_separate<const AR30_TYPE: usize, const AR30_O
     let k1 = vreinterpretq_s16_s32(v2.0);
     let k2 = vreinterpretq_s16_s32(v1.1);
     let k3 = vreinterpretq_s16_s32(v2.1);
-    let regi = int16x8x4_t(k0, k1, k2, k3);
-    regi
+    int16x8x4_t(k0, k1, k2, k3)
 }
 
 #[inline(always)]
@@ -212,8 +211,7 @@ pub(crate) unsafe fn vunzips_4_ar30_separate<const AR30_TYPE: usize, const AR30_
     let k1 = vreinterpret_s16_s32(v2.0);
     let k2 = vreinterpret_s16_s32(v1.1);
     let k3 = vreinterpret_s16_s32(v2.1);
-    let regi = int16x8x2_t(vcombine_s16(k0, k1), vcombine_s16(k2, k3));
-    regi
+    int16x8x2_t(vcombine_s16(k0, k1), vcombine_s16(k2, k3))
 }
 
 #[inline(always)]
