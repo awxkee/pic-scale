@@ -34,7 +34,26 @@ use std::arch::aarch64::{
     vrshrq_n_s16, vshlq_n_s16, vst1q_u32_x2,
 };
 
+#[inline(always)]
 pub(crate) fn neon_column_handler_fixed_point_ar30<
+    const AR30_TYPE: usize,
+    const AR30_ORDER: usize,
+>(
+    bounds: &FilterBounds,
+    src: &[u32],
+    dst: &mut [u32],
+    src_stride: usize,
+    weight: &[i16],
+) {
+    unsafe {
+        neon_column_handler_fixed_point_ar30_impl::<AR30_TYPE, AR30_ORDER>(
+            bounds, src, dst, src_stride, weight,
+        );
+    }
+}
+
+#[target_feature(enable = "rdm")]
+unsafe fn neon_column_handler_fixed_point_ar30_impl<
     const AR30_TYPE: usize,
     const AR30_ORDER: usize,
 >(

@@ -67,7 +67,9 @@ pub fn convolve_vertical_neon_i16_precision(
     src_stride: usize,
     weight: &[i16],
 ) {
-    convolve_vertical_neon_row_upper(width, bounds, src, dst, src_stride, weight);
+    unsafe {
+        convolve_vertical_neon_row_upper(width, bounds, src, dst, src_stride, weight);
+    }
 }
 
 pub fn convolve_vertical_neon_i32_precision(
@@ -95,7 +97,8 @@ unsafe fn vdot<const SCALE: i32>(
     (store0, store1)
 }
 
-fn convolve_vertical_neon_row_upper(
+#[target_feature(enable = "rdm")]
+unsafe fn convolve_vertical_neon_row_upper(
     _: usize,
     bounds: &FilterBounds,
     src: &[u8],

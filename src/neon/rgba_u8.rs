@@ -211,7 +211,6 @@ unsafe fn conv_horiz_rgba_1_u8_i16<const SCALE: i32>(
     vqrdmlah_s16(store, lo, w0)
 }
 
-/// Slightly lower precision scale option
 pub fn convolve_horizontal_rgba_neon_rows_4_u8_i16(
     src: &[u8],
     src_stride: usize,
@@ -220,139 +219,153 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u8_i16(
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        const CHANNELS: usize = 4;
-        const SCALE: i32 = 6;
-        const ROUNDING: i16 = 1 << (SCALE - 1);
-        let zeros = vdup_n_s16(0i16);
-        let init = vdup_n_s16(ROUNDING);
+        convolve_horizontal_rgba_neon_rows_4_u8_i16_impl(
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+            filter_weights,
+        );
+    }
+}
 
-        let (row0_ref, rest) = dst.split_at_mut(dst_stride);
-        let (row1_ref, rest) = rest.split_at_mut(dst_stride);
-        let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
+/// Slightly lower precision scale option
+#[target_feature(enable = "rdm")]
+unsafe fn convolve_horizontal_rgba_neon_rows_4_u8_i16_impl(
+    src: &[u8],
+    src_stride: usize,
+    dst: &mut [u8],
+    dst_stride: usize,
+    filter_weights: &FilterWeights<i16>,
+) {
+    const CHANNELS: usize = 4;
+    const SCALE: i32 = 6;
+    const ROUNDING: i16 = 1 << (SCALE - 1);
+    let zeros = vdup_n_s16(0i16);
+    let init = vdup_n_s16(ROUNDING);
 
-        let iter_row0 = row0_ref.chunks_exact_mut(CHANNELS);
-        let iter_row1 = row1_ref.chunks_exact_mut(CHANNELS);
-        let iter_row2 = row2_ref.chunks_exact_mut(CHANNELS);
-        let iter_row3 = row3_ref.chunks_exact_mut(CHANNELS);
+    let (row0_ref, rest) = dst.split_at_mut(dst_stride);
+    let (row1_ref, rest) = rest.split_at_mut(dst_stride);
+    let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
-            .zip(iter_row1)
-            .zip(iter_row2)
-            .zip(iter_row3)
-            .zip(filter_weights.bounds.iter())
-            .zip(
-                filter_weights
-                    .weights
-                    .chunks_exact(filter_weights.aligned_size),
-            )
-        {
-            let mut jx = 0usize;
+    let iter_row0 = row0_ref.chunks_exact_mut(CHANNELS);
+    let iter_row1 = row1_ref.chunks_exact_mut(CHANNELS);
+    let iter_row2 = row2_ref.chunks_exact_mut(CHANNELS);
+    let iter_row3 = row3_ref.chunks_exact_mut(CHANNELS);
 
-            let bounds_size = bounds.size;
+    for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
+        .zip(iter_row1)
+        .zip(iter_row2)
+        .zip(iter_row3)
+        .zip(filter_weights.bounds.iter())
+        .zip(
+            filter_weights
+                .weights
+                .chunks_exact(filter_weights.aligned_size),
+        )
+    {
+        let mut jx = 0usize;
 
-            let mut store_0 = init;
-            let mut store_1 = init;
-            let mut store_2 = init;
-            let mut store_3 = init;
+        let bounds_size = bounds.size;
 
-            let src0 = src;
-            let src1 = src0.get_unchecked(src_stride..);
-            let src2 = src1.get_unchecked(src_stride..);
-            let src3 = src2.get_unchecked(src_stride..);
+        let mut store_0 = init;
+        let mut store_1 = init;
+        let mut store_2 = init;
+        let mut store_3 = init;
 
-            while jx + 8 < bounds_size {
-                let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 8));
-                let weights_set = vld1q_s16(w_ptr.as_ptr());
-                let w0 = vdup_laneq_s16::<0>(weights_set);
-                let w1 = vdup_laneq_s16::<1>(weights_set);
-                let w2 = vdup_laneq_s16::<2>(weights_set);
-                let w3 = vdup_laneq_s16::<3>(weights_set);
-                let w4 = vdup_laneq_s16::<4>(weights_set);
-                let w5 = vdup_laneq_s16::<5>(weights_set);
-                let w6 = vdup_laneq_s16::<6>(weights_set);
-                let w7 = vdup_laneq_s16::<7>(weights_set);
-                let set1 = (w0, w1, w2, w3);
-                let set2 = (w4, w5, w6, w7);
-                store_0 =
-                    conv_horiz_rgba_8_u8_i16::<SCALE>(bounds_start, src0, set1, set2, store_0);
-                store_1 =
-                    conv_horiz_rgba_8_u8_i16::<SCALE>(bounds_start, src1, set1, set2, store_1);
-                store_2 =
-                    conv_horiz_rgba_8_u8_i16::<SCALE>(bounds_start, src2, set1, set2, store_2);
-                store_3 =
-                    conv_horiz_rgba_8_u8_i16::<SCALE>(bounds_start, src3, set1, set2, store_3);
-                jx += 8;
-            }
+        let src0 = src;
+        let src1 = src0.get_unchecked(src_stride..);
+        let src2 = src1.get_unchecked(src_stride..);
+        let src3 = src2.get_unchecked(src_stride..);
 
-            while jx + 4 < bounds_size {
-                let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
-                let weights = vld1_s16(w_ptr.as_ptr());
-                let w0 = vdup_lane_s16::<0>(weights);
-                let w1 = vdup_lane_s16::<1>(weights);
-                let w2 = vdup_lane_s16::<2>(weights);
-                let w3 = vdup_lane_s16::<3>(weights);
-                store_0 =
-                    conv_horiz_rgba_4_u8_i16::<SCALE>(bounds_start, src0, w0, w1, w2, w3, store_0);
-                store_1 =
-                    conv_horiz_rgba_4_u8_i16::<SCALE>(bounds_start, src1, w0, w1, w2, w3, store_1);
-                store_2 =
-                    conv_horiz_rgba_4_u8_i16::<SCALE>(bounds_start, src2, w0, w1, w2, w3, store_2);
-                store_3 =
-                    conv_horiz_rgba_4_u8_i16::<SCALE>(bounds_start, src3, w0, w1, w2, w3, store_3);
-                jx += 4;
-            }
-
-            while jx + 2 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 2));
-                let bounds_start = bounds.start + jx;
-                let w0 = vld1_dup_s16(w_ptr.as_ptr());
-                let w1 = vld1_dup_s16(w_ptr.get_unchecked(1..).as_ptr());
-                store_0 = conv_horiz_rgba_2_u8_i16::<SCALE>(bounds_start, src0, w0, w1, store_0);
-                store_1 = conv_horiz_rgba_2_u8_i16::<SCALE>(bounds_start, src1, w0, w1, store_1);
-                store_2 = conv_horiz_rgba_2_u8_i16::<SCALE>(bounds_start, src2, w0, w1, store_2);
-                store_3 = conv_horiz_rgba_2_u8_i16::<SCALE>(bounds_start, src3, w0, w1, store_3);
-                jx += 2;
-            }
-
-            while jx < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 1));
-                let bounds_start = bounds.start + jx;
-                let weight0 = vld1_dup_s16(w_ptr.as_ptr());
-                store_0 = conv_horiz_rgba_1_u8_i16::<SCALE>(bounds_start, src0, weight0, store_0);
-                store_1 = conv_horiz_rgba_1_u8_i16::<SCALE>(bounds_start, src1, weight0, store_1);
-                store_2 = conv_horiz_rgba_1_u8_i16::<SCALE>(bounds_start, src2, weight0, store_2);
-                store_3 = conv_horiz_rgba_1_u8_i16::<SCALE>(bounds_start, src3, weight0, store_3);
-                jx += 1;
-            }
-
-            let store_16_0 = vreinterpret_u16_s16(vshr_n_s16::<SCALE>(vmax_s16(store_0, zeros)));
-            let store_16_1 = vreinterpret_u16_s16(vshr_n_s16::<SCALE>(vmax_s16(store_1, zeros)));
-            let store_16_2 = vreinterpret_u16_s16(vshr_n_s16::<SCALE>(vmax_s16(store_2, zeros)));
-            let store_16_3 = vreinterpret_u16_s16(vshr_n_s16::<SCALE>(vmax_s16(store_3, zeros)));
-
-            let store_16_8_0 = vqmovn_u16(vcombine_u16(store_16_0, store_16_0));
-            let store_16_8_1 = vqmovn_u16(vcombine_u16(store_16_1, store_16_1));
-            let store_16_8_2 = vqmovn_u16(vcombine_u16(store_16_2, store_16_2));
-            let store_16_8 = vqmovn_u16(vcombine_u16(store_16_3, store_16_3));
-
-            let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8_0));
-            let dest_ptr_32 = chunk0.as_mut_ptr() as *mut u32;
-            dest_ptr_32.write_unaligned(pixel);
-
-            let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8_1));
-            let dest_ptr_32 = chunk1.as_mut_ptr() as *mut u32;
-            dest_ptr_32.write_unaligned(pixel);
-
-            let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8_2));
-            let dest_ptr_32 = chunk2.as_mut_ptr() as *mut u32;
-            dest_ptr_32.write_unaligned(pixel);
-
-            let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
-            let dest_ptr_32 = chunk3.as_mut_ptr() as *mut u32;
-            dest_ptr_32.write_unaligned(pixel);
+        while jx + 8 < bounds_size {
+            let bounds_start = bounds.start + jx;
+            let w_ptr = weights.get_unchecked(jx..(jx + 8));
+            let weights_set = vld1q_s16(w_ptr.as_ptr());
+            let w0 = vdup_laneq_s16::<0>(weights_set);
+            let w1 = vdup_laneq_s16::<1>(weights_set);
+            let w2 = vdup_laneq_s16::<2>(weights_set);
+            let w3 = vdup_laneq_s16::<3>(weights_set);
+            let w4 = vdup_laneq_s16::<4>(weights_set);
+            let w5 = vdup_laneq_s16::<5>(weights_set);
+            let w6 = vdup_laneq_s16::<6>(weights_set);
+            let w7 = vdup_laneq_s16::<7>(weights_set);
+            let set1 = (w0, w1, w2, w3);
+            let set2 = (w4, w5, w6, w7);
+            store_0 = conv_horiz_rgba_8_u8_i16::<SCALE>(bounds_start, src0, set1, set2, store_0);
+            store_1 = conv_horiz_rgba_8_u8_i16::<SCALE>(bounds_start, src1, set1, set2, store_1);
+            store_2 = conv_horiz_rgba_8_u8_i16::<SCALE>(bounds_start, src2, set1, set2, store_2);
+            store_3 = conv_horiz_rgba_8_u8_i16::<SCALE>(bounds_start, src3, set1, set2, store_3);
+            jx += 8;
         }
+
+        while jx + 4 < bounds_size {
+            let bounds_start = bounds.start + jx;
+            let w_ptr = weights.get_unchecked(jx..(jx + 4));
+            let weights = vld1_s16(w_ptr.as_ptr());
+            let w0 = vdup_lane_s16::<0>(weights);
+            let w1 = vdup_lane_s16::<1>(weights);
+            let w2 = vdup_lane_s16::<2>(weights);
+            let w3 = vdup_lane_s16::<3>(weights);
+            store_0 =
+                conv_horiz_rgba_4_u8_i16::<SCALE>(bounds_start, src0, w0, w1, w2, w3, store_0);
+            store_1 =
+                conv_horiz_rgba_4_u8_i16::<SCALE>(bounds_start, src1, w0, w1, w2, w3, store_1);
+            store_2 =
+                conv_horiz_rgba_4_u8_i16::<SCALE>(bounds_start, src2, w0, w1, w2, w3, store_2);
+            store_3 =
+                conv_horiz_rgba_4_u8_i16::<SCALE>(bounds_start, src3, w0, w1, w2, w3, store_3);
+            jx += 4;
+        }
+
+        while jx + 2 < bounds_size {
+            let w_ptr = weights.get_unchecked(jx..(jx + 2));
+            let bounds_start = bounds.start + jx;
+            let w0 = vld1_dup_s16(w_ptr.as_ptr());
+            let w1 = vld1_dup_s16(w_ptr.get_unchecked(1..).as_ptr());
+            store_0 = conv_horiz_rgba_2_u8_i16::<SCALE>(bounds_start, src0, w0, w1, store_0);
+            store_1 = conv_horiz_rgba_2_u8_i16::<SCALE>(bounds_start, src1, w0, w1, store_1);
+            store_2 = conv_horiz_rgba_2_u8_i16::<SCALE>(bounds_start, src2, w0, w1, store_2);
+            store_3 = conv_horiz_rgba_2_u8_i16::<SCALE>(bounds_start, src3, w0, w1, store_3);
+            jx += 2;
+        }
+
+        while jx < bounds_size {
+            let w_ptr = weights.get_unchecked(jx..(jx + 1));
+            let bounds_start = bounds.start + jx;
+            let weight0 = vld1_dup_s16(w_ptr.as_ptr());
+            store_0 = conv_horiz_rgba_1_u8_i16::<SCALE>(bounds_start, src0, weight0, store_0);
+            store_1 = conv_horiz_rgba_1_u8_i16::<SCALE>(bounds_start, src1, weight0, store_1);
+            store_2 = conv_horiz_rgba_1_u8_i16::<SCALE>(bounds_start, src2, weight0, store_2);
+            store_3 = conv_horiz_rgba_1_u8_i16::<SCALE>(bounds_start, src3, weight0, store_3);
+            jx += 1;
+        }
+
+        let store_16_0 = vreinterpret_u16_s16(vshr_n_s16::<SCALE>(vmax_s16(store_0, zeros)));
+        let store_16_1 = vreinterpret_u16_s16(vshr_n_s16::<SCALE>(vmax_s16(store_1, zeros)));
+        let store_16_2 = vreinterpret_u16_s16(vshr_n_s16::<SCALE>(vmax_s16(store_2, zeros)));
+        let store_16_3 = vreinterpret_u16_s16(vshr_n_s16::<SCALE>(vmax_s16(store_3, zeros)));
+
+        let store_16_8_0 = vqmovn_u16(vcombine_u16(store_16_0, store_16_0));
+        let store_16_8_1 = vqmovn_u16(vcombine_u16(store_16_1, store_16_1));
+        let store_16_8_2 = vqmovn_u16(vcombine_u16(store_16_2, store_16_2));
+        let store_16_8 = vqmovn_u16(vcombine_u16(store_16_3, store_16_3));
+
+        let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8_0));
+        let dest_ptr_32 = chunk0.as_mut_ptr() as *mut u32;
+        dest_ptr_32.write_unaligned(pixel);
+
+        let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8_1));
+        let dest_ptr_32 = chunk1.as_mut_ptr() as *mut u32;
+        dest_ptr_32.write_unaligned(pixel);
+
+        let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8_2));
+        let dest_ptr_32 = chunk2.as_mut_ptr() as *mut u32;
+        dest_ptr_32.write_unaligned(pixel);
+
+        let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
+        let dest_ptr_32 = chunk3.as_mut_ptr() as *mut u32;
+        dest_ptr_32.write_unaligned(pixel);
     }
 }
 
@@ -581,86 +594,94 @@ pub fn convolve_horizontal_rgba_neon_row_i16(
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        const SCALE: i32 = 6;
-        const ROUNDING: i16 = 1 << (SCALE - 1);
-        let zeros = vdup_n_s16(0i16);
-        const CHANNELS: usize = 4;
+        convolve_horizontal_rgba_neon_row_i16_impl(src, dst, filter_weights);
+    }
+}
 
-        for ((dst, bounds), weights) in dst
-            .chunks_exact_mut(CHANNELS)
-            .zip(filter_weights.bounds.iter())
-            .zip(
-                filter_weights
-                    .weights
-                    .chunks_exact(filter_weights.aligned_size),
-            )
-        {
-            let bounds_size = bounds.size;
-            let mut jx = 0usize;
-            let mut store = vdup_n_s16(ROUNDING);
+#[target_feature(enable = "rdm")]
+unsafe fn convolve_horizontal_rgba_neon_row_i16_impl(
+    src: &[u8],
+    dst: &mut [u8],
+    filter_weights: &FilterWeights<i16>,
+) {
+    const SCALE: i32 = 6;
+    const ROUNDING: i16 = 1 << (SCALE - 1);
+    let zeros = vdup_n_s16(0i16);
+    const CHANNELS: usize = 4;
 
-            while jx + 8 < bounds_size {
-                let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 8));
-                let weights_set = vld1q_s16(w_ptr.as_ptr());
-                let w0 = vdup_laneq_s16::<0>(weights_set);
-                let w1 = vdup_laneq_s16::<1>(weights_set);
-                let w2 = vdup_laneq_s16::<2>(weights_set);
-                let w3 = vdup_laneq_s16::<3>(weights_set);
-                let w4 = vdup_laneq_s16::<4>(weights_set);
-                let w5 = vdup_laneq_s16::<5>(weights_set);
-                let w6 = vdup_laneq_s16::<6>(weights_set);
-                let w7 = vdup_laneq_s16::<7>(weights_set);
-                let set1 = (w0, w1, w2, w3);
-                let set2 = (w4, w5, w6, w7);
-                store = conv_horiz_rgba_8_u8_i16::<SCALE>(bounds_start, src, set1, set2, store);
-                jx += 8;
-            }
+    for ((dst, bounds), weights) in dst
+        .chunks_exact_mut(CHANNELS)
+        .zip(filter_weights.bounds.iter())
+        .zip(
+            filter_weights
+                .weights
+                .chunks_exact(filter_weights.aligned_size),
+        )
+    {
+        let bounds_size = bounds.size;
+        let mut jx = 0usize;
+        let mut store = vdup_n_s16(ROUNDING);
 
-            while jx + 4 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
-                let weights = vld1_s16(w_ptr.as_ptr());
-                let weight0 = vdup_lane_s16::<0>(weights);
-                let weight1 = vdup_lane_s16::<1>(weights);
-                let weight2 = vdup_lane_s16::<2>(weights);
-                let weight3 = vdup_lane_s16::<3>(weights);
-                let bounds_start = bounds.start + jx;
-                store = conv_horiz_rgba_4_u8_i16::<SCALE>(
-                    bounds_start,
-                    src,
-                    weight0,
-                    weight1,
-                    weight2,
-                    weight3,
-                    store,
-                );
-                jx += 4;
-            }
-
-            while jx + 2 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 2));
-                let bounds_start = bounds.start + jx;
-                let weight0 = vld1_dup_s16(w_ptr.as_ptr());
-                let weight1 = vld1_dup_s16(w_ptr.get_unchecked(1..).as_ptr());
-                store =
-                    conv_horiz_rgba_2_u8_i16::<SCALE>(bounds_start, src, weight0, weight1, store);
-                jx += 2;
-            }
-
-            while jx < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 1));
-                let weight0 = vld1_dup_s16(w_ptr.as_ptr());
-                let bounds_start = bounds.start + jx;
-                store = conv_horiz_rgba_1_u8_i16::<SCALE>(bounds_start, src, weight0, store);
-                jx += 1;
-            }
-
-            let store_16 = vreinterpret_u16_s16(vshr_n_s16::<SCALE>(vmax_s16(store, zeros)));
-            let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
-
-            let value = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
-            let dest_ptr_32 = dst.as_mut_ptr() as *mut u32;
-            dest_ptr_32.write_unaligned(value);
+        while jx + 8 < bounds_size {
+            let bounds_start = bounds.start + jx;
+            let w_ptr = weights.get_unchecked(jx..(jx + 8));
+            let weights_set = vld1q_s16(w_ptr.as_ptr());
+            let w0 = vdup_laneq_s16::<0>(weights_set);
+            let w1 = vdup_laneq_s16::<1>(weights_set);
+            let w2 = vdup_laneq_s16::<2>(weights_set);
+            let w3 = vdup_laneq_s16::<3>(weights_set);
+            let w4 = vdup_laneq_s16::<4>(weights_set);
+            let w5 = vdup_laneq_s16::<5>(weights_set);
+            let w6 = vdup_laneq_s16::<6>(weights_set);
+            let w7 = vdup_laneq_s16::<7>(weights_set);
+            let set1 = (w0, w1, w2, w3);
+            let set2 = (w4, w5, w6, w7);
+            store = conv_horiz_rgba_8_u8_i16::<SCALE>(bounds_start, src, set1, set2, store);
+            jx += 8;
         }
+
+        while jx + 4 < bounds_size {
+            let w_ptr = weights.get_unchecked(jx..(jx + 4));
+            let weights = vld1_s16(w_ptr.as_ptr());
+            let weight0 = vdup_lane_s16::<0>(weights);
+            let weight1 = vdup_lane_s16::<1>(weights);
+            let weight2 = vdup_lane_s16::<2>(weights);
+            let weight3 = vdup_lane_s16::<3>(weights);
+            let bounds_start = bounds.start + jx;
+            store = conv_horiz_rgba_4_u8_i16::<SCALE>(
+                bounds_start,
+                src,
+                weight0,
+                weight1,
+                weight2,
+                weight3,
+                store,
+            );
+            jx += 4;
+        }
+
+        while jx + 2 < bounds_size {
+            let w_ptr = weights.get_unchecked(jx..(jx + 2));
+            let bounds_start = bounds.start + jx;
+            let weight0 = vld1_dup_s16(w_ptr.as_ptr());
+            let weight1 = vld1_dup_s16(w_ptr.get_unchecked(1..).as_ptr());
+            store = conv_horiz_rgba_2_u8_i16::<SCALE>(bounds_start, src, weight0, weight1, store);
+            jx += 2;
+        }
+
+        while jx < bounds_size {
+            let w_ptr = weights.get_unchecked(jx..(jx + 1));
+            let weight0 = vld1_dup_s16(w_ptr.as_ptr());
+            let bounds_start = bounds.start + jx;
+            store = conv_horiz_rgba_1_u8_i16::<SCALE>(bounds_start, src, weight0, store);
+            jx += 1;
+        }
+
+        let store_16 = vreinterpret_u16_s16(vshr_n_s16::<SCALE>(vmax_s16(store, zeros)));
+        let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
+
+        let value = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
+        let dest_ptr_32 = dst.as_mut_ptr() as *mut u32;
+        dest_ptr_32.write_unaligned(value);
     }
 }

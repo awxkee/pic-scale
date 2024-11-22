@@ -122,6 +122,25 @@ pub(crate) fn neon_convolve_horizontal_rgba_rows_4_ar30<
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
+        neon_convolve_horizontal_rgba_rows_4_impl::<AR_TYPE, AR_ORDER>(
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+            filter_weights,
+        );
+    }
+}
+
+#[target_feature(enable = "rdm")]
+unsafe fn neon_convolve_horizontal_rgba_rows_4_impl<const AR_TYPE: usize, const AR_ORDER: usize>(
+    src: &[u32],
+    src_stride: usize,
+    dst: &mut [u32],
+    dst_stride: usize,
+    filter_weights: &FilterWeights<i16>,
+) {
+    unsafe {
         const SCALE: i32 = 4;
         const ROUNDING: i16 = 1 << (SCALE - 1);
         let zeros = vdup_n_s16(0i16);

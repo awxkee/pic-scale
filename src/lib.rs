@@ -67,7 +67,7 @@ mod math;
 mod mixed_storage;
 mod mlaf;
 mod nearest_sampler;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 mod neon;
 mod pic_scale_error;
 mod plane_f32;
