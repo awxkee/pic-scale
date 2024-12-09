@@ -27,23 +27,21 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter_weights::FilterBounds;
+use crate::neon::utils::{xvld1q_u8_x2, xvld1q_u8_x4, xvst1q_u8_x2, xvst1q_u8_x4};
 use crate::support::{PRECISION, ROUNDING_CONST};
 use std::arch::aarch64::*;
 
 macro_rules! pack_weights {
     ($store_0: expr, $store_1: expr, $store_2: expr, $store_3: expr) => {{
-        let zeros = vdupq_n_s16(0);
-        let low_s16 = vcombine_s16(
-            vqshrn_n_s32::<PRECISION>($store_0),
-            vqshrn_n_s32::<PRECISION>($store_1),
+        let low_u16 = vcombine_u16(
+            vqshrun_n_s32::<PRECISION>($store_0),
+            vqshrun_n_s32::<PRECISION>($store_1),
         );
-        let high_s16 = vcombine_s16(
-            vqshrn_n_s32::<PRECISION>($store_2),
-            vqshrn_n_s32::<PRECISION>($store_3),
+        let high_u16 = vcombine_u16(
+            vqshrun_n_s32::<PRECISION>($store_2),
+            vqshrun_n_s32::<PRECISION>($store_3),
         );
-        let low_16 = vreinterpretq_u16_s16(vmaxq_s16(low_s16, zeros));
-        let high_16 = vreinterpretq_u16_s16(vmaxq_s16(high_s16, zeros));
-        vcombine_u8(vqmovn_u16(low_16), vqmovn_u16(high_16))
+        vcombine_u8(vqmovn_u16(low_u16), vqmovn_u16(high_u16))
     }};
 }
 
@@ -56,6 +54,18 @@ macro_rules! accumulate_4_into {
         $store_1 = vmlal_high_s16($store_1, low, $weight);
         $store_2 = vmlal_s16($store_2, vget_low_s16(high), vget_low_s16($weight));
         $store_3 = vmlal_high_s16($store_3, high, $weight);
+    }};
+}
+
+macro_rules! accumulate_4_into_lane {
+    ($item: expr,$store_0: expr, $store_1: expr, $store_2: expr, $store_3: expr, $weight: expr, $weight_pos: expr) => {{
+        let low = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8($item)));
+        let high = vreinterpretq_s16_u16(vmovl_high_u8($item));
+
+        $store_0 = vmlal_lane_s16::<$weight_pos>($store_0, vget_low_s16(low), $weight);
+        $store_1 = vmlal_high_lane_s16::<$weight_pos>($store_1, low, $weight);
+        $store_2 = vmlal_lane_s16::<$weight_pos>($store_2, vget_low_s16(high), $weight);
+        $store_3 = vmlal_high_lane_s16::<$weight_pos>($store_3, high, $weight);
     }};
 }
 
@@ -97,6 +107,20 @@ unsafe fn vdot<const SCALE: i32>(
     (store0, store1)
 }
 
+#[inline(always)]
+unsafe fn vdot_lane<const SCALE: i32, const LANE: i32>(
+    store0: int16x8_t,
+    store1: int16x8_t,
+    row: uint8x16_t,
+    weight: int16x4_t,
+) -> (int16x8_t, int16x8_t) {
+    let lo0 = vreinterpretq_s16_u16(vshll_n_u8::<SCALE>(vget_low_u8(row)));
+    let store0 = vqrdmlahq_lane_s16::<LANE>(store0, lo0, weight);
+    let hi0 = vreinterpretq_s16_u16(vshll_high_n_u8::<SCALE>(row));
+    let store1 = vqrdmlahq_lane_s16::<LANE>(store1, hi0, weight);
+    (store0, store1)
+}
+
 #[target_feature(enable = "rdm")]
 unsafe fn convolve_vertical_neon_row_upper(
     _: usize,
@@ -135,100 +159,97 @@ unsafe fn convolve_vertical_neon_row_upper(
             if bounds_size == 2 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..2);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
+                let mut v_weight = vld1_dup_s16(weight.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
 
-                let items0 = vld1q_u8_x4(src_ptr0.as_ptr());
+                let items0 = xvld1q_u8_x4(src_ptr0.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, items0.0, v_weight0);
-                (store_2, store_3) = vdot::<SCALE>(store_2, store_3, items0.1, v_weight0);
-                (store_4, store_5) = vdot::<SCALE>(store_4, store_5, items0.2, v_weight0);
-                (store_6, store_7) = vdot::<SCALE>(store_6, store_7, items0.3, v_weight0);
+                (store_0, store_1) = vdot_lane::<SCALE, 0>(store_0, store_1, items0.0, v_weight);
+                (store_2, store_3) = vdot_lane::<SCALE, 0>(store_2, store_3, items0.1, v_weight);
+                (store_4, store_5) = vdot_lane::<SCALE, 0>(store_4, store_5, items0.2, v_weight);
+                (store_6, store_7) = vdot_lane::<SCALE, 0>(store_6, store_7, items0.3, v_weight);
 
-                let items1 = vld1q_u8_x4(src_ptr1.as_ptr());
+                let items1 = xvld1q_u8_x4(src_ptr1.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, items1.0, v_weight1);
-                (store_2, store_3) = vdot::<SCALE>(store_2, store_3, items1.1, v_weight1);
-                (store_4, store_5) = vdot::<SCALE>(store_4, store_5, items1.2, v_weight1);
-                (store_6, store_7) = vdot::<SCALE>(store_6, store_7, items1.3, v_weight1);
+                (store_0, store_1) = vdot_lane::<SCALE, 1>(store_0, store_1, items1.0, v_weight);
+                (store_2, store_3) = vdot_lane::<SCALE, 1>(store_2, store_3, items1.1, v_weight);
+                (store_4, store_5) = vdot_lane::<SCALE, 1>(store_4, store_5, items1.2, v_weight);
+                (store_6, store_7) = vdot_lane::<SCALE, 1>(store_6, store_7, items1.3, v_weight);
             } else if bounds_size == 3 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..3);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
-                let v_weight2 = vld1q_dup_s16(weight.as_ptr().add(2));
+                let mut v_weight = vld1_dup_s16(weight.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
+                v_weight = vld1_lane_s16::<2>(weight.as_ptr().add(2), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
 
-                let items0 = vld1q_u8_x4(src_ptr0.as_ptr());
+                let items0 = xvld1q_u8_x4(src_ptr0.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, items0.0, v_weight0);
-                (store_2, store_3) = vdot::<SCALE>(store_2, store_3, items0.1, v_weight0);
-                (store_4, store_5) = vdot::<SCALE>(store_4, store_5, items0.2, v_weight0);
-                (store_6, store_7) = vdot::<SCALE>(store_6, store_7, items0.3, v_weight0);
+                (store_0, store_1) = vdot_lane::<SCALE, 0>(store_0, store_1, items0.0, v_weight);
+                (store_2, store_3) = vdot_lane::<SCALE, 0>(store_2, store_3, items0.1, v_weight);
+                (store_4, store_5) = vdot_lane::<SCALE, 0>(store_4, store_5, items0.2, v_weight);
+                (store_6, store_7) = vdot_lane::<SCALE, 0>(store_6, store_7, items0.3, v_weight);
 
-                let items1 = vld1q_u8_x4(src_ptr1.as_ptr());
+                let items1 = xvld1q_u8_x4(src_ptr1.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, items1.0, v_weight1);
-                (store_2, store_3) = vdot::<SCALE>(store_2, store_3, items1.1, v_weight1);
-                (store_4, store_5) = vdot::<SCALE>(store_4, store_5, items1.2, v_weight1);
-                (store_6, store_7) = vdot::<SCALE>(store_6, store_7, items1.3, v_weight1);
+                (store_0, store_1) = vdot_lane::<SCALE, 1>(store_0, store_1, items1.0, v_weight);
+                (store_2, store_3) = vdot_lane::<SCALE, 1>(store_2, store_3, items1.1, v_weight);
+                (store_4, store_5) = vdot_lane::<SCALE, 1>(store_4, store_5, items1.2, v_weight);
+                (store_6, store_7) = vdot_lane::<SCALE, 1>(store_6, store_7, items1.3, v_weight);
 
-                let items2 = vld1q_u8_x4(src_ptr2.as_ptr());
+                let items2 = xvld1q_u8_x4(src_ptr2.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, items2.0, v_weight2);
-                (store_2, store_3) = vdot::<SCALE>(store_2, store_3, items2.1, v_weight2);
-                (store_4, store_5) = vdot::<SCALE>(store_4, store_5, items2.2, v_weight2);
-                (store_6, store_7) = vdot::<SCALE>(store_6, store_7, items2.3, v_weight2);
+                (store_0, store_1) = vdot_lane::<SCALE, 2>(store_0, store_1, items2.0, v_weight);
+                (store_2, store_3) = vdot_lane::<SCALE, 2>(store_2, store_3, items2.1, v_weight);
+                (store_4, store_5) = vdot_lane::<SCALE, 2>(store_4, store_5, items2.2, v_weight);
+                (store_6, store_7) = vdot_lane::<SCALE, 2>(store_6, store_7, items2.3, v_weight);
             } else if bounds_size == 4 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..4);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
-                let v_weight2 = vld1q_dup_s16(weight.as_ptr().add(2));
-                let v_weight3 = vld1q_dup_s16(weight.as_ptr().add(3));
+                let v_weight = vld1_s16(weight.as_ptr());
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
                 let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + px)..);
 
-                let items0 = vld1q_u8_x4(src_ptr0.as_ptr());
+                let items0 = xvld1q_u8_x4(src_ptr0.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, items0.0, v_weight0);
-                (store_2, store_3) = vdot::<SCALE>(store_2, store_3, items0.1, v_weight0);
-                (store_4, store_5) = vdot::<SCALE>(store_4, store_5, items0.2, v_weight0);
-                (store_6, store_7) = vdot::<SCALE>(store_6, store_7, items0.3, v_weight0);
+                (store_0, store_1) = vdot_lane::<SCALE, 0>(store_0, store_1, items0.0, v_weight);
+                (store_2, store_3) = vdot_lane::<SCALE, 0>(store_2, store_3, items0.1, v_weight);
+                (store_4, store_5) = vdot_lane::<SCALE, 0>(store_4, store_5, items0.2, v_weight);
+                (store_6, store_7) = vdot_lane::<SCALE, 0>(store_6, store_7, items0.3, v_weight);
 
-                let items1 = vld1q_u8_x4(src_ptr1.as_ptr());
+                let items1 = xvld1q_u8_x4(src_ptr1.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, items1.0, v_weight1);
-                (store_2, store_3) = vdot::<SCALE>(store_2, store_3, items1.1, v_weight1);
-                (store_4, store_5) = vdot::<SCALE>(store_4, store_5, items1.2, v_weight1);
-                (store_6, store_7) = vdot::<SCALE>(store_6, store_7, items1.3, v_weight1);
+                (store_0, store_1) = vdot_lane::<SCALE, 1>(store_0, store_1, items1.0, v_weight);
+                (store_2, store_3) = vdot_lane::<SCALE, 1>(store_2, store_3, items1.1, v_weight);
+                (store_4, store_5) = vdot_lane::<SCALE, 1>(store_4, store_5, items1.2, v_weight);
+                (store_6, store_7) = vdot_lane::<SCALE, 1>(store_6, store_7, items1.3, v_weight);
 
-                let items2 = vld1q_u8_x4(src_ptr2.as_ptr());
+                let items2 = xvld1q_u8_x4(src_ptr2.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, items2.0, v_weight2);
-                (store_2, store_3) = vdot::<SCALE>(store_2, store_3, items2.1, v_weight2);
-                (store_4, store_5) = vdot::<SCALE>(store_4, store_5, items2.2, v_weight2);
-                (store_6, store_7) = vdot::<SCALE>(store_6, store_7, items2.3, v_weight2);
+                (store_0, store_1) = vdot_lane::<SCALE, 2>(store_0, store_1, items2.0, v_weight);
+                (store_2, store_3) = vdot_lane::<SCALE, 2>(store_2, store_3, items2.1, v_weight);
+                (store_4, store_5) = vdot_lane::<SCALE, 2>(store_4, store_5, items2.2, v_weight);
+                (store_6, store_7) = vdot_lane::<SCALE, 2>(store_6, store_7, items2.3, v_weight);
 
-                let items3 = vld1q_u8_x4(src_ptr3.as_ptr());
+                let items3 = xvld1q_u8_x4(src_ptr3.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, items3.0, v_weight3);
-                (store_2, store_3) = vdot::<SCALE>(store_2, store_3, items3.1, v_weight3);
-                (store_4, store_5) = vdot::<SCALE>(store_4, store_5, items3.2, v_weight3);
-                (store_6, store_7) = vdot::<SCALE>(store_6, store_7, items3.3, v_weight3);
+                (store_0, store_1) = vdot_lane::<SCALE, 3>(store_0, store_1, items3.0, v_weight);
+                (store_2, store_3) = vdot_lane::<SCALE, 3>(store_2, store_3, items3.1, v_weight);
+                (store_4, store_5) = vdot_lane::<SCALE, 3>(store_4, store_5, items3.2, v_weight);
+                (store_6, store_7) = vdot_lane::<SCALE, 3>(store_6, store_7, items3.3, v_weight);
             } else {
                 for j in 0..bounds_size {
                     let py = bounds.start + j;
                     let weight = weight.get_unchecked(j..);
                     let v_weight = vld1q_dup_s16(weight.as_ptr());
                     let src_ptr = src.get_unchecked((src_stride * py + px)..);
-                    let items = vld1q_u8_x4(src_ptr.as_ptr());
+                    let items = xvld1q_u8_x4(src_ptr.as_ptr());
 
                     (store_0, store_1) = vdot::<SCALE>(store_0, store_1, items.0, v_weight);
                     (store_2, store_3) = vdot::<SCALE>(store_2, store_3, items.1, v_weight);
@@ -260,7 +281,7 @@ unsafe fn convolve_vertical_neon_row_upper(
             let item3 = vcombine_u8(item30, item31);
 
             let dst_items = uint8x16x4_t(item0, item1, item2, item3);
-            vst1q_u8_x4(dst.as_mut_ptr(), dst_items);
+            xvst1q_u8_x4(dst.as_mut_ptr(), dst_items);
 
             cx += 64;
         }
@@ -280,82 +301,79 @@ unsafe fn convolve_vertical_neon_row_upper(
             if bounds_size == 2 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..2);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
+                let mut v_weight = vld1_dup_s16(weight.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
 
-                let items0 = vld1q_u8_x2(src_ptr0.as_ptr());
+                let items0 = xvld1q_u8_x2(src_ptr0.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, items0.0, v_weight0);
-                (store_2, store_3) = vdot::<SCALE>(store_2, store_3, items0.1, v_weight0);
+                (store_0, store_1) = vdot_lane::<SCALE, 0>(store_0, store_1, items0.0, v_weight);
+                (store_2, store_3) = vdot_lane::<SCALE, 0>(store_2, store_3, items0.1, v_weight);
 
-                let items1 = vld1q_u8_x2(src_ptr1.as_ptr());
+                let items1 = xvld1q_u8_x2(src_ptr1.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, items1.0, v_weight1);
-                (store_2, store_3) = vdot::<SCALE>(store_2, store_3, items1.1, v_weight1);
+                (store_0, store_1) = vdot_lane::<SCALE, 1>(store_0, store_1, items1.0, v_weight);
+                (store_2, store_3) = vdot_lane::<SCALE, 1>(store_2, store_3, items1.1, v_weight);
             } else if bounds_size == 3 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..3);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
-                let v_weight2 = vld1q_dup_s16(weight.as_ptr().add(2));
+                let mut v_weight = vld1_dup_s16(weight.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
+                v_weight = vld1_lane_s16::<2>(weight.as_ptr().add(2), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
 
-                let items0 = vld1q_u8_x2(src_ptr0.as_ptr());
+                let items0 = xvld1q_u8_x2(src_ptr0.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, items0.0, v_weight0);
-                (store_2, store_3) = vdot::<SCALE>(store_2, store_3, items0.1, v_weight0);
+                (store_0, store_1) = vdot_lane::<SCALE, 0>(store_0, store_1, items0.0, v_weight);
+                (store_2, store_3) = vdot_lane::<SCALE, 0>(store_2, store_3, items0.1, v_weight);
 
-                let items1 = vld1q_u8_x2(src_ptr1.as_ptr());
+                let items1 = xvld1q_u8_x2(src_ptr1.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, items1.0, v_weight1);
-                (store_2, store_3) = vdot::<SCALE>(store_2, store_3, items1.1, v_weight1);
+                (store_0, store_1) = vdot_lane::<SCALE, 1>(store_0, store_1, items1.0, v_weight);
+                (store_2, store_3) = vdot_lane::<SCALE, 1>(store_2, store_3, items1.1, v_weight);
 
-                let items2 = vld1q_u8_x2(src_ptr2.as_ptr());
+                let items2 = xvld1q_u8_x2(src_ptr2.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, items2.0, v_weight2);
-                (store_2, store_3) = vdot::<SCALE>(store_2, store_3, items2.1, v_weight2);
+                (store_0, store_1) = vdot_lane::<SCALE, 2>(store_0, store_1, items2.0, v_weight);
+                (store_2, store_3) = vdot_lane::<SCALE, 2>(store_2, store_3, items2.1, v_weight);
             } else if bounds_size == 4 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..4);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
-                let v_weight2 = vld1q_dup_s16(weight.as_ptr().add(2));
-                let v_weight3 = vld1q_dup_s16(weight.as_ptr().add(3));
+                let v_weight = vld1_s16(weight.as_ptr());
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
                 let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + px)..);
 
-                let items0 = vld1q_u8_x2(src_ptr0.as_ptr());
+                let items0 = xvld1q_u8_x2(src_ptr0.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, items0.0, v_weight0);
-                (store_2, store_3) = vdot::<SCALE>(store_2, store_3, items0.1, v_weight0);
+                (store_0, store_1) = vdot_lane::<SCALE, 0>(store_0, store_1, items0.0, v_weight);
+                (store_2, store_3) = vdot_lane::<SCALE, 0>(store_2, store_3, items0.1, v_weight);
 
-                let items1 = vld1q_u8_x2(src_ptr1.as_ptr());
+                let items1 = xvld1q_u8_x2(src_ptr1.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, items1.0, v_weight1);
-                (store_2, store_3) = vdot::<SCALE>(store_2, store_3, items1.1, v_weight1);
+                (store_0, store_1) = vdot_lane::<SCALE, 1>(store_0, store_1, items1.0, v_weight);
+                (store_2, store_3) = vdot_lane::<SCALE, 1>(store_2, store_3, items1.1, v_weight);
 
-                let items2 = vld1q_u8_x2(src_ptr2.as_ptr());
+                let items2 = xvld1q_u8_x2(src_ptr2.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, items2.0, v_weight2);
-                (store_2, store_3) = vdot::<SCALE>(store_2, store_3, items2.1, v_weight2);
+                (store_0, store_1) = vdot_lane::<SCALE, 2>(store_0, store_1, items2.0, v_weight);
+                (store_2, store_3) = vdot_lane::<SCALE, 2>(store_2, store_3, items2.1, v_weight);
 
-                let items3 = vld1q_u8_x2(src_ptr3.as_ptr());
+                let items3 = xvld1q_u8_x2(src_ptr3.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, items3.0, v_weight3);
-                (store_2, store_3) = vdot::<SCALE>(store_2, store_3, items3.1, v_weight3);
+                (store_0, store_1) = vdot_lane::<SCALE, 3>(store_0, store_1, items3.0, v_weight);
+                (store_2, store_3) = vdot_lane::<SCALE, 3>(store_2, store_3, items3.1, v_weight);
             } else {
                 for j in 0..bounds.size {
                     let py = bounds.start + j;
                     let weight = weight.get_unchecked(j..);
                     let v_weight = vld1q_dup_s16(weight.as_ptr());
                     let src_ptr = src.get_unchecked((src_stride * py + px)..);
-                    let items = vld1q_u8_x2(src_ptr.as_ptr());
+                    let items = xvld1q_u8_x2(src_ptr.as_ptr());
 
                     (store_0, store_1) = vdot::<SCALE>(store_0, store_1, items.0, v_weight);
                     (store_2, store_3) = vdot::<SCALE>(store_2, store_3, items.1, v_weight);
@@ -375,7 +393,7 @@ unsafe fn convolve_vertical_neon_row_upper(
             let item1 = vcombine_u8(item10, item11);
 
             let dst_items = uint8x16x2_t(item0, item1);
-            vst1q_u8_x2(dst.as_mut_ptr(), dst_items);
+            xvst1q_u8_x2(dst.as_mut_ptr(), dst_items);
 
             cx += 32;
         }
@@ -393,62 +411,58 @@ unsafe fn convolve_vertical_neon_row_upper(
             if bounds_size == 2 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..2);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
+                let mut v_weight = vld1_dup_s16(weight.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
 
                 let item0 = vld1q_u8(src_ptr0.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, item0, v_weight0);
+                (store_0, store_1) = vdot_lane::<SCALE, 0>(store_0, store_1, item0, v_weight);
 
                 let item1 = vld1q_u8(src_ptr1.as_ptr());
-
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, item1, v_weight1);
+                (store_0, store_1) = vdot_lane::<SCALE, 1>(store_0, store_1, item1, v_weight);
             } else if bounds_size == 3 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..3);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
-                let v_weight2 = vld1q_dup_s16(weight.as_ptr().add(2));
+                let mut v_weight = vld1_dup_s16(weight.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
+                v_weight = vld1_lane_s16::<2>(weight.as_ptr().add(2), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
 
                 let item0 = vld1q_u8(src_ptr0.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, item0, v_weight0);
+                (store_0, store_1) = vdot_lane::<SCALE, 0>(store_0, store_1, item0, v_weight);
 
                 let item1 = vld1q_u8(src_ptr1.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, item1, v_weight1);
+                (store_0, store_1) = vdot_lane::<SCALE, 1>(store_0, store_1, item1, v_weight);
 
                 let item2 = vld1q_u8(src_ptr2.as_ptr());
 
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, item2, v_weight2);
+                (store_0, store_1) = vdot_lane::<SCALE, 2>(store_0, store_1, item2, v_weight);
             } else if bounds_size == 4 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..4);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
-                let v_weight2 = vld1q_dup_s16(weight.as_ptr().add(2));
-                let v_weight3 = vld1q_dup_s16(weight.as_ptr().add(3));
+                let v_weight = vld1_s16(weight.as_ptr());
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
                 let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + px)..);
 
                 let item0 = vld1q_u8(src_ptr0.as_ptr());
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, item0, v_weight0);
+                (store_0, store_1) = vdot_lane::<SCALE, 0>(store_0, store_1, item0, v_weight);
 
                 let item1 = vld1q_u8(src_ptr1.as_ptr());
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, item1, v_weight1);
+                (store_0, store_1) = vdot_lane::<SCALE, 1>(store_0, store_1, item1, v_weight);
 
                 let item2 = vld1q_u8(src_ptr2.as_ptr());
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, item2, v_weight2);
+                (store_0, store_1) = vdot_lane::<SCALE, 2>(store_0, store_1, item2, v_weight);
 
                 let item3 = vld1q_u8(src_ptr3.as_ptr());
-                (store_0, store_1) = vdot::<SCALE>(store_0, store_1, item3, v_weight3);
+                (store_0, store_1) = vdot_lane::<SCALE, 2>(store_0, store_1, item3, v_weight);
             } else {
                 for j in 0..bounds_size {
                     let py = bounds.start + j;
@@ -484,46 +498,43 @@ unsafe fn convolve_vertical_neon_row_upper(
             if bounds_size == 2 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..2);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
+                let mut v_weight = vld1_dup_s16(weight.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
 
                 let item0 = vld1_u8(src_ptr0.as_ptr());
                 let low0 = vreinterpretq_s16_u16(vshll_n_u8::<SCALE>(item0));
-                store_0 = vqrdmlahq_s16(store_0, low0, v_weight0);
+                store_0 = vqrdmlahq_lane_s16::<0>(store_0, low0, v_weight);
 
                 let item1 = vld1_u8(src_ptr1.as_ptr());
                 let low1 = vreinterpretq_s16_u16(vshll_n_u8::<SCALE>(item1));
-                store_0 = vqrdmlahq_s16(store_0, low1, v_weight1);
+                store_0 = vqrdmlahq_lane_s16::<1>(store_0, low1, v_weight);
             } else if bounds_size == 3 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..3);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
-                let v_weight2 = vld1q_dup_s16(weight.as_ptr().add(2));
+                let mut v_weight = vld1_dup_s16(weight.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
+                v_weight = vld1_lane_s16::<2>(weight.as_ptr().add(2), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
 
                 let item0 = vld1_u8(src_ptr0.as_ptr());
                 let low0 = vreinterpretq_s16_u16(vshll_n_u8::<SCALE>(item0));
-                store_0 = vqrdmlahq_s16(store_0, low0, v_weight0);
+                store_0 = vqrdmlahq_lane_s16::<0>(store_0, low0, v_weight);
 
                 let item1 = vld1_u8(src_ptr1.as_ptr());
                 let low1 = vreinterpretq_s16_u16(vshll_n_u8::<SCALE>(item1));
-                store_0 = vqrdmlahq_s16(store_0, low1, v_weight1);
+                store_0 = vqrdmlahq_lane_s16::<1>(store_0, low1, v_weight);
 
                 let item2 = vld1_u8(src_ptr2.as_ptr());
                 let low2 = vreinterpretq_s16_u16(vshll_n_u8::<SCALE>(item2));
-                store_0 = vqrdmlahq_s16(store_0, low2, v_weight2);
+                store_0 = vqrdmlahq_lane_s16::<2>(store_0, low2, v_weight);
             } else if bounds_size == 4 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..4);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
-                let v_weight2 = vld1q_dup_s16(weight.as_ptr().add(2));
-                let v_weight3 = vld1q_dup_s16(weight.as_ptr().add(3));
+                let v_weight = vld1_s16(weight.as_ptr());
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
@@ -531,19 +542,19 @@ unsafe fn convolve_vertical_neon_row_upper(
 
                 let item0 = vld1_u8(src_ptr0.as_ptr());
                 let low0 = vreinterpretq_s16_u16(vshll_n_u8::<SCALE>(item0));
-                store_0 = vqrdmlahq_s16(store_0, low0, v_weight0);
+                store_0 = vqrdmlahq_lane_s16::<0>(store_0, low0, v_weight);
 
                 let item1 = vld1_u8(src_ptr1.as_ptr());
                 let low1 = vreinterpretq_s16_u16(vshll_n_u8::<SCALE>(item1));
-                store_0 = vqrdmlahq_s16(store_0, low1, v_weight1);
+                store_0 = vqrdmlahq_lane_s16::<1>(store_0, low1, v_weight);
 
                 let item2 = vld1_u8(src_ptr2.as_ptr());
                 let low2 = vreinterpretq_s16_u16(vshll_n_u8::<SCALE>(item2));
-                store_0 = vqrdmlahq_s16(store_0, low2, v_weight2);
+                store_0 = vqrdmlahq_lane_s16::<2>(store_0, low2, v_weight);
 
                 let item3 = vld1_u8(src_ptr3.as_ptr());
                 let low3 = vreinterpretq_s16_u16(vshll_n_u8::<SCALE>(item3));
-                store_0 = vqrdmlahq_s16(store_0, low3, v_weight3);
+                store_0 = vqrdmlahq_lane_s16::<3>(store_0, low3, v_weight);
             } else {
                 for j in 0..bounds_size {
                     let py = bounds.start + j;
@@ -577,46 +588,43 @@ unsafe fn convolve_vertical_neon_row_upper(
             if bounds_size == 2 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..2);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
+                let mut v_weight = vld1_dup_s16(weight.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
 
                 let items0 = vld1_dup_u8(src_ptr0.as_ptr());
                 let low0 = vreinterpretq_s16_u16(vshll_n_u8::<SCALE>(items0));
-                store = vqrdmlahq_s16(store, low0, v_weight0);
+                store = vqrdmlahq_lane_s16::<0>(store, low0, v_weight);
 
                 let items1 = vld1_dup_u8(src_ptr1.as_ptr());
                 let low1 = vreinterpretq_s16_u16(vshll_n_u8::<SCALE>(items1));
-                store = vqrdmlahq_s16(store, low1, v_weight1);
+                store = vqrdmlahq_lane_s16::<1>(store, low1, v_weight);
             } else if bounds_size == 3 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..3);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
-                let v_weight2 = vld1q_dup_s16(weight.as_ptr().add(2));
+                let mut v_weight = vld1_dup_s16(weight.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
+                v_weight = vld1_lane_s16::<2>(weight.as_ptr().add(2), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
 
                 let items0 = vld1_dup_u8(src_ptr0.as_ptr());
                 let low0 = vreinterpretq_s16_u16(vshll_n_u8::<SCALE>(items0));
-                store = vqrdmlahq_s16(store, low0, v_weight0);
+                store = vqrdmlahq_lane_s16::<0>(store, low0, v_weight);
 
                 let items1 = vld1_dup_u8(src_ptr1.as_ptr());
                 let low1 = vreinterpretq_s16_u16(vshll_n_u8::<SCALE>(items1));
-                store = vqrdmlahq_s16(store, low1, v_weight1);
+                store = vqrdmlahq_lane_s16::<1>(store, low1, v_weight);
 
                 let items2 = vld1_dup_u8(src_ptr2.as_ptr());
                 let low2 = vreinterpretq_s16_u16(vshll_n_u8::<SCALE>(items2));
-                store = vqrdmlahq_s16(store, low2, v_weight2);
+                store = vqrdmlahq_lane_s16::<2>(store, low2, v_weight);
             } else if bounds_size == 4 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..4);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
-                let v_weight2 = vld1q_dup_s16(weight.as_ptr().add(2));
-                let v_weight3 = vld1q_dup_s16(weight.as_ptr().add(3));
+                let v_weight = vld1_s16(weight.as_ptr());
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
@@ -624,19 +632,19 @@ unsafe fn convolve_vertical_neon_row_upper(
 
                 let items0 = vld1_dup_u8(src_ptr0.as_ptr());
                 let low0 = vreinterpretq_s16_u16(vshll_n_u8::<SCALE>(items0));
-                store = vqrdmlahq_s16(store, low0, v_weight0);
+                store = vqrdmlahq_lane_s16::<0>(store, low0, v_weight);
 
                 let items1 = vld1_dup_u8(src_ptr1.as_ptr());
                 let low1 = vreinterpretq_s16_u16(vshll_n_u8::<SCALE>(items1));
-                store = vqrdmlahq_s16(store, low1, v_weight1);
+                store = vqrdmlahq_lane_s16::<1>(store, low1, v_weight);
 
                 let items2 = vld1_dup_u8(src_ptr2.as_ptr());
                 let low2 = vreinterpretq_s16_u16(vshll_n_u8::<SCALE>(items2));
-                store = vqrdmlahq_s16(store, low2, v_weight2);
+                store = vqrdmlahq_lane_s16::<2>(store, low2, v_weight);
 
                 let items3 = vld1_dup_u8(src_ptr3.as_ptr());
                 let low3 = vreinterpretq_s16_u16(vshll_n_u8::<SCALE>(items3));
-                store = vqrdmlahq_s16(store, low3, v_weight3);
+                store = vqrdmlahq_lane_s16::<3>(store, low3, v_weight);
             } else {
                 for j in 0..bounds_size {
                     let py = bounds.start + j;
@@ -702,100 +710,133 @@ fn convolve_vertical_neon_row_full(
             if bounds_size == 2 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..2);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
+                let mut v_weight = vld1_dup_s16(weight.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
 
-                let items0 = vld1q_u8_x4(src_ptr0.as_ptr());
+                let items0 = xvld1q_u8_x4(src_ptr0.as_ptr());
 
-                accumulate_4_into!(items0.0, store_0, store_1, store_2, store_3, v_weight0);
-                accumulate_4_into!(items0.1, store_4, store_5, store_6, store_7, v_weight0);
-                accumulate_4_into!(items0.2, store_8, store_9, store_10, store_11, v_weight0);
-                accumulate_4_into!(items0.3, store_12, store_13, store_14, store_15, v_weight0);
+                accumulate_4_into_lane!(items0.0, store_0, store_1, store_2, store_3, v_weight, 0);
+                accumulate_4_into_lane!(items0.1, store_4, store_5, store_6, store_7, v_weight, 0);
+                accumulate_4_into_lane!(
+                    items0.2, store_8, store_9, store_10, store_11, v_weight, 0
+                );
+                accumulate_4_into_lane!(
+                    items0.3, store_12, store_13, store_14, store_15, v_weight, 0
+                );
 
-                let items1 = vld1q_u8_x4(src_ptr1.as_ptr());
+                let items1 = xvld1q_u8_x4(src_ptr1.as_ptr());
 
-                accumulate_4_into!(items1.0, store_0, store_1, store_2, store_3, v_weight1);
-                accumulate_4_into!(items1.1, store_4, store_5, store_6, store_7, v_weight1);
-                accumulate_4_into!(items1.2, store_8, store_9, store_10, store_11, v_weight1);
-                accumulate_4_into!(items1.3, store_12, store_13, store_14, store_15, v_weight1);
+                accumulate_4_into_lane!(items1.0, store_0, store_1, store_2, store_3, v_weight, 1);
+                accumulate_4_into_lane!(items1.1, store_4, store_5, store_6, store_7, v_weight, 1);
+                accumulate_4_into_lane!(
+                    items1.2, store_8, store_9, store_10, store_11, v_weight, 1
+                );
+                accumulate_4_into_lane!(
+                    items1.3, store_12, store_13, store_14, store_15, v_weight, 1
+                );
             } else if bounds_size == 3 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..3);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
-                let v_weight2 = vld1q_dup_s16(weight.as_ptr().add(2));
+                let mut v_weight = vld1_dup_s16(weight.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
+                v_weight = vld1_lane_s16::<2>(weight.as_ptr().add(2), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
 
-                let items0 = vld1q_u8_x4(src_ptr0.as_ptr());
+                let items0 = xvld1q_u8_x4(src_ptr0.as_ptr());
 
-                accumulate_4_into!(items0.0, store_0, store_1, store_2, store_3, v_weight0);
-                accumulate_4_into!(items0.1, store_4, store_5, store_6, store_7, v_weight0);
-                accumulate_4_into!(items0.2, store_8, store_9, store_10, store_11, v_weight0);
-                accumulate_4_into!(items0.3, store_12, store_13, store_14, store_15, v_weight0);
+                accumulate_4_into_lane!(items0.0, store_0, store_1, store_2, store_3, v_weight, 0);
+                accumulate_4_into_lane!(items0.1, store_4, store_5, store_6, store_7, v_weight, 0);
+                accumulate_4_into_lane!(
+                    items0.2, store_8, store_9, store_10, store_11, v_weight, 0
+                );
+                accumulate_4_into_lane!(
+                    items0.3, store_12, store_13, store_14, store_15, v_weight, 0
+                );
 
-                let items1 = vld1q_u8_x4(src_ptr1.as_ptr());
+                let items1 = xvld1q_u8_x4(src_ptr1.as_ptr());
 
-                accumulate_4_into!(items1.0, store_0, store_1, store_2, store_3, v_weight1);
-                accumulate_4_into!(items1.1, store_4, store_5, store_6, store_7, v_weight1);
-                accumulate_4_into!(items1.2, store_8, store_9, store_10, store_11, v_weight1);
-                accumulate_4_into!(items1.3, store_12, store_13, store_14, store_15, v_weight1);
+                accumulate_4_into_lane!(items1.0, store_0, store_1, store_2, store_3, v_weight, 1);
+                accumulate_4_into_lane!(items1.1, store_4, store_5, store_6, store_7, v_weight, 1);
+                accumulate_4_into_lane!(
+                    items1.2, store_8, store_9, store_10, store_11, v_weight, 1
+                );
+                accumulate_4_into_lane!(
+                    items1.3, store_12, store_13, store_14, store_15, v_weight, 1
+                );
 
-                let items2 = vld1q_u8_x4(src_ptr2.as_ptr());
+                let items2 = xvld1q_u8_x4(src_ptr2.as_ptr());
 
-                accumulate_4_into!(items2.0, store_0, store_1, store_2, store_3, v_weight2);
-                accumulate_4_into!(items2.1, store_4, store_5, store_6, store_7, v_weight2);
-                accumulate_4_into!(items2.2, store_8, store_9, store_10, store_11, v_weight2);
-                accumulate_4_into!(items2.3, store_12, store_13, store_14, store_15, v_weight2);
+                accumulate_4_into_lane!(items2.0, store_0, store_1, store_2, store_3, v_weight, 2);
+                accumulate_4_into_lane!(items2.1, store_4, store_5, store_6, store_7, v_weight, 2);
+                accumulate_4_into_lane!(
+                    items2.2, store_8, store_9, store_10, store_11, v_weight, 2
+                );
+                accumulate_4_into_lane!(
+                    items2.3, store_12, store_13, store_14, store_15, v_weight, 2
+                );
             } else if bounds_size == 4 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..4);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
-                let v_weight2 = vld1q_dup_s16(weight.as_ptr().add(2));
-                let v_weight3 = vld1q_dup_s16(weight.as_ptr().add(3));
+                let v_weight = vld1_s16(weight.as_ptr());
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
                 let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + px)..);
 
-                let items0 = vld1q_u8_x4(src_ptr0.as_ptr());
+                let items0 = xvld1q_u8_x4(src_ptr0.as_ptr());
 
-                accumulate_4_into!(items0.0, store_0, store_1, store_2, store_3, v_weight0);
-                accumulate_4_into!(items0.1, store_4, store_5, store_6, store_7, v_weight0);
-                accumulate_4_into!(items0.2, store_8, store_9, store_10, store_11, v_weight0);
-                accumulate_4_into!(items0.3, store_12, store_13, store_14, store_15, v_weight0);
+                accumulate_4_into_lane!(items0.0, store_0, store_1, store_2, store_3, v_weight, 0);
+                accumulate_4_into_lane!(items0.1, store_4, store_5, store_6, store_7, v_weight, 0);
+                accumulate_4_into_lane!(
+                    items0.2, store_8, store_9, store_10, store_11, v_weight, 0
+                );
+                accumulate_4_into_lane!(
+                    items0.3, store_12, store_13, store_14, store_15, v_weight, 0
+                );
 
-                let items1 = vld1q_u8_x4(src_ptr1.as_ptr());
+                let items1 = xvld1q_u8_x4(src_ptr1.as_ptr());
 
-                accumulate_4_into!(items1.0, store_0, store_1, store_2, store_3, v_weight1);
-                accumulate_4_into!(items1.1, store_4, store_5, store_6, store_7, v_weight1);
-                accumulate_4_into!(items1.2, store_8, store_9, store_10, store_11, v_weight1);
-                accumulate_4_into!(items1.3, store_12, store_13, store_14, store_15, v_weight1);
+                accumulate_4_into_lane!(items1.0, store_0, store_1, store_2, store_3, v_weight, 1);
+                accumulate_4_into_lane!(items1.1, store_4, store_5, store_6, store_7, v_weight, 1);
+                accumulate_4_into_lane!(
+                    items1.2, store_8, store_9, store_10, store_11, v_weight, 1
+                );
+                accumulate_4_into_lane!(
+                    items1.3, store_12, store_13, store_14, store_15, v_weight, 1
+                );
 
-                let items2 = vld1q_u8_x4(src_ptr2.as_ptr());
+                let items2 = xvld1q_u8_x4(src_ptr2.as_ptr());
 
-                accumulate_4_into!(items2.0, store_0, store_1, store_2, store_3, v_weight2);
-                accumulate_4_into!(items2.1, store_4, store_5, store_6, store_7, v_weight2);
-                accumulate_4_into!(items2.2, store_8, store_9, store_10, store_11, v_weight2);
-                accumulate_4_into!(items2.3, store_12, store_13, store_14, store_15, v_weight2);
+                accumulate_4_into_lane!(items2.0, store_0, store_1, store_2, store_3, v_weight, 2);
+                accumulate_4_into_lane!(items2.1, store_4, store_5, store_6, store_7, v_weight, 2);
+                accumulate_4_into_lane!(
+                    items2.2, store_8, store_9, store_10, store_11, v_weight, 2
+                );
+                accumulate_4_into_lane!(
+                    items2.3, store_12, store_13, store_14, store_15, v_weight, 2
+                );
 
-                let items3 = vld1q_u8_x4(src_ptr3.as_ptr());
+                let items3 = xvld1q_u8_x4(src_ptr3.as_ptr());
 
-                accumulate_4_into!(items3.0, store_0, store_1, store_2, store_3, v_weight3);
-                accumulate_4_into!(items3.1, store_4, store_5, store_6, store_7, v_weight3);
-                accumulate_4_into!(items3.2, store_8, store_9, store_10, store_11, v_weight3);
-                accumulate_4_into!(items3.3, store_12, store_13, store_14, store_15, v_weight3);
+                accumulate_4_into_lane!(items3.0, store_0, store_1, store_2, store_3, v_weight, 3);
+                accumulate_4_into_lane!(items3.1, store_4, store_5, store_6, store_7, v_weight, 3);
+                accumulate_4_into_lane!(
+                    items3.2, store_8, store_9, store_10, store_11, v_weight, 3
+                );
+                accumulate_4_into_lane!(
+                    items3.3, store_12, store_13, store_14, store_15, v_weight, 3
+                );
             } else {
                 for j in 0..bounds_size {
                     let py = bounds.start + j;
                     let weight = weight.get_unchecked(j..);
                     let v_weight = vld1q_dup_s16(weight.as_ptr());
                     let src_ptr = src.get_unchecked((src_stride * py + px)..);
-                    let items = vld1q_u8_x4(src_ptr.as_ptr());
+                    let items = xvld1q_u8_x4(src_ptr.as_ptr());
 
                     accumulate_4_into!(items.0, store_0, store_1, store_2, store_3, v_weight);
                     accumulate_4_into!(items.1, store_4, store_5, store_6, store_7, v_weight);
@@ -810,7 +851,7 @@ fn convolve_vertical_neon_row_full(
             let item_3 = pack_weights!(store_12, store_13, store_14, store_15);
 
             let dst_items = uint8x16x4_t(item_0, item_1, item_2, item_3);
-            vst1q_u8_x4(dst.as_mut_ptr(), dst_items);
+            xvst1q_u8_x4(dst.as_mut_ptr(), dst_items);
 
             cx += 64;
         }
@@ -834,79 +875,76 @@ fn convolve_vertical_neon_row_full(
             if bounds_size == 2 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..2);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
+                let mut v_weight = vld1_dup_s16(weight.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
-                let items0 = vld1q_u8_x2(src_ptr0.as_ptr());
+                let items0 = xvld1q_u8_x2(src_ptr0.as_ptr());
 
-                accumulate_4_into!(items0.0, store_0, store_1, store_2, store_3, v_weight0);
-                accumulate_4_into!(items0.1, store_4, store_5, store_6, store_7, v_weight0);
+                accumulate_4_into_lane!(items0.0, store_0, store_1, store_2, store_3, v_weight, 0);
+                accumulate_4_into_lane!(items0.1, store_4, store_5, store_6, store_7, v_weight, 0);
 
-                let items1 = vld1q_u8_x2(src_ptr1.as_ptr());
+                let items1 = xvld1q_u8_x2(src_ptr1.as_ptr());
 
-                accumulate_4_into!(items1.0, store_0, store_1, store_2, store_3, v_weight1);
-                accumulate_4_into!(items1.1, store_4, store_5, store_6, store_7, v_weight1);
+                accumulate_4_into_lane!(items1.0, store_0, store_1, store_2, store_3, v_weight, 1);
+                accumulate_4_into_lane!(items1.1, store_4, store_5, store_6, store_7, v_weight, 1);
             } else if bounds_size == 3 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..3);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
-                let v_weight2 = vld1q_dup_s16(weight.as_ptr().add(2));
+                let mut v_weight = vld1_dup_s16(weight.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
+                v_weight = vld1_lane_s16::<2>(weight.as_ptr().add(2), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
-                let items0 = vld1q_u8_x2(src_ptr0.as_ptr());
+                let items0 = xvld1q_u8_x2(src_ptr0.as_ptr());
 
-                accumulate_4_into!(items0.0, store_0, store_1, store_2, store_3, v_weight0);
-                accumulate_4_into!(items0.1, store_4, store_5, store_6, store_7, v_weight0);
+                accumulate_4_into_lane!(items0.0, store_0, store_1, store_2, store_3, v_weight, 0);
+                accumulate_4_into_lane!(items0.1, store_4, store_5, store_6, store_7, v_weight, 0);
 
-                let items1 = vld1q_u8_x2(src_ptr1.as_ptr());
+                let items1 = xvld1q_u8_x2(src_ptr1.as_ptr());
 
-                accumulate_4_into!(items1.0, store_0, store_1, store_2, store_3, v_weight1);
-                accumulate_4_into!(items1.1, store_4, store_5, store_6, store_7, v_weight1);
+                accumulate_4_into_lane!(items1.0, store_0, store_1, store_2, store_3, v_weight, 1);
+                accumulate_4_into_lane!(items1.1, store_4, store_5, store_6, store_7, v_weight, 1);
 
-                let items2 = vld1q_u8_x2(src_ptr2.as_ptr());
+                let items2 = xvld1q_u8_x2(src_ptr2.as_ptr());
 
-                accumulate_4_into!(items2.0, store_0, store_1, store_2, store_3, v_weight2);
-                accumulate_4_into!(items2.1, store_4, store_5, store_6, store_7, v_weight2);
+                accumulate_4_into_lane!(items2.0, store_0, store_1, store_2, store_3, v_weight, 2);
+                accumulate_4_into_lane!(items2.1, store_4, store_5, store_6, store_7, v_weight, 2);
             } else if bounds_size == 4 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..4);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
-                let v_weight2 = vld1q_dup_s16(weight.as_ptr().add(2));
-                let v_weight3 = vld1q_dup_s16(weight.as_ptr().add(3));
+                let v_weight = vld1_s16(weight.as_ptr());
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
                 let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + px)..);
-                let items0 = vld1q_u8_x2(src_ptr0.as_ptr());
+                let items0 = xvld1q_u8_x2(src_ptr0.as_ptr());
 
-                accumulate_4_into!(items0.0, store_0, store_1, store_2, store_3, v_weight0);
-                accumulate_4_into!(items0.1, store_4, store_5, store_6, store_7, v_weight0);
+                accumulate_4_into_lane!(items0.0, store_0, store_1, store_2, store_3, v_weight, 0);
+                accumulate_4_into_lane!(items0.1, store_4, store_5, store_6, store_7, v_weight, 0);
 
-                let items1 = vld1q_u8_x2(src_ptr1.as_ptr());
+                let items1 = xvld1q_u8_x2(src_ptr1.as_ptr());
 
-                accumulate_4_into!(items1.0, store_0, store_1, store_2, store_3, v_weight1);
-                accumulate_4_into!(items1.1, store_4, store_5, store_6, store_7, v_weight1);
+                accumulate_4_into_lane!(items1.0, store_0, store_1, store_2, store_3, v_weight, 1);
+                accumulate_4_into_lane!(items1.1, store_4, store_5, store_6, store_7, v_weight, 1);
 
-                let items2 = vld1q_u8_x2(src_ptr2.as_ptr());
+                let items2 = xvld1q_u8_x2(src_ptr2.as_ptr());
 
-                accumulate_4_into!(items2.0, store_0, store_1, store_2, store_3, v_weight2);
-                accumulate_4_into!(items2.1, store_4, store_5, store_6, store_7, v_weight2);
+                accumulate_4_into_lane!(items2.0, store_0, store_1, store_2, store_3, v_weight, 2);
+                accumulate_4_into_lane!(items2.1, store_4, store_5, store_6, store_7, v_weight, 2);
 
-                let items3 = vld1q_u8_x2(src_ptr3.as_ptr());
+                let items3 = xvld1q_u8_x2(src_ptr3.as_ptr());
 
-                accumulate_4_into!(items3.0, store_0, store_1, store_2, store_3, v_weight3);
-                accumulate_4_into!(items3.1, store_4, store_5, store_6, store_7, v_weight3);
+                accumulate_4_into_lane!(items3.0, store_0, store_1, store_2, store_3, v_weight, 3);
+                accumulate_4_into_lane!(items3.1, store_4, store_5, store_6, store_7, v_weight, 3);
             } else {
                 for j in 0..bounds.size {
                     let py = bounds.start + j;
                     let weight = weight.get_unchecked(j..);
                     let v_weight = vld1q_dup_s16(weight.as_ptr());
                     let src_ptr = src.get_unchecked((src_stride * py + px)..);
-                    let items = vld1q_u8_x2(src_ptr.as_ptr());
+                    let items = xvld1q_u8_x2(src_ptr.as_ptr());
 
                     accumulate_4_into!(items.0, store_0, store_1, store_2, store_3, v_weight);
                     accumulate_4_into!(items.1, store_4, store_5, store_6, store_7, v_weight);
@@ -917,7 +955,7 @@ fn convolve_vertical_neon_row_full(
             let item_1 = pack_weights!(store_4, store_5, store_6, store_7);
 
             let dst_items = uint8x16x2_t(item_0, item_1);
-            vst1q_u8_x2(dst.as_mut_ptr(), dst_items);
+            xvst1q_u8_x2(dst.as_mut_ptr(), dst_items);
 
             cx += 32;
         }
@@ -937,36 +975,33 @@ fn convolve_vertical_neon_row_full(
             if bounds_size == 2 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..2);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
+                let mut v_weight = vld1_dup_s16(weight.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let item_row0 = vld1q_u8(src_ptr0.as_ptr());
                 let item_row1 = vld1q_u8(src_ptr1.as_ptr());
-                accumulate_4_into!(item_row0, store_0, store_1, store_2, store_3, v_weight0);
-                accumulate_4_into!(item_row1, store_0, store_1, store_2, store_3, v_weight1);
+                accumulate_4_into_lane!(item_row0, store_0, store_1, store_2, store_3, v_weight, 0);
+                accumulate_4_into_lane!(item_row1, store_0, store_1, store_2, store_3, v_weight, 1);
             } else if bounds_size == 3 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..3);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
-                let v_weight2 = vld1q_dup_s16(weight.as_ptr().add(2));
+                let mut v_weight = vld1_dup_s16(weight.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
+                v_weight = vld1_lane_s16::<2>(weight.as_ptr().add(2), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
                 let item_row0 = vld1q_u8(src_ptr0.as_ptr());
                 let item_row1 = vld1q_u8(src_ptr1.as_ptr());
                 let item_row2 = vld1q_u8(src_ptr2.as_ptr());
-                accumulate_4_into!(item_row0, store_0, store_1, store_2, store_3, v_weight0);
-                accumulate_4_into!(item_row1, store_0, store_1, store_2, store_3, v_weight1);
-                accumulate_4_into!(item_row2, store_0, store_1, store_2, store_3, v_weight2);
+                accumulate_4_into_lane!(item_row0, store_0, store_1, store_2, store_3, v_weight, 0);
+                accumulate_4_into_lane!(item_row1, store_0, store_1, store_2, store_3, v_weight, 1);
+                accumulate_4_into_lane!(item_row2, store_0, store_1, store_2, store_3, v_weight, 2);
             } else if bounds_size == 4 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..4);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
-                let v_weight2 = vld1q_dup_s16(weight.as_ptr().add(2));
-                let v_weight3 = vld1q_dup_s16(weight.as_ptr().add(3));
+                let v_weight = vld1_s16(weight.as_ptr());
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
@@ -975,10 +1010,10 @@ fn convolve_vertical_neon_row_full(
                 let item_row1 = vld1q_u8(src_ptr1.as_ptr());
                 let item_row2 = vld1q_u8(src_ptr2.as_ptr());
                 let item_row3 = vld1q_u8(src_ptr3.as_ptr());
-                accumulate_4_into!(item_row0, store_0, store_1, store_2, store_3, v_weight0);
-                accumulate_4_into!(item_row1, store_0, store_1, store_2, store_3, v_weight1);
-                accumulate_4_into!(item_row2, store_0, store_1, store_2, store_3, v_weight2);
-                accumulate_4_into!(item_row3, store_0, store_1, store_2, store_3, v_weight3);
+                accumulate_4_into_lane!(item_row0, store_0, store_1, store_2, store_3, v_weight, 0);
+                accumulate_4_into_lane!(item_row1, store_0, store_1, store_2, store_3, v_weight, 1);
+                accumulate_4_into_lane!(item_row2, store_0, store_1, store_2, store_3, v_weight, 2);
+                accumulate_4_into_lane!(item_row3, store_0, store_1, store_2, store_3, v_weight, 3);
             } else {
                 for j in 0..bounds_size {
                     let py = bounds.start + j;
@@ -1010,8 +1045,8 @@ fn convolve_vertical_neon_row_full(
             if bounds_size == 2 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..2);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
+                let mut v_weight = vld1_dup_s16(weight.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let item_row0 = vld1_u8(src_ptr0.as_ptr());
@@ -1019,16 +1054,16 @@ fn convolve_vertical_neon_row_full(
 
                 let low0 = vreinterpretq_s16_u16(vmovl_u8(item_row0));
                 let low1 = vreinterpretq_s16_u16(vmovl_u8(item_row1));
-                store_0 = vmlal_s16(store_0, vget_low_s16(low0), vget_low_s16(v_weight0));
-                store_1 = vmlal_high_s16(store_1, low0, v_weight0);
-                store_0 = vmlal_s16(store_0, vget_low_s16(low1), vget_low_s16(v_weight1));
-                store_1 = vmlal_high_s16(store_1, low1, v_weight1);
+                store_0 = vmlal_lane_s16::<0>(store_0, vget_low_s16(low0), v_weight);
+                store_1 = vmlal_high_lane_s16::<0>(store_1, low0, v_weight);
+                store_0 = vmlal_lane_s16::<1>(store_0, vget_low_s16(low1), v_weight);
+                store_1 = vmlal_high_lane_s16::<1>(store_1, low1, v_weight);
             } else if bounds_size == 3 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..3);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
-                let v_weight2 = vld1q_dup_s16(weight.as_ptr().add(2));
+                let mut v_weight = vld1_dup_s16(weight.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
+                v_weight = vld1_lane_s16::<2>(weight.as_ptr().add(2), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
@@ -1039,19 +1074,16 @@ fn convolve_vertical_neon_row_full(
                 let low0 = vreinterpretq_s16_u16(vmovl_u8(item_row0));
                 let low1 = vreinterpretq_s16_u16(vmovl_u8(item_row1));
                 let low2 = vreinterpretq_s16_u16(vmovl_u8(item_row2));
-                store_0 = vmlal_s16(store_0, vget_low_s16(low0), vget_low_s16(v_weight0));
-                store_1 = vmlal_high_s16(store_1, low0, v_weight0);
-                store_0 = vmlal_s16(store_0, vget_low_s16(low1), vget_low_s16(v_weight1));
-                store_1 = vmlal_high_s16(store_1, low1, v_weight1);
-                store_0 = vmlal_s16(store_0, vget_low_s16(low2), vget_low_s16(v_weight2));
-                store_1 = vmlal_high_s16(store_1, low2, v_weight2);
+                store_0 = vmlal_lane_s16::<0>(store_0, vget_low_s16(low0), v_weight);
+                store_1 = vmlal_high_lane_s16::<0>(store_1, low0, v_weight);
+                store_0 = vmlal_lane_s16::<1>(store_0, vget_low_s16(low1), v_weight);
+                store_1 = vmlal_high_lane_s16::<1>(store_1, low1, v_weight);
+                store_0 = vmlal_lane_s16::<2>(store_0, vget_low_s16(low2), v_weight);
+                store_1 = vmlal_high_lane_s16::<3>(store_1, low2, v_weight);
             } else if bounds_size == 4 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..4);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
-                let v_weight2 = vld1q_dup_s16(weight.as_ptr().add(2));
-                let v_weight3 = vld1q_dup_s16(weight.as_ptr().add(3));
+                let v_weight = vld1_s16(weight.as_ptr());
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
@@ -1065,14 +1097,14 @@ fn convolve_vertical_neon_row_full(
                 let low1 = vreinterpretq_s16_u16(vmovl_u8(item_row1));
                 let low2 = vreinterpretq_s16_u16(vmovl_u8(item_row2));
                 let low3 = vreinterpretq_s16_u16(vmovl_u8(item_row3));
-                store_0 = vmlal_s16(store_0, vget_low_s16(low0), vget_low_s16(v_weight0));
-                store_1 = vmlal_high_s16(store_1, low0, v_weight0);
-                store_0 = vmlal_s16(store_0, vget_low_s16(low1), vget_low_s16(v_weight1));
-                store_1 = vmlal_high_s16(store_1, low1, v_weight1);
-                store_0 = vmlal_s16(store_0, vget_low_s16(low2), vget_low_s16(v_weight2));
-                store_1 = vmlal_high_s16(store_1, low2, v_weight2);
-                store_0 = vmlal_s16(store_0, vget_low_s16(low3), vget_low_s16(v_weight3));
-                store_1 = vmlal_high_s16(store_1, low3, v_weight3);
+                store_0 = vmlal_lane_s16::<0>(store_0, vget_low_s16(low0), v_weight);
+                store_1 = vmlal_high_lane_s16::<0>(store_1, low0, v_weight);
+                store_0 = vmlal_lane_s16::<1>(store_0, vget_low_s16(low1), v_weight);
+                store_1 = vmlal_high_lane_s16::<1>(store_1, low1, v_weight);
+                store_0 = vmlal_lane_s16::<2>(store_0, vget_low_s16(low2), v_weight);
+                store_1 = vmlal_high_lane_s16::<2>(store_1, low2, v_weight);
+                store_0 = vmlal_lane_s16::<3>(store_0, vget_low_s16(low3), v_weight);
+                store_1 = vmlal_high_lane_s16::<3>(store_1, low3, v_weight);
             } else {
                 for j in 0..bounds_size {
                     let py = bounds.start + j;
@@ -1087,15 +1119,12 @@ fn convolve_vertical_neon_row_full(
                 }
             }
 
-            let zeros = vdupq_n_s16(0);
-
-            let low_s16 = vcombine_s16(
-                vqshrn_n_s32::<PRECISION>(store_0),
-                vqshrn_n_s32::<PRECISION>(store_1),
+            let low_u16 = vcombine_u16(
+                vqshrun_n_s32::<PRECISION>(store_0),
+                vqshrun_n_s32::<PRECISION>(store_1),
             );
-            let low_16 = vreinterpretq_u16_s16(vmaxq_s16(low_s16, zeros));
 
-            let item = vqmovn_u16(low_16);
+            let item = vqmovn_u16(low_u16);
 
             vst1_u8(dst.as_mut_ptr(), item);
 
@@ -1114,8 +1143,8 @@ fn convolve_vertical_neon_row_full(
             if bounds_size == 2 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..2);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
+                let mut v_weight = vld1_dup_s16(weight.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let item_row0 = vld1_dup_u8(src_ptr0.as_ptr());
@@ -1123,14 +1152,14 @@ fn convolve_vertical_neon_row_full(
 
                 let low0 = vreinterpretq_s16_u16(vmovl_u8(item_row0));
                 let low1 = vreinterpretq_s16_u16(vmovl_u8(item_row1));
-                store = vmlal_s16(store, vget_low_s16(low0), vget_low_s16(v_weight0));
-                store = vmlal_s16(store, vget_low_s16(low1), vget_low_s16(v_weight1));
+                store = vmlal_lane_s16::<0>(store, vget_low_s16(low0), v_weight);
+                store = vmlal_lane_s16::<1>(store, vget_low_s16(low1), v_weight);
             } else if bounds_size == 3 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..3);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
-                let v_weight2 = vld1q_dup_s16(weight.as_ptr().add(2));
+                let mut v_weight = vld1_dup_s16(weight.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
+                v_weight = vld1_lane_s16::<2>(weight.as_ptr().add(2), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
@@ -1141,16 +1170,13 @@ fn convolve_vertical_neon_row_full(
                 let low0 = vreinterpretq_s16_u16(vmovl_u8(item_row0));
                 let low1 = vreinterpretq_s16_u16(vmovl_u8(item_row1));
                 let low2 = vreinterpretq_s16_u16(vmovl_u8(item_row2));
-                store = vmlal_s16(store, vget_low_s16(low0), vget_low_s16(v_weight0));
-                store = vmlal_s16(store, vget_low_s16(low1), vget_low_s16(v_weight1));
-                store = vmlal_s16(store, vget_low_s16(low2), vget_low_s16(v_weight2));
+                store = vmlal_lane_s16::<0>(store, vget_low_s16(low0), v_weight);
+                store = vmlal_lane_s16::<1>(store, vget_low_s16(low1), v_weight);
+                store = vmlal_lane_s16::<2>(store, vget_low_s16(low2), v_weight);
             } else if bounds_size == 4 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..4);
-                let v_weight0 = vld1q_dup_s16(weight.as_ptr());
-                let v_weight1 = vld1q_dup_s16(weight.as_ptr().add(1));
-                let v_weight2 = vld1q_dup_s16(weight.as_ptr().add(2));
-                let v_weight3 = vld1q_dup_s16(weight.as_ptr().add(3));
+                let v_weight = vld1_s16(weight.as_ptr());
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
@@ -1164,10 +1190,10 @@ fn convolve_vertical_neon_row_full(
                 let low1 = vreinterpretq_s16_u16(vmovl_u8(item_row1));
                 let low2 = vreinterpretq_s16_u16(vmovl_u8(item_row2));
                 let low3 = vreinterpretq_s16_u16(vmovl_u8(item_row3));
-                store = vmlal_s16(store, vget_low_s16(low0), vget_low_s16(v_weight0));
-                store = vmlal_s16(store, vget_low_s16(low1), vget_low_s16(v_weight1));
-                store = vmlal_s16(store, vget_low_s16(low2), vget_low_s16(v_weight2));
-                store = vmlal_s16(store, vget_low_s16(low3), vget_low_s16(v_weight3));
+                store = vmlal_lane_s16::<0>(store, vget_low_s16(low0), v_weight);
+                store = vmlal_lane_s16::<1>(store, vget_low_s16(low1), v_weight);
+                store = vmlal_lane_s16::<2>(store, vget_low_s16(low2), v_weight);
+                store = vmlal_lane_s16::<3>(store, vget_low_s16(low3), v_weight);
             } else {
                 for j in 0..bounds_size {
                     let py = bounds.start + j;

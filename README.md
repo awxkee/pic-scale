@@ -86,16 +86,9 @@ Even when `half` feature activated but platform do not support or features not e
 
 Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 image in 4 times.
 
-| Lanczos3  |  SSE  |  AVX  | NEON  |
-|-----------|:-----:|:-----:|:-----:|
-| pic-scale | 43.84 | 28.46 | 8.56  |
-| fir       | 45.36 | 32.07 | 32.77 |
-
-Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 image in 4 times.
-
 | Lanczos3  |  AVX  | NEON  |
 |-----------|:-----:|:-----:|
-| pic-scale | 16.67 | 10.88 |
+| pic-scale | 16.67 | 8.54  |
 | fir       | 22.83 | 24.97 |
 
 Example comparison time for downscale RGBA 4928x3279 image in two times with premultiplying alpha.

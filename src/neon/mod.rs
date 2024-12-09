@@ -102,7 +102,7 @@ pub use rgba_f16_full::{
 };
 pub use rgba_f32::*;
 pub use rgba_u16_lb::{
-    convolve_horizontal_rgba_neon_rows_4_lb_u8, convolve_horizontal_rgba_neon_u16_lb_row,
+    convolve_horizontal_rgba_neon_rows_4_lb_u16, convolve_horizontal_rgba_neon_u16_lb_row,
 };
 pub use rgba_u8::*;
 pub(crate) use vertical_ar30::neon_column_handler_fixed_point_ar30;

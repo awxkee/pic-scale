@@ -46,7 +46,6 @@ pub fn convolve_column_lb_u16(
 
         let bounds_size = bounds.size;
 
-        let zeros = vdupq_n_s32(0);
         let initial_store = vdupq_n_s32(ROUNDING_CONST);
 
         let v_max_colors = vdupq_n_u16(max_colors);
@@ -65,9 +64,8 @@ pub fn convolve_column_lb_u16(
 
             if bounds_size == 2 {
                 let weights = weight.get_unchecked(0..2);
-
-                let v_weight0 = vdupq_n_s16(weights[0]);
-                let v_weight1 = vdupq_n_s16(weights[1]);
+                let mut v_weight = vld1_dup_s16(weights.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weights.as_ptr().add(1), v_weight);
 
                 let py = bounds.start;
                 let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
@@ -76,24 +74,23 @@ pub fn convolve_column_lb_u16(
                 let item_row0 = vreinterpretq_s16_u16(vld1q_u16(src_ptr0.as_ptr()));
                 let item_row1 = vreinterpretq_s16_u16(vld1q_u16(src_ptr0.as_ptr().add(8)));
 
-                store0 = vmlal_s16(store0, vget_low_s16(item_row0), vget_low_s16(v_weight0));
-                store1 = vmlal_high_s16(store1, item_row0, v_weight0);
-                store2 = vmlal_s16(store2, vget_low_s16(item_row1), vget_low_s16(v_weight0));
-                store3 = vmlal_high_s16(store3, item_row1, v_weight0);
+                store0 = vmlal_lane_s16::<0>(store0, vget_low_s16(item_row0), v_weight);
+                store1 = vmlal_high_lane_s16::<0>(store1, item_row0, v_weight);
+                store2 = vmlal_lane_s16::<0>(store2, vget_low_s16(item_row1), v_weight);
+                store3 = vmlal_high_lane_s16::<0>(store3, item_row1, v_weight);
 
                 let item_row10 = vreinterpretq_s16_u16(vld1q_u16(src_ptr1.as_ptr()));
                 let item_row11 = vreinterpretq_s16_u16(vld1q_u16(src_ptr1.as_ptr().add(8)));
 
-                store0 = vmlal_s16(store0, vget_low_s16(item_row10), vget_low_s16(v_weight1));
-                store1 = vmlal_high_s16(store1, item_row10, v_weight1);
-                store2 = vmlal_s16(store2, vget_low_s16(item_row11), vget_low_s16(v_weight1));
-                store3 = vmlal_high_s16(store3, item_row11, v_weight1);
+                store0 = vmlal_lane_s16::<1>(store0, vget_low_s16(item_row10), v_weight);
+                store1 = vmlal_high_lane_s16::<1>(store1, item_row10, v_weight);
+                store2 = vmlal_lane_s16::<1>(store2, vget_low_s16(item_row11), v_weight);
+                store3 = vmlal_high_lane_s16::<1>(store3, item_row11, v_weight);
             } else if bounds_size == 3 {
                 let weights = weight.get_unchecked(0..3);
-
-                let v_weight0 = vdupq_n_s16(weights[0]);
-                let v_weight1 = vdupq_n_s16(weights[1]);
-                let v_weight2 = vdupq_n_s16(weights[2]);
+                let mut v_weight = vld1_dup_s16(weights.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weights.as_ptr().add(1), v_weight);
+                v_weight = vld1_lane_s16::<2>(weights.as_ptr().add(2), v_weight);
 
                 let py = bounds.start;
                 let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
@@ -103,33 +100,30 @@ pub fn convolve_column_lb_u16(
                 let item_row0 = vreinterpretq_s16_u16(vld1q_u16(src_ptr0.as_ptr()));
                 let item_row1 = vreinterpretq_s16_u16(vld1q_u16(src_ptr0.as_ptr().add(8)));
 
-                store0 = vmlal_s16(store0, vget_low_s16(item_row0), vget_low_s16(v_weight0));
-                store1 = vmlal_high_s16(store1, item_row0, v_weight0);
-                store2 = vmlal_s16(store2, vget_low_s16(item_row1), vget_low_s16(v_weight0));
-                store3 = vmlal_high_s16(store3, item_row1, v_weight0);
+                store0 = vmlal_lane_s16::<0>(store0, vget_low_s16(item_row0), v_weight);
+                store1 = vmlal_high_lane_s16::<0>(store1, item_row0, v_weight);
+                store2 = vmlal_lane_s16::<0>(store2, vget_low_s16(item_row1), v_weight);
+                store3 = vmlal_high_lane_s16::<0>(store3, item_row1, v_weight);
 
                 let item_row10 = vreinterpretq_s16_u16(vld1q_u16(src_ptr1.as_ptr()));
                 let item_row11 = vreinterpretq_s16_u16(vld1q_u16(src_ptr1.as_ptr().add(8)));
 
-                store0 = vmlal_s16(store0, vget_low_s16(item_row10), vget_low_s16(v_weight1));
-                store1 = vmlal_high_s16(store1, item_row10, v_weight1);
-                store2 = vmlal_s16(store2, vget_low_s16(item_row11), vget_low_s16(v_weight1));
-                store3 = vmlal_high_s16(store3, item_row11, v_weight1);
+                store0 = vmlal_lane_s16::<1>(store0, vget_low_s16(item_row10), v_weight);
+                store1 = vmlal_high_lane_s16::<1>(store1, item_row10, v_weight);
+                store2 = vmlal_lane_s16::<1>(store2, vget_low_s16(item_row11), v_weight);
+                store3 = vmlal_high_lane_s16::<1>(store3, item_row11, v_weight);
 
                 let item_row20 = vreinterpretq_s16_u16(vld1q_u16(src_ptr2.as_ptr()));
                 let item_row21 = vreinterpretq_s16_u16(vld1q_u16(src_ptr2.as_ptr().add(8)));
 
-                store0 = vmlal_s16(store0, vget_low_s16(item_row20), vget_low_s16(v_weight2));
-                store1 = vmlal_high_s16(store1, item_row20, v_weight2);
-                store2 = vmlal_s16(store2, vget_low_s16(item_row21), vget_low_s16(v_weight2));
-                store3 = vmlal_high_s16(store3, item_row21, v_weight2);
+                store0 = vmlal_lane_s16::<2>(store0, vget_low_s16(item_row20), v_weight);
+                store1 = vmlal_high_lane_s16::<2>(store1, item_row20, v_weight);
+                store2 = vmlal_lane_s16::<2>(store2, vget_low_s16(item_row21), v_weight);
+                store3 = vmlal_high_lane_s16::<2>(store3, item_row21, v_weight);
             } else if bounds_size == 4 {
                 let weights = weight.get_unchecked(0..4);
 
-                let v_weight0 = vdupq_n_s16(weights[0]);
-                let v_weight1 = vdupq_n_s16(weights[1]);
-                let v_weight2 = vdupq_n_s16(weights[2]);
-                let v_weight3 = vdupq_n_s16(weights[3]);
+                let v_weight = vld1_s16(weights.as_ptr());
 
                 let py = bounds.start;
                 let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
@@ -140,34 +134,34 @@ pub fn convolve_column_lb_u16(
                 let item_row0 = vreinterpretq_s16_u16(vld1q_u16(src_ptr0.as_ptr()));
                 let item_row1 = vreinterpretq_s16_u16(vld1q_u16(src_ptr0.as_ptr().add(8)));
 
-                store0 = vmlal_s16(store0, vget_low_s16(item_row0), vget_low_s16(v_weight0));
-                store1 = vmlal_high_s16(store1, item_row0, v_weight0);
-                store2 = vmlal_s16(store2, vget_low_s16(item_row1), vget_low_s16(v_weight0));
-                store3 = vmlal_high_s16(store3, item_row1, v_weight0);
+                store0 = vmlal_lane_s16::<0>(store0, vget_low_s16(item_row0), v_weight);
+                store1 = vmlal_high_lane_s16::<0>(store1, item_row0, v_weight);
+                store2 = vmlal_lane_s16::<0>(store2, vget_low_s16(item_row1), v_weight);
+                store3 = vmlal_high_lane_s16::<0>(store3, item_row1, v_weight);
 
                 let item_row10 = vreinterpretq_s16_u16(vld1q_u16(src_ptr1.as_ptr()));
                 let item_row11 = vreinterpretq_s16_u16(vld1q_u16(src_ptr1.as_ptr().add(8)));
 
-                store0 = vmlal_s16(store0, vget_low_s16(item_row10), vget_low_s16(v_weight1));
-                store1 = vmlal_high_s16(store1, item_row10, v_weight1);
-                store2 = vmlal_s16(store2, vget_low_s16(item_row11), vget_low_s16(v_weight1));
-                store3 = vmlal_high_s16(store3, item_row11, v_weight1);
+                store0 = vmlal_lane_s16::<1>(store0, vget_low_s16(item_row10), v_weight);
+                store1 = vmlal_high_lane_s16::<1>(store1, item_row10, v_weight);
+                store2 = vmlal_lane_s16::<1>(store2, vget_low_s16(item_row11), v_weight);
+                store3 = vmlal_high_lane_s16::<1>(store3, item_row11, v_weight);
 
                 let item_row20 = vreinterpretq_s16_u16(vld1q_u16(src_ptr2.as_ptr()));
                 let item_row21 = vreinterpretq_s16_u16(vld1q_u16(src_ptr2.as_ptr().add(8)));
 
-                store0 = vmlal_s16(store0, vget_low_s16(item_row20), vget_low_s16(v_weight2));
-                store1 = vmlal_high_s16(store1, item_row20, v_weight2);
-                store2 = vmlal_s16(store2, vget_low_s16(item_row21), vget_low_s16(v_weight2));
-                store3 = vmlal_high_s16(store3, item_row21, v_weight2);
+                store0 = vmlal_lane_s16::<2>(store0, vget_low_s16(item_row20), v_weight);
+                store1 = vmlal_high_lane_s16::<2>(store1, item_row20, v_weight);
+                store2 = vmlal_lane_s16::<2>(store2, vget_low_s16(item_row21), v_weight);
+                store3 = vmlal_high_lane_s16::<2>(store3, item_row21, v_weight);
 
                 let item_row30 = vreinterpretq_s16_u16(vld1q_u16(src_ptr3.as_ptr()));
                 let item_row31 = vreinterpretq_s16_u16(vld1q_u16(src_ptr3.as_ptr().add(8)));
 
-                store0 = vmlal_s16(store0, vget_low_s16(item_row30), vget_low_s16(v_weight3));
-                store1 = vmlal_high_s16(store1, item_row30, v_weight3);
-                store2 = vmlal_s16(store2, vget_low_s16(item_row31), vget_low_s16(v_weight3));
-                store3 = vmlal_high_s16(store3, item_row31, v_weight3);
+                store0 = vmlal_lane_s16::<3>(store0, vget_low_s16(item_row30), v_weight);
+                store1 = vmlal_high_lane_s16::<3>(store1, item_row30, v_weight);
+                store2 = vmlal_lane_s16::<3>(store2, vget_low_s16(item_row31), v_weight);
+                store3 = vmlal_high_lane_s16::<3>(store3, item_row31, v_weight);
             } else {
                 for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
                     let py = bounds.start + j;
@@ -187,15 +181,15 @@ pub fn convolve_column_lb_u16(
 
             let item0 = vminq_u16(
                 vcombine_u16(
-                    vqshrun_n_s32::<PRECISION>(vmaxq_s32(store0, zeros)),
-                    vqshrun_n_s32::<PRECISION>(vmaxq_s32(store1, zeros)),
+                    vqshrun_n_s32::<PRECISION>(store0),
+                    vqshrun_n_s32::<PRECISION>(store1),
                 ),
                 v_max_colors,
             );
             let item1 = vminq_u16(
                 vcombine_u16(
-                    vqshrun_n_s32::<PRECISION>(vmaxq_s32(store2, zeros)),
-                    vqshrun_n_s32::<PRECISION>(vmaxq_s32(store3, zeros)),
+                    vqshrun_n_s32::<PRECISION>(store2),
+                    vqshrun_n_s32::<PRECISION>(store3),
                 ),
                 v_max_colors,
             );
@@ -219,9 +213,8 @@ pub fn convolve_column_lb_u16(
 
             if bounds_size == 2 {
                 let weights = weight.get_unchecked(0..2);
-
-                let v_weight0 = vdupq_n_s16(weights[0]);
-                let v_weight1 = vdupq_n_s16(weights[1]);
+                let mut v_weight = vld1_dup_s16(weights.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weights.as_ptr().add(1), v_weight);
 
                 let py = bounds.start;
                 let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
@@ -229,19 +222,18 @@ pub fn convolve_column_lb_u16(
 
                 let item_row0 = vreinterpretq_s16_u16(vld1q_u16(src_ptr0.as_ptr()));
 
-                store0 = vmlal_s16(store0, vget_low_s16(item_row0), vget_low_s16(v_weight0));
-                store1 = vmlal_high_s16(store1, item_row0, v_weight0);
+                store0 = vmlal_lane_s16::<0>(store0, vget_low_s16(item_row0), v_weight);
+                store1 = vmlal_high_lane_s16::<0>(store1, item_row0, v_weight);
 
                 let item_row1 = vreinterpretq_s16_u16(vld1q_u16(src_ptr1.as_ptr()));
 
-                store0 = vmlal_s16(store0, vget_low_s16(item_row1), vget_low_s16(v_weight1));
-                store1 = vmlal_high_s16(store1, item_row1, v_weight1);
+                store0 = vmlal_lane_s16::<1>(store0, vget_low_s16(item_row1), v_weight);
+                store1 = vmlal_high_lane_s16::<1>(store1, item_row1, v_weight);
             } else if bounds_size == 3 {
                 let weights = weight.get_unchecked(0..3);
-
-                let v_weight0 = vdupq_n_s16(weights[0]);
-                let v_weight1 = vdupq_n_s16(weights[1]);
-                let v_weight2 = vdupq_n_s16(weights[2]);
+                let mut v_weight = vld1_dup_s16(weights.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weights.as_ptr().add(1), v_weight);
+                v_weight = vld1_lane_s16::<2>(weights.as_ptr().add(2), v_weight);
 
                 let py = bounds.start;
                 let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
@@ -250,25 +242,21 @@ pub fn convolve_column_lb_u16(
 
                 let item_row0 = vreinterpretq_s16_u16(vld1q_u16(src_ptr0.as_ptr()));
 
-                store0 = vmlal_s16(store0, vget_low_s16(item_row0), vget_low_s16(v_weight0));
-                store1 = vmlal_high_s16(store1, item_row0, v_weight0);
+                store0 = vmlal_lane_s16::<0>(store0, vget_low_s16(item_row0), v_weight);
+                store1 = vmlal_high_lane_s16::<0>(store1, item_row0, v_weight);
 
                 let item_row1 = vreinterpretq_s16_u16(vld1q_u16(src_ptr1.as_ptr()));
 
-                store0 = vmlal_s16(store0, vget_low_s16(item_row1), vget_low_s16(v_weight1));
-                store1 = vmlal_high_s16(store1, item_row1, v_weight1);
+                store0 = vmlal_lane_s16::<1>(store0, vget_low_s16(item_row1), v_weight);
+                store1 = vmlal_high_lane_s16::<1>(store1, item_row1, v_weight);
 
                 let item_row2 = vreinterpretq_s16_u16(vld1q_u16(src_ptr2.as_ptr()));
 
-                store0 = vmlal_s16(store0, vget_low_s16(item_row2), vget_low_s16(v_weight2));
-                store1 = vmlal_high_s16(store1, item_row2, v_weight2);
+                store0 = vmlal_lane_s16::<2>(store0, vget_low_s16(item_row2), v_weight);
+                store1 = vmlal_high_lane_s16::<2>(store1, item_row2, v_weight);
             } else if bounds_size == 4 {
                 let weights = weight.get_unchecked(0..4);
-
-                let v_weight0 = vdupq_n_s16(weights[0]);
-                let v_weight1 = vdupq_n_s16(weights[1]);
-                let v_weight2 = vdupq_n_s16(weights[2]);
-                let v_weight3 = vdupq_n_s16(weights[3]);
+                let v_weight = vld1_s16(weights.as_ptr());
 
                 let py = bounds.start;
                 let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
@@ -278,23 +266,23 @@ pub fn convolve_column_lb_u16(
 
                 let item_row0 = vreinterpretq_s16_u16(vld1q_u16(src_ptr0.as_ptr()));
 
-                store0 = vmlal_s16(store0, vget_low_s16(item_row0), vget_low_s16(v_weight0));
-                store1 = vmlal_high_s16(store1, item_row0, v_weight0);
+                store0 = vmlal_lane_s16::<0>(store0, vget_low_s16(item_row0), v_weight);
+                store1 = vmlal_high_lane_s16::<0>(store1, item_row0, v_weight);
 
                 let item_row1 = vreinterpretq_s16_u16(vld1q_u16(src_ptr1.as_ptr()));
 
-                store0 = vmlal_s16(store0, vget_low_s16(item_row1), vget_low_s16(v_weight1));
-                store1 = vmlal_high_s16(store1, item_row1, v_weight1);
+                store0 = vmlal_lane_s16::<1>(store0, vget_low_s16(item_row1), v_weight);
+                store1 = vmlal_high_lane_s16::<1>(store1, item_row1, v_weight);
 
                 let item_row2 = vreinterpretq_s16_u16(vld1q_u16(src_ptr2.as_ptr()));
 
-                store0 = vmlal_s16(store0, vget_low_s16(item_row2), vget_low_s16(v_weight2));
-                store1 = vmlal_high_s16(store1, item_row2, v_weight2);
+                store0 = vmlal_lane_s16::<2>(store0, vget_low_s16(item_row2), v_weight);
+                store1 = vmlal_high_lane_s16::<2>(store1, item_row2, v_weight);
 
                 let item_row3 = vreinterpretq_s16_u16(vld1q_u16(src_ptr3.as_ptr()));
 
-                store0 = vmlal_s16(store0, vget_low_s16(item_row3), vget_low_s16(v_weight3));
-                store1 = vmlal_high_s16(store1, item_row3, v_weight3);
+                store0 = vmlal_lane_s16::<3>(store0, vget_low_s16(item_row3), v_weight);
+                store1 = vmlal_high_lane_s16::<3>(store1, item_row3, v_weight);
             } else {
                 for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
                     let py = bounds.start + j;
@@ -311,8 +299,8 @@ pub fn convolve_column_lb_u16(
 
             let item = vminq_u16(
                 vcombine_u16(
-                    vqshrun_n_s32::<PRECISION>(vmaxq_s32(store0, zeros)),
-                    vqshrun_n_s32::<PRECISION>(vmaxq_s32(store1, zeros)),
+                    vqshrun_n_s32::<PRECISION>(store0),
+                    vqshrun_n_s32::<PRECISION>(store1),
                 ),
                 v_max_colors,
             );
@@ -333,25 +321,23 @@ pub fn convolve_column_lb_u16(
 
             if bounds_size == 2 {
                 let weights = weight.get_unchecked(0..2);
-
-                let v_weight0 = vdup_n_s16(weights[0]);
-                let v_weight1 = vdup_n_s16(weights[1]);
+                let mut v_weight = vld1_dup_s16(weights.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weights.as_ptr().add(1), v_weight);
 
                 let py = bounds.start;
                 let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
 
                 let item_row0 = vreinterpret_s16_u16(vld1_u16(src_ptr0.as_ptr()));
-                store0 = vmlal_s16(store0, item_row0, v_weight0);
+                store0 = vmlal_lane_s16::<0>(store0, item_row0, v_weight);
 
                 let item_row1 = vreinterpret_s16_u16(vld1_u16(src_ptr1.as_ptr()));
-                store0 = vmlal_s16(store0, item_row1, v_weight1);
+                store0 = vmlal_lane_s16::<1>(store0, item_row1, v_weight);
             } else if bounds_size == 3 {
                 let weights = weight.get_unchecked(0..3);
-
-                let v_weight0 = vdup_n_s16(weights[0]);
-                let v_weight1 = vdup_n_s16(weights[1]);
-                let v_weight2 = vdup_n_s16(weights[2]);
+                let mut v_weight = vld1_dup_s16(weights.as_ptr());
+                v_weight = vld1_lane_s16::<1>(weights.as_ptr().add(1), v_weight);
+                v_weight = vld1_lane_s16::<2>(weights.as_ptr().add(2), v_weight);
 
                 let py = bounds.start;
                 let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
@@ -359,20 +345,16 @@ pub fn convolve_column_lb_u16(
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
 
                 let item_row0 = vreinterpret_s16_u16(vld1_u16(src_ptr0.as_ptr()));
-                store0 = vmlal_s16(store0, item_row0, v_weight0);
+                store0 = vmlal_lane_s16::<0>(store0, item_row0, v_weight);
 
                 let item_row1 = vreinterpret_s16_u16(vld1_u16(src_ptr1.as_ptr()));
-                store0 = vmlal_s16(store0, item_row1, v_weight1);
+                store0 = vmlal_lane_s16::<1>(store0, item_row1, v_weight);
 
                 let item_row2 = vreinterpret_s16_u16(vld1_u16(src_ptr2.as_ptr()));
-                store0 = vmlal_s16(store0, item_row2, v_weight2);
+                store0 = vmlal_lane_s16::<2>(store0, item_row2, v_weight);
             } else if bounds_size == 4 {
                 let weights = weight.get_unchecked(0..4);
-
-                let v_weight0 = vdup_n_s16(weights[0]);
-                let v_weight1 = vdup_n_s16(weights[1]);
-                let v_weight2 = vdup_n_s16(weights[2]);
-                let v_weight3 = vdup_n_s16(weights[3]);
+                let v_weight = vld1_s16(weights.as_ptr());
 
                 let py = bounds.start;
                 let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
@@ -381,16 +363,16 @@ pub fn convolve_column_lb_u16(
                 let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + v_dx)..);
 
                 let item_row0 = vreinterpret_s16_u16(vld1_u16(src_ptr0.as_ptr()));
-                store0 = vmlal_s16(store0, item_row0, v_weight0);
+                store0 = vmlal_lane_s16::<0>(store0, item_row0, v_weight);
 
                 let item_row1 = vreinterpret_s16_u16(vld1_u16(src_ptr1.as_ptr()));
-                store0 = vmlal_s16(store0, item_row1, v_weight1);
+                store0 = vmlal_lane_s16::<1>(store0, item_row1, v_weight);
 
                 let item_row2 = vreinterpret_s16_u16(vld1_u16(src_ptr2.as_ptr()));
-                store0 = vmlal_s16(store0, item_row2, v_weight2);
+                store0 = vmlal_lane_s16::<2>(store0, item_row2, v_weight);
 
                 let item_row3 = vreinterpret_s16_u16(vld1_u16(src_ptr3.as_ptr()));
-                store0 = vmlal_s16(store0, item_row3, v_weight3);
+                store0 = vmlal_lane_s16::<3>(store0, item_row3, v_weight);
             } else {
                 for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
                     let py = bounds.start + j;
@@ -405,7 +387,7 @@ pub fn convolve_column_lb_u16(
             }
 
             let u_store0 = vmin_u16(
-                vqshrun_n_s32::<PRECISION>(vmaxq_s32(store0, zeros)),
+                vqshrun_n_s32::<PRECISION>(store0),
                 vget_low_u16(v_max_colors),
             );
             vst1_u16(dst.as_mut_ptr(), u_store0);

@@ -38,7 +38,7 @@ use crate::floating_point_vertical::column_handler_floating_point;
 use crate::mixed_storage::MixedStorage;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{
-    convolve_column_lb_u16, convolve_column_u16, convolve_horizontal_rgba_neon_rows_4_lb_u8,
+    convolve_column_lb_u16, convolve_column_u16, convolve_horizontal_rgba_neon_rows_4_lb_u16,
     convolve_horizontal_rgba_neon_u16_lb_row,
 };
 use crate::saturate_narrow::SaturateNarrow;
@@ -382,7 +382,7 @@ impl RowHandlerFixedPoint<u16> for u16 {
         u16: AsPrimitive<J>,
     {
         if COMPONENTS == 4 {
-            convolve_horizontal_rgba_neon_rows_4_lb_u8(
+            convolve_horizontal_rgba_neon_rows_4_lb_u16(
                 src,
                 src_stride,
                 dst,

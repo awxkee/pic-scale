@@ -30,6 +30,60 @@
 use std::arch::aarch64::*;
 
 #[inline(always)]
+pub(crate) unsafe fn xvld1q_u8_x2(ptr: *const u8) -> uint8x16x2_t {
+    uint8x16x2_t(vld1q_u8(ptr), vld1q_u8(ptr.add(16)))
+}
+
+#[inline(always)]
+pub(crate) unsafe fn xvld1q_u8_x4(ptr: *const u8) -> uint8x16x4_t {
+    uint8x16x4_t(
+        vld1q_u8(ptr),
+        vld1q_u8(ptr.add(16)),
+        vld1q_u8(ptr.add(32)),
+        vld1q_u8(ptr.add(48)),
+    )
+}
+
+#[inline(always)]
+pub(crate) unsafe fn xvld1q_u16_x4(a: *const u16) -> uint16x8x4_t {
+    uint16x8x4_t(
+        vld1q_u16(a),
+        vld1q_u16(a.add(8)),
+        vld1q_u16(a.add(16)),
+        vld1q_u16(a.add(24)),
+    )
+}
+
+#[inline(always)]
+pub(crate) unsafe fn xvld1q_u16_x2(a: *const u16) -> uint16x8x2_t {
+    uint16x8x2_t(vld1q_u16(a), vld1q_u16(a.add(8)))
+}
+
+#[inline(always)]
+pub(crate) unsafe fn xvld1q_f32_x4(a: *const f32) -> float32x4x4_t {
+    float32x4x4_t(
+        vld1q_f32(a),
+        vld1q_f32(a.add(4)),
+        vld1q_f32(a.add(8)),
+        vld1q_f32(a.add(12)),
+    )
+}
+
+#[inline(always)]
+pub(crate) unsafe fn xvst1q_u8_x2(ptr: *mut u8, b: uint8x16x2_t) {
+    vst1q_u8(ptr, b.0);
+    vst1q_u8(ptr.add(16), b.1);
+}
+
+#[inline(always)]
+pub(crate) unsafe fn xvst1q_u8_x4(ptr: *mut u8, b: uint8x16x4_t) {
+    vst1q_u8(ptr, b.0);
+    vst1q_u8(ptr.add(16), b.1);
+    vst1q_u8(ptr.add(32), b.2);
+    vst1q_u8(ptr.add(48), b.3);
+}
+
+#[inline(always)]
 pub(crate) unsafe fn prefer_vfmaq_f32(
     a: float32x4_t,
     b: float32x4_t,
@@ -74,9 +128,9 @@ pub(crate) unsafe fn vsplit_rgb_5(px: float32x4x4_t) -> Float32x5T {
 }
 
 pub(crate) struct Float32x5T(
-    pub float32x4_t,
-    pub float32x4_t,
-    pub float32x4_t,
-    pub float32x4_t,
-    pub float32x4_t,
+    pub(crate) float32x4_t,
+    pub(crate) float32x4_t,
+    pub(crate) float32x4_t,
+    pub(crate) float32x4_t,
+    pub(crate) float32x4_t,
 );

@@ -29,6 +29,7 @@
 
 use crate::filter_weights::FilterWeights;
 use crate::neon::utils::prefer_vfmaq_f32;
+use crate::neon::utils::xvld1q_f32_x4;
 use std::arch::aarch64::*;
 
 macro_rules! conv_horiz_rgba_8_f32 {
@@ -36,8 +37,8 @@ macro_rules! conv_horiz_rgba_8_f32 {
         const COMPONENTS: usize = 4;
         let src_ptr = $src.add($start_x * COMPONENTS);
 
-        let rgb_pixel0 = vld1q_f32_x4(src_ptr);
-        let rgb_pixel1 = vld1q_f32_x4(src_ptr.add(16));
+        let rgb_pixel0 = xvld1q_f32_x4(src_ptr);
+        let rgb_pixel1 = xvld1q_f32_x4(src_ptr.add(16));
 
         let mut acc = prefer_vfmaq_f32($store, rgb_pixel0.0, $set1.0);
         acc = prefer_vfmaq_f32(acc, rgb_pixel0.1, $set1.1);
@@ -56,7 +57,7 @@ macro_rules! conv_horiz_rgba_4_f32 {
         const COMPONENTS: usize = 4;
         let src_ptr = $src.add($start_x * COMPONENTS);
 
-        let rgb_pixel = vld1q_f32_x4(src_ptr);
+        let rgb_pixel = xvld1q_f32_x4(src_ptr);
 
         let acc = prefer_vfmaq_f32($store, rgb_pixel.0, $set1.0);
         let acc = prefer_vfmaq_f32(acc, rgb_pixel.1, $set1.1);

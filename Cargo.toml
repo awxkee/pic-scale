@@ -2,7 +2,7 @@ workspace = { members = ["app", "wasm"] }
 
 [package]
 name = "pic-scale"
-version = "0.3.7"
+version = "0.3.6"
 edition = "2021"
 description = "High performance image scaling"
 readme = "README.md"

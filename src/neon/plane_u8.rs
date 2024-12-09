@@ -30,13 +30,6 @@ use crate::filter_weights::FilterWeights;
 use crate::support::{PRECISION, ROUNDING_CONST};
 use std::arch::aarch64::*;
 
-macro_rules! vfullq_sum_s32 {
-    ($reg: expr) => {{
-        let acc = vadd_s32(vget_low_s32($reg), vget_high_s32($reg));
-        vget_lane_s32::<0>(vpadd_s32(acc, acc))
-    }};
-}
-
 macro_rules! accumulate_16_horiz {
     ($store: expr, $ptr: expr, $weights: expr) => {{
         let pixel_colors = vld1q_u8($ptr);
@@ -209,22 +202,22 @@ pub fn convolve_horizontal_plane_neon_rows_4_u8(
                 jx += 1;
             }
 
-            let sums = vfullq_sum_s32!(store0).max(0);
+            let sums = vaddvq_s32(store0).max(0);
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
             *chunk0 = value;
 
-            let sums = vfullq_sum_s32!(store1).max(0);
+            let sums = vaddvq_s32(store1).max(0);
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
             *chunk1 = value;
 
-            let sums = vfullq_sum_s32!(store2).max(0);
+            let sums = vaddvq_s32(store2).max(0);
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
             *chunk2 = value;
 
-            let sums = vfullq_sum_s32!(store3).max(0);
+            let sums = vaddvq_s32(store3).max(0);
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
             *chunk3 = value;
@@ -291,7 +284,7 @@ pub fn convolve_horizontal_plane_neon_row(
                 jx += 1;
             }
 
-            let sums = vfullq_sum_s32!(store).max(0);
+            let sums = vaddvq_s32(store).max(0);
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
             *dst = value;

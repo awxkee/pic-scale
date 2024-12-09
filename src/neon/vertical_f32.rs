@@ -28,6 +28,7 @@
  */
 use crate::filter_weights::FilterBounds;
 use crate::neon::utils::prefer_vfmaq_f32;
+use crate::neon::utils::xvld1q_f32_x4;
 use std::arch::aarch64::*;
 
 macro_rules! conv_vertical_part_neon_16_f32 {
@@ -46,7 +47,7 @@ macro_rules! conv_vertical_part_neon_16_f32 {
                 let src_ptr = $src.add($src_stride * py);
 
                 let s_ptr = src_ptr.add(px);
-                let item_row = vld1q_f32_x4(s_ptr);
+                let item_row = xvld1q_f32_x4(s_ptr);
 
                 store_0 = prefer_vfmaq_f32(store_0, item_row.0, v_weight);
                 store_1 = prefer_vfmaq_f32(store_1, item_row.1, v_weight);
@@ -81,8 +82,8 @@ macro_rules! conv_vertical_part_neon_32_f32 {
                 let src_ptr = $src.add($src_stride * py);
 
                 let s_ptr = src_ptr.add(px);
-                let item_row_0 = vld1q_f32_x4(s_ptr);
-                let item_row_1 = vld1q_f32_x4(s_ptr.add(16));
+                let item_row_0 = xvld1q_f32_x4(s_ptr);
+                let item_row_1 = xvld1q_f32_x4(s_ptr.add(16));
 
                 store_0 = prefer_vfmaq_f32(store_0, item_row_0.0, v_weight);
                 store_1 = prefer_vfmaq_f32(store_1, item_row_0.1, v_weight);
@@ -131,9 +132,9 @@ macro_rules! conv_vertical_part_neon_48_f32 {
                 let src_ptr = $src.add($src_stride * py);
 
                 let s_ptr = src_ptr.add(px);
-                let item_row_0 = vld1q_f32_x4(s_ptr);
-                let item_row_1 = vld1q_f32_x4(s_ptr.add(16));
-                let item_row_2 = vld1q_f32_x4(s_ptr.add(32));
+                let item_row_0 = xvld1q_f32_x4(s_ptr);
+                let item_row_1 = xvld1q_f32_x4(s_ptr.add(16));
+                let item_row_2 = xvld1q_f32_x4(s_ptr.add(32));
 
                 store_0 = prefer_vfmaq_f32(store_0, item_row_0.0, v_weight);
                 store_1 = prefer_vfmaq_f32(store_1, item_row_0.1, v_weight);

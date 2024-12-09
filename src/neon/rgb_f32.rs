@@ -30,6 +30,7 @@
 use std::arch::aarch64::*;
 
 use crate::filter_weights::FilterWeights;
+use crate::neon::utils::xvld1q_f32_x4;
 use crate::neon::utils::{prefer_vfmaq_f32, vsplit_rgb_5};
 
 macro_rules! write_rgb_f32 {
@@ -46,7 +47,7 @@ macro_rules! conv_horiz_5_rgb_f32 {
         const COMPONENTS: usize = 3;
         let src_ptr = $src.add($start_x * COMPONENTS);
 
-        let full_pixel = vld1q_f32_x4(src_ptr);
+        let full_pixel = xvld1q_f32_x4(src_ptr);
         let splat = vsplit_rgb_5(full_pixel);
 
         let mut acc = prefer_vfmaq_f32($store, splat.0, $set.0);
