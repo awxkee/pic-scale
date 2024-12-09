@@ -1,0 +1,40 @@
+[package]
+name = "app-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+pic-scale = {path = "../"}
+
+[[bin]]
+name = "resize_rgba"
+path = "resize_rgba/resize_rgba.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "resize_rgb"
+path = "resize_rgb/resize_rgb.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "resize_rgb_u16"
+path = "resize_rgb_u16/resize_rgb_u16.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "resize_rgba_u16"
+path = "resize_rgba_u16/resize_rgba_u16.rs"
+test = false
+doc = false
+bench = false
