@@ -54,6 +54,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "app-fuzz"
+version = "0.0.0"
+dependencies = [
+ "libfuzzer-sys",
+ "pic-scale",
+]
+
+[[package]]
 name = "arbitrary"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
