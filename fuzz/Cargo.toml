@@ -26,15 +26,15 @@ doc = false
 bench = false
 
 [[bin]]
-name = "resize_rgb_u16"
-path = "resize_rgb_u16/resize_rgb_u16.rs"
+name = "resize_rgba_u16"
+path = "resize_rgba_u16/resize_rgba_u16.rs"
 test = false
 doc = false
 bench = false
 
 [[bin]]
-name = "resize_rgba_u16"
-path = "resize_rgba_u16/resize_rgba_u16.rs"
+name = "resize_rgb_u16"
+path = "resize_rgb_u16/resize_rgb_u16.rs"
 test = false
 doc = false
 bench = false

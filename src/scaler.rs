@@ -909,6 +909,10 @@ impl ScalingU16 for Scaler {
             return Err(PicScaleError::UnsupportedBitDepth(bit_depth));
         }
 
+        if store.width == new_size.width && store.height == new_size.height {
+            return Ok(store.copied());
+        }
+
         let should_do_horizontal = store.width != new_size.width;
         let should_do_vertical = store.height != new_size.height;
         assert!(should_do_horizontal || should_do_vertical);

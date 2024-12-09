@@ -45,3 +45,13 @@ jobs:
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run resize_rgba -- -max_total_time=30
       - run: cargo fuzz run resize_rgb -- -max_total_time=30
+
+  fuzz_rgba_high_bit:
+    name: Fuzzing High bit-depth
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz run resize_rgba_u16 -- -max_total_time=30
+      - run: cargo fuzz run resize_rgb_u16 -- -max_total_time=30
