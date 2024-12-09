@@ -26,6 +26,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "resize_plane"
+path = "resize_plane/resize_plane.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "resize_rgba_u16"
 path = "resize_rgba_u16/resize_rgba_u16.rs"
 test = false
@@ -35,6 +42,13 @@ bench = false
 [[bin]]
 name = "resize_rgb_u16"
 path = "resize_rgb_u16/resize_rgb_u16.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "resize_plane_u16"
+path = "resize_plane_u16/resize_plane_u16.rs"
 test = false
 doc = false
 bench = false

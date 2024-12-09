@@ -183,7 +183,7 @@ pub fn convolve_horizontal_plane_neon_rows_4_u8(
             }
 
             while jx < bounds.size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let w_ptr = weights.get_unchecked(jx..(jx + 1));
                 let weight = vld1_lane_s16::<0>(w_ptr.as_ptr(), vdup_n_s16(0));
                 let bounds_start = bounds.start + jx;
 
