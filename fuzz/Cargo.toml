@@ -52,3 +52,24 @@ path = "resize_plane_u16/resize_plane_u16.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "resize_rgba_f32"
+path = "resize_rgba_f32/resize_rgba_f32.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "resize_rgb_f32"
+path = "resize_rgb_f32/resize_rgb_f32.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "resize_plane_f32"
+path = "resize_plane_f32/resize_plane_f32.rs"
+test = false
+doc = false
+bench = false

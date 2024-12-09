@@ -63,3 +63,17 @@ jobs:
       - run: cargo fuzz run resize_rgba_u16 -- -max_total_time=30
       - run: cargo fuzz run resize_rgb_u16 -- -max_total_time=30
       - run: cargo fuzz run resize_plane_u16 -- -max_total_time=30
+
+  fuzz_rgba_f32:
+    name: Fuzzing floating point
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz run resize_rgba_f32 -- -max_total_time=30
+      - run: cargo fuzz run resize_rgb_f32 -- -max_total_time=30
+      - run: cargo fuzz run resize_plane_f32 -- -max_total_time=30
