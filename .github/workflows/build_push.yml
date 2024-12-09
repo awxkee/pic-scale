@@ -37,10 +37,11 @@ jobs:
       - run: RUSTFLAGS="-C target-feature=+avx2" cargo build --target x86_64-unknown-linux-gnu
 
   fuzz_rgba_8bit:
-    name: Fuzzing RGBA8
+    name: Fuzzing 8bit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run resize_rgba -- -max_total_time=30
+      - run: cargo fuzz run resize_rgb -- -max_total_time=30
