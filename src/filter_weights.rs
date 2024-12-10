@@ -28,7 +28,7 @@
  */
 
 #[derive(Debug, Clone)]
-pub struct FilterWeights<T> {
+pub(crate) struct FilterWeights<T> {
     pub weights: Vec<T>,
     pub bounds: Vec<FilterBounds>,
     pub kernel_size: usize,
@@ -38,19 +38,19 @@ pub struct FilterWeights<T> {
 }
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct FilterBounds {
+pub(crate) struct FilterBounds {
     pub start: usize,
     pub size: usize,
 }
 
 impl FilterBounds {
-    pub fn new(start: usize, size: usize) -> FilterBounds {
+    pub(crate) fn new(start: usize, size: usize) -> FilterBounds {
         FilterBounds { start, size }
     }
 }
 
 impl<T> FilterWeights<T> {
-    pub fn new(
+    pub(crate) fn new(
         slice_ref: Vec<T>,
         kernel_size: usize,
         aligned_size: usize,
@@ -70,7 +70,7 @@ impl<T> FilterWeights<T> {
 }
 
 impl FilterWeights<f32> {
-    pub fn numerical_approximation_i16<const PRECISION: i32>(
+    pub(crate) fn numerical_approximation_i16<const PRECISION: i32>(
         &self,
         alignment: usize,
     ) -> FilterWeights<i16> {

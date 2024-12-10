@@ -33,10 +33,12 @@ mod alpha_f16_full;
 mod alpha_f32;
 mod alpha_u16;
 mod alpha_u8;
+mod ar30;
 #[cfg(feature = "half")]
 mod convolve_f16;
 #[cfg(feature = "half")]
 mod f16_utils;
+mod horizontal_ar30;
 mod plane_f32;
 mod plane_u8;
 #[cfg(feature = "half")]
@@ -53,6 +55,7 @@ mod rgba_f32;
 mod rgba_u16_lb;
 mod rgba_u8;
 mod utils;
+mod vertical_ar30;
 #[cfg(feature = "half")]
 mod vertical_f16;
 #[cfg(feature = "half")]
@@ -75,6 +78,7 @@ pub use alpha_u8::neon_premultiply_alpha_rgba;
 pub use alpha_u8::neon_unpremultiply_alpha_rgba;
 #[cfg(feature = "half")]
 pub use f16_utils::*;
+pub(crate) use horizontal_ar30::neon_convolve_horizontal_rgba_rows_4_ar30;
 pub use plane_f32::convolve_horizontal_plane_neon_row_one;
 pub use plane_f32::convolve_horizontal_plane_neon_rows_4;
 pub use plane_u8::{convolve_horizontal_plane_neon_row, convolve_horizontal_plane_neon_rows_4_u8};
@@ -98,9 +102,10 @@ pub use rgba_f16_full::{
 };
 pub use rgba_f32::*;
 pub use rgba_u16_lb::{
-    convolve_horizontal_rgba_neon_rows_4_lb_u8, convolve_horizontal_rgba_neon_u16_lb_row,
+    convolve_horizontal_rgba_neon_rows_4_lb_u16, convolve_horizontal_rgba_neon_u16_lb_row,
 };
 pub use rgba_u8::*;
+pub(crate) use vertical_ar30::neon_column_handler_fixed_point_ar30;
 #[cfg(feature = "half")]
 pub use vertical_f16::convolve_vertical_rgb_neon_row_f16;
 #[cfg(feature = "half")]

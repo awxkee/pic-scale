@@ -40,13 +40,13 @@ use rayon::slice::ParallelSliceMut;
 use rayon::ThreadPool;
 
 #[inline(always)]
-pub unsafe fn avx_unpremultiply_row_f32(x: __m256, a: __m256) -> __m256 {
+pub(crate) unsafe fn avx_unpremultiply_row_f32(x: __m256, a: __m256) -> __m256 {
     let is_zero_mask = _mm256_cmp_ps::<_CMP_EQ_OS>(a, _mm256_setzero_ps());
     let rs = _mm256_div_ps(x, a);
     _mm256_blendv_ps(rs, _mm256_setzero_ps(), is_zero_mask)
 }
 
-pub fn avx_unpremultiply_alpha_rgba_f32(
+pub(crate) fn avx_unpremultiply_alpha_rgba_f32(
     in_place: &mut [f32],
     width: usize,
     height: usize,
@@ -111,7 +111,7 @@ unsafe fn avx_unpremultiply_alpha_rgba_f32_impl(
     }
 }
 
-pub fn avx_premultiply_alpha_rgba_f32(
+pub(crate) fn avx_premultiply_alpha_rgba_f32(
     dst: &mut [f32],
     src: &[f32],
     width: usize,

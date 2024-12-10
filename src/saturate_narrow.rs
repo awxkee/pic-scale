@@ -29,7 +29,7 @@
 
 use crate::support::PRECISION;
 
-pub trait SaturateNarrow<J> {
+pub(crate) trait SaturateNarrow<J> {
     fn saturate_narrow(self, bit_depth: u32) -> J;
 }
 

@@ -38,7 +38,11 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-pub unsafe fn _mm_select_si128(mask: __m128i, true_vals: __m128i, false_vals: __m128i) -> __m128i {
+pub(crate) unsafe fn _mm_select_si128(
+    mask: __m128i,
+    true_vals: __m128i,
+    false_vals: __m128i,
+) -> __m128i {
     _mm_or_si128(
         _mm_and_si128(mask, true_vals),
         _mm_andnot_si128(mask, false_vals),
@@ -46,7 +50,7 @@ pub unsafe fn _mm_select_si128(mask: __m128i, true_vals: __m128i, false_vals: __
 }
 
 #[inline(always)]
-pub unsafe fn _mm_div_by_255_epi16(v: __m128i) -> __m128i {
+pub(crate) unsafe fn _mm_div_by_255_epi16(v: __m128i) -> __m128i {
     let addition = _mm_set1_epi16(127);
     _mm_srli_epi16::<8>(_mm_add_epi16(
         _mm_add_epi16(v, addition),
@@ -55,7 +59,7 @@ pub unsafe fn _mm_div_by_255_epi16(v: __m128i) -> __m128i {
 }
 
 #[inline(always)]
-pub unsafe fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
+pub(crate) unsafe fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
     let zeros = _mm_setzero_si128();
     let lo = _mm_cvtepu8_epi16(x);
     let hi = _mm_unpackhi_epi8(x, zeros);
@@ -90,7 +94,7 @@ pub unsafe fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
     _mm_select_si128(is_zero_mask, _mm_setzero_si128(), _mm_packus_epi16(lo, hi))
 }
 
-pub fn sse_premultiply_alpha_rgba(
+pub(crate) fn sse_premultiply_alpha_rgba(
     dst: &mut [u8],
     src: &[u8],
     width: usize,
@@ -185,7 +189,7 @@ unsafe fn sse_premultiply_alpha_rgba_impl(
     }
 }
 
-pub fn sse_unpremultiply_alpha_rgba(
+pub(crate) fn sse_unpremultiply_alpha_rgba(
     in_place: &mut [u8],
     width: usize,
     height: usize,

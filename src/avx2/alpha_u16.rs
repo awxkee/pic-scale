@@ -51,7 +51,7 @@ unsafe fn _mm256_scale_by_alpha(px: __m256i, low_low_a: __m256, low_high_a: __m2
 }
 
 #[inline(always)]
-pub unsafe fn _mm256_div_by_1023_epi32(v: __m256i) -> __m256i {
+pub(crate) unsafe fn _mm256_div_by_1023_epi32(v: __m256i) -> __m256i {
     const DIVIDING_BY: i32 = 10;
     let addition = _mm256_set1_epi32(1 << (DIVIDING_BY - 1));
     let v = _mm256_add_epi32(v, addition);
@@ -59,7 +59,7 @@ pub unsafe fn _mm256_div_by_1023_epi32(v: __m256i) -> __m256i {
 }
 
 #[inline(always)]
-pub unsafe fn _mm256_div_by_4095_epi32(v: __m256i) -> __m256i {
+pub(crate) unsafe fn _mm256_div_by_4095_epi32(v: __m256i) -> __m256i {
     const DIVIDING_BY: i32 = 12;
     let addition = _mm256_set1_epi32(1 << (DIVIDING_BY - 1));
     let v = _mm256_add_epi32(v, addition);
@@ -67,14 +67,14 @@ pub unsafe fn _mm256_div_by_4095_epi32(v: __m256i) -> __m256i {
 }
 
 #[inline(always)]
-pub unsafe fn _mm256_div_by_65535_epi32(v: __m256i) -> __m256i {
+pub(crate) unsafe fn _mm256_div_by_65535_epi32(v: __m256i) -> __m256i {
     const DIVIDING_BY: i32 = 16;
     let addition = _mm256_set1_epi32(1 << (DIVIDING_BY - 1));
     let v = _mm256_add_epi32(v, addition);
     _mm256_srli_epi32::<DIVIDING_BY>(_mm256_add_epi32(v, _mm256_srli_epi32::<DIVIDING_BY>(v)))
 }
 
-pub fn avx_premultiply_alpha_rgba_u16(
+pub(crate) fn avx_premultiply_alpha_rgba_u16(
     dst: &mut [u16],
     src: &[u16],
     width: usize,
@@ -339,7 +339,7 @@ unsafe fn avx_premultiply_alpha_rgba_u16_impl(
     }
 }
 
-pub fn avx_unpremultiply_alpha_rgba_u16(
+pub(crate) fn avx_unpremultiply_alpha_rgba_u16(
     in_place: &mut [u16],
     width: usize,
     height: usize,

@@ -189,7 +189,11 @@ pub(crate) unsafe fn convolve_vertical_part_sse_8_f16<const F16C: bool, const FM
     _mm_storeu_si128(dst_ptr as *mut __m128i, acc0);
 }
 
-pub fn convolve_vertical_sse_row_f16<const CHANNELS: usize, const F16C: bool, const FMA: bool>(
+pub(crate) fn convolve_vertical_sse_row_f16<
+    const CHANNELS: usize,
+    const F16C: bool,
+    const FMA: bool,
+>(
     width: usize,
     bounds: &FilterBounds,
     unsafe_source_ptr_0: *const half::f16,

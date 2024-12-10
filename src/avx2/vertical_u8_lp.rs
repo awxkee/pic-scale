@@ -33,7 +33,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-pub fn convolve_vertical_avx_row_lp(
+pub(crate) fn convolve_vertical_avx_row_lp(
     dst_width: usize,
     bounds: &FilterBounds,
     src: &[u8],

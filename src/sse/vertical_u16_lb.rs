@@ -34,7 +34,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-pub fn convolve_column_lb_sse_u16(
+pub(crate) fn convolve_column_lb_sse_u16(
     _: usize,
     bounds: &FilterBounds,
     src: &[u16],

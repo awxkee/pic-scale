@@ -1,0 +1,75 @@
+[package]
+name = "app-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+pic-scale = {path = "../"}
+
+[[bin]]
+name = "resize_rgba"
+path = "resize_rgba/resize_rgba.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "resize_rgb"
+path = "resize_rgb/resize_rgb.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "resize_plane"
+path = "resize_plane/resize_plane.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "resize_rgba_u16"
+path = "resize_rgba_u16/resize_rgba_u16.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "resize_rgb_u16"
+path = "resize_rgb_u16/resize_rgb_u16.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "resize_plane_u16"
+path = "resize_plane_u16/resize_plane_u16.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "resize_rgba_f32"
+path = "resize_rgba_f32/resize_rgba_f32.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "resize_rgb_f32"
+path = "resize_rgb_f32/resize_rgb_f32.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "resize_plane_f32"
+path = "resize_plane_f32/resize_plane_f32.rs"
+test = false
+doc = false
+bench = false

@@ -112,7 +112,7 @@ unsafe fn convolve_horizontal_parts_2_rgba_f32<const FMA: bool>(
     _mm256_fma_ps::<FMA>(store_0, rgb_pixel, weight0)
 }
 
-pub fn convolve_horizontal_rgba_avx_rows_4_f32<const FMA: bool>(
+pub(crate) fn convolve_horizontal_rgba_avx_rows_4_f32<const FMA: bool>(
     dst_width: usize,
     src_width: usize,
     filter_weights: &FilterWeights<f32>,
@@ -396,7 +396,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_f32_impl<const FMA: bool>(
     }
 }
 
-pub fn convolve_horizontal_rgba_avx_row_one_f32<const FMA: bool>(
+pub(crate) fn convolve_horizontal_rgba_avx_row_one_f32<const FMA: bool>(
     dst_width: usize,
     src_width: usize,
     filter_weights: &FilterWeights<f32>,

@@ -27,8 +27,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
-pub const PRECISION: i32 = 15;
-pub const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
+pub(crate) const PRECISION: i32 = 15;
+pub(crate) const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
 
 pub(crate) fn check_image_size_overflow(width: usize, height: usize, chan: usize) -> bool {
     let (stride, is_overflowed) = width.overflowing_mul(chan);

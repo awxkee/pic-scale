@@ -171,7 +171,7 @@ pub(crate) unsafe fn convolve_vertical_part_avx_f32<const FMA: bool>(
 }
 
 #[inline]
-pub fn convolve_vertical_avx_row_f32<const CHANNELS: usize, const FMA: bool>(
+pub(crate) fn convolve_vertical_avx_row_f32<const CHANNELS: usize, const FMA: bool>(
     width: usize,
     bounds: &FilterBounds,
     unsafe_source_ptr_0: *const f32,

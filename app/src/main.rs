@@ -11,12 +11,44 @@ use fast_image_resize::{
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
-    ImageSize, ImageStore, LinearApproxScaler, ResamplingFunction, Scaler, Scaling, ScalingU16,
-    ThreadingPolicy,
+    Ar30ByteOrder, ImageSize, ImageStore, LinearApproxScaler, ResamplingFunction, Scaler, Scaling,
+    ScalingU16, ThreadingPolicy,
+};
+use yuvutils_rs::{
+    ar30_to_rgba8, ra30_to_rgba8, rgb8_to_ar30, rgba8_to_ar30, rgba8_to_ra30, Rgb30ByteOrder,
 };
 
+fn resize_plane(
+    src_width: usize,
+    src_height: usize,
+    dst_width: usize,
+    dst_height: usize,
+    sampler: ResamplingFunction,
+) {
+    if src_width == 0
+        || src_width > 2000
+        || src_height == 0
+        || src_height > 2000
+        || dst_width == 0
+        || dst_width > 512
+        || dst_height == 0
+        || dst_height > 512
+    {
+        return;
+    }
+
+    let mut src_data = vec![15u8; src_width * src_height * 1];
+
+    let store = ImageStore::<u8, 1>::from_slice(&mut src_data, src_width, src_height).unwrap();
+    let scaler = Scaler::new(sampler);
+    _ = scaler
+        .resize_plane(ImageSize::new(dst_width, dst_height), store)
+        .unwrap();
+}
+
+
 fn main() {
-    test_fast_image();
+    // test_fast_image();
     let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
         .unwrap()
         .decode()
@@ -25,27 +57,53 @@ fn main() {
     let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
-    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
-    let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 2).collect();
+    resize_plane(378, 257, 257, 257, ResamplingFunction::Bilinear);
+
+    // let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 2).collect();
     //
     let store =
-        ImageStore::<u16, 4>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
+        ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
+
+    let dst_size = ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2);
+    // let mut resized_ar = vec![0u32; dst_size.width * dst_size.height];
     let start_time = Instant::now();
+    // scaler
+    //     .resize_ra30(
+    //         &ar30_src,
+    //         ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+    //         &mut resized_ar,
+    //         dst_size,
+    //         Ar30ByteOrder::Host,
+    //     )
+    //     .unwrap();
+
     let resized = scaler
-        .resize_rgba_u16(
+        .resize_rgba(
             ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
             store,
-            10,
-            true,
+            false,
         )
         .unwrap();
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
     println!("Scaler: {:.2?}", elapsed_time);
+
+    // let mut resized = vec![0u8; dst_size.width * dst_size.height * 4];
+    // ra30_to_rgba8(
+    //     &resized_ar,
+    //     dst_size.width as u32,
+    //     Rgb30ByteOrder::Host,
+    //     &mut resized,
+    //     dst_size.width as u32 * 4,
+    //     dst_size.width as u32,
+    //     dst_size.height as u32,
+    // )
+    // .unwrap();
 
     // let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| x).collect::<Vec<_>>();
     // println!("f1 {}, f2 {}, f3 {}, f4 {}", dst[0], dst[1], dst[2], dst[3]);
@@ -106,9 +164,18 @@ fn main() {
     //     .map(|&x| (x * 255f32) as u8)
     //     .collect();
 
-    let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 2) as u8).collect();
+    // let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 2) as u8).collect();
     //
-    // let dst = resized.as_bytes();
+    let dst = resized.as_bytes();
+    // let dst = resized;
+    // image::save_buffer(
+    //     "converted.png",
+    //     &dst,
+    //     dst_size.width as u32,
+    //     dst_size.height as u32,
+    //     image::ColorType::Rgba8,
+    // )
+    // .unwrap();
 
     if resized.channels == 4 {
         image::save_buffer(

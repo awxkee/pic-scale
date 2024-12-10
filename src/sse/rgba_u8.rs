@@ -52,7 +52,7 @@ unsafe fn convolve_horizontal_parts_one_rgba_sse(
     _mm_add_epi32(store_0, _mm_madd_epi16(_mm_cvtepi16_epi32(lo), weight0))
 }
 
-pub fn convolve_horizontal_rgba_sse_rows_4(
+pub(crate) fn convolve_horizontal_rgba_sse_rows_4(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -244,7 +244,7 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_impl(
     }
 }
 
-pub fn convolve_horizontal_rgba_sse_rows_one(
+pub(crate) fn convolve_horizontal_rgba_sse_rows_one(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,

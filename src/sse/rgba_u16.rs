@@ -175,7 +175,7 @@ unsafe fn conv_horiz_rgba_8_u16<const FMA: bool>(
     acc
 }
 
-pub fn convolve_horizontal_rgba_sse_rows_4_u16(
+pub(crate) fn convolve_horizontal_rgba_sse_rows_4_u16(
     src: &[u16],
     src_stride: usize,
     dst: &mut [u16],
@@ -392,7 +392,7 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_u16_impl<const FMA: bool>(
     }
 }
 
-pub fn convolve_horizontal_rgba_sse_u16_row(
+pub(crate) fn convolve_horizontal_rgba_sse_u16_row(
     src: &[u16],
     dst: &mut [u16],
     filter_weights: &FilterWeights<f32>,

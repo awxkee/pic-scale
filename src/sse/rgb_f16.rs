@@ -146,7 +146,7 @@ unsafe fn convolve_horizontal_parts_one_rgb_f16<const F16C: bool, const FMA: boo
     acc
 }
 
-pub fn convolve_horizontal_rgb_sse_row_one_f16<const F16C: bool, const FMA: bool>(
+pub(crate) fn convolve_horizontal_rgb_sse_row_one_f16<const F16C: bool, const FMA: bool>(
     dst_width: usize,
     src_width: usize,
     filter_weights: &FilterWeights<f32>,
@@ -317,7 +317,7 @@ unsafe fn convolve_horizontal_rgb_sse_row_one_f16_impl<const F16C: bool, const F
     }
 }
 
-pub fn convolve_horizontal_rgb_sse_rows_4_f16<const F16C: bool, const FMA: bool>(
+pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f16<const F16C: bool, const FMA: bool>(
     dst_width: usize,
     src_width: usize,
     filter_weights: &FilterWeights<f32>,

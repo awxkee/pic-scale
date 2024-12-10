@@ -36,7 +36,7 @@ use crate::filter_weights::FilterWeights;
 use crate::sse::{compress_i32, convolve_horizontal_parts_one_sse_rgb, shuffle};
 use crate::support::ROUNDING_CONST;
 
-pub fn convolve_horizontal_rgb_sse_rows_4(
+pub(crate) fn convolve_horizontal_rgb_sse_rows_4(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -245,7 +245,7 @@ unsafe fn convolve_horizontal_rgb_sse_rows_4_impl(
     }
 }
 
-pub fn convolve_horizontal_rgb_sse_row_one(
+pub(crate) fn convolve_horizontal_rgb_sse_row_one(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,

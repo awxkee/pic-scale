@@ -27,8 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::color_group::{
-    fast_load_color_group, fast_load_color_group_with_offset, fast_mixed_store_color_group,
-    ColorGroup,
+    fast_mixed_store_color_group, load_color_group, load_color_group_with_offset, ColorGroup,
 };
 use crate::filter_weights::FilterBounds;
 use crate::mixed_storage::MixedStorage;
@@ -83,26 +82,23 @@ pub(crate) fn convolve_column_handler_floating_point_4<
             let src_ptr0 = &src[offset0..(offset0 + CHANNELS * 4)];
             let src_ptr1 = &src[offset1..(offset1 + CHANNELS * 4)];
 
-            sums0 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
+            sums0 = (load_color_group_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0).mul_add(
+                load_color_group_with_offset!(src_ptr1, CHANNELS, 0, J),
+                weight1,
+            );
+            sums1 = (load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS, J) * weight0)
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr1, CHANNELS, 0, J),
+                    load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS, J),
                     weight1,
                 );
-            sums1 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS, J) * weight0)
+            sums2 = (load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS * 2, J) * weight0)
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS, J),
+                    load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS * 2, J),
                     weight1,
                 );
-            sums2 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS * 2, J)
-                * weight0)
+            sums3 = (load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS * 3, J) * weight0)
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS * 2, J),
-                    weight1,
-                );
-            sums3 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS * 3, J)
-                * weight0)
-                .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS * 3, J),
+                    load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS * 3, J),
                     weight1,
                 );
         } else if bounds_size == 3 {
@@ -117,45 +113,43 @@ pub(crate) fn convolve_column_handler_floating_point_4<
             let src_ptr1 = &src[offset1..(offset1 + CHANNELS * 4)];
             let src_ptr2 = &src[offset2..(offset2 + CHANNELS * 4)];
 
-            sums0 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
+            sums0 = (load_color_group_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr1, CHANNELS, 0, J),
+                    load_color_group_with_offset!(src_ptr1, CHANNELS, 0, J),
                     weight1,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr2, CHANNELS, 0, J),
+                    load_color_group_with_offset!(src_ptr2, CHANNELS, 0, J),
                     weight2,
                 );
 
-            sums1 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS, J) * weight0)
+            sums1 = (load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS, J) * weight0)
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS, J),
+                    load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS, J),
                     weight1,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr2, CHANNELS, CHANNELS, J),
+                    load_color_group_with_offset!(src_ptr2, CHANNELS, CHANNELS, J),
                     weight2,
                 );
 
-            sums2 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS * 2, J)
-                * weight0)
+            sums2 = (load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS * 2, J) * weight0)
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS * 2, J),
+                    load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS * 2, J),
                     weight1,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr2, CHANNELS, CHANNELS * 2, J),
+                    load_color_group_with_offset!(src_ptr2, CHANNELS, CHANNELS * 2, J),
                     weight2,
                 );
 
-            sums3 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS * 3, J)
-                * weight0)
+            sums3 = (load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS * 3, J) * weight0)
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS * 3, J),
+                    load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS * 3, J),
                     weight1,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr2, CHANNELS, CHANNELS * 3, J),
+                    load_color_group_with_offset!(src_ptr2, CHANNELS, CHANNELS * 3, J),
                     weight2,
                 );
         } else if bounds_size == 4 {
@@ -173,61 +167,59 @@ pub(crate) fn convolve_column_handler_floating_point_4<
             let src_ptr2 = &src[offset2..(offset2 + CHANNELS * 4)];
             let src_ptr3 = &src[offset3..(offset3 + CHANNELS * 4)];
 
-            sums0 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
+            sums0 = (load_color_group_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr1, CHANNELS, 0, J),
+                    load_color_group_with_offset!(src_ptr1, CHANNELS, 0, J),
                     weight1,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr2, CHANNELS, 0, J),
+                    load_color_group_with_offset!(src_ptr2, CHANNELS, 0, J),
                     weight2,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr3, CHANNELS, 0, J),
+                    load_color_group_with_offset!(src_ptr3, CHANNELS, 0, J),
                     weight3,
                 );
 
-            sums1 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS, J) * weight0)
+            sums1 = (load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS, J) * weight0)
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS, J),
+                    load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS, J),
                     weight1,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr2, CHANNELS, CHANNELS, J),
+                    load_color_group_with_offset!(src_ptr2, CHANNELS, CHANNELS, J),
                     weight2,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr3, CHANNELS, CHANNELS, J),
+                    load_color_group_with_offset!(src_ptr3, CHANNELS, CHANNELS, J),
                     weight3,
                 );
 
-            sums2 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS * 2, J)
-                * weight0)
+            sums2 = (load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS * 2, J) * weight0)
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS * 2, J),
+                    load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS * 2, J),
                     weight1,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr2, CHANNELS, CHANNELS * 2, J),
+                    load_color_group_with_offset!(src_ptr2, CHANNELS, CHANNELS * 2, J),
                     weight2,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr3, CHANNELS, CHANNELS * 2, J),
+                    load_color_group_with_offset!(src_ptr3, CHANNELS, CHANNELS * 2, J),
                     weight3,
                 );
 
-            sums3 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS * 3, J)
-                * weight0)
+            sums3 = (load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS * 3, J) * weight0)
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS * 3, J),
+                    load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS * 3, J),
                     weight1,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr2, CHANNELS, CHANNELS * 3, J),
+                    load_color_group_with_offset!(src_ptr2, CHANNELS, CHANNELS * 3, J),
                     weight2,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr3, CHANNELS, CHANNELS * 3, J),
+                    load_color_group_with_offset!(src_ptr3, CHANNELS, CHANNELS * 3, J),
                     weight3,
                 );
         } else if bounds_size == 6 {
@@ -251,93 +243,91 @@ pub(crate) fn convolve_column_handler_floating_point_4<
             let src_ptr4 = &src[offset4..(offset4 + CHANNELS * 4)];
             let src_ptr5 = &src[offset5..(offset5 + CHANNELS * 4)];
 
-            sums0 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
+            sums0 = (load_color_group_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr1, CHANNELS, 0, J),
+                    load_color_group_with_offset!(src_ptr1, CHANNELS, 0, J),
                     weight1,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr2, CHANNELS, 0, J),
+                    load_color_group_with_offset!(src_ptr2, CHANNELS, 0, J),
                     weight2,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr3, CHANNELS, 0, J),
+                    load_color_group_with_offset!(src_ptr3, CHANNELS, 0, J),
                     weight3,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr4, CHANNELS, 0, J),
+                    load_color_group_with_offset!(src_ptr4, CHANNELS, 0, J),
                     weight4,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr5, CHANNELS, 0, J),
+                    load_color_group_with_offset!(src_ptr5, CHANNELS, 0, J),
                     weight5,
                 );
 
-            sums1 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS, J) * weight0)
+            sums1 = (load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS, J) * weight0)
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS, J),
+                    load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS, J),
                     weight1,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr2, CHANNELS, CHANNELS, J),
+                    load_color_group_with_offset!(src_ptr2, CHANNELS, CHANNELS, J),
                     weight2,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr3, CHANNELS, CHANNELS, J),
+                    load_color_group_with_offset!(src_ptr3, CHANNELS, CHANNELS, J),
                     weight3,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr4, CHANNELS, CHANNELS, J),
+                    load_color_group_with_offset!(src_ptr4, CHANNELS, CHANNELS, J),
                     weight4,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr5, CHANNELS, CHANNELS, J),
+                    load_color_group_with_offset!(src_ptr5, CHANNELS, CHANNELS, J),
                     weight5,
                 );
 
-            sums2 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS * 2, J)
-                * weight0)
+            sums2 = (load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS * 2, J) * weight0)
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS * 2, J),
+                    load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS * 2, J),
                     weight1,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr2, CHANNELS, CHANNELS * 2, J),
+                    load_color_group_with_offset!(src_ptr2, CHANNELS, CHANNELS * 2, J),
                     weight2,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr3, CHANNELS, CHANNELS * 2, J),
+                    load_color_group_with_offset!(src_ptr3, CHANNELS, CHANNELS * 2, J),
                     weight3,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr4, CHANNELS, CHANNELS * 2, J),
+                    load_color_group_with_offset!(src_ptr4, CHANNELS, CHANNELS * 2, J),
                     weight4,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr5, CHANNELS, CHANNELS * 2, J),
+                    load_color_group_with_offset!(src_ptr5, CHANNELS, CHANNELS * 2, J),
                     weight5,
                 );
 
-            sums3 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS * 3, J)
-                * weight0)
+            sums3 = (load_color_group_with_offset!(src_ptr0, CHANNELS, CHANNELS * 3, J) * weight0)
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS * 3, J),
+                    load_color_group_with_offset!(src_ptr1, CHANNELS, CHANNELS * 3, J),
                     weight1,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr2, CHANNELS, CHANNELS * 3, J),
+                    load_color_group_with_offset!(src_ptr2, CHANNELS, CHANNELS * 3, J),
                     weight2,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr3, CHANNELS, CHANNELS * 3, J),
+                    load_color_group_with_offset!(src_ptr3, CHANNELS, CHANNELS * 3, J),
                     weight3,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr4, CHANNELS, CHANNELS * 3, J),
+                    load_color_group_with_offset!(src_ptr4, CHANNELS, CHANNELS * 3, J),
                     weight4,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr5, CHANNELS, CHANNELS * 3, J),
+                    load_color_group_with_offset!(src_ptr5, CHANNELS, CHANNELS * 3, J),
                     weight5,
                 );
         } else {
@@ -347,12 +337,10 @@ pub(crate) fn convolve_column_handler_floating_point_4<
                 let offset = src_stride * py + v_start_px;
                 let src_ptr = &src[offset..(offset + CHANNELS * 4)];
 
-                let new_px0 = fast_load_color_group_with_offset!(src_ptr, CHANNELS, 0, J);
-                let new_px1 = fast_load_color_group_with_offset!(src_ptr, CHANNELS, CHANNELS, J);
-                let new_px2 =
-                    fast_load_color_group_with_offset!(src_ptr, CHANNELS, CHANNELS * 2, J);
-                let new_px3 =
-                    fast_load_color_group_with_offset!(src_ptr, CHANNELS, CHANNELS * 3, J);
+                let new_px0 = load_color_group_with_offset!(src_ptr, CHANNELS, 0, J);
+                let new_px1 = load_color_group_with_offset!(src_ptr, CHANNELS, CHANNELS, J);
+                let new_px2 = load_color_group_with_offset!(src_ptr, CHANNELS, CHANNELS * 2, J);
+                let new_px3 = load_color_group_with_offset!(src_ptr, CHANNELS, CHANNELS * 3, J);
 
                 sums0 = sums0.mul_add(new_px0, weight);
                 sums1 = sums1.mul_add(new_px1, weight);
@@ -435,11 +423,10 @@ pub(crate) fn convolve_column_handler_floating_point<
             let src_ptr0 = &src[offset0..(offset0 + CHANNELS)];
             let src_ptr1 = &src[offset1..(offset1 + CHANNELS)];
 
-            sums0 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
-                .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr1, CHANNELS, 0, J),
-                    weight1,
-                );
+            sums0 = (load_color_group_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0).mul_add(
+                load_color_group_with_offset!(src_ptr1, CHANNELS, 0, J),
+                weight1,
+            );
         } else if bounds_size == 3 {
             let weights = &filter[0..3];
             let weight0 = weights[0].as_();
@@ -452,13 +439,13 @@ pub(crate) fn convolve_column_handler_floating_point<
             let src_ptr1 = &src[offset1..(offset1 + CHANNELS)];
             let src_ptr2 = &src[offset2..(offset2 + CHANNELS)];
 
-            sums0 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
+            sums0 = (load_color_group_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr1, CHANNELS, 0, J),
+                    load_color_group_with_offset!(src_ptr1, CHANNELS, 0, J),
                     weight1,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr2, CHANNELS, 0, J),
+                    load_color_group_with_offset!(src_ptr2, CHANNELS, 0, J),
                     weight2,
                 );
         } else if bounds_size == 4 {
@@ -476,17 +463,17 @@ pub(crate) fn convolve_column_handler_floating_point<
             let src_ptr2 = &src[offset2..(offset2 + CHANNELS)];
             let src_ptr3 = &src[offset3..(offset3 + CHANNELS)];
 
-            sums0 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
+            sums0 = (load_color_group_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr1, CHANNELS, 0, J),
+                    load_color_group_with_offset!(src_ptr1, CHANNELS, 0, J),
                     weight1,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr2, CHANNELS, 0, J),
+                    load_color_group_with_offset!(src_ptr2, CHANNELS, 0, J),
                     weight2,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr3, CHANNELS, 0, J),
+                    load_color_group_with_offset!(src_ptr3, CHANNELS, 0, J),
                     weight3,
                 );
         } else if bounds_size == 6 {
@@ -510,25 +497,25 @@ pub(crate) fn convolve_column_handler_floating_point<
             let src_ptr4 = &src[offset4..(offset4 + CHANNELS)];
             let src_ptr5 = &src[offset5..(offset5 + CHANNELS)];
 
-            sums0 = (fast_load_color_group_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
+            sums0 = (load_color_group_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr1, CHANNELS, 0, J),
+                    load_color_group_with_offset!(src_ptr1, CHANNELS, 0, J),
                     weight1,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr2, CHANNELS, 0, J),
+                    load_color_group_with_offset!(src_ptr2, CHANNELS, 0, J),
                     weight2,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr3, CHANNELS, 0, J),
+                    load_color_group_with_offset!(src_ptr3, CHANNELS, 0, J),
                     weight3,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr4, CHANNELS, 0, J),
+                    load_color_group_with_offset!(src_ptr4, CHANNELS, 0, J),
                     weight4,
                 )
                 .mul_add(
-                    fast_load_color_group_with_offset!(src_ptr5, CHANNELS, 0, J),
+                    load_color_group_with_offset!(src_ptr5, CHANNELS, 0, J),
                     weight5,
                 );
         } else {
@@ -538,7 +525,7 @@ pub(crate) fn convolve_column_handler_floating_point<
                 let offset = src_stride * py + v_start_px;
                 let src_ptr = &src[offset..(offset + CHANNELS)];
 
-                let new_px0 = fast_load_color_group!(src_ptr, CHANNELS, J);
+                let new_px0 = load_color_group!(src_ptr, CHANNELS, J);
 
                 sums0 = sums0.mul_add(new_px0, weight);
             }

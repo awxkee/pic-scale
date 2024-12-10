@@ -47,20 +47,20 @@ pub enum ThreadingPolicy {
 
 impl ThreadingPolicy {
     #[cfg(not(target_arch = "wasm32"))]
-    pub fn get_threads_count(&self, for_size: ImageSize) -> usize {
+    pub fn thread_count(&self, for_size: ImageSize) -> usize {
         match self {
             ThreadingPolicy::Single => 1,
             ThreadingPolicy::Fixed(thread_count) => (*thread_count).max(1),
             ThreadingPolicy::Adaptive => {
                 let box_size = 256 * 256;
                 let new_box_size = for_size.height * for_size.width;
-                (new_box_size / box_size).clamp(1, 16)
+                (new_box_size / box_size).clamp(1, 12)
             }
         }
     }
 
     #[cfg(target_arch = "wasm32")]
-    pub fn get_threads_count(&self, _: ImageSize) -> usize {
+    pub fn thread_count(&self, _: ImageSize) -> usize {
         1
     }
 }
@@ -71,9 +71,9 @@ impl ThreadingPolicy {
         if *self == ThreadingPolicy::Single {
             return None;
         }
-        let threads_count = self.get_threads_count(for_size);
+        let thread_count = self.thread_count(for_size);
         match rayon::ThreadPoolBuilder::new()
-            .num_threads(threads_count)
+            .num_threads(thread_count)
             .build()
         {
             Ok(pool) => Some(pool),

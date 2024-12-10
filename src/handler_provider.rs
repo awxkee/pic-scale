@@ -38,7 +38,7 @@ use crate::floating_point_vertical::column_handler_floating_point;
 use crate::mixed_storage::MixedStorage;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{
-    convolve_column_lb_u16, convolve_column_u16, convolve_horizontal_rgba_neon_rows_4_lb_u8,
+    convolve_column_lb_u16, convolve_column_u16, convolve_horizontal_rgba_neon_rows_4_lb_u16,
     convolve_horizontal_rgba_neon_u16_lb_row,
 };
 use crate::saturate_narrow::SaturateNarrow;
@@ -51,7 +51,7 @@ use crate::sse::{
 use num_traits::{AsPrimitive, Float, MulAdd};
 use std::ops::{Add, AddAssign, Mul};
 
-pub trait ColumnHandlerFloatingPoint<T, J, F>
+pub(crate) trait ColumnHandlerFloatingPoint<T, J, F>
 where
     T: Copy + 'static + AsPrimitive<J> + Default,
     J: Copy + 'static + AsPrimitive<T> + MulAdd<J, Output = J> + Default + MixedStorage<T>,
@@ -153,7 +153,7 @@ impl ColumnHandlerFloatingPoint<u16, f32, f32> for u16 {
 default_floating_column_handler!(u8);
 default_floating_column_handler!(f32);
 
-pub trait RowHandlerFloatingPoint<T, J, F>
+pub(crate) trait RowHandlerFloatingPoint<T, J, F>
 where
     T: Copy + 'static + AsPrimitive<J> + Default,
     J: Copy + 'static + AsPrimitive<T> + MulAdd<J, Output = J> + Default + MixedStorage<T>,
@@ -263,7 +263,7 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
     }
 }
 
-pub trait ColumnHandlerFixedPoint<T> {
+pub(crate) trait ColumnHandlerFixedPoint<T> {
     fn handle_fixed_column<J, const COMPONENTS: usize>(
         dst_width: usize,
         bounds: &FilterBounds,
@@ -285,7 +285,7 @@ pub trait ColumnHandlerFixedPoint<T> {
         i16: AsPrimitive<J>;
 }
 
-pub trait RowHandlerFixedPoint<T> {
+pub(crate) trait RowHandlerFixedPoint<T> {
     fn handle_fixed_row_4<J, const COMPONENTS: usize>(
         src: &[T],
         src_stride: usize,
@@ -382,7 +382,7 @@ impl RowHandlerFixedPoint<u16> for u16 {
         u16: AsPrimitive<J>,
     {
         if COMPONENTS == 4 {
-            convolve_horizontal_rgba_neon_rows_4_lb_u8(
+            convolve_horizontal_rgba_neon_rows_4_lb_u16(
                 src,
                 src_stride,
                 dst,

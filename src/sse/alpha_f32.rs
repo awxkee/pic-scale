@@ -44,7 +44,7 @@ unsafe fn sse_unpremultiply_row_f32(x: __m128, a: __m128) -> __m128 {
     _mm_blendv_ps(rs, _mm_setzero_ps(), is_zero_mask)
 }
 
-pub fn sse_unpremultiply_alpha_rgba_f32(
+pub(crate) fn sse_unpremultiply_alpha_rgba_f32(
     in_place: &mut [f32],
     width: usize,
     height: usize,
@@ -106,7 +106,7 @@ unsafe fn sse_unpremultiply_alpha_rgba_f32_impl(
     }
 }
 
-pub fn sse_premultiply_alpha_rgba_f32(
+pub(crate) fn sse_premultiply_alpha_rgba_f32(
     dst: &mut [f32],
     src: &[f32],
     width: usize,

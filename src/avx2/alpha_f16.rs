@@ -37,7 +37,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-pub fn avx_premultiply_alpha_rgba_f16(
+pub(crate) fn avx_premultiply_alpha_rgba_f16(
     dst: &mut [half::f16],
     src: &[half::f16],
     width: usize,
@@ -138,7 +138,7 @@ unsafe fn avx_premultiply_alpha_rgba_f16_impl(
     }
 }
 
-pub fn avx_unpremultiply_alpha_rgba_f16(
+pub(crate) fn avx_unpremultiply_alpha_rgba_f16(
     in_place: &mut [half::f16],
     width: usize,
     height: usize,

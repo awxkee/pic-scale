@@ -34,7 +34,7 @@ use std::fmt::Debug;
 use crate::filter_weights::FilterWeights;
 use crate::ImageStore;
 
-pub trait HorizontalConvolutionPass<T, const N: usize>
+pub(crate) trait HorizontalConvolutionPass<T, const N: usize>
 where
     T: FromPrimitive + Clone + Copy + Debug,
 {
@@ -46,7 +46,7 @@ where
     );
 }
 
-pub trait VerticalConvolutionPass<T, const N: usize>
+pub(crate) trait VerticalConvolutionPass<T, const N: usize>
 where
     T: FromPrimitive + Clone + Copy + Debug,
 {

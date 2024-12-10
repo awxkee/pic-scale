@@ -28,14 +28,14 @@
  */
 
 use crate::filter_weights::FilterWeights;
-use crate::neon::utils::prefer_vfmaq_f32;
+use crate::neon::utils::{prefer_vfmaq_f32, xvld1q_f32_x4};
 use std::arch::aarch64::*;
 
 macro_rules! conv_horiz_plane_16_f32 {
     ($start_x: expr, $src: expr, $set: expr, $store: expr) => {{
         let src_ptr = $src.add($start_x);
 
-        let rgb_pixel = vld1q_f32_x4(src_ptr);
+        let rgb_pixel = xvld1q_f32_x4(src_ptr);
 
         let mut acc = prefer_vfmaq_f32($store, rgb_pixel.0, $set.0);
         acc = prefer_vfmaq_f32(acc, rgb_pixel.1, $set.1);
@@ -87,13 +87,6 @@ macro_rules! conv_horiz_plane_1_f32 {
     }};
 }
 
-macro_rules! vfullq_sum_f32 {
-    ($reg: expr) => {{
-        let acc = vadd_f32(vget_low_f32($reg), vget_high_f32($reg));
-        vpadds_f32(acc)
-    }};
-}
-
 pub fn convolve_horizontal_plane_neon_row_one(
     dst_width: usize,
     _: usize,
@@ -113,7 +106,7 @@ pub fn convolve_horizontal_plane_neon_row_one(
             while jx + 16 < bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let read_weights = vld1q_f32_x4(ptr);
+                let read_weights = xvld1q_f32_x4(ptr);
                 store = conv_horiz_plane_16_f32!(
                     bounds_start,
                     unsafe_source_ptr_0,
@@ -165,7 +158,7 @@ pub fn convolve_horizontal_plane_neon_row_one(
 
             let px = x;
             let dest_ptr = unsafe_destination_ptr_0.add(px);
-            dest_ptr.write_unaligned(vfullq_sum_f32!(store));
+            dest_ptr.write_unaligned(vaddvq_f32(store));
 
             filter_offset += filter_weights.aligned_size;
         }
@@ -196,7 +189,7 @@ pub fn convolve_horizontal_plane_neon_rows_4(
 
             while jx + 16 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let read_weights = vld1q_f32_x4(ptr);
+                let read_weights = xvld1q_f32_x4(ptr);
                 let bounds_start = bounds.start + jx;
                 store_0 = conv_horiz_plane_16_f32!(
                     bounds_start,
@@ -303,16 +296,16 @@ pub fn convolve_horizontal_plane_neon_rows_4(
 
             let px = x;
             let dest_ptr = unsafe_destination_ptr_0.add(px);
-            dest_ptr.write_unaligned(vfullq_sum_f32!(store_0));
+            dest_ptr.write_unaligned(vaddvq_f32(store_0));
 
             let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride);
-            dest_ptr.write_unaligned(vfullq_sum_f32!(store_1));
+            dest_ptr.write_unaligned(vaddvq_f32(store_1));
 
             let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 2);
-            dest_ptr.write_unaligned(vfullq_sum_f32!(store_2));
+            dest_ptr.write_unaligned(vaddvq_f32(store_2));
 
             let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 3);
-            dest_ptr.write_unaligned(vfullq_sum_f32!(store_3));
+            dest_ptr.write_unaligned(vaddvq_f32(store_3));
 
             filter_offset += filter_weights.aligned_size;
         }

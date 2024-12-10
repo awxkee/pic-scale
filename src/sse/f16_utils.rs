@@ -34,13 +34,13 @@ use std::arch::x86_64::*;
 
 #[inline]
 #[cfg(target_feature = "avx2")]
-pub unsafe fn _mm_srlv_epi32x(c: __m128i, n: __m128i) -> __m128i {
+pub(crate) unsafe fn _mm_srlv_epi32x(c: __m128i, n: __m128i) -> __m128i {
     _mm_srlv_epi32(c, n)
 }
 
 #[inline]
 #[cfg(not(target_feature = "avx2"))]
-pub unsafe fn _mm_srlv_epi32x(c: __m128i, n: __m128i) -> __m128i {
+pub(crate) unsafe fn _mm_srlv_epi32x(c: __m128i, n: __m128i) -> __m128i {
     _mm_setr_epi32(
         _mm_extract_epi32::<0>(c).wrapping_shr(_mm_extract_epi32::<0>(n) as u32),
         _mm_extract_epi32::<1>(c).wrapping_shr(_mm_extract_epi32::<1>(n) as u32),
@@ -51,13 +51,13 @@ pub unsafe fn _mm_srlv_epi32x(c: __m128i, n: __m128i) -> __m128i {
 
 #[inline]
 #[cfg(target_feature = "avx2")]
-pub unsafe fn _mm_sllv_epi32x(c: __m128i, n: __m128i) -> __m128i {
+pub(crate) unsafe fn _mm_sllv_epi32x(c: __m128i, n: __m128i) -> __m128i {
     _mm_sllv_epi32(c, n)
 }
 
 #[inline]
 #[cfg(not(target_feature = "avx2"))]
-pub unsafe fn _mm_sllv_epi32x(c: __m128i, n: __m128i) -> __m128i {
+pub(crate) unsafe fn _mm_sllv_epi32x(c: __m128i, n: __m128i) -> __m128i {
     _mm_setr_epi32(
         _mm_extract_epi32::<0>(c).wrapping_shl(_mm_extract_epi32::<0>(n) as u32),
         _mm_extract_epi32::<1>(c).wrapping_shl(_mm_extract_epi32::<1>(n) as u32),
@@ -67,7 +67,7 @@ pub unsafe fn _mm_sllv_epi32x(c: __m128i, n: __m128i) -> __m128i {
 }
 
 #[inline(always)]
-pub unsafe fn _mm_blendv_epi32(xmm0: __m128i, xmm1: __m128i, mask: __m128i) -> __m128i {
+pub(crate) unsafe fn _mm_blendv_epi32(xmm0: __m128i, xmm1: __m128i, mask: __m128i) -> __m128i {
     _mm_castps_si128(_mm_blendv_ps(
         _mm_castsi128_ps(xmm0),
         _mm_castsi128_ps(xmm1),
@@ -77,7 +77,11 @@ pub unsafe fn _mm_blendv_epi32(xmm0: __m128i, xmm1: __m128i, mask: __m128i) -> _
 
 #[inline(always)]
 /// If mask then `true_vals` otherwise `false_val`
-pub unsafe fn _mm_select_epi32(mask: __m128i, true_vals: __m128i, false_vals: __m128i) -> __m128i {
+pub(crate) unsafe fn _mm_select_epi32(
+    mask: __m128i,
+    true_vals: __m128i,
+    false_vals: __m128i,
+) -> __m128i {
     _mm_blendv_epi32(false_vals, true_vals, mask)
 }
 
@@ -181,7 +185,7 @@ unsafe fn _mm_cvtps_phdx(x: __m128) -> __m128i {
 }
 
 #[inline]
-pub unsafe fn _mm_cvtps_phx<const F16C: bool>(x: __m128) -> __m128i {
+pub(crate) unsafe fn _mm_cvtps_phx<const F16C: bool>(x: __m128) -> __m128i {
     if F16C {
         _mm_cvtps_phdx(x)
     } else {
@@ -196,7 +200,7 @@ unsafe fn _mm_cvtph_psdx(x: __m128i) -> __m128 {
 }
 
 #[inline]
-pub unsafe fn _mm_cvtph_psx<const F16C: bool>(x: __m128i) -> __m128 {
+pub(crate) unsafe fn _mm_cvtph_psx<const F16C: bool>(x: __m128i) -> __m128 {
     if F16C {
         _mm_cvtph_ps(x)
     } else {
