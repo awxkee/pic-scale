@@ -50,7 +50,6 @@ dependencies = [
  "half",
  "image",
  "pic-scale",
- "yuvutils-rs",
 ]
 
 [[package]]
@@ -1475,15 +1474,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "36c1fec1a2bb5866f07c25f68c26e565c4c200aebb96d7e55710c19d3e8ac49b"
 dependencies = [
  "memchr",
-]
-
-[[package]]
-name = "yuvutils-rs"
-version = "0.5.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74d0d13bb8e3921f9d76ef4bcb348108578df0402c6cf2695ef0690b4b64c7d9"
-dependencies = [
- "num-traits",
 ]
 
 [[package]]
