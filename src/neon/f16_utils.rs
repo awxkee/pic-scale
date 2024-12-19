@@ -33,23 +33,56 @@ use std::arch::asm;
 
 /// Provides basic support for f16
 
-#[derive(Debug, Clone, Copy)]
-#[allow(non_camel_case_types)]
-#[allow(dead_code)]
-pub struct x_float16x4_t(pub(crate) uint16x4_t);
+#[allow(unused)]
+macro_rules! static_assert {
+    ($e:expr) => {
+        const {
+            assert!($e);
+        }
+    };
+    ($e:expr, $msg:expr) => {
+        const {
+            assert!($e, $msg);
+        }
+    };
+}
+
+#[allow(unused_macros)]
+macro_rules! static_assert_uimm_bits {
+    ($imm:ident, $bits:expr) => {
+        // `0 <= $imm` produces a warning if the immediate has an unsigned type
+        #[allow(unused_comparisons)]
+        {
+            static_assert!(
+                0 <= $imm && $imm < (1 << $bits),
+                concat!(
+                    stringify!($imm),
+                    " doesn't fit in ",
+                    stringify!($bits),
+                    " bits",
+                )
+            )
+        }
+    };
+}
 
 #[derive(Debug, Clone, Copy)]
 #[allow(non_camel_case_types)]
 #[allow(dead_code)]
-pub struct x_float16x8_t(pub(crate) uint16x8_t);
+pub(crate) struct x_float16x4_t(pub(crate) uint16x4_t);
 
 #[derive(Debug, Clone, Copy)]
 #[allow(non_camel_case_types)]
-pub struct x_float16x8x2_t(pub(crate) x_float16x8_t, pub(crate) x_float16x8_t);
+#[allow(dead_code)]
+pub(crate) struct x_float16x8_t(pub(crate) uint16x8_t);
 
 #[derive(Debug, Clone, Copy)]
 #[allow(non_camel_case_types)]
-pub struct x_float16x8x4_t(
+pub(crate) struct x_float16x8x2_t(pub(crate) x_float16x8_t, pub(crate) x_float16x8_t);
+
+#[derive(Debug, Clone, Copy)]
+#[allow(non_camel_case_types)]
+pub(crate) struct x_float16x8x4_t(
     pub(crate) x_float16x8_t,
     pub(crate) x_float16x8_t,
     pub(crate) x_float16x8_t,
@@ -57,41 +90,49 @@ pub struct x_float16x8x4_t(
 );
 
 #[inline]
-pub unsafe fn xvld_f16(ptr: *const half::f16) -> x_float16x4_t {
+pub(crate) unsafe fn xvld_f16(ptr: *const half::f16) -> x_float16x4_t {
     let store: uint16x4_t = vld1_u16(std::mem::transmute(ptr));
     std::mem::transmute(store)
 }
 
 #[inline]
-pub unsafe fn xvldq_f16(ptr: *const half::f16) -> x_float16x8_t {
+pub(crate) unsafe fn xvldq_f16(ptr: *const half::f16) -> x_float16x8_t {
     let store: uint16x8_t = vld1q_u16(std::mem::transmute(ptr));
     std::mem::transmute(store)
 }
 
 #[inline]
-pub unsafe fn xvldq_f16_x2(ptr: *const half::f16) -> x_float16x8x2_t {
-    let store = vld1q_u16_x2(std::mem::transmute(ptr));
-    std::mem::transmute(store)
+pub(crate) unsafe fn xvldq_f16_x2(ptr: *const half::f16) -> x_float16x8x2_t {
+    let ptr_u16 = ptr as *const u16;
+    x_float16x8x2_t(
+        xreinterpretq_f16_u16(vld1q_u16(ptr_u16)),
+        xreinterpretq_f16_u16(vld1q_u16(ptr_u16.add(8))),
+    )
 }
 
 #[inline]
-pub unsafe fn xvldq_f16_x4(ptr: *const half::f16) -> x_float16x8x4_t {
-    let store = vld1q_u16_x4(std::mem::transmute(ptr));
-    std::mem::transmute(store)
+pub(crate) unsafe fn xvldq_f16_x4(ptr: *const half::f16) -> x_float16x8x4_t {
+    let ptr_u16 = ptr as *const u16;
+    x_float16x8x4_t(
+        xreinterpretq_f16_u16(vld1q_u16(ptr_u16)),
+        xreinterpretq_f16_u16(vld1q_u16(ptr_u16.add(8))),
+        xreinterpretq_f16_u16(vld1q_u16(ptr_u16.add(16))),
+        xreinterpretq_f16_u16(vld1q_u16(ptr_u16.add(24))),
+    )
 }
 
 #[inline]
-pub unsafe fn xvget_low_f16(x: x_float16x8_t) -> x_float16x4_t {
+pub(crate) unsafe fn xvget_low_f16(x: x_float16x8_t) -> x_float16x4_t {
     std::mem::transmute(vget_low_u16(std::mem::transmute(x)))
 }
 
 #[inline]
-pub unsafe fn xvget_high_f16(x: x_float16x8_t) -> x_float16x4_t {
+pub(crate) unsafe fn xvget_high_f16(x: x_float16x8_t) -> x_float16x4_t {
     std::mem::transmute(vget_high_u16(std::mem::transmute(x)))
 }
 
 #[inline]
-pub unsafe fn xcombine_f16(low: x_float16x4_t, high: x_float16x4_t) -> x_float16x8_t {
+pub(crate) unsafe fn xcombine_f16(low: x_float16x4_t, high: x_float16x4_t) -> x_float16x8_t {
     std::mem::transmute(vcombine_u16(
         std::mem::transmute(low),
         std::mem::transmute(high),
@@ -99,22 +140,22 @@ pub unsafe fn xcombine_f16(low: x_float16x4_t, high: x_float16x4_t) -> x_float16
 }
 
 #[inline]
-pub unsafe fn xreinterpret_u16_f16(x: x_float16x4_t) -> uint16x4_t {
+pub(crate) unsafe fn xreinterpret_u16_f16(x: x_float16x4_t) -> uint16x4_t {
     std::mem::transmute(x)
 }
 
 #[inline]
-pub unsafe fn xreinterpretq_u16_f16(x: x_float16x8_t) -> uint16x8_t {
+pub(crate) unsafe fn xreinterpretq_u16_f16(x: x_float16x8_t) -> uint16x8_t {
     std::mem::transmute(x)
 }
 
 #[inline]
-pub unsafe fn xreinterpret_f16_u16(x: uint16x4_t) -> x_float16x4_t {
+pub(crate) unsafe fn xreinterpret_f16_u16(x: uint16x4_t) -> x_float16x4_t {
     std::mem::transmute(x)
 }
 
 #[inline]
-pub unsafe fn xreinterpretq_f16_u16(x: uint16x8_t) -> x_float16x8_t {
+pub(crate) unsafe fn xreinterpretq_f16_u16(x: uint16x8_t) -> x_float16x8_t {
     std::mem::transmute(x)
 }
 
@@ -129,7 +170,7 @@ pub(super) unsafe fn xvzeros_f16() -> x_float16x4_t {
 }
 
 #[inline]
-pub unsafe fn xvcvt_f32_f16(x: x_float16x4_t) -> float32x4_t {
+pub(crate) unsafe fn xvcvt_f32_f16(x: x_float16x4_t) -> float32x4_t {
     let src: uint16x4_t = xreinterpret_u16_f16(x);
     let dst: float32x4_t;
     asm!(
@@ -213,6 +254,130 @@ pub(super) unsafe fn xvfmla_f16(
     in(vreg) xreinterpret_u16_f16(c),
     options(pure, nomem, nostack)
     );
+    xreinterpret_f16_u16(result)
+}
+
+#[target_feature(enable = "fp16")]
+#[inline]
+pub(super) unsafe fn xvfmla_laneq_f16<const LANE: i32>(
+    a: x_float16x4_t,
+    b: x_float16x4_t,
+    c: x_float16x8_t,
+) -> x_float16x4_t {
+    static_assert_uimm_bits!(LANE, 3);
+    let mut result: uint16x4_t = xreinterpret_u16_f16(a);
+
+    if LANE == 0 {
+        asm!(
+        "fmla {0:v}.4h, {1:v}.4h, {2:v}.h[0]",
+        inout(vreg) result,
+        in(vreg) xreinterpret_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 1 {
+        asm!(
+        "fmla {0:v}.4h, {1:v}.4h, {2:v}.h[1]",
+        inout(vreg) result,
+        in(vreg) xreinterpret_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 2 {
+        asm!(
+        "fmla {0:v}.4h, {1:v}.4h, {2:v}.h[2]",
+        inout(vreg) result,
+        in(vreg) xreinterpret_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 3 {
+        asm!(
+        "fmla {0:v}.4h, {1:v}.4h, {2:v}.h[3]",
+        inout(vreg) result,
+        in(vreg) xreinterpret_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 4 {
+        asm!(
+        "fmla {0:v}.4h, {1:v}.4h, {2:v}.h[4]",
+        inout(vreg) result,
+        in(vreg) xreinterpret_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 5 {
+        asm!(
+        "fmla {0:v}.4h, {1:v}.4h, {2:v}.h[5]",
+        inout(vreg) result,
+        in(vreg) xreinterpret_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 6 {
+        asm!(
+        "fmla {0:v}.4h, {1:v}.4h, {2:v}.h[6]",
+        inout(vreg) result,
+        in(vreg) xreinterpret_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 7 {
+        asm!(
+        "fmla {0:v}.4h, {1:v}.4h, {2:v}.h[7]",
+        inout(vreg) result,
+        in(vreg) xreinterpret_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    }
+    xreinterpret_f16_u16(result)
+}
+
+#[target_feature(enable = "fp16")]
+#[inline]
+pub(super) unsafe fn xvfmla_lane_f16<const LANE: i32>(
+    a: x_float16x4_t,
+    b: x_float16x4_t,
+    c: x_float16x4_t,
+) -> x_float16x4_t {
+    static_assert_uimm_bits!(LANE, 3);
+    let mut result: uint16x4_t = xreinterpret_u16_f16(a);
+
+    if LANE == 0 {
+        asm!(
+        "fmla {0:v}.4h, {1:v}.4h, {2:v}.h[0]",
+        inout(vreg) result,
+        in(vreg) xreinterpret_u16_f16(b),
+        in(vreg) xreinterpret_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 1 {
+        asm!(
+        "fmla {0:v}.4h, {1:v}.4h, {2:v}.h[1]",
+        inout(vreg) result,
+        in(vreg) xreinterpret_u16_f16(b),
+        in(vreg) xreinterpret_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 2 {
+        asm!(
+        "fmla {0:v}.4h, {1:v}.4h, {2:v}.h[2]",
+        inout(vreg) result,
+        in(vreg) xreinterpret_u16_f16(b),
+        in(vreg) xreinterpret_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 3 {
+        asm!(
+        "fmla {0:v}.4h, {1:v}.4h, {2:v}.h[3]",
+        inout(vreg) result,
+        in(vreg) xreinterpret_u16_f16(b),
+        in(vreg) xreinterpret_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    }
     xreinterpret_f16_u16(result)
 }
 
@@ -309,38 +474,66 @@ pub(super) unsafe fn xvbslq_f16(
 }
 
 #[inline]
-pub unsafe fn xvst_f16(ptr: *const half::f16, x: x_float16x4_t) {
+pub(crate) unsafe fn xvst_f16(ptr: *mut half::f16, x: x_float16x4_t) {
     vst1_u16(std::mem::transmute(ptr), xreinterpret_u16_f16(x))
 }
 
 #[inline]
-pub unsafe fn xvstq_f16(ptr: *const half::f16, x: x_float16x8_t) {
+pub(crate) unsafe fn xvstq_f16(ptr: *mut half::f16, x: x_float16x8_t) {
     vst1q_u16(std::mem::transmute(ptr), xreinterpretq_u16_f16(x))
 }
 
 #[inline]
-pub unsafe fn xvstq_f16_x2(ptr: *const half::f16, x: x_float16x8x2_t) {
-    vst1q_u16_x2(std::mem::transmute(ptr), std::mem::transmute(x))
+pub(crate) unsafe fn xvstq_f16_x2(ptr: *mut half::f16, x: x_float16x8x2_t) {
+    let ptr_u16 = ptr as *mut u16;
+    vst1q_u16(ptr_u16, xreinterpretq_u16_f16(x.0));
+    vst1q_u16(ptr_u16.add(8), xreinterpretq_u16_f16(x.1));
 }
 
 #[inline]
-pub unsafe fn xvstq_f16_x4(ptr: *const half::f16, x: x_float16x8x4_t) {
-    vst1q_u16_x4(std::mem::transmute(ptr), std::mem::transmute(x))
+pub(crate) unsafe fn xvstq_f16_x4(ptr: *const half::f16, x: x_float16x8x4_t) {
+    let ptr_u16 = ptr as *mut u16;
+    vst1q_u16(ptr_u16, xreinterpretq_u16_f16(x.0));
+    vst1q_u16(ptr_u16.add(8), xreinterpretq_u16_f16(x.1));
+    vst1q_u16(ptr_u16.add(16), xreinterpretq_u16_f16(x.2));
+    vst1q_u16(ptr_u16.add(24), xreinterpretq_u16_f16(x.3));
 }
 
 #[inline]
-pub unsafe fn xvdup_lane_f16<const N: i32>(a: x_float16x4_t) -> x_float16x4_t {
+pub(crate) unsafe fn xvdup_lane_f16<const N: i32>(a: x_float16x4_t) -> x_float16x4_t {
     xreinterpret_f16_u16(vdup_lane_u16::<N>(xreinterpret_u16_f16(a)))
 }
 
 #[inline]
-pub unsafe fn xvdup_laneq_f16<const N: i32>(a: x_float16x8_t) -> x_float16x4_t {
+pub(crate) unsafe fn xvdup_laneq_f16<const N: i32>(a: x_float16x8_t) -> x_float16x4_t {
     xreinterpret_f16_u16(vdup_laneq_u16::<N>(xreinterpretq_u16_f16(a)))
+}
+
+#[inline]
+pub(crate) unsafe fn xvld1q_lane_f16<const LANE: i32>(
+    ptr: *const half::f16,
+    src: x_float16x8_t,
+) -> x_float16x8_t {
+    xreinterpretq_f16_u16(vld1q_lane_u16::<LANE>(
+        ptr as *const u16,
+        xreinterpretq_u16_f16(src),
+    ))
+}
+
+#[inline]
+pub(crate) unsafe fn xvsetq_lane_f16<const LANE: i32>(
+    v: half::f16,
+    r: x_float16x8_t,
+) -> x_float16x8_t {
+    xreinterpretq_f16_u16(vsetq_lane_u16::<LANE>(
+        v.to_bits(),
+        xreinterpretq_u16_f16(r),
+    ))
 }
 
 #[target_feature(enable = "fp16")]
 #[inline]
-pub unsafe fn vceqzq_f16(a: x_float16x8_t) -> uint16x8_t {
+pub(crate) unsafe fn vceqzq_f16(a: x_float16x8_t) -> uint16x8_t {
     let mut result: uint16x8_t;
     asm!(
     "fcmeq {0:v}.8h, {1:v}.8h, #0",

@@ -35,13 +35,14 @@ use crate::avx2::{
     convolve_vertical_avx_row_f16,
 };
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
-use crate::convolve_naive_f32::{
-    convolve_horizontal_rgb_native_row, convolve_horizontal_rgba_4_row_f32,
-};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
 use crate::cpu_features::{is_aarch_f16_supported, is_aarch_f16c_supported};
 use crate::dispatch_group_f16::{convolve_horizontal_dispatch_f16, convolve_vertical_dispatch_f16};
 use crate::filter_weights::{FilterBounds, FilterWeights};
+use crate::floating_point_horizontal::{
+    convolve_row_handler_floating_point, convolve_row_handler_floating_point_4,
+};
+use crate::floating_point_vertical::column_handler_floating_point;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
 use crate::neon::{
     convolve_horizontal_rgb_neon_row_one_f16, convolve_horizontal_rgb_neon_rows_4_f16,
@@ -54,7 +55,6 @@ use crate::neon::{
     xconvolve_horizontal_rgba_neon_row_one_f16, xconvolve_horizontal_rgba_neon_rows_4_f16,
     xconvolve_vertical_rgb_neon_row_f16,
 };
-use crate::rgb_f32::convolve_vertical_rgb_native_row_f32;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{
     convolve_horizontal_rgb_sse_row_one_f16, convolve_horizontal_rgb_sse_rows_4_f16,
@@ -65,6 +65,35 @@ use crate::ImageStore;
 use half::f16;
 use rayon::ThreadPool;
 
+fn convolve_horizontal_rgba_4_row_f16<const CHANNELS: usize>(
+    _: usize,
+    _: usize,
+    filter_weights: &FilterWeights<f32>,
+    src: &[f16],
+    src_stride: usize,
+    dst: &mut [f16],
+    dst_stride: usize,
+) {
+    convolve_row_handler_floating_point_4::<f16, f32, f32, CHANNELS>(
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+        filter_weights,
+        8,
+    )
+}
+
+fn convolve_horizontal_rgb_native_row_f16<const CHANNELS: usize>(
+    _: usize,
+    _: usize,
+    filter_weights: &FilterWeights<f32>,
+    src: &[f16],
+    dst: &mut [f16],
+) {
+    convolve_row_handler_floating_point::<f16, f32, f32, CHANNELS>(src, dst, filter_weights, 8)
+}
+
 impl<'a> HorizontalConvolutionPass<f16, 4> for ImageStore<'a, f16, 4> {
     fn convolve_horizontal(
         &self,
@@ -73,10 +102,10 @@ impl<'a> HorizontalConvolutionPass<f16, 4> for ImageStore<'a, f16, 4> {
         pool: &Option<ThreadPool>,
     ) {
         let mut _dispatcher_4_rows: Option<
-            fn(usize, usize, &FilterWeights<f32>, *const f16, usize, *mut f16, usize),
-        > = Some(convolve_horizontal_rgba_4_row_f32::<f16, f32, 4>);
-        let mut _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, *const f16, *mut f16) =
-            convolve_horizontal_rgb_native_row::<f16, f32, 4>;
+            fn(usize, usize, &FilterWeights<f32>, &[f16], usize, &mut [f16], usize),
+        > = Some(convolve_horizontal_rgba_4_row_f16::<4>);
+        let mut _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, &[f16], &mut [f16]) =
+            convolve_horizontal_rgb_native_row_f16::<4>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if is_aarch_f16c_supported() {
@@ -126,6 +155,17 @@ impl<'a> HorizontalConvolutionPass<f16, 4> for ImageStore<'a, f16, 4> {
     }
 }
 
+fn convolve_vertical_rgb_native_row_f16<const COMPONENTS: usize>(
+    _: usize,
+    bounds: &FilterBounds,
+    src: &[f16],
+    dst: &mut [f16],
+    src_stride: usize,
+    weight: &[f32],
+) {
+    column_handler_floating_point::<f16, f32, f32>(bounds, src, dst, src_stride, weight, 8);
+}
+
 impl<'a> VerticalConvolutionPass<f16, 4> for ImageStore<'a, f16, 4> {
     fn convolve_vertical(
         &self,
@@ -133,8 +173,8 @@ impl<'a> VerticalConvolutionPass<f16, 4> for ImageStore<'a, f16, 4> {
         destination: &mut ImageStore<f16, 4>,
         pool: &Option<ThreadPool>,
     ) {
-        let mut _dispatcher: fn(usize, &FilterBounds, *const f16, *mut f16, usize, &[f32]) =
-            convolve_vertical_rgb_native_row_f32::<f16, 4>;
+        let mut _dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[f32]) =
+            convolve_vertical_rgb_native_row_f16::<4>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if is_aarch_f16c_supported() {
@@ -178,10 +218,10 @@ impl<'a> HorizontalConvolutionPass<f16, 3> for ImageStore<'a, f16, 3> {
         pool: &Option<ThreadPool>,
     ) {
         let mut _dispatcher_4_rows: Option<
-            fn(usize, usize, &FilterWeights<f32>, *const f16, usize, *mut f16, usize),
-        > = Some(convolve_horizontal_rgba_4_row_f32::<f16, f32, 3>);
-        let mut _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, *const f16, *mut f16) =
-            convolve_horizontal_rgb_native_row::<f16, f32, 3>;
+            fn(usize, usize, &FilterWeights<f32>, &[f16], usize, &mut [f16], usize),
+        > = Some(convolve_horizontal_rgba_4_row_f16::<3>);
+        let mut _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, &[f16], &mut [f16]) =
+            convolve_horizontal_rgb_native_row_f16::<3>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if is_aarch_f16c_supported() {
@@ -229,8 +269,8 @@ impl<'a> VerticalConvolutionPass<f16, 3> for ImageStore<'a, f16, 3> {
         destination: &mut ImageStore<f16, 3>,
         pool: &Option<ThreadPool>,
     ) {
-        let mut _dispatcher: fn(usize, &FilterBounds, *const f16, *mut f16, usize, &[f32]) =
-            convolve_vertical_rgb_native_row_f32::<f16, 3>;
+        let mut _dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[f32]) =
+            convolve_vertical_rgb_native_row_f16::<3>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if is_aarch_f16c_supported() {
@@ -274,10 +314,10 @@ impl<'a> HorizontalConvolutionPass<f16, 1> for ImageStore<'a, f16, 1> {
         pool: &Option<ThreadPool>,
     ) {
         let _dispatcher_4_rows: Option<
-            fn(usize, usize, &FilterWeights<f32>, *const f16, usize, *mut f16, usize),
-        > = Some(convolve_horizontal_rgba_4_row_f32::<f16, f32, 1>);
-        let _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, *const f16, *mut f16) =
-            convolve_horizontal_rgb_native_row::<f16, f32, 1>;
+            fn(usize, usize, &FilterWeights<f32>, &[f16], usize, &mut [f16], usize),
+        > = Some(convolve_horizontal_rgba_4_row_f16::<1>);
+        let _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, &[f16], &mut [f16]) =
+            convolve_horizontal_rgb_native_row_f16::<1>;
         convolve_horizontal_dispatch_f16(
             self,
             filter_weights,
@@ -296,8 +336,8 @@ impl<'a> VerticalConvolutionPass<f16, 1> for ImageStore<'a, f16, 1> {
         destination: &mut ImageStore<f16, 1>,
         pool: &Option<ThreadPool>,
     ) {
-        let mut _dispatcher: fn(usize, &FilterBounds, *const f16, *mut f16, usize, &[f32]) =
-            convolve_vertical_rgb_native_row_f32::<f16, 1>;
+        let mut _dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[f32]) =
+            convolve_vertical_rgb_native_row_f16::<1>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if is_aarch_f16c_supported() {

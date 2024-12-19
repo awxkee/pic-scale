@@ -109,7 +109,7 @@ unsafe fn write_accumulator_u8(store: int32x4_t, dst: &mut [u8]) {
     *dst.get_unchecked_mut(2) = bytes[2];
 }
 
-pub fn convolve_horizontal_rgb_neon_rows_4(
+pub(crate) fn convolve_horizontal_rgb_neon_rows_4(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -200,7 +200,7 @@ pub fn convolve_horizontal_rgb_neon_rows_4(
     }
 }
 
-pub fn convolve_horizontal_rgb_neon_row_one(
+pub(crate) fn convolve_horizontal_rgb_neon_row_one(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,

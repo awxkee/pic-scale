@@ -28,7 +28,7 @@
  */
 
 use crate::filter_weights::FilterWeights;
-use crate::neon::utils::{prefer_vfmaq_f32, xvld1q_f32_x4};
+use crate::neon::utils::{prefer_vfmaq_f32, xvld1q_f32_x2, xvld1q_f32_x4};
 use std::arch::aarch64::*;
 
 macro_rules! conv_horiz_plane_16_f32 {
@@ -49,7 +49,7 @@ macro_rules! conv_horiz_plane_8_f32 {
     ($start_x: expr, $src: expr, $set1: expr, $set2: expr, $store: expr) => {{
         let src_ptr = $src.add($start_x);
 
-        let rgb_pixel = vld1q_f32_x2(src_ptr);
+        let rgb_pixel = xvld1q_f32_x2(src_ptr);
 
         let mut acc = prefer_vfmaq_f32($store, rgb_pixel.0, $set1);
         acc = prefer_vfmaq_f32(acc, rgb_pixel.1, $set2);
@@ -87,7 +87,7 @@ macro_rules! conv_horiz_plane_1_f32 {
     }};
 }
 
-pub fn convolve_horizontal_plane_neon_row_one(
+pub(crate) fn convolve_horizontal_plane_neon_row_one(
     dst_width: usize,
     _: usize,
     filter_weights: &FilterWeights<f32>,
@@ -119,7 +119,7 @@ pub fn convolve_horizontal_plane_neon_row_one(
             while jx + 8 < bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let read_weights = vld1q_f32_x2(ptr);
+                let read_weights = xvld1q_f32_x2(ptr);
                 store = conv_horiz_plane_8_f32!(
                     bounds_start,
                     unsafe_source_ptr_0,
@@ -165,7 +165,7 @@ pub fn convolve_horizontal_plane_neon_row_one(
     }
 }
 
-pub fn convolve_horizontal_plane_neon_rows_4(
+pub(crate) fn convolve_horizontal_plane_neon_rows_4(
     dst_width: usize,
     _: usize,
     filter_weights: &FilterWeights<f32>,
@@ -208,7 +208,7 @@ pub fn convolve_horizontal_plane_neon_rows_4(
 
             while jx + 8 < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let read_weights = vld1q_f32_x2(ptr);
+                let read_weights = xvld1q_f32_x2(ptr);
                 let bounds_start = bounds.start + jx;
                 store_0 = conv_horiz_plane_8_f32!(
                     bounds_start,

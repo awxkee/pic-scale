@@ -11,11 +11,8 @@ use fast_image_resize::{
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
-    Ar30ByteOrder, ImageSize, ImageStore, LinearApproxScaler, ResamplingFunction, Scaler, Scaling,
-    ScalingU16, ThreadingPolicy,
-};
-use yuvutils_rs::{
-    ar30_to_rgba8, ra30_to_rgba8, rgb8_to_ar30, rgba8_to_ar30, rgba8_to_ra30, Rgb30ByteOrder,
+    Ar30ByteOrder, ImageSize, ImageStore, LinearApproxScaler, LinearScaler, ResamplingFunction,
+    Scaler, Scaling, ScalingU16, ThreadingPolicy,
 };
 
 fn resize_plane(
@@ -46,7 +43,6 @@ fn resize_plane(
         .unwrap();
 }
 
-
 fn main() {
     // test_fast_image();
     let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
@@ -57,10 +53,10 @@ fn main() {
     let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
-    let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+    let mut scaler = LinearScaler::new(ResamplingFunction::Bilinear);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
-    resize_plane(378, 257, 257, 257, ResamplingFunction::Bilinear);
+    // resize_plane(378, 257, 257, 257, ResamplingFunction::Bilinear);
 
     // let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 2).collect();
     //

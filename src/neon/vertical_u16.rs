@@ -32,7 +32,7 @@ use crate::neon::utils::prefer_vfmaq_f32;
 use std::arch::aarch64::*;
 
 #[inline(always)]
-pub fn convolve_column_u16(
+pub(crate) fn convolve_column_u16(
     _: usize,
     bounds: &FilterBounds,
     src: &[u16],

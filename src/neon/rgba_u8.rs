@@ -195,7 +195,7 @@ unsafe fn conv_horiz_rgba_1_u8_i16<const SCALE: i32>(
     vqrdmlah_s16(store, lo, w0)
 }
 
-pub fn convolve_horizontal_rgba_neon_rows_4_u8_i16(
+pub(crate) fn convolve_horizontal_rgba_neon_rows_4_u8_i16(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -334,7 +334,7 @@ unsafe fn convolve_horizontal_rgba_neon_rows_4_u8_i16_impl(
     }
 }
 
-pub fn convolve_horizontal_rgba_neon_rows_4_u8(
+pub(crate) fn convolve_horizontal_rgba_neon_rows_4_u8(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -452,7 +452,7 @@ pub fn convolve_horizontal_rgba_neon_rows_4_u8(
     }
 }
 
-pub fn convolve_horizontal_rgba_neon_row(
+pub(crate) fn convolve_horizontal_rgba_neon_row(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
@@ -516,7 +516,7 @@ pub fn convolve_horizontal_rgba_neon_row(
     }
 }
 
-pub fn convolve_horizontal_rgba_neon_row_i16(
+pub(crate) fn convolve_horizontal_rgba_neon_row_i16(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,

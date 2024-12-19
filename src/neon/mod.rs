@@ -66,51 +66,62 @@ mod vertical_u16_lb;
 mod vertical_u8;
 
 #[cfg(feature = "half")]
-pub use alpha_f16::{neon_premultiply_alpha_rgba_f16, neon_unpremultiply_alpha_rgba_f16};
+pub(crate) use alpha_f16::{neon_premultiply_alpha_rgba_f16, neon_unpremultiply_alpha_rgba_f16};
 #[cfg(feature = "half")]
-pub use alpha_f16_full::{
+pub(crate) use alpha_f16_full::{
     neon_premultiply_alpha_rgba_f16_full, neon_unpremultiply_alpha_rgba_f16_full,
 };
-pub use alpha_f32::neon_premultiply_alpha_rgba_f32;
-pub use alpha_f32::neon_unpremultiply_alpha_rgba_f32;
-pub use alpha_u16::{neon_premultiply_alpha_rgba_u16, neon_unpremultiply_alpha_rgba_u16};
-pub use alpha_u8::neon_premultiply_alpha_rgba;
-pub use alpha_u8::neon_unpremultiply_alpha_rgba;
+pub(crate) use alpha_f32::neon_premultiply_alpha_rgba_f32;
+pub(crate) use alpha_f32::neon_unpremultiply_alpha_rgba_f32;
+pub(crate) use alpha_u16::{neon_premultiply_alpha_rgba_u16, neon_unpremultiply_alpha_rgba_u16};
+pub(crate) use alpha_u8::neon_premultiply_alpha_rgba;
+pub(crate) use alpha_u8::neon_unpremultiply_alpha_rgba;
 #[cfg(feature = "half")]
-pub use f16_utils::*;
+pub(crate) use f16_utils::*;
 pub(crate) use horizontal_ar30::neon_convolve_horizontal_rgba_rows_4_ar30;
-pub use plane_f32::convolve_horizontal_plane_neon_row_one;
-pub use plane_f32::convolve_horizontal_plane_neon_rows_4;
+pub(crate) use plane_f32::convolve_horizontal_plane_neon_row_one;
+pub(crate) use plane_f32::convolve_horizontal_plane_neon_rows_4;
 pub use plane_u8::{convolve_horizontal_plane_neon_row, convolve_horizontal_plane_neon_rows_4_u8};
 #[cfg(feature = "half")]
-pub use rgb_f16::{
+pub(crate) use rgb_f16::{
     convolve_horizontal_rgb_neon_row_one_f16, convolve_horizontal_rgb_neon_rows_4_f16,
 };
 #[cfg(feature = "half")]
-pub use rgb_f16_full::{
+pub(crate) use rgb_f16_full::{
     xconvolve_horizontal_rgb_neon_row_one_f16, xconvolve_horizontal_rgb_neon_rows_4_f16,
 };
-pub use rgb_f32::*;
-pub use rgb_u8::*;
+pub(crate) use rgb_f32::{
+    convolve_horizontal_rgb_neon_row_one_f32, convolve_horizontal_rgb_neon_rows_4_f32,
+};
+pub(crate) use rgb_u8::{
+    convolve_horizontal_rgb_neon_row_one, convolve_horizontal_rgb_neon_rows_4,
+};
 #[cfg(feature = "half")]
-pub use rgba_f16::convolve_horizontal_rgba_neon_row_one_f16;
+pub(crate) use rgba_f16::convolve_horizontal_rgba_neon_row_one_f16;
 #[cfg(feature = "half")]
-pub use rgba_f16::convolve_horizontal_rgba_neon_rows_4_f16;
+pub(crate) use rgba_f16::convolve_horizontal_rgba_neon_rows_4_f16;
 #[cfg(feature = "half")]
-pub use rgba_f16_full::{
+pub(crate) use rgba_f16_full::{
     xconvolve_horizontal_rgba_neon_row_one_f16, xconvolve_horizontal_rgba_neon_rows_4_f16,
 };
-pub use rgba_f32::*;
-pub use rgba_u16_lb::{
+pub(crate) use rgba_f32::{
+    convolve_horizontal_rgba_neon_row_one, convolve_horizontal_rgba_neon_rows_4,
+};
+pub(crate) use rgba_u16_lb::{
     convolve_horizontal_rgba_neon_rows_4_lb_u16, convolve_horizontal_rgba_neon_u16_lb_row,
 };
-pub use rgba_u8::*;
+pub(crate) use rgba_u8::{
+    convolve_horizontal_rgba_neon_row, convolve_horizontal_rgba_neon_row_i16,
+    convolve_horizontal_rgba_neon_rows_4_u8, convolve_horizontal_rgba_neon_rows_4_u8_i16,
+};
 pub(crate) use vertical_ar30::neon_column_handler_fixed_point_ar30;
 #[cfg(feature = "half")]
-pub use vertical_f16::convolve_vertical_rgb_neon_row_f16;
+pub(crate) use vertical_f16::convolve_vertical_rgb_neon_row_f16;
 #[cfg(feature = "half")]
-pub use vertical_f16_full::xconvolve_vertical_rgb_neon_row_f16;
-pub use vertical_f32::convolve_vertical_rgb_neon_row_f32;
-pub use vertical_u16::convolve_column_u16;
-pub use vertical_u16_lb::convolve_column_lb_u16;
-pub use vertical_u8::{convolve_vertical_neon_i16_precision, convolve_vertical_neon_i32_precision};
+pub(crate) use vertical_f16_full::xconvolve_vertical_rgb_neon_row_f16;
+pub(crate) use vertical_f32::convolve_vertical_rgb_neon_row_f32;
+pub(crate) use vertical_u16::convolve_column_u16;
+pub(crate) use vertical_u16_lb::convolve_column_lb_u16;
+pub(crate) use vertical_u8::{
+    convolve_vertical_neon_i16_precision, convolve_vertical_neon_i32_precision,
+};

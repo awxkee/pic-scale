@@ -46,7 +46,7 @@ macro_rules! conv_vertical_part_neon_16_f16 {
             for j in 0..$bounds.size {
                 let py = $start_y + j;
                 let v_weight = vld1q_dup_f32($filter.get_unchecked(j..).as_ptr());
-                let src_ptr = $src.add($src_stride * py);
+                let src_ptr = $src.get_unchecked($src_stride * py..).as_ptr();
 
                 let s_ptr = src_ptr.add(px);
                 let item_row = xvldq_f16_x2(s_ptr);
@@ -61,7 +61,7 @@ macro_rules! conv_vertical_part_neon_16_f16 {
                     prefer_vfmaq_f32(store_3, xvcvt_f32_f16(xvget_high_f16(item_row.1)), v_weight);
             }
 
-            let dst_ptr = $dst.add(px);
+            let dst_ptr = $dst.get_unchecked_mut(px..).as_mut_ptr();
             let f_set = x_float16x8x2_t(
                 xcombine_f16(xvcvt_f16_f32(store_0), xvcvt_f16_f32(store_1)),
                 xcombine_f16(xvcvt_f16_f32(store_2), xvcvt_f16_f32(store_3)),
@@ -88,7 +88,7 @@ macro_rules! conv_vertical_part_neon_32_f16 {
             for j in 0..$bounds.size {
                 let py = $start_y + j;
                 let v_weight = vld1q_dup_f32($filter.get_unchecked(j..).as_ptr());
-                let src_ptr = $src.add($src_stride * py);
+                let src_ptr = $src.get_unchecked($src_stride * py..).as_ptr();
 
                 let s_ptr = src_ptr.add(px);
                 let item_row = xvldq_f16_x4(s_ptr);
@@ -112,7 +112,7 @@ macro_rules! conv_vertical_part_neon_32_f16 {
                     prefer_vfmaq_f32(store_7, xvcvt_f32_f16(xvget_high_f16(item_row.3)), v_weight);
             }
 
-            let dst_ptr = $dst.add(px);
+            let dst_ptr = $dst.get_unchecked_mut(px..).as_mut_ptr();
             let f_set = x_float16x8x4_t(
                 xcombine_f16(xvcvt_f16_f32(store_0), xvcvt_f16_f32(store_1)),
                 xcombine_f16(xvcvt_f16_f32(store_2), xvcvt_f16_f32(store_3)),
@@ -147,7 +147,7 @@ macro_rules! conv_vertical_part_neon_48_f16 {
             for j in 0..$bounds.size {
                 let py = $start_y + j;
                 let v_weight = vld1q_dup_f32($filter.get_unchecked(j..).as_ptr());
-                let src_ptr = $src.add($src_stride * py);
+                let src_ptr = $src.get_unchecked($src_stride * py..).as_ptr();
 
                 let s_ptr = src_ptr.add(px);
                 let item_row_0 = xvldq_f16_x4(s_ptr);
@@ -217,7 +217,7 @@ macro_rules! conv_vertical_part_neon_48_f16 {
                 );
             }
 
-            let dst_ptr = $dst.add(px);
+            let dst_ptr = $dst.get_unchecked_mut(px..).as_mut_ptr();
             let f_set = x_float16x8x4_t(
                 xcombine_f16(xvcvt_f16_f32(store_0), xvcvt_f16_f32(store_1)),
                 xcombine_f16(xvcvt_f16_f32(store_2), xvcvt_f16_f32(store_3)),
@@ -236,11 +236,11 @@ macro_rules! conv_vertical_part_neon_48_f16 {
     }};
 }
 
-pub fn convolve_vertical_rgb_neon_row_f16<const CHANNELS: usize>(
+pub(crate) fn convolve_vertical_rgb_neon_row_f16<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,
-    unsafe_source_ptr_0: *const half::f16,
-    unsafe_destination_ptr_0: *mut half::f16,
+    src: &[half::f16],
+    dst: &mut [half::f16],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
@@ -248,43 +248,19 @@ pub fn convolve_vertical_rgb_neon_row_f16<const CHANNELS: usize>(
     let dst_width = width * CHANNELS;
 
     while cx + 48 < dst_width {
-        conv_vertical_part_neon_48_f16!(
-            bounds.start,
-            cx,
-            unsafe_source_ptr_0,
-            src_stride,
-            unsafe_destination_ptr_0,
-            weight_ptr,
-            bounds
-        );
+        conv_vertical_part_neon_48_f16!(bounds.start, cx, src, src_stride, dst, weight_ptr, bounds);
 
         cx += 48;
     }
 
     while cx + 32 < dst_width {
-        conv_vertical_part_neon_32_f16!(
-            bounds.start,
-            cx,
-            unsafe_source_ptr_0,
-            src_stride,
-            unsafe_destination_ptr_0,
-            weight_ptr,
-            bounds
-        );
+        conv_vertical_part_neon_32_f16!(bounds.start, cx, src, src_stride, dst, weight_ptr, bounds);
 
         cx += 32;
     }
 
     while cx + 16 < dst_width {
-        conv_vertical_part_neon_16_f16!(
-            bounds.start,
-            cx,
-            unsafe_source_ptr_0,
-            src_stride,
-            unsafe_destination_ptr_0,
-            weight_ptr,
-            bounds
-        );
+        conv_vertical_part_neon_16_f16!(bounds.start, cx, src, src_stride, dst, weight_ptr, bounds);
 
         cx += 16;
     }
@@ -294,9 +270,9 @@ pub fn convolve_vertical_rgb_neon_row_f16<const CHANNELS: usize>(
             convolve_vertical_part_neon_8_f16::<false>(
                 bounds.start,
                 cx,
-                unsafe_source_ptr_0,
+                src,
                 src_stride,
-                unsafe_destination_ptr_0,
+                dst,
                 weight_ptr,
                 bounds,
                 8,
@@ -313,9 +289,9 @@ pub fn convolve_vertical_rgb_neon_row_f16<const CHANNELS: usize>(
             convolve_vertical_part_neon_8_f16::<true>(
                 bounds.start,
                 cx,
-                unsafe_source_ptr_0,
+                src,
                 src_stride,
-                unsafe_destination_ptr_0,
+                dst,
                 weight_ptr,
                 bounds,
                 left,

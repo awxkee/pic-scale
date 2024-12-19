@@ -90,7 +90,7 @@ unsafe fn neon_premultiply_alpha_rgba_row_f16(dst: &mut [half::f16], src: &[half
     premultiply_pixel_f16_row(rem, src_rem);
 }
 
-pub fn neon_premultiply_alpha_rgba_f16(
+pub(crate) fn neon_premultiply_alpha_rgba_f16(
     dst: &mut [half::f16],
     src: &[half::f16],
     width: usize,
@@ -197,7 +197,7 @@ unsafe fn neon_unpremultiply_alpha_rgba_row_f16(in_place: &mut [half::f16]) {
     unpremultiply_pixel_f16_row(rem);
 }
 
-pub fn neon_unpremultiply_alpha_rgba_f16(
+pub(crate) fn neon_unpremultiply_alpha_rgba_f16(
     in_place: &mut [half::f16],
     width: usize,
     _: usize,

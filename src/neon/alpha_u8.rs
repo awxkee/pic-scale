@@ -134,7 +134,7 @@ unsafe fn neon_premultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8]) {
     premultiply_alpha_rgba_row_impl(rem, src_rem);
 }
 
-pub fn neon_premultiply_alpha_rgba(
+pub(crate) fn neon_premultiply_alpha_rgba(
     dst: &mut [u8],
     src: &[u8],
     width: usize,
@@ -178,7 +178,7 @@ unsafe fn neon_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8]) {
     unpremultiply_alpha_rgba_row_impl(rem);
 }
 
-pub fn neon_unpremultiply_alpha_rgba(
+pub(crate) fn neon_unpremultiply_alpha_rgba(
     in_place: &mut [u8],
     width: usize,
     _: usize,

@@ -70,6 +70,11 @@ pub(crate) unsafe fn xvld1q_f32_x4(a: *const f32) -> float32x4x4_t {
 }
 
 #[inline(always)]
+pub(crate) unsafe fn xvld1q_f32_x2(a: *const f32) -> float32x4x2_t {
+    float32x4x2_t(vld1q_f32(a), vld1q_f32(a.add(4)))
+}
+
+#[inline(always)]
 pub(crate) unsafe fn xvst1q_u8_x2(ptr: *mut u8, b: uint8x16x2_t) {
     vst1q_u8(ptr, b.0);
     vst1q_u8(ptr.add(16), b.1);
@@ -100,6 +105,24 @@ pub(crate) unsafe fn prefer_vfmaq_f32(
 }
 
 #[inline(always)]
+pub(crate) unsafe fn prefer_vfmaq_laneq_f32<const LANE: i32>(
+    a: float32x4_t,
+    b: float32x4_t,
+    c: float32x4_t,
+) -> float32x4_t {
+    vfmaq_laneq_f32::<LANE>(a, b, c)
+}
+
+#[inline(always)]
+pub(crate) unsafe fn prefer_vfmaq_lane_f32<const LANE: i32>(
+    a: float32x4_t,
+    b: float32x4_t,
+    c: float32x2_t,
+) -> float32x4_t {
+    vfmaq_lane_f32::<LANE>(a, b, c)
+}
+
+#[inline(always)]
 pub(crate) unsafe fn load_3b_as_u16x4(src_ptr: *const u8) -> uint16x4_t {
     let v_new_value1 = u16::from_le_bytes([src_ptr.read_unaligned(), 0]);
     let v_new_value2 = u16::from_le_bytes([src_ptr.add(1).read_unaligned(), 0]);
@@ -117,20 +140,3 @@ pub(crate) unsafe fn load_4b_as_u16x4(src_ptr: *const u8) -> uint16x4_t {
     let arr = [v_new_value1, v_new_value2, v_new_value3, v_new_value4];
     vld1_u16(arr.as_ptr())
 }
-
-#[inline(always)]
-pub(crate) unsafe fn vsplit_rgb_5(px: float32x4x4_t) -> Float32x5T {
-    let first_pixel = px.0;
-    let second_pixel = vextq_f32::<3>(px.0, px.1);
-    let third_pixel = vextq_f32::<2>(px.1, px.2);
-    let four_pixel = vextq_f32::<1>(px.2, px.3);
-    Float32x5T(first_pixel, second_pixel, third_pixel, four_pixel, px.3)
-}
-
-pub(crate) struct Float32x5T(
-    pub(crate) float32x4_t,
-    pub(crate) float32x4_t,
-    pub(crate) float32x4_t,
-    pub(crate) float32x4_t,
-    pub(crate) float32x4_t,
-);

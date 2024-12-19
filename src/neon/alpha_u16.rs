@@ -161,7 +161,7 @@ pub fn neon_premultiply_alpha_rgba_row_u16(dst: &mut [u16], src: &[u16], bit_dep
     premultiply_alpha_rgba_row(rem, src_rem, max_colors);
 }
 
-pub fn neon_premultiply_alpha_rgba_u16(
+pub(crate) fn neon_premultiply_alpha_rgba_u16(
     dst: &mut [u16],
     src: &[u16],
     width: usize,
@@ -252,7 +252,7 @@ fn neon_unpremultiply_alpha_rgba_row_u16(in_place: &mut [u16], bit_depth: usize)
     unpremultiply_alpha_rgba_row(rem, max_colors);
 }
 
-pub fn neon_unpremultiply_alpha_rgba_u16(
+pub(crate) fn neon_unpremultiply_alpha_rgba_u16(
     in_place: &mut [u16],
     width: usize,
     _: usize,
