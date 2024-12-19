@@ -150,8 +150,8 @@ pub(crate) fn convolve_horizontal_rgb_sse_row_one_f16<const F16C: bool, const FM
     dst_width: usize,
     src_width: usize,
     filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f16,
-    unsafe_destination_ptr_0: *mut f16,
+    src: &[f16],
+    dst: &mut [f16],
 ) {
     unsafe {
         if F16C {
@@ -160,16 +160,16 @@ pub(crate) fn convolve_horizontal_rgb_sse_row_one_f16<const F16C: bool, const FM
                     dst_width,
                     src_width,
                     filter_weights,
-                    unsafe_source_ptr_0,
-                    unsafe_destination_ptr_0,
+                    src,
+                    dst,
                 );
             } else {
                 convolve_horizontal_rgb_sse_row_one_f16c(
                     dst_width,
                     src_width,
                     filter_weights,
-                    unsafe_source_ptr_0,
-                    unsafe_destination_ptr_0,
+                    src,
+                    dst,
                 );
             }
         } else {
@@ -177,8 +177,8 @@ pub(crate) fn convolve_horizontal_rgb_sse_row_one_f16<const F16C: bool, const FM
                 dst_width,
                 src_width,
                 filter_weights,
-                unsafe_source_ptr_0,
-                unsafe_destination_ptr_0,
+                src,
+                dst,
             );
         }
     }
@@ -190,15 +190,15 @@ unsafe fn convolve_horizontal_rgb_sse_row_one_f16_regular(
     dst_width: usize,
     src_width: usize,
     filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f16,
-    unsafe_destination_ptr_0: *mut f16,
+    src: &[f16],
+    dst: &mut [f16],
 ) {
     convolve_horizontal_rgb_sse_row_one_f16_impl::<false, false>(
         dst_width,
         src_width,
         filter_weights,
-        unsafe_source_ptr_0,
-        unsafe_destination_ptr_0,
+        src,
+        dst,
     );
 }
 
@@ -208,15 +208,15 @@ unsafe fn convolve_horizontal_rgb_sse_row_one_f16c(
     dst_width: usize,
     src_width: usize,
     filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f16,
-    unsafe_destination_ptr_0: *mut f16,
+    src: &[f16],
+    dst: &mut [f16],
 ) {
     convolve_horizontal_rgb_sse_row_one_f16_impl::<true, false>(
         dst_width,
         src_width,
         filter_weights,
-        unsafe_source_ptr_0,
-        unsafe_destination_ptr_0,
+        src,
+        dst,
     );
 }
 
@@ -226,15 +226,15 @@ unsafe fn convolve_horizontal_rgb_sse_row_one_f16c_fma(
     dst_width: usize,
     src_width: usize,
     filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f16,
-    unsafe_destination_ptr_0: *mut f16,
+    src: &[f16],
+    dst: &mut [f16],
 ) {
     convolve_horizontal_rgb_sse_row_one_f16_impl::<true, true>(
         dst_width,
         src_width,
         filter_weights,
-        unsafe_source_ptr_0,
-        unsafe_destination_ptr_0,
+        src,
+        dst,
     );
 }
 
@@ -243,8 +243,8 @@ unsafe fn convolve_horizontal_rgb_sse_row_one_f16_impl<const F16C: bool, const F
     dst_width: usize,
     _: usize,
     filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f16,
-    unsafe_destination_ptr_0: *mut f16,
+    src: &[f16],
+    dst: &mut [f16],
 ) {
     const CHANNELS: usize = 3;
     let mut filter_offset = 0usize;
@@ -261,7 +261,7 @@ unsafe fn convolve_horizontal_rgb_sse_row_one_f16_impl<const F16C: bool, const F
             let filter_start = jx + bounds.start;
             store = convolve_horizontal_parts_4_rgb_f16::<F16C, FMA>(
                 filter_start,
-                unsafe_source_ptr_0,
+                src.as_ptr(),
                 weight0,
                 weight1,
                 weight2,
@@ -283,7 +283,7 @@ unsafe fn convolve_horizontal_rgb_sse_row_one_f16_impl<const F16C: bool, const F
             let filter_start = jx + bounds.start;
             store = convolve_horizontal_parts_2_rgb_f16::<F16C, FMA>(
                 filter_start,
-                unsafe_source_ptr_0,
+                src.as_ptr(),
                 weight0,
                 weight1,
                 store,
@@ -297,7 +297,7 @@ unsafe fn convolve_horizontal_rgb_sse_row_one_f16_impl<const F16C: bool, const F
             let filter_start = jx + bounds.start;
             store = convolve_horizontal_parts_one_rgb_f16::<F16C, FMA>(
                 filter_start,
-                unsafe_source_ptr_0,
+                src.as_ptr(),
                 weight0,
                 store,
             );
@@ -307,7 +307,7 @@ unsafe fn convolve_horizontal_rgb_sse_row_one_f16_impl<const F16C: bool, const F
         let store_ph = _mm_cvtps_phx::<F16C>(store);
 
         let px = x * CHANNELS;
-        let dest_ptr = unsafe_destination_ptr_0.add(px);
+        let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
         (dest_ptr as *mut i32).write_unaligned(_mm_extract_epi32::<0>(store_ph));
         (dest_ptr as *mut i16)
             .add(2)
@@ -321,9 +321,9 @@ pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f16<const F16C: bool, const FMA
     dst_width: usize,
     src_width: usize,
     filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f16,
+    src: &[f16],
     src_stride: usize,
-    unsafe_destination_ptr_0: *mut f16,
+    dst: &mut [f16],
     dst_stride: usize,
 ) {
     unsafe {
@@ -333,9 +333,9 @@ pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f16<const F16C: bool, const FMA
                     dst_width,
                     src_width,
                     filter_weights,
-                    unsafe_source_ptr_0,
+                    src,
                     src_stride,
-                    unsafe_destination_ptr_0,
+                    dst,
                     dst_stride,
                 );
             } else {
@@ -343,9 +343,9 @@ pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f16<const F16C: bool, const FMA
                     dst_width,
                     src_width,
                     filter_weights,
-                    unsafe_source_ptr_0,
+                    src,
                     src_stride,
-                    unsafe_destination_ptr_0,
+                    dst,
                     dst_stride,
                 );
             }
@@ -354,9 +354,9 @@ pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f16<const F16C: bool, const FMA
                 dst_width,
                 src_width,
                 filter_weights,
-                unsafe_source_ptr_0,
+                src,
                 src_stride,
-                unsafe_destination_ptr_0,
+                dst,
                 dst_stride,
             );
         }
@@ -369,18 +369,18 @@ unsafe fn convolve_horizontal_rgb_sse_rows_4_f16_regular(
     dst_width: usize,
     src_width: usize,
     filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f16,
+    src: &[f16],
     src_stride: usize,
-    unsafe_destination_ptr_0: *mut f16,
+    dst: &mut [f16],
     dst_stride: usize,
 ) {
     convolve_horizontal_rgb_sse_rows_4_f16_impl::<false, false>(
         dst_width,
         src_width,
         filter_weights,
-        unsafe_source_ptr_0,
+        src,
         src_stride,
-        unsafe_destination_ptr_0,
+        dst,
         dst_stride,
     );
 }
@@ -391,18 +391,18 @@ unsafe fn convolve_horizontal_rgb_sse_rows_4_f16c(
     dst_width: usize,
     src_width: usize,
     filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f16,
+    src: &[f16],
     src_stride: usize,
-    unsafe_destination_ptr_0: *mut f16,
+    dst: &mut [f16],
     dst_stride: usize,
 ) {
     convolve_horizontal_rgb_sse_rows_4_f16_impl::<true, false>(
         dst_width,
         src_width,
         filter_weights,
-        unsafe_source_ptr_0,
+        src,
         src_stride,
-        unsafe_destination_ptr_0,
+        dst,
         dst_stride,
     );
 }
@@ -413,30 +413,30 @@ unsafe fn convolve_horizontal_rgb_sse_rows_4_f16c_fma(
     dst_width: usize,
     src_width: usize,
     filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f16,
+    src: &[f16],
     src_stride: usize,
-    unsafe_destination_ptr_0: *mut f16,
+    dst: &mut [f16],
     dst_stride: usize,
 ) {
     convolve_horizontal_rgb_sse_rows_4_f16_impl::<true, true>(
         dst_width,
         src_width,
         filter_weights,
-        unsafe_source_ptr_0,
+        src,
         src_stride,
-        unsafe_destination_ptr_0,
+        dst,
         dst_stride,
     );
 }
 
-#[inline]
+#[inline(always)]
 unsafe fn convolve_horizontal_rgb_sse_rows_4_f16_impl<const F16C: bool, const FMA: bool>(
     dst_width: usize,
     _: usize,
     filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f16,
+    src: &[f16],
     src_stride: usize,
-    unsafe_destination_ptr_0: *mut f16,
+    dst: &mut [f16],
     dst_stride: usize,
 ) {
     const CHANNELS: usize = 3;
@@ -458,7 +458,7 @@ unsafe fn convolve_horizontal_rgb_sse_rows_4_f16_impl<const F16C: bool, const FM
             let filter_start = jx + bounds.start;
             store_0 = convolve_horizontal_parts_4_rgb_f16::<F16C, FMA>(
                 filter_start,
-                unsafe_source_ptr_0,
+                src.as_ptr(),
                 weight0,
                 weight1,
                 weight2,
@@ -467,7 +467,7 @@ unsafe fn convolve_horizontal_rgb_sse_rows_4_f16_impl<const F16C: bool, const FM
             );
             store_1 = convolve_horizontal_parts_4_rgb_f16::<F16C, FMA>(
                 filter_start,
-                unsafe_source_ptr_0.add(src_stride),
+                src.get_unchecked(src_stride..).as_ptr(),
                 weight0,
                 weight1,
                 weight2,
@@ -476,7 +476,7 @@ unsafe fn convolve_horizontal_rgb_sse_rows_4_f16_impl<const F16C: bool, const FM
             );
             store_2 = convolve_horizontal_parts_4_rgb_f16::<F16C, FMA>(
                 filter_start,
-                unsafe_source_ptr_0.add(src_stride * 2),
+                src.get_unchecked(src_stride * 2..).as_ptr(),
                 weight0,
                 weight1,
                 weight2,
@@ -485,7 +485,7 @@ unsafe fn convolve_horizontal_rgb_sse_rows_4_f16_impl<const F16C: bool, const FM
             );
             store_3 = convolve_horizontal_parts_4_rgb_f16::<F16C, FMA>(
                 filter_start,
-                unsafe_source_ptr_0.add(src_stride * 3),
+                src.get_unchecked(src_stride * 3..).as_ptr(),
                 weight0,
                 weight1,
                 weight2,
@@ -507,28 +507,28 @@ unsafe fn convolve_horizontal_rgb_sse_rows_4_f16_impl<const F16C: bool, const FM
             let filter_start = jx + bounds.start;
             store_0 = convolve_horizontal_parts_2_rgb_f16::<F16C, FMA>(
                 filter_start,
-                unsafe_source_ptr_0,
+                src.as_ptr(),
                 weight0,
                 weight1,
                 store_0,
             );
             store_1 = convolve_horizontal_parts_2_rgb_f16::<F16C, FMA>(
                 filter_start,
-                unsafe_source_ptr_0.add(src_stride),
+                src.get_unchecked(src_stride..).as_ptr(),
                 weight0,
                 weight1,
                 store_1,
             );
             store_2 = convolve_horizontal_parts_2_rgb_f16::<F16C, FMA>(
                 filter_start,
-                unsafe_source_ptr_0.add(src_stride * 2),
+                src.get_unchecked(src_stride * 2..).as_ptr(),
                 weight0,
                 weight1,
                 store_2,
             );
             store_3 = convolve_horizontal_parts_2_rgb_f16::<F16C, FMA>(
                 filter_start,
-                unsafe_source_ptr_0.add(src_stride * 3),
+                src.get_unchecked(src_stride * 3..).as_ptr(),
                 weight0,
                 weight1,
                 store_3,
@@ -542,25 +542,25 @@ unsafe fn convolve_horizontal_rgb_sse_rows_4_f16_impl<const F16C: bool, const FM
             let filter_start = jx + bounds.start;
             store_0 = convolve_horizontal_parts_one_rgb_f16::<F16C, FMA>(
                 filter_start,
-                unsafe_source_ptr_0,
+                src.as_ptr(),
                 weight0,
                 store_0,
             );
             store_1 = convolve_horizontal_parts_one_rgb_f16::<F16C, FMA>(
                 filter_start,
-                unsafe_source_ptr_0.add(src_stride),
+                src.get_unchecked(src_stride..).as_ptr(),
                 weight0,
                 store_1,
             );
             store_2 = convolve_horizontal_parts_one_rgb_f16::<F16C, FMA>(
                 filter_start,
-                unsafe_source_ptr_0.add(src_stride * 2),
+                src.get_unchecked(src_stride * 2..).as_ptr(),
                 weight0,
                 store_2,
             );
             store_3 = convolve_horizontal_parts_one_rgb_f16::<F16C, FMA>(
                 filter_start,
-                unsafe_source_ptr_0.add(src_stride * 3),
+                src.get_unchecked(src_stride * 3..).as_ptr(),
                 weight0,
                 store_3,
             );
@@ -573,25 +573,25 @@ unsafe fn convolve_horizontal_rgb_sse_rows_4_f16_impl<const F16C: bool, const FM
         let store_ph_3 = _mm_cvtps_phx::<F16C>(store_3);
 
         let px = x * CHANNELS;
-        let dest_ptr = unsafe_destination_ptr_0.add(px);
+        let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
         (dest_ptr as *mut i32).write_unaligned(_mm_extract_epi32::<0>(store_ph_0));
         (dest_ptr as *mut i16)
             .add(2)
             .write_unaligned(_mm_extract_epi16::<2>(store_ph_0) as i16);
 
-        let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride);
+        let dest_ptr = dst.get_unchecked_mut(px + dst_stride..).as_mut_ptr();
         (dest_ptr as *mut i32).write_unaligned(_mm_extract_epi32::<0>(store_ph_1));
         (dest_ptr as *mut i16)
             .add(2)
             .write_unaligned(_mm_extract_epi16::<2>(store_ph_1) as i16);
 
-        let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 2);
+        let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 2..).as_mut_ptr();
         (dest_ptr as *mut i32).write_unaligned(_mm_extract_epi32::<0>(store_ph_2));
         (dest_ptr as *mut i16)
             .add(2)
             .write_unaligned(_mm_extract_epi16::<2>(store_ph_2) as i16);
 
-        let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 3);
+        let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 3..).as_mut_ptr();
         (dest_ptr as *mut i32).write_unaligned(_mm_extract_epi32::<0>(store_ph_3));
         (dest_ptr as *mut i16)
             .add(2)

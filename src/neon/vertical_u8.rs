@@ -69,7 +69,7 @@ macro_rules! accumulate_4_into_lane {
     }};
 }
 
-pub fn convolve_vertical_neon_i16_precision(
+pub(crate) fn convolve_vertical_neon_i16_precision(
     width: usize,
     bounds: &FilterBounds,
     src: &[u8],
@@ -82,7 +82,7 @@ pub fn convolve_vertical_neon_i16_precision(
     }
 }
 
-pub fn convolve_vertical_neon_i32_precision(
+pub(crate) fn convolve_vertical_neon_i32_precision(
     width: usize,
     bounds: &FilterBounds,
     src: &[u8],

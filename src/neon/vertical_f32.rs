@@ -27,8 +27,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter_weights::FilterBounds;
-use crate::neon::utils::prefer_vfmaq_f32;
 use crate::neon::utils::xvld1q_f32_x4;
+use crate::neon::utils::{prefer_vfmaq_f32, xvld1q_f32_x2};
 use std::arch::aarch64::*;
 
 macro_rules! conv_vertical_part_neon_16_f32 {
@@ -187,7 +187,7 @@ unsafe fn convolve_vertical_part_neon_8_f32(
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
-        let item_row = vld1q_f32_x2(s_ptr);
+        let item_row = xvld1q_f32_x2(s_ptr);
 
         store_0 = prefer_vfmaq_f32(store_0, item_row.0, v_weight);
         store_1 = prefer_vfmaq_f32(store_1, item_row.1, v_weight);
@@ -220,7 +220,7 @@ unsafe fn convolve_vertical_part_neon_4_f32(
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
-        let item_row = vld1q_f32_x2(s_ptr);
+        let item_row = xvld1q_f32_x2(s_ptr);
 
         store_0 = prefer_vfmaq_f32(store_0, item_row.0, v_weight);
     }
@@ -259,7 +259,7 @@ unsafe fn convolve_vertical_part_neon_1_f32(
     dst_ptr.write_unaligned(vgetq_lane_f32::<0>(store_0));
 }
 
-pub fn convolve_vertical_rgb_neon_row_f32<const CHANNELS: usize>(
+pub(crate) fn convolve_vertical_rgb_neon_row_f32<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,
     unsafe_source_ptr_0: *const f32,

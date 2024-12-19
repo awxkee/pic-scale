@@ -39,9 +39,9 @@ use crate::sse::f16_utils::{_mm_cvtph_psx, _mm_cvtps_phx};
 pub(crate) unsafe fn convolve_vertical_part_sse_f16<const F16C: bool, const FMA: bool>(
     start_y: usize,
     start_x: usize,
-    src: *const half::f16,
+    src: &[half::f16],
     src_stride: usize,
-    dst: *mut half::f16,
+    dst: &mut [half::f16],
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
@@ -53,7 +53,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_f16<const F16C: bool, const FMA:
         let py = start_y + j;
         let weight = filter.get_unchecked(j..);
         let v_weight = _mm_load1_ps(weight.as_ptr());
-        let src_ptr = src.add(src_stride * py);
+        let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
 
         let s_ptr = src_ptr.add(px);
         let item_row_0 = _mm_set1_epi16(s_ptr.read_unaligned().to_bits() as i16);
@@ -61,7 +61,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_f16<const F16C: bool, const FMA:
         store_0 = _mm_prefer_fma_ps::<FMA>(store_0, _mm_cvtph_psx::<F16C>(item_row_0), v_weight);
     }
 
-    let dst_ptr = dst.add(px);
+    let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
     let converted = _mm_cvtps_phx::<F16C>(store_0);
     let first_item = _mm_extract_epi16::<0>(converted) as u16;
     (dst_ptr as *mut u16).write_unaligned(first_item);
@@ -71,9 +71,9 @@ pub(crate) unsafe fn convolve_vertical_part_sse_f16<const F16C: bool, const FMA:
 pub(crate) unsafe fn convolve_vertical_part_sse_4_f16<const F16C: bool, const FMA: bool>(
     start_y: usize,
     start_x: usize,
-    src: *const half::f16,
+    src: &[half::f16],
     src_stride: usize,
-    dst: *mut half::f16,
+    dst: &mut [half::f16],
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
@@ -85,7 +85,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_4_f16<const F16C: bool, const FM
         let py = start_y + j;
         let weight = filter.get_unchecked(j..);
         let v_weight = _mm_load1_ps(weight.as_ptr());
-        let src_ptr = src.add(src_stride * py);
+        let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
 
         let s_ptr = src_ptr.add(px);
         let item_row_0 = _mm_loadu_si64(s_ptr as *const u8);
@@ -93,7 +93,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_4_f16<const F16C: bool, const FM
         store_0 = _mm_prefer_fma_ps::<FMA>(store_0, _mm_cvtph_psx::<F16C>(item_row_0), v_weight);
     }
 
-    let dst_ptr = dst.add(px);
+    let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
     let acc = _mm_cvtps_phx::<F16C>(store_0);
     std::ptr::copy_nonoverlapping(&acc as *const _ as *const u8, dst_ptr as *mut u8, 8);
 }
@@ -102,9 +102,9 @@ pub(crate) unsafe fn convolve_vertical_part_sse_4_f16<const F16C: bool, const FM
 pub(crate) unsafe fn convolve_vertical_part_sse_16_16<const F16C: bool, const FMA: bool>(
     start_y: usize,
     start_x: usize,
-    src: *const half::f16,
+    src: &[half::f16],
     src_stride: usize,
-    dst: *mut half::f16,
+    dst: &mut [half::f16],
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
@@ -119,7 +119,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_16_16<const F16C: bool, const FM
         let py = start_y + j;
         let weight = filter.get_unchecked(j..);
         let v_weight = _mm_load1_ps(weight.as_ptr());
-        let src_ptr = src.add(src_stride * py);
+        let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
 
         let s_ptr = src_ptr.add(px);
         let item_row_0 = _mm_loadu_si128(s_ptr as *const __m128i);
@@ -136,7 +136,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_16_16<const F16C: bool, const FM
         store_3 = _mm_prefer_fma_ps::<FMA>(store_3, items3, v_weight);
     }
 
-    let dst_ptr = dst.add(px);
+    let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
 
     let acc0 = _mm_unpacklo_epi64(
         _mm_cvtps_phx::<F16C>(store_0),
@@ -155,9 +155,9 @@ pub(crate) unsafe fn convolve_vertical_part_sse_16_16<const F16C: bool, const FM
 pub(crate) unsafe fn convolve_vertical_part_sse_8_f16<const F16C: bool, const FMA: bool>(
     start_y: usize,
     start_x: usize,
-    src: *const half::f16,
+    src: &[half::f16],
     src_stride: usize,
-    dst: *mut half::f16,
+    dst: &mut [half::f16],
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
@@ -170,7 +170,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_8_f16<const F16C: bool, const FM
         let py = start_y + j;
         let weight = filter.get_unchecked(j..);
         let v_weight = _mm_load1_ps(weight.as_ptr());
-        let src_ptr = src.add(src_stride * py);
+        let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
 
         let s_ptr = src_ptr.add(px);
         let item_row = _mm_loadu_si128(s_ptr as *const __m128i);
@@ -181,7 +181,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_8_f16<const F16C: bool, const FM
         store_1 = _mm_prefer_fma_ps::<FMA>(store_1, items1, v_weight);
     }
 
-    let dst_ptr = dst.add(px);
+    let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
     let acc0 = _mm_unpacklo_epi64(
         _mm_cvtps_phx::<F16C>(store_0),
         _mm_cvtps_phx::<F16C>(store_1),
@@ -196,8 +196,8 @@ pub(crate) fn convolve_vertical_sse_row_f16<
 >(
     width: usize,
     bounds: &FilterBounds,
-    unsafe_source_ptr_0: *const half::f16,
-    unsafe_destination_ptr_0: *mut half::f16,
+    src: &[half::f16],
+    dst: &mut [half::f16],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
@@ -205,31 +205,16 @@ pub(crate) fn convolve_vertical_sse_row_f16<
         if F16C {
             if FMA {
                 convolve_vertical_sse_row_f16c_fma::<CHANNELS>(
-                    width,
-                    bounds,
-                    unsafe_source_ptr_0,
-                    unsafe_destination_ptr_0,
-                    src_stride,
-                    weight_ptr,
+                    width, bounds, src, dst, src_stride, weight_ptr,
                 );
             } else {
                 convolve_vertical_sse_row_f16c::<CHANNELS>(
-                    width,
-                    bounds,
-                    unsafe_source_ptr_0,
-                    unsafe_destination_ptr_0,
-                    src_stride,
-                    weight_ptr,
+                    width, bounds, src, dst, src_stride, weight_ptr,
                 );
             }
         } else {
             convolve_vertical_sse_row_f16_regular::<CHANNELS>(
-                width,
-                bounds,
-                unsafe_source_ptr_0,
-                unsafe_destination_ptr_0,
-                src_stride,
-                weight_ptr,
+                width, bounds, src, dst, src_stride, weight_ptr,
             );
         }
     }
@@ -240,18 +225,13 @@ pub(crate) fn convolve_vertical_sse_row_f16<
 unsafe fn convolve_vertical_sse_row_f16_regular<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,
-    unsafe_source_ptr_0: *const half::f16,
-    unsafe_destination_ptr_0: *mut half::f16,
+    src: &[half::f16],
+    dst: &mut [half::f16],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
     convolve_vertical_sse_row_f16_impl::<CHANNELS, false, false>(
-        width,
-        bounds,
-        unsafe_source_ptr_0,
-        unsafe_destination_ptr_0,
-        src_stride,
-        weight_ptr,
+        width, bounds, src, dst, src_stride, weight_ptr,
     );
 }
 
@@ -260,18 +240,13 @@ unsafe fn convolve_vertical_sse_row_f16_regular<const CHANNELS: usize>(
 unsafe fn convolve_vertical_sse_row_f16c_fma<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,
-    unsafe_source_ptr_0: *const half::f16,
-    unsafe_destination_ptr_0: *mut half::f16,
+    src: &[half::f16],
+    dst: &mut [half::f16],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
     convolve_vertical_sse_row_f16_impl::<CHANNELS, true, true>(
-        width,
-        bounds,
-        unsafe_source_ptr_0,
-        unsafe_destination_ptr_0,
-        src_stride,
-        weight_ptr,
+        width, bounds, src, dst, src_stride, weight_ptr,
     );
 }
 
@@ -280,18 +255,13 @@ unsafe fn convolve_vertical_sse_row_f16c_fma<const CHANNELS: usize>(
 unsafe fn convolve_vertical_sse_row_f16c<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,
-    unsafe_source_ptr_0: *const half::f16,
-    unsafe_destination_ptr_0: *mut half::f16,
+    src: &[half::f16],
+    dst: &mut [half::f16],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
     convolve_vertical_sse_row_f16_impl::<CHANNELS, false, true>(
-        width,
-        bounds,
-        unsafe_source_ptr_0,
-        unsafe_destination_ptr_0,
-        src_stride,
-        weight_ptr,
+        width, bounds, src, dst, src_stride, weight_ptr,
     );
 }
 
@@ -303,8 +273,8 @@ unsafe fn convolve_vertical_sse_row_f16_impl<
 >(
     width: usize,
     bounds: &FilterBounds,
-    unsafe_source_ptr_0: *const half::f16,
-    unsafe_destination_ptr_0: *mut half::f16,
+    src: &[half::f16],
+    dst: &mut [half::f16],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
@@ -316,9 +286,9 @@ unsafe fn convolve_vertical_sse_row_f16_impl<
             convolve_vertical_part_sse_16_16::<F16C, FMA>(
                 bounds.start,
                 cx,
-                unsafe_source_ptr_0,
+                src,
                 src_stride,
-                unsafe_destination_ptr_0,
+                dst,
                 weight_ptr,
                 bounds,
             );
@@ -332,9 +302,9 @@ unsafe fn convolve_vertical_sse_row_f16_impl<
             convolve_vertical_part_sse_8_f16::<F16C, FMA>(
                 bounds.start,
                 cx,
-                unsafe_source_ptr_0,
+                src,
                 src_stride,
-                unsafe_destination_ptr_0,
+                dst,
                 weight_ptr,
                 bounds,
             );
@@ -348,9 +318,9 @@ unsafe fn convolve_vertical_sse_row_f16_impl<
             convolve_vertical_part_sse_4_f16::<F16C, FMA>(
                 bounds.start,
                 cx,
-                unsafe_source_ptr_0,
+                src,
                 src_stride,
-                unsafe_destination_ptr_0,
+                dst,
                 weight_ptr,
                 bounds,
             );
@@ -364,9 +334,9 @@ unsafe fn convolve_vertical_sse_row_f16_impl<
             convolve_vertical_part_sse_f16::<F16C, FMA>(
                 bounds.start,
                 cx,
-                unsafe_source_ptr_0,
+                src,
                 src_stride,
-                unsafe_destination_ptr_0,
+                dst,
                 weight_ptr,
                 bounds,
             );

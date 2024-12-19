@@ -64,7 +64,7 @@ unsafe fn neon_premultiply_alpha_rgba_row_f32(dst: &mut [f32], src: &[f32]) {
     premultiply_pixel_f32_row(rem, src_rem);
 }
 
-pub fn neon_premultiply_alpha_rgba_f32(
+pub(crate) fn neon_premultiply_alpha_rgba_f32(
     dst: &mut [f32],
     src: &[f32],
     width: usize,
@@ -108,7 +108,7 @@ unsafe fn neon_unpremultiply_alpha_rgba_f32_row(in_place: &mut [f32]) {
     unpremultiply_pixel_f32_row(rem);
 }
 
-pub fn neon_unpremultiply_alpha_rgba_f32(
+pub(crate) fn neon_unpremultiply_alpha_rgba_f32(
     in_place: &mut [f32],
     width: usize,
     _: usize,

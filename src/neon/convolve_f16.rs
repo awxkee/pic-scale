@@ -36,9 +36,9 @@ use crate::neon::*;
 pub(crate) unsafe fn convolve_vertical_part_neon_8_f16<const USE_BLENDING: bool>(
     start_y: usize,
     start_x: usize,
-    src: *const half::f16,
+    src: &[half::f16],
     src_stride: usize,
-    dst: *mut half::f16,
+    dst: &mut [half::f16],
     filter: &[f32],
     bounds: &FilterBounds,
     blend_length: usize,
@@ -52,7 +52,7 @@ pub(crate) unsafe fn convolve_vertical_part_neon_8_f16<const USE_BLENDING: bool>
         let py = start_y + j;
         let weight = filter.get_unchecked(j..);
         let v_weight = vld1q_dup_f32(weight.as_ptr());
-        let src_ptr = src.add(src_stride * py);
+        let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
 
         let s_ptr = src_ptr.add(px);
         let item_row = if USE_BLENDING {
@@ -72,7 +72,7 @@ pub(crate) unsafe fn convolve_vertical_part_neon_8_f16<const USE_BLENDING: bool>
 
     let item = xcombine_f16(xvcvt_f16_f32(store_0), xvcvt_f16_f32(store_1));
 
-    let dst_ptr = dst.add(px);
+    let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
     if USE_BLENDING {
         let mut transient: [half::f16; 8] = [half::f16::from_f32(0.); 8];
         xvstq_f16(transient.as_mut_ptr(), item);

@@ -55,6 +55,15 @@ impl MixedStorage<u16> for f32 {
     }
 }
 
+#[cfg(feature = "half")]
+impl MixedStorage<half::f16> for f32 {
+    #[inline(always)]
+    #[allow(clippy::manual_clamp)]
+    fn to_mixed(self, _: u32) -> half::f16 {
+        half::f16::from_f32(self)
+    }
+}
+
 impl MixedStorage<u16> for f64 {
     #[inline(always)]
     #[allow(clippy::manual_clamp)]
