@@ -107,12 +107,7 @@ pub(crate) fn convolve_horizontal_plane_neon_row_one(
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let read_weights = xvld1q_f32_x4(ptr);
-                store = conv_horiz_plane_16_f32!(
-                    bounds_start,
-                    src.as_ptr(),
-                    read_weights,
-                    store
-                );
+                store = conv_horiz_plane_16_f32!(bounds_start, src.as_ptr(), read_weights, store);
                 jx += 8;
             }
 
@@ -134,8 +129,7 @@ pub(crate) fn convolve_horizontal_plane_neon_row_one(
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let read_weights = vld1q_f32(ptr);
-                store =
-                    conv_horiz_plane_4_f32!(bounds_start, src.as_ptr(), read_weights, store);
+                store = conv_horiz_plane_4_f32!(bounds_start, src.as_ptr(), read_weights, store);
                 jx += 4;
             }
 
