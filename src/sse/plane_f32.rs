@@ -36,7 +36,7 @@ use std::arch::x86_64::*;
 
 macro_rules! conv_horiz_plane_16_f32 {
     ($start_x: expr, $src: expr, $set: expr, $store: expr, $fma: expr) => {{
-        let src_ptr = $src.add($start_x);
+        let src_ptr = $src.get_unchecked($start_x..).as_ptr();
 
         let rgb_pixel0 = _mm_loadu_ps(src_ptr);
         let rgb_pixel1 = _mm_loadu_ps(src_ptr.add(4));
@@ -53,7 +53,7 @@ macro_rules! conv_horiz_plane_16_f32 {
 
 macro_rules! conv_horiz_plane_8_f32 {
     ($start_x: expr, $src: expr, $set1: expr, $set2: expr, $store: expr, $fma: expr) => {{
-        let src_ptr = $src.add($start_x);
+        let src_ptr = $src.get_unchecked($start_x..).as_ptr();
 
         let rgb_pixel0 = _mm_loadu_ps(src_ptr);
         let rgb_pixel1 = _mm_loadu_ps(src_ptr.add(4));
@@ -66,7 +66,7 @@ macro_rules! conv_horiz_plane_8_f32 {
 
 macro_rules! conv_horiz_plane_4_f32 {
     ($start_x: expr, $src: expr, $set1: expr,  $store: expr, $fma: expr) => {{
-        let src_ptr = $src.add($start_x);
+        let src_ptr = $src.get_unchecked($start_x..).as_ptr();
 
         let rgb_pixel = _mm_loadu_ps(src_ptr);
 
@@ -76,7 +76,7 @@ macro_rules! conv_horiz_plane_4_f32 {
 
 macro_rules! conv_horiz_plane_2_f32 {
     ($start_x: expr, $src: expr, $set: expr,  $store: expr, $fma: expr) => {{
-        let src_ptr = $src.add($start_x);
+        let src_ptr = $src.get_unchecked($start_x..).as_ptr();
 
         let rgb_pixel = _mm_setr_ps(
             src_ptr.read_unaligned(),
@@ -91,7 +91,7 @@ macro_rules! conv_horiz_plane_2_f32 {
 
 macro_rules! conv_horiz_plane_1_f32 {
     ($start_x: expr, $src: expr, $set: expr,  $store: expr, $fma: expr) => {{
-        let src_ptr = $src.add($start_x);
+        let src_ptr = $src.get_unchecked($start_x..).as_ptr();
         let rgb_pixel = _mm_setr_ps(src_ptr.read_unaligned(), 0., 0., 0.);
         _mm_prefer_fma_ps::<$fma>($store, rgb_pixel, $set)
     }};
@@ -101,8 +101,8 @@ pub(crate) fn convolve_horizontal_plane_sse_row_one<const FMA: bool>(
     dst_width: usize,
     src_width: usize,
     filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f32,
-    unsafe_destination_ptr_0: *mut f32,
+    src: &[f32],
+    dst: &mut [f32],
 ) {
     unsafe {
         if FMA {
@@ -110,64 +110,62 @@ pub(crate) fn convolve_horizontal_plane_sse_row_one<const FMA: bool>(
                 dst_width,
                 src_width,
                 filter_weights,
-                unsafe_source_ptr_0,
-                unsafe_destination_ptr_0,
+                src,
+                dst,
             );
         } else {
             convolve_horizontal_plane_sse_row_one_regular(
                 dst_width,
                 src_width,
                 filter_weights,
-                unsafe_source_ptr_0,
-                unsafe_destination_ptr_0,
+                src,
+                dst,
             );
         }
     }
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1")]
 unsafe fn convolve_horizontal_plane_sse_row_one_regular(
     dst_width: usize,
     src_width: usize,
     filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f32,
-    unsafe_destination_ptr_0: *mut f32,
+    src: &[f32],
+    dst: &mut [f32],
 ) {
     convolve_horizontal_plane_sse_row_one_impl::<false>(
         dst_width,
         src_width,
         filter_weights,
-        unsafe_source_ptr_0,
-        unsafe_destination_ptr_0,
+        src,
+        dst,
     );
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1,fma")]
 unsafe fn convolve_horizontal_plane_sse_row_one_fma(
     dst_width: usize,
     src_width: usize,
     filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f32,
-    unsafe_destination_ptr_0: *mut f32,
+    src: &[f32],
+    dst: &mut [f32],
 ) {
     convolve_horizontal_plane_sse_row_one_impl::<true>(
         dst_width,
         src_width,
         filter_weights,
-        unsafe_source_ptr_0,
-        unsafe_destination_ptr_0,
+        src,
+        dst,
     );
 }
 
-#[inline]
+#[inline(always)]
 unsafe fn convolve_horizontal_plane_sse_row_one_impl<const FMA: bool>(
     dst_width: usize,
     _: usize,
     filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f32,
-    unsafe_destination_ptr_0: *mut f32,
+    src: &[f32],
+    dst: &mut [f32],
 ) {
     let mut filter_offset = 0usize;
     let weights_ptr = filter_weights.weights.as_ptr();
@@ -185,8 +183,7 @@ unsafe fn convolve_horizontal_plane_sse_row_one_impl<const FMA: bool>(
             let read_weights2 = _mm_loadu_ps(ptr.add(8));
             let read_weights3 = _mm_loadu_ps(ptr.add(12));
             let weights = (read_weights0, read_weights1, read_weights2, read_weights3);
-            store =
-                conv_horiz_plane_16_f32!(bounds_start, unsafe_source_ptr_0, weights, store, FMA);
+            store = conv_horiz_plane_16_f32!(bounds_start, src, weights, store, FMA);
             jx += 8;
         }
 
@@ -198,7 +195,7 @@ unsafe fn convolve_horizontal_plane_sse_row_one_impl<const FMA: bool>(
             let read_weights = (read_weights0, read_weights1);
             store = conv_horiz_plane_8_f32!(
                 bounds_start,
-                unsafe_source_ptr_0,
+                src,
                 read_weights.0,
                 read_weights.1,
                 store,
@@ -211,13 +208,7 @@ unsafe fn convolve_horizontal_plane_sse_row_one_impl<const FMA: bool>(
             let bounds_start = bounds.start + jx;
             let ptr = weights_ptr.add(jx + filter_offset);
             let read_weights = _mm_loadu_ps(ptr);
-            store = conv_horiz_plane_4_f32!(
-                bounds_start,
-                unsafe_source_ptr_0,
-                read_weights,
-                store,
-                FMA
-            );
+            store = conv_horiz_plane_4_f32!(bounds_start, src, read_weights, store, FMA);
             jx += 4;
         }
 
@@ -225,7 +216,7 @@ unsafe fn convolve_horizontal_plane_sse_row_one_impl<const FMA: bool>(
             let bounds_start = bounds.start + jx;
             let ptr = weights_ptr.add(jx + filter_offset);
             let weights = _mm_setr_ps(ptr.read_unaligned(), ptr.add(1).read_unaligned(), 0., 0.);
-            store = conv_horiz_plane_2_f32!(bounds_start, unsafe_source_ptr_0, weights, store, FMA);
+            store = conv_horiz_plane_2_f32!(bounds_start, src, weights, store, FMA);
             jx += 2;
         }
 
@@ -233,13 +224,13 @@ unsafe fn convolve_horizontal_plane_sse_row_one_impl<const FMA: bool>(
             let bounds_start = bounds.start + jx;
             let ptr = weights_ptr.add(jx + filter_offset);
             let weight0 = _mm_load1_ps(ptr);
-            store = conv_horiz_plane_1_f32!(bounds_start, unsafe_source_ptr_0, weight0, store, FMA);
+            store = conv_horiz_plane_1_f32!(bounds_start, src, weight0, store, FMA);
             jx += 1;
         }
 
         let px = x;
-        let dest_ptr = unsafe_destination_ptr_0.add(px);
-        dest_ptr.write_unaligned(_mm_hsum_ps(store));
+        let dest_ptr = dst.get_unchecked_mut(px);
+        *dest_ptr = _mm_hsum_ps(store);
 
         filter_offset += filter_weights.aligned_size;
     }
@@ -249,9 +240,9 @@ pub(crate) fn convolve_horizontal_plane_sse_rows_4<const FMA: bool>(
     dst_width: usize,
     src_width: usize,
     filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f32,
+    src: &[f32],
     src_stride: usize,
-    unsafe_destination_ptr_0: *mut f32,
+    dst: &mut [f32],
     dst_stride: usize,
 ) {
     unsafe {
@@ -260,9 +251,9 @@ pub(crate) fn convolve_horizontal_plane_sse_rows_4<const FMA: bool>(
                 dst_width,
                 src_width,
                 filter_weights,
-                unsafe_source_ptr_0,
+                src,
                 src_stride,
-                unsafe_destination_ptr_0,
+                dst,
                 dst_stride,
             );
         } else {
@@ -270,55 +261,53 @@ pub(crate) fn convolve_horizontal_plane_sse_rows_4<const FMA: bool>(
                 dst_width,
                 src_width,
                 filter_weights,
-                unsafe_source_ptr_0,
+                src,
                 src_stride,
-                unsafe_destination_ptr_0,
+                dst,
                 dst_stride,
             );
         }
     }
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1")]
 unsafe fn convolve_horizontal_plane_sse_rows_4_regular(
     dst_width: usize,
     src_width: usize,
     filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f32,
+    src: &[f32],
     src_stride: usize,
-    unsafe_destination_ptr_0: *mut f32,
+    dst: &mut [f32],
     dst_stride: usize,
 ) {
     convolve_horizontal_plane_sse_rows_4_impl::<false>(
         dst_width,
         src_width,
         filter_weights,
-        unsafe_source_ptr_0,
+        src,
         src_stride,
-        unsafe_destination_ptr_0,
+        dst,
         dst_stride,
     );
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1,fma")]
 unsafe fn convolve_horizontal_plane_sse_rows_4_fma(
     dst_width: usize,
     src_width: usize,
     filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f32,
+    src: &[f32],
     src_stride: usize,
-    unsafe_destination_ptr_0: *mut f32,
+    dst: &mut [f32],
     dst_stride: usize,
 ) {
     convolve_horizontal_plane_sse_rows_4_impl::<true>(
         dst_width,
         src_width,
         filter_weights,
-        unsafe_source_ptr_0,
+        src,
         src_stride,
-        unsafe_destination_ptr_0,
+        dst,
         dst_stride,
     );
 }
@@ -328,9 +317,9 @@ unsafe fn convolve_horizontal_plane_sse_rows_4_impl<const FMA: bool>(
     dst_width: usize,
     _: usize,
     filter_weights: &FilterWeights<f32>,
-    unsafe_source_ptr_0: *const f32,
+    src: &[f32],
     src_stride: usize,
-    unsafe_destination_ptr_0: *mut f32,
+    dst: &mut [f32],
     dst_stride: usize,
 ) {
     unsafe {
@@ -354,18 +343,12 @@ unsafe fn convolve_horizontal_plane_sse_rows_4_impl<const FMA: bool>(
                 let read_weights3 = _mm_loadu_ps(ptr.add(12));
                 let weights = (read_weights0, read_weights1, read_weights2, read_weights3);
                 let bounds_start = bounds.start + jx;
-                store_0 = conv_horiz_plane_16_f32!(
-                    bounds_start,
-                    unsafe_source_ptr_0,
-                    weights,
-                    store_0,
-                    FMA
-                );
-                let s_ptr_1 = unsafe_source_ptr_0.add(src_stride);
+                store_0 = conv_horiz_plane_16_f32!(bounds_start, src, weights, store_0, FMA);
+                let s_ptr_1 = src.get_unchecked(src_stride..);
                 store_1 = conv_horiz_plane_16_f32!(bounds_start, s_ptr_1, weights, store_1, FMA);
-                let s_ptr2 = unsafe_source_ptr_0.add(src_stride * 2);
+                let s_ptr2 = src.get_unchecked(src_stride * 2..);
                 store_2 = conv_horiz_plane_16_f32!(bounds_start, s_ptr2, weights, store_2, FMA);
-                let s_ptr3 = unsafe_source_ptr_0.add(src_stride * 3);
+                let s_ptr3 = src.get_unchecked(src_stride * 3..);
                 store_3 = conv_horiz_plane_16_f32!(bounds_start, s_ptr3, weights, store_3, FMA);
                 jx += 16;
             }
@@ -378,13 +361,13 @@ unsafe fn convolve_horizontal_plane_sse_rows_4_impl<const FMA: bool>(
                 let bounds_start = bounds.start + jx;
                 store_0 = conv_horiz_plane_8_f32!(
                     bounds_start,
-                    unsafe_source_ptr_0,
+                    src,
                     read_weights.0,
                     read_weights.1,
                     store_0,
                     FMA
                 );
-                let s_ptr_1 = unsafe_source_ptr_0.add(src_stride);
+                let s_ptr_1 = src.get_unchecked(src_stride..);
                 store_1 = conv_horiz_plane_8_f32!(
                     bounds_start,
                     s_ptr_1,
@@ -393,7 +376,7 @@ unsafe fn convolve_horizontal_plane_sse_rows_4_impl<const FMA: bool>(
                     store_1,
                     FMA
                 );
-                let s_ptr2 = unsafe_source_ptr_0.add(src_stride * 2);
+                let s_ptr2 = src.get_unchecked(src_stride * 2..);
                 store_2 = conv_horiz_plane_8_f32!(
                     bounds_start,
                     s_ptr2,
@@ -402,7 +385,7 @@ unsafe fn convolve_horizontal_plane_sse_rows_4_impl<const FMA: bool>(
                     store_2,
                     FMA
                 );
-                let s_ptr3 = unsafe_source_ptr_0.add(src_stride * 3);
+                let s_ptr3 = src.get_unchecked(src_stride * 3..);
                 store_3 = conv_horiz_plane_8_f32!(
                     bounds_start,
                     s_ptr3,
@@ -418,19 +401,13 @@ unsafe fn convolve_horizontal_plane_sse_rows_4_impl<const FMA: bool>(
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let read_weights = _mm_loadu_ps(ptr);
                 let bounds_start = bounds.start + jx;
-                store_0 = conv_horiz_plane_4_f32!(
-                    bounds_start,
-                    unsafe_source_ptr_0,
-                    read_weights,
-                    store_0,
-                    FMA
-                );
-                let s_ptr_1 = unsafe_source_ptr_0.add(src_stride);
+                store_0 = conv_horiz_plane_4_f32!(bounds_start, src, read_weights, store_0, FMA);
+                let s_ptr_1 = src.get_unchecked(src_stride..);
                 store_1 =
                     conv_horiz_plane_4_f32!(bounds_start, s_ptr_1, read_weights, store_1, FMA);
-                let s_ptr2 = unsafe_source_ptr_0.add(src_stride * 2);
+                let s_ptr2 = src.get_unchecked(src_stride * 2..);
                 store_2 = conv_horiz_plane_4_f32!(bounds_start, s_ptr2, read_weights, store_2, FMA);
-                let s_ptr3 = unsafe_source_ptr_0.add(src_stride * 3);
+                let s_ptr3 = src.get_unchecked(src_stride * 3..);
                 store_3 = conv_horiz_plane_4_f32!(bounds_start, s_ptr3, read_weights, store_3, FMA);
                 jx += 4;
             }
@@ -440,18 +417,12 @@ unsafe fn convolve_horizontal_plane_sse_rows_4_impl<const FMA: bool>(
                 let weights =
                     _mm_setr_ps(ptr.read_unaligned(), ptr.add(1).read_unaligned(), 0., 0.);
                 let bounds_start = bounds.start + jx;
-                store_0 = conv_horiz_plane_2_f32!(
-                    bounds_start,
-                    unsafe_source_ptr_0,
-                    weights,
-                    store_0,
-                    FMA
-                );
-                let ptr_1 = unsafe_source_ptr_0.add(src_stride);
+                store_0 = conv_horiz_plane_2_f32!(bounds_start, src, weights, store_0, FMA);
+                let ptr_1 = src.get_unchecked(src_stride..);
                 store_1 = conv_horiz_plane_2_f32!(bounds_start, ptr_1, weights, store_1, FMA);
-                let ptr_2 = unsafe_source_ptr_0.add(src_stride * 2);
+                let ptr_2 = src.get_unchecked(src_stride * 2..);
                 store_2 = conv_horiz_plane_2_f32!(bounds_start, ptr_2, weights, store_2, FMA);
-                let ptr_3 = unsafe_source_ptr_0.add(src_stride * 3);
+                let ptr_3 = src.get_unchecked(src_stride * 3..);
                 store_3 = conv_horiz_plane_2_f32!(bounds_start, ptr_3, weights, store_3, FMA);
                 jx += 2;
             }
@@ -460,34 +431,28 @@ unsafe fn convolve_horizontal_plane_sse_rows_4_impl<const FMA: bool>(
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let weight0 = _mm_set1_ps(ptr.read_unaligned());
                 let bounds_start = bounds.start + jx;
-                store_0 = conv_horiz_plane_1_f32!(
-                    bounds_start,
-                    unsafe_source_ptr_0,
-                    weight0,
-                    store_0,
-                    FMA
-                );
-                let ptr_1 = unsafe_source_ptr_0.add(src_stride);
+                store_0 = conv_horiz_plane_1_f32!(bounds_start, src, weight0, store_0, FMA);
+                let ptr_1 = src.get_unchecked(src_stride..);
                 store_1 = conv_horiz_plane_1_f32!(bounds_start, ptr_1, weight0, store_1, FMA);
-                let ptr_2 = unsafe_source_ptr_0.add(src_stride * 2);
+                let ptr_2 = src.get_unchecked(src_stride * 2..);
                 store_2 = conv_horiz_plane_1_f32!(bounds_start, ptr_2, weight0, store_2, FMA);
-                let ptr_3 = unsafe_source_ptr_0.add(src_stride * 3);
+                let ptr_3 = src.get_unchecked(src_stride * 3..);
                 store_3 = conv_horiz_plane_1_f32!(bounds_start, ptr_3, weight0, store_3, FMA);
                 jx += 1;
             }
 
             let px = x;
-            let dest_ptr = unsafe_destination_ptr_0.add(px);
-            dest_ptr.write_unaligned(_mm_hsum_ps(store_0));
+            let dest_ptr = dst.get_unchecked_mut(px);
+            *dest_ptr = _mm_hsum_ps(store_0);
 
-            let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride);
-            dest_ptr.write_unaligned(_mm_hsum_ps(store_1));
+            let dest_ptr = dst.get_unchecked_mut(px + dst_stride);
+            *dest_ptr = _mm_hsum_ps(store_1);
 
-            let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 2);
-            dest_ptr.write_unaligned(_mm_hsum_ps(store_2));
+            let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 2);
+            *dest_ptr = _mm_hsum_ps(store_2);
 
-            let dest_ptr = unsafe_destination_ptr_0.add(px + dst_stride * 3);
-            dest_ptr.write_unaligned(_mm_hsum_ps(store_3));
+            let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 3);
+            *dest_ptr = _mm_hsum_ps(store_3);
 
             filter_offset += filter_weights.aligned_size;
         }
