@@ -88,7 +88,6 @@ mod scaler_f16;
 mod sse;
 mod support;
 mod threading_policy;
-mod unsafe_slice;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128",))]
 mod wasm32;
 

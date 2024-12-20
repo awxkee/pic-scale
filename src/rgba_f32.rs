@@ -54,10 +54,10 @@ impl HorizontalConvolutionPass<f32, 4> for ImageStore<'_, f32, 4> {
         pool: &Option<ThreadPool>,
     ) {
         let mut _dispatcher_4_rows: Option<
-            fn(usize, usize, &FilterWeights<f32>, *const f32, usize, *mut f32, usize),
-        > = Some(convolve_horizontal_rgba_4_row_f32::<f32, f32, 4>);
-        let mut _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, *const f32, *mut f32) =
-            convolve_horizontal_rgb_native_row::<f32, f32, 4>;
+            fn(usize, usize, &FilterWeights<f32>, &[f32], usize, &mut [f32], usize),
+        > = Some(convolve_horizontal_rgba_4_row_f32::<4>);
+        let mut _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, &[f32], &mut [f32]) =
+            convolve_horizontal_rgb_native_row::<4>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             _dispatcher_4_rows = Some(convolve_horizontal_rgba_neon_rows_4);
@@ -65,7 +65,7 @@ impl HorizontalConvolutionPass<f32, 4> for ImageStore<'_, f32, 4> {
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            if is_x86_feature_detected!("sse4.1") {
+            if std::is_x86_feature_detected!("sse4.1") {
                 _dispatcher_4_rows = Some(convolve_horizontal_rgba_sse_rows_4_f32::<false>);
                 _dispatcher_row = convolve_horizontal_rgba_sse_row_one_f32::<false>;
                 if is_x86_feature_detected!("fma") {
@@ -73,7 +73,7 @@ impl HorizontalConvolutionPass<f32, 4> for ImageStore<'_, f32, 4> {
                     _dispatcher_row = convolve_horizontal_rgba_sse_row_one_f32::<true>;
                 }
             }
-            if is_x86_feature_detected!("avx2") {
+            if std::is_x86_feature_detected!("avx2") {
                 _dispatcher_4_rows = Some(convolve_horizontal_rgba_avx_rows_4_f32::<false>);
                 _dispatcher_row = convolve_horizontal_rgba_avx_row_one_f32::<false>;
                 if is_x86_feature_detected!("fma") {
@@ -100,23 +100,23 @@ impl VerticalConvolutionPass<f32, 4> for ImageStore<'_, f32, 4> {
         destination: &mut ImageStore<f32, 4>,
         pool: &Option<ThreadPool>,
     ) {
-        let mut _dispatcher: fn(usize, &FilterBounds, *const f32, *mut f32, usize, &[f32]) =
-            convolve_vertical_rgb_native_row_f32::<f32, 4>;
+        let mut _dispatcher: fn(usize, &FilterBounds, &[f32], &mut [f32], usize, &[f32]) =
+            convolve_vertical_rgb_native_row_f32::<4>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             _dispatcher = convolve_vertical_rgb_neon_row_f32::<4>;
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            let has_fma = is_x86_feature_detected!("fma");
-            if is_x86_feature_detected!("sse4.1") {
+            let has_fma = std::is_x86_feature_detected!("fma");
+            if std::is_x86_feature_detected!("sse4.1") {
                 if has_fma {
                     _dispatcher = convolve_vertical_rgb_sse_row_f32::<4, true>;
                 } else {
                     _dispatcher = convolve_vertical_rgb_sse_row_f32::<4, false>;
                 }
             }
-            if is_x86_feature_detected!("avx2") {
+            if std::is_x86_feature_detected!("avx2") {
                 _dispatcher = convolve_vertical_avx_row_f32::<4, false>;
                 if has_fma {
                     _dispatcher = convolve_vertical_avx_row_f32::<4, true>;
