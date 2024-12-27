@@ -161,7 +161,10 @@ pub(crate) unsafe fn convolve_vertical_part_avx_f32<const FMA: bool>(
     }
 
     let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-    (dst_ptr as *mut i32).write_unaligned(_mm256_extract_epi32::<0>(_mm256_castps_si256(store_0)));
+    _mm_storeu_si32(
+        dst_ptr as *mut u8,
+        _mm256_castsi256_si128(_mm256_castps_si256(store_0)),
+    );
 }
 
 #[inline]

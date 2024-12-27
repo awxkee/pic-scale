@@ -46,7 +46,7 @@ unsafe fn sse_unpremultiply_row_u16(
     a_hi_f: __m128,
 ) -> __m128i {
     let zeros = _mm_setzero_si128();
-    let lo = _mm_cvtepu16_epi32(x);
+    let lo = _mm_unpacklo_epi16(x, zeros);
     let hi = _mm_unpackhi_epi16(x, zeros);
 
     const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
@@ -119,7 +119,10 @@ unsafe fn unpremultiply_alpha_sse_rgba_u16_row_impl(in_place: &mut [u16], bit_de
 
             let is_zero_mask = _mm_cmpeq_epi16(aaaa, _mm_setzero_si128());
             let a_lo_f = _mm_mul_ps(
-                _mm_rcp_ps(_mm_cvtepi32_ps(_mm_cvtepu16_epi32(aaaa))),
+                _mm_rcp_ps(_mm_cvtepi32_ps(_mm_unpacklo_epi16(
+                    aaaa,
+                    _mm_setzero_si128(),
+                ))),
                 v_max_colors,
             );
             let a_hi_f = _mm_mul_ps(
@@ -183,7 +186,7 @@ unsafe fn sse_premultiply_row_u16(
     v_max_colors_scale: __m128,
 ) -> __m128i {
     let zeros = _mm_setzero_si128();
-    let lo = _mm_cvtepu16_epi32(x);
+    let lo = _mm_unpacklo_epi16(x, zeros);
     let hi = _mm_unpackhi_epi16(x, zeros);
 
     let new_lo = _mm_cvtps_epi32(_mm_mul_ps(
@@ -241,7 +244,7 @@ unsafe fn premultiply_alpha_sse_rgba_u16_row_impl(dst: &mut [u16], src: &[u16], 
                 let row3 = _mm_loadu_si128(src_ptr.add(24) as *const __m128i);
                 let (rrrr, gggg, bbbb, aaaa) = sse_deinterleave_rgba_epi16(row0, row1, row2, row3);
 
-                let a_lo_f = _mm_cvtepu16_epi32(aaaa);
+                let a_lo_f = _mm_unpacklo_epi16(aaaa, zeros);
                 let a_hi_f = _mm_unpackhi_epi16(aaaa, zeros);
 
                 let new_rrrr = _mm_packus_epi32(
@@ -276,7 +279,7 @@ unsafe fn premultiply_alpha_sse_rgba_u16_row_impl(dst: &mut [u16], src: &[u16], 
                 let row3 = _mm_loadu_si128(src_ptr.add(24) as *const __m128i);
                 let (rrrr, gggg, bbbb, aaaa) = sse_deinterleave_rgba_epi16(row0, row1, row2, row3);
 
-                let a_lo_f = _mm_cvtepu16_epi32(aaaa);
+                let a_lo_f = _mm_unpacklo_epi16(aaaa, zeros);
                 let a_hi_f = _mm_unpackhi_epi16(aaaa, zeros);
 
                 let new_rrrr = _mm_packus_epi32(
@@ -311,7 +314,7 @@ unsafe fn premultiply_alpha_sse_rgba_u16_row_impl(dst: &mut [u16], src: &[u16], 
                 let row3 = _mm_loadu_si128(src_ptr.add(24) as *const __m128i);
                 let (rrrr, gggg, bbbb, aaaa) = sse_deinterleave_rgba_epi16(row0, row1, row2, row3);
 
-                let a_lo_f = _mm_cvtepu16_epi32(aaaa);
+                let a_lo_f = _mm_unpacklo_epi16(aaaa, zeros);
                 let a_hi_f = _mm_unpackhi_epi16(aaaa, zeros);
 
                 let new_rrrr = _mm_packus_epi32(
@@ -365,7 +368,7 @@ unsafe fn premultiply_alpha_sse_rgba_u16_row_impl(dst: &mut [u16], src: &[u16], 
                 let row3 = _mm_loadu_si128(src_ptr.add(24) as *const __m128i);
                 let (rrrr, gggg, bbbb, aaaa) = sse_deinterleave_rgba_epi16(row0, row1, row2, row3);
 
-                let a_lo_f = _mm_cvtepi32_ps(_mm_cvtepu16_epi32(aaaa));
+                let a_lo_f = _mm_cvtepi32_ps(_mm_unpacklo_epi16(aaaa, _mm_setzero_si128()));
                 let a_hi_f = _mm_cvtepi32_ps(_mm_unpackhi_epi16(aaaa, _mm_setzero_si128()));
 
                 let new_rrrr = sse_premultiply_row_u16(rrrr, a_lo_f, a_hi_f, v_max_colors_scale);

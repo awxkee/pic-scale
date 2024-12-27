@@ -61,7 +61,7 @@ pub(crate) unsafe fn _mm_div_by_255_epi16(v: __m128i) -> __m128i {
 #[inline(always)]
 pub(crate) unsafe fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
     let zeros = _mm_setzero_si128();
-    let lo = _mm_cvtepu8_epi16(x);
+    let lo = _mm_unpacklo_epi8(x, zeros);
     let hi = _mm_unpackhi_epi8(x, zeros);
 
     let scale = _mm_set1_epi16(255);
@@ -71,15 +71,15 @@ pub(crate) unsafe fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
 
     let scale_ps = _mm_set1_ps(255f32);
 
-    let lo_lo = _mm_mul_ps(_mm_cvtepi32_ps(_mm_cvtepi16_epi32(lo)), scale_ps);
+    let lo_lo = _mm_mul_ps(_mm_cvtepi32_ps(_mm_unpacklo_epi16(lo, zeros)), scale_ps);
     let lo_hi = _mm_mul_ps(_mm_cvtepi32_ps(_mm_unpackhi_epi16(lo, zeros)), scale_ps);
-    let hi_lo = _mm_mul_ps(_mm_cvtepi32_ps(_mm_cvtepi16_epi32(hi)), scale_ps);
+    let hi_lo = _mm_mul_ps(_mm_cvtepi32_ps(_mm_unpacklo_epi16(hi, zeros)), scale_ps);
     let hi_hi = _mm_mul_ps(_mm_cvtepi32_ps(_mm_unpackhi_epi16(hi, zeros)), scale_ps);
-    let a_lo = _mm_cvtepu8_epi16(a);
+    let a_lo = _mm_unpacklo_epi8(a, zeros);
     let a_hi = _mm_unpackhi_epi8(a, zeros);
-    let a_lo_lo = _mm_rcp_ps(_mm_cvtepi32_ps(_mm_cvtepi16_epi32(a_lo)));
+    let a_lo_lo = _mm_rcp_ps(_mm_cvtepi32_ps(_mm_unpacklo_epi16(a_lo, zeros)));
     let a_lo_hi = _mm_rcp_ps(_mm_cvtepi32_ps(_mm_unpackhi_epi16(a_lo, zeros)));
-    let a_hi_lo = _mm_rcp_ps(_mm_cvtepi32_ps(_mm_cvtepi16_epi32(a_hi)));
+    let a_hi_lo = _mm_rcp_ps(_mm_cvtepi32_ps(_mm_unpacklo_epi16(a_hi, zeros)));
     let a_hi_hi = _mm_rcp_ps(_mm_cvtepi32_ps(_mm_unpackhi_epi16(a_hi, zeros)));
 
     const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
@@ -124,16 +124,16 @@ unsafe fn sse_premultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8]) {
             let rgba3 = _mm_loadu_si128(src_ptr.add(48) as *const __m128i);
             let (rrr, ggg, bbb, aaa) = sse_deinterleave_rgba(rgba0, rgba1, rgba2, rgba3);
 
-            let mut rrr_low = _mm_cvtepu8_epi16(rrr);
+            let mut rrr_low = _mm_unpacklo_epi8(rrr, zeros);
             let mut rrr_high = _mm_unpackhi_epi8(rrr, zeros);
 
-            let mut ggg_low = _mm_cvtepu8_epi16(ggg);
+            let mut ggg_low = _mm_unpacklo_epi8(ggg, zeros);
             let mut ggg_high = _mm_unpackhi_epi8(ggg, zeros);
 
-            let mut bbb_low = _mm_cvtepu8_epi16(bbb);
+            let mut bbb_low = _mm_unpacklo_epi8(bbb, zeros);
             let mut bbb_high = _mm_unpackhi_epi8(bbb, zeros);
 
-            let aaa_low = _mm_cvtepu8_epi16(aaa);
+            let aaa_low = _mm_unpacklo_epi8(aaa, zeros);
             let aaa_high = _mm_unpackhi_epi8(aaa, zeros);
 
             rrr_low = _mm_div_by_255_epi16(_mm_mullo_epi16(rrr_low, aaa_low));

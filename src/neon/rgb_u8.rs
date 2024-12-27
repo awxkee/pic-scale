@@ -102,11 +102,11 @@ unsafe fn conv_horiz_rgba_1_u8(
 unsafe fn write_accumulator_u8(store: int32x4_t, dst: &mut [u8]) {
     let store_16 = vqshrun_n_s32::<PRECISION>(store);
     let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
-    let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
-    let bytes = pixel.to_le_bytes();
-    let first_byte = u16::from_le_bytes([bytes[0], bytes[1]]);
-    (dst.as_mut_ptr() as *mut u16).write_unaligned(first_byte);
-    *dst.get_unchecked_mut(2) = bytes[2];
+    vst1_lane_u16::<0>(
+        dst.as_mut_ptr() as *mut u16,
+        vreinterpret_u16_u8(store_16_8),
+    );
+    vst1_lane_u8::<2>(dst.as_mut_ptr().add(2), store_16_8);
 }
 
 pub(crate) fn convolve_horizontal_rgb_neon_rows_4(

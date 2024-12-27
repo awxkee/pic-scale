@@ -29,7 +29,7 @@
 
 use crate::alpha_handle_u16::{premultiply_alpha_rgba_row, unpremultiply_alpha_rgba_row};
 use crate::avx2::utils::{
-    _mm256_select_si256, avx2_pack_u32, avx_deinterleave_rgba_epi16, avx_interleave_rgba_epi16,
+    _mm256_select_si256, avx_deinterleave_rgba_epi16, avx_interleave_rgba_epi16,
 };
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
@@ -39,15 +39,16 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-#[inline]
+#[inline(always)]
 unsafe fn _mm256_scale_by_alpha(px: __m256i, low_low_a: __m256, low_high_a: __m256) -> __m256i {
-    let low_px = _mm256_cvtepi32_ps(_mm256_cvtepu16_epi32(_mm256_castsi256_si128(px)));
-    let high_px = _mm256_cvtepi32_ps(_mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(px)));
+    let zeros = _mm256_setzero_si256();
+    let low_px = _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(px, zeros));
+    let high_px = _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(px, zeros));
 
     let new_ll = _mm256_cvtps_epi32(_mm256_round_ps::<0x02>(_mm256_mul_ps(low_px, low_low_a)));
     let new_lh = _mm256_cvtps_epi32(_mm256_round_ps::<0x02>(_mm256_mul_ps(high_px, low_high_a)));
 
-    avx2_pack_u32(new_ll, new_lh)
+    _mm256_packus_epi32(new_ll, new_lh)
 }
 
 #[inline(always)]
@@ -108,36 +109,37 @@ unsafe fn avx_premultiply_alpha_rgba_u16_row(dst: &mut [u16], src: &[u16], bit_d
 
                 let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
 
-                let low_alpha = _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.3));
-                let high_alpha = _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.3));
+                let zeros = _mm256_setzero_si256();
+                let low_alpha = _mm256_unpacklo_epi16(pixel.3, zeros);
+                let high_alpha = _mm256_unpackhi_epi16(pixel.3, zeros);
 
-                let new_rrr = avx2_pack_u32(
+                let new_rrr = _mm256_packus_epi32(
                     _mm256_div_by_1023_epi32(_mm256_madd_epi16(
-                        _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.0)),
+                        _mm256_unpacklo_epi16(pixel.0, zeros),
                         low_alpha,
                     )),
                     _mm256_div_by_1023_epi32(_mm256_madd_epi16(
-                        _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.0)),
+                        _mm256_unpackhi_epi16(pixel.0, zeros),
                         high_alpha,
                     )),
                 );
-                let new_ggg = avx2_pack_u32(
+                let new_ggg = _mm256_packus_epi32(
                     _mm256_div_by_1023_epi32(_mm256_madd_epi16(
-                        _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.1)),
+                        _mm256_unpacklo_epi16(pixel.1, zeros),
                         low_alpha,
                     )),
                     _mm256_div_by_1023_epi32(_mm256_madd_epi16(
-                        _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.1)),
+                        _mm256_unpackhi_epi16(pixel.1, zeros),
                         high_alpha,
                     )),
                 );
-                let new_bbb = avx2_pack_u32(
+                let new_bbb = _mm256_packus_epi32(
                     _mm256_div_by_1023_epi32(_mm256_madd_epi16(
-                        _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.2)),
+                        _mm256_unpacklo_epi16(pixel.2, zeros),
                         low_alpha,
                     )),
                     _mm256_div_by_1023_epi32(_mm256_madd_epi16(
-                        _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.2)),
+                        _mm256_unpackhi_epi16(pixel.2, zeros),
                         high_alpha,
                     )),
                 );
@@ -165,36 +167,37 @@ unsafe fn avx_premultiply_alpha_rgba_u16_row(dst: &mut [u16], src: &[u16], bit_d
 
                 let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
 
-                let low_alpha = _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.3));
-                let high_alpha = _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.3));
+                let zeros = _mm256_setzero_si256();
+                let low_alpha = _mm256_unpacklo_epi16(pixel.3, zeros);
+                let high_alpha = _mm256_unpackhi_epi16(pixel.3, zeros);
 
-                let new_rrr = avx2_pack_u32(
+                let new_rrr = _mm256_packus_epi32(
                     _mm256_div_by_4095_epi32(_mm256_madd_epi16(
-                        _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.0)),
+                        _mm256_unpacklo_epi16(pixel.0, zeros),
                         low_alpha,
                     )),
                     _mm256_div_by_4095_epi32(_mm256_madd_epi16(
-                        _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.0)),
+                        _mm256_unpackhi_epi16(pixel.0, zeros),
                         high_alpha,
                     )),
                 );
-                let new_ggg = avx2_pack_u32(
+                let new_ggg = _mm256_packus_epi32(
                     _mm256_div_by_4095_epi32(_mm256_madd_epi16(
-                        _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.1)),
+                        _mm256_unpacklo_epi16(pixel.1, zeros),
                         low_alpha,
                     )),
                     _mm256_div_by_4095_epi32(_mm256_madd_epi16(
-                        _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.1)),
+                        _mm256_unpackhi_epi16(pixel.1, zeros),
                         high_alpha,
                     )),
                 );
-                let new_bbb = avx2_pack_u32(
+                let new_bbb = _mm256_packus_epi32(
                     _mm256_div_by_4095_epi32(_mm256_madd_epi16(
-                        _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.2)),
+                        _mm256_unpacklo_epi16(pixel.2, zeros),
                         low_alpha,
                     )),
                     _mm256_div_by_4095_epi32(_mm256_madd_epi16(
-                        _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.2)),
+                        _mm256_unpackhi_epi16(pixel.2, zeros),
                         high_alpha,
                     )),
                 );
@@ -222,36 +225,37 @@ unsafe fn avx_premultiply_alpha_rgba_u16_row(dst: &mut [u16], src: &[u16], bit_d
 
                 let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
 
-                let low_alpha = _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.3));
-                let high_alpha = _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.3));
+                let zeros = _mm256_setzero_si256();
+                let low_alpha = _mm256_unpacklo_epi16(pixel.3, zeros);
+                let high_alpha = _mm256_unpackhi_epi16(pixel.3, zeros);
 
-                let new_rrr = avx2_pack_u32(
+                let new_rrr = _mm256_packus_epi32(
                     _mm256_div_by_65535_epi32(_mm256_mullo_epi32(
-                        _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.0)),
+                        _mm256_unpacklo_epi16(pixel.0, zeros),
                         low_alpha,
                     )),
                     _mm256_div_by_65535_epi32(_mm256_mullo_epi32(
-                        _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.0)),
+                        _mm256_unpackhi_epi16(pixel.0, zeros),
                         high_alpha,
                     )),
                 );
-                let new_ggg = avx2_pack_u32(
+                let new_ggg = _mm256_packus_epi32(
                     _mm256_div_by_65535_epi32(_mm256_mullo_epi32(
-                        _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.1)),
+                        _mm256_unpacklo_epi16(pixel.1, zeros),
                         low_alpha,
                     )),
                     _mm256_div_by_65535_epi32(_mm256_mullo_epi32(
-                        _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.1)),
+                        _mm256_unpackhi_epi16(pixel.1, zeros),
                         high_alpha,
                     )),
                 );
-                let new_bbb = avx2_pack_u32(
+                let new_bbb = _mm256_packus_epi32(
                     _mm256_div_by_65535_epi32(_mm256_mullo_epi32(
-                        _mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.2)),
+                        _mm256_unpacklo_epi16(pixel.2, zeros),
                         low_alpha,
                     )),
                     _mm256_div_by_65535_epi32(_mm256_mullo_epi32(
-                        _mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(pixel.2)),
+                        _mm256_unpackhi_epi16(pixel.2, zeros),
                         high_alpha,
                     )),
                 );
@@ -280,14 +284,14 @@ unsafe fn avx_premultiply_alpha_rgba_u16_row(dst: &mut [u16], src: &[u16], bit_d
 
                 let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
 
+                let zeros = _mm256_setzero_si256();
+
                 let low_alpha = _mm256_mul_ps(
-                    _mm256_cvtepi32_ps(_mm256_cvtepu16_epi32(_mm256_castsi256_si128(pixel.3))),
+                    _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(pixel.3, zeros)),
                     v_scale_colors,
                 );
                 let high_alpha = _mm256_mul_ps(
-                    _mm256_cvtepi32_ps(_mm256_cvtepu16_epi32(_mm256_extracti128_si256::<1>(
-                        pixel.3,
-                    ))),
+                    _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(pixel.3, zeros)),
                     v_scale_colors,
                 );
 
@@ -368,17 +372,17 @@ unsafe fn avx_unpremultiply_alpha_rgba_u16_row(in_place: &mut [u16], bit_depth: 
 
         let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
 
-        let is_zero_alpha_mask = _mm256_cmpeq_epi16(pixel.3, _mm256_setzero_si256());
+        let zeros = _mm256_setzero_si256();
 
-        let mut low_alpha = _mm256_rcp_ps(_mm256_cvtepi32_ps(_mm256_cvtepu16_epi32(
-            _mm256_castsi256_si128(pixel.3),
-        )));
+        let is_zero_alpha_mask = _mm256_cmpeq_epi16(pixel.3, zeros);
+
+        let mut low_alpha =
+            _mm256_rcp_ps(_mm256_cvtepi32_ps(_mm256_unpacklo_epi16(pixel.3, zeros)));
 
         low_alpha = _mm256_mul_ps(low_alpha, v_scale_colors);
 
-        let mut high_alpha = _mm256_rcp_ps(_mm256_cvtepi32_ps(_mm256_cvtepu16_epi32(
-            _mm256_extracti128_si256::<1>(pixel.3),
-        )));
+        let mut high_alpha =
+            _mm256_rcp_ps(_mm256_cvtepi32_ps(_mm256_unpackhi_epi16(pixel.3, zeros)));
 
         high_alpha = _mm256_mul_ps(high_alpha, v_scale_colors);
 

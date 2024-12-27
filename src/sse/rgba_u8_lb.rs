@@ -45,7 +45,7 @@ unsafe fn convolve_horizontal_parts_one_rgba_sse<const SCALE: i32>(
 
     let src_ptr_32 = src_ptr.as_ptr() as *const i32;
     let rgba_pixel = _mm_cvtsi32_si128(src_ptr_32.read_unaligned());
-    let lo = _mm_slli_epi16::<SCALE>(_mm_cvtepu8_epi16(rgba_pixel));
+    let lo = _mm_slli_epi16::<SCALE>(_mm_unpacklo_epi8(rgba_pixel, _mm_setzero_si128()));
 
     _mm_add_epi16(store_0, _mm_mulhi_epi16(lo, weight0))
 }
@@ -127,8 +127,6 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_impl(
         const SCALE: i32 = 6;
         const ROUNDING: i16 = 1 << (SCALE - 1);
         const V_SHR: i32 = SCALE - 1;
-
-        let zeros = _mm_setzero_si128();
 
         let vld = _mm_set1_epi16(ROUNDING);
 
@@ -360,27 +358,27 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_impl(
                 jx += 1;
             }
 
-            let store_16_8_0 = _mm_srai_epi16::<V_SHR>(_mm_max_epi16(store_0, zeros));
-            let store_16_8_1 = _mm_srai_epi16::<V_SHR>(_mm_max_epi16(store_1, zeros));
-            let store_16_8_2 = _mm_srai_epi16::<V_SHR>(_mm_max_epi16(store_2, zeros));
-            let store_16_8_3 = _mm_srai_epi16::<V_SHR>(_mm_max_epi16(store_3, zeros));
+            let store_16_8_0 = _mm_srai_epi16::<V_SHR>(store_0);
+            let store_16_8_1 = _mm_srai_epi16::<V_SHR>(store_1);
+            let store_16_8_2 = _mm_srai_epi16::<V_SHR>(store_2);
+            let store_16_8_3 = _mm_srai_epi16::<V_SHR>(store_3);
 
-            let pixel_0 = _mm_extract_epi32::<0>(_mm_packus_epi16(store_16_8_0, store_16_8_0));
-            let pixel_1 = _mm_extract_epi32::<0>(_mm_packus_epi16(store_16_8_1, store_16_8_1));
-            let pixel_2 = _mm_extract_epi32::<0>(_mm_packus_epi16(store_16_8_2, store_16_8_2));
-            let pixel_3 = _mm_extract_epi32::<0>(_mm_packus_epi16(store_16_8_3, store_16_8_3));
-
-            let dest_ptr = chunk0.as_mut_ptr() as *mut i32;
-            dest_ptr.write_unaligned(pixel_0);
-
-            let dest_ptr = chunk1.as_mut_ptr() as *mut i32;
-            dest_ptr.write_unaligned(pixel_1);
-
-            let dest_ptr = chunk2.as_mut_ptr() as *mut i32;
-            dest_ptr.write_unaligned(pixel_2);
-
-            let dest_ptr = chunk3.as_mut_ptr() as *mut i32;
-            dest_ptr.write_unaligned(pixel_3);
+            _mm_storeu_si32(
+                chunk0.as_mut_ptr() as *mut _,
+                _mm_packus_epi16(store_16_8_0, store_16_8_0),
+            );
+            _mm_storeu_si32(
+                chunk1.as_mut_ptr() as *mut _,
+                _mm_packus_epi16(store_16_8_1, store_16_8_1),
+            );
+            _mm_storeu_si32(
+                chunk2.as_mut_ptr() as *mut _,
+                _mm_packus_epi16(store_16_8_2, store_16_8_2),
+            );
+            _mm_storeu_si32(
+                chunk3.as_mut_ptr() as *mut _,
+                _mm_packus_epi16(store_16_8_3, store_16_8_3),
+            );
         }
     }
 }
@@ -404,8 +402,6 @@ unsafe fn convolve_horizontal_rgba_sse_rows_one_impl(
     const CHANNELS: usize = 4;
 
     let shuffle_weights = _mm_setr_epi8(0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3);
-
-    let zeros = _mm_setzero_si128();
 
     const SCALE: i32 = 6;
     const ROUNDING: i16 = 1 << (SCALE - 1);
@@ -520,10 +516,10 @@ unsafe fn convolve_horizontal_rgba_sse_rows_one_impl(
             jx += 1;
         }
 
-        let store_16_8 = _mm_srai_epi16::<V_SHR>(_mm_max_epi16(store, zeros));
-        let pixel = _mm_extract_epi32::<0>(_mm_packus_epi16(store_16_8, store_16_8));
-
-        let dest_ptr_32 = dst.as_mut_ptr() as *mut i32;
-        dest_ptr_32.write_unaligned(pixel);
+        let store_16_8 = _mm_srai_epi16::<V_SHR>(store);
+        _mm_storeu_si32(
+            dst.as_mut_ptr() as *mut _,
+            _mm_packus_epi16(store_16_8, store_16_8),
+        );
     }
 }

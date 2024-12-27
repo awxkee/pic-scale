@@ -1216,9 +1216,7 @@ fn convolve_vertical_neon_row_full(
             let low_16 = vcombine_u16(shrinked_store, shrinked_store);
 
             let item = vqmovn_u16(low_16);
-
-            let value = vget_lane_u8::<0>(item);
-            *dst = value;
+            vst1_lane_u8::<0>(dst, item);
             cx += 1;
         }
     }

@@ -265,11 +265,7 @@ unsafe fn convolve_horizontal_rgba_sse_row_one_f16_impl<const F16C: bool, const 
             let px = x * CHANNELS;
             let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
             let converted_f16 = _mm_cvtps_phx::<F16C>(store);
-            std::ptr::copy_nonoverlapping(
-                &converted_f16 as *const _ as *const u8,
-                dest_ptr as *mut u8,
-                8,
-            );
+            _mm_storeu_si64(dest_ptr as *mut u8, converted_f16);
 
             filter_offset += filter_weights.aligned_size;
         }
@@ -536,29 +532,11 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_f16_impl<const F16C: bool, const F
         let converted_f16_1 = _mm_cvtps_phx::<F16C>(store_1);
         let converted_f16_2 = _mm_cvtps_phx::<F16C>(store_2);
         let converted_f16_3 = _mm_cvtps_phx::<F16C>(store_3);
-        std::ptr::copy_nonoverlapping(
-            &converted_f16_0 as *const _ as *const u8,
-            dest_ptr0 as *mut u8,
-            8,
-        );
 
-        std::ptr::copy_nonoverlapping(
-            &converted_f16_1 as *const _ as *const u8,
-            dest_ptr1 as *mut u8,
-            8,
-        );
-
-        std::ptr::copy_nonoverlapping(
-            &converted_f16_2 as *const _ as *const u8,
-            dest_ptr2 as *mut u8,
-            8,
-        );
-
-        std::ptr::copy_nonoverlapping(
-            &converted_f16_3 as *const _ as *const u8,
-            dest_ptr3 as *mut u8,
-            8,
-        );
+        _mm_storeu_si64(dest_ptr0 as *mut u8, converted_f16_0);
+        _mm_storeu_si64(dest_ptr1 as *mut u8, converted_f16_1);
+        _mm_storeu_si64(dest_ptr2 as *mut u8, converted_f16_2);
+        _mm_storeu_si64(dest_ptr3 as *mut u8, converted_f16_3);
 
         filter_offset += filter_weights.aligned_size;
     }

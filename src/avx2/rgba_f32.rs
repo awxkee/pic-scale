@@ -500,8 +500,8 @@ unsafe fn convolve_horizontal_rgba_avx_row_one_f32_impl<const FMA: bool>(
 
         while jx + 2 < bounds.size {
             let ptr = weights_ptr.add(jx + filter_offset);
-            let weight0 = _mm_set1_ps(ptr.read_unaligned());
-            let weight1 = _mm_set1_ps(ptr.add(1).read_unaligned());
+            let weight0 = _mm_load1_ps(ptr);
+            let weight1 = _mm_load1_ps(ptr.add(1));
             let weight = avx_combine_ps(weight0, weight1);
             let filter_start = jx + bounds.start;
             store = convolve_horizontal_parts_2_rgba_f32::<FMA>(filter_start, src, weight, store);

@@ -433,21 +433,22 @@ pub(crate) fn convolve_horizontal_rgba_neon_rows_4_u8(
             let store_16_8_2 = vqmovn_u16(vcombine_u16(store_16_2, store_16_2));
             let store_16_8 = vqmovn_u16(vcombine_u16(store_16_3, store_16_3));
 
-            let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8_0));
-            let dest_ptr_32 = chunk0.as_mut_ptr() as *mut u32;
-            dest_ptr_32.write_unaligned(pixel);
-
-            let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8_1));
-            let dest_ptr_32 = chunk1.as_mut_ptr() as *mut u32;
-            dest_ptr_32.write_unaligned(pixel);
-
-            let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8_2));
-            let dest_ptr_32 = chunk2.as_mut_ptr() as *mut u32;
-            dest_ptr_32.write_unaligned(pixel);
-
-            let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
-            let dest_ptr_32 = chunk3.as_mut_ptr() as *mut u32;
-            dest_ptr_32.write_unaligned(pixel);
+            vst1_lane_u32::<0>(
+                chunk0.as_mut_ptr() as *mut u32,
+                vreinterpret_u32_u8(store_16_8_0),
+            );
+            vst1_lane_u32::<0>(
+                chunk1.as_mut_ptr() as *mut u32,
+                vreinterpret_u32_u8(store_16_8_1),
+            );
+            vst1_lane_u32::<0>(
+                chunk2.as_mut_ptr() as *mut u32,
+                vreinterpret_u32_u8(store_16_8_2),
+            );
+            vst1_lane_u32::<0>(
+                chunk3.as_mut_ptr() as *mut u32,
+                vreinterpret_u32_u8(store_16_8),
+            );
         }
     }
 }
@@ -585,8 +586,9 @@ unsafe fn convolve_horizontal_rgba_neon_row_i16_impl(
         let store_16 = vshr_n_s16::<SCALE>(store);
         let store_16_8 = vqmovun_s16(vcombine_s16(store_16, store_16));
 
-        let value = vget_lane_u32::<0>(vreinterpret_u32_u8(store_16_8));
-        let dest_ptr_32 = dst.as_mut_ptr() as *mut u32;
-        dest_ptr_32.write_unaligned(value);
+        vst1_lane_u32::<0>(
+            dst.as_mut_ptr() as *mut u32,
+            vreinterpret_u32_u8(store_16_8),
+        );
     }
 }

@@ -95,7 +95,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_4_f16<const F16C: bool, const FM
 
     let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
     let acc = _mm_cvtps_phx::<F16C>(store_0);
-    std::ptr::copy_nonoverlapping(&acc as *const _ as *const u8, dst_ptr as *mut u8, 8);
+    _mm_storeu_si64(dst_ptr as *mut u8, acc);
 }
 
 #[inline(always)]

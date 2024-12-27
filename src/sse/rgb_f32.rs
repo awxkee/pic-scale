@@ -28,7 +28,7 @@
  */
 
 use crate::filter_weights::FilterWeights;
-use crate::sse::{_mm_extract_epi64x, _mm_prefer_fma_ps, load_4_weights, shuffle};
+use crate::sse::{_mm_prefer_fma_ps, load_4_weights, shuffle};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -231,7 +231,7 @@ unsafe fn convolve_horizontal_rgb_sse_row_one_f32_impl<const FMA: bool>(
 
         let px = x * CHANNELS;
         let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-        (dest_ptr as *mut i64).write_unaligned(_mm_extract_epi64x::<0>(_mm_castps_si128(store)));
+        _mm_storeu_si64(dest_ptr as *mut u8, _mm_castps_si128(store));
         (dest_ptr as *mut i32)
             .add(2)
             .write_unaligned(_mm_extract_ps::<2>(store));
@@ -452,25 +452,25 @@ unsafe fn convolve_horizontal_rgb_sse_rows_4_f32_impl<const FMA: bool>(
 
         let px = x * CHANNELS;
         let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-        (dest_ptr as *mut i64).write_unaligned(_mm_extract_epi64x::<0>(_mm_castps_si128(store_0)));
+        _mm_storeu_si64(dest_ptr as *mut u8, _mm_castps_si128(store_0));
         (dest_ptr as *mut i32)
             .add(2)
             .write_unaligned(_mm_extract_ps::<2>(store_0));
 
         let dest_ptr = dst.get_unchecked_mut(px + dst_stride..).as_mut_ptr();
-        (dest_ptr as *mut i64).write_unaligned(_mm_extract_epi64x::<0>(_mm_castps_si128(store_1)));
+        _mm_storeu_si64(dest_ptr as *mut u8, _mm_castps_si128(store_1));
         (dest_ptr as *mut i32)
             .add(2)
             .write_unaligned(_mm_extract_ps::<2>(store_1));
 
         let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 2..).as_mut_ptr();
-        (dest_ptr as *mut i64).write_unaligned(_mm_extract_epi64x::<0>(_mm_castps_si128(store_2)));
+        _mm_storeu_si64(dest_ptr as *mut u8, _mm_castps_si128(store_2));
         (dest_ptr as *mut i32)
             .add(2)
             .write_unaligned(_mm_extract_ps::<2>(store_2));
 
         let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 3..).as_mut_ptr();
-        (dest_ptr as *mut i64).write_unaligned(_mm_extract_epi64x::<0>(_mm_castps_si128(store_3)));
+        _mm_storeu_si64(dest_ptr as *mut u8, _mm_castps_si128(store_3));
         (dest_ptr as *mut i32)
             .add(2)
             .write_unaligned(_mm_extract_ps::<2>(store_3));

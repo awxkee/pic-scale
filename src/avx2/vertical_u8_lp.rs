@@ -53,8 +53,9 @@ unsafe fn m256dot<const SCALE: i32>(
     row: __m256i,
     weight: __m256i,
 ) -> (__m256i, __m256i) {
-    let lo = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(row));
-    let hi = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(row));
+    let zeros = _mm256_setzero_si256();
+    let lo = _mm256_unpacklo_epi8(row, zeros);
+    let hi = _mm256_unpackhi_epi8(row, zeros);
 
     let store0 = _mm256_add_epi16(
         store0,
@@ -216,8 +217,8 @@ unsafe fn convolve_vertical_avx2_row_impl(
         let rebased2 = _mm256_srai_epi16::<R_SHR_SCALE>(store2);
         let rebased3 = _mm256_srai_epi16::<R_SHR_SCALE>(store3);
 
-        let shrank0 = avx2_pack_u16(rebased0, rebased1);
-        let shrank1 = avx2_pack_u16(rebased2, rebased3);
+        let shrank0 = _mm256_packus_epi16(rebased0, rebased1);
+        let shrank1 = _mm256_packus_epi16(rebased2, rebased3);
 
         _mm256_storeu_si256(dst.as_mut_ptr() as *mut __m256i, shrank0);
         _mm256_storeu_si256(
@@ -316,7 +317,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
         let rebased0 = _mm256_srai_epi16::<R_SHR_SCALE>(store0);
         let rebased1 = _mm256_srai_epi16::<R_SHR_SCALE>(store1);
 
-        let shrank0 = avx2_pack_u16(rebased0, rebased1);
+        let shrank0 = _mm256_packus_epi16(rebased0, rebased1);
         _mm256_storeu_si256(dst.as_mut_ptr() as *mut __m256i, shrank0);
 
         cx += 32;
@@ -469,7 +470,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
 
         let rebased = _mm_srai_epi16::<R_SHR_SCALE>(store);
         let shrank = _mm_packus_epi16(rebased, rebased);
-        std::ptr::copy_nonoverlapping(&shrank as *const _ as *const u8, dst.as_mut_ptr(), 8);
+        _mm_storeu_si64(dst.as_mut_ptr(), shrank);
 
         cx += 8;
     }

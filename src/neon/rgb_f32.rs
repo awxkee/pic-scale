@@ -35,10 +35,8 @@ use crate::neon::utils::{prefer_vfmaq_f32, prefer_vfmaq_lane_f32};
 
 macro_rules! write_rgb_f32 {
     ($store: expr, $dest_ptr: expr) => {{
-        let l1 = vgetq_lane_u64::<0>(vreinterpretq_u64_f32($store));
-        let l3 = vgetq_lane_f32::<2>($store);
-        ($dest_ptr as *mut u64).write_unaligned(l1);
-        $dest_ptr.add(2).write_unaligned(l3);
+        vst1_f32($dest_ptr, vget_low_f32($store));
+        vst1q_lane_f32::<2>($dest_ptr.add(2), $store);
     }};
 }
 

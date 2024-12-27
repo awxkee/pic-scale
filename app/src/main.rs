@@ -45,7 +45,7 @@ fn resize_plane(
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
+    let img = ImageReader::open("./assets/test_1.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -53,7 +53,7 @@ fn main() {
     let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
-    let mut scaler = LinearScaler::new(ResamplingFunction::Bilinear);
+    let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
     // resize_plane(378, 257, 257, 257, ResamplingFunction::Bilinear);

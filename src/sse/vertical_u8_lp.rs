@@ -94,189 +94,22 @@ unsafe fn convolve_vertical_sse_row_impl(
 
         let px = cx;
 
-        if bounds_size == 2 {
-            let py = bounds.start;
-            let weights = weight.get_unchecked(0..2);
-            let v_weight0 = _mm_set1_epi16(weights[0]);
-            let v_weight1 = _mm_set1_epi16(weights[1]);
-            let v_offset0 = src_stride * py + px;
-            let src_ptr0 = src.get_unchecked(v_offset0..);
-            let v_offset1 = src_stride * (py + 1) + px;
-            let src_ptr1 = src.get_unchecked(v_offset1..);
+        for j in 0..bounds_size {
+            let py = bounds.start + j;
+            let weight = weight.get_unchecked(j..(j + 1));
+            let v_weight = _mm_set1_epi16(weight[0]);
+            let v_offset = src_stride * py + px;
+            let src_ptr = src.get_unchecked(v_offset..);
+            let item_row0 = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
+            let item_row1 = _mm_loadu_si128(src_ptr.get_unchecked(16..).as_ptr() as *const __m128i);
+            let item_row2 = _mm_loadu_si128(src_ptr.get_unchecked(32..).as_ptr() as *const __m128i);
+            let item_row3 = _mm_loadu_si128(src_ptr.get_unchecked(48..).as_ptr() as *const __m128i);
 
-            let item_row0 = _mm_loadu_si128(src_ptr0.as_ptr() as *const __m128i);
-            let item_row1 =
-                _mm_loadu_si128(src_ptr0.get_unchecked(16..).as_ptr() as *const __m128i);
-            let item_row2 =
-                _mm_loadu_si128(src_ptr0.get_unchecked(32..).as_ptr() as *const __m128i);
-            let item_row3 =
-                _mm_loadu_si128(src_ptr0.get_unchecked(48..).as_ptr() as *const __m128i);
-
-            (store0, store1) = mdot::<SCALE>(store0, store1, item_row0, v_weight0);
-            (store2, store3) = mdot::<SCALE>(store2, store3, item_row1, v_weight0);
-            (store4, store5) = mdot::<SCALE>(store4, store5, item_row2, v_weight0);
-            (store6, store7) = mdot::<SCALE>(store6, store7, item_row3, v_weight0);
-
-            let item_row10 = _mm_loadu_si128(src_ptr1.as_ptr() as *const __m128i);
-            let item_row11 =
-                _mm_loadu_si128(src_ptr1.get_unchecked(16..).as_ptr() as *const __m128i);
-            let item_row12 =
-                _mm_loadu_si128(src_ptr1.get_unchecked(32..).as_ptr() as *const __m128i);
-            let item_row13 =
-                _mm_loadu_si128(src_ptr1.get_unchecked(48..).as_ptr() as *const __m128i);
-
-            (store0, store1) = mdot::<SCALE>(store0, store1, item_row10, v_weight1);
-            (store2, store3) = mdot::<SCALE>(store2, store3, item_row11, v_weight1);
-            (store4, store5) = mdot::<SCALE>(store4, store5, item_row12, v_weight1);
-            (store6, store7) = mdot::<SCALE>(store6, store7, item_row13, v_weight1);
-        } else if bounds_size == 3 {
-            let py = bounds.start;
-            let weights = weight.get_unchecked(0..3);
-            let v_weight0 = _mm_set1_epi16(weights[0]);
-            let v_weight1 = _mm_set1_epi16(weights[1]);
-            let v_weight2 = _mm_set1_epi16(weights[2]);
-            let v_offset0 = src_stride * py + px;
-            let src_ptr0 = src.get_unchecked(v_offset0..);
-            let v_offset1 = src_stride * (py + 1) + px;
-            let src_ptr1 = src.get_unchecked(v_offset1..);
-            let v_offset2 = src_stride * (py + 2) + px;
-            let src_ptr2 = src.get_unchecked(v_offset2..);
-
-            let item_row0 = _mm_loadu_si128(src_ptr0.as_ptr() as *const __m128i);
-            let item_row1 =
-                _mm_loadu_si128(src_ptr0.get_unchecked(16..).as_ptr() as *const __m128i);
-            let item_row2 =
-                _mm_loadu_si128(src_ptr0.get_unchecked(32..).as_ptr() as *const __m128i);
-            let item_row3 =
-                _mm_loadu_si128(src_ptr0.get_unchecked(48..).as_ptr() as *const __m128i);
-
-            (store0, store1) = mdot::<SCALE>(store0, store1, item_row0, v_weight0);
-            (store2, store3) = mdot::<SCALE>(store2, store3, item_row1, v_weight0);
-            (store4, store5) = mdot::<SCALE>(store4, store5, item_row2, v_weight0);
-            (store6, store7) = mdot::<SCALE>(store6, store7, item_row3, v_weight0);
-
-            let item_row10 = _mm_loadu_si128(src_ptr1.as_ptr() as *const __m128i);
-            let item_row11 =
-                _mm_loadu_si128(src_ptr1.get_unchecked(16..).as_ptr() as *const __m128i);
-            let item_row12 =
-                _mm_loadu_si128(src_ptr1.get_unchecked(32..).as_ptr() as *const __m128i);
-            let item_row13 =
-                _mm_loadu_si128(src_ptr1.get_unchecked(48..).as_ptr() as *const __m128i);
-
-            (store0, store1) = mdot::<SCALE>(store0, store1, item_row10, v_weight1);
-            (store2, store3) = mdot::<SCALE>(store2, store3, item_row11, v_weight1);
-            (store4, store5) = mdot::<SCALE>(store4, store5, item_row12, v_weight1);
-            (store6, store7) = mdot::<SCALE>(store6, store7, item_row13, v_weight1);
-
-            let item_row20 = _mm_loadu_si128(src_ptr2.as_ptr() as *const __m128i);
-            let item_row21 =
-                _mm_loadu_si128(src_ptr2.get_unchecked(16..).as_ptr() as *const __m128i);
-            let item_row22 =
-                _mm_loadu_si128(src_ptr2.get_unchecked(32..).as_ptr() as *const __m128i);
-            let item_row23 =
-                _mm_loadu_si128(src_ptr2.get_unchecked(48..).as_ptr() as *const __m128i);
-
-            (store0, store1) = mdot::<SCALE>(store0, store1, item_row20, v_weight2);
-            (store2, store3) = mdot::<SCALE>(store2, store3, item_row21, v_weight2);
-            (store4, store5) = mdot::<SCALE>(store4, store5, item_row22, v_weight2);
-            (store6, store7) = mdot::<SCALE>(store6, store7, item_row23, v_weight2);
-        } else if bounds_size == 4 {
-            let py = bounds.start;
-            let weights = weight.get_unchecked(0..4);
-            let v_weight0 = _mm_set1_epi16(weights[0]);
-            let v_weight1 = _mm_set1_epi16(weights[1]);
-            let v_weight2 = _mm_set1_epi16(weights[2]);
-            let v_weight3 = _mm_set1_epi16(weights[3]);
-            let v_offset0 = src_stride * py + px;
-            let src_ptr0 = src.get_unchecked(v_offset0..);
-            let v_offset1 = src_stride * (py + 1) + px;
-            let src_ptr1 = src.get_unchecked(v_offset1..);
-            let v_offset2 = src_stride * (py + 2) + px;
-            let src_ptr2 = src.get_unchecked(v_offset2..);
-            let v_offset3 = src_stride * (py + 3) + px;
-            let src_ptr3 = src.get_unchecked(v_offset3..);
-
-            let item_row0 = _mm_loadu_si128(src_ptr0.as_ptr() as *const __m128i);
-            let item_row1 =
-                _mm_loadu_si128(src_ptr0.get_unchecked(16..).as_ptr() as *const __m128i);
-            let item_row2 =
-                _mm_loadu_si128(src_ptr0.get_unchecked(32..).as_ptr() as *const __m128i);
-            let item_row3 =
-                _mm_loadu_si128(src_ptr0.get_unchecked(48..).as_ptr() as *const __m128i);
-
-            (store0, store1) = mdot::<SCALE>(store0, store1, item_row0, v_weight0);
-            (store2, store3) = mdot::<SCALE>(store2, store3, item_row1, v_weight0);
-            (store4, store5) = mdot::<SCALE>(store4, store5, item_row2, v_weight0);
-            (store6, store7) = mdot::<SCALE>(store6, store7, item_row3, v_weight0);
-
-            let item_row10 = _mm_loadu_si128(src_ptr1.as_ptr() as *const __m128i);
-            let item_row11 =
-                _mm_loadu_si128(src_ptr1.get_unchecked(16..).as_ptr() as *const __m128i);
-            let item_row12 =
-                _mm_loadu_si128(src_ptr1.get_unchecked(32..).as_ptr() as *const __m128i);
-            let item_row13 =
-                _mm_loadu_si128(src_ptr1.get_unchecked(48..).as_ptr() as *const __m128i);
-
-            (store0, store1) = mdot::<SCALE>(store0, store1, item_row10, v_weight1);
-            (store2, store3) = mdot::<SCALE>(store2, store3, item_row11, v_weight1);
-            (store4, store5) = mdot::<SCALE>(store4, store5, item_row12, v_weight1);
-            (store6, store7) = mdot::<SCALE>(store6, store7, item_row13, v_weight1);
-
-            let item_row20 = _mm_loadu_si128(src_ptr2.as_ptr() as *const __m128i);
-            let item_row21 =
-                _mm_loadu_si128(src_ptr2.get_unchecked(16..).as_ptr() as *const __m128i);
-            let item_row22 =
-                _mm_loadu_si128(src_ptr2.get_unchecked(32..).as_ptr() as *const __m128i);
-            let item_row23 =
-                _mm_loadu_si128(src_ptr2.get_unchecked(48..).as_ptr() as *const __m128i);
-
-            (store0, store1) = mdot::<SCALE>(store0, store1, item_row20, v_weight2);
-            (store2, store3) = mdot::<SCALE>(store2, store3, item_row21, v_weight2);
-            (store4, store5) = mdot::<SCALE>(store4, store5, item_row22, v_weight2);
-            (store6, store7) = mdot::<SCALE>(store6, store7, item_row23, v_weight2);
-
-            let item_row30 = _mm_loadu_si128(src_ptr3.as_ptr() as *const __m128i);
-            let item_row31 =
-                _mm_loadu_si128(src_ptr3.get_unchecked(16..).as_ptr() as *const __m128i);
-            let item_row32 =
-                _mm_loadu_si128(src_ptr3.get_unchecked(32..).as_ptr() as *const __m128i);
-            let item_row33 =
-                _mm_loadu_si128(src_ptr3.get_unchecked(48..).as_ptr() as *const __m128i);
-
-            (store0, store1) = mdot::<SCALE>(store0, store1, item_row30, v_weight3);
-            (store2, store3) = mdot::<SCALE>(store2, store3, item_row31, v_weight3);
-            (store4, store5) = mdot::<SCALE>(store4, store5, item_row32, v_weight3);
-            (store6, store7) = mdot::<SCALE>(store6, store7, item_row33, v_weight3);
-        } else {
-            for j in 0..bounds_size {
-                let py = bounds.start + j;
-                let weight = weight.get_unchecked(j..(j + 1));
-                let v_weight = _mm_set1_epi16(weight[0]);
-                let v_offset = src_stride * py + px;
-                let src_ptr = src.get_unchecked(v_offset..);
-                let item_row0 = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
-                let item_row1 =
-                    _mm_loadu_si128(src_ptr.get_unchecked(16..).as_ptr() as *const __m128i);
-                let item_row2 =
-                    _mm_loadu_si128(src_ptr.get_unchecked(32..).as_ptr() as *const __m128i);
-                let item_row3 =
-                    _mm_loadu_si128(src_ptr.get_unchecked(48..).as_ptr() as *const __m128i);
-
-                (store0, store1) = mdot::<SCALE>(store0, store1, item_row0, v_weight);
-                (store2, store3) = mdot::<SCALE>(store2, store3, item_row1, v_weight);
-                (store4, store5) = mdot::<SCALE>(store4, store5, item_row2, v_weight);
-                (store6, store7) = mdot::<SCALE>(store6, store7, item_row3, v_weight);
-            }
+            (store0, store1) = mdot::<SCALE>(store0, store1, item_row0, v_weight);
+            (store2, store3) = mdot::<SCALE>(store2, store3, item_row1, v_weight);
+            (store4, store5) = mdot::<SCALE>(store4, store5, item_row2, v_weight);
+            (store6, store7) = mdot::<SCALE>(store6, store7, item_row3, v_weight);
         }
-
-        store0 = _mm_max_epi16(store0, zeros);
-        store1 = _mm_max_epi16(store1, zeros);
-        store2 = _mm_max_epi16(store2, zeros);
-        store3 = _mm_max_epi16(store3, zeros);
-        store4 = _mm_max_epi16(store4, zeros);
-        store5 = _mm_max_epi16(store5, zeros);
-        store6 = _mm_max_epi16(store6, zeros);
-        store7 = _mm_max_epi16(store7, zeros);
 
         let rebased0 = _mm_srli_epi16::<R_SHR_SCALE>(store0);
         let rebased1 = _mm_srli_epi16::<R_SHR_SCALE>(store1);
@@ -318,125 +151,18 @@ unsafe fn convolve_vertical_sse_row_impl(
 
         let px = cx;
 
-        if bounds_size == 2 {
-            let py = bounds.start;
-            let weights = weight.get_unchecked(0..2);
-            let v_weight0 = _mm_set1_epi16(weights[0]);
-            let v_weight1 = _mm_set1_epi16(weights[1]);
-            let v_offset0 = src_stride * py + px;
-            let src_ptr0 = src.get_unchecked(v_offset0..);
-            let v_offset1 = src_stride * (py + 1) + px;
-            let src_ptr1 = src.get_unchecked(v_offset1..);
+        for j in 0..bounds_size {
+            let py = bounds.start + j;
+            let weight = weight.get_unchecked(j..(j + 1));
+            let v_weight = _mm_set1_epi16(weight[0]);
+            let v_offset = src_stride * py + px;
+            let src_ptr = src.get_unchecked(v_offset..);
+            let item_row0 = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
+            let item_row1 = _mm_loadu_si128(src_ptr.get_unchecked(16..).as_ptr() as *const __m128i);
 
-            let item_row0 = _mm_loadu_si128(src_ptr0.as_ptr() as *const __m128i);
-            let item_row1 =
-                _mm_loadu_si128(src_ptr0.get_unchecked(16..).as_ptr() as *const __m128i);
-
-            (store0, store1) = mdot::<SCALE>(store0, store1, item_row0, v_weight0);
-            (store2, store3) = mdot::<SCALE>(store2, store3, item_row1, v_weight0);
-
-            let item_row10 = _mm_loadu_si128(src_ptr1.as_ptr() as *const __m128i);
-            let item_row11 =
-                _mm_loadu_si128(src_ptr1.get_unchecked(16..).as_ptr() as *const __m128i);
-
-            (store0, store1) = mdot::<SCALE>(store0, store1, item_row10, v_weight1);
-            (store2, store3) = mdot::<SCALE>(store2, store3, item_row11, v_weight1);
-        } else if bounds_size == 3 {
-            let py = bounds.start;
-            let weights = weight.get_unchecked(0..3);
-            let v_weight0 = _mm_set1_epi16(weights[0]);
-            let v_weight1 = _mm_set1_epi16(weights[1]);
-            let v_weight2 = _mm_set1_epi16(weights[2]);
-            let v_offset0 = src_stride * py + px;
-            let src_ptr0 = src.get_unchecked(v_offset0..);
-            let v_offset1 = src_stride * (py + 1) + px;
-            let src_ptr1 = src.get_unchecked(v_offset1..);
-            let v_offset2 = src_stride * (py + 2) + px;
-            let src_ptr2 = src.get_unchecked(v_offset2..);
-
-            let item_row0 = _mm_loadu_si128(src_ptr0.as_ptr() as *const __m128i);
-            let item_row1 =
-                _mm_loadu_si128(src_ptr0.get_unchecked(16..).as_ptr() as *const __m128i);
-
-            (store0, store1) = mdot::<SCALE>(store0, store1, item_row0, v_weight0);
-            (store2, store3) = mdot::<SCALE>(store2, store3, item_row1, v_weight0);
-
-            let item_row10 = _mm_loadu_si128(src_ptr1.as_ptr() as *const __m128i);
-            let item_row11 =
-                _mm_loadu_si128(src_ptr1.get_unchecked(16..).as_ptr() as *const __m128i);
-
-            (store0, store1) = mdot::<SCALE>(store0, store1, item_row10, v_weight1);
-            (store2, store3) = mdot::<SCALE>(store2, store3, item_row11, v_weight1);
-
-            let item_row20 = _mm_loadu_si128(src_ptr2.as_ptr() as *const __m128i);
-            let item_row21 =
-                _mm_loadu_si128(src_ptr2.get_unchecked(16..).as_ptr() as *const __m128i);
-
-            (store0, store1) = mdot::<SCALE>(store0, store1, item_row20, v_weight2);
-            (store2, store3) = mdot::<SCALE>(store2, store3, item_row21, v_weight2);
-        } else if bounds_size == 4 {
-            let py = bounds.start;
-            let weights = weight.get_unchecked(0..4);
-            let v_weight0 = _mm_set1_epi16(weights[0]);
-            let v_weight1 = _mm_set1_epi16(weights[1]);
-            let v_weight2 = _mm_set1_epi16(weights[2]);
-            let v_weight3 = _mm_set1_epi16(weights[3]);
-            let v_offset0 = src_stride * py + px;
-            let src_ptr0 = src.get_unchecked(v_offset0..);
-            let v_offset1 = src_stride * (py + 1) + px;
-            let src_ptr1 = src.get_unchecked(v_offset1..);
-            let v_offset2 = src_stride * (py + 2) + px;
-            let src_ptr2 = src.get_unchecked(v_offset2..);
-            let v_offset3 = src_stride * (py + 3) + px;
-            let src_ptr3 = src.get_unchecked(v_offset3..);
-
-            let item_row0 = _mm_loadu_si128(src_ptr0.as_ptr() as *const __m128i);
-            let item_row1 =
-                _mm_loadu_si128(src_ptr0.get_unchecked(16..).as_ptr() as *const __m128i);
-
-            (store0, store1) = mdot::<SCALE>(store0, store1, item_row0, v_weight0);
-            (store2, store3) = mdot::<SCALE>(store2, store3, item_row1, v_weight0);
-
-            let item_row10 = _mm_loadu_si128(src_ptr1.as_ptr() as *const __m128i);
-            let item_row11 =
-                _mm_loadu_si128(src_ptr1.get_unchecked(16..).as_ptr() as *const __m128i);
-
-            (store0, store1) = mdot::<SCALE>(store0, store1, item_row10, v_weight1);
-            (store2, store3) = mdot::<SCALE>(store2, store3, item_row11, v_weight1);
-
-            let item_row20 = _mm_loadu_si128(src_ptr2.as_ptr() as *const __m128i);
-            let item_row21 =
-                _mm_loadu_si128(src_ptr2.get_unchecked(16..).as_ptr() as *const __m128i);
-
-            (store0, store1) = mdot::<SCALE>(store0, store1, item_row20, v_weight2);
-            (store2, store3) = mdot::<SCALE>(store2, store3, item_row21, v_weight2);
-
-            let item_row30 = _mm_loadu_si128(src_ptr3.as_ptr() as *const __m128i);
-            let item_row31 =
-                _mm_loadu_si128(src_ptr3.get_unchecked(16..).as_ptr() as *const __m128i);
-
-            (store0, store1) = mdot::<SCALE>(store0, store1, item_row30, v_weight3);
-            (store2, store3) = mdot::<SCALE>(store2, store3, item_row31, v_weight3);
-        } else {
-            for j in 0..bounds_size {
-                let py = bounds.start + j;
-                let weight = weight.get_unchecked(j..(j + 1));
-                let v_weight = _mm_set1_epi16(weight[0]);
-                let v_offset = src_stride * py + px;
-                let src_ptr = src.get_unchecked(v_offset..);
-                let item_row0 = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
-                let item_row1 =
-                    _mm_loadu_si128(src_ptr.get_unchecked(16..).as_ptr() as *const __m128i);
-
-                (store0, store1) = mdot::<SCALE>(store0, store1, item_row0, v_weight);
-                (store2, store3) = mdot::<SCALE>(store2, store3, item_row1, v_weight);
-            }
+            (store0, store1) = mdot::<SCALE>(store0, store1, item_row0, v_weight);
+            (store2, store3) = mdot::<SCALE>(store2, store3, item_row1, v_weight);
         }
-
-        store0 = _mm_max_epi16(store0, zeros);
-        store1 = _mm_max_epi16(store1, zeros);
-        store2 = _mm_max_epi16(store2, zeros);
-        store3 = _mm_max_epi16(store3, zeros);
 
         let rebased0 = _mm_srli_epi16::<R_SHR_SCALE>(store0);
         let rebased1 = _mm_srli_epi16::<R_SHR_SCALE>(store1);
@@ -531,9 +257,6 @@ unsafe fn convolve_vertical_sse_row_impl(
                 (store0, store1) = mdot::<SCALE>(store0, store1, item_row, v_weight);
             }
         }
-
-        store0 = _mm_max_epi16(store0, zeros);
-        store1 = _mm_max_epi16(store1, zeros);
 
         let rebased0 = _mm_srli_epi16::<R_SHR_SCALE>(store0);
         let rebased1 = _mm_srli_epi16::<R_SHR_SCALE>(store1);
@@ -655,11 +378,9 @@ unsafe fn convolve_vertical_sse_row_impl(
             }
         }
 
-        store = _mm_max_epi16(store, zeros);
-
         let rebased = _mm_srli_epi16::<R_SHR_SCALE>(store);
         let shrank = _mm_packus_epi16(rebased, rebased);
-        std::ptr::copy_nonoverlapping(&shrank as *const _ as *const u8, dst.as_mut_ptr(), 8);
+        _mm_storeu_si64(dst.as_mut_ptr(), shrank);
 
         cx += 8;
     }
@@ -780,8 +501,6 @@ unsafe fn convolve_vertical_sse_row_impl(
                 );
             }
         }
-
-        store = _mm_max_epi16(store, zeros);
 
         let rebased = _mm_srli_epi16::<R_SHR_SCALE>(store);
         let value = _mm_extract_epi8::<0>(_mm_packus_epi16(rebased, rebased));
