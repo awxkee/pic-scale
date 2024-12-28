@@ -35,6 +35,7 @@ mod alpha_u8;
 #[cfg(feature = "half")]
 mod rgba_f16;
 mod rgba_f32;
+mod rgba_u8_lb;
 pub(crate) mod utils;
 #[cfg(feature = "half")]
 mod vertical_f16;
@@ -55,6 +56,9 @@ pub(crate) use rgba_f16::{
 };
 pub(crate) use rgba_f32::{
     convolve_horizontal_rgba_avx_row_one_f32, convolve_horizontal_rgba_avx_rows_4_f32,
+};
+pub(crate) use rgba_u8_lb::{
+    convolve_horizontal_rgba_avx_rows_4_lb, convolve_horizontal_rgba_avx_rows_one_lb,
 };
 #[cfg(feature = "half")]
 pub(crate) use vertical_f16::convolve_vertical_avx_row_f16;

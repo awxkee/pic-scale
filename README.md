@@ -43,21 +43,21 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 
 `~` - Partially implemented
 
-|                | NEON | SSE | AVX | WASM | 
-|----------------|------|-----|-----|------| 
-| RGBA (8 bit)   | x    | x   | ~   | ~    | 
-| RGB (8 bit)    | x    | x   | ~   | ~    | 
-| Plane (8 bit)  | x    | x   | ~   | ~    | 
-| RGBA (8+ bit)  | x    | x   | ~   | -    | 
-| RGB (8+ bit)   | x    | x   | ~   | -    | 
-| Plane (8+ bit) | ~    | ~   | ~   | -    | 
-| RGBA (f32)     | x    | x   | x   | -    | 
-| RGB (f32)      | x    | x   | ~   | -    | 
-| Plane (f32)    | x    | x   | ~   | -    | 
-| RGBA (f16)     | x    | x   | x   | -    | 
-| RGB (f16)      | x    | ~   | ~   | -    | 
-| Plane (f16)    | ~    | ~   | ~   | -    |
-| AR30/RA30      | x    | -   | -   | -    |
+|                | NEON | SSE | AVX2 | WASM | 
+|----------------|------|-----|------|------| 
+| RGBA (8 bit)   | x    | x   | x    | ~    | 
+| RGB (8 bit)    | x    | x   | ~    | ~    | 
+| Plane (8 bit)  | x    | x   | ~    | ~    | 
+| RGBA (8+ bit)  | x    | x   | ~    | -    | 
+| RGB (8+ bit)   | x    | x   | ~    | -    | 
+| Plane (8+ bit) | ~    | ~   | ~    | -    | 
+| RGBA (f32)     | x    | x   | x    | -    | 
+| RGB (f32)      | x    | x   | ~    | -    | 
+| Plane (f32)    | x    | x   | ~    | -    | 
+| RGBA (f16)     | x    | x   | x    | -    | 
+| RGB (f16)      | x    | ~   | ~    | -    | 
+| Plane (f16)    | ~    | ~   | ~    | -    |
+| AR30/RA30      | x    | -   | -    | -    |
 
 #### Features
 

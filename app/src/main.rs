@@ -53,7 +53,7 @@ fn main() {
     let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
-    let mut scaler = LinearScaler::new(ResamplingFunction::Bilinear);
+    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
     // resize_plane(378, 257, 257, 257, ResamplingFunction::Bilinear);
@@ -64,7 +64,7 @@ fn main() {
         ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
 
-    let dst_size = ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2);
+    let dst_size = ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
     // let mut resized_ar = vec![0u32; dst_size.width * dst_size.height];
     let start_time = Instant::now();
     // scaler
@@ -78,7 +78,7 @@ fn main() {
     //     .unwrap();
 
     let mut dst_store =
-        ImageStoreMut::<u8, 4>::alloc(dimensions.0 as usize / 2, dimensions.1 as usize / 2);
+        ImageStoreMut::<u8, 4>::alloc(dimensions.0 as usize / 3, dimensions.1 as usize / 3);
 
     scaler.resize_rgba(&store, &mut dst_store, false).unwrap();
 
