@@ -17,16 +17,16 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let src_bytes = binding.as_bytes();
 
     c.bench_function("Pic scale RGB: Lanczos 3", |b| {
+        let mut copied: Vec<u8> = Vec::from(src_bytes);
+        let store = ImageStore::<u8, 3>::from_slice(
+            &mut copied,
+            dimensions.0 as usize,
+            dimensions.1 as usize,
+        )
+        .unwrap();
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
             scaler.set_threading_policy(ThreadingPolicy::Single);
-            let mut copied: Vec<u8> = Vec::from(src_bytes);
-            let store = ImageStore::<u8, 3>::from_slice(
-                &mut copied,
-                dimensions.0 as usize,
-                dimensions.1 as usize,
-            )
-            .unwrap();
             let mut target =
                 ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
             scaler.resize_rgb(&store, &mut target).unwrap();
@@ -36,16 +36,16 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let f32_image: Vec<f32> = src_bytes.iter().map(|&x| x as f32 / 255f32).collect();
 
     c.bench_function("Pic scale RGB f32: Lanczos 3", |b| {
+        let mut copied: Vec<f32> = Vec::from(f32_image.clone());
+        let store = ImageStore::<f32, 3>::from_slice(
+            &mut copied,
+            dimensions.0 as usize,
+            dimensions.1 as usize,
+        )
+        .unwrap();
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
             scaler.set_threading_policy(ThreadingPolicy::Single);
-            let mut copied: Vec<f32> = Vec::from(f32_image.clone());
-            let store = ImageStore::<f32, 3>::from_slice(
-                &mut copied,
-                dimensions.0 as usize,
-                dimensions.1 as usize,
-            )
-            .unwrap();
             let mut target =
                 ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
             scaler.resize_rgb_f32(&store, &mut target).unwrap();
@@ -53,11 +53,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     });
 
     c.bench_function("Fast image resize RGB: Lanczos 3", |b| {
+        let mut vc = Vec::from(img.as_bytes());
+        let pixel_type: PixelType = PixelType::U8x3;
+
+        let src_image =
+            Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
         b.iter(|| {
-            let mut vc = Vec::from(img.as_bytes());
-            let pixel_type: PixelType = PixelType::U8x3;
-            let src_image =
-                Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
             let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
 
             let mut resizer = Resizer::new();

@@ -236,8 +236,8 @@ pub(crate) fn convolve_vertical_rgb_sse_row_f32<const CHANNELS: usize, const FMA
     }
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1")]
+/// This inlining is required to activate all features for runtime dispatch.
 unsafe fn convolve_vertical_rgb_sse_row_f32_regular<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,
@@ -251,8 +251,8 @@ unsafe fn convolve_vertical_rgb_sse_row_f32_regular<const CHANNELS: usize>(
     );
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1", enable = "fma")]
+/// This inlining is required to activate all features for runtime dispatch.
 unsafe fn convolve_vertical_rgb_sse_row_f32_fma<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,

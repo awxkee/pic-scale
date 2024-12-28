@@ -184,8 +184,8 @@ pub(crate) fn convolve_horizontal_rgb_sse_row_one_f16<const F16C: bool, const FM
     }
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1")]
+/// This inlining is required to activate all features for runtime dispatch
 unsafe fn convolve_horizontal_rgb_sse_row_one_f16_regular(
     dst_width: usize,
     src_width: usize,
@@ -202,8 +202,10 @@ unsafe fn convolve_horizontal_rgb_sse_row_one_f16_regular(
     );
 }
 
-#[inline]
-#[target_feature(enable = "sse4.1,f16c")]
+#[target_feature(enable = "sse4.1", enable = "f16c")]
+/// This inlining is required to activate all features for runtime dispatch.
+///
+/// Crate has a safe fallback for f16 conversion even it is not supported.
 unsafe fn convolve_horizontal_rgb_sse_row_one_f16c(
     dst_width: usize,
     src_width: usize,
@@ -220,8 +222,10 @@ unsafe fn convolve_horizontal_rgb_sse_row_one_f16c(
     );
 }
 
-#[inline]
-#[target_feature(enable = "sse4.1,f16c,fma")]
+#[target_feature(enable = "sse4.1", enable = "f16c", enable = "fma")]
+/// This inlining is required to activate all features for runtime dispatch.
+///
+/// Crate has a safe fallback for f16 conversion even it is not supported.
 unsafe fn convolve_horizontal_rgb_sse_row_one_f16c_fma(
     dst_width: usize,
     src_width: usize,
@@ -363,8 +367,8 @@ pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f16<const F16C: bool, const FMA
     }
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1")]
+/// This inlining is required to activate all features for runtime dispatch.
 unsafe fn convolve_horizontal_rgb_sse_rows_4_f16_regular(
     dst_width: usize,
     src_width: usize,
@@ -385,8 +389,10 @@ unsafe fn convolve_horizontal_rgb_sse_rows_4_f16_regular(
     );
 }
 
-#[inline]
-#[target_feature(enable = "sse4.1,f16c")]
+#[target_feature(enable = "sse4.1", enable = "f16c")]
+/// This inlining is required to activate all features for runtime dispatch.
+///
+/// Crate has a safe fallback for f16 conversion even it is not supported.
 unsafe fn convolve_horizontal_rgb_sse_rows_4_f16c(
     dst_width: usize,
     src_width: usize,
@@ -407,8 +413,10 @@ unsafe fn convolve_horizontal_rgb_sse_rows_4_f16c(
     );
 }
 
-#[inline]
-#[target_feature(enable = "sse4.1,f16c,fma")]
+#[target_feature(enable = "sse4.1", enable = "f16c", enable = "fma")]
+/// This inlining is required to activate all features for runtime dispatch.
+///
+/// Crate has a safe fallback for f16 conversion even it is not supported.
 unsafe fn convolve_horizontal_rgb_sse_rows_4_f16c_fma(
     dst_width: usize,
     src_width: usize,
