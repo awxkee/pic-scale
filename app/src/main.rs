@@ -11,8 +11,9 @@ use fast_image_resize::{
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
-    Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, LinearScaler, ResamplingFunction, Scaler,
-    Scaling, ScalingU16, ThreadingPolicy,
+    Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, JzazbzScaler, LChScaler, LabScaler,
+    LinearApproxScaler, LinearScaler, LuvScaler, OklabScaler, ResamplingFunction, Scaler, Scaling,
+    ScalingU16, SigmoidalScaler, ThreadingPolicy, TransferFunction, XYZScaler,
 };
 
 fn resize_plane(
