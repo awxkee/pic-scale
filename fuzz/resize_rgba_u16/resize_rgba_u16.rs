@@ -63,22 +63,20 @@ fn resize_rgba(
         return;
     }
 
-    let mut src_data = vec![1u16; src_width * src_height * 4];
-
-    let store = ImageStore::<u16, 4>::from_slice(&mut src_data, src_width, src_height).unwrap();
+    let store = ImageStore::<u16, 4>::alloc(src_width, src_height);
     let mut target = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 10);
 
     let scaler = Scaler::new(sampler);
     scaler.resize_rgba_u16(&store, &mut target, false).unwrap();
-    let store = ImageStore::<u16, 4>::from_slice(&mut src_data, src_width, src_height).unwrap();
+    let store = ImageStore::<u16, 4>::alloc(src_width, src_height);
     scaler.resize_rgba_u16(&store, &mut target, true).unwrap();
 
     let mut target = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
 
-    let store = ImageStore::<u16, 4>::from_slice(&mut src_data, src_width, src_height).unwrap();
+    let store = ImageStore::<u16, 4>::alloc(src_width, src_height);
     scaler.resize_rgba_u16(&store, &mut target, false).unwrap();
 
-    let store = ImageStore::<u16, 4>::from_slice(&mut src_data, src_width, src_height).unwrap();
+    let store = ImageStore::<u16, 4>::alloc(src_width, src_height);
     scaler.resize_rgba_u16(&store, &mut target, true).unwrap();
 
     let src_data_ar30 = vec![1u32; src_width * src_height];
