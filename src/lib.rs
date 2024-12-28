@@ -97,7 +97,7 @@ pub use colors::*;
 #[cfg(feature = "colorspaces")]
 pub use colorutils_rs::TransferFunction;
 pub use image_size::ImageSize;
-pub use image_store::ImageStore;
+pub use image_store::{ImageStore, ImageStoreMut};
 pub use math::*;
 pub use sampler::*;
 pub use scaler::Scaler;

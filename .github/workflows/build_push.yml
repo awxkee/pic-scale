@@ -57,6 +57,7 @@ jobs:
       - run: cargo fuzz run resize_rgba -- -max_total_time=30
       - run: cargo fuzz run resize_rgb -- -max_total_time=30
       - run: cargo fuzz run resize_plane -- -max_total_time=30
+      - run: cargo fuzz run colorspaces -- -max_total_time=10
 
   fuzz_rgba_high_bit:
     name: Fuzzing High bit-depth

@@ -28,6 +28,7 @@
  */
 
 use crate::filter_weights::{FilterBounds, FilterWeights};
+use crate::image_store::ImageStoreMut;
 use crate::ImageStore;
 use half::f16;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
@@ -37,7 +38,7 @@ use rayon::ThreadPool;
 pub(crate) fn convolve_vertical_dispatch_f16<const COMPONENTS: usize>(
     image_store: &ImageStore<f16, COMPONENTS>,
     filter_weights: FilterWeights<f32>,
-    destination: &mut ImageStore<f16, COMPONENTS>,
+    destination: &mut ImageStoreMut<f16, COMPONENTS>,
     pool: &Option<ThreadPool>,
     dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[f32]),
 ) {
@@ -57,7 +58,7 @@ pub(crate) fn convolve_vertical_dispatch_f16<const COMPONENTS: usize>(
                     let bounds = filter_weights.bounds[y];
                     let filter_offset = y * filter_weights.aligned_size;
                     let weights = &filter_weights.weights[filter_offset..];
-                    let source_buffer = image_store.buffer.borrow();
+                    let source_buffer = image_store.buffer.as_ref();
                     dispatcher(dst_width, &bounds, source_buffer, row, src_stride, weights);
                 });
         });
@@ -71,7 +72,7 @@ pub(crate) fn convolve_vertical_dispatch_f16<const COMPONENTS: usize>(
                 let bounds = filter_weights.bounds[y];
                 let filter_offset = y * filter_weights.aligned_size;
                 let weights = &filter_weights.weights[filter_offset..];
-                let source_buffer = image_store.buffer.borrow();
+                let source_buffer = image_store.buffer.as_ref();
                 dispatcher(dst_width, &bounds, source_buffer, row, src_stride, weights);
             });
     }
@@ -80,7 +81,7 @@ pub(crate) fn convolve_vertical_dispatch_f16<const COMPONENTS: usize>(
 pub(crate) fn convolve_horizontal_dispatch_f16<const CHANNELS: usize>(
     image_store: &ImageStore<f16, CHANNELS>,
     filter_weights: FilterWeights<f32>,
-    destination: &mut ImageStore<f16, CHANNELS>,
+    destination: &mut ImageStoreMut<f16, CHANNELS>,
     pool: &Option<ThreadPool>,
     dispatcher_4_rows: Option<
         fn(usize, usize, &FilterWeights<f32>, &[f16], usize, &mut [f16], usize),
@@ -99,7 +100,7 @@ pub(crate) fn convolve_horizontal_dispatch_f16<const CHANNELS: usize>(
             if let Some(dispatcher) = dispatcher_4_rows {
                 image_store
                     .buffer
-                    .borrow()
+                    .as_ref()
                     .par_chunks_exact(src_stride * 4)
                     .zip(
                         destination
@@ -124,11 +125,11 @@ pub(crate) fn convolve_horizontal_dispatch_f16<const CHANNELS: usize>(
             let left_src_rows = if processed_4 {
                 image_store
                     .buffer
-                    .borrow()
+                    .as_ref()
                     .chunks_exact(src_stride * 4)
                     .remainder()
             } else {
-                image_store.buffer.borrow()
+                image_store.buffer.as_ref()
             };
             let left_dst_rows = if processed_4 {
                 destination
@@ -152,7 +153,7 @@ pub(crate) fn convolve_horizontal_dispatch_f16<const CHANNELS: usize>(
         if let Some(dispatcher) = dispatcher_4_rows {
             for (src, dst) in image_store
                 .buffer
-                .borrow()
+                .as_ref()
                 .chunks_exact(src_stride * 4)
                 .zip(
                     destination
@@ -177,11 +178,11 @@ pub(crate) fn convolve_horizontal_dispatch_f16<const CHANNELS: usize>(
         let left_src_rows = if processed_4 {
             image_store
                 .buffer
-                .borrow()
+                .as_ref()
                 .chunks_exact(src_stride * 4)
                 .remainder()
         } else {
-            image_store.buffer.borrow()
+            image_store.buffer.as_ref()
         };
         let left_dst_rows = if processed_4 {
             destination

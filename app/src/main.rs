@@ -11,8 +11,8 @@ use fast_image_resize::{
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
-    Ar30ByteOrder, ImageSize, ImageStore, LinearApproxScaler, LinearScaler, ResamplingFunction,
-    Scaler, Scaling, ScalingU16, ThreadingPolicy,
+    Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, LinearScaler, ResamplingFunction, Scaler,
+    Scaling, ScalingU16, ThreadingPolicy,
 };
 
 fn resize_plane(
@@ -37,15 +37,14 @@ fn resize_plane(
     let mut src_data = vec![15u8; src_width * src_height * 1];
 
     let store = ImageStore::<u8, 1>::from_slice(&mut src_data, src_width, src_height).unwrap();
+    let mut dst_store = ImageStoreMut::<u8, 1>::alloc(src_width / 2, src_height / 2);
     let scaler = Scaler::new(sampler);
-    _ = scaler
-        .resize_plane(ImageSize::new(dst_width, dst_height), store)
-        .unwrap();
+    _ = scaler.resize_plane(&store, &mut dst_store).unwrap();
 }
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/test_1.jpg")
+    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -53,7 +52,7 @@ fn main() {
     let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
-    let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+    let mut scaler = LinearScaler::new(ResamplingFunction::Bilinear);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
     // resize_plane(378, 257, 257, 257, ResamplingFunction::Bilinear);
@@ -77,13 +76,10 @@ fn main() {
     //     )
     //     .unwrap();
 
-    let resized = scaler
-        .resize_rgba(
-            ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-            store,
-            false,
-        )
-        .unwrap();
+    let mut dst_store =
+        ImageStoreMut::<u8, 4>::alloc(dimensions.0 as usize / 2, dimensions.1 as usize / 2);
+
+    scaler.resize_rgba(&store, &mut dst_store, false).unwrap();
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
@@ -162,7 +158,7 @@ fn main() {
 
     // let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| (x >> 2) as u8).collect();
     //
-    let dst = resized.as_bytes();
+    let dst = dst_store.as_bytes();
     // let dst = resized;
     // image::save_buffer(
     //     "converted.png",
@@ -173,12 +169,12 @@ fn main() {
     // )
     // .unwrap();
 
-    if resized.channels == 4 {
+    if dst_store.channels == 4 {
         image::save_buffer(
             "converted.png",
             &dst,
-            resized.width as u32,
-            resized.height as u32,
+            dst_store.width as u32,
+            dst_store.height as u32,
             image::ColorType::Rgba8,
         )
         .unwrap();
@@ -186,8 +182,8 @@ fn main() {
         image::save_buffer(
             "converted.png",
             &dst,
-            resized.width as u32,
-            resized.height as u32,
+            dst_store.width as u32,
+            dst_store.height as u32,
             image::ColorType::Rgb8,
         )
         .unwrap();

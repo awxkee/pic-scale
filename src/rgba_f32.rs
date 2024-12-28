@@ -37,6 +37,7 @@ use crate::convolve_naive_f32::{
 };
 use crate::dispatch_group_f32::{convolve_horizontal_dispatch_f32, convolve_vertical_dispatch_f32};
 use crate::filter_weights::*;
+use crate::image_store::ImageStoreMut;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::*;
 use crate::rgb_f32::convolve_vertical_rgb_native_row_f32;
@@ -50,7 +51,7 @@ impl HorizontalConvolutionPass<f32, 4> for ImageStore<'_, f32, 4> {
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStore<f32, 4>,
+        destination: &mut ImageStoreMut<f32, 4>,
         pool: &Option<ThreadPool>,
     ) {
         let mut _dispatcher_4_rows: Option<
@@ -97,7 +98,7 @@ impl VerticalConvolutionPass<f32, 4> for ImageStore<'_, f32, 4> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStore<f32, 4>,
+        destination: &mut ImageStoreMut<f32, 4>,
         pool: &Option<ThreadPool>,
     ) {
         let mut _dispatcher: fn(usize, &FilterBounds, &[f32], &mut [f32], usize, &[f32]) =

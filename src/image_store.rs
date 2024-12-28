@@ -26,6 +26,10 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::alpha_check::{
+    has_non_constant_cap_alpha_rgba16, has_non_constant_cap_alpha_rgba8,
+    has_non_constant_cap_alpha_rgba_f32,
+};
 #[cfg(feature = "half")]
 use crate::alpha_handle_f16::{premultiply_alpha_rgba_f16, unpremultiply_alpha_rgba_f16};
 use crate::alpha_handle_f32::{premultiply_alpha_rgba_f32, unpremultiply_alpha_rgba_f32};
@@ -35,9 +39,10 @@ use crate::pic_scale_error::{PicScaleBufferMismatch, PicScaleError};
 use crate::ImageSize;
 use num_traits::FromPrimitive;
 use rayon::ThreadPool;
+use std::borrow::Cow;
 use std::fmt::Debug;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 /// Holds an image
 ///
 /// # Arguments
@@ -51,7 +56,7 @@ pub struct ImageStore<'a, T, const N: usize>
 where
     T: FromPrimitive + Clone + Copy + Debug,
 {
-    pub(crate) buffer: BufferStore<'a, T>,
+    pub(crate) buffer: std::borrow::Cow<'a, [T]>,
     /// Channels in the image
     pub channels: usize,
     /// Image width
@@ -60,6 +65,35 @@ where
     pub height: usize,
     /// This is private field, currently used only for u16, will be automatically passed from upper func
     pub(crate) bit_depth: usize,
+}
+
+#[derive(Debug)]
+/// Holds an image
+///
+/// # Arguments
+/// `N` - count of channels
+///
+/// # Examples
+/// ImageStore<u8, 4> - represents RGBA
+/// ImageStore<u8, 3> - represents RGB
+/// ImageStore<f32, 3> - represents RGB in f32 and etc
+pub struct ImageStoreMut<'a, T, const N: usize>
+where
+    T: FromPrimitive + Clone + Copy + Debug,
+{
+    pub(crate) buffer: BufferStore<'a, T>,
+    /// Channels in the image
+    pub channels: usize,
+    /// Image width
+    pub width: usize,
+    /// Image height
+    pub height: usize,
+    /// Required for `u16` images
+    pub bit_depth: usize,
+}
+
+pub(crate) trait CheckStoreDensity {
+    fn should_have_bit_depth(&self) -> bool;
 }
 
 #[derive(Debug)]
@@ -84,7 +118,7 @@ impl<T: Copy + Debug> BufferStore<'_, T> {
     }
 }
 
-impl<T, const N: usize> ImageStore<'static, T, N>
+impl<'a, T, const N: usize> ImageStore<'a, T, N>
 where
     T: FromPrimitive + Clone + Copy + Debug + Default,
 {
@@ -92,7 +126,7 @@ where
         slice_ref: Vec<T>,
         width: usize,
         height: usize,
-    ) -> Result<ImageStore<'static, T, N>, PicScaleError> {
+    ) -> Result<ImageStore<'a, T, N>, PicScaleError> {
         let expected_size = width * height * N;
         if slice_ref.len() != width * height * N {
             return Err(PicScaleError::BufferMismatch(PicScaleBufferMismatch {
@@ -104,7 +138,7 @@ where
             }));
         }
         Ok(ImageStore::<T, N> {
-            buffer: BufferStore::Owned(slice_ref),
+            buffer: std::borrow::Cow::Owned(slice_ref),
             channels: N,
             width,
             height,
@@ -112,10 +146,10 @@ where
         })
     }
 
-    pub fn alloc(width: usize, height: usize) -> ImageStore<'static, T, N> {
+    pub fn alloc(width: usize, height: usize) -> ImageStore<'a, T, N> {
         let vc = vec![T::from_u32(0).unwrap_or_default(); width * N * height];
         ImageStore::<T, N> {
-            buffer: BufferStore::Owned(vc),
+            buffer: std::borrow::Cow::Owned(vc),
             channels: N,
             width,
             height,
@@ -124,7 +158,162 @@ where
     }
 }
 
+impl<const N: usize> CheckStoreDensity for ImageStoreMut<'_, u8, N> {
+    fn should_have_bit_depth(&self) -> bool {
+        false
+    }
+}
+
+impl<const N: usize> CheckStoreDensity for ImageStoreMut<'_, f32, N> {
+    fn should_have_bit_depth(&self) -> bool {
+        false
+    }
+}
+
+#[cfg(feature = "half")]
+impl<const N: usize> CheckStoreDensity for ImageStoreMut<'_, half::f16, N> {
+    fn should_have_bit_depth(&self) -> bool {
+        false
+    }
+}
+
+impl<const N: usize> CheckStoreDensity for ImageStoreMut<'_, u16, N> {
+    fn should_have_bit_depth(&self) -> bool {
+        true
+    }
+}
+
+impl<T, const N: usize> ImageStoreMut<'_, T, N>
+where
+    T: FromPrimitive + Clone + Copy + Debug + Default,
+{
+    pub(crate) fn validate(&self) -> Result<(), PicScaleError> {
+        let expected_size = self.width * self.height * N;
+        if self.buffer.borrow().len() != self.width * self.height * N {
+            return Err(PicScaleError::BufferMismatch(PicScaleBufferMismatch {
+                expected: expected_size,
+                width: self.width,
+                height: self.height,
+                channels: N,
+                slice_len: self.buffer.borrow().len(),
+            }));
+        }
+        Ok(())
+    }
+}
+
+impl<'a, T, const N: usize> ImageStoreMut<'a, T, N>
+where
+    T: FromPrimitive + Clone + Copy + Debug + Default,
+{
+    pub fn new(
+        slice_ref: Vec<T>,
+        width: usize,
+        height: usize,
+    ) -> Result<ImageStoreMut<'a, T, N>, PicScaleError> {
+        let expected_size = width * height * N;
+        if slice_ref.len() != width * height * N {
+            return Err(PicScaleError::BufferMismatch(PicScaleBufferMismatch {
+                expected: expected_size,
+                width,
+                height,
+                channels: N,
+                slice_len: slice_ref.len(),
+            }));
+        }
+        Ok(ImageStoreMut::<T, N> {
+            buffer: BufferStore::Owned(slice_ref),
+            channels: N,
+            width,
+            height,
+            bit_depth: 0,
+        })
+    }
+
+    pub fn alloc(width: usize, height: usize) -> ImageStoreMut<'a, T, N> {
+        let vc = vec![T::from_u32(0).unwrap_or_default(); width * N * height];
+        ImageStoreMut::<T, N> {
+            buffer: BufferStore::Owned(vc),
+            channels: N,
+            width,
+            height,
+            bit_depth: 0,
+        }
+    }
+
+    pub fn alloc_with_depth(
+        width: usize,
+        height: usize,
+        bit_depth: usize,
+    ) -> ImageStoreMut<'a, T, N> {
+        let vc = vec![T::from_u32(0).unwrap_or_default(); width * N * height];
+        ImageStoreMut::<T, N> {
+            buffer: BufferStore::Owned(vc),
+            channels: N,
+            width,
+            height,
+            bit_depth,
+        }
+    }
+}
+
 impl<'a, T, const N: usize> ImageStore<'a, T, N>
+where
+    T: FromPrimitive + Clone + Copy + Debug,
+{
+    pub fn get_size(&self) -> ImageSize {
+        ImageSize::new(self.width, self.height)
+    }
+
+    pub fn as_bytes(&self) -> &[T] {
+        match &self.buffer {
+            Cow::Borrowed(br) => br.as_ref(),
+            Cow::Owned(v) => v.as_ref(),
+        }
+    }
+
+    pub fn from_slice(
+        slice_ref: &'a [T],
+        width: usize,
+        height: usize,
+    ) -> Result<ImageStore<'a, T, N>, PicScaleError> {
+        let expected_size = width * height * N;
+        if slice_ref.len() != width * height * N {
+            return Err(PicScaleError::BufferMismatch(PicScaleBufferMismatch {
+                expected: expected_size,
+                width,
+                height,
+                channels: N,
+                slice_len: slice_ref.len(),
+            }));
+        }
+        Ok(ImageStore::<T, N> {
+            buffer: std::borrow::Cow::Borrowed(slice_ref),
+            channels: N,
+            width,
+            height,
+            bit_depth: 0,
+        })
+    }
+
+    pub fn copied<'b>(&self) -> ImageStore<'b, T, N> {
+        ImageStore::<T, N> {
+            buffer: std::borrow::Cow::Owned(self.buffer.as_ref().to_vec()),
+            channels: N,
+            width: self.width,
+            height: self.height,
+            bit_depth: self.bit_depth,
+        }
+    }
+
+    pub fn copied_to_mut<'b>(&self, into: &mut ImageStoreMut<'b, T, N>) {
+        for (&src, dst) in self.buffer.as_ref().iter().zip(into.buffer.borrow_mut()) {
+            *dst = src;
+        }
+    }
+}
+
+impl<'a, T, const N: usize> ImageStoreMut<'a, T, N>
 where
     T: FromPrimitive + Clone + Copy + Debug,
 {
@@ -143,7 +332,7 @@ where
         slice_ref: &'a mut [T],
         width: usize,
         height: usize,
-    ) -> Result<ImageStore<'a, T, N>, PicScaleError> {
+    ) -> Result<ImageStoreMut<'a, T, N>, PicScaleError> {
         let expected_size = width * height * N;
         if slice_ref.len() != width * height * N {
             return Err(PicScaleError::BufferMismatch(PicScaleBufferMismatch {
@@ -154,7 +343,7 @@ where
                 slice_len: slice_ref.len(),
             }));
         }
-        Ok(ImageStore::<T, N> {
+        Ok(ImageStoreMut::<T, N> {
             buffer: BufferStore::Borrowed(slice_ref),
             channels: N,
             width,
@@ -163,9 +352,19 @@ where
         })
     }
 
-    pub fn copied<'b>(&self) -> ImageStore<'b, T, N> {
-        ImageStore::<T, N> {
+    pub fn copied<'b>(&self) -> ImageStoreMut<'b, T, N> {
+        ImageStoreMut::<T, N> {
             buffer: BufferStore::Owned(self.buffer.borrow().to_vec()),
+            channels: N,
+            width: self.width,
+            height: self.height,
+            bit_depth: self.bit_depth,
+        }
+    }
+
+    pub fn to_immutable(&self) -> ImageStore<'_, T, N> {
+        ImageStore::<T, N> {
+            buffer: std::borrow::Cow::Owned(self.buffer.borrow().to_owned()),
             channels: N,
             width: self.width,
             height: self.height,
@@ -174,59 +373,93 @@ where
     }
 }
 
-impl ImageStore<'_, u8, 4> {
-    pub fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
+pub(crate) trait AssociateAlpha<T: FromPrimitive + Clone + Copy + Debug, const N: usize> {
+    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, T, N>, pool: &Option<ThreadPool>);
+    fn is_alpha_premultiplication_needed(&self) -> bool;
+}
+
+pub(crate) trait UnassociateAlpha<T: FromPrimitive + Clone + Copy + Debug, const N: usize> {
+    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>);
+}
+
+impl AssociateAlpha<u8, 4> for ImageStore<'_, u8, 4> {
+    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, u8, 4>, pool: &Option<ThreadPool>) {
+        let dst = into.buffer.borrow_mut();
+        let src = self.buffer.as_ref();
+        premultiply_alpha_rgba(dst, src, self.width, self.height, pool);
+    }
+
+    fn is_alpha_premultiplication_needed(&self) -> bool {
+        has_non_constant_cap_alpha_rgba8(self.buffer.as_ref(), self.width)
+    }
+}
+
+impl UnassociateAlpha<u8, 4> for ImageStoreMut<'_, u8, 4> {
+    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
         let dst = self.buffer.borrow_mut();
         unpremultiply_alpha_rgba(dst, self.width, self.height, pool);
     }
-
-    pub fn premultiply_alpha(&self, into: &mut ImageStore<'_, u8, 4>, pool: &Option<ThreadPool>) {
-        let dst = into.buffer.borrow_mut();
-        let src = self.buffer.borrow();
-        premultiply_alpha_rgba(dst, src, self.width, self.height, pool);
-    }
 }
 
-impl ImageStore<'_, u16, 4> {
-    pub fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
-        let in_place = self.buffer.borrow_mut();
-        unpremultiply_alpha_rgba_u16(in_place, self.width, self.height, self.bit_depth, pool);
-    }
-
-    pub fn premultiply_alpha(&self, into: &mut ImageStore<'_, u16, 4>, pool: &Option<ThreadPool>) {
+impl AssociateAlpha<u16, 4> for ImageStore<'_, u16, 4> {
+    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, u16, 4>, pool: &Option<ThreadPool>) {
         let dst = into.buffer.borrow_mut();
-        let src = self.buffer.borrow();
+        let src = self.buffer.as_ref();
         premultiply_alpha_rgba_u16(dst, src, self.width, self.height, self.bit_depth, pool);
     }
+
+    fn is_alpha_premultiplication_needed(&self) -> bool {
+        has_non_constant_cap_alpha_rgba16(self.buffer.as_ref(), self.width)
+    }
 }
 
-impl ImageStore<'_, f32, 4> {
-    pub fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
-        let dst = self.buffer.borrow_mut();
-        unpremultiply_alpha_rgba_f32(dst, self.width, self.height, pool);
+impl AssociateAlpha<f32, 4> for ImageStore<'_, f32, 4> {
+    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, f32, 4>, pool: &Option<ThreadPool>) {
+        let dst = into.buffer.borrow_mut();
+        let src = self.buffer.as_ref();
+        premultiply_alpha_rgba_f32(dst, src, self.width, self.height, pool);
     }
 
-    pub fn premultiply_alpha(&self, into: &mut ImageStore<'_, f32, 4>, pool: &Option<ThreadPool>) {
-        let dst = into.buffer.borrow_mut();
-        let src = self.buffer.borrow();
-        premultiply_alpha_rgba_f32(dst, src, self.width, self.height, pool);
+    fn is_alpha_premultiplication_needed(&self) -> bool {
+        has_non_constant_cap_alpha_rgba_f32(self.buffer.as_ref(), self.width)
     }
 }
 
 #[cfg(feature = "half")]
-impl<'a> ImageStore<'a, half::f16, 4> {
-    pub fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
-        let dst = self.buffer.borrow_mut();
-        unpremultiply_alpha_rgba_f16(dst, self.width, self.height, pool);
-    }
-
-    pub fn premultiply_alpha(
+impl AssociateAlpha<half::f16, 4> for ImageStore<'_, half::f16, 4> {
+    fn premultiply_alpha(
         &self,
-        into: &mut ImageStore<'_, half::f16, 4>,
+        into: &mut ImageStoreMut<'_, half::f16, 4>,
         pool: &Option<ThreadPool>,
     ) {
         let dst = into.buffer.borrow_mut();
-        let src = self.buffer.borrow();
+        let src = self.buffer.as_ref();
         premultiply_alpha_rgba_f16(dst, src, self.width, self.height, pool);
+    }
+
+    fn is_alpha_premultiplication_needed(&self) -> bool {
+        true
+    }
+}
+
+impl UnassociateAlpha<u16, 4> for ImageStoreMut<'_, u16, 4> {
+    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
+        let in_place = self.buffer.borrow_mut();
+        unpremultiply_alpha_rgba_u16(in_place, self.width, self.height, self.bit_depth, pool);
+    }
+}
+
+impl UnassociateAlpha<f32, 4> for ImageStoreMut<'_, f32, 4> {
+    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
+        let dst = self.buffer.borrow_mut();
+        unpremultiply_alpha_rgba_f32(dst, self.width, self.height, pool);
+    }
+}
+
+#[cfg(feature = "half")]
+impl UnassociateAlpha<half::f16, 4> for ImageStoreMut<'_, half::f16, 4> {
+    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
+        let dst = self.buffer.borrow_mut();
+        unpremultiply_alpha_rgba_f16(dst, self.width, self.height, pool);
     }
 }

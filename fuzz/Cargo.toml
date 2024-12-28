@@ -73,3 +73,10 @@ path = "resize_plane_f32/resize_plane_f32.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "colorspaces"
+path = "colorspaces/colorspaces.rs"
+test = false
+doc = false
+bench = false

@@ -105,6 +105,20 @@ pub(crate) unsafe fn prefer_vfmaq_f32(
 }
 
 #[inline(always)]
+pub unsafe fn xvst1q_f32_x4(a: *mut f32, b: float32x4x4_t) {
+    vst1q_f32(a, b.0);
+    vst1q_f32(a.add(4), b.1);
+    vst1q_f32(a.add(8), b.2);
+    vst1q_f32(a.add(12), b.3);
+}
+
+#[inline(always)]
+pub unsafe fn xvst1q_f32_x2(a: *mut f32, b: float32x4x2_t) {
+    vst1q_f32(a, b.0);
+    vst1q_f32(a.add(4), b.1);
+}
+
+#[inline(always)]
 pub(crate) unsafe fn prefer_vfmaq_laneq_f32<const LANE: i32>(
     a: float32x4_t,
     b: float32x4_t,

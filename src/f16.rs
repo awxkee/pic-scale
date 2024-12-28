@@ -43,6 +43,7 @@ use crate::floating_point_horizontal::{
     convolve_row_handler_floating_point, convolve_row_handler_floating_point_4,
 };
 use crate::floating_point_vertical::column_handler_floating_point;
+use crate::image_store::ImageStoreMut;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
 use crate::neon::{
     convolve_horizontal_rgb_neon_row_one_f16, convolve_horizontal_rgb_neon_rows_4_f16,
@@ -98,7 +99,7 @@ impl<'a> HorizontalConvolutionPass<f16, 4> for ImageStore<'a, f16, 4> {
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStore<f16, 4>,
+        destination: &mut ImageStoreMut<f16, 4>,
         pool: &Option<ThreadPool>,
     ) {
         let mut _dispatcher_4_rows: Option<
@@ -170,7 +171,7 @@ impl<'a> VerticalConvolutionPass<f16, 4> for ImageStore<'a, f16, 4> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStore<f16, 4>,
+        destination: &mut ImageStoreMut<f16, 4>,
         pool: &Option<ThreadPool>,
     ) {
         let mut _dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[f32]) =
@@ -214,7 +215,7 @@ impl<'a> HorizontalConvolutionPass<f16, 3> for ImageStore<'a, f16, 3> {
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStore<f16, 3>,
+        destination: &mut ImageStoreMut<f16, 3>,
         pool: &Option<ThreadPool>,
     ) {
         let mut _dispatcher_4_rows: Option<
@@ -266,7 +267,7 @@ impl<'a> VerticalConvolutionPass<f16, 3> for ImageStore<'a, f16, 3> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStore<f16, 3>,
+        destination: &mut ImageStoreMut<f16, 3>,
         pool: &Option<ThreadPool>,
     ) {
         let mut _dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[f32]) =
@@ -310,7 +311,7 @@ impl<'a> HorizontalConvolutionPass<f16, 1> for ImageStore<'a, f16, 1> {
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStore<f16, 1>,
+        destination: &mut ImageStoreMut<f16, 1>,
         pool: &Option<ThreadPool>,
     ) {
         let _dispatcher_4_rows: Option<
@@ -333,7 +334,7 @@ impl<'a> VerticalConvolutionPass<f16, 1> for ImageStore<'a, f16, 1> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStore<f16, 1>,
+        destination: &mut ImageStoreMut<f16, 1>,
         pool: &Option<ThreadPool>,
     ) {
         let mut _dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[f32]) =

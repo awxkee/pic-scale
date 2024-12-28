@@ -33,7 +33,7 @@ use crate::convolve_naive_f32::*;
 use crate::dispatch_group_f32::{convolve_horizontal_dispatch_f32, convolve_vertical_dispatch_f32};
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::floating_point_vertical::column_handler_floating_point;
-use crate::image_store::ImageStore;
+use crate::image_store::{ImageStore, ImageStoreMut};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
 use crate::neon::*;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -56,7 +56,7 @@ impl HorizontalConvolutionPass<f32, 3> for ImageStore<'_, f32, 3> {
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStore<f32, 3>,
+        destination: &mut ImageStoreMut<f32, 3>,
         pool: &Option<ThreadPool>,
     ) {
         let mut _dispatcher_4_rows: Option<
@@ -95,7 +95,7 @@ impl VerticalConvolutionPass<f32, 3> for ImageStore<'_, f32, 3> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStore<f32, 3>,
+        destination: &mut ImageStoreMut<f32, 3>,
         pool: &Option<ThreadPool>,
     ) {
         let mut _dispatcher: fn(usize, &FilterBounds, &[f32], &mut [f32], usize, &[f32]) =

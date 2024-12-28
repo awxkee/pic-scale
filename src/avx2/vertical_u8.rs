@@ -107,8 +107,7 @@ unsafe fn convolve_vertical_part_avx_64(
         let pix = _mm256_unpackhi_epi8(interleaved, zeros);
         store_3 = _mm256_add_epi32(store_3, _mm256_madd_epi16(pix, v_weight_2));
 
-        let item_row_0 =
-            _mm256_loadu_si256(src_ptr.get_unchecked(32..).as_ptr() as *const __m256i);
+        let item_row_0 = _mm256_loadu_si256(src_ptr.get_unchecked(32..).as_ptr() as *const __m256i);
         let item_row_1 =
             _mm256_loadu_si256(s_ptr_next.get_unchecked(32..).as_ptr() as *const __m256i);
 
@@ -134,8 +133,7 @@ unsafe fn convolve_vertical_part_avx_64(
         let src_ptr = src.get_unchecked((src_stride * py + px)..);
 
         let item_row_0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
-        let item_row_1 =
-            _mm256_loadu_si256(src_ptr.get_unchecked(32..).as_ptr() as *const __m256i);
+        let item_row_1 = _mm256_loadu_si256(src_ptr.get_unchecked(32..).as_ptr() as *const __m256i);
 
         (store_0, store_1, store_2, store_3) =
             dot_prod(store_0, store_1, store_2, store_3, item_row_0, v_weight);
