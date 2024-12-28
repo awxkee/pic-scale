@@ -32,7 +32,7 @@ use rayon::ThreadPool;
 use std::fmt::Debug;
 
 use crate::filter_weights::FilterWeights;
-use crate::ImageStore;
+use crate::image_store::ImageStoreMut;
 
 pub(crate) trait HorizontalConvolutionPass<T, const N: usize>
 where
@@ -41,7 +41,7 @@ where
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStore<T, N>,
+        destination: &mut ImageStoreMut<T, N>,
         pool: &Option<ThreadPool>,
     );
 }
@@ -53,7 +53,7 @@ where
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStore<T, N>,
+        destination: &mut ImageStoreMut<T, N>,
         pool: &Option<ThreadPool>,
     );
 }

@@ -192,7 +192,6 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_lb_u8_impl(
     bit_depth: u32,
 ) {
     const CHANNELS: usize = 4;
-    let zeros = _mm_setzero_si128();
     let init = _mm_set1_epi32(ROUNDING_CONST);
 
     let v_max_colors = _mm_set1_epi16((1 << bit_depth) - 1);
@@ -287,36 +286,20 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_lb_u8_impl(
             jx += 1;
         }
 
-        let v_st0 = _mm_srai_epi32::<PRECISION>(_mm_max_epi32(store_0, zeros));
-        let v_st1 = _mm_srai_epi32::<PRECISION>(_mm_max_epi32(store_1, zeros));
-        let v_st2 = _mm_srai_epi32::<PRECISION>(_mm_max_epi32(store_2, zeros));
-        let v_st3 = _mm_srai_epi32::<PRECISION>(_mm_max_epi32(store_3, zeros));
+        let v_st0 = _mm_srai_epi32::<PRECISION>(store_0);
+        let v_st1 = _mm_srai_epi32::<PRECISION>(store_1);
+        let v_st2 = _mm_srai_epi32::<PRECISION>(store_2);
+        let v_st3 = _mm_srai_epi32::<PRECISION>(store_3);
 
         let store_16_0 = _mm_min_epi16(_mm_packus_epi32(v_st0, v_st0), v_max_colors);
         let store_16_1 = _mm_min_epi16(_mm_packus_epi32(v_st1, v_st1), v_max_colors);
         let store_16_2 = _mm_min_epi16(_mm_packus_epi32(v_st2, v_st2), v_max_colors);
         let store_16_3 = _mm_min_epi16(_mm_packus_epi32(v_st3, v_st3), v_max_colors);
 
-        std::ptr::copy_nonoverlapping(
-            &store_16_0 as *const _ as *const u8,
-            chunk0.as_mut_ptr() as *mut u8,
-            8,
-        );
-        std::ptr::copy_nonoverlapping(
-            &store_16_1 as *const _ as *const u8,
-            chunk1.as_mut_ptr() as *mut u8,
-            8,
-        );
-        std::ptr::copy_nonoverlapping(
-            &store_16_2 as *const _ as *const u8,
-            chunk2.as_mut_ptr() as *mut u8,
-            8,
-        );
-        std::ptr::copy_nonoverlapping(
-            &store_16_3 as *const _ as *const u8,
-            chunk3.as_mut_ptr() as *mut u8,
-            8,
-        );
+        _mm_storeu_si64(chunk0.as_mut_ptr() as *mut u8, store_16_0);
+        _mm_storeu_si64(chunk1.as_mut_ptr() as *mut u8, store_16_1);
+        _mm_storeu_si64(chunk2.as_mut_ptr() as *mut u8, store_16_2);
+        _mm_storeu_si64(chunk3.as_mut_ptr() as *mut u8, store_16_3);
     }
 }
 
@@ -340,7 +323,6 @@ unsafe fn convolve_horizontal_rgba_sse_u16_lb_row_impl(
 ) {
     const CHANNELS: usize = 4;
 
-    let zeros = _mm_setzero_si128();
     let v_max_colors = _mm_set1_epi16((1 << bit_depth) - 1);
 
     for ((dst, bounds), weights) in dst
@@ -401,14 +383,9 @@ unsafe fn convolve_horizontal_rgba_sse_u16_lb_row_impl(
             jx += 1;
         }
 
-        let v_st = _mm_srai_epi32::<PRECISION>(_mm_max_epi32(store, zeros));
+        let v_st = _mm_srai_epi32::<PRECISION>(store);
 
         let store_16_0 = _mm_min_epi16(_mm_packus_epi32(v_st, v_st), v_max_colors);
-
-        std::ptr::copy_nonoverlapping(
-            &store_16_0 as *const _ as *const u8,
-            dst.as_mut_ptr() as *mut u8,
-            8,
-        );
+        _mm_storeu_si64(dst.as_mut_ptr() as *mut u8, store_16_0);
     }
 }

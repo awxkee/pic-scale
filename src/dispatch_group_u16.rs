@@ -32,6 +32,7 @@ use crate::handler_provider::{
     ColumnHandlerFixedPoint, ColumnHandlerFloatingPoint, RowHandlerFixedPoint,
     RowHandlerFloatingPoint,
 };
+use crate::image_store::ImageStoreMut;
 use crate::support::PRECISION;
 use crate::ImageStore;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
@@ -42,10 +43,10 @@ use rayon::ThreadPool;
 pub(crate) fn convolve_horizontal_dispatch_u16<const CHANNELS: usize>(
     image_store: &ImageStore<u16, CHANNELS>,
     filter_weights: FilterWeights<f32>,
-    destination: &mut ImageStore<u16, CHANNELS>,
+    destination: &mut ImageStoreMut<u16, CHANNELS>,
     pool: &Option<ThreadPool>,
 ) {
-    let src = image_store.buffer.borrow();
+    let src = image_store.buffer.as_ref();
     let dst = destination.buffer.borrow_mut();
 
     let src_stride = image_store.width * image_store.channels;
@@ -156,7 +157,7 @@ pub(crate) fn convolve_horizontal_dispatch_u16<const CHANNELS: usize>(
 pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
     image_store: &ImageStore<u16, COMPONENTS>,
     filter_weights: FilterWeights<f32>,
-    destination: &mut ImageStore<'_, u16, COMPONENTS>,
+    destination: &mut ImageStoreMut<'_, u16, COMPONENTS>,
     pool: &Option<ThreadPool>,
 ) {
     let src_stride = image_store.width * image_store.channels;
@@ -176,7 +177,7 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
                         let bounds = filter_weights.bounds[y];
                         let filter_offset = y * filter_weights.aligned_size;
                         let weights = &filter_weights.weights[filter_offset..];
-                        let source_buffer = image_store.buffer.borrow();
+                        let source_buffer = image_store.buffer.as_ref();
                         u16::handle_floating_column(
                             dst_width,
                             &bounds,
@@ -196,7 +197,7 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
                         let bounds = filter_weights.bounds[y];
                         let filter_offset = y * filter_weights.aligned_size;
                         let weights = &approx.weights[filter_offset..];
-                        let source_buffer = image_store.buffer.borrow();
+                        let source_buffer = image_store.buffer.as_ref();
                         u16::handle_fixed_column::<i32, COMPONENTS>(
                             dst_width,
                             &bounds,
@@ -218,7 +219,7 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
                 let bounds = filter_weights.bounds[y];
                 let filter_offset = y * filter_weights.aligned_size;
                 let weights = &filter_weights.weights[filter_offset..];
-                let source_buffer = image_store.buffer.borrow();
+                let source_buffer = image_store.buffer.as_ref();
                 u16::handle_floating_column(
                     dst_width,
                     &bounds,
@@ -239,7 +240,7 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
                 let bounds = filter_weights.bounds[y];
                 let filter_offset = y * filter_weights.aligned_size;
                 let weights = &approx.weights[filter_offset..];
-                let source_buffer = image_store.buffer.borrow();
+                let source_buffer = image_store.buffer.as_ref();
                 u16::handle_fixed_column::<i32, COMPONENTS>(
                     dst_width,
                     &bounds,

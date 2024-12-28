@@ -261,11 +261,7 @@ unsafe fn convolve_horizontal_rgba_avx_row_one_f16_impl<const FMA: bool>(
             _mm256_castps256_ps128(store),
             _mm256_extractf128_ps::<1>(store),
         ));
-        std::ptr::copy_nonoverlapping(
-            &converted_f16 as *const _ as *const u8,
-            dest_ptr as *mut u8,
-            8,
-        );
+        _mm_storeu_si64(dest_ptr as *mut u8, converted_f16);
 
         filter_offset += filter_weights.aligned_size;
     }
@@ -454,8 +450,8 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_f16_impl<const FMA: bool>(
 
         while jx + 2 < bounds.size {
             let ptr = weights_ptr.add(jx + filter_offset);
-            let weight0 = _mm_set1_ps(ptr.read_unaligned());
-            let weight1 = _mm_set1_ps(ptr.add(1).read_unaligned());
+            let weight0 = _mm_load1_ps(ptr);
+            let weight1 = _mm_load1_ps(ptr.add(1));
             let weight = avx_combine_ps(weight0, weight1);
             let filter_start = jx + bounds.start;
             store_0 = convolve_horizontal_parts_2_rgba_f16::<FMA>(
@@ -522,44 +518,28 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_f16_impl<const FMA: bool>(
             _mm256_castps256_ps128(store_0),
             _mm256_extractf128_ps::<1>(store_0),
         ));
-        std::ptr::copy_nonoverlapping(
-            &converted_f16_0 as *const _ as *const u8,
-            dest_ptr as *mut u8,
-            8,
-        );
+        _mm_storeu_si64(dest_ptr as *mut u8, converted_f16_0);
 
         let dest_ptr = dst.get_unchecked_mut(px + dst_stride..).as_mut_ptr();
         let converted_f16_1 = _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(_mm_add_ps(
             _mm256_castps256_ps128(store_1),
             _mm256_extractf128_ps::<1>(store_1),
         ));
-        std::ptr::copy_nonoverlapping(
-            &converted_f16_1 as *const _ as *const u8,
-            dest_ptr as *mut u8,
-            8,
-        );
+        _mm_storeu_si64(dest_ptr as *mut u8, converted_f16_1);
 
         let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 2..).as_mut_ptr();
         let converted_f16_2 = _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(_mm_add_ps(
             _mm256_castps256_ps128(store_2),
             _mm256_extractf128_ps::<1>(store_2),
         ));
-        std::ptr::copy_nonoverlapping(
-            &converted_f16_2 as *const _ as *const u8,
-            dest_ptr as *mut u8,
-            8,
-        );
+        _mm_storeu_si64(dest_ptr as *mut u8, converted_f16_2);
 
         let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 3..).as_mut_ptr();
         let converted_f16_3 = _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(_mm_add_ps(
             _mm256_castps256_ps128(store_3),
             _mm256_extractf128_ps::<1>(store_3),
         ));
-        std::ptr::copy_nonoverlapping(
-            &converted_f16_3 as *const _ as *const u8,
-            dest_ptr as *mut u8,
-            8,
-        );
+        _mm_storeu_si64(dest_ptr as *mut u8, converted_f16_3);
 
         filter_offset += filter_weights.aligned_size;
     }

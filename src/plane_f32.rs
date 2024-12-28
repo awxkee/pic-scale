@@ -34,6 +34,7 @@ use crate::convolve_naive_f32::{
 };
 use crate::dispatch_group_f32::{convolve_horizontal_dispatch_f32, convolve_vertical_dispatch_f32};
 use crate::filter_weights::{FilterBounds, FilterWeights};
+use crate::image_store::ImageStoreMut;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
 use crate::neon::{
     convolve_horizontal_plane_neon_row_one, convolve_horizontal_plane_neon_rows_4,
@@ -54,14 +55,14 @@ impl HorizontalConvolutionPass<f32, 1> for ImageStore<'_, f32, 1> {
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStore<f32, 1>,
+        destination: &mut ImageStoreMut<f32, 1>,
         pool: &Option<ThreadPool>,
     ) {
         let mut _dispatcher_4_rows: Option<
-            fn(usize, usize, &FilterWeights<f32>, *const f32, usize, *mut f32, usize),
-        > = Some(convolve_horizontal_rgba_4_row_f32::<f32, f32, 1>);
-        let mut _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, *const f32, *mut f32) =
-            convolve_horizontal_rgb_native_row::<f32, f32, 1>;
+            fn(usize, usize, &FilterWeights<f32>, &[f32], usize, &mut [f32], usize),
+        > = Some(convolve_horizontal_rgba_4_row_f32::<1>);
+        let mut _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, &[f32], &mut [f32]) =
+            convolve_horizontal_rgb_native_row::<1>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             _dispatcher_4_rows = Some(convolve_horizontal_plane_neon_rows_4);
@@ -93,11 +94,11 @@ impl VerticalConvolutionPass<f32, 1> for ImageStore<'_, f32, 1> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStore<f32, 1>,
+        destination: &mut ImageStoreMut<f32, 1>,
         pool: &Option<ThreadPool>,
     ) {
-        let mut _dispatcher: fn(usize, &FilterBounds, *const f32, *mut f32, usize, &[f32]) =
-            convolve_vertical_rgb_native_row_f32::<f32, 1>;
+        let mut _dispatcher: fn(usize, &FilterBounds, &[f32], &mut [f32], usize, &[f32]) =
+            convolve_vertical_rgb_native_row_f32::<1>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             _dispatcher = convolve_vertical_rgb_neon_row_f32::<1>;

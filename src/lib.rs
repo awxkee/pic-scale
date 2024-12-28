@@ -88,7 +88,6 @@ mod scaler_f16;
 mod sse;
 mod support;
 mod threading_policy;
-mod unsafe_slice;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128",))]
 mod wasm32;
 
@@ -98,7 +97,7 @@ pub use colors::*;
 #[cfg(feature = "colorspaces")]
 pub use colorutils_rs::TransferFunction;
 pub use image_size::ImageSize;
-pub use image_store::ImageStore;
+pub use image_store::{ImageStore, ImageStoreMut};
 pub use math::*;
 pub use sampler::*;
 pub use scaler::Scaler;

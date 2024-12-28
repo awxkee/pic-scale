@@ -30,6 +30,7 @@
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::dispatch_group_u16::{convolve_horizontal_dispatch_u16, convolve_vertical_dispatch_u16};
 use crate::filter_weights::FilterWeights;
+use crate::image_store::ImageStoreMut;
 use crate::ImageStore;
 use rayon::ThreadPool;
 
@@ -38,7 +39,7 @@ impl HorizontalConvolutionPass<u16, 3> for ImageStore<'_, u16, 3> {
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStore<u16, 3>,
+        destination: &mut ImageStoreMut<u16, 3>,
         _pool: &Option<ThreadPool>,
     ) {
         convolve_horizontal_dispatch_u16(self, filter_weights, destination, _pool);
@@ -49,7 +50,7 @@ impl VerticalConvolutionPass<u16, 3> for ImageStore<'_, u16, 3> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStore<u16, 3>,
+        destination: &mut ImageStoreMut<u16, 3>,
         pool: &Option<ThreadPool>,
     ) {
         convolve_vertical_dispatch_u16(self, filter_weights, destination, pool);

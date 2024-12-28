@@ -39,7 +39,7 @@ use crate::support::{PRECISION, ROUNDING_CONST};
 macro_rules! s_accumulate_8_horiz {
     ($store: expr, $ptr: expr, $weights: expr) => {{
         let pixel_colors = _mm_loadu_si64($ptr);
-        let px_16 = _mm_cvtepu8_epi16(pixel_colors);
+        let px_16 = _mm_unpacklo_epi8(pixel_colors, _mm_setzero_si128());
         let px_lo = _mm_unpacklo_epi16(px_16, _mm_setzero_si128());
         let px_hi = _mm_unpackhi_epi16(px_16, _mm_setzero_si128());
 

@@ -32,11 +32,10 @@ use colorutils_rs::{
     SRGB_TO_XYZ_D65, XYZ_TO_SRGB_D65,
 };
 
-use crate::alpha_check::has_non_constant_cap_alpha_rgba8;
 use crate::pic_scale_error::PicScaleError;
 use crate::scaler::{Scaling, ScalingF32};
 use crate::support::check_image_size_overflow;
-use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, ThreadingPolicy};
+use crate::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy};
 
 #[derive(Debug, Copy, Clone)]
 /// Converts image to CIE XYZ components scales it and convert back
@@ -50,37 +49,6 @@ impl XYZScaler {
             scaler: Scaler::new(filter),
         }
     }
-
-    fn rgba_to_xyz(store: ImageStore<u8, 4>) -> ImageStore<f32, 4> {
-        let mut new_store = ImageStore::<f32, 4>::alloc(store.width, store.height);
-        let lab_stride = store.width as u32 * 4u32 * std::mem::size_of::<f32>() as u32;
-        rgba_to_xyz_with_alpha(
-            store.buffer.borrow(),
-            store.width as u32 * 4u32,
-            new_store.buffer.borrow_mut(),
-            lab_stride,
-            store.width as u32,
-            store.height as u32,
-            &SRGB_TO_XYZ_D65,
-            TransferFunction::Srgb,
-        );
-        new_store
-    }
-
-    fn xyz_to_srgba(store: ImageStore<f32, 4>) -> ImageStore<u8, 4> {
-        let mut new_store = ImageStore::<u8, 4>::alloc(store.width, store.height);
-        xyz_with_alpha_to_rgba(
-            store.buffer.borrow(),
-            store.width as u32 * 4u32 * std::mem::size_of::<f32>() as u32,
-            new_store.buffer.borrow_mut(),
-            store.width as u32 * 4u32,
-            store.width as u32,
-            store.height as u32,
-            &XYZ_TO_SRGB_D65,
-            TransferFunction::Srgb,
-        );
-        new_store
-    }
 }
 
 impl Scaling for XYZScaler {
@@ -88,11 +56,12 @@ impl Scaling for XYZScaler {
         self.scaler.threading_policy = threading_policy;
     }
 
-    fn resize_rgb(
-        &self,
-        new_size: ImageSize,
-        store: ImageStore<u8, 3>,
-    ) -> Result<ImageStore<u8, 3>, PicScaleError> {
+    fn resize_rgb<'a>(
+        &'a self,
+        store: &ImageStore<'a, u8, 3>,
+        into: &mut ImageStoreMut<'a, u8, 3>,
+    ) -> Result<(), PicScaleError> {
+        let new_size = into.get_size();
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
             return Err(PicScaleError::ZeroImageDimensions);
         }
@@ -106,42 +75,65 @@ impl Scaling for XYZScaler {
         }
 
         if store.width == new_size.width && store.height == new_size.height {
-            return Ok(store.copied());
+            store.copied_to_mut(into);
+            return Ok(());
         }
 
         const COMPONENTS: usize = 3;
-        let mut lab_store = ImageStore::<f32, COMPONENTS>::alloc(store.width, store.height);
+
+        let mut target_vertical = vec![f32::default(); store.width * store.height * COMPONENTS];
+
+        let mut lab_store = ImageStoreMut::<f32, COMPONENTS>::from_slice(
+            &mut target_vertical,
+            store.width,
+            store.height,
+        )?;
+        lab_store.bit_depth = into.bit_depth;
+
         let lab_stride =
             lab_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<f32>() as u32;
+
         srgb_to_xyz(
-            store.buffer.borrow(),
+            store.buffer.as_ref(),
             store.width as u32 * COMPONENTS as u32,
             lab_store.buffer.borrow_mut(),
             lab_stride,
             lab_store.width as u32,
             lab_store.height as u32,
         );
-        let new_store = self.scaler.resize_rgb_f32(new_size, lab_store)?;
-        let mut new_u8_store = ImageStore::<u8, COMPONENTS>::alloc(new_size.width, new_size.height);
+
+        let new_immutable_store = ImageStore::<f32, COMPONENTS> {
+            buffer: std::borrow::Cow::Owned(target_vertical),
+            channels: COMPONENTS,
+            width: store.width,
+            height: store.height,
+            bit_depth: into.bit_depth,
+        };
+
+        let mut new_store = ImageStoreMut::<f32, COMPONENTS>::alloc(into.width, into.height);
+
+        self.scaler
+            .resize_rgb_f32(&new_immutable_store, &mut new_store)?;
         let new_lab_stride =
             new_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<f32>() as u32;
         xyz_to_srgb(
             new_store.buffer.borrow(),
             new_lab_stride,
-            new_u8_store.buffer.borrow_mut(),
-            new_u8_store.width as u32 * COMPONENTS as u32,
+            into.buffer.borrow_mut(),
+            into.width as u32 * COMPONENTS as u32,
             new_store.width as u32,
             new_store.height as u32,
         );
-        Ok(new_u8_store)
+        Ok(())
     }
 
     fn resize_rgba<'a>(
         &'a self,
-        new_size: ImageSize,
-        store: ImageStore<'a, u8, 4>,
+        store: &ImageStore<'a, u8, 4>,
+        into: &mut ImageStoreMut<'a, u8, 4>,
         premultiply_alpha: bool,
-    ) -> Result<ImageStore<'a, u8, 4>, PicScaleError> {
+    ) -> Result<(), PicScaleError> {
+        let new_size = into.get_size();
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
             return Err(PicScaleError::ZeroImageDimensions);
         }
@@ -155,36 +147,59 @@ impl Scaling for XYZScaler {
         }
 
         if store.width == new_size.width && store.height == new_size.height {
-            return Ok(store.copied());
+            store.copied_to_mut(into);
+            return Ok(());
         }
 
-        let mut src_store = store;
+        const COMPONENTS: usize = 4;
 
-        let pool = self
-            .scaler
-            .threading_policy
-            .get_pool(ImageSize::new(new_size.width, new_size.height));
+        let mut target_vertical = vec![f32::default(); store.width * store.height * COMPONENTS];
 
-        let mut has_alpha_premultiplied = false;
+        let mut lab_store = ImageStoreMut::<f32, COMPONENTS>::from_slice(
+            &mut target_vertical,
+            store.width,
+            store.height,
+        )?;
+        lab_store.bit_depth = into.bit_depth;
 
-        if premultiply_alpha {
-            let is_alpha_premultiplication_reasonable =
-                has_non_constant_cap_alpha_rgba8(src_store.buffer.borrow(), src_store.width);
-            if is_alpha_premultiplication_reasonable {
-                let mut new_store = ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
-                src_store.premultiply_alpha(&mut new_store, &pool);
-                src_store = new_store;
-                has_alpha_premultiplied = true;
-            }
-        }
-        let lab_store = Self::rgba_to_xyz(src_store);
-        let new_store = self
-            .scaler
-            .resize_rgba_f32_impl(new_size, lab_store, false, &pool)?;
-        let mut rgba_store = Self::xyz_to_srgba(new_store);
-        if premultiply_alpha && has_alpha_premultiplied {
-            rgba_store.unpremultiply_alpha(&pool);
-        }
-        Ok(rgba_store)
+        let lab_stride =
+            lab_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<f32>() as u32;
+
+        rgba_to_xyz_with_alpha(
+            store.buffer.as_ref(),
+            store.width as u32 * COMPONENTS as u32,
+            lab_store.buffer.borrow_mut(),
+            lab_stride,
+            lab_store.width as u32,
+            lab_store.height as u32,
+            &SRGB_TO_XYZ_D65,
+            TransferFunction::Srgb,
+        );
+
+        let new_immutable_store = ImageStore::<f32, COMPONENTS> {
+            buffer: std::borrow::Cow::Owned(target_vertical),
+            channels: COMPONENTS,
+            width: store.width,
+            height: store.height,
+            bit_depth: into.bit_depth,
+        };
+
+        let mut new_store = ImageStoreMut::<f32, COMPONENTS>::alloc(into.width, into.height);
+
+        self.scaler
+            .resize_rgba_f32(&new_immutable_store, &mut new_store, premultiply_alpha)?;
+        let new_lab_stride =
+            new_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<f32>() as u32;
+        xyz_with_alpha_to_rgba(
+            new_store.buffer.borrow(),
+            new_lab_stride,
+            into.buffer.borrow_mut(),
+            into.width as u32 * COMPONENTS as u32,
+            new_store.width as u32,
+            new_store.height as u32,
+            &XYZ_TO_SRGB_D65,
+            TransferFunction::Srgb,
+        );
+        Ok(())
     }
 }

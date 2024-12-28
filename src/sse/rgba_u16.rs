@@ -369,26 +369,10 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_u16_impl<const FMA: bool>(
         let store_16_2 = _mm_packus_epi32(v_st2, v_st2);
         let store_16_3 = _mm_packus_epi32(v_st3, v_st3);
 
-        std::ptr::copy_nonoverlapping(
-            &store_16_0 as *const _ as *const u8,
-            chunk0.as_mut_ptr() as *mut u8,
-            8,
-        );
-        std::ptr::copy_nonoverlapping(
-            &store_16_1 as *const _ as *const u8,
-            chunk1.as_mut_ptr() as *mut u8,
-            8,
-        );
-        std::ptr::copy_nonoverlapping(
-            &store_16_2 as *const _ as *const u8,
-            chunk2.as_mut_ptr() as *mut u8,
-            8,
-        );
-        std::ptr::copy_nonoverlapping(
-            &store_16_3 as *const _ as *const u8,
-            chunk3.as_mut_ptr() as *mut u8,
-            8,
-        );
+        _mm_storeu_si64(chunk0.as_mut_ptr() as *mut u8, store_16_0);
+        _mm_storeu_si64(chunk1.as_mut_ptr() as *mut u8, store_16_1);
+        _mm_storeu_si64(chunk2.as_mut_ptr() as *mut u8, store_16_2);
+        _mm_storeu_si64(chunk3.as_mut_ptr() as *mut u8, store_16_3);
     }
 }
 
@@ -502,11 +486,6 @@ unsafe fn convolve_horizontal_rgba_sse_u16_row_impl<const FMA: bool>(
         );
 
         let store_16_0 = _mm_packus_epi32(v_st, v_st);
-
-        std::ptr::copy_nonoverlapping(
-            &store_16_0 as *const _ as *const u8,
-            dst.as_mut_ptr() as *mut u8,
-            8,
-        );
+        _mm_storeu_si64(dst.as_mut_ptr() as *mut u8, store_16_0);
     }
 }

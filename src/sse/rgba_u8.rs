@@ -47,7 +47,7 @@ unsafe fn convolve_horizontal_parts_one_rgba_sse(
 
     let src_ptr_32 = src_ptr.as_ptr() as *const i32;
     let rgba_pixel = _mm_cvtsi32_si128(src_ptr_32.read_unaligned());
-    let lo = _mm_cvtepu8_epi16(rgba_pixel);
+    let lo = _mm_unpacklo_epi8(rgba_pixel, _mm_setzero_si128());
 
     _mm_add_epi32(store_0, _mm_madd_epi16(_mm_cvtepi16_epi32(lo), weight0))
 }
@@ -224,22 +224,22 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_impl(
             let store_16_8_2 = compress_i32(store_2);
             let store_16_8_3 = compress_i32(store_3);
 
-            let pixel_0 = _mm_extract_epi32::<0>(store_16_8_0);
-            let pixel_1 = _mm_extract_epi32::<0>(store_16_8_1);
-            let pixel_2 = _mm_extract_epi32::<0>(store_16_8_2);
-            let pixel_3 = _mm_extract_epi32::<0>(store_16_8_3);
-
-            let dest_ptr = chunk0.as_mut_ptr() as *mut i32;
-            dest_ptr.write_unaligned(pixel_0);
-
-            let dest_ptr = chunk1.as_mut_ptr() as *mut i32;
-            dest_ptr.write_unaligned(pixel_1);
-
-            let dest_ptr = chunk2.as_mut_ptr() as *mut i32;
-            dest_ptr.write_unaligned(pixel_2);
-
-            let dest_ptr = chunk3.as_mut_ptr() as *mut i32;
-            dest_ptr.write_unaligned(pixel_3);
+            _mm_storeu_si32(
+                chunk0.as_mut_ptr() as *mut _,
+                _mm_packus_epi16(store_16_8_0, store_16_8_0),
+            );
+            _mm_storeu_si32(
+                chunk1.as_mut_ptr() as *mut _,
+                _mm_packus_epi16(store_16_8_1, store_16_8_1),
+            );
+            _mm_storeu_si32(
+                chunk2.as_mut_ptr() as *mut _,
+                _mm_packus_epi16(store_16_8_2, store_16_8_2),
+            );
+            _mm_storeu_si32(
+                chunk3.as_mut_ptr() as *mut _,
+                _mm_packus_epi16(store_16_8_3, store_16_8_3),
+            );
         }
     }
 }
@@ -342,9 +342,9 @@ unsafe fn convolve_horizontal_rgba_sse_rows_one_impl(
         }
 
         let store_16_8 = compress_i32(store);
-        let pixel = _mm_extract_epi32::<0>(store_16_8);
-
-        let dest_ptr_32 = dst.as_mut_ptr() as *mut i32;
-        dest_ptr_32.write_unaligned(pixel);
+        _mm_storeu_si32(
+            dst.as_mut_ptr() as *mut _,
+            _mm_packus_epi16(store_16_8, store_16_8),
+        );
     }
 }

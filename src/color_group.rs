@@ -28,7 +28,7 @@
  */
 use crate::mlaf::mlaf;
 use crate::saturate_narrow::SaturateNarrow;
-use num_traits::{AsPrimitive, FromPrimitive, MulAdd};
+use num_traits::{FromPrimitive, MulAdd};
 use std::ops::{Add, AddAssign, Mul, Shr, ShrAssign, Sub, SubAssign};
 
 #[repr(C)]
@@ -66,72 +66,6 @@ where
             g: v,
             b: v,
             a: v,
-        }
-    }
-}
-
-impl<const COMPS: usize, J> ColorGroup<COMPS, J>
-where
-    J: Copy + Default + 'static,
-{
-    #[inline(always)]
-    pub(crate) fn from_ptr<T>(store: *const T, offset: usize) -> ColorGroup<COMPS, J>
-    where
-        T: AsPrimitive<J>,
-    {
-        unsafe {
-            let l_ptr = store.add(offset);
-            if COMPS == 1 {
-                ColorGroup {
-                    r: l_ptr.read_unaligned().as_(),
-                    g: J::default(),
-                    b: J::default(),
-                    a: J::default(),
-                }
-            } else if COMPS == 2 {
-                ColorGroup {
-                    r: l_ptr.read_unaligned().as_(),
-                    g: l_ptr.add(1).read_unaligned().as_(),
-                    b: J::default(),
-                    a: J::default(),
-                }
-            } else if COMPS == 3 {
-                ColorGroup {
-                    r: l_ptr.read_unaligned().as_(),
-                    g: l_ptr.add(1).read_unaligned().as_(),
-                    b: l_ptr.add(2).read_unaligned().as_(),
-                    a: J::default(),
-                }
-            } else if COMPS == 4 {
-                ColorGroup {
-                    r: l_ptr.read_unaligned().as_(),
-                    g: l_ptr.add(1).read_unaligned().as_(),
-                    b: l_ptr.add(2).read_unaligned().as_(),
-                    a: l_ptr.add(3).read_unaligned().as_(),
-                }
-            } else {
-                unimplemented!("Not implemented.")
-            }
-        }
-    }
-
-    #[inline(always)]
-    pub(crate) fn as_ptr<V: Copy + 'static>(self, ptr: *mut V, offset: usize)
-    where
-        J: Copy + AsPrimitive<V>,
-    {
-        unsafe {
-            let s_ptr = ptr.add(offset);
-            s_ptr.write_unaligned(self.r.as_());
-            if COMPS > 1 {
-                s_ptr.add(1).write_unaligned(self.g.as_());
-            }
-            if COMPS > 2 {
-                s_ptr.add(2).write_unaligned(self.b.as_());
-            }
-            if COMPS == 4 {
-                s_ptr.add(3).write_unaligned(self.a.as_());
-            }
         }
     }
 }

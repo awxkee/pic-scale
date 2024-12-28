@@ -32,6 +32,7 @@ use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertical_dispatch_u8};
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::handler_provider::{handle_fixed_column_u8, handle_fixed_row_u8};
+use crate::image_store::ImageStoreMut;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
 use crate::neon::{convolve_horizontal_plane_neon_row, convolve_horizontal_plane_neon_rows_4_u8};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -51,7 +52,7 @@ impl HorizontalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStore<u8, 1>,
+        destination: &mut ImageStoreMut<u8, 1>,
         _pool: &Option<ThreadPool>,
     ) {
         let mut _dispatcher_4_rows: Option<
@@ -86,7 +87,7 @@ impl VerticalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStore<u8, 1>,
+        destination: &mut ImageStoreMut<u8, 1>,
         pool: &Option<ThreadPool>,
     ) {
         let _scale_factor = self.height as f32 / destination.height as f32;

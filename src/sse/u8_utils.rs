@@ -36,7 +36,7 @@ use crate::support::PRECISION;
 
 #[inline(always)]
 pub(crate) fn compress_i32(x: __m128i) -> __m128i {
-    let store_32 = unsafe { _mm_srai_epi32::<PRECISION>(_mm_max_epi32(x, _mm_setzero_si128())) };
+    let store_32 = unsafe { _mm_srai_epi32::<PRECISION>(x) };
     let store_16 = unsafe { _mm_packus_epi32(store_32, store_32) };
     unsafe { _mm_packus_epi16(store_16, store_16) }
 }
@@ -57,6 +57,9 @@ pub(crate) unsafe fn convolve_horizontal_parts_one_sse_rgb(
         0,
     ]);
     let m_vl = _mm_cvtsi32_si128(vl);
-    let lo = _mm_cvtepu8_epi16(m_vl);
-    _mm_add_epi32(store_0, _mm_madd_epi16(_mm_cvtepi16_epi32(lo), weight0))
+    let lo = _mm_unpacklo_epi8(m_vl, _mm_setzero_si128());
+    _mm_add_epi32(
+        store_0,
+        _mm_madd_epi16(_mm_unpacklo_epi16(lo, _mm_setzero_si128()), weight0),
+    )
 }

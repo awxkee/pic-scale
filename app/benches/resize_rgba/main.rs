@@ -4,7 +4,7 @@ use fast_image_resize::FilterType::Lanczos3;
 use fast_image_resize::{CpuExtensions, PixelType, ResizeAlg, ResizeOptions, Resizer};
 use image::{GenericImageView, ImageReader};
 use pic_scale::{
-    ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ScalingF32, ThreadingPolicy,
+    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32, ThreadingPolicy,
 };
 
 pub fn criterion_benchmark(c: &mut Criterion) {
@@ -25,11 +25,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 dimensions.1 as usize,
             )
             .unwrap();
-            _ = scaler.resize_rgba(
-                ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-                store,
-                true,
-            );
+            let mut target =
+                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+            _ = scaler.resize_rgba(&store, &mut target, true);
         })
     });
 
@@ -46,17 +44,15 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 dimensions.1 as usize,
             )
             .unwrap();
-            _ = scaler.resize_rgba_f32(
-                ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-                store,
-                false,
-            );
+            let mut target =
+                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+            _ = scaler.resize_rgba_f32(&store, &mut target, false);
         })
     });
 
     c.bench_function("Fast image resize RGBA with alpha: Lanczos 3", |b| {
+        let mut vc = Vec::from(img.as_bytes());
         b.iter(|| {
-            let mut vc = Vec::from(img.as_bytes());
             let pixel_type: PixelType = PixelType::U8x4;
             let src_image =
                 Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
@@ -84,27 +80,25 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     });
 
     c.bench_function("Pic scale RGBA without alpha: Lanczos 3", |b| {
+        let mut copied: Vec<u8> = Vec::from(src_bytes);
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
             scaler.set_threading_policy(ThreadingPolicy::Single);
-            let mut copied: Vec<u8> = Vec::from(src_bytes);
             let store = ImageStore::<u8, 4>::from_slice(
                 &mut copied,
                 dimensions.0 as usize,
                 dimensions.1 as usize,
             )
             .unwrap();
-            _ = scaler.resize_rgba(
-                ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-                store,
-                false,
-            );
+            let mut target =
+                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+            _ = scaler.resize_rgba(&store, &mut target, false);
         })
     });
 
     c.bench_function("Fast image resize RGBA without alpha: Lanczos 3", |b| {
+        let mut vc = Vec::from(img.as_bytes());
         b.iter(|| {
-            let mut vc = Vec::from(img.as_bytes());
             let pixel_type: PixelType = PixelType::U8x4;
             let src_image =
                 Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();

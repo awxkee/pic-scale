@@ -84,171 +84,61 @@ pub(crate) unsafe fn convolve_vertical_part_sse_32(
 
     let bounds_size = bounds.size;
 
-    if bounds_size == 2 {
-        let py = start_y;
-        let weight = filter.get_unchecked(0..2);
-        let v_weight0 = _mm_set1_epi32(weight[0] as i32);
-        let v_weight1 = _mm_set1_epi32(weight[1] as i32);
+    let mut jj = 0usize;
 
-        let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
-        let item_row_0 = _mm_loadu_si128(src_ptr0.as_ptr() as *const __m128i);
-        let item_row_1 = _mm_loadu_si128(src_ptr0.as_ptr().add(16) as *const __m128i);
+    while jj < bounds_size.saturating_sub(2) {
+        let py = start_y + jj;
+        let f_ptr = filter.get_unchecked(jj..).as_ptr() as *const i32;
+        let v_weight_2 = _mm_set1_epi32(f_ptr.read_unaligned());
+        let src_ptr = src.get_unchecked((src_stride * py + px)..);
+        let s_ptr_next = src_ptr.as_ptr().add(src_stride);
 
-        let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
-        let item_row_10 = _mm_loadu_si128(src_ptr1.as_ptr() as *const __m128i);
-        let item_row_11 = _mm_loadu_si128(src_ptr1.as_ptr().add(16) as *const __m128i);
+        let item_row_0 = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
+        let item_row_1 = _mm_loadu_si128(s_ptr_next as *const __m128i);
 
-        (store_0, store_1, store_2, store_3) =
-            dot_prod(store_0, store_1, store_2, store_3, item_row_0, v_weight0);
-        (store_4, store_5, store_6, store_7) =
-            dot_prod(store_4, store_5, store_6, store_7, item_row_1, v_weight0);
+        let interleaved = _mm_unpacklo_epi8(item_row_0, item_row_1);
+        let pix = _mm_unpacklo_epi8(interleaved, zeros);
+        store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(pix, v_weight_2));
+        let pix = _mm_unpackhi_epi8(interleaved, zeros);
+        store_1 = _mm_add_epi32(store_1, _mm_madd_epi16(pix, v_weight_2));
 
-        (store_0, store_1, store_2, store_3) =
-            dot_prod(store_0, store_1, store_2, store_3, item_row_10, v_weight1);
-        (store_4, store_5, store_6, store_7) =
-            dot_prod(store_4, store_5, store_6, store_7, item_row_11, v_weight1);
-    } else if bounds_size == 3 {
-        let py = start_y;
-        let weight = filter.get_unchecked(0..3);
-        let v_weight0 = _mm_set1_epi32(weight[0] as i32);
-        let v_weight1 = _mm_set1_epi32(weight[1] as i32);
-        let v_weight2 = _mm_set1_epi32(weight[2] as i32);
+        let interleaved = _mm_unpackhi_epi8(item_row_0, item_row_1);
+        let pix = _mm_unpacklo_epi8(interleaved, zeros);
+        store_2 = _mm_add_epi32(store_2, _mm_madd_epi16(pix, v_weight_2));
+        let pix = _mm_unpackhi_epi8(interleaved, zeros);
+        store_3 = _mm_add_epi32(store_3, _mm_madd_epi16(pix, v_weight_2));
 
-        let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
-        let item_row_0 = _mm_loadu_si128(src_ptr0.as_ptr() as *const __m128i);
-        let item_row_1 = _mm_loadu_si128(src_ptr0.as_ptr().add(16) as *const __m128i);
+        let item_row_0 = _mm_loadu_si128(src_ptr.as_ptr().add(16) as *const __m128i);
+        let item_row_1 = _mm_loadu_si128(s_ptr_next.add(16) as *const __m128i);
 
-        let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
-        let item_row_10 = _mm_loadu_si128(src_ptr1.as_ptr() as *const __m128i);
-        let item_row_11 = _mm_loadu_si128(src_ptr1.as_ptr().add(16) as *const __m128i);
+        let interleaved = _mm_unpacklo_epi8(item_row_0, item_row_1);
+        let pix = _mm_unpacklo_epi8(interleaved, zeros);
+        store_4 = _mm_add_epi32(store_4, _mm_madd_epi16(pix, v_weight_2));
+        let pix = _mm_unpackhi_epi8(interleaved, zeros);
+        store_5 = _mm_add_epi32(store_5, _mm_madd_epi16(pix, v_weight_2));
 
-        let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
-        let item_row_20 = _mm_loadu_si128(src_ptr2.as_ptr() as *const __m128i);
-        let item_row_21 = _mm_loadu_si128(src_ptr2.as_ptr().add(16) as *const __m128i);
+        let interleaved = _mm_unpackhi_epi8(item_row_0, item_row_1);
+        let pix = _mm_unpacklo_epi8(interleaved, zeros);
+        store_6 = _mm_add_epi32(store_6, _mm_madd_epi16(pix, v_weight_2));
+        let pix = _mm_unpackhi_epi8(interleaved, zeros);
+        store_7 = _mm_add_epi32(store_7, _mm_madd_epi16(pix, v_weight_2));
 
-        (store_0, store_1, store_2, store_3) =
-            dot_prod(store_0, store_1, store_2, store_3, item_row_0, v_weight0);
-        (store_4, store_5, store_6, store_7) =
-            dot_prod(store_4, store_5, store_6, store_7, item_row_1, v_weight0);
-
-        (store_0, store_1, store_2, store_3) =
-            dot_prod(store_0, store_1, store_2, store_3, item_row_10, v_weight1);
-        (store_4, store_5, store_6, store_7) =
-            dot_prod(store_4, store_5, store_6, store_7, item_row_11, v_weight1);
-
-        (store_0, store_1, store_2, store_3) =
-            dot_prod(store_0, store_1, store_2, store_3, item_row_20, v_weight2);
-        (store_4, store_5, store_6, store_7) =
-            dot_prod(store_4, store_5, store_6, store_7, item_row_21, v_weight2);
-    } else if bounds_size == 4 {
-        let py = start_y;
-        let weight = filter.get_unchecked(0..4);
-        let v_weight0 = _mm_set1_epi32(weight[0] as i32);
-        let v_weight1 = _mm_set1_epi32(weight[1] as i32);
-        let v_weight2 = _mm_set1_epi32(weight[2] as i32);
-        let v_weight3 = _mm_set1_epi32(weight[3] as i32);
-
-        let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
-        let item_row_0 = _mm_loadu_si128(src_ptr0.as_ptr() as *const __m128i);
-        let item_row_1 = _mm_loadu_si128(src_ptr0.as_ptr().add(16) as *const __m128i);
-
-        let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
-        let item_row_10 = _mm_loadu_si128(src_ptr1.as_ptr() as *const __m128i);
-        let item_row_11 = _mm_loadu_si128(src_ptr1.as_ptr().add(16) as *const __m128i);
-
-        let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
-        let item_row_20 = _mm_loadu_si128(src_ptr2.as_ptr() as *const __m128i);
-        let item_row_21 = _mm_loadu_si128(src_ptr2.as_ptr().add(16) as *const __m128i);
-
-        let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + px)..);
-        let item_row_30 = _mm_loadu_si128(src_ptr3.as_ptr() as *const __m128i);
-        let item_row_31 = _mm_loadu_si128(src_ptr3.as_ptr().add(16) as *const __m128i);
-
-        (store_0, store_1, store_2, store_3) =
-            dot_prod(store_0, store_1, store_2, store_3, item_row_0, v_weight0);
-        (store_4, store_5, store_6, store_7) =
-            dot_prod(store_4, store_5, store_6, store_7, item_row_1, v_weight0);
-
-        (store_0, store_1, store_2, store_3) =
-            dot_prod(store_0, store_1, store_2, store_3, item_row_10, v_weight1);
-        (store_4, store_5, store_6, store_7) =
-            dot_prod(store_4, store_5, store_6, store_7, item_row_11, v_weight1);
-
-        (store_0, store_1, store_2, store_3) =
-            dot_prod(store_0, store_1, store_2, store_3, item_row_20, v_weight2);
-        (store_4, store_5, store_6, store_7) =
-            dot_prod(store_4, store_5, store_6, store_7, item_row_21, v_weight2);
-
-        (store_0, store_1, store_2, store_3) =
-            dot_prod(store_0, store_1, store_2, store_3, item_row_30, v_weight3);
-        (store_4, store_5, store_6, store_7) =
-            dot_prod(store_4, store_5, store_6, store_7, item_row_31, v_weight3);
-    } else {
-        let mut jj = 0usize;
-
-        while jj < bounds_size.saturating_sub(2) {
-            let py = start_y + jj;
-            let f_ptr = filter.get_unchecked(jj..).as_ptr() as *const i32;
-            let v_weight_2 = _mm_set1_epi32(f_ptr.read_unaligned());
-            let src_ptr = src.get_unchecked((src_stride * py + px)..);
-            let s_ptr_next = src_ptr.as_ptr().add(src_stride);
-
-            let item_row_0 = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
-            let item_row_1 = _mm_loadu_si128(s_ptr_next as *const __m128i);
-
-            let interleaved = _mm_unpacklo_epi8(item_row_0, item_row_1);
-            let pix = _mm_unpacklo_epi8(interleaved, zeros);
-            store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(pix, v_weight_2));
-            let pix = _mm_unpackhi_epi8(interleaved, zeros);
-            store_1 = _mm_add_epi32(store_1, _mm_madd_epi16(pix, v_weight_2));
-
-            let interleaved = _mm_unpackhi_epi8(item_row_0, item_row_1);
-            let pix = _mm_unpacklo_epi8(interleaved, zeros);
-            store_2 = _mm_add_epi32(store_2, _mm_madd_epi16(pix, v_weight_2));
-            let pix = _mm_unpackhi_epi8(interleaved, zeros);
-            store_3 = _mm_add_epi32(store_3, _mm_madd_epi16(pix, v_weight_2));
-
-            let item_row_0 = _mm_loadu_si128(src_ptr.as_ptr().add(16) as *const __m128i);
-            let item_row_1 = _mm_loadu_si128(s_ptr_next.add(16) as *const __m128i);
-
-            let interleaved = _mm_unpacklo_epi8(item_row_0, item_row_1);
-            let pix = _mm_unpacklo_epi8(interleaved, zeros);
-            store_4 = _mm_add_epi32(store_4, _mm_madd_epi16(pix, v_weight_2));
-            let pix = _mm_unpackhi_epi8(interleaved, zeros);
-            store_5 = _mm_add_epi32(store_5, _mm_madd_epi16(pix, v_weight_2));
-
-            let interleaved = _mm_unpackhi_epi8(item_row_0, item_row_1);
-            let pix = _mm_unpacklo_epi8(interleaved, zeros);
-            store_6 = _mm_add_epi32(store_6, _mm_madd_epi16(pix, v_weight_2));
-            let pix = _mm_unpackhi_epi8(interleaved, zeros);
-            store_7 = _mm_add_epi32(store_7, _mm_madd_epi16(pix, v_weight_2));
-
-            jj += 2;
-        }
-
-        for j in jj..bounds_size {
-            let py = start_y + j;
-            let weight = *filter.get_unchecked(j);
-            let v_weight = _mm_set1_epi32(weight as i32);
-            let src_ptr = src.get_unchecked((src_stride * py + px)..);
-            let item_row_0 = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
-            let item_row_1 = _mm_loadu_si128(src_ptr.as_ptr().add(16) as *const __m128i);
-
-            (store_0, store_1, store_2, store_3) =
-                dot_prod(store_0, store_1, store_2, store_3, item_row_0, v_weight);
-            (store_4, store_5, store_6, store_7) =
-                dot_prod(store_4, store_5, store_6, store_7, item_row_1, v_weight);
-        }
+        jj += 2;
     }
 
-    store_0 = _mm_srai_epi32::<PRECISION>(store_0);
-    store_1 = _mm_srai_epi32::<PRECISION>(store_1);
-    store_2 = _mm_srai_epi32::<PRECISION>(store_2);
-    store_3 = _mm_srai_epi32::<PRECISION>(store_3);
-    store_4 = _mm_srai_epi32::<PRECISION>(store_4);
-    store_5 = _mm_srai_epi32::<PRECISION>(store_5);
-    store_6 = _mm_srai_epi32::<PRECISION>(store_6);
-    store_7 = _mm_srai_epi32::<PRECISION>(store_7);
+    for j in jj..bounds_size {
+        let py = start_y + j;
+        let weight = *filter.get_unchecked(j);
+        let v_weight = _mm_set1_epi32(weight as i32);
+        let src_ptr = src.get_unchecked((src_stride * py + px)..);
+        let item_row_0 = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
+        let item_row_1 = _mm_loadu_si128(src_ptr.as_ptr().add(16) as *const __m128i);
+
+        (store_0, store_1, store_2, store_3) =
+            dot_prod(store_0, store_1, store_2, store_3, item_row_0, v_weight);
+        (store_4, store_5, store_6, store_7) =
+            dot_prod(store_4, store_5, store_6, store_7, item_row_1, v_weight);
+    }
 
     let rgb0 = _mm_packs_epi32(store_0, store_1);
     let rgb2 = _mm_packs_epi32(store_2, store_3);
@@ -283,87 +173,18 @@ pub(crate) unsafe fn convolve_vertical_part_sse_16(
 
     let px = start_x;
 
-    let zeros = _mm_setzero_si128();
-
     let bounds_size = bounds.size;
 
-    if bounds_size == 2 {
-        let py = start_y;
-        let weight = filter.get_unchecked(0..2);
-        let v_weight0 = _mm_set1_epi32(weight[0] as i32);
-        let v_weight1 = _mm_set1_epi32(weight[1] as i32);
-
-        let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
-        let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
-        let item_row0 = _mm_loadu_si128(src_ptr0.as_ptr() as *const __m128i);
-        let item_row1 = _mm_loadu_si128(src_ptr1.as_ptr() as *const __m128i);
+    for j in 0..bounds_size {
+        let py = start_y + j;
+        let weight = *filter.get_unchecked(j);
+        let v_weight = _mm_set1_epi32(weight as i32);
+        let src_ptr = src.get_unchecked((src_stride * py + px)..);
+        let item_row = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
 
         (store_0, store_1, store_2, store_3) =
-            dot_prod(store_0, store_1, store_2, store_3, item_row0, v_weight0);
-        (store_0, store_1, store_2, store_3) =
-            dot_prod(store_0, store_1, store_2, store_3, item_row1, v_weight1);
-    } else if bounds_size == 3 {
-        let py = start_y;
-        let weight = filter.get_unchecked(0..3);
-        let v_weight0 = _mm_set1_epi32(weight[0] as i32);
-        let v_weight1 = _mm_set1_epi32(weight[1] as i32);
-        let v_weight2 = _mm_set1_epi32(weight[2] as i32);
-
-        let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
-        let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
-        let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
-        let item_row0 = _mm_loadu_si128(src_ptr0.as_ptr() as *const __m128i);
-        let item_row1 = _mm_loadu_si128(src_ptr1.as_ptr() as *const __m128i);
-        let item_row2 = _mm_loadu_si128(src_ptr2.as_ptr() as *const __m128i);
-
-        (store_0, store_1, store_2, store_3) =
-            dot_prod(store_0, store_1, store_2, store_3, item_row0, v_weight0);
-        (store_0, store_1, store_2, store_3) =
-            dot_prod(store_0, store_1, store_2, store_3, item_row1, v_weight1);
-        (store_0, store_1, store_2, store_3) =
-            dot_prod(store_0, store_1, store_2, store_3, item_row2, v_weight2);
-    } else if bounds_size == 4 {
-        let py = start_y;
-        let weight = filter.get_unchecked(0..4);
-        let v_weight0 = _mm_set1_epi32(weight[0] as i32);
-        let v_weight1 = _mm_set1_epi32(weight[1] as i32);
-        let v_weight2 = _mm_set1_epi32(weight[2] as i32);
-        let v_weight3 = _mm_set1_epi32(weight[3] as i32);
-
-        let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
-        let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
-        let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + px)..);
-        let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + px)..);
-        let item_row0 = _mm_loadu_si128(src_ptr0.as_ptr() as *const __m128i);
-        let item_row1 = _mm_loadu_si128(src_ptr1.as_ptr() as *const __m128i);
-        let item_row2 = _mm_loadu_si128(src_ptr2.as_ptr() as *const __m128i);
-        let item_row3 = _mm_loadu_si128(src_ptr3.as_ptr() as *const __m128i);
-
-        (store_0, store_1, store_2, store_3) =
-            dot_prod(store_0, store_1, store_2, store_3, item_row0, v_weight0);
-        (store_0, store_1, store_2, store_3) =
-            dot_prod(store_0, store_1, store_2, store_3, item_row1, v_weight1);
-        (store_0, store_1, store_2, store_3) =
-            dot_prod(store_0, store_1, store_2, store_3, item_row2, v_weight2);
-        (store_0, store_1, store_2, store_3) =
-            dot_prod(store_0, store_1, store_2, store_3, item_row3, v_weight3);
-    } else {
-        for j in 0..bounds_size {
-            let py = start_y + j;
-            let weight = *filter.get_unchecked(j);
-            let v_weight = _mm_set1_epi32(weight as i32);
-            let src_ptr = src.get_unchecked((src_stride * py + px)..);
-            let item_row = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
-
-            (store_0, store_1, store_2, store_3) =
-                dot_prod(store_0, store_1, store_2, store_3, item_row, v_weight);
-        }
+            dot_prod(store_0, store_1, store_2, store_3, item_row, v_weight);
     }
-
-    store_0 = _mm_max_epi32(store_0, zeros);
-    store_1 = _mm_max_epi32(store_1, zeros);
-    store_2 = _mm_max_epi32(store_2, zeros);
-    store_3 = _mm_max_epi32(store_3, zeros);
 
     let low_16 = _mm_packs_epi32(
         _mm_srai_epi32::<PRECISION>(store_0),
@@ -410,14 +231,14 @@ pub(crate) unsafe fn convolve_vertical_part_sse_8(
         let item_row0 = _mm_loadu_si64(src_ptr0.as_ptr());
         let item_row1 = _mm_loadu_si64(src_ptr1.as_ptr());
 
-        let low0 = _mm_cvtepu8_epi16(item_row0);
+        let low0 = _mm_unpacklo_epi8(item_row0, zeros);
         store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(_mm_cvtepi16_epi32(low0), v_weight0));
         store_1 = _mm_add_epi32(
             store_1,
             _mm_madd_epi16(_mm_unpackhi_epi16(low0, zeros), v_weight0),
         );
 
-        let low1 = _mm_cvtepu8_epi16(item_row1);
+        let low1 = _mm_unpacklo_epi8(item_row1, zeros);
         store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(_mm_cvtepi16_epi32(low1), v_weight1));
         store_1 = _mm_add_epi32(
             store_1,
@@ -436,21 +257,21 @@ pub(crate) unsafe fn convolve_vertical_part_sse_8(
         let item_row1 = _mm_loadu_si64(src_ptr1.as_ptr());
         let item_row2 = _mm_loadu_si64(src_ptr2.as_ptr());
 
-        let low0 = _mm_cvtepu8_epi16(item_row0);
+        let low0 = _mm_unpacklo_epi8(item_row0, zeros);
         store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(_mm_cvtepi16_epi32(low0), v_weight0));
         store_1 = _mm_add_epi32(
             store_1,
             _mm_madd_epi16(_mm_unpackhi_epi16(low0, zeros), v_weight0),
         );
 
-        let low1 = _mm_cvtepu8_epi16(item_row1);
+        let low1 = _mm_unpacklo_epi8(item_row1, zeros);
         store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(_mm_cvtepi16_epi32(low1), v_weight1));
         store_1 = _mm_add_epi32(
             store_1,
             _mm_madd_epi16(_mm_unpackhi_epi16(low1, zeros), v_weight1),
         );
 
-        let low2 = _mm_cvtepu8_epi16(item_row2);
+        let low2 = _mm_unpacklo_epi8(item_row2, zeros);
         store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(_mm_cvtepi16_epi32(low2), v_weight2));
         store_1 = _mm_add_epi32(
             store_1,
@@ -472,28 +293,28 @@ pub(crate) unsafe fn convolve_vertical_part_sse_8(
         let item_row2 = _mm_loadu_si64(src_ptr2.as_ptr());
         let item_row3 = _mm_loadu_si64(src_ptr3.as_ptr());
 
-        let low0 = _mm_cvtepu8_epi16(item_row0);
+        let low0 = _mm_unpacklo_epi8(item_row0, zeros);
         store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(_mm_cvtepi16_epi32(low0), v_weight0));
         store_1 = _mm_add_epi32(
             store_1,
             _mm_madd_epi16(_mm_unpackhi_epi16(low0, zeros), v_weight0),
         );
 
-        let low1 = _mm_cvtepu8_epi16(item_row1);
+        let low1 = _mm_unpacklo_epi8(item_row1, zeros);
         store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(_mm_cvtepi16_epi32(low1), v_weight1));
         store_1 = _mm_add_epi32(
             store_1,
             _mm_madd_epi16(_mm_unpackhi_epi16(low1, zeros), v_weight1),
         );
 
-        let low2 = _mm_cvtepu8_epi16(item_row2);
+        let low2 = _mm_unpacklo_epi8(item_row2, zeros);
         store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(_mm_cvtepi16_epi32(low2), v_weight2));
         store_1 = _mm_add_epi32(
             store_1,
             _mm_madd_epi16(_mm_unpackhi_epi16(low2, zeros), v_weight2),
         );
 
-        let low3 = _mm_cvtepu8_epi16(item_row3);
+        let low3 = _mm_unpacklo_epi8(item_row3, zeros);
         store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(_mm_cvtepi16_epi32(low3), v_weight3));
         store_1 = _mm_add_epi32(
             store_1,
@@ -507,7 +328,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_8(
             let src_ptr = src.get_unchecked((src_stride * py + px)..);
             let item_row = _mm_loadu_si64(src_ptr.as_ptr());
 
-            let low = _mm_cvtepu8_epi16(item_row);
+            let low = _mm_unpacklo_epi8(item_row, zeros);
             store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(_mm_cvtepi16_epi32(low), v_weight));
             store_1 = _mm_add_epi32(
                 store_1,
@@ -515,9 +336,6 @@ pub(crate) unsafe fn convolve_vertical_part_sse_8(
             );
         }
     }
-
-    store_0 = _mm_max_epi32(store_0, zeros);
-    store_1 = _mm_max_epi32(store_1, zeros);
 
     let low_16 = _mm_packus_epi32(
         _mm_srai_epi32::<PRECISION>(store_0),
@@ -527,7 +345,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_8(
     let item = _mm_packus_epi16(low_16, low_16);
 
     let dst_ptr = dst.get_unchecked_mut(px..);
-    std::ptr::copy_nonoverlapping(&item as *const _ as *const u8, dst_ptr.as_mut_ptr(), 8);
+    _mm_storeu_si64(dst_ptr.as_mut_ptr(), item);
 }
 
 #[inline(always)]
@@ -542,8 +360,6 @@ pub(crate) unsafe fn convolve_vertical_part_sse(
 ) {
     let vld = _mm_set1_epi32(ROUNDING_CONST);
     let mut store = vld;
-
-    let zeros = _mm_setzero_si128();
 
     let px = start_x;
 
@@ -618,8 +434,6 @@ pub(crate) unsafe fn convolve_vertical_part_sse(
             store = _mm_add_epi32(store, _mm_madd_epi16(item_row, v_weight));
         }
     }
-
-    store = _mm_max_epi32(store, zeros);
 
     let vegi = _mm_srai_epi32::<PRECISION>(store);
 

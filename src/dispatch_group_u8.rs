@@ -28,6 +28,7 @@
  */
 
 use crate::filter_weights::{FilterBounds, FilterWeights};
+use crate::image_store::ImageStoreMut;
 use crate::support::PRECISION;
 use crate::ImageStore;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
@@ -39,14 +40,14 @@ use std::sync::Arc;
 pub(crate) fn convolve_horizontal_dispatch_u8<const CHANNELS: usize>(
     image_store: &ImageStore<u8, CHANNELS>,
     filter_weights: FilterWeights<f32>,
-    destination: &mut ImageStore<u8, CHANNELS>,
+    destination: &mut ImageStoreMut<u8, CHANNELS>,
     pool: &Option<ThreadPool>,
     dispatcher_4_rows: Option<fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>)>,
     dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i16>),
 ) {
     let approx_weights = filter_weights.numerical_approximation_i16::<PRECISION>(0);
 
-    let src = image_store.buffer.borrow();
+    let src = image_store.buffer.as_ref();
     let dst = destination.buffer.borrow_mut();
 
     let src_stride = image_store.width * image_store.channels;
@@ -100,7 +101,7 @@ pub(crate) fn convolve_horizontal_dispatch_u8<const CHANNELS: usize>(
 pub(crate) fn convolve_vertical_dispatch_u8<'a, const COMPONENTS: usize>(
     image_store: &ImageStore<u8, COMPONENTS>,
     filter_weights: FilterWeights<f32>,
-    destination: &mut ImageStore<'a, u8, COMPONENTS>,
+    destination: &mut ImageStoreMut<'a, u8, COMPONENTS>,
     pool: &Option<ThreadPool>,
     dispatcher: fn(usize, &FilterBounds, &[u8], &mut [u8], usize, &[i16]),
 ) {
@@ -120,7 +121,7 @@ pub(crate) fn convolve_vertical_dispatch_u8<'a, const COMPONENTS: usize>(
                     let bounds = filter_weights.bounds[y];
                     let filter_offset = y * filter_weights.aligned_size;
                     let weights = &approx.weights[filter_offset..];
-                    let source_buffer = image_store.buffer.borrow();
+                    let source_buffer = image_store.buffer.as_ref();
                     dispatcher(dst_width, &bounds, source_buffer, row, src_stride, weights);
                 });
         });
@@ -134,7 +135,7 @@ pub(crate) fn convolve_vertical_dispatch_u8<'a, const COMPONENTS: usize>(
                 let bounds = filter_weights.bounds[y];
                 let filter_offset = y * filter_weights.aligned_size;
                 let weights = &approx.weights[filter_offset..];
-                let source_buffer = image_store.buffer.borrow();
+                let source_buffer = image_store.buffer.as_ref();
                 dispatcher(dst_width, &bounds, source_buffer, row, src_stride, weights);
             });
     }

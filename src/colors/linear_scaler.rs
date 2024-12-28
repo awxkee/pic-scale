@@ -31,11 +31,10 @@ use colorutils_rs::{
     linear_u8_to_rgb, linear_u8_to_rgba, rgb_to_linear_u8, rgba_to_linear_u8, TransferFunction,
 };
 
-use crate::alpha_check::has_non_constant_cap_alpha_rgba8;
 use crate::pic_scale_error::PicScaleError;
 use crate::scaler::Scaling;
 use crate::support::check_image_size_overflow;
-use crate::{ImageSize, ImageStore, ResamplingFunction, Scaler, ThreadingPolicy};
+use crate::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy};
 
 #[derive(Debug, Copy, Clone)]
 /// Linearize image into u8, scale and then convert it back. It's much faster than scale in f32, however involves some precision loss
@@ -70,11 +69,12 @@ impl Scaling for LinearApproxScaler {
         self.scaler.threading_policy = threading_policy;
     }
 
-    fn resize_rgb(
+    fn resize_rgb<'a>(
         &self,
-        new_size: ImageSize,
-        store: ImageStore<u8, 3>,
-    ) -> Result<ImageStore<u8, 3>, PicScaleError> {
+        store: &ImageStore<'a, u8, 3>,
+        into: &mut ImageStoreMut<'a, u8, 3>,
+    ) -> Result<(), PicScaleError> {
+        let new_size = into.get_size();
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
             return Err(PicScaleError::ZeroImageDimensions);
         }
@@ -88,42 +88,67 @@ impl Scaling for LinearApproxScaler {
         }
 
         if store.width == new_size.width && store.height == new_size.height {
-            return Ok(store.copied());
+            store.copied_to_mut(into);
+            return Ok(());
         }
 
-        const CHANNELS: usize = 3;
-        let mut linear_store = ImageStore::<u8, CHANNELS>::alloc(store.width, store.height);
+        const COMPONENTS: usize = 3;
+
+        let mut target_vertical = vec![u8::default(); store.width * store.height * COMPONENTS];
+
+        let mut lab_store = ImageStoreMut::<u8, COMPONENTS>::from_slice(
+            &mut target_vertical,
+            store.width,
+            store.height,
+        )?;
+        lab_store.bit_depth = into.bit_depth;
+
+        let lab_stride =
+            lab_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<u8>() as u32;
+
         rgb_to_linear_u8(
-            store.buffer.borrow(),
-            store.width as u32 * CHANNELS as u32,
-            linear_store.buffer.borrow_mut(),
-            linear_store.width as u32 * CHANNELS as u32,
-            linear_store.width as u32,
-            linear_store.height as u32,
+            store.buffer.as_ref(),
+            store.width as u32 * COMPONENTS as u32,
+            lab_store.buffer.borrow_mut(),
+            lab_stride,
+            lab_store.width as u32,
+            lab_store.height as u32,
             self.transfer_function,
         );
-        let new_store = self.scaler.resize_rgb(new_size, linear_store)?;
-        let mut gamma_store = ImageStore::<u8, CHANNELS>::alloc(new_store.width, new_store.height);
-        let src = new_store.buffer.borrow();
-        let gamma_buffer = gamma_store.buffer.borrow_mut();
+
+        let new_immutable_store = ImageStore::<u8, COMPONENTS> {
+            buffer: std::borrow::Cow::Owned(target_vertical),
+            channels: COMPONENTS,
+            width: store.width,
+            height: store.height,
+            bit_depth: into.bit_depth,
+        };
+
+        let mut new_store = ImageStoreMut::<u8, COMPONENTS>::alloc(into.width, into.height);
+
+        self.scaler
+            .resize_rgb(&new_immutable_store, &mut new_store)?;
+        let new_lab_stride =
+            new_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<u8>() as u32;
         linear_u8_to_rgb(
-            src,
-            new_store.width as u32 * CHANNELS as u32,
-            gamma_buffer,
-            gamma_store.width as u32 * CHANNELS as u32,
-            gamma_store.width as u32,
-            gamma_store.height as u32,
+            new_store.buffer.borrow(),
+            new_lab_stride,
+            into.buffer.borrow_mut(),
+            into.width as u32 * COMPONENTS as u32,
+            new_store.width as u32,
+            new_store.height as u32,
             self.transfer_function,
         );
-        Ok(gamma_store)
+        Ok(())
     }
 
     fn resize_rgba<'a>(
         &self,
-        new_size: ImageSize,
-        store: ImageStore<'a, u8, 4>,
+        store: &ImageStore<'a, u8, 4>,
+        into: &mut ImageStoreMut<'a, u8, 4>,
         premultiply_alpha: bool,
-    ) -> Result<ImageStore<'a, u8, 4>, PicScaleError> {
+    ) -> Result<(), PicScaleError> {
+        let new_size = into.get_size();
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
             return Err(PicScaleError::ZeroImageDimensions);
         }
@@ -137,58 +162,57 @@ impl Scaling for LinearApproxScaler {
         }
 
         if store.width == new_size.width && store.height == new_size.height {
-            return Ok(store.copied());
+            store.copied_to_mut(into);
+            return Ok(());
         }
 
-        const CHANNELS: usize = 4;
-        let mut src_store = store;
+        const COMPONENTS: usize = 4;
 
-        let pool = self
-            .scaler
-            .threading_policy
-            .get_pool(ImageSize::new(new_size.width, new_size.height));
+        let mut target_vertical = vec![u8::default(); store.width * store.height * COMPONENTS];
 
-        let mut has_alpha_premultiplied = false;
+        let mut lab_store = ImageStoreMut::<u8, COMPONENTS>::from_slice(
+            &mut target_vertical,
+            store.width,
+            store.height,
+        )?;
+        lab_store.bit_depth = into.bit_depth;
 
-        if premultiply_alpha {
-            let is_alpha_premultiplication_reasonable =
-                has_non_constant_cap_alpha_rgba8(src_store.buffer.borrow(), src_store.width);
-            if is_alpha_premultiplication_reasonable {
-                let mut new_store = ImageStore::<u8, 4>::alloc(src_store.width, src_store.height);
-                src_store.premultiply_alpha(&mut new_store, &pool);
-                src_store = new_store;
-                has_alpha_premultiplied = true;
-            }
-        }
+        let lab_stride =
+            lab_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<u8>() as u32;
 
-        let mut linear_store = ImageStore::<u8, CHANNELS>::alloc(src_store.width, src_store.height);
         rgba_to_linear_u8(
-            src_store.buffer.borrow(),
-            src_store.width as u32 * CHANNELS as u32,
-            linear_store.buffer.borrow_mut(),
-            linear_store.width as u32 * CHANNELS as u32,
-            linear_store.width as u32,
-            linear_store.height as u32,
+            store.buffer.as_ref(),
+            store.width as u32 * COMPONENTS as u32,
+            lab_store.buffer.borrow_mut(),
+            lab_stride,
+            lab_store.width as u32,
+            lab_store.height as u32,
             self.transfer_function,
         );
-        let new_store = self
-            .scaler
-            .resize_rgba_impl(new_size, linear_store, false, &pool)?;
-        let mut gamma_store = ImageStore::<u8, CHANNELS>::alloc(new_store.width, new_store.height);
-        let src = new_store.buffer.borrow();
-        let gamma_buffer = gamma_store.buffer.borrow_mut();
+
+        let new_immutable_store = ImageStore::<u8, COMPONENTS> {
+            buffer: std::borrow::Cow::Owned(target_vertical),
+            channels: COMPONENTS,
+            width: store.width,
+            height: store.height,
+            bit_depth: into.bit_depth,
+        };
+
+        let mut new_store = ImageStoreMut::<u8, COMPONENTS>::alloc(into.width, into.height);
+
+        self.scaler
+            .resize_rgba(&new_immutable_store, &mut new_store, premultiply_alpha)?;
+        let new_lab_stride =
+            new_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<u8>() as u32;
         linear_u8_to_rgba(
-            src,
-            new_store.width as u32 * CHANNELS as u32,
-            gamma_buffer,
-            gamma_store.width as u32 * CHANNELS as u32,
-            gamma_store.width as u32,
-            gamma_store.height as u32,
+            new_store.buffer.borrow(),
+            new_lab_stride,
+            into.buffer.borrow_mut(),
+            into.width as u32 * COMPONENTS as u32,
+            new_store.width as u32,
+            new_store.height as u32,
             self.transfer_function,
         );
-        if premultiply_alpha && has_alpha_premultiplied {
-            gamma_store.unpremultiply_alpha(&pool);
-        }
-        Ok(gamma_store)
+        Ok(())
     }
 }

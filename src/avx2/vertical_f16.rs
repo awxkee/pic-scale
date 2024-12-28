@@ -102,7 +102,7 @@ unsafe fn convolve_vertical_part_avx_4_f16<const FMA: bool>(
 
     let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
     let acc = _mm256_cvtps_ph::<ROUNDING_FLAGS>(store_0);
-    std::ptr::copy_nonoverlapping(&acc as *const _ as *const u8, dst_ptr as *mut u8, 8);
+    _mm_storeu_si64(dst_ptr as *mut u8, acc);
 }
 
 #[inline(always)]

@@ -38,9 +38,9 @@ use std::arch::x86_64::*;
 pub(crate) unsafe fn convolve_vertical_part_avx_32_f32<const FMA: bool>(
     start_y: usize,
     start_x: usize,
-    src: *const f32,
+    src: &[f32],
     src_stride: usize,
-    dst: *mut f32,
+    dst: &mut [f32],
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
@@ -55,13 +55,11 @@ pub(crate) unsafe fn convolve_vertical_part_avx_32_f32<const FMA: bool>(
         let py = start_y + j;
         let weight = *filter.get_unchecked(j);
         let v_weight = _mm256_set1_ps(weight);
-        let src_ptr = src.add(src_stride * py);
-
-        let s_ptr = src_ptr.add(px);
-        let item_row_0 = _mm256_loadu_ps(s_ptr);
-        let item_row_1 = _mm256_loadu_ps(s_ptr.add(8));
-        let item_row_2 = _mm256_loadu_ps(s_ptr.add(16));
-        let item_row_3 = _mm256_loadu_ps(s_ptr.add(24));
+        let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
+        let item_row_0 = _mm256_loadu_ps(src_ptr);
+        let item_row_1 = _mm256_loadu_ps(src_ptr.add(8));
+        let item_row_2 = _mm256_loadu_ps(src_ptr.add(16));
+        let item_row_3 = _mm256_loadu_ps(src_ptr.add(24));
 
         store_0 = _mm256_fma_ps::<FMA>(store_0, item_row_0, v_weight);
         store_1 = _mm256_fma_ps::<FMA>(store_1, item_row_1, v_weight);
@@ -69,7 +67,7 @@ pub(crate) unsafe fn convolve_vertical_part_avx_32_f32<const FMA: bool>(
         store_3 = _mm256_fma_ps::<FMA>(store_3, item_row_3, v_weight);
     }
 
-    let dst_ptr = dst.add(px);
+    let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
     _mm256_storeu_ps(dst_ptr, store_0);
     _mm256_storeu_ps(dst_ptr.add(8), store_1);
     _mm256_storeu_ps(dst_ptr.add(16), store_2);
@@ -80,9 +78,9 @@ pub(crate) unsafe fn convolve_vertical_part_avx_32_f32<const FMA: bool>(
 pub(crate) unsafe fn convolve_vertical_part_avx_16_f32<const FMA: bool>(
     start_y: usize,
     start_x: usize,
-    src: *const f32,
+    src: &[f32],
     src_stride: usize,
-    dst: *mut f32,
+    dst: &mut [f32],
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
@@ -95,17 +93,16 @@ pub(crate) unsafe fn convolve_vertical_part_avx_16_f32<const FMA: bool>(
         let py = start_y + j;
         let weight = *filter.get_unchecked(j);
         let v_weight = _mm256_set1_ps(weight);
-        let src_ptr = src.add(src_stride * py);
+        let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
 
-        let s_ptr = src_ptr.add(px);
-        let item_row_0 = _mm256_loadu_ps(s_ptr);
-        let item_row_1 = _mm256_loadu_ps(s_ptr.add(8));
+        let item_row_0 = _mm256_loadu_ps(src_ptr);
+        let item_row_1 = _mm256_loadu_ps(src_ptr.add(8));
 
         store_0 = _mm256_fma_ps::<FMA>(store_0, item_row_0, v_weight);
         store_1 = _mm256_fma_ps::<FMA>(store_1, item_row_1, v_weight);
     }
 
-    let dst_ptr = dst.add(px);
+    let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
     _mm256_storeu_ps(dst_ptr, store_0);
     _mm256_storeu_ps(dst_ptr.add(8), store_1);
 }
@@ -114,9 +111,9 @@ pub(crate) unsafe fn convolve_vertical_part_avx_16_f32<const FMA: bool>(
 pub(crate) unsafe fn convolve_vertical_part_avx_8_f32<const FMA: bool>(
     start_y: usize,
     start_x: usize,
-    src: *const f32,
+    src: &[f32],
     src_stride: usize,
-    dst: *mut f32,
+    dst: &mut [f32],
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
@@ -128,15 +125,13 @@ pub(crate) unsafe fn convolve_vertical_part_avx_8_f32<const FMA: bool>(
         let py = start_y + j;
         let weight = *filter.get_unchecked(j);
         let v_weight = _mm256_set1_ps(weight);
-        let src_ptr = src.add(src_stride * py);
-
-        let s_ptr = src_ptr.add(px);
-        let item_row_0 = _mm256_loadu_ps(s_ptr);
+        let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
+        let item_row_0 = _mm256_loadu_ps(src_ptr);
 
         store_0 = _mm256_fma_ps::<FMA>(store_0, item_row_0, v_weight);
     }
 
-    let dst_ptr = dst.add(px);
+    let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
     _mm256_storeu_ps(dst_ptr, store_0);
 }
 
@@ -144,9 +139,9 @@ pub(crate) unsafe fn convolve_vertical_part_avx_8_f32<const FMA: bool>(
 pub(crate) unsafe fn convolve_vertical_part_avx_f32<const FMA: bool>(
     start_y: usize,
     start_x: usize,
-    src: *const f32,
+    src: &[f32],
     src_stride: usize,
-    dst: *mut f32,
+    dst: &mut [f32],
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
@@ -158,45 +153,37 @@ pub(crate) unsafe fn convolve_vertical_part_avx_f32<const FMA: bool>(
         let py = start_y + j;
         let weight = *filter.get_unchecked(j);
         let v_weight = _mm256_set1_ps(weight);
-        let src_ptr = src.add(src_stride * py);
+        let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
 
-        let s_ptr = src_ptr.add(px);
-        let item_row_0 = _mm256_set1_ps(s_ptr.read_unaligned());
+        let item_row_0 = _mm256_set1_ps(src_ptr.read_unaligned());
 
         store_0 = _mm256_fma_ps::<FMA>(store_0, item_row_0, v_weight);
     }
 
-    let dst_ptr = dst.add(px);
-    (dst_ptr as *mut i32).write_unaligned(_mm256_extract_epi32::<0>(_mm256_castps_si256(store_0)));
+    let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
+    _mm_storeu_si32(
+        dst_ptr as *mut u8,
+        _mm256_castsi256_si128(_mm256_castps_si256(store_0)),
+    );
 }
 
 #[inline]
 pub(crate) fn convolve_vertical_avx_row_f32<const CHANNELS: usize, const FMA: bool>(
     width: usize,
     bounds: &FilterBounds,
-    unsafe_source_ptr_0: *const f32,
-    unsafe_destination_ptr_0: *mut f32,
+    src: &[f32],
+    dst: &mut [f32],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
     unsafe {
         if FMA {
             convolve_vertical_avx_row_f32_fma::<CHANNELS>(
-                width,
-                bounds,
-                unsafe_source_ptr_0,
-                unsafe_destination_ptr_0,
-                src_stride,
-                weight_ptr,
+                width, bounds, src, dst, src_stride, weight_ptr,
             );
         } else {
             convolve_vertical_avx_row_f32_regular::<CHANNELS>(
-                width,
-                bounds,
-                unsafe_source_ptr_0,
-                unsafe_destination_ptr_0,
-                src_stride,
-                weight_ptr,
+                width, bounds, src, dst, src_stride, weight_ptr,
             );
         }
     }
@@ -206,18 +193,13 @@ pub(crate) fn convolve_vertical_avx_row_f32<const CHANNELS: usize, const FMA: bo
 unsafe fn convolve_vertical_avx_row_f32_regular<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,
-    unsafe_source_ptr_0: *const f32,
-    unsafe_destination_ptr_0: *mut f32,
+    src: &[f32],
+    dst: &mut [f32],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
     convolve_vertical_avx_row_f32_impl::<CHANNELS, false>(
-        width,
-        bounds,
-        unsafe_source_ptr_0,
-        unsafe_destination_ptr_0,
-        src_stride,
-        weight_ptr,
+        width, bounds, src, dst, src_stride, weight_ptr,
     );
 }
 
@@ -225,18 +207,13 @@ unsafe fn convolve_vertical_avx_row_f32_regular<const CHANNELS: usize>(
 unsafe fn convolve_vertical_avx_row_f32_fma<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,
-    unsafe_source_ptr_0: *const f32,
-    unsafe_destination_ptr_0: *mut f32,
+    src: &[f32],
+    dst: &mut [f32],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
     convolve_vertical_avx_row_f32_impl::<CHANNELS, true>(
-        width,
-        bounds,
-        unsafe_source_ptr_0,
-        unsafe_destination_ptr_0,
-        src_stride,
-        weight_ptr,
+        width, bounds, src, dst, src_stride, weight_ptr,
     );
 }
 
@@ -244,8 +221,8 @@ unsafe fn convolve_vertical_avx_row_f32_fma<const CHANNELS: usize>(
 unsafe fn convolve_vertical_avx_row_f32_impl<const CHANNELS: usize, const FMA: bool>(
     width: usize,
     bounds: &FilterBounds,
-    unsafe_source_ptr_0: *const f32,
-    unsafe_destination_ptr_0: *mut f32,
+    src: &[f32],
+    dst: &mut [f32],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
@@ -256,9 +233,9 @@ unsafe fn convolve_vertical_avx_row_f32_impl<const CHANNELS: usize, const FMA: b
         convolve_vertical_part_avx_32_f32::<FMA>(
             bounds.start,
             cx,
-            unsafe_source_ptr_0,
+            src,
             src_stride,
-            unsafe_destination_ptr_0,
+            dst,
             weight_ptr,
             bounds,
         );
@@ -267,17 +244,15 @@ unsafe fn convolve_vertical_avx_row_f32_impl<const CHANNELS: usize, const FMA: b
     }
 
     while cx + 16 < dst_width {
-        unsafe {
-            convolve_vertical_part_avx_16_f32::<FMA>(
-                bounds.start,
-                cx,
-                unsafe_source_ptr_0,
-                src_stride,
-                unsafe_destination_ptr_0,
-                weight_ptr,
-                bounds,
-            );
-        }
+        convolve_vertical_part_avx_16_f32::<FMA>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+        );
 
         cx += 16;
     }
@@ -286,9 +261,9 @@ unsafe fn convolve_vertical_avx_row_f32_impl<const CHANNELS: usize, const FMA: b
         convolve_vertical_part_avx_8_f32::<FMA>(
             bounds.start,
             cx,
-            unsafe_source_ptr_0,
+            src,
             src_stride,
-            unsafe_destination_ptr_0,
+            dst,
             weight_ptr,
             bounds,
         );
@@ -300,9 +275,9 @@ unsafe fn convolve_vertical_avx_row_f32_impl<const CHANNELS: usize, const FMA: b
         convolve_vertical_part_avx_f32::<FMA>(
             bounds.start,
             cx,
-            unsafe_source_ptr_0,
+            src,
             src_stride,
-            unsafe_destination_ptr_0,
+            dst,
             weight_ptr,
             bounds,
         );

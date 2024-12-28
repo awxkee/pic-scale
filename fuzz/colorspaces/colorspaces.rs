@@ -30,10 +30,14 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling};
+use pic_scale::{
+    ImageStore, ImageStoreMut, JzazbzScaler, LChScaler, LabScaler, LinearApproxScaler,
+    LinearScaler, LuvScaler, OklabScaler, ResamplingFunction, Scaling, SigmoidalScaler,
+    TransferFunction, XYZScaler,
+};
 
 fuzz_target!(|data: (u16, u16, u16, u16)| {
-    resize_rgba(
+    resize_plane(
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
@@ -42,7 +46,7 @@ fuzz_target!(|data: (u16, u16, u16, u16)| {
     )
 });
 
-fn resize_rgba(
+fn resize_plane(
     src_width: usize,
     src_height: usize,
     dst_width: usize,
@@ -61,10 +65,31 @@ fn resize_rgba(
         return;
     }
 
-    let store = ImageStore::<u8, 4>::alloc(src_width, src_height);
-    let mut target = ImageStoreMut::alloc(dst_width, dst_height);
-    let scaler = Scaler::new(sampler);
-    scaler.resize_rgba(&store, &mut target, false).unwrap();
-    let store = ImageStore::<u8, 4>::alloc(src_width, src_height);
-    scaler.resize_rgba(&store, &mut target, true).unwrap();
+    let scalers: Vec<Box<dyn Scaling>> = vec![
+        Box::new(JzazbzScaler::new(sampler, 203f32, TransferFunction::Srgb)),
+        Box::new(LabScaler::new(sampler)),
+        Box::new(LChScaler::new(sampler)),
+        Box::new(LinearScaler::new(sampler)),
+        Box::new(LinearApproxScaler::new(sampler)),
+        Box::new(LuvScaler::new(sampler)),
+        Box::new(OklabScaler::new(sampler, TransferFunction::Srgb)),
+        Box::new(SigmoidalScaler::new(sampler)),
+        Box::new(XYZScaler::new(sampler)),
+    ];
+
+    for scaler in scalers {
+        let mut src_data_rgb = vec![15u8; src_width * src_height * 3];
+        let store =
+            ImageStore::<u8, 3>::from_slice(&mut src_data_rgb, src_width, src_height).unwrap();
+        let mut target_store = ImageStoreMut::alloc(dst_width, dst_height);
+        scaler.resize_rgb(&store, &mut target_store).unwrap();
+
+        let mut src_data_rgba = vec![15u8; src_width * src_height * 4];
+        let store_rgba =
+            ImageStore::<u8, 4>::from_slice(&mut src_data_rgba, src_width, src_height).unwrap();
+        let mut target_store_rgba = ImageStoreMut::alloc(dst_width, dst_height);
+        scaler
+            .resize_rgba(&store_rgba, &mut target_store_rgba, false)
+            .unwrap();
+    }
 }
