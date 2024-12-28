@@ -30,7 +30,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use pic_scale::{ImageSize, ImageStore, ResamplingFunction, Scaler, ScalingU16};
+use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16};
 
 fuzz_target!(|data: (u16, u16, u16, u16)| {
     resize_rgb(
@@ -64,13 +64,12 @@ fn resize_rgb(
     let mut src_data = vec![1u16; src_width * src_height];
 
     let store = ImageStore::<u16, 1>::from_slice(&mut src_data, src_width, src_height).unwrap();
+    let mut target = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 10);
+
     let scaler = Scaler::new(sampler);
-    _ = scaler
-        .resize_plane_u16(ImageSize::new(dst_width, dst_height), store, 10)
-        .unwrap();
+    scaler.resize_plane_u16(&store, &mut target).unwrap();
 
     let store = ImageStore::<u16, 1>::from_slice(&mut src_data, src_width, src_height).unwrap();
-    _ = scaler
-        .resize_plane_u16(ImageSize::new(dst_width, dst_height), store, 16)
-        .unwrap();
+    let mut target16 = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
+    scaler.resize_plane_u16(&store, &mut target16).unwrap();
 }

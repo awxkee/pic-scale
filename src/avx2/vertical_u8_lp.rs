@@ -59,11 +59,11 @@ unsafe fn m256dot<const SCALE: i32>(
 
     let store0 = _mm256_add_epi16(
         store0,
-        _mm256_mulhi_epi16(_mm256_slli_epi16::<SCALE>(lo), weight),
+        _mm256_mulhrs_epi16(_mm256_slli_epi16::<SCALE>(lo), weight),
     );
     let store1 = _mm256_add_epi16(
         store1,
-        _mm256_mulhi_epi16(_mm256_slli_epi16::<SCALE>(hi), weight),
+        _mm256_mulhrs_epi16(_mm256_slli_epi16::<SCALE>(hi), weight),
     );
     (store0, store1)
 }
@@ -81,8 +81,8 @@ unsafe fn convolve_vertical_avx2_row_impl(
 
     let bounds_size = bounds.size;
     const SCALE: i32 = 6;
-    const R_SHR_SCALE: i32 = SCALE - 1;
-    const ROUNDING: i16 = 1 << (SCALE - 1);
+    const R_SHR_SCALE: i32 = SCALE;
+    const ROUNDING: i16 = 1 << (R_SHR_SCALE - 1);
 
     let mut cx = 0usize;
 
@@ -342,7 +342,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
 
             store0 = _mm256_add_epi16(
                 store0,
-                _mm256_mulhi_epi16(_mm256_slli_epi16::<SCALE>(item_row), v_weight),
+                _mm256_mulhrs_epi16(_mm256_slli_epi16::<SCALE>(item_row), v_weight),
             );
         }
 
@@ -377,13 +377,13 @@ unsafe fn convolve_vertical_avx2_row_impl(
             let item_row0 = _mm_unpacklo_epi8(_mm_loadu_si64(src_ptr0.as_ptr()), zeros);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
             );
 
             let item_row1 = _mm_unpacklo_epi8(_mm_loadu_si64(src_ptr1.as_ptr()), zeros);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
             );
         } else if bounds_size == 3 {
             let py = bounds.start;
@@ -401,19 +401,19 @@ unsafe fn convolve_vertical_avx2_row_impl(
             let item_row0 = _mm_unpacklo_epi8(_mm_loadu_si64(src_ptr0.as_ptr()), zeros);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
             );
 
             let item_row1 = _mm_unpacklo_epi8(_mm_loadu_si64(src_ptr1.as_ptr()), zeros);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
             );
 
             let item_row2 = _mm_unpacklo_epi8(_mm_loadu_si64(src_ptr2.as_ptr()), zeros);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row2), v_weight2),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row2), v_weight2),
             );
         } else if bounds_size == 4 {
             let py = bounds.start;
@@ -434,25 +434,25 @@ unsafe fn convolve_vertical_avx2_row_impl(
             let item_row0 = _mm_unpacklo_epi8(_mm_loadu_si64(src_ptr0.as_ptr()), zeros);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
             );
 
             let item_row1 = _mm_unpacklo_epi8(_mm_loadu_si64(src_ptr1.as_ptr()), zeros);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
             );
 
             let item_row2 = _mm_unpacklo_epi8(_mm_loadu_si64(src_ptr2.as_ptr()), zeros);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row2), v_weight2),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row2), v_weight2),
             );
 
             let item_row3 = _mm_unpacklo_epi8(_mm_loadu_si64(src_ptr3.as_ptr()), zeros);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row3), v_weight3),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row3), v_weight3),
             );
         } else {
             for j in 0..bounds_size {
@@ -464,7 +464,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
                 let item_row = _mm_unpacklo_epi8(_mm_loadu_si64(src_ptr.as_ptr()), zeros);
 
                 let low = _mm_slli_epi16::<SCALE>(item_row);
-                store = _mm_add_epi16(store, _mm_mulhi_epi16(low, v_weight));
+                store = _mm_add_epi16(store, _mm_mulhrs_epi16(low, v_weight));
             }
         }
 
@@ -497,13 +497,13 @@ unsafe fn convolve_vertical_avx2_row_impl(
 
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
             );
 
             let item_row1 = _mm_set1_epi16(src_ptr1[0] as i16);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
             );
         } else if bounds_size == 3 {
             let py = bounds.start;
@@ -522,19 +522,19 @@ unsafe fn convolve_vertical_avx2_row_impl(
 
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
             );
 
             let item_row1 = _mm_set1_epi16(src_ptr1[0] as i16);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
             );
 
             let item_row2 = _mm_set1_epi16(src_ptr2[0] as i16);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row2), v_weight2),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row2), v_weight2),
             );
         } else if bounds_size == 4 {
             let py = bounds.start;
@@ -556,25 +556,25 @@ unsafe fn convolve_vertical_avx2_row_impl(
 
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
             );
 
             let item_row1 = _mm_set1_epi16(src_ptr1[0] as i16);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
             );
 
             let item_row2 = _mm_set1_epi16(src_ptr2[0] as i16);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row2), v_weight2),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row2), v_weight2),
             );
 
             let item_row3 = _mm_set1_epi16(src_ptr3[0] as i16);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row3), v_weight3),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row3), v_weight3),
             );
         } else {
             for j in 0..bounds_size {
@@ -587,7 +587,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
 
                 store = _mm_add_epi16(
                     store,
-                    _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row), v_weight),
+                    _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row), v_weight),
                 );
             }
         }

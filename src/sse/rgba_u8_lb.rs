@@ -47,7 +47,7 @@ unsafe fn convolve_horizontal_parts_one_rgba_sse<const SCALE: i32>(
     let rgba_pixel = _mm_cvtsi32_si128(src_ptr_32.read_unaligned());
     let lo = _mm_slli_epi16::<SCALE>(_mm_unpacklo_epi8(rgba_pixel, _mm_setzero_si128()));
 
-    _mm_add_epi16(store_0, _mm_mulhi_epi16(lo, weight0))
+    _mm_add_epi16(store_0, _mm_mulhrs_epi16(lo, weight0))
 }
 
 pub(crate) fn convolve_horizontal_rgba_sse_rows_4_lb(
@@ -77,10 +77,10 @@ unsafe fn hdot4<const SCALE: i32>(
     let hi0 = _mm_slli_epi16::<SCALE>(_mm_unpackhi_epi8(v0, zeros));
     let lo1 = _mm_slli_epi16::<SCALE>(_mm_unpacklo_epi8(v1, zeros));
     let hi1 = _mm_slli_epi16::<SCALE>(_mm_unpackhi_epi8(v1, zeros));
-    let mut p = _mm_mulhi_epi16(lo0, w01);
-    p = _mm_add_epi16(p, _mm_mulhi_epi16(hi0, w23));
-    p = _mm_add_epi16(p, _mm_mulhi_epi16(lo1, w45));
-    p = _mm_add_epi16(p, _mm_mulhi_epi16(hi1, w67));
+    let mut p = _mm_mulhrs_epi16(lo0, w01);
+    p = _mm_add_epi16(p, _mm_mulhrs_epi16(hi0, w23));
+    p = _mm_add_epi16(p, _mm_mulhrs_epi16(lo1, w45));
+    p = _mm_add_epi16(p, _mm_mulhrs_epi16(hi1, w67));
     let hi_part = _mm_unpackhi_epi64(p, p);
     p = _mm_add_epi16(hi_part, p);
     _mm_add_epi16(store, p)
@@ -96,8 +96,8 @@ unsafe fn hdot2<const SCALE: i32>(
     let zeros = _mm_setzero_si128();
     let lo = _mm_slli_epi16::<SCALE>(_mm_unpacklo_epi8(v, zeros));
     let hi = _mm_slli_epi16::<SCALE>(_mm_unpackhi_epi8(v, zeros));
-    let mut p = _mm_mulhi_epi16(lo, w01);
-    p = _mm_add_epi16(p, _mm_mulhi_epi16(hi, w23));
+    let mut p = _mm_mulhrs_epi16(lo, w01);
+    p = _mm_add_epi16(p, _mm_mulhrs_epi16(hi, w23));
     let hi_part = _mm_unpackhi_epi64(p, p);
     p = _mm_add_epi16(hi_part, p);
     _mm_add_epi16(store, p)
@@ -107,7 +107,7 @@ unsafe fn hdot2<const SCALE: i32>(
 unsafe fn hdot<const SCALE: i32>(store: __m128i, v: __m128i, w01: __m128i) -> __m128i {
     let zeros = _mm_setzero_si128();
     let lo = _mm_slli_epi16::<SCALE>(_mm_unpacklo_epi8(v, zeros));
-    let mut p = _mm_mulhi_epi16(lo, w01);
+    let mut p = _mm_mulhrs_epi16(lo, w01);
     let hi_part = _mm_unpackhi_epi64(p, p);
     p = _mm_add_epi16(hi_part, p);
     _mm_add_epi16(store, p)
@@ -125,8 +125,8 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_impl(
         const CHANNELS: usize = 4;
 
         const SCALE: i32 = 6;
-        const ROUNDING: i16 = 1 << (SCALE - 1);
-        const V_SHR: i32 = SCALE - 1;
+        const V_SHR: i32 = SCALE;
+        const ROUNDING: i16 = 1 << (V_SHR - 1);
 
         let vld = _mm_set1_epi16(ROUNDING);
 

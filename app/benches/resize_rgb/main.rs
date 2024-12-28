@@ -4,7 +4,7 @@ use fast_image_resize::FilterType::Lanczos3;
 use fast_image_resize::{CpuExtensions, PixelType, ResizeAlg, ResizeOptions, Resizer};
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
-    ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ScalingF32, ThreadingPolicy,
+    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32, ThreadingPolicy,
 };
 
 pub fn criterion_benchmark(c: &mut Criterion) {
@@ -27,10 +27,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 dimensions.1 as usize,
             )
             .unwrap();
-            _ = scaler.resize_rgb(
-                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
-                store,
-            );
+            let mut target =
+                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+            scaler.resize_rgb(&store, &mut target).unwrap();
         })
     });
 
@@ -47,10 +46,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 dimensions.1 as usize,
             )
             .unwrap();
-            _ = scaler.resize_rgb_f32(
-                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
-                store,
-            );
+            let mut target =
+                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+            scaler.resize_rgb_f32(&store, &mut target).unwrap();
         })
     });
 

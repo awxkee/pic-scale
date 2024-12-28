@@ -56,8 +56,14 @@ unsafe fn mdot<const SCALE: i32>(
     let lo = _mm_unpacklo_epi8(row, zeros);
     let hi = _mm_unpackhi_epi8(row, zeros);
 
-    let store0 = _mm_add_epi16(store0, _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(lo), weight));
-    let store1 = _mm_add_epi16(store1, _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(hi), weight));
+    let store0 = _mm_add_epi16(
+        store0,
+        _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(lo), weight),
+    );
+    let store1 = _mm_add_epi16(
+        store1,
+        _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(hi), weight),
+    );
     (store0, store1)
 }
 
@@ -74,8 +80,8 @@ unsafe fn convolve_vertical_sse_row_impl(
 
     let bounds_size = bounds.size;
     const SCALE: i32 = 6;
-    const R_SHR_SCALE: i32 = SCALE - 1;
-    const ROUNDING: i16 = 1 << (SCALE - 1);
+    const R_SHR_SCALE: i32 = SCALE;
+    const ROUNDING: i16 = 1 << (R_SHR_SCALE - 1);
 
     let mut cx = 0usize;
 
@@ -111,14 +117,14 @@ unsafe fn convolve_vertical_sse_row_impl(
             (store6, store7) = mdot::<SCALE>(store6, store7, item_row3, v_weight);
         }
 
-        let rebased0 = _mm_srli_epi16::<R_SHR_SCALE>(store0);
-        let rebased1 = _mm_srli_epi16::<R_SHR_SCALE>(store1);
-        let rebased2 = _mm_srli_epi16::<R_SHR_SCALE>(store2);
-        let rebased3 = _mm_srli_epi16::<R_SHR_SCALE>(store3);
-        let rebased4 = _mm_srli_epi16::<R_SHR_SCALE>(store4);
-        let rebased5 = _mm_srli_epi16::<R_SHR_SCALE>(store5);
-        let rebased6 = _mm_srli_epi16::<R_SHR_SCALE>(store6);
-        let rebased7 = _mm_srli_epi16::<R_SHR_SCALE>(store7);
+        let rebased0 = _mm_srai_epi16::<R_SHR_SCALE>(store0);
+        let rebased1 = _mm_srai_epi16::<R_SHR_SCALE>(store1);
+        let rebased2 = _mm_srai_epi16::<R_SHR_SCALE>(store2);
+        let rebased3 = _mm_srai_epi16::<R_SHR_SCALE>(store3);
+        let rebased4 = _mm_srai_epi16::<R_SHR_SCALE>(store4);
+        let rebased5 = _mm_srai_epi16::<R_SHR_SCALE>(store5);
+        let rebased6 = _mm_srai_epi16::<R_SHR_SCALE>(store6);
+        let rebased7 = _mm_srai_epi16::<R_SHR_SCALE>(store7);
         let shrank0 = _mm_packus_epi16(rebased0, rebased1);
         let shrank1 = _mm_packus_epi16(rebased2, rebased3);
         let shrank2 = _mm_packus_epi16(rebased4, rebased5);
@@ -164,10 +170,10 @@ unsafe fn convolve_vertical_sse_row_impl(
             (store2, store3) = mdot::<SCALE>(store2, store3, item_row1, v_weight);
         }
 
-        let rebased0 = _mm_srli_epi16::<R_SHR_SCALE>(store0);
-        let rebased1 = _mm_srli_epi16::<R_SHR_SCALE>(store1);
-        let rebased2 = _mm_srli_epi16::<R_SHR_SCALE>(store2);
-        let rebased3 = _mm_srli_epi16::<R_SHR_SCALE>(store3);
+        let rebased0 = _mm_srai_epi16::<R_SHR_SCALE>(store0);
+        let rebased1 = _mm_srai_epi16::<R_SHR_SCALE>(store1);
+        let rebased2 = _mm_srai_epi16::<R_SHR_SCALE>(store2);
+        let rebased3 = _mm_srai_epi16::<R_SHR_SCALE>(store3);
         let shrank0 = _mm_packus_epi16(rebased0, rebased1);
         let shrank1 = _mm_packus_epi16(rebased2, rebased3);
         _mm_storeu_si128(dst.as_mut_ptr() as *mut __m128i, shrank0);
@@ -258,8 +264,8 @@ unsafe fn convolve_vertical_sse_row_impl(
             }
         }
 
-        let rebased0 = _mm_srli_epi16::<R_SHR_SCALE>(store0);
-        let rebased1 = _mm_srli_epi16::<R_SHR_SCALE>(store1);
+        let rebased0 = _mm_srai_epi16::<R_SHR_SCALE>(store0);
+        let rebased1 = _mm_srai_epi16::<R_SHR_SCALE>(store1);
         let shrank = _mm_packus_epi16(rebased0, rebased1);
         _mm_storeu_si128(dst.as_mut_ptr() as *mut __m128i, shrank);
 
@@ -287,13 +293,13 @@ unsafe fn convolve_vertical_sse_row_impl(
             let item_row0 = _mm_unpacklo_epi8(_mm_loadu_si64(src_ptr0.as_ptr()), zeros);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
             );
 
             let item_row1 = _mm_unpacklo_epi8(_mm_loadu_si64(src_ptr1.as_ptr()), zeros);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
             );
         } else if bounds_size == 3 {
             let py = bounds.start;
@@ -311,19 +317,19 @@ unsafe fn convolve_vertical_sse_row_impl(
             let item_row0 = _mm_unpacklo_epi8(_mm_loadu_si64(src_ptr0.as_ptr()), zeros);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
             );
 
             let item_row1 = _mm_unpacklo_epi8(_mm_loadu_si64(src_ptr1.as_ptr()), zeros);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
             );
 
             let item_row2 = _mm_unpacklo_epi8(_mm_loadu_si64(src_ptr2.as_ptr()), zeros);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row2), v_weight2),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row2), v_weight2),
             );
         } else if bounds_size == 4 {
             let py = bounds.start;
@@ -344,25 +350,25 @@ unsafe fn convolve_vertical_sse_row_impl(
             let item_row0 = _mm_unpacklo_epi8(_mm_loadu_si64(src_ptr0.as_ptr()), zeros);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
             );
 
             let item_row1 = _mm_unpacklo_epi8(_mm_loadu_si64(src_ptr1.as_ptr()), zeros);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
             );
 
             let item_row2 = _mm_unpacklo_epi8(_mm_loadu_si64(src_ptr2.as_ptr()), zeros);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row2), v_weight2),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row2), v_weight2),
             );
 
             let item_row3 = _mm_unpacklo_epi8(_mm_loadu_si64(src_ptr3.as_ptr()), zeros);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row3), v_weight3),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row3), v_weight3),
             );
         } else {
             for j in 0..bounds_size {
@@ -374,11 +380,11 @@ unsafe fn convolve_vertical_sse_row_impl(
                 let item_row = _mm_unpacklo_epi8(_mm_loadu_si64(src_ptr.as_ptr()), zeros);
 
                 let low = _mm_slli_epi16::<SCALE>(item_row);
-                store = _mm_add_epi16(store, _mm_mulhi_epi16(low, v_weight));
+                store = _mm_add_epi16(store, _mm_mulhrs_epi16(low, v_weight));
             }
         }
 
-        let rebased = _mm_srli_epi16::<R_SHR_SCALE>(store);
+        let rebased = _mm_srai_epi16::<R_SHR_SCALE>(store);
         let shrank = _mm_packus_epi16(rebased, rebased);
         _mm_storeu_si64(dst.as_mut_ptr(), shrank);
 
@@ -407,13 +413,13 @@ unsafe fn convolve_vertical_sse_row_impl(
 
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
             );
 
             let item_row1 = _mm_set1_epi16(src_ptr1[0] as i16);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
             );
         } else if bounds_size == 3 {
             let py = bounds.start;
@@ -432,19 +438,19 @@ unsafe fn convolve_vertical_sse_row_impl(
 
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
             );
 
             let item_row1 = _mm_set1_epi16(src_ptr1[0] as i16);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
             );
 
             let item_row2 = _mm_set1_epi16(src_ptr2[0] as i16);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row2), v_weight2),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row2), v_weight2),
             );
         } else if bounds_size == 4 {
             let py = bounds.start;
@@ -466,25 +472,25 @@ unsafe fn convolve_vertical_sse_row_impl(
 
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row0), v_weight0),
             );
 
             let item_row1 = _mm_set1_epi16(src_ptr1[0] as i16);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row1), v_weight1),
             );
 
             let item_row2 = _mm_set1_epi16(src_ptr2[0] as i16);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row2), v_weight2),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row2), v_weight2),
             );
 
             let item_row3 = _mm_set1_epi16(src_ptr3[0] as i16);
             store = _mm_add_epi16(
                 store,
-                _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row3), v_weight3),
+                _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row3), v_weight3),
             );
         } else {
             for j in 0..bounds_size {
@@ -497,12 +503,12 @@ unsafe fn convolve_vertical_sse_row_impl(
 
                 store = _mm_add_epi16(
                     store,
-                    _mm_mulhi_epi16(_mm_slli_epi16::<SCALE>(item_row), v_weight),
+                    _mm_mulhrs_epi16(_mm_slli_epi16::<SCALE>(item_row), v_weight),
                 );
             }
         }
 
-        let rebased = _mm_srli_epi16::<R_SHR_SCALE>(store);
+        let rebased = _mm_srai_epi16::<R_SHR_SCALE>(store);
         let value = _mm_extract_epi8::<0>(_mm_packus_epi16(rebased, rebased));
         *dst = value as u8;
 
