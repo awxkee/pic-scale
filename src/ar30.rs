@@ -61,8 +61,8 @@ impl Rgb30 {
     #[inline]
     pub(crate) const fn pack_w_a<const STORE: usize>(self, r: i32, g: i32, b: i32, a: i32) -> u32 {
         let value: u32 = match self {
-            Rgb30::Ar30 => (a << 30 | (b << 20) | (g << 10) | r) as u32,
-            Rgb30::Ra30 => ((r << 22) | (g << 12) | (b << 2) | a) as u32,
+            Rgb30::Ar30 => (((a << 30) | (b << 20)) | ((g << 10) | r)) as u32,
+            Rgb30::Ra30 => (((r << 22) | (g << 12)) | ((b << 2) | a)) as u32,
         };
         if STORE == 0 {
             value

@@ -61,19 +61,18 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 
 #### Features
 
-For RISC-V `riscv` feature should be implicitly enabled, nightly compiler channel is required
-
 To enable support of `f16` the feature `half` should be activated.
 
 #### Target features
 
-`neon` optional target features are available, enable it when compiling on supported platform to get full features
+`neon` optional target features are available, enable it when compiling on supported platform to get full features.
 
-`avx2`, `fma`, `sse4.1`, `f16c` will be detected automatically if available, and called the best path
+`avx2`, `fma`, `sse4.1`, `f16c` will be detected automatically if available, and called the best path.
+For x86 and aarch64 NEON runtime dispatch is used.
 
 `fullfp16` NEON target detection performed in runtime, when available best the best paths for *f16* images are available on ARM.
 
-WASM `simd128` target feature activating is mandatory in build flags
+WASM `simd128` target feature activating is mandatory in build flags.
 
 ##### About f16
 

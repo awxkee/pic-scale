@@ -107,8 +107,8 @@ impl Scaling for JzazbzScaler {
 
     fn resize_rgb<'a>(
         &'a self,
-        store: &ImageStore<u8, 3>,
-        into: &mut ImageStoreMut<u8, 3>,
+        store: &ImageStore<'a, u8, 3>,
+        into: &mut ImageStoreMut<'a, u8, 3>,
     ) -> Result<(), PicScaleError> {
         let new_size = into.get_size();
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {

@@ -42,6 +42,7 @@ pub(crate) fn has_non_constant_cap_alpha_rgba_f32(store: &[f32], width: usize) -
     has_non_constant_cap_alpha_f32_impl::<3, 4>(store, width)
 }
 
+/// Scans an image to check if alpha is not constant
 pub(crate) fn has_non_constant_cap_alpha<
     V: Copy + PartialEq + BitXor<V, Output = V> + 'static + AsPrimitive<J> + 'static,
     J: Copy + AddAssign + Default + 'static + Eq + Ord,
@@ -76,6 +77,7 @@ where
     row_sums.ne(&zeros)
 }
 
+/// Scans an `f32` image to check if alpha is not constant
 fn has_non_constant_cap_alpha_f32_impl<const ALPHA_CHANNEL_INDEX: usize, const CHANNELS: usize>(
     store: &[f32],
     width: usize,

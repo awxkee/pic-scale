@@ -39,6 +39,7 @@ use rayon::slice::ParallelSliceMut;
 use rayon::ThreadPool;
 
 #[inline]
+/// Divides value by 1023 with rounding to nearest
 pub(crate) fn div_by_1023(v: u32) -> u16 {
     let round = 1 << 9;
     let v = v + round;
@@ -46,6 +47,7 @@ pub(crate) fn div_by_1023(v: u32) -> u16 {
 }
 
 #[inline]
+/// Divides value by 4095 with rounding to nearest
 pub(crate) fn div_by_4095(v: u32) -> u16 {
     let round = 1 << 11;
     let v = v + round;
@@ -53,6 +55,7 @@ pub(crate) fn div_by_4095(v: u32) -> u16 {
 }
 
 #[inline]
+/// Divides value by 655353 with rounding to nearest
 pub(crate) fn div_by_65535(v: u32) -> u16 {
     let round = 1 << 15;
     let v_expand = v;
@@ -174,13 +177,13 @@ pub(crate) fn premultiply_alpha_rgba_u16(
         premultiply_alpha_rgba_impl;
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
-        if is_x86_feature_detected!("sse4.1") {
+        if std::is_x86_feature_detected!("sse4.1") {
             _dispatcher = premultiply_alpha_sse_rgba_u16;
         }
     }
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
-        if is_x86_feature_detected!("avx2") {
+        if std::is_x86_feature_detected!("avx2") {
             _dispatcher = avx_premultiply_alpha_rgba_u16;
         }
     }
@@ -203,13 +206,13 @@ pub(crate) fn unpremultiply_alpha_rgba_u16(
         unpremultiply_alpha_rgba_impl;
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
-        if is_x86_feature_detected!("sse4.1") {
+        if std::is_x86_feature_detected!("sse4.1") {
             _dispatcher = unpremultiply_alpha_sse_rgba_u16;
         }
     }
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
-        if is_x86_feature_detected!("avx2") {
+        if std::is_x86_feature_detected!("avx2") {
             _dispatcher = avx_unpremultiply_alpha_rgba_u16;
         }
     }

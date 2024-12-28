@@ -98,6 +98,7 @@ impl VerticalConvolutionPass<f32, 3> for ImageStore<'_, f32, 3> {
         destination: &mut ImageStoreMut<f32, 3>,
         pool: &Option<ThreadPool>,
     ) {
+        #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(usize, &FilterBounds, &[f32], &mut [f32], usize, &[f32]) =
             convolve_vertical_rgb_native_row_f32::<3>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
