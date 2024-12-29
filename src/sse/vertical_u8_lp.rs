@@ -77,69 +77,77 @@ unsafe fn convolve_vertical_sse_row_impl(
     let mut cx = 0usize;
 
     let mut rem = dst;
-    let iter_64 = rem.chunks_exact_mut(64);
 
-    for dst in iter_64 {
-        let mut store0 = _mm_set1_epi16(ROUNDING);
-        let mut store1 = _mm_set1_epi16(ROUNDING);
-        let mut store2 = _mm_set1_epi16(ROUNDING);
-        let mut store3 = _mm_set1_epi16(ROUNDING);
-        let mut store4 = _mm_set1_epi16(ROUNDING);
-        let mut store5 = _mm_set1_epi16(ROUNDING);
-        let mut store6 = _mm_set1_epi16(ROUNDING);
-        let mut store7 = _mm_set1_epi16(ROUNDING);
+    #[cfg(target_arch = "x86_64")]
+    {
+        let iter_64 = rem.chunks_exact_mut(64);
 
-        let px = cx;
+        for dst in iter_64 {
+            let mut store0 = _mm_set1_epi16(ROUNDING);
+            let mut store1 = _mm_set1_epi16(ROUNDING);
+            let mut store2 = _mm_set1_epi16(ROUNDING);
+            let mut store3 = _mm_set1_epi16(ROUNDING);
+            let mut store4 = _mm_set1_epi16(ROUNDING);
+            let mut store5 = _mm_set1_epi16(ROUNDING);
+            let mut store6 = _mm_set1_epi16(ROUNDING);
+            let mut store7 = _mm_set1_epi16(ROUNDING);
 
-        for j in 0..bounds_size {
-            let py = bounds.start + j;
-            let weight = weight.get_unchecked(j..(j + 1));
-            let v_weight = _mm_set1_epi16(weight[0]);
-            let v_offset = src_stride * py + px;
-            let src_ptr = src.get_unchecked(v_offset..);
-            let item_row0 = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
-            let item_row1 = _mm_loadu_si128(src_ptr.get_unchecked(16..).as_ptr() as *const __m128i);
-            let item_row2 = _mm_loadu_si128(src_ptr.get_unchecked(32..).as_ptr() as *const __m128i);
-            let item_row3 = _mm_loadu_si128(src_ptr.get_unchecked(48..).as_ptr() as *const __m128i);
+            let px = cx;
 
-            (store0, store1) = mdot(store0, store1, item_row0, v_weight);
-            (store2, store3) = mdot(store2, store3, item_row1, v_weight);
-            (store4, store5) = mdot(store4, store5, item_row2, v_weight);
-            (store6, store7) = mdot(store6, store7, item_row3, v_weight);
+            for j in 0..bounds_size {
+                let py = bounds.start + j;
+                let weight = weight.get_unchecked(j..(j + 1));
+                let v_weight = _mm_set1_epi16(weight[0]);
+                let v_offset = src_stride * py + px;
+                let src_ptr = src.get_unchecked(v_offset..);
+                let item_row0 = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
+                let item_row1 =
+                    _mm_loadu_si128(src_ptr.get_unchecked(16..).as_ptr() as *const __m128i);
+                let item_row2 =
+                    _mm_loadu_si128(src_ptr.get_unchecked(32..).as_ptr() as *const __m128i);
+                let item_row3 =
+                    _mm_loadu_si128(src_ptr.get_unchecked(48..).as_ptr() as *const __m128i);
+
+                (store0, store1) = mdot(store0, store1, item_row0, v_weight);
+                (store2, store3) = mdot(store2, store3, item_row1, v_weight);
+                (store4, store5) = mdot(store4, store5, item_row2, v_weight);
+                (store6, store7) = mdot(store6, store7, item_row3, v_weight);
+            }
+
+            let rebased0 = _mm_srai_epi16::<R_SHR_SCALE>(store0);
+            let rebased1 = _mm_srai_epi16::<R_SHR_SCALE>(store1);
+            let rebased2 = _mm_srai_epi16::<R_SHR_SCALE>(store2);
+            let rebased3 = _mm_srai_epi16::<R_SHR_SCALE>(store3);
+            let rebased4 = _mm_srai_epi16::<R_SHR_SCALE>(store4);
+            let rebased5 = _mm_srai_epi16::<R_SHR_SCALE>(store5);
+            let rebased6 = _mm_srai_epi16::<R_SHR_SCALE>(store6);
+            let rebased7 = _mm_srai_epi16::<R_SHR_SCALE>(store7);
+
+            let shrank0 = _mm_packus_epi16(rebased0, rebased1);
+            let shrank1 = _mm_packus_epi16(rebased2, rebased3);
+            let shrank2 = _mm_packus_epi16(rebased4, rebased5);
+            let shrank3 = _mm_packus_epi16(rebased6, rebased7);
+
+            _mm_storeu_si128(dst.as_mut_ptr() as *mut __m128i, shrank0);
+            _mm_storeu_si128(
+                dst.get_unchecked_mut(16..).as_mut_ptr() as *mut __m128i,
+                shrank1,
+            );
+            _mm_storeu_si128(
+                dst.get_unchecked_mut(32..).as_mut_ptr() as *mut __m128i,
+                shrank2,
+            );
+            _mm_storeu_si128(
+                dst.get_unchecked_mut(48..).as_mut_ptr() as *mut __m128i,
+                shrank3,
+            );
+
+            cx += 64;
         }
 
-        let rebased0 = _mm_srai_epi16::<R_SHR_SCALE>(store0);
-        let rebased1 = _mm_srai_epi16::<R_SHR_SCALE>(store1);
-        let rebased2 = _mm_srai_epi16::<R_SHR_SCALE>(store2);
-        let rebased3 = _mm_srai_epi16::<R_SHR_SCALE>(store3);
-        let rebased4 = _mm_srai_epi16::<R_SHR_SCALE>(store4);
-        let rebased5 = _mm_srai_epi16::<R_SHR_SCALE>(store5);
-        let rebased6 = _mm_srai_epi16::<R_SHR_SCALE>(store6);
-        let rebased7 = _mm_srai_epi16::<R_SHR_SCALE>(store7);
-
-        let shrank0 = _mm_packus_epi16(rebased0, rebased1);
-        let shrank1 = _mm_packus_epi16(rebased2, rebased3);
-        let shrank2 = _mm_packus_epi16(rebased4, rebased5);
-        let shrank3 = _mm_packus_epi16(rebased6, rebased7);
-
-        _mm_storeu_si128(dst.as_mut_ptr() as *mut __m128i, shrank0);
-        _mm_storeu_si128(
-            dst.get_unchecked_mut(16..).as_mut_ptr() as *mut __m128i,
-            shrank1,
-        );
-        _mm_storeu_si128(
-            dst.get_unchecked_mut(32..).as_mut_ptr() as *mut __m128i,
-            shrank2,
-        );
-        _mm_storeu_si128(
-            dst.get_unchecked_mut(48..).as_mut_ptr() as *mut __m128i,
-            shrank3,
-        );
-
-        cx += 64;
+        rem = rem.chunks_exact_mut(64).into_remainder();
     }
 
-    rem = rem.chunks_exact_mut(64).into_remainder();
     let iter_32 = rem.chunks_exact_mut(32);
 
     for dst in iter_32 {

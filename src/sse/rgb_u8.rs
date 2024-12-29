@@ -69,7 +69,6 @@ unsafe fn load_rgb_x4(src: &[u8]) -> __m128i {
     rgb_pixel
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1")]
 unsafe fn convolve_horizontal_rgb_sse_rows_4_impl(
     src: &[u8],
@@ -135,6 +134,7 @@ unsafe fn convolve_horizontal_rgb_sse_rows_4_impl(
             let src3 = src2.get_unchecked(src_stride..);
 
             // Will make step in 4 items however since it is RGB it is necessary to make a safe offset
+            #[cfg(target_arch = "x86_64")]
             while jx + 4 < bounds.size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 4));
                 let weights = _mm_loadu_si64(w_ptr.as_ptr() as *const u8);

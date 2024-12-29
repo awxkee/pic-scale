@@ -217,8 +217,8 @@ unsafe fn convolve_column_lb_avx_u16_impl(
         if bounds_size == 2 {
             let weights = weight.get_unchecked(0..2);
 
-            let v_weight0 = _mm_set1_epi32(weights[0] as i32);
-            let v_weight1 = _mm_set1_epi32(weights[1] as i32);
+            let v_weight0 = _mm_set1_epi16(weights[0]);
+            let v_weight1 = _mm_set1_epi16(weights[1]);
 
             let py = bounds.start;
             let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
@@ -238,9 +238,9 @@ unsafe fn convolve_column_lb_avx_u16_impl(
         } else if bounds_size == 3 {
             let weights = weight.get_unchecked(0..3);
 
-            let v_weight0 = _mm_set1_epi32(weights[0] as i32);
-            let v_weight1 = _mm_set1_epi32(weights[1] as i32);
-            let v_weight2 = _mm_set1_epi32(weights[2] as i32);
+            let v_weight0 = _mm_set1_epi16(weights[0]);
+            let v_weight1 = _mm_set1_epi16(weights[1]);
+            let v_weight2 = _mm_set1_epi16(weights[2]);
 
             let py = bounds.start;
             let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
@@ -267,10 +267,10 @@ unsafe fn convolve_column_lb_avx_u16_impl(
         } else if bounds_size == 4 {
             let weights = weight.get_unchecked(0..4);
 
-            let v_weight0 = _mm_set1_epi32(weights[0] as i32);
-            let v_weight1 = _mm_set1_epi32(weights[1] as i32);
-            let v_weight2 = _mm_set1_epi32(weights[2] as i32);
-            let v_weight3 = _mm_set1_epi32(weights[3] as i32);
+            let v_weight0 = _mm_set1_epi16(weights[0]);
+            let v_weight1 = _mm_set1_epi16(weights[1]);
+            let v_weight2 = _mm_set1_epi16(weights[2]);
+            let v_weight3 = _mm_set1_epi16(weights[3]);
 
             let py = bounds.start;
             let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
@@ -306,7 +306,7 @@ unsafe fn convolve_column_lb_avx_u16_impl(
                 let py = bounds.start + j;
                 let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
 
-                let v_weight = _mm_set1_epi32(k_weight as i32);
+                let v_weight = _mm_set1_epi16(k_weight);
 
                 let item_row = _mm_loadu_si64(src_ptr.as_ptr() as *const u8);
 

@@ -329,6 +329,7 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_f32_impl<const FMA: bool>(
         let mut store_1 = zeros;
         let mut store_2 = zeros;
         let mut store_3 = zeros;
+
         while jx + 4 < bounds.size {
             let ptr = weights_ptr.add(jx + filter_offset);
             let (weight0, weight1, weight2, weight3) = load_4_weights!(ptr);

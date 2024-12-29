@@ -70,6 +70,7 @@ unsafe fn convolve_vertical_part_avx_64(
 ) {
     let zeros = _mm256_setzero_si256();
     let vld = _mm256_set1_epi32(ROUNDING_CONST);
+
     let mut store_0 = vld;
     let mut store_1 = vld;
     let mut store_2 = vld;
@@ -85,6 +86,7 @@ unsafe fn convolve_vertical_part_avx_64(
 
     let mut jj = 0usize;
 
+    #[cfg(target_arch = "x86_64")]
     while jj < bounds_size.saturating_sub(2) {
         let py = start_y + jj;
         let f_ptr = filter.get_unchecked(jj..).as_ptr() as *const i32;
@@ -129,7 +131,7 @@ unsafe fn convolve_vertical_part_avx_64(
     for j in jj..bounds_size {
         let py = start_y + j;
         let weight = *filter.get_unchecked(j);
-        let v_weight = _mm256_set1_epi32(weight as i32);
+        let v_weight = _mm256_set1_epi16(weight);
         let src_ptr = src.get_unchecked((src_stride * py + px)..);
 
         let item_row_0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
@@ -188,7 +190,7 @@ unsafe fn convolve_vertical_part_avx_32(
     for j in 0..bounds_size {
         let py = start_y + j;
         let weight = *filter.get_unchecked(j);
-        let v_weight = _mm256_set1_epi32(weight as i32);
+        let v_weight = _mm256_set1_epi16(weight);
         let src_ptr = src.get_unchecked((src_stride * py + px)..);
 
         let item_row = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
@@ -232,14 +234,14 @@ unsafe fn convolve_vertical_part_8_avx(
     for j in 0..bounds_size {
         let py = start_y + j;
         let weight = *filter.get_unchecked(j);
-        let v_weight = _mm256_set1_epi32(weight as i32);
+        let v_weight = _mm256_set1_epi16(weight);
         let src_ptr = src.get_unchecked((src_stride * py + px)..);
         let item_row = _mm256_cvtepu16_epi32(_mm_unpacklo_epi8(
             _mm_loadu_si64(src_ptr.as_ptr()),
             _mm_setzero_si128(),
         ));
 
-        store_0 = _mm256_add_epi32(store_0, _mm256_mullo_epi32(item_row, v_weight));
+        store_0 = _mm256_add_epi32(store_0, _mm256_madd_epi16(item_row, v_weight));
     }
 
     const MASK: i32 = shuffle(3, 1, 2, 0);
@@ -278,8 +280,8 @@ unsafe fn convolve_vertical_part_avx(
     if bounds_size == 2 {
         let py = start_y;
         let weight = filter.get_unchecked(0..2);
-        let v_weight0 = _mm256_set1_epi32(weight[0] as i32);
-        let v_weight1 = _mm256_set1_epi32(weight[1] as i32);
+        let v_weight0 = _mm256_set1_epi16(weight[0]);
+        let v_weight1 = _mm256_set1_epi16(weight[1]);
         let src_ptr0 = src.get_unchecked(src_stride * py + px);
         let src_ptr1 = src.get_unchecked(src_stride * (py + 1) + px);
         let item_row0 = _mm256_insert_epi8::<0>(_mm256_setzero_si256(), *src_ptr0 as i8);
@@ -290,9 +292,9 @@ unsafe fn convolve_vertical_part_avx(
     } else if bounds_size == 3 {
         let py = start_y;
         let weight = filter.get_unchecked(0..3);
-        let v_weight0 = _mm256_set1_epi32(weight[0] as i32);
-        let v_weight1 = _mm256_set1_epi32(weight[1] as i32);
-        let v_weight2 = _mm256_set1_epi32(weight[2] as i32);
+        let v_weight0 = _mm256_set1_epi16(weight[0]);
+        let v_weight1 = _mm256_set1_epi16(weight[1]);
+        let v_weight2 = _mm256_set1_epi16(weight[2]);
         let src_ptr0 = src.get_unchecked(src_stride * py + px);
         let src_ptr1 = src.get_unchecked(src_stride * (py + 1) + px);
         let src_ptr2 = src.get_unchecked(src_stride * (py + 2) + px);
@@ -306,10 +308,10 @@ unsafe fn convolve_vertical_part_avx(
     } else if bounds_size == 4 {
         let py = start_y;
         let weight = filter.get_unchecked(0..4);
-        let v_weight0 = _mm256_set1_epi32(weight[0] as i32);
-        let v_weight1 = _mm256_set1_epi32(weight[1] as i32);
-        let v_weight2 = _mm256_set1_epi32(weight[2] as i32);
-        let v_weight3 = _mm256_set1_epi32(weight[3] as i32);
+        let v_weight0 = _mm256_set1_epi16(weight[0]);
+        let v_weight1 = _mm256_set1_epi16(weight[1]);
+        let v_weight2 = _mm256_set1_epi16(weight[2]);
+        let v_weight3 = _mm256_set1_epi16(weight[3]);
         let src_ptr0 = src.get_unchecked(src_stride * py + px);
         let src_ptr1 = src.get_unchecked(src_stride * (py + 1) + px);
         let src_ptr2 = src.get_unchecked(src_stride * (py + 2) + px);
@@ -327,7 +329,7 @@ unsafe fn convolve_vertical_part_avx(
         for j in 0..bounds.size {
             let py = start_y + j;
             let weight = *filter.get_unchecked(j);
-            let v_weight = _mm256_set1_epi32(weight as i32);
+            let v_weight = _mm256_set1_epi16(weight);
             let src_ptr = src.get_unchecked(src_stride * py + px);
             let item_row = _mm256_setr_epi32(*src_ptr as i32, 0, 0, 0, 0, 0, 0, 0);
 
