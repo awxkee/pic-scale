@@ -51,7 +51,7 @@ pub(crate) fn convolve_horizontal_dispatch_u16<const CHANNELS: usize>(
 
     let src_stride = image_store.width * image_store.channels;
     let dst_stride = destination.width * image_store.channels;
-    let bit_depth = image_store.bit_depth;
+    let bit_depth = destination.bit_depth;
 
     if let Some(pool) = pool {
         pool.install(|| {
@@ -162,7 +162,7 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
 ) {
     let src_stride = image_store.width * image_store.channels;
     let dst_stride = destination.width * image_store.channels;
-    let bit_depth = image_store.bit_depth;
+    let bit_depth = destination.bit_depth;
 
     let dst_width = destination.width;
 

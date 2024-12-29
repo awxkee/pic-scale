@@ -892,6 +892,31 @@ impl Scaler {
 }
 
 impl ScalingU16 for Scaler {
+    /// Performs rescaling for RGB
+    ///
+    /// Scales RGB high bit-depth image stored in `u16` type.
+    /// To perform scaling image bit-depth should be set in target image,
+    /// source image expects to have the same one.
+    /// Channel order does not matter.
+    ///
+    /// # Arguments
+    /// `store` - original image store
+    /// `into` - target image store
+    ///
+    /// # Panics
+    /// Method panics if bit-depth < 1 or bit-depth > 16
+    ///
+    /// # Example
+    ///
+    /// #[no_build]
+    /// ```rust
+    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16};
+    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+    ///  let src_store = ImageStore::alloc(100, 100);
+    ///  let mut dst_store = ImageStoreMut::<u16, 3>::alloc_with_depth(50, 50, 10);
+    ///  scaler.resize_rgb_u16(&src_store, &mut dst_store).unwrap();
+    /// ```
+    ///
     fn resize_rgb_u16<'a>(
         &'a self,
         store: &ImageStore<'a, u16, 3>,
@@ -903,13 +928,24 @@ impl ScalingU16 for Scaler {
     /// Resizes u16 image
     ///
     /// # Arguments
-    /// `new_size` - New image size
     /// `store` - original image store
-    /// `bit_depth` - image bit depth, this is required for u16 image
+    /// `into` - target image store
     /// `premultiply_alpha` - flags is alpha is premultiplied
     ///
     /// # Panics
-    /// Panic if bit depth < 1 or bit depth > 16
+    /// Method panics if bit -depth < 1 or bit-depth > 16
+    ///
+    /// # Example
+    ///
+    /// #[no_build]
+    /// ```rust
+    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16};
+    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+    ///  let src_store = ImageStore::alloc(100, 100);
+    ///  let mut dst_store = ImageStoreMut::<u16, 4>::alloc_with_depth(50, 50, 10);
+    ///  scaler.resize_rgba_u16(&src_store, &mut dst_store, true).unwrap();
+    /// ```
+    ///
     fn resize_rgba_u16<'a>(
         &'a self,
         store: &ImageStore<'a, u16, 4>,
@@ -919,7 +955,29 @@ impl ScalingU16 for Scaler {
         self.generic_resize_with_alpha(store, into, premultiply_alpha)
     }
 
-    /// Performs rescaling for u16 plane
+    /// Performs rescaling for Planar u16
+    ///
+    /// Scales planar high bit-depth image stored in `u16` type.
+    /// To perform scaling image bit-depth should be set in target image,
+    /// source image expects to have the same one.
+    ///
+    /// # Arguments
+    /// `store` - original image store
+    /// `into` - target image store
+    ///
+    /// # Panic
+    /// Method panics if bit-depth < 1 or bit-depth > 16
+    ///
+    /// # Example
+    ///
+    /// #[no_build]
+    /// ```rust
+    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16};
+    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    ///  let src_store = ImageStore::alloc(100, 100);
+    ///  let mut dst_store = ImageStoreMut::<u16, 1>::alloc_with_depth(50, 50, 10);
+    ///  scaler.resize_plane_u16(&src_store, &mut dst_store).unwrap();
+    /// ```
     fn resize_plane_u16<'a>(
         &'a self,
         store: &ImageStore<'a, u16, 1>,

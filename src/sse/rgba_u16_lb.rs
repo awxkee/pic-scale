@@ -42,7 +42,8 @@ unsafe fn conv_horiz_rgba_1_u16(
 ) -> __m128i {
     const COMPONENTS: usize = 4;
     let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
-    let rgba_pixel = _mm_loadu_si64(src_ptr.as_ptr() as *const u8);
+    let rgba_pixel = _mm_loadl_epi64(src_ptr.as_ptr() as *const __m128i);
+
     _mm_add_epi32(
         store,
         _mm_madd_epi16(_mm_unpacklo_epi16(rgba_pixel, _mm_setzero_si128()), w0),
@@ -191,6 +192,7 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_lb_u8_impl(
     filter_weights: &FilterWeights<i16>,
     bit_depth: u32,
 ) {
+    assert!(bit_depth >= 1 && bit_depth <= 16);
     const CHANNELS: usize = 4;
     let init = _mm_set1_epi32(ROUNDING_CONST);
 
@@ -229,17 +231,18 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_lb_u8_impl(
         let src2 = src1.get_unchecked(src_stride..);
         let src3 = src2.get_unchecked(src_stride..);
 
+        #[cfg(target_arch = "x86_64")]
         while jx + 8 < bounds_size {
             let bounds_start = bounds.start + jx;
             let w_ptr = weights.get_unchecked(jx..(jx + 8));
-            let w0 = _mm_set1_epi32(w_ptr[0] as i32);
-            let w1 = _mm_set1_epi32(w_ptr[1] as i32);
-            let w2 = _mm_set1_epi32(w_ptr[2] as i32);
-            let w3 = _mm_set1_epi32(w_ptr[3] as i32);
-            let w4 = _mm_set1_epi32(w_ptr[4] as i32);
-            let w5 = _mm_set1_epi32(w_ptr[5] as i32);
-            let w6 = _mm_set1_epi32(w_ptr[6] as i32);
-            let w7 = _mm_set1_epi32(w_ptr[7] as i32);
+            let w0 = _mm_set1_epi16(w_ptr[0]);
+            let w1 = _mm_set1_epi16(w_ptr[1]);
+            let w2 = _mm_set1_epi16(w_ptr[2]);
+            let w3 = _mm_set1_epi16(w_ptr[3]);
+            let w4 = _mm_set1_epi16(w_ptr[4]);
+            let w5 = _mm_set1_epi16(w_ptr[5]);
+            let w6 = _mm_set1_epi16(w_ptr[6]);
+            let w7 = _mm_set1_epi16(w_ptr[7]);
             let set1 = (w0, w1, w2, w3);
             let set2 = (w4, w5, w6, w7);
             store_0 = conv_horiz_rgba_8_u16(bounds_start, src0, set1, set2, store_0);
@@ -252,10 +255,10 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_lb_u8_impl(
         while jx + 4 < bounds_size {
             let bounds_start = bounds.start + jx;
             let w_ptr = weights.get_unchecked(jx..(jx + 4));
-            let w0 = _mm_set1_epi32(w_ptr[0] as i32);
-            let w1 = _mm_set1_epi32(w_ptr[1] as i32);
-            let w2 = _mm_set1_epi32(w_ptr[2] as i32);
-            let w3 = _mm_set1_epi32(w_ptr[3] as i32);
+            let w0 = _mm_set1_epi16(w_ptr[0]);
+            let w1 = _mm_set1_epi16(w_ptr[1]);
+            let w2 = _mm_set1_epi16(w_ptr[2]);
+            let w3 = _mm_set1_epi16(w_ptr[3]);
             store_0 = conv_horiz_rgba_4_u16(bounds_start, src0, w0, w1, w2, w3, store_0);
             store_1 = conv_horiz_rgba_4_u16(bounds_start, src1, w0, w1, w2, w3, store_1);
             store_2 = conv_horiz_rgba_4_u16(bounds_start, src2, w0, w1, w2, w3, store_2);
@@ -266,8 +269,8 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_lb_u8_impl(
         while jx + 2 < bounds_size {
             let w_ptr = weights.get_unchecked(jx..(jx + 2));
             let bounds_start = bounds.start + jx;
-            let w0 = _mm_set1_epi32(w_ptr[0] as i32);
-            let w1 = _mm_set1_epi32(w_ptr[1] as i32);
+            let w0 = _mm_set1_epi16(w_ptr[0] as i16);
+            let w1 = _mm_set1_epi16(w_ptr[1] as i16);
             store_0 = conv_horiz_rgba_2_u16(bounds_start, src0, w0, w1, store_0);
             store_1 = conv_horiz_rgba_2_u16(bounds_start, src1, w0, w1, store_1);
             store_2 = conv_horiz_rgba_2_u16(bounds_start, src2, w0, w1, store_2);
@@ -278,7 +281,7 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_lb_u8_impl(
         while jx < bounds_size {
             let w_ptr = weights.get_unchecked(jx..(jx + 1));
             let bounds_start = bounds.start + jx;
-            let w0 = _mm_set1_epi32(w_ptr[0] as i32);
+            let w0 = _mm_set1_epi16(w_ptr[0]);
             store_0 = conv_horiz_rgba_1_u16(bounds_start, src0, w0, store_0);
             store_1 = conv_horiz_rgba_1_u16(bounds_start, src1, w0, store_1);
             store_2 = conv_horiz_rgba_1_u16(bounds_start, src2, w0, store_2);
