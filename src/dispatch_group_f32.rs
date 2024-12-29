@@ -34,6 +34,7 @@ use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
 
+#[allow(clippy::type_complexity)]
 pub(crate) fn convolve_vertical_dispatch_f32<const COMPONENTS: usize>(
     image_store: &ImageStore<f32, COMPONENTS>,
     filter_weights: FilterWeights<f32>,

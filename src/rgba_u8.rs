@@ -29,7 +29,10 @@
 #![forbid(unsafe_code)]
 
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::avx2::{convolve_vertical_avx_row, convolve_vertical_avx_row_lp};
+use crate::avx2::{
+    convolve_horizontal_rgba_avx_rows_4_lb, convolve_horizontal_rgba_avx_rows_one_lb,
+    convolve_vertical_avx_row, convolve_vertical_avx_row_lp,
+};
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertical_dispatch_u8};
 use crate::filter_weights::{FilterBounds, FilterWeights};
@@ -76,7 +79,7 @@ impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            if is_x86_feature_detected!("sse4.1") {
+            if std::is_x86_feature_detected!("sse4.1") {
                 if _scale_factor < 8. {
                     _dispatcher_4_rows = Some(convolve_horizontal_rgba_sse_rows_4_lb);
                     _dispatcher_1_row = convolve_horizontal_rgba_sse_rows_one_lb;
@@ -84,6 +87,10 @@ impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
                     _dispatcher_4_rows = Some(convolve_horizontal_rgba_sse_rows_4);
                     _dispatcher_1_row = convolve_horizontal_rgba_sse_rows_one;
                 }
+            }
+            if std::is_x86_feature_detected!("avx2") || _scale_factor < 8. {
+                _dispatcher_4_rows = Some(convolve_horizontal_rgba_avx_rows_4_lb);
+                _dispatcher_1_row = convolve_horizontal_rgba_avx_rows_one_lb;
             }
         }
         convolve_horizontal_dispatch_u8(
@@ -119,14 +126,14 @@ impl VerticalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            if is_x86_feature_detected!("sse4.1") {
+            if std::is_x86_feature_detected!("sse4.1") {
                 if _scale_factor < 8. {
                     _dispatcher = convolve_vertical_sse_row_lp;
                 } else {
                     _dispatcher = convolve_vertical_sse_row;
                 }
             }
-            if is_x86_feature_detected!("avx2") {
+            if std::is_x86_feature_detected!("avx2") {
                 if _scale_factor < 8. {
                     _dispatcher = convolve_vertical_avx_row_lp;
                 } else {

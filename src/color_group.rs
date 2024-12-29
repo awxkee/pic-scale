@@ -34,10 +34,10 @@ use std::ops::{Add, AddAssign, Mul, Shr, ShrAssign, Sub, SubAssign};
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ColorGroup<const COMPS: usize, J: Copy> {
-    pub r: J,
-    pub g: J,
-    pub b: J,
-    pub a: J,
+    pub(crate) r: J,
+    pub(crate) g: J,
+    pub(crate) b: J,
+    pub(crate) a: J,
 }
 
 impl<const COMPS: usize, J> ColorGroup<COMPS, J>

@@ -126,6 +126,7 @@ pub(crate) fn convolve_horizontal_plane_sse_row_one<const FMA: bool>(
 }
 
 #[target_feature(enable = "sse4.1")]
+/// This inlining is required to activate all features for runtime dispatch.
 unsafe fn convolve_horizontal_plane_sse_row_one_regular(
     dst_width: usize,
     src_width: usize,
@@ -142,7 +143,8 @@ unsafe fn convolve_horizontal_plane_sse_row_one_regular(
     );
 }
 
-#[target_feature(enable = "sse4.1,fma")]
+#[target_feature(enable = "sse4.1", enable = "fma")]
+/// This inlining is required to activate all features for runtime dispatch.
 unsafe fn convolve_horizontal_plane_sse_row_one_fma(
     dst_width: usize,
     src_width: usize,
@@ -271,6 +273,7 @@ pub(crate) fn convolve_horizontal_plane_sse_rows_4<const FMA: bool>(
 }
 
 #[target_feature(enable = "sse4.1")]
+/// This inlining is required to activate all features for runtime dispatch.
 unsafe fn convolve_horizontal_plane_sse_rows_4_regular(
     dst_width: usize,
     src_width: usize,
@@ -291,7 +294,8 @@ unsafe fn convolve_horizontal_plane_sse_rows_4_regular(
     );
 }
 
-#[target_feature(enable = "sse4.1,fma")]
+#[target_feature(enable = "sse4.1", enable = "fma")]
+/// This inlining is required to activate all features for runtime dispatch.
 unsafe fn convolve_horizontal_plane_sse_rows_4_fma(
     dst_width: usize,
     src_width: usize,

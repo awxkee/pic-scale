@@ -220,8 +220,10 @@ pub(crate) fn convolve_vertical_sse_row_f16<
     }
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1")]
+/// This inlining is required to activate all features for runtime dispatch.
+///
+/// Crate has a safe fallback for f16c conversion even it is not supported.
 unsafe fn convolve_vertical_sse_row_f16_regular<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,
@@ -235,8 +237,10 @@ unsafe fn convolve_vertical_sse_row_f16_regular<const CHANNELS: usize>(
     );
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1", enable = "f16c", enable = "fma")]
+/// This inlining is required to activate all features for runtime dispatch.
+///
+/// Crate has a safe fallback for f16c conversion even it is not supported.
 unsafe fn convolve_vertical_sse_row_f16c_fma<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,
@@ -250,8 +254,10 @@ unsafe fn convolve_vertical_sse_row_f16c_fma<const CHANNELS: usize>(
     );
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1", enable = "f16c")]
+/// This inlining is required to activate all features for runtime dispatch.
+///
+/// Crate has a safe fallback for f16c conversion even it is not supported.
 unsafe fn convolve_vertical_sse_row_f16c<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,

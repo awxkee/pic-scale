@@ -33,7 +33,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-#[inline]
+#[inline(always)]
 unsafe fn conv_horiz_rgba_1_u16<const FMA: bool>(
     start_x: usize,
     src: &[u16],
@@ -50,7 +50,7 @@ unsafe fn conv_horiz_rgba_1_u16<const FMA: bool>(
     )
 }
 
-#[inline]
+#[inline(always)]
 unsafe fn conv_horiz_rgba_2_u16<const FMA: bool>(
     start_x: usize,
     src: &[u16],
@@ -207,6 +207,7 @@ pub(crate) fn convolve_horizontal_rgba_sse_rows_4_u16(
 }
 
 #[target_feature(enable = "sse4.1")]
+/// This inlining is required to activate all features for runtime dispatch.
 unsafe fn convolve_horizontal_rgba_sse_rows_4_u16_def(
     src: &[u16],
     src_stride: usize,
@@ -226,6 +227,7 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_u16_def(
 }
 
 #[target_feature(enable = "sse4.1", enable = "fma")]
+/// This inlining is required to activate all features for runtime dispatch.
 unsafe fn convolve_horizontal_rgba_sse_rows_4_u16_fma(
     src: &[u16],
     src_stride: usize,
@@ -392,6 +394,7 @@ pub(crate) fn convolve_horizontal_rgba_sse_u16_row(
 }
 
 #[target_feature(enable = "sse4.1")]
+/// This inlining is required to activate all features for runtime dispatch.
 unsafe fn convolve_horizontal_rgba_sse_u16_row_def(
     src: &[u16],
     dst: &mut [u16],
@@ -402,6 +405,7 @@ unsafe fn convolve_horizontal_rgba_sse_u16_row_def(
 }
 
 #[target_feature(enable = "sse4.1", enable = "fma")]
+/// This inlining is required to activate all features for runtime dispatch.
 unsafe fn convolve_horizontal_rgba_sse_u16_row_fma(
     src: &[u16],
     dst: &mut [u16],

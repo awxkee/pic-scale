@@ -43,37 +43,36 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 
 `~` - Partially implemented
 
-|                | NEON | SSE | AVX | WASM | 
-|----------------|------|-----|-----|------| 
-| RGBA (8 bit)   | x    | x   | ~   | ~    | 
-| RGB (8 bit)    | x    | x   | ~   | ~    | 
-| Plane (8 bit)  | x    | x   | ~   | ~    | 
-| RGBA (8+ bit)  | x    | x   | ~   | -    | 
-| RGB (8+ bit)   | x    | x   | ~   | -    | 
-| Plane (8+ bit) | ~    | ~   | ~   | -    | 
-| RGBA (f32)     | x    | x   | x   | -    | 
-| RGB (f32)      | x    | x   | ~   | -    | 
-| Plane (f32)    | x    | x   | ~   | -    | 
-| RGBA (f16)     | x    | x   | x   | -    | 
-| RGB (f16)      | x    | ~   | ~   | -    | 
-| Plane (f16)    | ~    | ~   | ~   | -    |
-| AR30/RA30      | x    | -   | -   | -    |
+|                | NEON | SSE | AVX2 | WASM | 
+|----------------|------|-----|------|------| 
+| RGBA (8 bit)   | x    | x   | x    | ~    | 
+| RGB (8 bit)    | x    | x   | ~    | ~    | 
+| Plane (8 bit)  | x    | x   | ~    | ~    | 
+| RGBA (8+ bit)  | x    | x   | ~    | -    | 
+| RGB (8+ bit)   | x    | x   | ~    | -    | 
+| Plane (8+ bit) | ~    | ~   | ~    | -    | 
+| RGBA (f32)     | x    | x   | x    | -    | 
+| RGB (f32)      | x    | x   | ~    | -    | 
+| Plane (f32)    | x    | x   | ~    | -    | 
+| RGBA (f16)     | x    | x   | x    | -    | 
+| RGB (f16)      | x    | ~   | ~    | -    | 
+| Plane (f16)    | ~    | ~   | ~    | -    |
+| AR30/RA30      | x    | -   | -    | -    |
 
 #### Features
-
-For RISC-V `riscv` feature should be implicitly enabled, nightly compiler channel is required
 
 To enable support of `f16` the feature `half` should be activated.
 
 #### Target features
 
-`neon` optional target features are available, enable it when compiling on supported platform to get full features
+`neon` optional target features are available, enable it when compiling on supported platform to get full features.
 
-`avx2`, `fma`, `sse4.1`, `f16c` will be detected automatically if available, and called the best path
+`avx2`, `fma`, `sse4.1`, `f16c` will be detected automatically if available, and called the best path.
+For x86 and aarch64 NEON runtime dispatch is used.
 
 `fullfp16` NEON target detection performed in runtime, when available best the best paths for *f16* images are available on ARM.
 
-WASM `simd128` target feature activating is mandatory in build flags
+WASM `simd128` target feature activating is mandatory in build flags.
 
 ##### About f16
 

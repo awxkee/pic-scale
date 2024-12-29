@@ -206,6 +206,9 @@ impl<'a, T, const N: usize> ImageStoreMut<'a, T, N>
 where
     T: FromPrimitive + Clone + Copy + Debug + Default,
 {
+    /// Creates new mutable storage from vectors
+    ///
+    /// Always sets bit-depth to `0`
     pub fn new(
         slice_ref: Vec<T>,
         width: usize,
@@ -230,6 +233,9 @@ where
         })
     }
 
+    /// Allocates new mutable image storage
+    ///
+    /// Always sets bit depth to `0`
     pub fn alloc(width: usize, height: usize) -> ImageStoreMut<'a, T, N> {
         let vc = vec![T::from_u32(0).unwrap_or_default(); width * N * height];
         ImageStoreMut::<T, N> {
@@ -241,6 +247,7 @@ where
         }
     }
 
+    /// Allocates new mutable image storage with required bit-depth
     pub fn alloc_with_depth(
         width: usize,
         height: usize,
@@ -261,13 +268,14 @@ impl<'a, T, const N: usize> ImageStore<'a, T, N>
 where
     T: FromPrimitive + Clone + Copy + Debug,
 {
+    /// Returns bounded image size
     pub fn get_size(&self) -> ImageSize {
         ImageSize::new(self.width, self.height)
     }
 
     pub fn as_bytes(&self) -> &[T] {
         match &self.buffer {
-            Cow::Borrowed(br) => br.as_ref(),
+            Cow::Borrowed(br) => br,
             Cow::Owned(v) => v.as_ref(),
         }
     }
@@ -306,7 +314,7 @@ where
         }
     }
 
-    pub fn copied_to_mut<'b>(&self, into: &mut ImageStoreMut<'b, T, N>) {
+    pub fn copied_to_mut(&self, into: &mut ImageStoreMut<T, N>) {
         for (&src, dst) in self.buffer.as_ref().iter().zip(into.buffer.borrow_mut()) {
             *dst = src;
         }
@@ -317,6 +325,7 @@ impl<'a, T, const N: usize> ImageStoreMut<'a, T, N>
 where
     T: FromPrimitive + Clone + Copy + Debug,
 {
+    /// Returns bounded image size
     pub fn get_size(&self) -> ImageSize {
         ImageSize::new(self.width, self.height)
     }

@@ -356,8 +356,8 @@ pub(crate) fn convolve_vertical_avx_row(
     }
 }
 
-#[inline]
 #[target_feature(enable = "avx2")]
+/// This inlining is required to activate all features for runtime dispatch
 unsafe fn convolve_vertical_avx_row_impl(
     _: usize,
     bounds: &FilterBounds,

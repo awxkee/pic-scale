@@ -52,16 +52,53 @@ pub struct Scaler {
 }
 
 pub trait Scaling {
+    /// Sets threading policy
+    ///
+    /// Setting up threading policy, refer to [crate::ThreadingPolicy] for more info
+    ///
+    /// # Example
+    ///
+    /// #[no_build]
+    /// ```rust
+    /// use pic_scale::{ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
+    /// let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+    /// scaler.set_threading_policy(ThreadingPolicy::Adaptive);
+    /// ```
     fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy);
 
     /// Performs rescaling for RGB, channel order does not matter
+    ///
+    /// # Example
+    ///
+    /// #[no_build]
+    /// ```rust
+    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling};
+    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+    ///  let src_store = ImageStore::alloc(100, 100);
+    ///  let mut dst_store = ImageStoreMut::<u8, 3>::alloc(50, 50);
+    ///  scaler.resize_rgb(&src_store, &mut dst_store).unwrap();
+    /// ```
     fn resize_rgb<'a>(
         &'a self,
         store: &ImageStore<'a, u8, 3>,
         into: &mut ImageStoreMut<'a, u8, 3>,
     ) -> Result<(), PicScaleError>;
 
-    /// Performs rescaling for RGBA, for pre-multiplying alpha, converting to LUV or LAB alpha must be last channel
+    /// Performs rescaling for RGBA
+    ///
+    /// This method may premultiply and un associate alpha if required.
+    /// Alpha position is always considered as last
+    ///
+    /// # Example
+    ///
+    /// #[no_build]
+    /// ```rust
+    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling};
+    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    ///  let src_store = ImageStore::alloc(100, 100);
+    ///  let mut dst_store = ImageStoreMut::<u8, 4>::alloc(50, 50);
+    ///  scaler.resize_rgba(&src_store, &mut dst_store, false).unwrap();
+    /// ```
     fn resize_rgba<'a>(
         &'a self,
         store: &ImageStore<'a, u8, 4>,
@@ -71,14 +108,41 @@ pub trait Scaling {
 }
 
 pub trait ScalingF32 {
-    /// Performs rescaling for RGB f32, channel order does not matter
+    /// Performs rescaling for RGB f32
+    ///
+    /// Scales an image RGB f32, channel order does not matter
+    ///
+    /// # Example
+    ///
+    /// #[no_build]
+    /// ```rust
+    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32};
+    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    ///  let src_store = ImageStore::alloc(100, 100);
+    ///  let mut dst_store = ImageStoreMut::<f32, 3>::alloc(50, 50);
+    ///  scaler.resize_rgb_f32(&src_store, &mut dst_store).unwrap();
+    /// ```
     fn resize_rgb_f32<'a>(
         &'a self,
         store: &ImageStore<'a, f32, 3>,
         into: &mut ImageStoreMut<'a, f32, 3>,
     ) -> Result<(), PicScaleError>;
 
-    /// Performs rescaling for RGBA f32, alpha expected to be last
+    /// Performs rescaling for RGBA f32
+    ///
+    /// Scales an image RGBA f32, alpha expected to be at last position if
+    /// alpha pre-multiplication is requested
+    ///
+    /// # Example
+    ///
+    /// #[no_build]
+    /// ```rust
+    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32};
+    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    ///  let src_store = ImageStore::alloc(100, 100);
+    ///  let mut dst_store = ImageStoreMut::<f32, 4>::alloc(50, 50);
+    ///  scaler.resize_rgba_f32(&src_store, &mut dst_store, false).unwrap();
+    /// ```
     fn resize_rgba_f32<'a>(
         &'a self,
         store: &ImageStore<'a, f32, 4>,
@@ -88,46 +152,93 @@ pub trait ScalingF32 {
 }
 
 pub trait ScalingU16 {
-    /// Performs rescaling for Planar u16, channel order does not matter
+    /// Performs rescaling for Planar u16
+    ///
+    /// Scales planar high bit-depth image stored in `u16` type.
+    /// To perform scaling image bit-depth should be set in target image,
+    /// source image expects to have the same one.
     ///
     /// # Arguments
-    /// `new_size` - New image size
     /// `store` - original image store
-    /// `bit_depth` - image bit-depth, this is required for u16 image
+    /// `into` - target image store
     ///
-    /// # Panics
-    /// Panic if bit-depth < 1 or bit-depth > 16
+    /// # Panic
+    /// Method panics if bit-depth < 1 or bit-depth > 16
+    ///
+    /// # Example
+    ///
+    /// #[no_build]
+    /// ```rust
+    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16};
+    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    ///  let src_store = ImageStore::alloc(100, 100);
+    ///  let mut dst_store = ImageStoreMut::<u16, 1>::alloc_with_depth(50, 50, 10);
+    ///  scaler.resize_plane_u16(&src_store, &mut dst_store).unwrap();
+    /// ```
     fn resize_plane_u16<'a>(
         &'a self,
         store: &ImageStore<'a, u16, 1>,
         into: &mut ImageStoreMut<'a, u16, 1>,
     ) -> Result<(), PicScaleError>;
 
-    /// Performs rescaling for RGB, channel order does not matter
+    /// Performs rescaling for RGB
+    ///
+    /// Scales RGB high bit-depth image stored in `u16` type.
+    /// To perform scaling image bit-depth should be set in target image,
+    /// source image expects to have the same one.
+    /// Channel order does not matter.
     ///
     /// # Arguments
-    /// `new_size` - New image size
     /// `store` - original image store
-    /// `bit_depth` - image bit-depth, this is required for u16 image
+    /// `into` - target image store
     ///
     /// # Panics
-    /// Panic if bit-depth < 1 or bit-depth > 16
+    /// Method panics if bit-depth < 1 or bit-depth > 16
+    ///
+    /// # Example
+    ///
+    /// #[no_build]
+    /// ```rust
+    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16};
+    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+    ///  let src_store = ImageStore::alloc(100, 100);
+    ///  let mut dst_store = ImageStoreMut::<u16, 3>::alloc_with_depth(50, 50, 10);
+    ///  scaler.resize_rgb_u16(&src_store, &mut dst_store).unwrap();
+    /// ```
+    ///
     fn resize_rgb_u16<'a>(
         &'a self,
         store: &ImageStore<'a, u16, 3>,
         into: &mut ImageStoreMut<'a, u16, 3>,
     ) -> Result<(), PicScaleError>;
 
-    /// Performs rescaling for RGBA, for pre-multiplying alpha should be last
+    /// Performs rescaling for RGBA high bit-depth
+    ///
+    /// Scales RGB high bit-depth image stored in `u16` type.
+    /// To perform scaling image bit-depth should be set in target image,
+    /// source image expects to have the same one.
+    /// If pre-multiplication is requested alpha should be at last, otherwise
+    /// channel order does not matter.
     ///
     /// # Arguments
-    /// `new_size` - New image size
     /// `store` - original image store
-    /// `bit_depth` - image bit-depth, this is required for u16 image
+    /// `into` - target image store
     /// `premultiply_alpha` - flags is alpha is premultiplied
     ///
     /// # Panics
-    /// Panic if bit-depth < 1 or bit-depth > 16
+    /// Method panics if bit-depth < 1 or bit-depth > 16
+    ///
+    /// # Example
+    ///
+    /// #[no_build]
+    /// ```rust
+    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16};
+    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+    ///  let src_store = ImageStore::alloc(100, 100);
+    ///  let mut dst_store = ImageStoreMut::<u16, 4>::alloc_with_depth(50, 50, 10);
+    ///  scaler.resize_rgba_u16(&src_store, &mut dst_store, true).unwrap();
+    /// ```
+    ///
     fn resize_rgba_u16<'a>(
         &'a self,
         store: &ImageStore<'a, u16, 4>,
@@ -137,7 +248,10 @@ pub trait ScalingU16 {
 }
 
 impl Scaler {
-    /// Creates new Scaler instance with corresponding filter
+    /// Creates new [Scaler] instance with corresponding filter
+    ///
+    /// Creates default [crate::Scaler] with corresponding filter and default [ThreadingPolicy::Single]
+    ///
     pub fn new(filter: ResamplingFunction) -> Self {
         Scaler {
             function: filter,
@@ -390,10 +504,8 @@ impl Scaler {
             return Err(PicScaleError::DestinationImageIsTooLarge);
         }
 
-        if into.should_have_bit_depth() {
-            if !(1..=16).contains(&into.bit_depth) {
-                return Err(PicScaleError::UnsupportedBitDepth(into.bit_depth));
-            }
+        if into.should_have_bit_depth() && !(1..=16).contains(&into.bit_depth) {
+            return Err(PicScaleError::UnsupportedBitDepth(into.bit_depth));
         }
 
         if store.width == new_size.width && store.height == new_size.height {
@@ -490,7 +602,7 @@ impl Scaler {
                     src_store.height,
                 )?;
                 new_store.bit_depth = into.bit_depth;
-                src_store.premultiply_alpha(&mut new_store, &pool);
+                src_store.premultiply_alpha(&mut new_store, pool);
                 src_store = std::borrow::Cow::Owned(ImageStore::<T, N> {
                     buffer: std::borrow::Cow::Owned(target_premultiplied),
                     channels: N,
@@ -511,7 +623,7 @@ impl Scaler {
         )?;
         new_image_vertical.bit_depth = into.bit_depth;
         let vertical_filters = self.generate_weights(src_store.height, new_size.height);
-        src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+        src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, pool);
 
         let new_immutable_store = ImageStore::<T, N> {
             buffer: std::borrow::Cow::Owned(target_vertical),
@@ -521,10 +633,10 @@ impl Scaler {
             bit_depth: into.bit_depth,
         };
         let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
-        new_immutable_store.convolve_horizontal(horizontal_filters, into, &pool);
+        new_immutable_store.convolve_horizontal(horizontal_filters, into, pool);
 
         if premultiply_alpha_requested && has_alpha_premultiplied {
-            into.unpremultiply_alpha(&pool);
+            into.unpremultiply_alpha(pool);
         }
 
         Ok(())
@@ -563,7 +675,7 @@ impl Scaler {
                     src_store.height,
                 )?;
                 new_store.bit_depth = into.bit_depth;
-                src_store.premultiply_alpha(&mut new_store, &pool);
+                src_store.premultiply_alpha(&mut new_store, pool);
                 src_store = std::borrow::Cow::Owned(ImageStore::<T, N> {
                     buffer: std::borrow::Cow::Owned(target_premultiplied),
                     channels: N,
@@ -576,10 +688,10 @@ impl Scaler {
         }
 
         let vertical_filters = self.generate_weights(src_store.height, new_size.height);
-        src_store.convolve_vertical(vertical_filters, into, &pool);
+        src_store.convolve_vertical(vertical_filters, into, pool);
 
         if premultiply_alpha_requested && has_alpha_premultiplied {
-            into.unpremultiply_alpha(&pool);
+            into.unpremultiply_alpha(pool);
         }
 
         Ok(())
@@ -618,7 +730,7 @@ impl Scaler {
                     src_store.height,
                 )?;
                 new_store.bit_depth = into.bit_depth;
-                src_store.premultiply_alpha(&mut new_store, &pool);
+                src_store.premultiply_alpha(&mut new_store, pool);
                 src_store = std::borrow::Cow::Owned(ImageStore::<T, N> {
                     buffer: std::borrow::Cow::Owned(target_premultiplied),
                     channels: N,
@@ -631,10 +743,10 @@ impl Scaler {
         }
 
         let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
-        src_store.convolve_horizontal(horizontal_filters, into, &pool);
+        src_store.convolve_horizontal(horizontal_filters, into, pool);
 
         if premultiply_alpha_requested && has_alpha_premultiplied {
-            into.unpremultiply_alpha(&pool);
+            into.unpremultiply_alpha(pool);
         }
 
         Ok(())
@@ -669,10 +781,8 @@ impl Scaler {
             return Err(PicScaleError::DestinationImageIsTooLarge);
         }
 
-        if into.should_have_bit_depth() {
-            if !(1..=16).contains(&into.bit_depth) {
-                return Err(PicScaleError::UnsupportedBitDepth(into.bit_depth));
-            }
+        if into.should_have_bit_depth() && !(1..=16).contains(&into.bit_depth) {
+            return Err(PicScaleError::UnsupportedBitDepth(into.bit_depth));
         }
 
         if store.width == new_size.width && store.height == new_size.height {

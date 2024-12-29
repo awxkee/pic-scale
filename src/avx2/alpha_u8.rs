@@ -209,7 +209,6 @@ unsafe fn avx_premultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8]) {
     premultiply_alpha_rgba_row_impl(rem, src_rem);
 }
 
-#[inline]
 #[target_feature(enable = "avx2")]
 unsafe fn avx_premultiply_alpha_rgba_impl(
     dst: &mut [u8],
@@ -301,7 +300,6 @@ unsafe fn avx_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8]) {
     unpremultiply_alpha_rgba_row_impl(rem);
 }
 
-#[inline]
 #[target_feature(enable = "avx2")]
 unsafe fn avx_unpremultiply_alpha_rgba_impl(
     in_place: &mut [u8],

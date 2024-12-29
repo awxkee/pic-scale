@@ -28,6 +28,10 @@
  */
 #![forbid(unsafe_code)]
 use rayon::ThreadPool;
+#[cfg(not(target_arch = "wasm32"))]
+use std::num::NonZeroUsize;
+#[cfg(not(target_arch = "wasm32"))]
+use std::thread::available_parallelism;
 
 use crate::ImageSize;
 
@@ -40,23 +44,29 @@ pub enum ThreadingPolicy {
     /// Spawn provided threads count, will not work for wasm - fallback to Single
     #[cfg(not(target_arch = "wasm32"))]
     Fixed(usize),
-    /// Computes adaptive thread count between 1...12 for given image bounds, will not work for wasm - fallback to Single
+    /// Computes adaptive thread count between 1...`available parallelism`
+    /// for given image bounds, will not work for wasm - fallback to Single
     #[cfg(not(target_arch = "wasm32"))]
     Adaptive,
 }
 
 impl ThreadingPolicy {
     #[cfg(not(target_arch = "wasm32"))]
+    /// Returns the number of threads to use for the given image dimensions under the
+    /// selected policy variant.
     pub fn thread_count(&self, for_size: ImageSize) -> usize {
         match self {
             ThreadingPolicy::Single => 1,
             ThreadingPolicy::Fixed(thread_count) => (*thread_count).max(1),
-            ThreadingPolicy::Adaptive => {
-                let box_size = 256 * 256;
-                let new_box_size = for_size.height * for_size.width;
-                (new_box_size / box_size).clamp(1, 12)
-            }
+            ThreadingPolicy::Adaptive => (for_size.width * for_size.height / (256 * 256))
+                .clamp(1, Self::available_parallelism()),
         }
+    }
+
+    fn available_parallelism() -> usize {
+        available_parallelism()
+            .unwrap_or_else(|_| NonZeroUsize::new(1).unwrap())
+            .get()
     }
 
     #[cfg(target_arch = "wasm32")]
