@@ -301,6 +301,13 @@ pub(crate) unsafe fn avx2_pack_u16(s_1: __m256i, s_2: __m256i) -> __m256i {
 }
 
 #[inline(always)]
+pub(crate) unsafe fn avx2_pack_u32(s_1: __m256i, s_2: __m256i) -> __m256i {
+    let packed = _mm256_packus_epi32(s_1, s_2);
+    const MASK: i32 = shuffle(3, 1, 2, 0);
+    _mm256_permute4x64_epi64::<MASK>(packed)
+}
+
+#[inline(always)]
 #[allow(dead_code)]
 pub(crate) unsafe fn avx_combine_ps(lo: __m128, hi: __m128) -> __m256 {
     _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(lo), hi)

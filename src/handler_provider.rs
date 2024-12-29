@@ -607,7 +607,10 @@ impl ColumnHandlerFixedPoint<u16> for u16 {
         i32: AsPrimitive<J>,
         i16: AsPrimitive<J>,
     {
-        if std::arch::is_x86_feature_detected!("sse4.1") {
+        use crate::avx2::convolve_column_lb_avx2_u16;
+        if std::arch::is_x86_feature_detected!("avx2") {
+            convolve_column_lb_avx2_u16(dst_width, bounds, src, dst, src_stride, weight, bit_depth);
+        } else if std::arch::is_x86_feature_detected!("sse4.1") {
             convolve_column_lb_sse_u16(dst_width, bounds, src, dst, src_stride, weight, bit_depth);
         } else {
             column_handler_fixed_point::<u16, J>(
