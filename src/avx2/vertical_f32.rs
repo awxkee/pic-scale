@@ -190,6 +190,7 @@ pub(crate) fn convolve_vertical_avx_row_f32<const CHANNELS: usize, const FMA: bo
 }
 
 #[target_feature(enable = "avx2")]
+/// This inlining is required to activate all features for runtime dispatch
 unsafe fn convolve_vertical_avx_row_f32_regular<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,
@@ -204,6 +205,7 @@ unsafe fn convolve_vertical_avx_row_f32_regular<const CHANNELS: usize>(
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
+/// This inlining is required to activate all features for runtime dispatch
 unsafe fn convolve_vertical_avx_row_f32_fma<const CHANNELS: usize>(
     width: usize,
     bounds: &FilterBounds,

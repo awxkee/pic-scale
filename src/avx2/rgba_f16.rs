@@ -144,8 +144,8 @@ pub(crate) fn convolve_horizontal_rgba_avx_row_one_f16<const FMA: bool>(
     }
 }
 
-#[inline]
-#[target_feature(enable = "avx2,f16c,fma")]
+#[target_feature(enable = "avx2", enable = "f16c", enable = "fma")]
+/// This inlining is required to activate all features for runtime dispatch
 unsafe fn convolve_horizontal_rgba_avx_row_one_f16_fma(
     dst_width: usize,
     src_width: usize,
@@ -162,8 +162,8 @@ unsafe fn convolve_horizontal_rgba_avx_row_one_f16_fma(
     );
 }
 
-#[inline]
-#[target_feature(enable = "avx2,f16c")]
+#[target_feature(enable = "avx2", enable = "f16c")]
+/// This inlining is required to activate all features for runtime dispatch
 unsafe fn convolve_horizontal_rgba_avx_row_one_f16_regular(
     dst_width: usize,
     src_width: usize,
@@ -301,8 +301,8 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_4_f16<const FMA: bool>(
     }
 }
 
-#[inline]
 #[target_feature(enable = "avx2", enable = "f16c")]
+/// This inlining is required to activate all features for runtime dispatch
 unsafe fn convolve_horizontal_rgba_avx_rows_4_f16_regular(
     dst_width: usize,
     src_width: usize,
@@ -323,8 +323,8 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_f16_regular(
     );
 }
 
-#[inline]
 #[target_feature(enable = "avx2", enable = "f16c", enable = "fma")]
+/// This inlining is required to activate all features for runtime dispatch
 unsafe fn convolve_horizontal_rgba_avx_rows_4_f16_fma(
     dst_width: usize,
     src_width: usize,

@@ -50,6 +50,7 @@ pub(crate) fn avx_premultiply_alpha_rgba_f16(
 }
 
 #[target_feature(enable = "avx2", enable = "f16c")]
+/// This inlining is required to activate all features for runtime dispatch
 unsafe fn avx_premultiply_alpha_rgba_f16_row_impl(dst: &mut [half::f16], src: &[half::f16]) {
     let mut rem = dst;
     let mut src_rem = src;
@@ -112,8 +113,8 @@ unsafe fn avx_premultiply_alpha_rgba_f16_row_impl(dst: &mut [half::f16], src: &[
     premultiply_pixel_f16_row(rem, src_rem);
 }
 
-#[inline]
 #[target_feature(enable = "avx2", enable = "f16c")]
+/// This inlining is required to activate all features for runtime dispatch
 unsafe fn avx_premultiply_alpha_rgba_f16_impl(
     dst: &mut [half::f16],
     src: &[half::f16],
@@ -150,6 +151,7 @@ pub(crate) fn avx_unpremultiply_alpha_rgba_f16(
 }
 
 #[target_feature(enable = "avx2", enable = "f16c")]
+/// This inlining is required to activate all features for runtime dispatch
 unsafe fn avx_unpremultiply_alpha_rgba_f16_row_impl(in_place: &mut [half::f16]) {
     let mut rem = in_place;
 
@@ -234,8 +236,8 @@ unsafe fn avx_unpremultiply_alpha_rgba_f16_row_impl(in_place: &mut [half::f16]) 
     unpremultiply_pixel_f16_row(rem);
 }
 
-#[inline]
 #[target_feature(enable = "avx2", enable = "f16c")]
+/// This inlining is required to activate all features for runtime dispatch
 unsafe fn avx_unpremultiply_alpha_rgba_f16_impl(
     in_place: &mut [half::f16],
     width: usize,

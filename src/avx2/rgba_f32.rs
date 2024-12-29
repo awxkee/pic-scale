@@ -147,6 +147,7 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_4_f32<const FMA: bool>(
 }
 
 #[target_feature(enable = "avx2")]
+/// This inlining is required to activate all features for runtime dispatch
 unsafe fn convolve_horizontal_rgba_avx_rows_4_f32_regular(
     dst_width: usize,
     src_width: usize,
@@ -167,7 +168,8 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_f32_regular(
     );
 }
 
-#[target_feature(enable = "avx2,fma")]
+#[target_feature(enable = "avx2", enable = "fma")]
+/// This inlining is required to activate all features for runtime dispatch
 unsafe fn convolve_horizontal_rgba_avx_rows_4_f32_fma(
     dst_width: usize,
     src_width: usize,

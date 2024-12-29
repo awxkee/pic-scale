@@ -89,6 +89,7 @@ pub(crate) fn avx_premultiply_alpha_rgba_u16(
 }
 
 #[target_feature(enable = "avx2")]
+/// This inlining is required to activate all features for runtime dispatch
 unsafe fn avx_premultiply_alpha_rgba_u16_row(dst: &mut [u16], src: &[u16], bit_depth: usize) {
     let max_colors = (1 << bit_depth) - 1;
 
@@ -356,6 +357,7 @@ pub(crate) fn avx_unpremultiply_alpha_rgba_u16(
 }
 
 #[target_feature(enable = "avx2")]
+/// This inlining is required to activate all features for runtime dispatch
 unsafe fn avx_unpremultiply_alpha_rgba_u16_row(in_place: &mut [u16], bit_depth: usize) {
     let max_colors = (1 << bit_depth) - 1;
 
@@ -408,7 +410,6 @@ unsafe fn avx_unpremultiply_alpha_rgba_u16_row(in_place: &mut [u16], bit_depth: 
     unpremultiply_alpha_rgba_row(rem, max_colors);
 }
 
-#[inline]
 #[target_feature(enable = "avx2")]
 unsafe fn avx_unpremultiply_alpha_rgba_u16_impl(
     in_place: &mut [u16],

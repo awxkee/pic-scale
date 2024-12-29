@@ -517,6 +517,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_row(
     }
 }
 
+/// Checking NEON `rdm` availability is required before a call
 pub(crate) fn convolve_horizontal_rgba_neon_row_i16(
     src: &[u8],
     dst: &mut [u8],

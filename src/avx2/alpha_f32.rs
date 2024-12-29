@@ -88,7 +88,6 @@ unsafe fn avx_unpremultiply_alpha_rgba_f32_row_impl(in_place: &mut [f32]) {
     unpremultiply_pixel_f32_row(rem);
 }
 
-#[inline]
 #[target_feature(enable = "avx2")]
 unsafe fn avx_unpremultiply_alpha_rgba_f32_impl(
     in_place: &mut [f32],

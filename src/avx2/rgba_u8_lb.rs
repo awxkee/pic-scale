@@ -90,6 +90,7 @@ unsafe fn _mm_add_hi_lo_epi16(v: __m128i) -> __m128i {
 }
 
 #[target_feature(enable = "avx2")]
+/// This inlining is required to activate all features for runtime dispatch.
 unsafe fn convolve_horizontal_rgba_avx_rows_4_impl(
     src: &[u8],
     src_stride: usize,
@@ -325,6 +326,7 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_one_lb(
 }
 
 #[target_feature(enable = "avx2")]
+/// This inlining is required to activate all features for runtime dispatch.
 unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
     src: &[u8],
     dst: &mut [u8],
