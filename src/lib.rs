@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![deny(deprecated)]
-// #![deny(unreachable_code, unused)]
+#![deny(unreachable_code, unused)]
 #![allow(clippy::too_many_arguments)]
 mod alpha_check;
 #[cfg(feature = "half")]

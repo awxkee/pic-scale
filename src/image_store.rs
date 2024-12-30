@@ -398,7 +398,28 @@ impl AssociateAlpha<u8, 4> for ImageStore<'_, u8, 4> {
         premultiply_alpha_rgba(dst, src, self.width, self.height, pool);
     }
 
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
     fn is_alpha_premultiplication_needed(&self) -> bool {
+        has_non_constant_cap_alpha_rgba8(self.buffer.as_ref(), self.width)
+    }
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    fn is_alpha_premultiplication_needed(&self) -> bool {
+        use crate::avx2::avx_has_non_constant_cap_alpha_rgba8;
+        use crate::sse::sse_has_non_constant_cap_alpha_rgba8;
+        if std::arch::is_x86_feature_detected!("avx2") {
+            return avx_has_non_constant_cap_alpha_rgba8(
+                self.buffer.as_ref(),
+                self.width,
+                self.width * 4,
+            );
+        } else if std::arch::is_x86_feature_detected!("sse4.1") {
+            return sse_has_non_constant_cap_alpha_rgba8(
+                self.buffer.as_ref(),
+                self.width,
+                self.width * 4,
+            );
+        }
         has_non_constant_cap_alpha_rgba8(self.buffer.as_ref(), self.width)
     }
 }
@@ -417,7 +438,28 @@ impl AssociateAlpha<u16, 4> for ImageStore<'_, u16, 4> {
         premultiply_alpha_rgba_u16(dst, src, self.width, self.height, self.bit_depth, pool);
     }
 
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
     fn is_alpha_premultiplication_needed(&self) -> bool {
+        has_non_constant_cap_alpha_rgba16(self.buffer.as_ref(), self.width)
+    }
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    fn is_alpha_premultiplication_needed(&self) -> bool {
+        use crate::avx2::avx_has_non_constant_cap_alpha_rgba16;
+        use crate::sse::sse_has_non_constant_cap_alpha_rgba16;
+        if std::arch::is_x86_feature_detected!("avx2") {
+            return avx_has_non_constant_cap_alpha_rgba16(
+                self.buffer.as_ref(),
+                self.width,
+                self.width * 4,
+            );
+        } else if std::arch::is_x86_feature_detected!("sse4.1") {
+            return sse_has_non_constant_cap_alpha_rgba16(
+                self.buffer.as_ref(),
+                self.width,
+                self.width * 4,
+            );
+        }
         has_non_constant_cap_alpha_rgba16(self.buffer.as_ref(), self.width)
     }
 }
@@ -470,5 +512,29 @@ impl UnassociateAlpha<half::f16, 4> for ImageStoreMut<'_, half::f16, 4> {
     fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
         let dst = self.buffer.borrow_mut();
         unpremultiply_alpha_rgba_f16(dst, self.width, self.height, pool);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn image_store_alpha_test_rgba8() {
+        let image_size = 256usize;
+        let mut image = vec![0u8; image_size * image_size * 4];
+        image[3 + 150 * 4] = 75;
+        let store = ImageStore::<u8, 4>::from_slice(&image, image_size, image_size).unwrap();
+        let has_alpha = store.is_alpha_premultiplication_needed();
+        assert_eq!(true, has_alpha);
+    }
+
+    #[test]
+    fn check_alpha_not_exists_rgba8() {
+        let image_size = 256usize;
+        let image = vec![255u8; image_size * image_size * 4];
+        let store = ImageStore::<u8, 4>::from_slice(&image, image_size, image_size).unwrap();
+        let has_alpha = store.is_alpha_premultiplication_needed();
+        assert_eq!(false, has_alpha);
     }
 }

@@ -45,7 +45,7 @@ fn resize_plane(
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/asset_4.png")
+    let img = ImageReader::open("./assets/beach_horizon.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -59,6 +59,7 @@ fn main() {
     // resize_plane(378, 257, 257, 257, ResamplingFunction::Bilinear);
 
     let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 2).collect();
+
     //
     let store =
         ImageStore::<u16, 4>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)

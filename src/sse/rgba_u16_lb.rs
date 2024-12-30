@@ -192,7 +192,7 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_lb_u8_impl(
     filter_weights: &FilterWeights<i16>,
     bit_depth: u32,
 ) {
-    assert!(bit_depth >= 1 && bit_depth <= 16);
+    assert!((1..=16).contains(&bit_depth));
     const CHANNELS: usize = 4;
     let init = _mm_set1_epi32(ROUNDING_CONST);
 

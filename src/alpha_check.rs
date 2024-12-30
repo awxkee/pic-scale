@@ -61,7 +61,7 @@ where
     if store.is_empty() {
         return false;
     }
-    let first = store[0];
+    let first = store[ALPHA_CHANNEL_INDEX];
     let mut row_sums: J = 0u32.as_();
     for row in store.chunks_exact(width * CHANNELS) {
         for color in row.chunks_exact(CHANNELS) {
@@ -87,7 +87,7 @@ fn has_non_constant_cap_alpha_f32_impl<const ALPHA_CHANNEL_INDEX: usize, const C
     if store.is_empty() {
         return false;
     }
-    let first = store[0].to_bits();
+    let first = store[ALPHA_CHANNEL_INDEX].to_bits();
     let mut row_sums: u64 = 0u64;
     for row in store.chunks_exact(width * CHANNELS) {
         for color in row.chunks_exact(CHANNELS) {

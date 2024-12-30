@@ -32,6 +32,7 @@ mod alpha_f16;
 mod alpha_f32;
 mod alpha_u16;
 mod alpha_u8;
+mod check_alpha;
 #[cfg(feature = "half")]
 mod rgba_f16;
 mod rgba_f32;
@@ -51,6 +52,9 @@ pub(crate) use alpha_f32::avx_unpremultiply_alpha_rgba_f32;
 pub(crate) use alpha_u16::{avx_premultiply_alpha_rgba_u16, avx_unpremultiply_alpha_rgba_u16};
 pub(crate) use alpha_u8::avx_premultiply_alpha_rgba;
 pub(crate) use alpha_u8::avx_unpremultiply_alpha_rgba;
+pub(crate) use check_alpha::{
+    avx_has_non_constant_cap_alpha_rgba16, avx_has_non_constant_cap_alpha_rgba8,
+};
 #[cfg(feature = "half")]
 pub(crate) use rgba_f16::{
     convolve_horizontal_rgba_avx_row_one_f16, convolve_horizontal_rgba_avx_rows_4_f16,

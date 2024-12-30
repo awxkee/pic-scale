@@ -58,7 +58,7 @@ unsafe fn convolve_column_lb_u16_impl(
     weight: &[i16],
     bit_depth: u32,
 ) {
-    assert!(bit_depth >= 1 && bit_depth <= 16);
+    assert!((1..=16).contains(&bit_depth));
     let max_colors = (1 << bit_depth) - 1;
     let mut cx = 0usize;
 
