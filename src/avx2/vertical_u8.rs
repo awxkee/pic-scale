@@ -86,7 +86,6 @@ unsafe fn convolve_vertical_part_avx_64(
 
     let mut jj = 0usize;
 
-    #[cfg(target_arch = "x86_64")]
     while jj < bounds_size.saturating_sub(2) {
         let py = start_y + jj;
         let f_ptr = filter.get_unchecked(jj..).as_ptr() as *const i32;
