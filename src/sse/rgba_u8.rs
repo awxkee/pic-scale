@@ -128,7 +128,6 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_impl(
             let src2 = src1.get_unchecked(src_stride..);
             let src3 = src2.get_unchecked(src_stride..);
 
-            #[cfg(target_arch = "x86_64")]
             while jx + 4 < bounds.size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 4));
                 let weights = _mm_loadu_si64(w_ptr.as_ptr() as *const u8);
