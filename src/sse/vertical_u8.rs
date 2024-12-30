@@ -470,7 +470,6 @@ unsafe fn convolve_vertical_sse_row_impl(
     let mut cx = 0usize;
     let total_width = dst.len();
 
-    #[cfg(target_arch = "x86_64")]
     while cx + 32 < total_width {
         unsafe {
             convolve_vertical_part_sse_32(bounds.start, cx, src, dst, src_stride, weights, bounds);
