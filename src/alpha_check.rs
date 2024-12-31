@@ -30,10 +30,12 @@
 use num_traits::AsPrimitive;
 use std::ops::{AddAssign, BitXor};
 
+#[allow(dead_code)]
 pub(crate) fn has_non_constant_cap_alpha_rgba8(store: &[u8], width: usize) -> bool {
     has_non_constant_cap_alpha::<u8, u32, 3, 4>(store, width)
 }
 
+#[allow(dead_code)]
 pub(crate) fn has_non_constant_cap_alpha_rgba16(store: &[u16], width: usize) -> bool {
     has_non_constant_cap_alpha::<u16, u64, 3, 4>(store, width)
 }

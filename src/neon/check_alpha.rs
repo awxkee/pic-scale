@@ -79,6 +79,56 @@ pub(crate) fn neon_has_non_constant_cap_alpha_rgba8(
     }
 }
 
+/// Checks if image has constant alpha by xor rows for image 16bits
+pub(crate) fn neon_has_non_constant_cap_alpha_rgba16(
+    store: &[u16],
+    width: usize,
+    stride: usize,
+) -> bool {
+    unsafe {
+        if store.is_empty() {
+            return true;
+        }
+
+        let first_alpha = store[3];
+        let def_alpha = vdupq_n_u16(first_alpha);
+
+        for row in store.chunks_exact(stride) {
+            let row = &row[0..width * 4];
+            let mut sums = vdupq_n_u32(0);
+            for chunk in row.chunks_exact(8 * 4) {
+                let r0 = vld4q_u16(chunk.as_ptr());
+
+                let pxor = veorq_u16(r0.3, def_alpha);
+                sums = vaddq_u32(sums, vpaddlq_u16(pxor));
+            }
+
+            let row = row.chunks_exact(8 * 4).remainder();
+
+            for chunk in row.chunks_exact(4 * 4) {
+                let r0 = vld4_u16(chunk.as_ptr());
+
+                let pxor = veor_u16(r0.3, vget_low_u16(def_alpha));
+                let pw = vpaddl_u16(pxor);
+                sums = vaddq_u32(sums, vcombine_u32(pw, pw));
+            }
+
+            let row = row.chunks_exact(4 * 4).remainder();
+
+            let mut h_sum = vaddvq_u32(sums);
+
+            for chunk in row.chunks_exact(4) {
+                h_sum += chunk[3] as u32 ^ first_alpha as u32;
+            }
+
+            if h_sum != 0 {
+                return true;
+            }
+        }
+        false
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -98,5 +148,25 @@ mod tests {
         let image = vec![255u8; image_size * image_size * 4];
         let has_alpha = neon_has_non_constant_cap_alpha_rgba8(&image, image_size, image_size * 4);
         assert_eq!(false, has_alpha);
+    }
+
+    #[test]
+    fn check_alpha_not_exists_rgba16() {
+        let image_size = 256usize;
+        let image = vec![255u16; image_size * image_size * 4];
+        let has_alpha = neon_has_non_constant_cap_alpha_rgba16(&image, image_size, image_size * 4);
+        assert_eq!(false, has_alpha);
+    }
+
+    #[test]
+    fn check_alpha_exists_rgba16() {
+        let image_size = 256usize;
+        let mut image = vec![0u16; image_size * image_size * 4];
+        image[3] = 715;
+        image[7] = 715;
+        image[11] = 715;
+        image[15] = 715;
+        let has_alpha = neon_has_non_constant_cap_alpha_rgba16(&image, image_size, image_size * 4);
+        assert_eq!(true, has_alpha);
     }
 }

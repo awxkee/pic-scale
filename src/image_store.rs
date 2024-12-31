@@ -26,10 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::alpha_check::{
-    has_non_constant_cap_alpha_rgba16, has_non_constant_cap_alpha_rgba8,
-    has_non_constant_cap_alpha_rgba_f32,
-};
+use crate::alpha_check::has_non_constant_cap_alpha_rgba_f32;
 #[cfg(feature = "half")]
 use crate::alpha_handle_f16::{premultiply_alpha_rgba_f16, unpremultiply_alpha_rgba_f16};
 use crate::alpha_handle_f32::{premultiply_alpha_rgba_f32, unpremultiply_alpha_rgba_f32};
@@ -403,25 +400,19 @@ impl AssociateAlpha<u8, 4> for ImageStore<'_, u8, 4> {
         all(target_arch = "aarch64", target_feature = "neon")
     )))]
     fn is_alpha_premultiplication_needed(&self) -> bool {
+        use crate::alpha_check::has_non_constant_cap_alpha_rgba8;
         has_non_constant_cap_alpha_rgba8(self.buffer.as_ref(), self.width)
     }
 
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     fn is_alpha_premultiplication_needed(&self) -> bool {
         use crate::neon::neon_has_non_constant_cap_alpha_rgba8;
-        // This is more like for import handling rather than necessary
-        if std::arch::is_aarch64_feature_detected!("neon") {
-            return neon_has_non_constant_cap_alpha_rgba8(
-                self.buffer.as_ref(),
-                self.width,
-                self.width * 4,
-            );
-        }
-        has_non_constant_cap_alpha_rgba8(self.buffer.as_ref(), self.width)
+        neon_has_non_constant_cap_alpha_rgba8(self.buffer.as_ref(), self.width, self.width * 4)
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn is_alpha_premultiplication_needed(&self) -> bool {
+        use crate::alpha_check::has_non_constant_cap_alpha_rgba8;
         use crate::avx2::avx_has_non_constant_cap_alpha_rgba8;
         use crate::sse::sse_has_non_constant_cap_alpha_rgba8;
         if std::arch::is_x86_feature_detected!("avx2") {
@@ -455,13 +446,24 @@ impl AssociateAlpha<u16, 4> for ImageStore<'_, u16, 4> {
         premultiply_alpha_rgba_u16(dst, src, self.width, self.height, self.bit_depth, pool);
     }
 
+    #[cfg(not(any(
+        any(target_arch = "x86_64", target_arch = "x86"),
+        all(target_arch = "aarch64", target_feature = "neon")
+    )))]
+    fn is_alpha_premultiplication_needed(&self) -> bool {
+        use crate::alpha_check::has_non_constant_cap_alpha_rgba16;
+        has_non_constant_cap_alpha_rgba16(self.buffer.as_ref(), self.width)
+    }
+
     #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
     fn is_alpha_premultiplication_needed(&self) -> bool {
-        has_non_constant_cap_alpha_rgba16(self.buffer.as_ref(), self.width)
+        use crate::neon::neon_has_non_constant_cap_alpha_rgba16;
+        neon_has_non_constant_cap_alpha_rgba16(self.buffer.as_ref(), self.width, self.width * 4)
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn is_alpha_premultiplication_needed(&self) -> bool {
+        use crate::alpha_check::has_non_constant_cap_alpha_rgba16;
         use crate::avx2::avx_has_non_constant_cap_alpha_rgba16;
         use crate::sse::sse_has_non_constant_cap_alpha_rgba16;
         if std::arch::is_x86_feature_detected!("avx2") {
