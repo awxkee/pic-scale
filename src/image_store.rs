@@ -398,8 +398,25 @@ impl AssociateAlpha<u8, 4> for ImageStore<'_, u8, 4> {
         premultiply_alpha_rgba(dst, src, self.width, self.height, pool);
     }
 
-    #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
+    #[cfg(not(any(
+        any(target_arch = "x86_64", target_arch = "x86"),
+        all(target_arch = "aarch64", target_feature = "neon")
+    )))]
     fn is_alpha_premultiplication_needed(&self) -> bool {
+        has_non_constant_cap_alpha_rgba8(self.buffer.as_ref(), self.width)
+    }
+
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    fn is_alpha_premultiplication_needed(&self) -> bool {
+        use crate::neon::neon_has_non_constant_cap_alpha_rgba8;
+        // This is more like for import handling rather than necessary
+        if std::arch::is_aarch64_feature_detected!("neon") {
+            return neon_has_non_constant_cap_alpha_rgba8(
+                self.buffer.as_ref(),
+                self.width,
+                self.width * 4,
+            );
+        }
         has_non_constant_cap_alpha_rgba8(self.buffer.as_ref(), self.width)
     }
 

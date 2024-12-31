@@ -64,6 +64,7 @@ mod vertical_f32;
 mod vertical_u16;
 mod vertical_u16_lb;
 mod vertical_u8;
+mod check_alpha;
 
 #[cfg(feature = "half")]
 pub(crate) use alpha_f16::{neon_premultiply_alpha_rgba_f16, neon_unpremultiply_alpha_rgba_f16};
@@ -125,3 +126,4 @@ pub(crate) use vertical_u16_lb::convolve_column_lb_u16;
 pub(crate) use vertical_u8::{
     convolve_vertical_neon_i16_precision, convolve_vertical_neon_i32_precision,
 };
+pub(crate) use check_alpha::neon_has_non_constant_cap_alpha_rgba8;
