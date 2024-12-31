@@ -36,9 +36,11 @@ use crate::support::PRECISION;
 
 #[inline(always)]
 pub(crate) fn compress_i32(x: __m128i) -> __m128i {
-    let store_32 = unsafe { _mm_srai_epi32::<PRECISION>(x) };
-    let store_16 = unsafe { _mm_packus_epi32(store_32, store_32) };
-    unsafe { _mm_packus_epi16(store_16, store_16) }
+    unsafe {
+        let store_32 = _mm_srai_epi32::<PRECISION>(x);
+        let store_16 = _mm_packus_epi32(store_32, store_32);
+        _mm_packus_epi16(store_16, store_16)
+    }
 }
 
 #[inline]
