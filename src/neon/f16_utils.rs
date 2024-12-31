@@ -32,7 +32,6 @@ use std::arch::aarch64::*;
 use std::arch::asm;
 
 /// Provides basic support for f16
-
 #[allow(unused)]
 macro_rules! static_assert {
     ($e:expr) => {
@@ -90,18 +89,21 @@ pub(crate) struct x_float16x8x4_t(
 );
 
 #[inline]
+#[cfg(feature = "half")]
 pub(crate) unsafe fn xvld_f16(ptr: *const half::f16) -> x_float16x4_t {
     let store: uint16x4_t = vld1_u16(std::mem::transmute(ptr));
     std::mem::transmute(store)
 }
 
 #[inline]
+#[cfg(feature = "half")]
 pub(crate) unsafe fn xvldq_f16(ptr: *const half::f16) -> x_float16x8_t {
     let store: uint16x8_t = vld1q_u16(std::mem::transmute(ptr));
     std::mem::transmute(store)
 }
 
 #[inline]
+#[cfg(feature = "half")]
 pub(crate) unsafe fn xvldq_f16_x2(ptr: *const half::f16) -> x_float16x8x2_t {
     let ptr_u16 = ptr as *const u16;
     x_float16x8x2_t(
@@ -111,6 +113,7 @@ pub(crate) unsafe fn xvldq_f16_x2(ptr: *const half::f16) -> x_float16x8x2_t {
 }
 
 #[inline]
+#[cfg(feature = "half")]
 pub(crate) unsafe fn xvldq_f16_x4(ptr: *const half::f16) -> x_float16x8x4_t {
     let ptr_u16 = ptr as *const u16;
     x_float16x8x4_t(
@@ -123,19 +126,25 @@ pub(crate) unsafe fn xvldq_f16_x4(ptr: *const half::f16) -> x_float16x8x4_t {
 
 #[inline]
 pub(crate) unsafe fn xvget_low_f16(x: x_float16x8_t) -> x_float16x4_t {
-    std::mem::transmute(vget_low_u16(std::mem::transmute(x)))
+    std::mem::transmute::<uint16x4_t, x_float16x4_t>(vget_low_u16(std::mem::transmute::<
+        x_float16x8_t,
+        uint16x8_t,
+    >(x)))
 }
 
 #[inline]
 pub(crate) unsafe fn xvget_high_f16(x: x_float16x8_t) -> x_float16x4_t {
-    std::mem::transmute(vget_high_u16(std::mem::transmute(x)))
+    std::mem::transmute::<uint16x4_t, x_float16x4_t>(vget_high_u16(std::mem::transmute::<
+        x_float16x8_t,
+        uint16x8_t,
+    >(x)))
 }
 
 #[inline]
 pub(crate) unsafe fn xcombine_f16(low: x_float16x4_t, high: x_float16x4_t) -> x_float16x8_t {
-    std::mem::transmute(vcombine_u16(
-        std::mem::transmute(low),
-        std::mem::transmute(high),
+    std::mem::transmute::<uint16x8_t, x_float16x8_t>(vcombine_u16(
+        std::mem::transmute::<x_float16x4_t, uint16x4_t>(low),
+        std::mem::transmute::<x_float16x4_t, uint16x4_t>(high),
     ))
 }
 
@@ -558,16 +567,19 @@ pub(super) unsafe fn xvbslq_f16(
 }
 
 #[inline]
+#[cfg(feature = "half")]
 pub(crate) unsafe fn xvst_f16(ptr: *mut half::f16, x: x_float16x4_t) {
     vst1_u16(std::mem::transmute(ptr), xreinterpret_u16_f16(x))
 }
 
 #[inline]
+#[cfg(feature = "half")]
 pub(crate) unsafe fn xvstq_f16(ptr: *mut half::f16, x: x_float16x8_t) {
     vst1q_u16(std::mem::transmute(ptr), xreinterpretq_u16_f16(x))
 }
 
 #[inline]
+#[cfg(feature = "half")]
 pub(crate) unsafe fn xvstq_f16_x2(ptr: *mut half::f16, x: x_float16x8x2_t) {
     let ptr_u16 = ptr as *mut u16;
     vst1q_u16(ptr_u16, xreinterpretq_u16_f16(x.0));
@@ -575,6 +587,7 @@ pub(crate) unsafe fn xvstq_f16_x2(ptr: *mut half::f16, x: x_float16x8x2_t) {
 }
 
 #[inline]
+#[cfg(feature = "half")]
 pub(crate) unsafe fn xvstq_f16_x4(ptr: *const half::f16, x: x_float16x8x4_t) {
     let ptr_u16 = ptr as *mut u16;
     vst1q_u16(ptr_u16, xreinterpretq_u16_f16(x.0));
@@ -594,6 +607,7 @@ pub(crate) unsafe fn xvdup_laneq_f16<const N: i32>(a: x_float16x8_t) -> x_float1
 }
 
 #[inline]
+#[cfg(feature = "half")]
 pub(crate) unsafe fn xvld1q_lane_f16<const LANE: i32>(
     ptr: *const half::f16,
     src: x_float16x8_t,
@@ -605,6 +619,7 @@ pub(crate) unsafe fn xvld1q_lane_f16<const LANE: i32>(
 }
 
 #[inline]
+#[cfg(feature = "half")]
 pub(crate) unsafe fn xvsetq_lane_f16<const LANE: i32>(
     v: half::f16,
     r: x_float16x8_t,

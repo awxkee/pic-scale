@@ -37,7 +37,6 @@ mod ar30;
 mod check_alpha;
 #[cfg(feature = "half")]
 mod convolve_f16;
-#[cfg(feature = "half")]
 mod f16_utils;
 mod horizontal_ar30;
 mod plane_f32;
@@ -80,7 +79,6 @@ pub(crate) use alpha_u8::neon_unpremultiply_alpha_rgba;
 pub(crate) use check_alpha::{
     neon_has_non_constant_cap_alpha_rgba16, neon_has_non_constant_cap_alpha_rgba8,
 };
-#[cfg(feature = "half")]
 pub(crate) use f16_utils::*;
 pub(crate) use horizontal_ar30::neon_convolve_horizontal_rgba_rows_4_ar30;
 pub(crate) use plane_f32::convolve_horizontal_plane_neon_row_one;

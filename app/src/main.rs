@@ -81,7 +81,9 @@ fn main() {
         10,
     );
 
-    scaler.resize_rgba_u16(&store, &mut dst_store, true).unwrap();
+    scaler
+        .resize_rgba_u16(&store, &mut dst_store, true)
+        .unwrap();
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds

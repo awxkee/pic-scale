@@ -138,13 +138,8 @@ trait DisassociateAlpha {
     unsafe fn disassociate(&self, in_place: &mut [u8]);
 }
 
+#[derive(Default)]
 struct NeonDisassociateAlpha {}
-
-impl Default for NeonDisassociateAlpha {
-    fn default() -> Self {
-        NeonDisassociateAlpha {}
-    }
-}
 
 impl NeonDisassociateAlpha {
     #[inline(always)]
@@ -234,13 +229,8 @@ impl DisassociateAlpha for NeonDisassociateAlpha {
     }
 }
 
+#[derive(Default)]
 struct NeonDisassociateAlphaFloat16 {}
-
-impl Default for NeonDisassociateAlphaFloat16 {
-    fn default() -> Self {
-        NeonDisassociateAlphaFloat16 {}
-    }
-}
 
 impl NeonDisassociateAlphaFloat16 {
     #[inline]

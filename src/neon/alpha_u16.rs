@@ -54,18 +54,13 @@ trait NeonPremultiplyExecutor {
     unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize);
 }
 
+#[derive(Default)]
 struct NeonPremultiplyExecutor10Bit {}
-
-impl Default for NeonPremultiplyExecutor10Bit {
-    fn default() -> Self {
-        NeonPremultiplyExecutor10Bit {}
-    }
-}
 
 impl NeonPremultiplyExecutor for NeonPremultiplyExecutor10Bit {
     unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
         assert_ne!(bit_depth, 0, "Something goes wrong!");
-        assert!(bit_depth >= 1 && bit_depth <= 16);
+        assert!((1..=16).contains(&bit_depth));
         let max_colors = (1 << bit_depth) - 1;
         let mut rem = dst;
         let mut src_rem = src;
@@ -101,18 +96,13 @@ impl NeonPremultiplyExecutor for NeonPremultiplyExecutor10Bit {
     }
 }
 
+#[derive(Default)]
 struct NeonPremultiplyExecutor12Bit {}
-
-impl Default for NeonPremultiplyExecutor12Bit {
-    fn default() -> Self {
-        NeonPremultiplyExecutor12Bit {}
-    }
-}
 
 impl NeonPremultiplyExecutor for NeonPremultiplyExecutor12Bit {
     unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
         assert_ne!(bit_depth, 0, "Something goes wrong!");
-        assert!(bit_depth >= 1 && bit_depth <= 16);
+        assert!((1..=16).contains(&bit_depth));
         let max_colors = (1 << bit_depth) - 1;
         let mut rem = dst;
         let mut src_rem = src;
@@ -149,18 +139,13 @@ impl NeonPremultiplyExecutor for NeonPremultiplyExecutor12Bit {
     }
 }
 
+#[derive(Default)]
 struct NeonPremultiplyExecutor16Bit {}
-
-impl Default for NeonPremultiplyExecutor16Bit {
-    fn default() -> Self {
-        NeonPremultiplyExecutor16Bit {}
-    }
-}
 
 impl NeonPremultiplyExecutor for NeonPremultiplyExecutor16Bit {
     unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
         assert_ne!(bit_depth, 0, "Something goes wrong!");
-        assert!(bit_depth >= 1 && bit_depth <= 16);
+        assert!((1..=16).contains(&bit_depth));
         let max_colors = (1 << bit_depth) - 1;
         let mut rem = dst;
         let mut src_rem = src;
@@ -197,18 +182,13 @@ impl NeonPremultiplyExecutor for NeonPremultiplyExecutor16Bit {
     }
 }
 
+#[derive(Default)]
 struct NeonPremultiplyExecutorAnyBitDepth {}
-
-impl Default for NeonPremultiplyExecutorAnyBitDepth {
-    fn default() -> Self {
-        NeonPremultiplyExecutorAnyBitDepth {}
-    }
-}
 
 impl NeonPremultiplyExecutor for NeonPremultiplyExecutorAnyBitDepth {
     unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
         assert_ne!(bit_depth, 0, "Something goes wrong!");
-        assert!(bit_depth >= 1 && bit_depth <= 16);
+        assert!((1..=16).contains(&bit_depth));
         let max_colors = (1 << bit_depth) - 1;
         let mut rem = dst;
         let mut src_rem = src;
@@ -318,13 +298,8 @@ trait DisassociateAlpha {
     unsafe fn disassociate(&self, in_place: &mut [u16], bit_depth: usize);
 }
 
+#[derive(Default)]
 struct NeonDisassociateAlpha {}
-
-impl Default for NeonDisassociateAlpha {
-    fn default() -> Self {
-        NeonDisassociateAlpha {}
-    }
-}
 
 impl DisassociateAlpha for NeonDisassociateAlpha {
     unsafe fn disassociate(&self, in_place: &mut [u16], bit_depth: usize) {
@@ -372,13 +347,8 @@ impl DisassociateAlpha for NeonDisassociateAlpha {
     }
 }
 
+#[derive(Default)]
 struct NeonDisassociateAlphaFloat16 {}
-
-impl Default for NeonDisassociateAlphaFloat16 {
-    fn default() -> Self {
-        NeonDisassociateAlphaFloat16 {}
-    }
-}
 
 impl DisassociateAlpha for NeonDisassociateAlphaFloat16 {
     #[target_feature(enable = "fp16")]
