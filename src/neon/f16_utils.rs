@@ -192,6 +192,76 @@ pub(super) unsafe fn xvcvt_f16_f32(v: float32x4_t) -> x_float16x4_t {
     xreinterpret_f16_u16(result)
 }
 
+/// This instruction converts each element in a vector from fixed-point to floating-point
+/// using the rounding mode that is specified by the FPCR, and writes the result
+/// to the SIMD&FP destination register.
+///
+/// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcvtq_f16_u16)
+#[inline]
+#[target_feature(enable = "fp16")]
+pub(super) unsafe fn xvcvtq_f16_u16(v: uint16x8_t) -> x_float16x8_t {
+    let result: uint16x8_t;
+    asm!(
+    "ucvtf {0:v}.8h, {1:v}.8h",
+    out(vreg) result,
+    in(vreg) v,
+    options(pure, nomem, nostack));
+    xreinterpretq_f16_u16(result)
+}
+
+/// This instruction converts each element in a vector from fixed-point to floating-point
+/// using the rounding mode that is specified by the FPCR, and writes the result
+/// to the SIMD&FP destination register.
+///
+/// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcvt_f16_u16)
+#[inline]
+#[target_feature(enable = "fp16")]
+pub(super) unsafe fn xvcvt_f16_u16(v: uint16x4_t) -> x_float16x4_t {
+    let result: uint16x4_t;
+    asm!(
+    "ucvtf {0:v}.4h, {1:v}.4h",
+    out(vreg) result,
+    in(vreg) v,
+    options(pure, nomem, nostack));
+    xreinterpret_f16_u16(result)
+}
+
+/// Floating-point Convert to Unsigned integer, rounding to nearest with ties to Away (vector).
+/// This instruction converts each element in a vector from a floating-point value to an unsigned
+/// integer value using the Round to Nearest with Ties to Away rounding mode and writes the result
+/// to the SIMD&FP destination register.
+///
+/// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcvtaq_u16_f16)
+#[inline]
+#[target_feature(enable = "fp16")]
+pub(super) unsafe fn xvcvtaq_u16_f16(v: x_float16x8_t) -> uint16x8_t {
+    let result: uint16x8_t;
+    asm!(
+    "fcvtau {0:v}.8h, {1:v}.8h",
+    out(vreg) result,
+    in(vreg) xreinterpretq_u16_f16(v),
+    options(pure, nomem, nostack));
+    result
+}
+
+/// Floating-point Reciprocal Estimate.
+/// This instruction finds an approximate reciprocal estimate for each vector element
+/// in the source SIMD&FP register, places the result in a vector,
+/// and writes the vector to the destination SIMD&FP register.
+///
+/// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrecpeq_f16)
+#[inline]
+#[target_feature(enable = "fp16")]
+pub(super) unsafe fn xvrecpeq_f16(v: x_float16x8_t) -> x_float16x8_t {
+    let result: uint16x8_t;
+    asm!(
+    "frecpe {0:v}.8h, {1:v}.8h",
+    out(vreg) result,
+    in(vreg) xreinterpretq_u16_f16(v),
+    options(pure, nomem, nostack));
+    xreinterpretq_f16_u16(result)
+}
+
 // #[inline]
 // pub(super) unsafe fn xvadd_f16(v1: x_float16x4_t, v2: x_float16x4_t) -> x_float16x4_t {
 //     let result: uint16x4_t;
@@ -439,6 +509,20 @@ pub(super) unsafe fn xvmulq_f16(v1: x_float16x8_t, v2: x_float16x8_t) -> x_float
     options(pure, nomem, nostack)
     );
     xreinterpretq_f16_u16(result)
+}
+
+#[target_feature(enable = "fp16")]
+#[inline]
+pub(super) unsafe fn xvmul_f16(v1: x_float16x4_t, v2: x_float16x4_t) -> x_float16x4_t {
+    let result: uint16x4_t;
+    asm!(
+    "fmul {0:v}.4h, {1:v}.4h, {2:v}.4h",
+    out(vreg) result,
+    in(vreg) xreinterpret_u16_f16(v1),
+    in(vreg) xreinterpret_u16_f16(v2),
+    options(pure, nomem, nostack)
+    );
+    xreinterpret_f16_u16(result)
 }
 
 #[target_feature(enable = "fp16")]

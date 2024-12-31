@@ -27,7 +27,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::alpha_handle_u8::{premultiply_alpha_rgba_row_impl, unpremultiply_alpha_rgba_row_impl};
+use crate::alpha_handle_u8::premultiply_alpha_rgba_row_impl;
+use crate::cpu_features::is_aarch_f16_supported;
+use crate::neon::f16_utils::{xvcvtaq_u16_f16, xvcvtq_f16_u16, xvmulq_f16, xvrecpeq_f16};
+use crate::neon::xreinterpretq_f16_u16;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
@@ -45,33 +48,6 @@ macro_rules! premultiply_vec {
         let hi = neon_div_by_255_n(acc_hi);
         let lo = neon_div_by_255_n(acc_lo);
         vcombine_u8(lo, hi)
-    }};
-}
-
-macro_rules! unpremultiply_vec {
-    ($v: expr, $a_values: expr) => {{
-        let scale = vdupq_n_u8(255);
-        let hi = vmull_high_u8($v, scale);
-        let lo = vmull_u8(vget_low_u8($v), vget_low_u8(scale));
-        let lo_lo = vcvtq_f32_u32(vmovl_u16(vget_low_u16(lo)));
-        let lo_hi = vcvtq_f32_u32(vmovl_high_u16(lo));
-        let hi_lo = vcvtq_f32_u32(vmovl_u16(vget_low_u16(hi)));
-        let hi_hi = vcvtq_f32_u32(vmovl_high_u16(hi));
-        let zero_mask = vmvnq_u8(vceqzq_u8($a_values));
-        let a_hi = vmovl_high_u8($a_values);
-        let a_lo = vmovl_u8(vget_low_u8($a_values));
-        let a_lo_lo = vrecpeq_f32(vcvtq_f32_u32(vmovl_u16(vget_low_u16(a_lo))));
-        let a_lo_hi = vrecpeq_f32(vcvtq_f32_u32(vmovl_high_u16(a_lo)));
-        let a_hi_lo = vrecpeq_f32(vcvtq_f32_u32(vmovl_u16(vget_low_u16(a_hi))));
-        let a_hi_ho = vrecpeq_f32(vcvtq_f32_u32(vmovl_high_u16(a_hi)));
-
-        let lo_lo = vcvtaq_u32_f32(vmulq_f32(lo_lo, a_lo_lo));
-        let lo_hi = vcvtaq_u32_f32(vmulq_f32(lo_hi, a_lo_hi));
-        let hi_lo = vcvtaq_u32_f32(vmulq_f32(hi_lo, a_hi_lo));
-        let hi_hi = vcvtaq_u32_f32(vmulq_f32(hi_hi, a_hi_ho));
-        let lo = vcombine_u16(vmovn_u32(lo_lo), vmovn_u32(lo_hi));
-        let hi = vcombine_u16(vmovn_u32(hi_lo), vmovn_u32(hi_hi));
-        vandq_u8(vcombine_u8(vqmovn_u16(lo), vqmovn_u16(hi)), zero_mask)
     }};
 }
 
@@ -158,24 +134,202 @@ pub(crate) fn neon_premultiply_alpha_rgba(
     }
 }
 
-unsafe fn neon_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8]) {
-    let mut rem = in_place;
+trait DisassociateAlpha {
+    unsafe fn disassociate(&self, in_place: &mut [u8]);
+}
 
-    unsafe {
+struct NeonDisassociateAlpha {}
+
+impl Default for NeonDisassociateAlpha {
+    fn default() -> Self {
+        NeonDisassociateAlpha {}
+    }
+}
+
+impl NeonDisassociateAlpha {
+    #[inline(always)]
+    unsafe fn unpremultiply_vec(v: uint8x16_t, a_values: uint8x16_t) -> uint8x16_t {
+        let scale = vdupq_n_u8(255);
+        let hi = vmull_high_u8(v, scale);
+        let lo = vmull_u8(vget_low_u8(v), vget_low_u8(scale));
+        let lo_lo = vcvtq_f32_u32(vmovl_u16(vget_low_u16(lo)));
+        let lo_hi = vcvtq_f32_u32(vmovl_high_u16(lo));
+        let hi_lo = vcvtq_f32_u32(vmovl_u16(vget_low_u16(hi)));
+        let hi_hi = vcvtq_f32_u32(vmovl_high_u16(hi));
+        let zero_mask = vmvnq_u8(vceqzq_u8(a_values));
+        let a_hi = vmovl_high_u8(a_values);
+        let a_lo = vmovl_u8(vget_low_u8(a_values));
+        let a_lo_lo = vrecpeq_f32(vcvtq_f32_u32(vmovl_u16(vget_low_u16(a_lo))));
+        let a_lo_hi = vrecpeq_f32(vcvtq_f32_u32(vmovl_high_u16(a_lo)));
+        let a_hi_lo = vrecpeq_f32(vcvtq_f32_u32(vmovl_u16(vget_low_u16(a_hi))));
+        let a_hi_ho = vrecpeq_f32(vcvtq_f32_u32(vmovl_high_u16(a_hi)));
+
+        let lo_lo = vcvtaq_u32_f32(vmulq_f32(lo_lo, a_lo_lo));
+        let lo_hi = vcvtaq_u32_f32(vmulq_f32(lo_hi, a_lo_hi));
+        let hi_lo = vcvtaq_u32_f32(vmulq_f32(hi_lo, a_hi_lo));
+        let hi_hi = vcvtaq_u32_f32(vmulq_f32(hi_hi, a_hi_ho));
+        let lo = vcombine_u16(vmovn_u32(lo_lo), vmovn_u32(lo_hi));
+        let hi = vcombine_u16(vmovn_u32(hi_lo), vmovn_u32(hi_hi));
+        vandq_u8(vcombine_u8(vqmovn_u16(lo), vqmovn_u16(hi)), zero_mask)
+    }
+
+    #[inline(always)]
+    unsafe fn unpremultiply_vech(v: uint8x8_t, a_values: uint8x8_t) -> uint8x8_t {
+        let scale = vdupq_n_u8(255);
+        let lo = vmull_u8(v, vget_low_u8(scale));
+        let lo_lo = vcvtq_f32_u32(vmovl_u16(vget_low_u16(lo)));
+        let lo_hi = vcvtq_f32_u32(vmovl_high_u16(lo));
+        let zero_mask = vmvn_u8(vceqz_u8(a_values));
+        let a_lo = vmovl_u8(a_values);
+        let a_lo_lo = vrecpeq_f32(vcvtq_f32_u32(vmovl_u16(vget_low_u16(a_lo))));
+        let a_lo_hi = vrecpeq_f32(vcvtq_f32_u32(vmovl_high_u16(a_lo)));
+
+        let lo_lo = vcvtaq_u32_f32(vmulq_f32(lo_lo, a_lo_lo));
+        let lo_hi = vcvtaq_u32_f32(vmulq_f32(lo_hi, a_lo_hi));
+        let lo = vcombine_u16(vmovn_u32(lo_lo), vmovn_u32(lo_hi));
+        vand_u8(vqmovn_u16(lo), zero_mask)
+    }
+}
+
+impl DisassociateAlpha for NeonDisassociateAlpha {
+    unsafe fn disassociate(&self, in_place: &mut [u8]) {
+        let mut rem = in_place;
+
         for dst in rem.chunks_exact_mut(16 * 4) {
             let src_ptr = dst.as_ptr();
             let mut pixel = vld4q_u8(src_ptr);
-            pixel.0 = unpremultiply_vec!(pixel.0, pixel.3);
-            pixel.1 = unpremultiply_vec!(pixel.1, pixel.3);
-            pixel.2 = unpremultiply_vec!(pixel.2, pixel.3);
+            pixel.0 = Self::unpremultiply_vec(pixel.0, pixel.3);
+            pixel.1 = Self::unpremultiply_vec(pixel.1, pixel.3);
+            pixel.2 = Self::unpremultiply_vec(pixel.2, pixel.3);
             let dst_ptr = dst.as_mut_ptr();
             vst4q_u8(dst_ptr, pixel);
         }
 
         rem = rem.chunks_exact_mut(16 * 4).into_remainder();
+
+        for dst in rem.chunks_exact_mut(8 * 4) {
+            let src_ptr = dst.as_ptr();
+            let mut pixel = vld4_u8(src_ptr);
+            pixel.0 = Self::unpremultiply_vech(pixel.0, pixel.3);
+            pixel.1 = Self::unpremultiply_vech(pixel.1, pixel.3);
+            pixel.2 = Self::unpremultiply_vech(pixel.2, pixel.3);
+            vst4_u8(dst.as_mut_ptr(), pixel);
+        }
+
+        rem = rem.chunks_exact_mut(8 * 4).into_remainder();
+
+        if !rem.is_empty() {
+            assert!(rem.len() < 8 * 4);
+            let mut buffer: [u8; 8 * 4] = [0u8; 8 * 4];
+            std::ptr::copy_nonoverlapping(rem.as_ptr(), buffer.as_mut_ptr(), rem.len());
+
+            let mut pixel = vld4_u8(buffer.as_ptr());
+            pixel.0 = Self::unpremultiply_vech(pixel.0, pixel.3);
+            pixel.1 = Self::unpremultiply_vech(pixel.1, pixel.3);
+            pixel.2 = Self::unpremultiply_vech(pixel.2, pixel.3);
+            vst4_u8(buffer.as_mut_ptr(), pixel);
+
+            std::ptr::copy_nonoverlapping(buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
+        }
+    }
+}
+
+struct NeonDisassociateAlphaFloat16 {}
+
+impl Default for NeonDisassociateAlphaFloat16 {
+    fn default() -> Self {
+        NeonDisassociateAlphaFloat16 {}
+    }
+}
+
+impl NeonDisassociateAlphaFloat16 {
+    #[inline]
+    #[target_feature(enable = "fp16")]
+    /// Float16 feature un pre-multiplication, it's faster with a little slower precision
+    unsafe fn unpremultiply_vec_f16(v: uint8x16_t, a_values: uint8x16_t) -> uint8x16_t {
+        // 23544 = 255f16
+        let v_scale = xreinterpretq_f16_u16(vdupq_n_u16(23544));
+
+        let lo = xvmulq_f16(xvcvtq_f16_u16(vmovl_u8(vget_low_u8(v))), v_scale);
+        let hi = xvmulq_f16(xvcvtq_f16_u16(vmovl_high_u8(v)), v_scale);
+
+        let lo_a = xvrecpeq_f16(xvcvtq_f16_u16(vmovl_u8(vget_low_u8(a_values))));
+        let hi_a = xvrecpeq_f16(xvcvtq_f16_u16(vmovl_high_u8(a_values)));
+
+        let zero_mask = vmvnq_u8(vceqzq_u8(a_values));
+
+        let lo = xvcvtaq_u16_f16(xvmulq_f16(lo, lo_a));
+        let hi = xvcvtaq_u16_f16(xvmulq_f16(hi, hi_a));
+        vandq_u8(vcombine_u8(vqmovn_u16(lo), vqmovn_u16(hi)), zero_mask)
     }
 
-    unpremultiply_alpha_rgba_row_impl(rem);
+    #[inline]
+    #[target_feature(enable = "fp16")]
+    /// Float16 feature un pre-multiplication, it's faster with a little slower precision
+    unsafe fn unpremultiply_vec_f16h(v: uint8x8_t, a_values: uint8x8_t) -> uint8x8_t {
+        // 23544 = 255f16
+        let v_scale = xreinterpretq_f16_u16(vdupq_n_u16(23544));
+        let lo = xvmulq_f16(xvcvtq_f16_u16(vmovl_u8(v)), v_scale);
+        let lo_a = xvrecpeq_f16(xvcvtq_f16_u16(vmovl_u8(a_values)));
+        let zero_mask = vmvn_u8(vceqz_u8(a_values));
+        let lo = xvcvtaq_u16_f16(xvmulq_f16(lo, lo_a));
+        vand_u8(vqmovn_u16(lo), zero_mask)
+    }
+}
+
+impl DisassociateAlpha for NeonDisassociateAlphaFloat16 {
+    #[target_feature(enable = "fp16")]
+    unsafe fn disassociate(&self, in_place: &mut [u8]) {
+        let mut rem = in_place;
+
+        for dst in rem.chunks_exact_mut(16 * 4) {
+            let mut pixel = vld4q_u8(dst.as_ptr());
+            pixel.0 = Self::unpremultiply_vec_f16(pixel.0, pixel.3);
+            pixel.1 = Self::unpremultiply_vec_f16(pixel.1, pixel.3);
+            pixel.2 = Self::unpremultiply_vec_f16(pixel.2, pixel.3);
+            let dst_ptr = dst.as_mut_ptr();
+            vst4q_u8(dst_ptr, pixel);
+        }
+
+        rem = rem.chunks_exact_mut(16 * 4).into_remainder();
+
+        for dst in rem.chunks_exact_mut(8 * 4) {
+            let mut pixel = vld4_u8(dst.as_ptr());
+            pixel.0 = Self::unpremultiply_vec_f16h(pixel.0, pixel.3);
+            pixel.1 = Self::unpremultiply_vec_f16h(pixel.1, pixel.3);
+            pixel.2 = Self::unpremultiply_vec_f16h(pixel.2, pixel.3);
+            let dst_ptr = dst.as_mut_ptr();
+            vst4_u8(dst_ptr, pixel);
+        }
+
+        rem = rem.chunks_exact_mut(8 * 4).into_remainder();
+
+        if !rem.is_empty() {
+            assert!(rem.len() < 8 * 4);
+            let mut buffer: [u8; 8 * 4] = [0u8; 8 * 4];
+            std::ptr::copy_nonoverlapping(rem.as_ptr(), buffer.as_mut_ptr(), rem.len());
+
+            let mut pixel = vld4_u8(buffer.as_ptr());
+            pixel.0 = Self::unpremultiply_vec_f16h(pixel.0, pixel.3);
+            pixel.1 = Self::unpremultiply_vec_f16h(pixel.1, pixel.3);
+            pixel.2 = Self::unpremultiply_vec_f16h(pixel.2, pixel.3);
+            vst4_u8(buffer.as_mut_ptr(), pixel);
+
+            std::ptr::copy_nonoverlapping(buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
+        }
+    }
+}
+
+unsafe fn neon_dis_dispatch(in_place: &mut [u8], handler: impl DisassociateAlpha) {
+    handler.disassociate(in_place);
+}
+
+unsafe fn neon_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8]) {
+    if is_aarch_f16_supported() {
+        neon_dis_dispatch(in_place, NeonDisassociateAlphaFloat16::default());
+    } else {
+        neon_dis_dispatch(in_place, NeonDisassociateAlpha::default());
+    }
 }
 
 pub(crate) fn neon_unpremultiply_alpha_rgba(

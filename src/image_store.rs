@@ -61,7 +61,7 @@ where
     /// Image height
     pub height: usize,
     /// This is private field, currently used only for u16, will be automatically passed from upper func
-    pub(crate) bit_depth: usize,
+    pub bit_depth: usize,
 }
 
 #[derive(Debug)]
@@ -443,7 +443,7 @@ impl AssociateAlpha<u16, 4> for ImageStore<'_, u16, 4> {
     fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, u16, 4>, pool: &Option<ThreadPool>) {
         let dst = into.buffer.borrow_mut();
         let src = self.buffer.as_ref();
-        premultiply_alpha_rgba_u16(dst, src, self.width, self.height, self.bit_depth, pool);
+        premultiply_alpha_rgba_u16(dst, src, self.width, self.height, into.bit_depth, pool);
     }
 
     #[cfg(not(any(
