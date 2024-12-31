@@ -221,10 +221,10 @@ pub(crate) fn convolve_column_u16(
                     store3 = prefer_vfmaq_f32(store3, hi1, v_weight);
                 }
             }
-            let u_store0 = vminq_u32(vcvtaq_u32_f32(vmaxq_f32(store0, zeros)), v_max_colors);
-            let u_store1 = vminq_u32(vcvtaq_u32_f32(vmaxq_f32(store1, zeros)), v_max_colors);
-            let u_store2 = vminq_u32(vcvtaq_u32_f32(vmaxq_f32(store2, zeros)), v_max_colors);
-            let u_store3 = vminq_u32(vcvtaq_u32_f32(vmaxq_f32(store3, zeros)), v_max_colors);
+            let u_store0 = vminq_u32(vcvtaq_u32_f32(store0), v_max_colors);
+            let u_store1 = vminq_u32(vcvtaq_u32_f32(store1), v_max_colors);
+            let u_store2 = vminq_u32(vcvtaq_u32_f32(store2), v_max_colors);
+            let u_store3 = vminq_u32(vcvtaq_u32_f32(store3), v_max_colors);
 
             let item0 = vcombine_u16(vqmovn_u32(u_store0), vqmovn_u32(u_store1));
             vst1q_u16(dst.as_mut_ptr(), item0);
@@ -348,8 +348,8 @@ pub(crate) fn convolve_column_u16(
                 }
             }
 
-            let u_store0 = vminq_u32(vcvtaq_u32_f32(vmaxq_f32(store0, zeros)), v_max_colors);
-            let u_store1 = vminq_u32(vcvtaq_u32_f32(vmaxq_f32(store1, zeros)), v_max_colors);
+            let u_store0 = vminq_u32(vcvtaq_u32_f32(store0), v_max_colors);
+            let u_store1 = vminq_u32(vcvtaq_u32_f32(store1), v_max_colors);
 
             let item = vcombine_u16(vqmovn_u32(u_store0), vqmovn_u32(u_store1));
             vst1q_u16(dst.as_mut_ptr(), item);
@@ -444,7 +444,7 @@ pub(crate) fn convolve_column_u16(
                 }
             }
 
-            let u_store0 = vminq_u32(vcvtaq_u32_f32(vmaxq_f32(store0, zeros)), v_max_colors);
+            let u_store0 = vminq_u32(vcvtaq_u32_f32(store0), v_max_colors);
 
             vst1_u16(dst.as_mut_ptr(), vqmovn_u32(u_store0));
 

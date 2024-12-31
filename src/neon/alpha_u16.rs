@@ -47,17 +47,26 @@ unsafe fn neon_div_by_65535_n(v: uint32x4_t) -> uint16x4_t {
     vqrshrn_n_u32::<16>(vrsraq_n_u32::<16>(v, v))
 }
 
-pub fn neon_premultiply_alpha_rgba_row_u16(dst: &mut [u16], src: &[u16], bit_depth: usize) {
-    assert_ne!(bit_depth, 0, "Something goes wrong!");
-    let max_colors = (1 << bit_depth) - 1;
+trait NeonPremultiplyExecutor {
+    fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize);
+}
 
-    let v_max_colors_scale = unsafe { vdupq_n_f32((1. / max_colors as f64) as f32) };
+struct NeonPremultiplyExecutor10Bit {}
 
-    let mut rem = dst;
-    let mut src_rem = src;
+impl Default for NeonPremultiplyExecutor10Bit {
+    fn default() -> Self {
+        NeonPremultiplyExecutor10Bit {}
+    }
+}
 
-    unsafe {
-        if bit_depth == 10 {
+impl NeonPremultiplyExecutor for NeonPremultiplyExecutor10Bit {
+    fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
+        unsafe {
+            assert_ne!(bit_depth, 0, "Something goes wrong!");
+            assert!(bit_depth >= 1 && bit_depth <= 16);
+            let max_colors = (1 << bit_depth) - 1;
+            let mut rem = dst;
+            let mut src_rem = src;
             for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
                 let pixel = vld4q_u16(src.as_ptr());
 
@@ -82,7 +91,32 @@ pub fn neon_premultiply_alpha_rgba_row_u16(dst: &mut [u16], src: &[u16], bit_dep
 
                 vst4q_u16(dst.as_mut_ptr(), new_px);
             }
-        } else if bit_depth == 12 {
+
+            rem = rem.chunks_exact_mut(8 * 4).into_remainder();
+            src_rem = src_rem.chunks_exact(8 * 4).remainder();
+
+            premultiply_alpha_rgba_row(rem, src_rem, max_colors);
+        }
+    }
+}
+
+struct NeonPremultiplyExecutor12Bit {}
+
+impl Default for NeonPremultiplyExecutor12Bit {
+    fn default() -> Self {
+        NeonPremultiplyExecutor12Bit {}
+    }
+}
+
+impl NeonPremultiplyExecutor for NeonPremultiplyExecutor12Bit {
+    fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
+        unsafe {
+            assert_ne!(bit_depth, 0, "Something goes wrong!");
+            assert!(bit_depth >= 1 && bit_depth <= 16);
+            let max_colors = (1 << bit_depth) - 1;
+            let mut rem = dst;
+            let mut src_rem = src;
+
             for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
                 let pixel = vld4q_u16(src.as_ptr());
 
@@ -107,7 +141,32 @@ pub fn neon_premultiply_alpha_rgba_row_u16(dst: &mut [u16], src: &[u16], bit_dep
 
                 vst4q_u16(dst.as_mut_ptr(), new_px);
             }
-        } else if bit_depth == 16 {
+
+            rem = rem.chunks_exact_mut(8 * 4).into_remainder();
+            src_rem = src_rem.chunks_exact(8 * 4).remainder();
+
+            premultiply_alpha_rgba_row(rem, src_rem, max_colors);
+        }
+    }
+}
+
+struct NeonPremultiplyExecutor16Bit {}
+
+impl Default for NeonPremultiplyExecutor16Bit {
+    fn default() -> Self {
+        NeonPremultiplyExecutor16Bit {}
+    }
+}
+
+impl NeonPremultiplyExecutor for NeonPremultiplyExecutor16Bit {
+    fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
+        unsafe {
+            assert_ne!(bit_depth, 0, "Something goes wrong!");
+            assert!(bit_depth >= 1 && bit_depth <= 16);
+            let max_colors = (1 << bit_depth) - 1;
+            let mut rem = dst;
+            let mut src_rem = src;
+
             for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
                 let pixel = vld4q_u16(src.as_ptr());
 
@@ -132,7 +191,34 @@ pub fn neon_premultiply_alpha_rgba_row_u16(dst: &mut [u16], src: &[u16], bit_dep
 
                 vst4q_u16(dst.as_mut_ptr(), new_px);
             }
-        } else {
+
+            rem = rem.chunks_exact_mut(8 * 4).into_remainder();
+            src_rem = src_rem.chunks_exact(8 * 4).remainder();
+
+            premultiply_alpha_rgba_row(rem, src_rem, max_colors);
+        }
+    }
+}
+
+struct NeonPremultiplyExecutorAnyBitDepth {}
+
+impl Default for NeonPremultiplyExecutorAnyBitDepth {
+    fn default() -> Self {
+        NeonPremultiplyExecutorAnyBitDepth {}
+    }
+}
+
+impl NeonPremultiplyExecutor for NeonPremultiplyExecutorAnyBitDepth {
+    fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
+        unsafe {
+            assert_ne!(bit_depth, 0, "Something goes wrong!");
+            assert!(bit_depth >= 1 && bit_depth <= 16);
+            let max_colors = (1 << bit_depth) - 1;
+            let mut rem = dst;
+            let mut src_rem = src;
+
+            let v_max_colors_scale = vdupq_n_f32((1. / max_colors as f64) as f32);
+
             for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
                 let pixel = vld4q_u16(src.as_ptr());
 
@@ -152,13 +238,28 @@ pub fn neon_premultiply_alpha_rgba_row_u16(dst: &mut [u16], src: &[u16], bit_dep
 
                 vst4q_u16(dst.as_mut_ptr(), new_px);
             }
+
+            rem = rem.chunks_exact_mut(8 * 4).into_remainder();
+            src_rem = src_rem.chunks_exact(8 * 4).remainder();
+
+            premultiply_alpha_rgba_row(rem, src_rem, max_colors);
         }
-
-        rem = rem.chunks_exact_mut(8 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(8 * 4).remainder();
     }
+}
 
-    premultiply_alpha_rgba_row(rem, src_rem, max_colors);
+fn neon_premultiply_alpha_rgba_row_u16(dst: &mut [u16], src: &[u16], bit_depth: usize) {
+    assert_ne!(bit_depth, 0, "Something goes wrong!");
+
+    let executor: Box<dyn NeonPremultiplyExecutor> = if bit_depth == 10 {
+        Box::new(NeonPremultiplyExecutor10Bit::default())
+    } else if bit_depth == 12 {
+        Box::new(NeonPremultiplyExecutor12Bit::default())
+    } else if bit_depth == 16 {
+        Box::new(NeonPremultiplyExecutor16Bit::default())
+    } else {
+        Box::new(NeonPremultiplyExecutorAnyBitDepth::default())
+    };
+    executor.premultiply(dst, src, bit_depth);
 }
 
 pub(crate) fn neon_premultiply_alpha_rgba_u16(

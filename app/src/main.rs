@@ -3,17 +3,14 @@ mod split;
 
 use std::time::Instant;
 
-use crate::merge::merge_channels_3;
-use crate::split::split_channels_3;
 use fast_image_resize::images::Image;
 use fast_image_resize::{
     CpuExtensions, FilterType, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
-    Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, JzazbzScaler, LChScaler, LabScaler,
-    LinearApproxScaler, LinearScaler, LuvScaler, OklabScaler, ResamplingFunction, Scaler, Scaling,
-    ScalingU16, SigmoidalScaler, ThreadingPolicy, TransferFunction, XYZScaler,
+    ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingU16,
+    ThreadingPolicy,
 };
 
 fn resize_plane(
@@ -58,11 +55,11 @@ fn main() {
 
     // resize_plane(378, 257, 257, 257, ResamplingFunction::Bilinear);
 
-    let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 2).collect();
+    // let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 2).collect();
 
     //
     let store =
-        ImageStore::<u16, 3>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
+        ImageStore::<u8, 3>::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
 
     let dst_size = ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
@@ -78,15 +75,13 @@ fn main() {
     //     )
     //     .unwrap();
 
-    let mut dst_store = ImageStoreMut::<u16, 3>::alloc_with_depth(
+    let mut dst_store = ImageStoreMut::<u8, 3>::alloc_with_depth(
         dimensions.0 as usize,
         dimensions.1 as usize / 2,
         10,
     );
 
-    scaler
-        .resize_rgb_u16(&store, &mut dst_store)
-        .unwrap();
+    scaler.resize_rgb(&store, &mut dst_store).unwrap();
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
@@ -163,13 +158,13 @@ fn main() {
     //     .map(|&x| (x * 255f32) as u8)
     //     .collect();
 
-    let dst: Vec<u8> = dst_store
-        .as_bytes()
-        .iter()
-        .map(|&x| (x >> 2) as u8)
-        .collect();
+    // let dst: Vec<u8> = dst_store
+    //     .as_bytes()
+    //     .iter()
+    //     .map(|&x| (x >> 2) as u8)
+    //     .collect();
     //
-    // let dst = dst_store.as_bytes();
+    let dst = dst_store.as_bytes();
     // let dst = resized;
     // image::save_buffer(
     //     "converted.png",

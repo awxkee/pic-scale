@@ -138,19 +138,13 @@ pub(crate) unsafe fn prefer_vfmaq_lane_f32<const LANE: i32>(
 
 #[inline(always)]
 pub(crate) unsafe fn load_3b_as_u16x4(src_ptr: *const u8) -> uint16x4_t {
-    let v_new_value1 = u16::from_le_bytes([src_ptr.read_unaligned(), 0]);
-    let v_new_value2 = u16::from_le_bytes([src_ptr.add(1).read_unaligned(), 0]);
-    let v_new_value3 = u16::from_le_bytes([src_ptr.add(2).read_unaligned(), 0]);
-    let arr = [v_new_value1, v_new_value2, v_new_value3, 0];
-    vld1_u16(arr.as_ptr())
+    let mut v = vreinterpret_u8_u16(vld1_lane_u16::<0>(src_ptr as *const u16, vdup_n_u16(0)));
+    v = vld1_lane_u8::<2>(src_ptr.add(2), v);
+    vget_low_u16(vmovl_u8(v))
 }
 
 #[inline(always)]
 pub(crate) unsafe fn load_4b_as_u16x4(src_ptr: *const u8) -> uint16x4_t {
-    let v_new_value1 = u16::from_le_bytes([src_ptr.read_unaligned(), 0]);
-    let v_new_value2 = u16::from_le_bytes([src_ptr.add(1).read_unaligned(), 0]);
-    let v_new_value3 = u16::from_le_bytes([src_ptr.add(2).read_unaligned(), 0]);
-    let v_new_value4 = u16::from_le_bytes([src_ptr.add(3).read_unaligned(), 0]);
-    let arr = [v_new_value1, v_new_value2, v_new_value3, v_new_value4];
-    vld1_u16(arr.as_ptr())
+    let j = vreinterpret_u8_u32(vld1_lane_u32::<0>(src_ptr as *const u32, vdup_n_u32(0)));
+    vget_low_u16(vmovl_u8(j))
 }

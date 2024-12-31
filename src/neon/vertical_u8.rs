@@ -69,6 +69,13 @@ macro_rules! accumulate_4_into_lane {
     }};
 }
 
+/// Checking NEON `rdm` availability is required before a call.
+///
+/// RDM feature has slightly lower precision and won't work really well on huge kernel which
+/// edges fades out fast. Therefore, it would be reasonable to avoid using feature for huge downscaling.
+///
+/// # Safety
+/// - Check `rdm` availability before the call.
 pub(crate) fn convolve_vertical_neon_i16_precision(
     width: usize,
     bounds: &FilterBounds,
@@ -133,7 +140,6 @@ unsafe fn convolve_vertical_neon_row_upper(
     let mut cx = 0usize;
 
     unsafe {
-        let zeros = vdupq_n_s16(0);
         let iter_64 = dst.chunks_exact_mut(64);
 
         let bounds_size = bounds.size;
@@ -258,15 +264,6 @@ unsafe fn convolve_vertical_neon_row_upper(
                 }
             }
 
-            store_0 = vmaxq_s16(store_0, zeros);
-            store_1 = vmaxq_s16(store_1, zeros);
-            store_2 = vmaxq_s16(store_2, zeros);
-            store_3 = vmaxq_s16(store_3, zeros);
-            store_4 = vmaxq_s16(store_4, zeros);
-            store_5 = vmaxq_s16(store_5, zeros);
-            store_6 = vmaxq_s16(store_6, zeros);
-            store_7 = vmaxq_s16(store_7, zeros);
-
             let item00 = vqshrun_n_s16::<R_SHR_SCALE>(store_0);
             let item01 = vqshrun_n_s16::<R_SHR_SCALE>(store_1);
             let item10 = vqshrun_n_s16::<R_SHR_SCALE>(store_2);
@@ -380,11 +377,6 @@ unsafe fn convolve_vertical_neon_row_upper(
                 }
             }
 
-            store_0 = vmaxq_s16(store_0, zeros);
-            store_1 = vmaxq_s16(store_1, zeros);
-            store_2 = vmaxq_s16(store_2, zeros);
-            store_3 = vmaxq_s16(store_3, zeros);
-
             let item00 = vqshrun_n_s16::<R_SHR_SCALE>(store_0);
             let item01 = vqshrun_n_s16::<R_SHR_SCALE>(store_1);
             let item10 = vqshrun_n_s16::<R_SHR_SCALE>(store_2);
@@ -474,9 +466,6 @@ unsafe fn convolve_vertical_neon_row_upper(
                     (store_0, store_1) = vdot::<SCALE>(store_0, store_1, item_row, v_weight);
                 }
             }
-
-            store_0 = vmaxq_s16(store_0, zeros);
-            store_1 = vmaxq_s16(store_1, zeros);
 
             let item0 = vqshrun_n_s16::<R_SHR_SCALE>(store_0);
             let item1 = vqshrun_n_s16::<R_SHR_SCALE>(store_1);
@@ -568,8 +557,6 @@ unsafe fn convolve_vertical_neon_row_upper(
                 }
             }
 
-            store_0 = vmaxq_s16(store_0, zeros);
-
             let item = vqshrun_n_s16::<R_SHR_SCALE>(store_0);
             vst1_u8(dst.as_mut_ptr(), item);
 
@@ -657,8 +644,6 @@ unsafe fn convolve_vertical_neon_row_upper(
                     store = vqrdmlahq_s16(store, low, v_weight);
                 }
             }
-
-            store = vmaxq_s16(store, zeros);
 
             let shrinked_store = vqshrun_n_s16::<R_SHR_SCALE>(store);
             let value = vget_lane_u8::<0>(shrinked_store);
@@ -1206,10 +1191,6 @@ fn convolve_vertical_neon_row_full(
                     store = vmlal_s16(store, vget_low_s16(low), vget_low_s16(v_weight));
                 }
             }
-
-            let zeros = vdupq_n_s32(0);
-
-            store = vmaxq_s32(store, zeros);
 
             let shrinked_store = vqshrun_n_s32::<PRECISION>(store);
 
