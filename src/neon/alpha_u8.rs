@@ -55,57 +55,55 @@ unsafe fn neon_premultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8]) {
     let mut rem = dst;
     let mut src_rem = src;
 
-    unsafe {
-        for (dst, src) in rem
-            .chunks_exact_mut(64 * 4)
-            .zip(src_rem.chunks_exact(64 * 4))
-        {
-            let src_ptr = src.as_ptr();
-            let mut pixel0 = vld4q_u8(src_ptr);
-            let mut pixel1 = vld4q_u8(src_ptr.add(16 * 4));
-            let mut pixel2 = vld4q_u8(src_ptr.add(16 * 4 * 2));
-            let mut pixel3 = vld4q_u8(src_ptr.add(16 * 4 * 3));
-            pixel0.0 = premultiply_vec!(pixel0.0, pixel0.3);
-            pixel0.1 = premultiply_vec!(pixel0.1, pixel0.3);
-            pixel0.2 = premultiply_vec!(pixel0.2, pixel0.3);
+    for (dst, src) in rem
+        .chunks_exact_mut(64 * 4)
+        .zip(src_rem.chunks_exact(64 * 4))
+    {
+        let src_ptr = src.as_ptr();
+        let mut pixel0 = vld4q_u8(src_ptr);
+        let mut pixel1 = vld4q_u8(src_ptr.add(16 * 4));
+        let mut pixel2 = vld4q_u8(src_ptr.add(16 * 4 * 2));
+        let mut pixel3 = vld4q_u8(src_ptr.add(16 * 4 * 3));
+        pixel0.0 = premultiply_vec!(pixel0.0, pixel0.3);
+        pixel0.1 = premultiply_vec!(pixel0.1, pixel0.3);
+        pixel0.2 = premultiply_vec!(pixel0.2, pixel0.3);
 
-            pixel1.0 = premultiply_vec!(pixel1.0, pixel1.3);
-            pixel1.1 = premultiply_vec!(pixel1.1, pixel1.3);
-            pixel1.2 = premultiply_vec!(pixel1.2, pixel1.3);
+        pixel1.0 = premultiply_vec!(pixel1.0, pixel1.3);
+        pixel1.1 = premultiply_vec!(pixel1.1, pixel1.3);
+        pixel1.2 = premultiply_vec!(pixel1.2, pixel1.3);
 
-            pixel2.0 = premultiply_vec!(pixel2.0, pixel2.3);
-            pixel2.1 = premultiply_vec!(pixel2.1, pixel2.3);
-            pixel2.2 = premultiply_vec!(pixel2.2, pixel2.3);
+        pixel2.0 = premultiply_vec!(pixel2.0, pixel2.3);
+        pixel2.1 = premultiply_vec!(pixel2.1, pixel2.3);
+        pixel2.2 = premultiply_vec!(pixel2.2, pixel2.3);
 
-            pixel3.0 = premultiply_vec!(pixel3.0, pixel3.3);
-            pixel3.1 = premultiply_vec!(pixel3.1, pixel3.3);
-            pixel3.2 = premultiply_vec!(pixel3.2, pixel3.3);
-            let dst_ptr = dst.as_mut_ptr();
-            vst4q_u8(dst_ptr, pixel0);
-            vst4q_u8(dst_ptr.add(16 * 4), pixel1);
-            vst4q_u8(dst_ptr.add(16 * 4 * 2), pixel2);
-            vst4q_u8(dst_ptr.add(16 * 4 * 3), pixel3);
-        }
-
-        rem = rem.chunks_exact_mut(64 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(64 * 4).remainder();
-
-        for (dst, src) in rem
-            .chunks_exact_mut(16 * 4)
-            .zip(src_rem.chunks_exact(16 * 4))
-        {
-            let src_ptr = src.as_ptr();
-            let mut pixel = vld4q_u8(src_ptr);
-            pixel.0 = premultiply_vec!(pixel.0, pixel.3);
-            pixel.1 = premultiply_vec!(pixel.1, pixel.3);
-            pixel.2 = premultiply_vec!(pixel.2, pixel.3);
-            let dst_ptr = dst.as_mut_ptr();
-            vst4q_u8(dst_ptr, pixel);
-        }
-
-        rem = rem.chunks_exact_mut(16 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(16 * 4).remainder();
+        pixel3.0 = premultiply_vec!(pixel3.0, pixel3.3);
+        pixel3.1 = premultiply_vec!(pixel3.1, pixel3.3);
+        pixel3.2 = premultiply_vec!(pixel3.2, pixel3.3);
+        let dst_ptr = dst.as_mut_ptr();
+        vst4q_u8(dst_ptr, pixel0);
+        vst4q_u8(dst_ptr.add(16 * 4), pixel1);
+        vst4q_u8(dst_ptr.add(16 * 4 * 2), pixel2);
+        vst4q_u8(dst_ptr.add(16 * 4 * 3), pixel3);
     }
+
+    rem = rem.chunks_exact_mut(64 * 4).into_remainder();
+    src_rem = src_rem.chunks_exact(64 * 4).remainder();
+
+    for (dst, src) in rem
+        .chunks_exact_mut(16 * 4)
+        .zip(src_rem.chunks_exact(16 * 4))
+    {
+        let src_ptr = src.as_ptr();
+        let mut pixel = vld4q_u8(src_ptr);
+        pixel.0 = premultiply_vec!(pixel.0, pixel.3);
+        pixel.1 = premultiply_vec!(pixel.1, pixel.3);
+        pixel.2 = premultiply_vec!(pixel.2, pixel.3);
+        let dst_ptr = dst.as_mut_ptr();
+        vst4q_u8(dst_ptr, pixel);
+    }
+
+    rem = rem.chunks_exact_mut(16 * 4).into_remainder();
+    src_rem = src_rem.chunks_exact(16 * 4).remainder();
 
     premultiply_alpha_rgba_row_impl(rem, src_rem);
 }

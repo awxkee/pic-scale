@@ -137,6 +137,13 @@ pub(crate) fn premultiply_alpha_rgba(
         if is_x86_feature_detected!("avx2") {
             _dispatcher = avx_premultiply_alpha_rgba;
         }
+        #[cfg(feature = "nightly_avx512")]
+        if std::arch::is_x86_feature_detected!("avx512f")
+            && std::arch::is_x86_feature_detected!("avx512bw")
+        {
+            use crate::avx512::avx512_premultiply_alpha_rgba;
+            _dispatcher = avx512_premultiply_alpha_rgba;
+        }
     }
     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
     {
@@ -159,14 +166,21 @@ pub(crate) fn unpremultiply_alpha_rgba(
     }
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
-        if is_x86_feature_detected!("sse4.1") {
+        if std::arch::is_x86_feature_detected!("sse4.1") {
             _dispatcher = sse_unpremultiply_alpha_rgba;
         }
     }
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
-        if is_x86_feature_detected!("avx2") {
+        if std::arch::is_x86_feature_detected!("avx2") {
             _dispatcher = avx_unpremultiply_alpha_rgba;
+        }
+        #[cfg(feature = "nightly_avx512")]
+        if std::arch::is_x86_feature_detected!("avx512f")
+            && std::arch::is_x86_feature_detected!("avx512bw")
+        {
+            use crate::avx512::avx512_unpremultiply_alpha_rgba;
+            _dispatcher = avx512_unpremultiply_alpha_rgba;
         }
     }
     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]

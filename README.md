@@ -12,7 +12,7 @@ Those transformations also very efficients.
 Prefer downscale in linear colorspace or XYZ.\
 Up scaling might be done in LAB/LUB and simoidized components and also efficient in sRGB.
 
-Have good f16 (binary float16) support.
+Have good `f16` (the “binary16” type defined in IEEE 754-2008) support.
 
 #### Example integration with `image` crate
 
@@ -29,9 +29,10 @@ scaler.set_threading_policy(ThreadingPolicy::Adaptive);
 // ImageStore::<u8, 4> - (u8, 4) represents RGBA, (u8, 3) - RGB etc
 let store =
     ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
+let mut dst_store = ImageStoreMut::<u8, 4>::alloc(dimensions.0 as usize / 2, dimensions.1 as usize / 2);
 let resized = scaler.resize_rgba(
-    ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-    store,
+    &store,
+    &mut dst_store,
     true
 );
 let resized_image = resized.as_bytes();
@@ -43,32 +44,37 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 
 `~` - Partially implemented
 
-|                | NEON | SSE | AVX2 | WASM | 
-|----------------|------|-----|------|------| 
-| RGBA (8 bit)   | x    | x   | x    | ~    | 
-| RGB (8 bit)    | x    | x   | ~    | ~    | 
-| Plane (8 bit)  | x    | x   | ~    | ~    | 
-| RGBA (8+ bit)  | x    | x   | ~    | -    | 
-| RGB (8+ bit)   | x    | x   | ~    | -    | 
-| Plane (8+ bit) | ~    | ~   | ~    | -    | 
-| RGBA (f32)     | x    | x   | x    | -    | 
-| RGB (f32)      | x    | x   | ~    | -    | 
-| Plane (f32)    | x    | x   | ~    | -    | 
-| RGBA (f16)     | x    | x   | x    | -    | 
-| RGB (f16)      | x    | ~   | ~    | -    | 
-| Plane (f16)    | ~    | ~   | ~    | -    |
-| AR30/RA30      | x    | -   | -    | -    |
+|                | NEON | SSE | AVX2 | AVX-512 | WASM | 
+|----------------|------|-----|------|---------|------| 
+| RGBA (8 bit)   | x    | x   | x    | ~       | ~    | 
+| RGB (8 bit)    | x    | x   | ~    | ~       | ~    | 
+| Plane (8 bit)  | x    | x   | ~    | ~       | ~    | 
+| RGBA (8+ bit)  | x    | x   | ~    | -       | -    | 
+| RGB (8+ bit)   | x    | x   | ~    | -       | -    | 
+| Plane (8+ bit) | ~    | ~   | ~    | -       | -    | 
+| RGBA (f32)     | x    | x   | x    | -       | -    | 
+| RGB (f32)      | x    | x   | ~    | -       | -    | 
+| Plane (f32)    | x    | x   | ~    | -       | -    | 
+| RGBA (f16)     | x    | x   | x    | -       | -    | 
+| RGB (f16)      | x    | ~   | ~    | -       | -    | 
+| Plane (f16)    | ~    | ~   | ~    | -       | -    |
+| AR30/RA30      | x    | -   | -    | -       | -    |
 
 #### Features
 
-To enable support of `f16` the feature `half` should be activated.
+Features: 
+ -  To enable support of `f16` the feature `half` should be activated.
+ -  `nightly_avx512` activates AVX-512 feature set and requires `nightly` compiler channel 
 
-#### Target features
+#### Target features with runtime dispatch
+
+For x86 and aarch64 NEON runtime dispatch is used.
 
 `neon` optional target features are available, enable it when compiling on supported platform to get full features.
 
-`avx2`, `fma`, `sse4.1`, `f16c` will be detected automatically if available, and called the best path.
-For x86 and aarch64 NEON runtime dispatch is used.
+`avx2`, `fma`, `sse4.1`, `f16c` will be detected automatically if available, no additional actions need, and called the best path.
+
+`avx512` requires feature `nightly_avx512` and requires `nightly` compiler channel, runtime detection if it is available then will be used.
 
 `fullfp16` NEON target detection performed in runtime, when available best the best paths for *f16* images are available on ARM.
 
@@ -132,11 +138,11 @@ In common, you should not downsize an image in sRGB colorspace, however if speed
 ```rust
 let mut scaler = Scaler::new(ResamplingFunction::Hermite);
 scaler.set_threading_policy(ThreadingPolicy::Single);
-let store =
-    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height).unwrap();
+let store = ImageStore::<u8, 4>::from_slice(&bytes, width, height).unwrap();
+let mut dst_store = ImageStoreMut::<u8, 4>::alloc(width / 2, height / 2);
 let resized = scaler.resize_rgba(
-    ImageSize::new(new_width, new_height),
-    store,
+    &store,
+    &mut dst_store,
     true
 );
 ```
@@ -148,11 +154,11 @@ At the moment only sRGB transfer function is supported. This is also good optimi
 ```rust
 let mut scaler = LinearScaler::new(ResamplingFunction::Lanczos3);
 scaler.set_threading_policy(ThreadingPolicy::Single);
-let store =
-    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height).unwrap();
+let store = ImageStore::<u8, 4>::from_slice(&bytes, width, height).unwrap();
+let mut dst_store = ImageStoreMut::<u8, 4>::alloc(width / 2, height / 2);
 let resized = scaler.resize_rgba(
-    ImageSize::new(new_width, new_height),
-    store,
+    &store,
+    &mut dst_store,
     true
 );
 ```
@@ -161,11 +167,11 @@ let resized = scaler.resize_rgba(
 ```rust
 let mut scaler = LabScaler::new(ResamplingFunction::Hermite);
 scaler.set_threading_policy(ThreadingPolicy::Single);
-let store =
-    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height).unwrap();
+let store = ImageStore::<u8, 4>::from_slice(&bytes, width, height).unwrap();
+let mut dst_store = ImageStoreMut::<u8, 4>::alloc(width / 2, height / 2);
 let resized = scaler.resize_rgba(
-    ImageSize::new(new_width, new_height),
-    store,
+    &store,
+    &mut dst_store,
     true
 );
 ```
@@ -174,11 +180,11 @@ let resized = scaler.resize_rgba(
 ```rust
 let mut scaler = LuvScaler::new(ResamplingFunction::Hermite);
 scaler.set_threading_policy(ThreadingPolicy::Single);
-let store =
-    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height).unwrap();
+let store = ImageStore::<u8, 4>::from_slice(&bytes, width, height).unwrap();
+let mut dst_store = ImageStoreMut::<u8, 4>::alloc(width / 2, height / 2);
 let resized = scaler.resize_rgba(
-    ImageSize::new(new_width, new_height),
-    store,
+    &store,
+    &mut dst_store,
     true
 );
 ```
@@ -187,24 +193,11 @@ let resized = scaler.resize_rgba(
 ```rust
 let mut scaler = XYZScale::new(ResamplingFunction::Hermite);
 scaler.set_threading_policy(ThreadingPolicy::Single);
-let store =
-    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height).unwrap();
-let resized = scaler.resize_rgba(
-    ImageSize::new(new_width, new_height),
-    store,
-    true
-);
-```
-
-#### Example in Sigmoidal colorspace
-```rust
-let mut scaler = SigmoidalScaler::new(ResamplingFunction::Hermite);
-scaler.set_threading_policy(ThreadingPolicy::Single);
-let store =
-    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height).unwrap();
-let resized = scaler.resize_rgba(
-    ImageSize::new(new_width, new_height),
-    store,
+let store = ImageStore::<u8, 4>::from_slice(&bytes, width, height).unwrap();
+let mut dst_store = ImageStoreMut::<u8, 4>::alloc(width / 2, height / 2);
+    let resized = scaler.resize_rgba(
+    &store,
+    &mut dst_store,
     true
 );
 ```
@@ -213,11 +206,11 @@ let resized = scaler.resize_rgba(
 ```rust
 let mut scaler = LChScaler::new(ResamplingFunction::Hermite);
 scaler.set_threading_policy(ThreadingPolicy::Single);
-let store =
-    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height).unwrap();
+let store = ImageStore::<u8, 4>::from_slice(&bytes, width, height).unwrap();
+let mut dst_store = ImageStoreMut::<u8, 4>::alloc(width / 2, height / 2);
 let resized = scaler.resize_rgba(
-    ImageSize::new(new_width, new_height),
-    store,
+    &store,
+    &mut dst_store,
     true
 );
 ```
@@ -226,11 +219,11 @@ let resized = scaler.resize_rgba(
 ```rust
 let mut scaler = OklabScaler::new(ResamplingFunction::Hermite);
 scaler.set_threading_policy(ThreadingPolicy::Single);
-let store =
-    ImageStore::<u8, 4>::from_slice(&mut bytes, width, height).unwrap();
+let store = ImageStore::<u8, 4>::from_slice(&bytes, width, height).unwrap();
+let mut dst_store = ImageStoreMut::<u8, 4>::alloc(width / 2, height / 2);
 let resized = scaler.resize_rgba(
-    ImageSize::new(new_width, new_height),
-    store,
+    &store,
+    &mut dst_store,
     true
 );
 ```

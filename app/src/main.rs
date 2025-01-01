@@ -42,7 +42,7 @@ fn resize_plane(
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/asset_4.png")
+    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -59,7 +59,7 @@ fn main() {
 
     //
     let store =
-        ImageStore::<u16, 4>::from_slice(&choke, dimensions.0 as usize, dimensions.1 as usize)
+        ImageStore::<u8, 4>::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
 
     let dst_size = ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
@@ -75,15 +75,13 @@ fn main() {
     //     )
     //     .unwrap();
 
-    let mut dst_store = ImageStoreMut::<u16, 4>::alloc_with_depth(
+    let mut dst_store = ImageStoreMut::<u8, 4>::alloc_with_depth(
         dimensions.0 as usize,
         dimensions.1 as usize / 2,
         10,
     );
 
-    scaler
-        .resize_rgba_u16(&store, &mut dst_store, true)
-        .unwrap();
+    scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
@@ -160,13 +158,13 @@ fn main() {
     //     .map(|&x| (x * 255f32) as u8)
     //     .collect();
 
-    let dst: Vec<u8> = dst_store
-        .as_bytes()
-        .iter()
-        .map(|&x| (x >> 2) as u8)
-        .collect();
+    // let dst: Vec<u8> = dst_store
+    //     .as_bytes()
+    //     .iter()
+    //     .map(|&x| (x >> 2) as u8)
+    //     .collect();
 
-    // let dst = dst_store.as_bytes();
+    let dst = dst_store.as_bytes();
     // let dst = resized;
     // image::save_buffer(
     //     "converted.png",

@@ -64,10 +64,7 @@ pub(crate) use alpha_f16::{sse_premultiply_alpha_rgba_f16, sse_unpremultiply_alp
 pub(crate) use alpha_f32::sse_premultiply_alpha_rgba_f32;
 pub(crate) use alpha_f32::sse_unpremultiply_alpha_rgba_f32;
 pub(crate) use alpha_u16::{premultiply_alpha_sse_rgba_u16, unpremultiply_alpha_sse_rgba_u16};
-pub(crate) use alpha_u8::{
-    _mm_div_by_255_epi16, sse_premultiply_alpha_rgba, sse_unpremultiply_alpha_rgba,
-    sse_unpremultiply_row,
-};
+pub(crate) use alpha_u8::{sse_premultiply_alpha_rgba, sse_unpremultiply_alpha_rgba};
 pub(crate) use check_alpha::{
     sse_has_non_constant_cap_alpha_rgba16, sse_has_non_constant_cap_alpha_rgba8,
 };

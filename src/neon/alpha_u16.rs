@@ -104,8 +104,10 @@ impl<const BIT_DEPTH: usize> NeonPremultiplyExecutor for NeonPremultiplyExecutor
         if !rem.is_empty() {
             assert!(src_rem.len() < 8 * 4);
             assert!(rem.len() < 8 * 4);
+            assert_eq!(src_rem.len(), rem.len());
+
             let mut buffer: [u16; 8 * 4] = [0u16; 8 * 4];
-            std::ptr::copy_nonoverlapping(rem.as_ptr(), buffer.as_mut_ptr(), src_rem.len());
+            std::ptr::copy_nonoverlapping(src_rem.as_ptr(), buffer.as_mut_ptr(), src_rem.len());
 
             let pixel = vld4q_u16(buffer.as_ptr());
 
@@ -174,8 +176,9 @@ impl NeonPremultiplyExecutor for NeonPremultiplyExecutorAnyBitDepth {
         if !rem.is_empty() {
             assert!(src_rem.len() < 8 * 4);
             assert!(rem.len() < 8 * 4);
+            assert_eq!(src_rem.len(), rem.len());
             let mut buffer: [u16; 8 * 4] = [0u16; 8 * 4];
-            std::ptr::copy_nonoverlapping(rem.as_ptr(), buffer.as_mut_ptr(), src_rem.len());
+            std::ptr::copy_nonoverlapping(src_rem.as_ptr(), buffer.as_mut_ptr(), src_rem.len());
 
             let pixel = vld4q_u16(buffer.as_ptr());
 

@@ -72,6 +72,7 @@ pub(crate) unsafe fn _mm256_selecti_ps(
     _mm256_blendv_ps(false_vals, true_vals, _mm256_castsi256_ps(mask))
 }
 
+/// Exact division by 255 with rounding to nearest
 #[inline(always)]
 pub(crate) unsafe fn avx2_div_by255(v: __m256i) -> __m256i {
     let addition = _mm256_set1_epi16(127);

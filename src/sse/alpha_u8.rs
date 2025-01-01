@@ -27,7 +27,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::alpha_handle_u8::premultiply_alpha_rgba_row_impl;
 use crate::sse::{sse_deinterleave_rgba, sse_interleave_rgba};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
@@ -49,6 +48,7 @@ pub(crate) unsafe fn _mm_select_si128(
     )
 }
 
+/// Exact division by 255 with rounding to nearest
 #[inline(always)]
 pub(crate) unsafe fn _mm_div_by_255_epi16(v: __m128i) -> __m128i {
     let addition = _mm_set1_epi16(127);
@@ -64,10 +64,7 @@ pub(crate) unsafe fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
     let lo = _mm_unpacklo_epi8(x, zeros);
     let hi = _mm_unpackhi_epi8(x, zeros);
 
-    let scale = _mm_set1_epi16(255);
-
     let is_zero_mask = _mm_cmpeq_epi8(a, zeros);
-    let a = _mm_select_si128(is_zero_mask, scale, a);
 
     let scale_ps = _mm_set1_ps(255f32);
 
@@ -106,16 +103,17 @@ pub(crate) fn sse_premultiply_alpha_rgba(
     }
 }
 
-#[target_feature(enable = "sse4.1")]
-unsafe fn sse_premultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8]) {
-    let mut rem = dst;
-    let mut src_rem = src;
+trait Sse41PremultiplyExecutorRgba8 {
+    unsafe fn premultiply(&self, dst: &mut [u8], src: &[u8]);
+}
 
-    let zeros = _mm_setzero_si128();
-    for (dst, src) in rem
-        .chunks_exact_mut(16 * 4)
-        .zip(src_rem.chunks_exact(16 * 4))
-    {
+#[derive(Default)]
+struct Sse41PremultiplyExecutor8Default {}
+
+impl Sse41PremultiplyExecutor8Default {
+    #[inline(always)]
+    unsafe fn premultiply_chunk(&self, dst: &mut [u8], src: &[u8]) {
+        let zeros = _mm_setzero_si128();
         let src_ptr = src.as_ptr();
         let rgba0 = _mm_loadu_si128(src_ptr as *const __m128i);
         let rgba1 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
@@ -154,11 +152,49 @@ unsafe fn sse_premultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8]) {
         _mm_storeu_si128(dst_ptr.add(32) as *mut __m128i, rgba2);
         _mm_storeu_si128(dst_ptr.add(48) as *mut __m128i, rgba3);
     }
+}
 
-    rem = rem.chunks_exact_mut(16 * 4).into_remainder();
-    src_rem = src_rem.chunks_exact(16 * 4).remainder();
+impl Sse41PremultiplyExecutorRgba8 for Sse41PremultiplyExecutor8Default {
+    #[target_feature(enable = "sse4.1")]
+    unsafe fn premultiply(&self, dst: &mut [u8], src: &[u8]) {
+        let mut rem = dst;
+        let mut src_rem = src;
 
-    premultiply_alpha_rgba_row_impl(rem, src_rem);
+        for (dst, src) in rem
+            .chunks_exact_mut(16 * 4)
+            .zip(src_rem.chunks_exact(16 * 4))
+        {
+            self.premultiply_chunk(dst, src);
+        }
+
+        rem = rem.chunks_exact_mut(16 * 4).into_remainder();
+        src_rem = src_rem.chunks_exact(16 * 4).remainder();
+
+        if !rem.is_empty() {
+            const PART_SIZE: usize = 16 * 4;
+            assert!(src_rem.len() < PART_SIZE);
+            assert!(rem.len() < PART_SIZE);
+            assert_eq!(src_rem.len(), rem.len());
+
+            let mut buffer: [u8; PART_SIZE] = [0u8; PART_SIZE];
+            let mut dst_buffer: [u8; PART_SIZE] = [0u8; PART_SIZE];
+
+            std::ptr::copy_nonoverlapping(src_rem.as_ptr(), buffer.as_mut_ptr(), src_rem.len());
+
+            self.premultiply_chunk(&mut dst_buffer, &buffer);
+
+            std::ptr::copy_nonoverlapping(dst_buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
+        }
+    }
+}
+
+#[target_feature(enable = "sse4.1")]
+unsafe fn sse_premultiply_alpha_rgba_impl_row(
+    dst: &mut [u8],
+    src: &[u8],
+    executor: impl Sse41PremultiplyExecutorRgba8,
+) {
+    executor.premultiply(dst, src);
 }
 
 #[inline]
@@ -175,14 +211,22 @@ unsafe fn sse_premultiply_alpha_rgba_impl(
             dst.par_chunks_exact_mut(width * 4)
                 .zip(src.par_chunks_exact(width * 4))
                 .for_each(|(dst, src)| unsafe {
-                    sse_premultiply_alpha_rgba_impl_row(dst, src);
+                    sse_premultiply_alpha_rgba_impl_row(
+                        dst,
+                        src,
+                        Sse41PremultiplyExecutor8Default::default(),
+                    );
                 });
         });
     } else {
         dst.chunks_exact_mut(width * 4)
             .zip(src.chunks_exact(width * 4))
             .for_each(|(dst, src)| unsafe {
-                sse_premultiply_alpha_rgba_impl_row(dst, src);
+                sse_premultiply_alpha_rgba_impl_row(
+                    dst,
+                    src,
+                    Sse41PremultiplyExecutor8Default::default(),
+                );
             });
     }
 }
@@ -198,12 +242,17 @@ pub(crate) fn sse_unpremultiply_alpha_rgba(
     }
 }
 
-#[target_feature(enable = "sse4.1")]
-unsafe fn sse_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8]) {
-    let mut rem = in_place;
+trait DisassociateAlpha {
+    unsafe fn disassociate(&self, in_place: &mut [u8]);
+}
 
-    for dst in rem.chunks_exact_mut(16 * 4) {
-        let src_ptr = dst.as_ptr();
+#[derive(Default)]
+struct DisassociateAlphaDefault {}
+
+impl DisassociateAlphaDefault {
+    #[inline(always)]
+    unsafe fn disassociate_chunk(&self, in_place: &mut [u8]) {
+        let src_ptr = in_place.as_ptr();
         let rgba0 = _mm_loadu_si128(src_ptr as *const __m128i);
         let rgba1 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
         let rgba2 = _mm_loadu_si128(src_ptr.add(32) as *const __m128i);
@@ -216,25 +265,46 @@ unsafe fn sse_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8]) {
 
         let (rgba0, rgba1, rgba2, rgba3) = sse_interleave_rgba(rrr, ggg, bbb, aaa);
 
-        let dst_ptr = dst.as_mut_ptr();
+        let dst_ptr = in_place.as_mut_ptr();
         _mm_storeu_si128(dst_ptr as *mut __m128i, rgba0);
         _mm_storeu_si128(dst_ptr.add(16) as *mut __m128i, rgba1);
         _mm_storeu_si128(dst_ptr.add(32) as *mut __m128i, rgba2);
         _mm_storeu_si128(dst_ptr.add(48) as *mut __m128i, rgba3);
     }
+}
 
-    rem = rem.chunks_exact_mut(8 * 4).into_remainder();
+impl DisassociateAlpha for DisassociateAlphaDefault {
+    #[target_feature(enable = "sse4.1")]
+    unsafe fn disassociate(&self, in_place: &mut [u8]) {
+        let mut rem = in_place;
 
-    for dst in rem.chunks_exact_mut(4) {
-        let a = dst[3];
-        if a != 0 {
-            let a_recip = 1. / a as f32;
-            dst[0] = ((dst[0] as f32 * 255.) * a_recip) as u8;
-            dst[1] = ((dst[1] as f32 * 255.) * a_recip) as u8;
-            dst[2] = ((dst[2] as f32 * 255.) * a_recip) as u8;
-            dst[3] = ((a as f32 * 255.) * a_recip) as u8;
+        for dst in rem.chunks_exact_mut(16 * 4) {
+            self.disassociate_chunk(dst);
+        }
+
+        rem = rem.chunks_exact_mut(16 * 4).into_remainder();
+
+        if !rem.is_empty() {
+            const PART_SIZE: usize = 16 * 4;
+            assert!(rem.len() < PART_SIZE);
+
+            let mut buffer: [u8; PART_SIZE] = [0u8; PART_SIZE];
+
+            std::ptr::copy_nonoverlapping(rem.as_ptr(), buffer.as_mut_ptr(), rem.len());
+
+            self.disassociate_chunk(&mut buffer);
+
+            std::ptr::copy_nonoverlapping(buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
         }
     }
+}
+
+#[target_feature(enable = "sse4.1")]
+unsafe fn sse_unpremultiply_alpha_rgba_impl_row(
+    in_place: &mut [u8],
+    executor: impl DisassociateAlpha,
+) {
+    executor.disassociate(in_place);
 }
 
 #[target_feature(enable = "sse4.1")]
@@ -249,12 +319,12 @@ unsafe fn sse_unpremultiply_alpha_rgba_impl(
             in_place
                 .par_chunks_exact_mut(width * 4)
                 .for_each(|row| unsafe {
-                    sse_unpremultiply_alpha_rgba_impl_row(row);
+                    sse_unpremultiply_alpha_rgba_impl_row(row, DisassociateAlphaDefault::default());
                 });
         });
     } else {
         in_place.chunks_exact_mut(width * 4).for_each(|row| unsafe {
-            sse_unpremultiply_alpha_rgba_impl_row(row);
+            sse_unpremultiply_alpha_rgba_impl_row(row, DisassociateAlphaDefault::default());
         });
     }
 }
