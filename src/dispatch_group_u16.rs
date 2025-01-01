@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::cpu_features::is_aarch_f16_supported;
 use crate::filter_weights::{
     DefaultWeightsConverter, FilterBounds, FilterWeights, WeightsConverter,
