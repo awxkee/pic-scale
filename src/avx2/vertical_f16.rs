@@ -253,7 +253,7 @@ unsafe fn convolve_vertical_avx_row_f16_fma<const CHANNELS: usize>(
 }
 
 #[inline(always)]
-pub(crate) fn convolve_vertical_avx_row_f16_impl<const CHANNELS: usize, const FMA: bool>(
+unsafe fn convolve_vertical_avx_row_f16_impl<const CHANNELS: usize, const FMA: bool>(
     width: usize,
     bounds: &FilterBounds,
     src: &[half::f16],
@@ -265,65 +265,58 @@ pub(crate) fn convolve_vertical_avx_row_f16_impl<const CHANNELS: usize, const FM
     let dst_width = CHANNELS * width;
 
     while cx + 32 < dst_width {
-        unsafe {
-            convolve_vertical_part_avx_32_f16::<FMA>(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
-        }
+        convolve_vertical_part_avx_32_f16::<FMA>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+        );
 
         cx += 32;
     }
 
     while cx + 16 < dst_width {
-        unsafe {
-            convolve_vertical_part_avx_16_f16::<FMA>(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
-        }
+        convolve_vertical_part_avx_16_f16::<FMA>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+        );
 
         cx += 16;
     }
 
     while cx + 4 < dst_width {
-        unsafe {
-            convolve_vertical_part_avx_4_f16::<FMA>(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
-        }
+        convolve_vertical_part_avx_4_f16::<FMA>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+        );
 
         cx += 4;
     }
 
     while cx < dst_width {
-        unsafe {
-            convolve_vertical_part_avx_f16::<FMA>(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
-        }
+        convolve_vertical_part_avx_f16::<FMA>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+        );
+
         cx += 1;
     }
 }
