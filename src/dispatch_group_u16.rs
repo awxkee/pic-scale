@@ -27,7 +27,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::filter_weights::FilterWeights;
+use crate::cpu_features::is_aarch_f16_supported;
+use crate::filter_weights::{
+    DefaultWeightsConverter, FilterBounds, FilterWeights, WeightsConverter,
+};
 use crate::handler_provider::{
     ColumnHandlerFixedPoint, ColumnHandlerFloatingPoint, RowHandlerFixedPoint,
     RowHandlerFloatingPoint,
@@ -189,25 +192,50 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
                         );
                     });
             } else {
-                let approx = filter_weights.numerical_approximation_i16::<PRECISION>(0);
-                destination_image
-                    .par_chunks_exact_mut(dst_stride)
-                    .enumerate()
-                    .for_each(|(y, row)| {
-                        let bounds = filter_weights.bounds[y];
-                        let filter_offset = y * filter_weights.aligned_size;
-                        let weights = &approx.weights[filter_offset..];
-                        let source_buffer = image_store.buffer.as_ref();
-                        u16::handle_fixed_column::<i32, COMPONENTS>(
-                            dst_width,
-                            &bounds,
-                            source_buffer,
-                            row,
+                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+                {
+                    if is_aarch_f16_supported() {
+                        use crate::filter_weights::WeightFloat16Converter;
+                        execute_low_precision_row(
+                            true,
+                            image_store,
+                            &filter_weights,
                             src_stride,
-                            weights,
-                            bit_depth as u32,
+                            dst_stride,
+                            bit_depth,
+                            dst_width,
+                            destination_image,
+                            HighBitDepthFloat16LowerHandler::default(),
+                            WeightFloat16Converter::default(),
                         );
-                    });
+                    } else {
+                        execute_low_precision_row(
+                            true,
+                            image_store,
+                            &filter_weights,
+                            src_stride,
+                            dst_stride,
+                            bit_depth,
+                            dst_width,
+                            destination_image,
+                            DefaultHighBitDepthLowerHandler::default(),
+                            DefaultWeightsConverter::default(),
+                        );
+                    }
+                }
+                #[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
+                execute_low_precision_row(
+                    true,
+                    image_store,
+                    &filter_weights,
+                    src_stride,
+                    dst_stride,
+                    bit_depth,
+                    dst_width,
+                    destination_image,
+                    DefaultHighBitDepthLowerHandler::default(),
+                    DefaultWeightsConverter::default(),
+                );
             }
         });
     } else if bit_depth > 12 {
@@ -231,8 +259,145 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
                 );
             });
     } else {
-        let destination_image = destination.buffer.borrow_mut();
-        let approx = filter_weights.numerical_approximation_i16::<PRECISION>(0);
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            if is_aarch_f16_supported() {
+                use crate::filter_weights::WeightFloat16Converter;
+                execute_low_precision_row(
+                    false,
+                    image_store,
+                    &filter_weights,
+                    src_stride,
+                    dst_stride,
+                    bit_depth,
+                    dst_width,
+                    destination.buffer.borrow_mut(),
+                    HighBitDepthFloat16LowerHandler::default(),
+                    WeightFloat16Converter::default(),
+                );
+            } else {
+                execute_low_precision_row(
+                    false,
+                    image_store,
+                    &filter_weights,
+                    src_stride,
+                    dst_stride,
+                    bit_depth,
+                    dst_width,
+                    destination.buffer.borrow_mut(),
+                    DefaultHighBitDepthLowerHandler::default(),
+                    DefaultWeightsConverter::default(),
+                );
+            }
+        }
+        #[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
+        execute_low_precision_row(
+            false,
+            image_store,
+            &filter_weights,
+            src_stride,
+            dst_stride,
+            bit_depth,
+            dst_width,
+            destination.buffer.borrow_mut(),
+            DefaultHighBitDepthLowerHandler::default(),
+            DefaultWeightsConverter::default(),
+        );
+    }
+}
+
+trait HandleHighBitDepthLower<const COMPONENTS: usize> {
+    fn handle_fixed_column(
+        &self,
+        dst_width: usize,
+        bounds: &FilterBounds,
+        src: &[u16],
+        dst: &mut [u16],
+        src_stride: usize,
+        weight: &[i16],
+        bit_depth: u32,
+    );
+}
+
+#[derive(Default)]
+struct DefaultHighBitDepthLowerHandler {}
+
+impl<const COMPONENTS: usize> HandleHighBitDepthLower<COMPONENTS>
+    for DefaultHighBitDepthLowerHandler
+{
+    fn handle_fixed_column(
+        &self,
+        dst_width: usize,
+        bounds: &FilterBounds,
+        src: &[u16],
+        dst: &mut [u16],
+        src_stride: usize,
+        weight: &[i16],
+        bit_depth: u32,
+    ) {
+        u16::handle_fixed_column::<i32, COMPONENTS>(
+            dst_width, bounds, src, dst, src_stride, weight, bit_depth,
+        );
+    }
+}
+
+#[derive(Default)]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+struct HighBitDepthFloat16LowerHandler {}
+
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+impl<const COMPONENTS: usize> HandleHighBitDepthLower<COMPONENTS>
+    for HighBitDepthFloat16LowerHandler
+{
+    fn handle_fixed_column(
+        &self,
+        dst_width: usize,
+        bounds: &FilterBounds,
+        src: &[u16],
+        dst: &mut [u16],
+        src_stride: usize,
+        weight: &[i16],
+        bit_depth: u32,
+    ) {
+        use crate::neon::convolve_column_lb_u16_f16;
+        convolve_column_lb_u16_f16(dst_width, bounds, src, dst, src_stride, weight, bit_depth);
+    }
+}
+
+#[inline]
+fn execute_low_precision_row<const COMPONENTS: usize>(
+    is_parallel: bool,
+    image_store: &ImageStore<u16, COMPONENTS>,
+    filter_weights: &FilterWeights<f32>,
+    src_stride: usize,
+    dst_stride: usize,
+    bit_depth: usize,
+    dst_width: usize,
+    destination_image: &mut [u16],
+    handler: impl HandleHighBitDepthLower<COMPONENTS> + Sync,
+    weights: impl WeightsConverter,
+) {
+    let approx = weights.prepare_weights(filter_weights);
+    if is_parallel {
+        destination_image
+            .par_chunks_exact_mut(dst_stride)
+            .enumerate()
+            .for_each(|(y, row)| {
+                let bounds = filter_weights.bounds[y];
+                let filter_offset = y * filter_weights.aligned_size;
+                let weights = &approx.weights[filter_offset..];
+                let source_buffer = image_store.buffer.as_ref();
+                handler.handle_fixed_column(
+                    dst_width,
+                    &bounds,
+                    source_buffer,
+                    row,
+                    src_stride,
+                    weights,
+                    bit_depth as u32,
+                );
+            });
+    } else {
         destination_image
             .chunks_exact_mut(dst_stride)
             .enumerate()
@@ -241,7 +406,7 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
                 let filter_offset = y * filter_weights.aligned_size;
                 let weights = &approx.weights[filter_offset..];
                 let source_buffer = image_store.buffer.as_ref();
-                u16::handle_fixed_column::<i32, COMPONENTS>(
+                handler.handle_fixed_column(
                     dst_width,
                     &bounds,
                     source_buffer,

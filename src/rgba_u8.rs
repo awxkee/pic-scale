@@ -35,7 +35,7 @@ use crate::avx2::{
 };
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertical_dispatch_u8};
-use crate::filter_weights::{FilterBounds, FilterWeights};
+use crate::filter_weights::{DefaultWeightsConverter, FilterBounds, FilterWeights};
 use crate::handler_provider::{
     handle_fixed_column_u8, handle_fixed_row_u8, handle_fixed_rows_4_u8,
 };
@@ -100,6 +100,7 @@ impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
             _pool,
             _dispatcher_4_rows,
             _dispatcher_1_row,
+            DefaultWeightsConverter::default(),
         );
     }
 }

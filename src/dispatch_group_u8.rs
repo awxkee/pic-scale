@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::filter_weights::{FilterBounds, FilterWeights};
+use crate::filter_weights::{FilterBounds, FilterWeights, WeightsConverter};
 use crate::image_store::ImageStoreMut;
 use crate::support::PRECISION;
 use crate::ImageStore;
@@ -44,8 +44,9 @@ pub(crate) fn convolve_horizontal_dispatch_u8<const CHANNELS: usize>(
     pool: &Option<ThreadPool>,
     dispatcher_4_rows: Option<fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>)>,
     dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i16>),
+    weights_converter: impl WeightsConverter,
 ) {
-    let approx_weights = filter_weights.numerical_approximation_i16::<PRECISION>(0);
+    let approx_weights = weights_converter.prepare_weights(&filter_weights);
 
     let src = image_store.buffer.as_ref();
     let dst = destination.buffer.borrow_mut();

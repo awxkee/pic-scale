@@ -26,7 +26,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::alpha_handle_u16::{premultiply_alpha_rgba_row, unpremultiply_alpha_rgba_row};
 use crate::cpu_features::is_aarch_f16_supported;
 use crate::neon::f16_utils::{xvcvtaq_u16_f16, xvcvtq_f16_u16, xvdivq_f16, xvmulq_f16};
 use crate::neon::xreinterpretq_f16_u16;
@@ -50,18 +49,28 @@ unsafe fn neon_div_by_65535_n(v: uint32x4_t) -> uint16x4_t {
     vqrshrn_n_u32::<16>(vrsraq_n_u32::<16>(v, v))
 }
 
+#[inline(always)]
+unsafe fn neon_div_by<const BIT_DEPTH: usize>(v: uint32x4_t) -> uint16x4_t {
+    match BIT_DEPTH {
+        10 => neon_div_by_1023_n(v),
+        12 => neon_div_by_4095_n(v),
+        16 => neon_div_by_65535_n(v),
+        _ => neon_div_by_1023_n(v),
+    }
+}
+
 trait NeonPremultiplyExecutor {
     unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize);
 }
 
 #[derive(Default)]
-struct NeonPremultiplyExecutor10Bit {}
+struct NeonPremultiplyExecutorDefault<const BIT_DEPTH: usize> {}
 
-impl NeonPremultiplyExecutor for NeonPremultiplyExecutor10Bit {
+impl<const BIT_DEPTH: usize> NeonPremultiplyExecutor for NeonPremultiplyExecutorDefault<BIT_DEPTH> {
     unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
         assert_ne!(bit_depth, 0, "Something goes wrong!");
         assert!((1..=16).contains(&bit_depth));
-        let max_colors = (1 << bit_depth) - 1;
+
         let mut rem = dst;
         let mut src_rem = src;
         for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
@@ -70,18 +79,18 @@ impl NeonPremultiplyExecutor for NeonPremultiplyExecutor10Bit {
             let low_a = vget_low_u16(pixel.3);
 
             let new_r = vcombine_u16(
-                neon_div_by_1023_n(vmull_u16(vget_low_u16(pixel.0), low_a)),
-                neon_div_by_1023_n(vmull_high_u16(pixel.0, pixel.3)),
+                neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel.0), low_a)),
+                neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel.0, pixel.3)),
             );
 
             let new_g = vcombine_u16(
-                neon_div_by_1023_n(vmull_u16(vget_low_u16(pixel.1), low_a)),
-                neon_div_by_1023_n(vmull_high_u16(pixel.1, pixel.3)),
+                neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel.1), low_a)),
+                neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel.1, pixel.3)),
             );
 
             let new_b = vcombine_u16(
-                neon_div_by_1023_n(vmull_u16(vget_low_u16(pixel.2), low_a)),
-                neon_div_by_1023_n(vmull_high_u16(pixel.2, pixel.3)),
+                neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel.2), low_a)),
+                neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel.2, pixel.3)),
             );
 
             let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
@@ -92,93 +101,37 @@ impl NeonPremultiplyExecutor for NeonPremultiplyExecutor10Bit {
         rem = rem.chunks_exact_mut(8 * 4).into_remainder();
         src_rem = src_rem.chunks_exact(8 * 4).remainder();
 
-        premultiply_alpha_rgba_row(rem, src_rem, max_colors);
-    }
-}
+        if !rem.is_empty() {
+            assert!(src_rem.len() < 8 * 4);
+            assert!(rem.len() < 8 * 4);
+            let mut buffer: [u16; 8 * 4] = [0u16; 8 * 4];
+            std::ptr::copy_nonoverlapping(rem.as_ptr(), buffer.as_mut_ptr(), src_rem.len());
 
-#[derive(Default)]
-struct NeonPremultiplyExecutor12Bit {}
-
-impl NeonPremultiplyExecutor for NeonPremultiplyExecutor12Bit {
-    unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
-        assert_ne!(bit_depth, 0, "Something goes wrong!");
-        assert!((1..=16).contains(&bit_depth));
-        let max_colors = (1 << bit_depth) - 1;
-        let mut rem = dst;
-        let mut src_rem = src;
-
-        for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
-            let pixel = vld4q_u16(src.as_ptr());
+            let pixel = vld4q_u16(buffer.as_ptr());
 
             let low_a = vget_low_u16(pixel.3);
 
             let new_r = vcombine_u16(
-                neon_div_by_4095_n(vmull_u16(vget_low_u16(pixel.0), low_a)),
-                neon_div_by_4095_n(vmull_high_u16(pixel.0, pixel.3)),
+                neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel.0), low_a)),
+                neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel.0, pixel.3)),
             );
 
             let new_g = vcombine_u16(
-                neon_div_by_4095_n(vmull_u16(vget_low_u16(pixel.1), low_a)),
-                neon_div_by_4095_n(vmull_high_u16(pixel.1, pixel.3)),
+                neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel.1), low_a)),
+                neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel.1, pixel.3)),
             );
 
             let new_b = vcombine_u16(
-                neon_div_by_4095_n(vmull_u16(vget_low_u16(pixel.2), low_a)),
-                neon_div_by_4095_n(vmull_high_u16(pixel.2, pixel.3)),
+                neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel.2), low_a)),
+                neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel.2, pixel.3)),
             );
 
             let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
 
-            vst4q_u16(dst.as_mut_ptr(), new_px);
+            vst4q_u16(buffer.as_mut_ptr(), new_px);
+
+            std::ptr::copy_nonoverlapping(buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
         }
-
-        rem = rem.chunks_exact_mut(8 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(8 * 4).remainder();
-
-        premultiply_alpha_rgba_row(rem, src_rem, max_colors);
-    }
-}
-
-#[derive(Default)]
-struct NeonPremultiplyExecutor16Bit {}
-
-impl NeonPremultiplyExecutor for NeonPremultiplyExecutor16Bit {
-    unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
-        assert_ne!(bit_depth, 0, "Something goes wrong!");
-        assert!((1..=16).contains(&bit_depth));
-        let max_colors = (1 << bit_depth) - 1;
-        let mut rem = dst;
-        let mut src_rem = src;
-
-        for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
-            let pixel = vld4q_u16(src.as_ptr());
-
-            let low_a = vget_low_u16(pixel.3);
-
-            let new_r = vcombine_u16(
-                neon_div_by_65535_n(vmull_u16(vget_low_u16(pixel.0), low_a)),
-                neon_div_by_65535_n(vmull_high_u16(pixel.0, pixel.3)),
-            );
-
-            let new_g = vcombine_u16(
-                neon_div_by_65535_n(vmull_u16(vget_low_u16(pixel.1), low_a)),
-                neon_div_by_65535_n(vmull_high_u16(pixel.1, pixel.3)),
-            );
-
-            let new_b = vcombine_u16(
-                neon_div_by_65535_n(vmull_u16(vget_low_u16(pixel.2), low_a)),
-                neon_div_by_65535_n(vmull_high_u16(pixel.2, pixel.3)),
-            );
-
-            let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
-
-            vst4q_u16(dst.as_mut_ptr(), new_px);
-        }
-
-        rem = rem.chunks_exact_mut(8 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(8 * 4).remainder();
-
-        premultiply_alpha_rgba_row(rem, src_rem, max_colors);
     }
 }
 
@@ -218,7 +171,32 @@ impl NeonPremultiplyExecutor for NeonPremultiplyExecutorAnyBitDepth {
         rem = rem.chunks_exact_mut(8 * 4).into_remainder();
         src_rem = src_rem.chunks_exact(8 * 4).remainder();
 
-        premultiply_alpha_rgba_row(rem, src_rem, max_colors);
+        if !rem.is_empty() {
+            assert!(src_rem.len() < 8 * 4);
+            assert!(rem.len() < 8 * 4);
+            let mut buffer: [u16; 8 * 4] = [0u16; 8 * 4];
+            std::ptr::copy_nonoverlapping(rem.as_ptr(), buffer.as_mut_ptr(), src_rem.len());
+
+            let pixel = vld4q_u16(buffer.as_ptr());
+
+            let low_a = vmovl_u16(vget_low_u16(pixel.3));
+            let high_a = vmovl_high_u16(pixel.3);
+
+            let low_a = vmulq_f32(vcvtq_f32_u32(low_a), v_max_colors_scale);
+            let hi_a = vmulq_f32(vcvtq_f32_u32(high_a), v_max_colors_scale);
+
+            let new_r = v_scale_by_alpha(pixel.0, low_a, hi_a);
+
+            let new_g = v_scale_by_alpha(pixel.1, low_a, hi_a);
+
+            let new_b = v_scale_by_alpha(pixel.2, low_a, hi_a);
+
+            let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
+
+            vst4q_u16(buffer.as_mut_ptr(), new_px);
+
+            std::ptr::copy_nonoverlapping(buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
+        }
     }
 }
 
@@ -226,11 +204,26 @@ fn neon_premultiply_alpha_rgba_row_u16(dst: &mut [u16], src: &[u16], bit_depth: 
     assert_ne!(bit_depth, 0, "Something goes wrong!");
 
     if bit_depth == 10 {
-        neon_pa_dispatch(dst, src, bit_depth, NeonPremultiplyExecutor10Bit::default())
+        neon_pa_dispatch(
+            dst,
+            src,
+            bit_depth,
+            NeonPremultiplyExecutorDefault::<10>::default(),
+        )
     } else if bit_depth == 12 {
-        neon_pa_dispatch(dst, src, bit_depth, NeonPremultiplyExecutor12Bit::default())
+        neon_pa_dispatch(
+            dst,
+            src,
+            bit_depth,
+            NeonPremultiplyExecutorDefault::<12>::default(),
+        )
     } else if bit_depth == 16 {
-        neon_pa_dispatch(dst, src, bit_depth, NeonPremultiplyExecutor16Bit::default())
+        neon_pa_dispatch(
+            dst,
+            src,
+            bit_depth,
+            NeonPremultiplyExecutorDefault::<16>::default(),
+        )
     } else {
         neon_pa_dispatch(
             dst,
@@ -343,7 +336,46 @@ impl DisassociateAlpha for NeonDisassociateAlpha {
             vst4q_u16(dst.as_mut_ptr(), new_px);
         }
         rem = rem.chunks_exact_mut(8 * 4).into_remainder();
-        unpremultiply_alpha_rgba_row(rem, max_colors);
+
+        if !rem.is_empty() {
+            assert!(rem.len() < 8 * 4);
+            let mut buffer: [u16; 8 * 4] = [0u16; 8 * 4];
+            std::ptr::copy_nonoverlapping(rem.as_ptr(), buffer.as_mut_ptr(), rem.len());
+
+            let pixel = vld4q_u16(buffer.as_ptr());
+
+            let is_alpha_zero_mask = vceqzq_u16(pixel.3);
+
+            let low_a = vmovl_u16(vget_low_u16(pixel.3));
+            let high_a = vmovl_high_u16(pixel.3);
+
+            let low_a = vmulq_f32(vdivq_f32(ones, vcvtq_f32_u32(low_a)), v_max_colors_f);
+            let hi_a = vmulq_f32(vdivq_f32(ones, vcvtq_f32_u32(high_a)), v_max_colors_f);
+
+            let new_r = vbslq_u16(
+                is_alpha_zero_mask,
+                pixel.0,
+                v_scale_by_alpha(pixel.0, low_a, hi_a),
+            );
+
+            let new_g = vbslq_u16(
+                is_alpha_zero_mask,
+                pixel.1,
+                v_scale_by_alpha(pixel.1, low_a, hi_a),
+            );
+
+            let new_b = vbslq_u16(
+                is_alpha_zero_mask,
+                pixel.2,
+                v_scale_by_alpha(pixel.2, low_a, hi_a),
+            );
+
+            let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
+
+            vst4q_u16(buffer.as_mut_ptr(), new_px);
+
+            std::ptr::copy_nonoverlapping(buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
+        }
     }
 }
 

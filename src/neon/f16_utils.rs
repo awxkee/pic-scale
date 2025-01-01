@@ -91,14 +91,14 @@ pub(crate) struct x_float16x8x4_t(
 #[inline]
 #[cfg(feature = "half")]
 pub(crate) unsafe fn xvld_f16(ptr: *const half::f16) -> x_float16x4_t {
-    let store: uint16x4_t = vld1_u16(std::mem::transmute(ptr));
+    let store: uint16x4_t = vld1_u16(ptr as *const _);
     std::mem::transmute(store)
 }
 
 #[inline]
 #[cfg(feature = "half")]
 pub(crate) unsafe fn xvldq_f16(ptr: *const half::f16) -> x_float16x8_t {
-    let store: uint16x8_t = vld1q_u16(std::mem::transmute(ptr));
+    let store: uint16x8_t = vld1q_u16(ptr as *const _);
     std::mem::transmute(store)
 }
 
@@ -168,12 +168,14 @@ pub(crate) unsafe fn xreinterpretq_f16_u16(x: uint16x8_t) -> x_float16x8_t {
     std::mem::transmute(x)
 }
 
-#[inline]
+/// Sets register to f16 zero
+#[inline(always)]
 pub(super) unsafe fn xvzerosq_f16() -> x_float16x8_t {
     xreinterpretq_f16_u16(vdupq_n_u16(0))
 }
 
-#[inline]
+/// Sets register to f16 zero
+#[inline(always)]
 pub(super) unsafe fn xvzeros_f16() -> x_float16x4_t {
     xreinterpret_f16_u16(vdup_n_u16(0))
 }
@@ -253,6 +255,24 @@ pub(super) unsafe fn xvcvtaq_u16_f16(v: x_float16x8_t) -> uint16x8_t {
     result
 }
 
+/// Floating-point Convert to Unsigned integer, rounding to nearest with ties to Away (vector).
+/// This instruction converts each element in a vector from a floating-point value to an unsigned
+/// integer value using the Round to Nearest with Ties to Away rounding mode and writes the result
+/// to the SIMD&FP destination register.
+///
+/// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcvta_u16_f16)
+#[inline]
+#[target_feature(enable = "fp16")]
+pub(super) unsafe fn xvcvta_u16_f16(v: x_float16x4_t) -> uint16x4_t {
+    let result: uint16x4_t;
+    asm!(
+    "fcvtau {0:v}.4h, {1:v}.4h",
+    out(vreg) result,
+    in(vreg) xreinterpret_u16_f16(v),
+    options(pure, nomem, nostack));
+    result
+}
+
 /// Floating-point Reciprocal Estimate.
 /// This instruction finds an approximate reciprocal estimate for each vector element
 /// in the source SIMD&FP register, places the result in a vector,
@@ -318,6 +338,12 @@ pub(super) unsafe fn xvcombine_f16(v1: x_float16x4_t, v2: x_float16x4_t) -> x_fl
 //     xreinterpret_f16_u16(result)
 // }
 
+/// Floating-point fused Multiply-Add to accumulator (vector).
+/// This instruction multiplies corresponding floating-point values in the vectors
+/// in the two source SIMD&FP registers, adds the product to the corresponding vector element
+/// of the destination SIMD&FP register, and writes the result to the destination SIMD&FP register.
+///
+/// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vfma_f16)
 #[target_feature(enable = "fp16")]
 #[inline]
 pub(super) unsafe fn xvfmla_f16(
@@ -336,6 +362,13 @@ pub(super) unsafe fn xvfmla_f16(
     xreinterpret_f16_u16(result)
 }
 
+/// Floating-point fused Multiply-Add to accumulator (vector).
+/// This instruction multiplies corresponding floating-point values in the vectors
+/// in the two source SIMD&FP registers, adds the product to the corresponding
+/// vector element of the destination SIMD&FP register,
+/// and writes the result to the destination SIMD&FP register.
+///
+/// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vfma_laneq_f16)
 #[target_feature(enable = "fp16")]
 #[inline]
 pub(super) unsafe fn xvfmla_laneq_f16<const LANE: i32>(
@@ -414,6 +447,13 @@ pub(super) unsafe fn xvfmla_laneq_f16<const LANE: i32>(
     xreinterpret_f16_u16(result)
 }
 
+/// Floating-point fused Multiply-Add to accumulator (vector).
+/// This instruction multiplies corresponding floating-point values in the vectors
+/// in the two source SIMD&FP registers, adds the product to the corresponding
+/// vector element of the destination SIMD&FP register,
+/// and writes the result to the destination SIMD&FP register.
+///
+/// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vfma_lane_f16)
 #[target_feature(enable = "fp16")]
 #[inline]
 pub(super) unsafe fn xvfmla_lane_f16<const LANE: i32>(
@@ -460,6 +500,13 @@ pub(super) unsafe fn xvfmla_lane_f16<const LANE: i32>(
     xreinterpret_f16_u16(result)
 }
 
+/// Floating-point fused Multiply-Add to accumulator (vector).
+/// This instruction multiplies corresponding floating-point values in the vectors
+/// in the two source SIMD&FP registers, adds the product to the corresponding
+/// vector element of the destination SIMD&FP register,
+/// and writes the result to the destination SIMD&FP register.
+///
+/// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vfmaq_f16)
 #[target_feature(enable = "fp16")]
 #[inline]
 pub(super) unsafe fn xvfmlaq_f16(
@@ -506,6 +553,12 @@ pub(super) unsafe fn xvfmlaq_f16(
 //     xvadd_f16(a, xvmul_f16(b, c))
 // }
 
+/// Floating-point Multiply (vector).
+/// This instruction multiplies corresponding floating-point values in the vectors in the two
+/// source SIMD&FP registers,
+/// places the result in a vector, and writes the vector to the destination SIMD&FP register.
+///
+/// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vmulq_f16)
 #[target_feature(enable = "fp16")]
 #[inline]
 pub(super) unsafe fn xvmulq_f16(v1: x_float16x8_t, v2: x_float16x8_t) -> x_float16x8_t {
@@ -520,6 +573,12 @@ pub(super) unsafe fn xvmulq_f16(v1: x_float16x8_t, v2: x_float16x8_t) -> x_float
     xreinterpretq_f16_u16(result)
 }
 
+/// Floating-point Multiply (vector).
+/// This instruction multiplies corresponding floating-point values in the vectors
+/// in the two source SIMD&FP registers, places the result in a vector,
+/// and writes the vector to the destination SIMD&FP register.
+///
+/// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vmul_f16)
 #[target_feature(enable = "fp16")]
 #[inline]
 pub(super) unsafe fn xvmul_f16(v1: x_float16x4_t, v2: x_float16x4_t) -> x_float16x4_t {
@@ -534,6 +593,13 @@ pub(super) unsafe fn xvmul_f16(v1: x_float16x4_t, v2: x_float16x4_t) -> x_float1
     xreinterpret_f16_u16(result)
 }
 
+/// Floating-point Divide (vector).
+/// This instruction divides the floating-point values in the elements
+/// in the first source SIMD&FP register, by the floating-point values
+/// in the corresponding elements in the second source SIMD&FP register,
+/// places the results in a vector, and writes the vector to the destination SIMD&FP register.
+///
+/// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vdivq_f16)
 #[target_feature(enable = "fp16")]
 #[inline]
 pub(super) unsafe fn xvdivq_f16(v1: x_float16x8_t, v2: x_float16x8_t) -> x_float16x8_t {
@@ -548,6 +614,12 @@ pub(super) unsafe fn xvdivq_f16(v1: x_float16x8_t, v2: x_float16x8_t) -> x_float
     xreinterpretq_f16_u16(result)
 }
 
+/// Bitwise Select.
+/// This instruction sets each bit in the destination SIMD&FP register
+/// to the corresponding bit from the first source SIMD&FP register when the
+/// original destination bit was 1, otherwise from the second source SIMD&FP register.
+///
+/// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vbslq_f16)
 #[target_feature(enable = "fp16")]
 #[inline]
 pub(super) unsafe fn xvbslq_f16(
@@ -569,13 +641,13 @@ pub(super) unsafe fn xvbslq_f16(
 #[inline]
 #[cfg(feature = "half")]
 pub(crate) unsafe fn xvst_f16(ptr: *mut half::f16, x: x_float16x4_t) {
-    vst1_u16(std::mem::transmute(ptr), xreinterpret_u16_f16(x))
+    vst1_u16(ptr as *mut u16, xreinterpret_u16_f16(x))
 }
 
 #[inline]
 #[cfg(feature = "half")]
 pub(crate) unsafe fn xvstq_f16(ptr: *mut half::f16, x: x_float16x8_t) {
-    vst1q_u16(std::mem::transmute(ptr), xreinterpretq_u16_f16(x))
+    vst1q_u16(ptr as *mut u16, xreinterpretq_u16_f16(x))
 }
 
 #[inline]
@@ -630,6 +702,13 @@ pub(crate) unsafe fn xvsetq_lane_f16<const LANE: i32>(
     ))
 }
 
+/// Floating-point Compare Equal to zero (vector).
+/// This instruction reads each floating-point value in the source SIMD&FP register
+/// and if the value is equal to zero sets every bit of the corresponding vector element
+/// in the destination SIMD&FP register to one, otherwise sets every bit of the
+/// corresponding vector element in the destination SIMD&FP register to zero.
+///
+/// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceqzq_f16)
 #[target_feature(enable = "fp16")]
 #[inline]
 pub(crate) unsafe fn vceqzq_f16(a: x_float16x8_t) -> uint16x8_t {

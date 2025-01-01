@@ -95,16 +95,18 @@ fn convolve_horizontal_rgb_native_row_f16<const CHANNELS: usize>(
     convolve_row_handler_floating_point::<f16, f32, f32, CHANNELS>(src, dst, filter_weights, 8)
 }
 
-impl<'a> HorizontalConvolutionPass<f16, 4> for ImageStore<'a, f16, 4> {
+impl HorizontalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 4>,
         pool: &Option<ThreadPool>,
     ) {
+        #[allow(clippy::type_complexity)]
         let mut _dispatcher_4_rows: Option<
             fn(usize, usize, &FilterWeights<f32>, &[f16], usize, &mut [f16], usize),
         > = Some(convolve_horizontal_rgba_4_row_f16::<4>);
+        #[allow(clippy::type_complexity)]
         let mut _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, &[f16], &mut [f16]) =
             convolve_horizontal_rgb_native_row_f16::<4>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -167,13 +169,14 @@ fn convolve_vertical_rgb_native_row_f16<const COMPONENTS: usize>(
     column_handler_floating_point::<f16, f32, f32>(bounds, src, dst, src_stride, weight, 8);
 }
 
-impl<'a> VerticalConvolutionPass<f16, 4> for ImageStore<'a, f16, 4> {
+impl VerticalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 4>,
         pool: &Option<ThreadPool>,
     ) {
+        #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[f32]) =
             convolve_vertical_rgb_native_row_f16::<4>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -211,16 +214,18 @@ impl<'a> VerticalConvolutionPass<f16, 4> for ImageStore<'a, f16, 4> {
     }
 }
 
-impl<'a> HorizontalConvolutionPass<f16, 3> for ImageStore<'a, f16, 3> {
+impl HorizontalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 3>,
         pool: &Option<ThreadPool>,
     ) {
+        #[allow(clippy::type_complexity)]
         let mut _dispatcher_4_rows: Option<
             fn(usize, usize, &FilterWeights<f32>, &[f16], usize, &mut [f16], usize),
         > = Some(convolve_horizontal_rgba_4_row_f16::<3>);
+        #[allow(clippy::type_complexity)]
         let mut _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, &[f16], &mut [f16]) =
             convolve_horizontal_rgb_native_row_f16::<3>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -263,13 +268,14 @@ impl<'a> HorizontalConvolutionPass<f16, 3> for ImageStore<'a, f16, 3> {
     }
 }
 
-impl<'a> VerticalConvolutionPass<f16, 3> for ImageStore<'a, f16, 3> {
+impl VerticalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 3>,
         pool: &Option<ThreadPool>,
     ) {
+        #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[f32]) =
             convolve_vertical_rgb_native_row_f16::<3>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -307,13 +313,14 @@ impl<'a> VerticalConvolutionPass<f16, 3> for ImageStore<'a, f16, 3> {
     }
 }
 
-impl<'a> HorizontalConvolutionPass<f16, 1> for ImageStore<'a, f16, 1> {
+impl HorizontalConvolutionPass<f16, 1> for ImageStore<'_, f16, 1> {
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 1>,
         pool: &Option<ThreadPool>,
     ) {
+        #[allow(clippy::type_complexity)]
         let _dispatcher_4_rows: Option<
             fn(usize, usize, &FilterWeights<f32>, &[f16], usize, &mut [f16], usize),
         > = Some(convolve_horizontal_rgba_4_row_f16::<1>);
@@ -330,13 +337,14 @@ impl<'a> HorizontalConvolutionPass<f16, 1> for ImageStore<'a, f16, 1> {
     }
 }
 
-impl<'a> VerticalConvolutionPass<f16, 1> for ImageStore<'a, f16, 1> {
+impl VerticalConvolutionPass<f16, 1> for ImageStore<'_, f16, 1> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 1>,
         pool: &Option<ThreadPool>,
     ) {
+        #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[f32]) =
             convolve_vertical_rgb_native_row_f16::<1>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]

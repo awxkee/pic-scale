@@ -30,7 +30,7 @@
 use crate::avx2::{convolve_vertical_avx_row, convolve_vertical_avx_row_lp};
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertical_dispatch_u8};
-use crate::filter_weights::{FilterBounds, FilterWeights};
+use crate::filter_weights::{DefaultWeightsConverter, FilterBounds, FilterWeights};
 use crate::handler_provider::{handle_fixed_column_u8, handle_fixed_row_u8};
 use crate::image_store::ImageStoreMut;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
@@ -79,6 +79,7 @@ impl HorizontalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
             _pool,
             _dispatcher_4_rows,
             _dispatcher_1_row,
+            DefaultWeightsConverter::default(),
         );
     }
 }
