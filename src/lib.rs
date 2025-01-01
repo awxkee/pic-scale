@@ -29,6 +29,9 @@
 #![deny(deprecated)]
 // #![deny(unreachable_code, unused)]
 #![allow(clippy::too_many_arguments)]
+#![cfg_attr(feature = "nightly_avx512", feature(cfg_version))]
+#![cfg_attr(feature = "nightly_avx512", feature(avx512_target_feature))]
+#![cfg_attr(feature = "nightly_avx512", feature(stdarch_x86_avx512))]
 mod alpha_check;
 #[cfg(feature = "half")]
 mod alpha_handle_f16;
@@ -38,6 +41,11 @@ mod alpha_handle_u8;
 mod ar30;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod avx2;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    feature = "nightly_avx512"
+))]
+mod avx512;
 mod color_group;
 #[cfg(feature = "colorspaces")]
 mod colors;

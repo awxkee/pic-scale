@@ -45,8 +45,8 @@ unsafe fn _mm256_scale_by_alpha(px: __m256i, low_low_a: __m256, low_high_a: __m2
     let low_px = _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(px, zeros));
     let high_px = _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(px, zeros));
 
-    let new_ll = _mm256_cvtps_epi32(_mm256_round_ps::<0x02>(_mm256_mul_ps(low_px, low_low_a)));
-    let new_lh = _mm256_cvtps_epi32(_mm256_round_ps::<0x02>(_mm256_mul_ps(high_px, low_high_a)));
+    let new_ll = _mm256_cvtps_epi32(_mm256_round_ps::<0x00>(_mm256_mul_ps(low_px, low_low_a)));
+    let new_lh = _mm256_cvtps_epi32(_mm256_round_ps::<0x00>(_mm256_mul_ps(high_px, low_high_a)));
 
     _mm256_packus_epi32(new_ll, new_lh)
 }
@@ -110,8 +110,7 @@ trait Avx2PremultiplyExecutor {
 struct Avx2PremultiplyExecutorDefault<const BIT_DEPTH: usize> {}
 
 impl<const BIT_DEPTH: usize> Avx2PremultiplyExecutorDefault<BIT_DEPTH> {
-    #[inline]
-    #[target_feature(enable = "avx2")]
+    #[inline(always)]
     unsafe fn premultiply_chunk(&self, dst: &mut [u16], src: &[u16]) {
         let src_ptr = src.as_ptr();
         let lane0 = _mm256_loadu_si256(src_ptr as *const __m256i);
@@ -203,8 +202,7 @@ impl<const BIT_DEPTH: usize> Avx2PremultiplyExecutor for Avx2PremultiplyExecutor
 struct Avx2PremultiplyExecutorAnyBit {}
 
 impl Avx2PremultiplyExecutorAnyBit {
-    #[inline]
-    #[target_feature(enable = "avx2")]
+    #[inline(always)]
     unsafe fn premultiply_chunk(&self, dst: &mut [u16], src: &[u16], scale: __m256) {
         let src_ptr = src.as_ptr();
         let lane0 = _mm256_loadu_si256(src_ptr as *const __m256i);

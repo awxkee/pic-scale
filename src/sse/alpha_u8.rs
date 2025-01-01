@@ -64,10 +64,7 @@ pub(crate) unsafe fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
     let lo = _mm_unpacklo_epi8(x, zeros);
     let hi = _mm_unpackhi_epi8(x, zeros);
 
-    let scale = _mm_set1_epi16(255);
-
     let is_zero_mask = _mm_cmpeq_epi8(a, zeros);
-    let a = _mm_select_si128(is_zero_mask, scale, a);
 
     let scale_ps = _mm_set1_ps(255f32);
 
@@ -114,8 +111,7 @@ trait Sse41PremultiplyExecutorRgba8 {
 struct Sse41PremultiplyExecutor8Default {}
 
 impl Sse41PremultiplyExecutor8Default {
-    #[inline]
-    #[target_feature(enable = "sse4.1")]
+    #[inline(always)]
     unsafe fn premultiply_chunk(&self, dst: &mut [u8], src: &[u8]) {
         let zeros = _mm_setzero_si128();
         let src_ptr = src.as_ptr();
@@ -254,8 +250,7 @@ trait DisassociateAlpha {
 struct DisassociateAlphaDefault {}
 
 impl DisassociateAlphaDefault {
-    #[inline]
-    #[target_feature(enable = "sse4.1")]
+    #[inline(always)]
     unsafe fn disassociate_chunk(&self, in_place: &mut [u8]) {
         let src_ptr = in_place.as_ptr();
         let rgba0 = _mm_loadu_si128(src_ptr as *const __m128i);

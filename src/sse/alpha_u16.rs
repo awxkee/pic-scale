@@ -121,8 +121,7 @@ trait DisassociateAlpha {
 struct DisassociateAlphaDefault {}
 
 impl DisassociateAlphaDefault {
-    #[inline]
-    #[target_feature(enable = "sse4.1")]
+    #[inline(always)]
     unsafe fn disassociate_chunk(&self, in_place: &mut [u16], v_max_colors: __m128) {
         let src_ptr = in_place.as_ptr();
         let row0 = _mm_loadu_si128(src_ptr as *const __m128i);
@@ -362,8 +361,7 @@ impl<const BIT_DEPTH: usize> Sse41PremultiplyExecutor
 struct Sse41PremultiplyExecutorAny {}
 
 impl Sse41PremultiplyExecutorAny {
-    #[inline]
-    #[target_feature(enable = "sse4.1")]
+    #[inline(always)]
     unsafe fn premultiply_chunk(&self, dst: &mut [u16], src: &[u16], scale: __m128) {
         let src_ptr = src.as_ptr();
         let row0 = _mm_loadu_si128(src_ptr as *const __m128i);

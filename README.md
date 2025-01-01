@@ -44,25 +44,27 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 
 `~` - Partially implemented
 
-|                | NEON | SSE | AVX2 | WASM | 
-|----------------|------|-----|------|------| 
-| RGBA (8 bit)   | x    | x   | x    | ~    | 
-| RGB (8 bit)    | x    | x   | ~    | ~    | 
-| Plane (8 bit)  | x    | x   | ~    | ~    | 
-| RGBA (8+ bit)  | x    | x   | ~    | -    | 
-| RGB (8+ bit)   | x    | x   | ~    | -    | 
-| Plane (8+ bit) | ~    | ~   | ~    | -    | 
-| RGBA (f32)     | x    | x   | x    | -    | 
-| RGB (f32)      | x    | x   | ~    | -    | 
-| Plane (f32)    | x    | x   | ~    | -    | 
-| RGBA (f16)     | x    | x   | x    | -    | 
-| RGB (f16)      | x    | ~   | ~    | -    | 
-| Plane (f16)    | ~    | ~   | ~    | -    |
-| AR30/RA30      | x    | -   | -    | -    |
+|                | NEON | SSE | AVX2 | AVX-512 | WASM | 
+|----------------|------|-----|------|---------|------| 
+| RGBA (8 bit)   | x    | x   | x    | ~       | ~    | 
+| RGB (8 bit)    | x    | x   | ~    | ~       | ~    | 
+| Plane (8 bit)  | x    | x   | ~    | ~       | ~    | 
+| RGBA (8+ bit)  | x    | x   | ~    | -       | -    | 
+| RGB (8+ bit)   | x    | x   | ~    | -       | -    | 
+| Plane (8+ bit) | ~    | ~   | ~    | -       | -    | 
+| RGBA (f32)     | x    | x   | x    | -       | -    | 
+| RGB (f32)      | x    | x   | ~    | -       | -    | 
+| Plane (f32)    | x    | x   | ~    | -       | -    | 
+| RGBA (f16)     | x    | x   | x    | -       | -    | 
+| RGB (f16)      | x    | ~   | ~    | -       | -    | 
+| Plane (f16)    | ~    | ~   | ~    | -       | -    |
+| AR30/RA30      | x    | -   | -    | -       | -    |
 
 #### Features
 
-To enable support of `f16` the feature `half` should be activated.
+Features: 
+ -  To enable support of `f16` the feature `half` should be activated.
+ -  `nightly_avx512` activates AVX-512 feature set and requires `nightly` compiler channel 
 
 #### Target features with runtime dispatch
 
@@ -71,6 +73,8 @@ For x86 and aarch64 NEON runtime dispatch is used.
 `neon` optional target features are available, enable it when compiling on supported platform to get full features.
 
 `avx2`, `fma`, `sse4.1`, `f16c` will be detected automatically if available, no additional actions need, and called the best path.
+
+`avx512` requires feature `nightly_avx512` and requires `nightly` compiler channel, runtime detection if it is available then will be used.
 
 `fullfp16` NEON target detection performed in runtime, when available best the best paths for *f16* images are available on ARM.
 
