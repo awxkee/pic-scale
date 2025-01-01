@@ -75,6 +75,17 @@ pub(crate) unsafe fn _mm256_div_by_65535_epi32(v: __m256i) -> __m256i {
     _mm256_srli_epi32::<DIVIDING_BY>(_mm256_add_epi32(v, _mm256_srli_epi32::<DIVIDING_BY>(v)))
 }
 
+#[inline(always)]
+unsafe fn _mm256_div_by_epi32<const BIT_DEPTH: usize>(v: __m256i) -> __m256i {
+    if BIT_DEPTH == 10 {
+        _mm256_div_by_1023_epi32(v)
+    } else if BIT_DEPTH == 12 {
+        _mm256_div_by_4095_epi32(v)
+    } else {
+        _mm256_div_by_65535_epi32(v)
+    }
+}
+
 pub(crate) fn avx_premultiply_alpha_rgba_u16(
     dst: &mut [u16],
     src: &[u16],
@@ -92,21 +103,10 @@ trait Avx2PremultiplyExecutor {
     unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize);
 }
 
-struct Avx2PremultiplyExecutor10Bit {}
+#[derive(Default)]
+struct Avx2PremultiplyExecutorDefault<const BIT_DEPTH: usize> {}
 
-impl Default for Avx2PremultiplyExecutor10Bit {
-    fn default() -> Self {
-        Avx2PremultiplyExecutor10Bit {}
-    }
-}
-
-impl Avx2PremultiplyExecutor10Bit {
-    fn create() -> impl Avx2PremultiplyExecutor {
-        Avx2PremultiplyExecutor10Bit::default()
-    }
-}
-
-impl Avx2PremultiplyExecutor for Avx2PremultiplyExecutor10Bit {
+impl<const BIT_DEPTH: usize> Avx2PremultiplyExecutor for Avx2PremultiplyExecutorDefault<BIT_DEPTH> {
     #[target_feature(enable = "avx2")]
     unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
         let max_colors = (1 << bit_depth) - 1;
@@ -131,31 +131,31 @@ impl Avx2PremultiplyExecutor for Avx2PremultiplyExecutor10Bit {
             let high_alpha = _mm256_unpackhi_epi16(pixel.3, zeros);
 
             let new_rrr = _mm256_packus_epi32(
-                _mm256_div_by_1023_epi32(_mm256_madd_epi16(
+                _mm256_div_by_epi32::<BIT_DEPTH>(_mm256_madd_epi16(
                     _mm256_unpacklo_epi16(pixel.0, zeros),
                     low_alpha,
                 )),
-                _mm256_div_by_1023_epi32(_mm256_madd_epi16(
+                _mm256_div_by_epi32::<BIT_DEPTH>(_mm256_madd_epi16(
                     _mm256_unpackhi_epi16(pixel.0, zeros),
                     high_alpha,
                 )),
             );
             let new_ggg = _mm256_packus_epi32(
-                _mm256_div_by_1023_epi32(_mm256_madd_epi16(
+                _mm256_div_by_epi32::<BIT_DEPTH>(_mm256_madd_epi16(
                     _mm256_unpacklo_epi16(pixel.1, zeros),
                     low_alpha,
                 )),
-                _mm256_div_by_1023_epi32(_mm256_madd_epi16(
+                _mm256_div_by_epi32::<BIT_DEPTH>(_mm256_madd_epi16(
                     _mm256_unpackhi_epi16(pixel.1, zeros),
                     high_alpha,
                 )),
             );
             let new_bbb = _mm256_packus_epi32(
-                _mm256_div_by_1023_epi32(_mm256_madd_epi16(
+                _mm256_div_by_epi32::<BIT_DEPTH>(_mm256_madd_epi16(
                     _mm256_unpacklo_epi16(pixel.2, zeros),
                     low_alpha,
                 )),
-                _mm256_div_by_1023_epi32(_mm256_madd_epi16(
+                _mm256_div_by_epi32::<BIT_DEPTH>(_mm256_madd_epi16(
                     _mm256_unpackhi_epi16(pixel.2, zeros),
                     high_alpha,
                 )),
@@ -179,193 +179,8 @@ impl Avx2PremultiplyExecutor for Avx2PremultiplyExecutor10Bit {
     }
 }
 
-struct Avx2PremultiplyExecutor12Bit {}
-
-impl Default for Avx2PremultiplyExecutor12Bit {
-    fn default() -> Self {
-        Avx2PremultiplyExecutor12Bit {}
-    }
-}
-
-impl Avx2PremultiplyExecutor12Bit {
-    fn create() -> impl Avx2PremultiplyExecutor {
-        Avx2PremultiplyExecutor12Bit::default()
-    }
-}
-
-impl Avx2PremultiplyExecutor for Avx2PremultiplyExecutor12Bit {
-    #[target_feature(enable = "avx2")]
-    unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
-        let max_colors = (1 << bit_depth) - 1;
-
-        let mut rem = dst;
-        let mut src_rem = src;
-
-        for (dst, src) in rem
-            .chunks_exact_mut(16 * 4)
-            .zip(src_rem.chunks_exact(16 * 4))
-        {
-            let src_ptr = src.as_ptr();
-            let lane0 = _mm256_loadu_si256(src_ptr as *const __m256i);
-            let lane1 = _mm256_loadu_si256(src_ptr.add(16) as *const __m256i);
-            let lane2 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
-            let lane3 = _mm256_loadu_si256(src_ptr.add(48) as *const __m256i);
-
-            let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
-
-            let zeros = _mm256_setzero_si256();
-            let low_alpha = _mm256_unpacklo_epi16(pixel.3, zeros);
-            let high_alpha = _mm256_unpackhi_epi16(pixel.3, zeros);
-
-            let new_rrr = _mm256_packus_epi32(
-                _mm256_div_by_4095_epi32(_mm256_madd_epi16(
-                    _mm256_unpacklo_epi16(pixel.0, zeros),
-                    low_alpha,
-                )),
-                _mm256_div_by_4095_epi32(_mm256_madd_epi16(
-                    _mm256_unpackhi_epi16(pixel.0, zeros),
-                    high_alpha,
-                )),
-            );
-            let new_ggg = _mm256_packus_epi32(
-                _mm256_div_by_4095_epi32(_mm256_madd_epi16(
-                    _mm256_unpacklo_epi16(pixel.1, zeros),
-                    low_alpha,
-                )),
-                _mm256_div_by_4095_epi32(_mm256_madd_epi16(
-                    _mm256_unpackhi_epi16(pixel.1, zeros),
-                    high_alpha,
-                )),
-            );
-            let new_bbb = _mm256_packus_epi32(
-                _mm256_div_by_4095_epi32(_mm256_madd_epi16(
-                    _mm256_unpacklo_epi16(pixel.2, zeros),
-                    low_alpha,
-                )),
-                _mm256_div_by_4095_epi32(_mm256_madd_epi16(
-                    _mm256_unpackhi_epi16(pixel.2, zeros),
-                    high_alpha,
-                )),
-            );
-
-            let dst_ptr = dst.as_mut_ptr();
-
-            let (d_lane0, d_lane1, d_lane2, d_lane3) =
-                avx_interleave_rgba_epi16(new_rrr, new_ggg, new_bbb, pixel.3);
-
-            _mm256_storeu_si256(dst_ptr as *mut __m256i, d_lane0);
-            _mm256_storeu_si256(dst_ptr.add(16) as *mut __m256i, d_lane1);
-            _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, d_lane2);
-            _mm256_storeu_si256(dst_ptr.add(48) as *mut __m256i, d_lane3);
-        }
-
-        rem = rem.chunks_exact_mut(16 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(16 * 4).remainder();
-
-        premultiply_alpha_rgba_row(rem, src_rem, max_colors);
-    }
-}
-
-struct Avx2PremultiplyExecutor16Bit {}
-
-impl Default for Avx2PremultiplyExecutor16Bit {
-    fn default() -> Self {
-        Avx2PremultiplyExecutor16Bit {}
-    }
-}
-
-impl Avx2PremultiplyExecutor16Bit {
-    fn create() -> impl Avx2PremultiplyExecutor {
-        Avx2PremultiplyExecutor16Bit::default()
-    }
-}
-
-impl Avx2PremultiplyExecutor for Avx2PremultiplyExecutor16Bit {
-    #[target_feature(enable = "avx2")]
-    unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
-        let max_colors = (1 << bit_depth) - 1;
-
-        let mut rem = dst;
-        let mut src_rem = src;
-
-        for (dst, src) in rem
-            .chunks_exact_mut(16 * 4)
-            .zip(src_rem.chunks_exact(16 * 4))
-        {
-            let src_ptr = src.as_ptr();
-            let lane0 = _mm256_loadu_si256(src_ptr as *const __m256i);
-            let lane1 = _mm256_loadu_si256(src_ptr.add(16) as *const __m256i);
-            let lane2 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
-            let lane3 = _mm256_loadu_si256(src_ptr.add(48) as *const __m256i);
-
-            let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
-
-            let zeros = _mm256_setzero_si256();
-            let low_alpha = _mm256_unpacklo_epi16(pixel.3, zeros);
-            let high_alpha = _mm256_unpackhi_epi16(pixel.3, zeros);
-
-            let new_rrr = _mm256_packus_epi32(
-                _mm256_div_by_65535_epi32(_mm256_mullo_epi32(
-                    _mm256_unpacklo_epi16(pixel.0, zeros),
-                    low_alpha,
-                )),
-                _mm256_div_by_65535_epi32(_mm256_mullo_epi32(
-                    _mm256_unpackhi_epi16(pixel.0, zeros),
-                    high_alpha,
-                )),
-            );
-            let new_ggg = _mm256_packus_epi32(
-                _mm256_div_by_65535_epi32(_mm256_mullo_epi32(
-                    _mm256_unpacklo_epi16(pixel.1, zeros),
-                    low_alpha,
-                )),
-                _mm256_div_by_65535_epi32(_mm256_mullo_epi32(
-                    _mm256_unpackhi_epi16(pixel.1, zeros),
-                    high_alpha,
-                )),
-            );
-            let new_bbb = _mm256_packus_epi32(
-                _mm256_div_by_65535_epi32(_mm256_mullo_epi32(
-                    _mm256_unpacklo_epi16(pixel.2, zeros),
-                    low_alpha,
-                )),
-                _mm256_div_by_65535_epi32(_mm256_mullo_epi32(
-                    _mm256_unpackhi_epi16(pixel.2, zeros),
-                    high_alpha,
-                )),
-            );
-
-            let dst_ptr = dst.as_mut_ptr();
-
-            let (d_lane0, d_lane1, d_lane2, d_lane3) =
-                avx_interleave_rgba_epi16(new_rrr, new_ggg, new_bbb, pixel.3);
-
-            _mm256_storeu_si256(dst_ptr as *mut __m256i, d_lane0);
-            _mm256_storeu_si256(dst_ptr.add(16) as *mut __m256i, d_lane1);
-            _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, d_lane2);
-            _mm256_storeu_si256(dst_ptr.add(48) as *mut __m256i, d_lane3);
-        }
-
-        rem = rem.chunks_exact_mut(16 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(16 * 4).remainder();
-
-        premultiply_alpha_rgba_row(rem, src_rem, max_colors);
-    }
-}
-
+#[derive(Default)]
 struct Avx2PremultiplyExecutorAnyBit {}
-
-impl Default for Avx2PremultiplyExecutorAnyBit {
-    fn default() -> Self {
-        Avx2PremultiplyExecutorAnyBit {}
-    }
-}
-
-impl Avx2PremultiplyExecutorAnyBit {
-    fn create() -> impl Avx2PremultiplyExecutor {
-        Avx2PremultiplyExecutorAnyBit {}
-    }
-}
 
 impl Avx2PremultiplyExecutor for Avx2PremultiplyExecutorAnyBit {
     #[target_feature(enable = "avx2")]
@@ -425,13 +240,33 @@ impl Avx2PremultiplyExecutor for Avx2PremultiplyExecutorAnyBit {
 /// This inlining is required to activate all features for runtime dispatch
 unsafe fn avx_premultiply_alpha_rgba_u16_row(dst: &mut [u16], src: &[u16], bit_depth: usize) {
     if bit_depth == 10 {
-        avx_pa_dispatch(dst, src, bit_depth, Avx2PremultiplyExecutor10Bit::create());
+        avx_pa_dispatch(
+            dst,
+            src,
+            bit_depth,
+            Avx2PremultiplyExecutorDefault::<10>::default(),
+        );
     } else if bit_depth == 12 {
-        avx_pa_dispatch(dst, src, bit_depth, Avx2PremultiplyExecutor12Bit::create());
+        avx_pa_dispatch(
+            dst,
+            src,
+            bit_depth,
+            Avx2PremultiplyExecutorDefault::<12>::default(),
+        );
     } else if bit_depth == 16 {
-        avx_pa_dispatch(dst, src, bit_depth, Avx2PremultiplyExecutor16Bit::create());
+        avx_pa_dispatch(
+            dst,
+            src,
+            bit_depth,
+            Avx2PremultiplyExecutorDefault::<16>::default(),
+        );
     } else {
-        avx_pa_dispatch(dst, src, bit_depth, Avx2PremultiplyExecutorAnyBit::create());
+        avx_pa_dispatch(
+            dst,
+            src,
+            bit_depth,
+            Avx2PremultiplyExecutorAnyBit::default(),
+        );
     };
 }
 

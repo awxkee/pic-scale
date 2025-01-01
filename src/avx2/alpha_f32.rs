@@ -129,33 +129,31 @@ unsafe fn avx_premultiply_alpha_rgba_f32_row_impl(dst: &mut [f32], src: &[f32]) 
     let mut rem = dst;
     let mut src_rem = src;
 
-    unsafe {
-        for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
-            let src_ptr = src.as_ptr();
-            let rgba0 = _mm256_loadu_ps(src_ptr);
-            let rgba1 = _mm256_loadu_ps(src_ptr.add(8));
-            let rgba2 = _mm256_loadu_ps(src_ptr.add(16));
-            let rgba3 = _mm256_loadu_ps(src_ptr.add(24));
-            let (rrr, ggg, bbb, aaa) = avx_deinterleave_rgba_ps(rgba0, rgba1, rgba2, rgba3);
+    for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
+        let src_ptr = src.as_ptr();
+        let rgba0 = _mm256_loadu_ps(src_ptr);
+        let rgba1 = _mm256_loadu_ps(src_ptr.add(8));
+        let rgba2 = _mm256_loadu_ps(src_ptr.add(16));
+        let rgba3 = _mm256_loadu_ps(src_ptr.add(24));
+        let (rrr, ggg, bbb, aaa) = avx_deinterleave_rgba_ps(rgba0, rgba1, rgba2, rgba3);
 
-            let rrr = _mm256_mul_ps(rrr, aaa);
-            let ggg = _mm256_mul_ps(ggg, aaa);
-            let bbb = _mm256_mul_ps(bbb, aaa);
+        let rrr = _mm256_mul_ps(rrr, aaa);
+        let ggg = _mm256_mul_ps(ggg, aaa);
+        let bbb = _mm256_mul_ps(bbb, aaa);
 
-            let (rgba0, rgba1, rgba2, rgba3) = avx_interleave_rgba_ps(rrr, ggg, bbb, aaa);
+        let (rgba0, rgba1, rgba2, rgba3) = avx_interleave_rgba_ps(rrr, ggg, bbb, aaa);
 
-            let dst_ptr = dst.as_mut_ptr();
-            _mm256_storeu_ps(dst_ptr, rgba0);
-            _mm256_storeu_ps(dst_ptr.add(8), rgba1);
-            _mm256_storeu_ps(dst_ptr.add(16), rgba2);
-            _mm256_storeu_ps(dst_ptr.add(24), rgba3);
+        let dst_ptr = dst.as_mut_ptr();
+        _mm256_storeu_ps(dst_ptr, rgba0);
+        _mm256_storeu_ps(dst_ptr.add(8), rgba1);
+        _mm256_storeu_ps(dst_ptr.add(16), rgba2);
+        _mm256_storeu_ps(dst_ptr.add(24), rgba3);
 
-            _cx += 8;
-        }
-
-        rem = rem.chunks_exact_mut(8 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(8 * 4).remainder();
+        _cx += 8;
     }
+
+    rem = rem.chunks_exact_mut(8 * 4).into_remainder();
+    src_rem = src_rem.chunks_exact(8 * 4).remainder();
 
     premultiply_pixel_f32_row(rem, src_rem);
 }

@@ -166,7 +166,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 dimensions.0 as usize,
                 dimensions.1 as usize,
             )
-                .unwrap();
+            .unwrap();
             let mut target = ImageStoreMut::alloc_with_depth(
                 dimensions.0 as usize / 4,
                 dimensions.1 as usize / 4,

@@ -49,8 +49,7 @@ unsafe fn convolve_horizontal_parts_one_rgba_f16<const F16C: bool, const FMA: bo
     let src_ptr = src.add(start_x * COMPONENTS);
     let rgb_pixel = _mm_loadu_si64(src_ptr as *const u8);
     let pixels = _mm_cvtph_psx::<F16C>(rgb_pixel);
-    let acc = _mm_prefer_fma_ps::<FMA>(store_0, pixels, weight0);
-    acc
+    _mm_prefer_fma_ps::<FMA>(store_0, pixels, weight0)
 }
 
 #[inline(always)]
@@ -77,8 +76,7 @@ unsafe fn convolve_horizontal_parts_4_rgba_f16<const F16C: bool, const FMA: bool
     let acc = _mm_prefer_fma_ps::<FMA>(store_0, rgb_pixel_0, weight0);
     let acc = _mm_prefer_fma_ps::<FMA>(acc, rgb_pixel_1, weight1);
     let acc = _mm_prefer_fma_ps::<FMA>(acc, rgb_pixel_2, weight2);
-    let acc = _mm_prefer_fma_ps::<FMA>(acc, rgb_pixel_3, weight3);
-    acc
+    _mm_prefer_fma_ps::<FMA>(acc, rgb_pixel_3, weight3)
 }
 
 #[inline(always)]
@@ -95,12 +93,11 @@ unsafe fn convolve_horizontal_parts_2_rgba_f16<const F16C: bool, const FMA: bool
     let rgb_pixels = _mm_loadu_si128(src_ptr as *const __m128i);
 
     let acc = _mm_prefer_fma_ps::<FMA>(store_0, _mm_cvtph_psx::<F16C>(rgb_pixels), weight0);
-    let acc = _mm_prefer_fma_ps::<FMA>(
+    _mm_prefer_fma_ps::<FMA>(
         acc,
         _mm_cvtph_psx::<F16C>(_mm_srli_si128::<8>(rgb_pixels)),
         weight1,
-    );
-    acc
+    )
 }
 
 pub(crate) fn convolve_horizontal_rgba_sse_row_one_f16<const F16C: bool, const FMA: bool>(

@@ -42,7 +42,7 @@ fn resize_plane(
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/abstract_alpha.png")
+    let img = ImageReader::open("./assets/asset_4.png")
         .unwrap()
         .decode()
         .unwrap();

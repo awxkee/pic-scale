@@ -82,8 +82,7 @@ unsafe fn convolve_horizontal_parts_4_rgb_f16<const F16C: bool, const FMA: bool>
     let acc = _mm_prefer_fma_ps::<FMA>(store_0, rgb_pixel_0, weight0);
     let acc = _mm_prefer_fma_ps::<FMA>(acc, rgb_pixel_1, weight1);
     let acc = _mm_prefer_fma_ps::<FMA>(acc, rgb_pixel_2, weight2);
-    let acc = _mm_prefer_fma_ps::<FMA>(acc, rgb_pixel_3, weight3);
-    acc
+    _mm_prefer_fma_ps::<FMA>(acc, rgb_pixel_3, weight3)
 }
 
 #[inline(always)]
@@ -142,8 +141,7 @@ unsafe fn convolve_horizontal_parts_one_rgb_f16<const F16C: bool, const FMA: boo
         0,
         0,
     ));
-    let acc = _mm_prefer_fma_ps::<FMA>(store_0, rgb_pixel, weight0);
-    acc
+    _mm_prefer_fma_ps::<FMA>(store_0, rgb_pixel, weight0)
 }
 
 pub(crate) fn convolve_horizontal_rgb_sse_row_one_f16<const F16C: bool, const FMA: bool>(

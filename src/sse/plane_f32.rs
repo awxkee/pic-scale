@@ -316,7 +316,7 @@ unsafe fn convolve_horizontal_plane_sse_rows_4_fma(
     );
 }
 
-#[inline]
+#[inline(always)]
 unsafe fn convolve_horizontal_plane_sse_rows_4_impl<const FMA: bool>(
     dst_width: usize,
     _: usize,
@@ -326,139 +326,135 @@ unsafe fn convolve_horizontal_plane_sse_rows_4_impl<const FMA: bool>(
     dst: &mut [f32],
     dst_stride: usize,
 ) {
-    unsafe {
-        let mut filter_offset = 0usize;
-        let zeros = _mm_setzero_ps();
-        let weights_ptr = filter_weights.weights.as_ptr();
+    let mut filter_offset = 0usize;
+    let zeros = _mm_setzero_ps();
+    let weights_ptr = filter_weights.weights.as_ptr();
 
-        for x in 0..dst_width {
-            let bounds = filter_weights.bounds.get_unchecked(x);
-            let mut jx = 0usize;
-            let mut store_0 = zeros;
-            let mut store_1 = zeros;
-            let mut store_2 = zeros;
-            let mut store_3 = zeros;
+    for x in 0..dst_width {
+        let bounds = filter_weights.bounds.get_unchecked(x);
+        let mut jx = 0usize;
+        let mut store_0 = zeros;
+        let mut store_1 = zeros;
+        let mut store_2 = zeros;
+        let mut store_3 = zeros;
 
-            while jx + 16 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let read_weights0 = _mm_loadu_ps(ptr);
-                let read_weights1 = _mm_loadu_ps(ptr.add(4));
-                let read_weights2 = _mm_loadu_ps(ptr.add(8));
-                let read_weights3 = _mm_loadu_ps(ptr.add(12));
-                let weights = (read_weights0, read_weights1, read_weights2, read_weights3);
-                let bounds_start = bounds.start + jx;
-                store_0 = conv_horiz_plane_16_f32!(bounds_start, src, weights, store_0, FMA);
-                let s_ptr_1 = src.get_unchecked(src_stride..);
-                store_1 = conv_horiz_plane_16_f32!(bounds_start, s_ptr_1, weights, store_1, FMA);
-                let s_ptr2 = src.get_unchecked(src_stride * 2..);
-                store_2 = conv_horiz_plane_16_f32!(bounds_start, s_ptr2, weights, store_2, FMA);
-                let s_ptr3 = src.get_unchecked(src_stride * 3..);
-                store_3 = conv_horiz_plane_16_f32!(bounds_start, s_ptr3, weights, store_3, FMA);
-                jx += 16;
-            }
-
-            while jx + 8 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let read_weights0 = _mm_loadu_ps(ptr);
-                let read_weights1 = _mm_loadu_ps(ptr.add(4));
-                let read_weights = (read_weights0, read_weights1);
-                let bounds_start = bounds.start + jx;
-                store_0 = conv_horiz_plane_8_f32!(
-                    bounds_start,
-                    src,
-                    read_weights.0,
-                    read_weights.1,
-                    store_0,
-                    FMA
-                );
-                let s_ptr_1 = src.get_unchecked(src_stride..);
-                store_1 = conv_horiz_plane_8_f32!(
-                    bounds_start,
-                    s_ptr_1,
-                    read_weights.0,
-                    read_weights.1,
-                    store_1,
-                    FMA
-                );
-                let s_ptr2 = src.get_unchecked(src_stride * 2..);
-                store_2 = conv_horiz_plane_8_f32!(
-                    bounds_start,
-                    s_ptr2,
-                    read_weights.0,
-                    read_weights.1,
-                    store_2,
-                    FMA
-                );
-                let s_ptr3 = src.get_unchecked(src_stride * 3..);
-                store_3 = conv_horiz_plane_8_f32!(
-                    bounds_start,
-                    s_ptr3,
-                    read_weights.0,
-                    read_weights.1,
-                    store_3,
-                    FMA
-                );
-                jx += 8;
-            }
-
-            while jx + 4 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let read_weights = _mm_loadu_ps(ptr);
-                let bounds_start = bounds.start + jx;
-                store_0 = conv_horiz_plane_4_f32!(bounds_start, src, read_weights, store_0, FMA);
-                let s_ptr_1 = src.get_unchecked(src_stride..);
-                store_1 =
-                    conv_horiz_plane_4_f32!(bounds_start, s_ptr_1, read_weights, store_1, FMA);
-                let s_ptr2 = src.get_unchecked(src_stride * 2..);
-                store_2 = conv_horiz_plane_4_f32!(bounds_start, s_ptr2, read_weights, store_2, FMA);
-                let s_ptr3 = src.get_unchecked(src_stride * 3..);
-                store_3 = conv_horiz_plane_4_f32!(bounds_start, s_ptr3, read_weights, store_3, FMA);
-                jx += 4;
-            }
-
-            while jx + 2 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let weights =
-                    _mm_setr_ps(ptr.read_unaligned(), ptr.add(1).read_unaligned(), 0., 0.);
-                let bounds_start = bounds.start + jx;
-                store_0 = conv_horiz_plane_2_f32!(bounds_start, src, weights, store_0, FMA);
-                let ptr_1 = src.get_unchecked(src_stride..);
-                store_1 = conv_horiz_plane_2_f32!(bounds_start, ptr_1, weights, store_1, FMA);
-                let ptr_2 = src.get_unchecked(src_stride * 2..);
-                store_2 = conv_horiz_plane_2_f32!(bounds_start, ptr_2, weights, store_2, FMA);
-                let ptr_3 = src.get_unchecked(src_stride * 3..);
-                store_3 = conv_horiz_plane_2_f32!(bounds_start, ptr_3, weights, store_3, FMA);
-                jx += 2;
-            }
-
-            while jx < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = _mm_set1_ps(ptr.read_unaligned());
-                let bounds_start = bounds.start + jx;
-                store_0 = conv_horiz_plane_1_f32!(bounds_start, src, weight0, store_0, FMA);
-                let ptr_1 = src.get_unchecked(src_stride..);
-                store_1 = conv_horiz_plane_1_f32!(bounds_start, ptr_1, weight0, store_1, FMA);
-                let ptr_2 = src.get_unchecked(src_stride * 2..);
-                store_2 = conv_horiz_plane_1_f32!(bounds_start, ptr_2, weight0, store_2, FMA);
-                let ptr_3 = src.get_unchecked(src_stride * 3..);
-                store_3 = conv_horiz_plane_1_f32!(bounds_start, ptr_3, weight0, store_3, FMA);
-                jx += 1;
-            }
-
-            let px = x;
-            let dest_ptr = dst.get_unchecked_mut(px);
-            *dest_ptr = _mm_hsum_ps(store_0);
-
-            let dest_ptr = dst.get_unchecked_mut(px + dst_stride);
-            *dest_ptr = _mm_hsum_ps(store_1);
-
-            let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 2);
-            *dest_ptr = _mm_hsum_ps(store_2);
-
-            let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 3);
-            *dest_ptr = _mm_hsum_ps(store_3);
-
-            filter_offset += filter_weights.aligned_size;
+        while jx + 16 < bounds.size {
+            let ptr = weights_ptr.add(jx + filter_offset);
+            let read_weights0 = _mm_loadu_ps(ptr);
+            let read_weights1 = _mm_loadu_ps(ptr.add(4));
+            let read_weights2 = _mm_loadu_ps(ptr.add(8));
+            let read_weights3 = _mm_loadu_ps(ptr.add(12));
+            let weights = (read_weights0, read_weights1, read_weights2, read_weights3);
+            let bounds_start = bounds.start + jx;
+            store_0 = conv_horiz_plane_16_f32!(bounds_start, src, weights, store_0, FMA);
+            let s_ptr_1 = src.get_unchecked(src_stride..);
+            store_1 = conv_horiz_plane_16_f32!(bounds_start, s_ptr_1, weights, store_1, FMA);
+            let s_ptr2 = src.get_unchecked(src_stride * 2..);
+            store_2 = conv_horiz_plane_16_f32!(bounds_start, s_ptr2, weights, store_2, FMA);
+            let s_ptr3 = src.get_unchecked(src_stride * 3..);
+            store_3 = conv_horiz_plane_16_f32!(bounds_start, s_ptr3, weights, store_3, FMA);
+            jx += 16;
         }
+
+        while jx + 8 < bounds.size {
+            let ptr = weights_ptr.add(jx + filter_offset);
+            let read_weights0 = _mm_loadu_ps(ptr);
+            let read_weights1 = _mm_loadu_ps(ptr.add(4));
+            let read_weights = (read_weights0, read_weights1);
+            let bounds_start = bounds.start + jx;
+            store_0 = conv_horiz_plane_8_f32!(
+                bounds_start,
+                src,
+                read_weights.0,
+                read_weights.1,
+                store_0,
+                FMA
+            );
+            let s_ptr_1 = src.get_unchecked(src_stride..);
+            store_1 = conv_horiz_plane_8_f32!(
+                bounds_start,
+                s_ptr_1,
+                read_weights.0,
+                read_weights.1,
+                store_1,
+                FMA
+            );
+            let s_ptr2 = src.get_unchecked(src_stride * 2..);
+            store_2 = conv_horiz_plane_8_f32!(
+                bounds_start,
+                s_ptr2,
+                read_weights.0,
+                read_weights.1,
+                store_2,
+                FMA
+            );
+            let s_ptr3 = src.get_unchecked(src_stride * 3..);
+            store_3 = conv_horiz_plane_8_f32!(
+                bounds_start,
+                s_ptr3,
+                read_weights.0,
+                read_weights.1,
+                store_3,
+                FMA
+            );
+            jx += 8;
+        }
+
+        while jx + 4 < bounds.size {
+            let ptr = weights_ptr.add(jx + filter_offset);
+            let read_weights = _mm_loadu_ps(ptr);
+            let bounds_start = bounds.start + jx;
+            store_0 = conv_horiz_plane_4_f32!(bounds_start, src, read_weights, store_0, FMA);
+            let s_ptr_1 = src.get_unchecked(src_stride..);
+            store_1 = conv_horiz_plane_4_f32!(bounds_start, s_ptr_1, read_weights, store_1, FMA);
+            let s_ptr2 = src.get_unchecked(src_stride * 2..);
+            store_2 = conv_horiz_plane_4_f32!(bounds_start, s_ptr2, read_weights, store_2, FMA);
+            let s_ptr3 = src.get_unchecked(src_stride * 3..);
+            store_3 = conv_horiz_plane_4_f32!(bounds_start, s_ptr3, read_weights, store_3, FMA);
+            jx += 4;
+        }
+
+        while jx + 2 < bounds.size {
+            let ptr = weights_ptr.add(jx + filter_offset);
+            let weights = _mm_setr_ps(ptr.read_unaligned(), ptr.add(1).read_unaligned(), 0., 0.);
+            let bounds_start = bounds.start + jx;
+            store_0 = conv_horiz_plane_2_f32!(bounds_start, src, weights, store_0, FMA);
+            let ptr_1 = src.get_unchecked(src_stride..);
+            store_1 = conv_horiz_plane_2_f32!(bounds_start, ptr_1, weights, store_1, FMA);
+            let ptr_2 = src.get_unchecked(src_stride * 2..);
+            store_2 = conv_horiz_plane_2_f32!(bounds_start, ptr_2, weights, store_2, FMA);
+            let ptr_3 = src.get_unchecked(src_stride * 3..);
+            store_3 = conv_horiz_plane_2_f32!(bounds_start, ptr_3, weights, store_3, FMA);
+            jx += 2;
+        }
+
+        while jx < bounds.size {
+            let ptr = weights_ptr.add(jx + filter_offset);
+            let weight0 = _mm_set1_ps(ptr.read_unaligned());
+            let bounds_start = bounds.start + jx;
+            store_0 = conv_horiz_plane_1_f32!(bounds_start, src, weight0, store_0, FMA);
+            let ptr_1 = src.get_unchecked(src_stride..);
+            store_1 = conv_horiz_plane_1_f32!(bounds_start, ptr_1, weight0, store_1, FMA);
+            let ptr_2 = src.get_unchecked(src_stride * 2..);
+            store_2 = conv_horiz_plane_1_f32!(bounds_start, ptr_2, weight0, store_2, FMA);
+            let ptr_3 = src.get_unchecked(src_stride * 3..);
+            store_3 = conv_horiz_plane_1_f32!(bounds_start, ptr_3, weight0, store_3, FMA);
+            jx += 1;
+        }
+
+        let px = x;
+        let dest_ptr = dst.get_unchecked_mut(px);
+        *dest_ptr = _mm_hsum_ps(store_0);
+
+        let dest_ptr = dst.get_unchecked_mut(px + dst_stride);
+        *dest_ptr = _mm_hsum_ps(store_1);
+
+        let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 2);
+        *dest_ptr = _mm_hsum_ps(store_2);
+
+        let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 3);
+        *dest_ptr = _mm_hsum_ps(store_3);
+
+        filter_offset += filter_weights.aligned_size;
     }
 }
