@@ -1,3 +1,4 @@
+#![feature(stdarch_x86_avx512_f16)]
 /*
  * Copyright (c) Radzivon Bartoshyk. All rights reserved.
  *

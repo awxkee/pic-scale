@@ -64,7 +64,6 @@ fn main() {
 
     let dst_size = ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
     // let mut resized_ar = vec![0u32; dst_size.width * dst_size.height];
-    let start_time = Instant::now();
     // scaler
     //     .resize_ra30(
     //         &ar30_src,
@@ -81,11 +80,14 @@ fn main() {
         10,
     );
 
-    scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
+    for i in 0..25 {
+        let start_time = Instant::now();
+        scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
 
-    let elapsed_time = start_time.elapsed();
-    // Print the elapsed time in milliseconds
-    println!("Scaler: {:.2?}", elapsed_time);
+        let elapsed_time = start_time.elapsed();
+        // Print the elapsed time in milliseconds
+        println!("Scaler: {:.2?}", elapsed_time);
+    }
 
     // let mut resized = vec![0u8; dst_size.width * dst_size.height * 4];
     // ra30_to_rgba8(
@@ -252,17 +254,17 @@ fn test_fast_image() {
 
     let mut vc = Vec::from(img.as_bytes());
 
-    let mut converted_bytes: Vec<u16> = vc.iter().map(|&x| (x as u16) << 8).collect();
+    // let mut converted_bytes: Vec<u16> = vc.iter().map(|&x| (x as u16) << 8).collect();
     //
-    let mut chokidar = Vec::from(u16_to_u8(&converted_bytes));
+    // let mut chokidar = Vec::from(u16_to_u8(&converted_bytes));
 
     let start_time = Instant::now();
 
-    let pixel_type: PixelType = PixelType::U16x4;
+    let pixel_type: PixelType = PixelType::U8x4;
 
-    let src_image = Image::from_vec_u8(dimensions.0, dimensions.1, chokidar, pixel_type).unwrap();
+    let src_image = Image::from_vec_u8(dimensions.0, dimensions.1, vc, pixel_type).unwrap();
 
-    let mut dst_image = Image::new(dimensions.0 / 2, dimensions.1 / 2, pixel_type);
+    let mut dst_image = Image::new(dimensions.0, dimensions.1 / 2, pixel_type);
 
     let mut resizer = Resizer::new();
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]

@@ -341,6 +341,7 @@ impl DisassociateAlpha for Avx512DisassociateAlpha<true> {
 unsafe fn avx512_unp_row(in_place: &mut [u8], executor: impl DisassociateAlpha) {
     executor.disassociate(in_place);
 }
+
 pub(crate) fn avx512_unpremultiply_alpha_rgba(
     in_place: &mut [u8],
     width: usize,
