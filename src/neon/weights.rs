@@ -26,48 +26,45 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::neon::f16_utils::{xvcombine_f16, xvcvt_f16_f32};
+use crate::neon::utils::xvld1q_f32_x2;
+use crate::neon::{xreinterpret_u16_f16, xreinterpretq_u16_f16};
+use std::arch::aarch64::*;
 
-#[cfg(feature = "half")]
-mod alpha_f16;
-mod alpha_f32;
-mod alpha_u16;
-mod alpha_u8;
-mod check_alpha;
-#[cfg(feature = "half")]
-mod rgba_f16;
-mod rgba_f32;
-mod rgba_u8_lb;
-pub(crate) mod utils;
-#[cfg(feature = "half")]
-mod vertical_f16;
-mod vertical_f32;
-mod vertical_u16_lb;
-mod vertical_u8;
-mod vertical_u8_lp;
+pub(crate) fn convert_weights_to_f16(weights: &[f32]) -> Vec<i16> {
+    unsafe { convert_weights_to_f16_impl(weights) }
+}
 
-#[cfg(feature = "half")]
-pub(crate) use alpha_f16::{avx_premultiply_alpha_rgba_f16, avx_unpremultiply_alpha_rgba_f16};
-pub(crate) use alpha_f32::avx_premultiply_alpha_rgba_f32;
-pub(crate) use alpha_f32::avx_unpremultiply_alpha_rgba_f32;
-pub(crate) use alpha_u16::{avx_premultiply_alpha_rgba_u16, avx_unpremultiply_alpha_rgba_u16};
-pub(crate) use alpha_u8::avx_premultiply_alpha_rgba;
-pub(crate) use alpha_u8::avx_unpremultiply_alpha_rgba;
-pub(crate) use check_alpha::{
-    avx_has_non_constant_cap_alpha_rgba16, avx_has_non_constant_cap_alpha_rgba8,
-};
-#[cfg(feature = "half")]
-pub(crate) use rgba_f16::{
-    convolve_horizontal_rgba_avx_row_one_f16, convolve_horizontal_rgba_avx_rows_4_f16,
-};
-pub(crate) use rgba_f32::{
-    convolve_horizontal_rgba_avx_row_one_f32, convolve_horizontal_rgba_avx_rows_4_f32,
-};
-pub(crate) use rgba_u8_lb::{
-    convolve_horizontal_rgba_avx_rows_4_lb, convolve_horizontal_rgba_avx_rows_one_lb,
-};
-#[cfg(feature = "half")]
-pub(crate) use vertical_f16::convolve_vertical_avx_row_f16;
-pub(crate) use vertical_f32::convolve_vertical_avx_row_f32;
-pub(crate) use vertical_u16_lb::convolve_column_lb_avx2_u16;
-pub(crate) use vertical_u8::convolve_vertical_avx_row;
-pub(crate) use vertical_u8_lp::convolve_vertical_avx_row_lp;
+#[target_feature(enable = "fp16")]
+unsafe fn convert_weights_to_f16_impl(weights: &[f32]) -> Vec<i16> {
+    let mut new_weights = vec![0i16; weights.len()];
+
+    for (dst, src) in new_weights.chunks_exact_mut(8).zip(weights.chunks_exact(8)) {
+        let j = xvld1q_f32_x2(src.as_ptr());
+        let cvt0 = xvcvt_f16_f32(j.0);
+        let cvt1 = xvcvt_f16_f32(j.1);
+        vst1q_u16(
+            dst.as_mut_ptr() as *mut u16,
+            xreinterpretq_u16_f16(xvcombine_f16(cvt0, cvt1)),
+        );
+    }
+
+    let dst = new_weights.chunks_exact_mut(8).into_remainder();
+    let src = weights.chunks_exact(8).remainder();
+
+    for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+        let j = vld1q_f32(src.as_ptr());
+        let cvt = xvcvt_f16_f32(j);
+        vst1_u16(dst.as_mut_ptr() as *mut u16, xreinterpret_u16_f16(cvt));
+    }
+
+    let dst = dst.chunks_exact_mut(4).into_remainder();
+    let src = src.chunks_exact(4).remainder();
+
+    for (dst, src) in dst.chunks_exact_mut(1).zip(src.iter()) {
+        let j = xvcvt_f16_f32(vld1q_lane_f32::<0>(src, vdupq_n_f32(0.)));
+        vst1_lane_u16::<0>(dst.as_mut_ptr() as *mut u16, xreinterpret_u16_f16(j));
+    }
+
+    new_weights
+}

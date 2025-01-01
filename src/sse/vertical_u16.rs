@@ -144,19 +144,19 @@ unsafe fn convolve_column_lb_u16_impl<const FMA: bool>(
         }
 
         let v_st0 = _mm_min_epi32(
-            _mm_cvtps_epi32(_mm_round_ps::<ROUNDING>(_mm_max_ps(store0, zeros_ps))),
+            _mm_cvtps_epi32(_mm_round_ps::<ROUNDING>(store0)),
             v_max_colors,
         );
         let v_st1 = _mm_min_epi32(
-            _mm_cvtps_epi32(_mm_round_ps::<ROUNDING>(_mm_max_ps(store1, zeros_ps))),
+            _mm_cvtps_epi32(_mm_round_ps::<ROUNDING>(store1)),
             v_max_colors,
         );
         let v_st2 = _mm_min_epi32(
-            _mm_cvtps_epi32(_mm_round_ps::<ROUNDING>(_mm_max_ps(store2, zeros_ps))),
+            _mm_cvtps_epi32(_mm_round_ps::<ROUNDING>(store2)),
             v_max_colors,
         );
         let v_st3 = _mm_min_epi32(
-            _mm_cvtps_epi32(_mm_round_ps::<ROUNDING>(_mm_max_ps(store3, zeros_ps))),
+            _mm_cvtps_epi32(_mm_round_ps::<ROUNDING>(store3)),
             v_max_colors,
         );
 
@@ -201,11 +201,11 @@ unsafe fn convolve_column_lb_u16_impl<const FMA: bool>(
         }
 
         let v_st0 = _mm_min_epi32(
-            _mm_cvtps_epi32(_mm_round_ps::<ROUNDING>(_mm_max_ps(store0, zeros_ps))),
+            _mm_cvtps_epi32(_mm_round_ps::<ROUNDING>(store0)),
             v_max_colors,
         );
         let v_st1 = _mm_min_epi32(
-            _mm_cvtps_epi32(_mm_round_ps::<ROUNDING>(_mm_max_ps(store1, zeros_ps))),
+            _mm_cvtps_epi32(_mm_round_ps::<ROUNDING>(store1)),
             v_max_colors,
         );
 
@@ -351,7 +351,7 @@ unsafe fn convolve_column_lb_u16_impl<const FMA: bool>(
         }
 
         let v_st = _mm_min_epi32(
-            _mm_cvtps_epi32(_mm_round_ps::<ROUNDING>(_mm_max_ps(store0, zeros_ps))),
+            _mm_cvtps_epi32(_mm_round_ps::<ROUNDING>(store0)),
             v_max_colors,
         );
 

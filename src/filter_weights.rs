@@ -109,3 +109,40 @@ impl FilterWeights<f32> {
         )
     }
 }
+
+pub(crate) trait WeightsConverter {
+    fn prepare_weights(&self, weights: &FilterWeights<f32>) -> FilterWeights<i16>;
+}
+
+#[derive(Default)]
+pub(crate) struct DefaultWeightsConverter {}
+
+impl WeightsConverter for DefaultWeightsConverter {
+    fn prepare_weights(&self, weights: &FilterWeights<f32>) -> FilterWeights<i16> {
+        use crate::support::PRECISION;
+        weights.numerical_approximation_i16::<PRECISION>(0)
+    }
+}
+
+#[derive(Default)]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+pub(crate) struct WeightFloat16Converter {}
+
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+impl WeightsConverter for WeightFloat16Converter {
+    fn prepare_weights(&self, weights: &FilterWeights<f32>) -> FilterWeights<i16> {
+        use crate::neon::convert_weights_to_f16;
+        let converted_weights = convert_weights_to_f16(&weights.weights);
+
+        let new_bounds = weights.bounds.to_vec();
+
+        FilterWeights::new(
+            converted_weights,
+            weights.kernel_size,
+            weights.kernel_size,
+            weights.distinct_elements,
+            weights.coeffs_size,
+            new_bounds,
+        )
+    }
+}

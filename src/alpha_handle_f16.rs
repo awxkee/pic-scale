@@ -28,13 +28,13 @@
  */
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::avx2::{avx_premultiply_alpha_rgba_f16, avx_unpremultiply_alpha_rgba_f16};
-#[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::cpu_features::is_aarch_f16_supported;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{neon_premultiply_alpha_rgba_f16, neon_unpremultiply_alpha_rgba_f16};
-#[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{neon_premultiply_alpha_rgba_f16_full, neon_unpremultiply_alpha_rgba_f16_full};
-#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"),))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{sse_premultiply_alpha_rgba_f16, sse_unpremultiply_alpha_rgba_f16};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
@@ -49,9 +49,9 @@ pub(crate) fn unpremultiply_pixel_f16_row(in_place: &mut [half::f16]) {
         let a = dst[3].to_f32();
         if a != 0. {
             let scale_alpha = 1. / a;
-            r = r * scale_alpha;
-            g = g * scale_alpha;
-            b = b * scale_alpha;
+            r *= scale_alpha;
+            g *= scale_alpha;
+            b *= scale_alpha;
         } else {
             r = 0.;
             g = 0.;

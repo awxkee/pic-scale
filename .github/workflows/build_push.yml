@@ -44,6 +44,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo clippy
 
+  tests:
+    name: Testing
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo test
+
   fuzz_rgba_8bit:
     name: Fuzzing 8bit
     strategy:

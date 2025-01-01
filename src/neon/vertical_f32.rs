@@ -255,7 +255,7 @@ unsafe fn convolve_vertical_part_neon_1_f32(
     }
 
     let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-    dst_ptr.write_unaligned(vgetq_lane_f32::<0>(store_0));
+    vst1q_lane_f32::<0>(dst_ptr, store_0);
 }
 
 pub(crate) fn convolve_vertical_rgb_neon_row_f32<const CHANNELS: usize>(

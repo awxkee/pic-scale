@@ -77,6 +77,7 @@ unsafe fn convolve_vertical_sse_row_impl(
     let mut cx = 0usize;
 
     let mut rem = dst;
+
     let iter_64 = rem.chunks_exact_mut(64);
 
     for dst in iter_64 {
@@ -140,6 +141,7 @@ unsafe fn convolve_vertical_sse_row_impl(
     }
 
     rem = rem.chunks_exact_mut(64).into_remainder();
+
     let iter_32 = rem.chunks_exact_mut(32);
 
     for dst in iter_32 {

@@ -3,17 +3,14 @@ mod split;
 
 use std::time::Instant;
 
-use crate::merge::merge_channels_3;
-use crate::split::split_channels_3;
 use fast_image_resize::images::Image;
 use fast_image_resize::{
     CpuExtensions, FilterType, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
-    Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, JzazbzScaler, LChScaler, LabScaler,
-    LinearApproxScaler, LinearScaler, LuvScaler, OklabScaler, ResamplingFunction, Scaler, Scaling,
-    ScalingU16, SigmoidalScaler, ThreadingPolicy, TransferFunction, XYZScaler,
+    ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingU16,
+    ThreadingPolicy,
 };
 
 fn resize_plane(
@@ -53,15 +50,16 @@ fn main() {
     let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
-    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
     // resize_plane(378, 257, 257, 257, ResamplingFunction::Bilinear);
 
     let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 2).collect();
+
     //
     let store =
-        ImageStore::<u16, 4>::from_slice(&mut choke, dimensions.0 as usize, dimensions.1 as usize)
+        ImageStore::<u16, 4>::from_slice(&choke, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
 
     let dst_size = ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
@@ -78,13 +76,13 @@ fn main() {
     //     .unwrap();
 
     let mut dst_store = ImageStoreMut::<u16, 4>::alloc_with_depth(
-        dimensions.0 as usize / 3,
-        dimensions.1 as usize / 3,
+        dimensions.0 as usize,
+        dimensions.1 as usize / 2,
         10,
     );
 
     scaler
-        .resize_rgba_u16(&store, &mut dst_store, false)
+        .resize_rgba_u16(&store, &mut dst_store, true)
         .unwrap();
 
     let elapsed_time = start_time.elapsed();
@@ -167,7 +165,7 @@ fn main() {
         .iter()
         .map(|&x| (x >> 2) as u8)
         .collect();
-    //
+
     // let dst = dst_store.as_bytes();
     // let dst = resized;
     // image::save_buffer(

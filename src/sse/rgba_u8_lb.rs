@@ -112,254 +112,240 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_impl(
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
 ) {
-    unsafe {
-        const CHANNELS: usize = 4;
+    const CHANNELS: usize = 4;
 
-        const SCALE: i32 = 6;
-        const V_SHR: i32 = SCALE;
-        const ROUNDING: i16 = 1 << (V_SHR - 1);
+    const SCALE: i32 = 6;
+    const V_SHR: i32 = SCALE;
+    const ROUNDING: i16 = 1 << (V_SHR - 1);
 
-        let vld = _mm_setr_epi16(ROUNDING, ROUNDING, ROUNDING, ROUNDING, 0, 0, 0, 0);
+    let vld = _mm_setr_epi16(ROUNDING, ROUNDING, ROUNDING, ROUNDING, 0, 0, 0, 0);
 
-        let shuffle_weights = _mm_setr_epi8(0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3);
+    let shuffle_weights = _mm_setr_epi8(0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3);
 
-        let (row0_ref, rest) = dst.split_at_mut(dst_stride);
-        let (row1_ref, rest) = rest.split_at_mut(dst_stride);
-        let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
+    let (row0_ref, rest) = dst.split_at_mut(dst_stride);
+    let (row1_ref, rest) = rest.split_at_mut(dst_stride);
+    let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let iter_row0 = row0_ref.chunks_exact_mut(CHANNELS);
-        let iter_row1 = row1_ref.chunks_exact_mut(CHANNELS);
-        let iter_row2 = row2_ref.chunks_exact_mut(CHANNELS);
-        let iter_row3 = row3_ref.chunks_exact_mut(CHANNELS);
+    let iter_row0 = row0_ref.chunks_exact_mut(CHANNELS);
+    let iter_row1 = row1_ref.chunks_exact_mut(CHANNELS);
+    let iter_row2 = row2_ref.chunks_exact_mut(CHANNELS);
+    let iter_row3 = row3_ref.chunks_exact_mut(CHANNELS);
 
-        for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
-            .zip(iter_row1)
-            .zip(iter_row2)
-            .zip(iter_row3)
-            .zip(filter_weights.bounds.iter())
-            .zip(
-                filter_weights
-                    .weights
-                    .chunks_exact(filter_weights.aligned_size),
-            )
-        {
-            let mut jx = 0usize;
-            let mut store_0 = vld;
-            let mut store_1 = vld;
-            let mut store_2 = vld;
-            let mut store_3 = vld;
+    for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
+        .zip(iter_row1)
+        .zip(iter_row2)
+        .zip(iter_row3)
+        .zip(filter_weights.bounds.iter())
+        .zip(
+            filter_weights
+                .weights
+                .chunks_exact(filter_weights.aligned_size),
+        )
+    {
+        let mut jx = 0usize;
+        let mut store_0 = vld;
+        let mut store_1 = vld;
+        let mut store_2 = vld;
+        let mut store_3 = vld;
 
-            let src0 = src;
-            let src1 = src0.get_unchecked(src_stride..);
-            let src2 = src1.get_unchecked(src_stride..);
-            let src3 = src2.get_unchecked(src_stride..);
+        let src0 = src;
+        let src1 = src0.get_unchecked(src_stride..);
+        let src2 = src1.get_unchecked(src_stride..);
+        let src3 = src2.get_unchecked(src_stride..);
 
-            while jx + 8 < bounds.size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+        while jx + 8 < bounds.size {
+            let w_ptr = weights.get_unchecked(jx..(jx + 8));
 
-                let weight01 = _mm_shuffle_epi8(
-                    _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned()),
-                    shuffle_weights,
-                );
-                let weight23 = _mm_shuffle_epi8(
-                    _mm_set1_epi32(
-                        (w_ptr.get_unchecked(2..).as_ptr() as *const i32).read_unaligned(),
-                    ),
-                    shuffle_weights,
-                );
-
-                let weight45 = _mm_shuffle_epi8(
-                    _mm_set1_epi32(
-                        (w_ptr.get_unchecked(4..).as_ptr() as *const i32).read_unaligned(),
-                    ),
-                    shuffle_weights,
-                );
-
-                let weight67 = _mm_shuffle_epi8(
-                    _mm_set1_epi32(
-                        (w_ptr.get_unchecked(6..).as_ptr() as *const i32).read_unaligned(),
-                    ),
-                    shuffle_weights,
-                );
-
-                let start_bounds = bounds.start + jx;
-
-                let rgb_pixel_0 = _mm_loadu_si128(
-                    src0.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
-                );
-                let rgb_pixel_0_1 = _mm_loadu_si128(
-                    src0.get_unchecked((start_bounds * CHANNELS + 16)..)
-                        .as_ptr() as *const __m128i,
-                );
-                let rgb_pixel_1 = _mm_loadu_si128(
-                    src1.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
-                );
-                let rgb_pixel_1_0 = _mm_loadu_si128(
-                    src1.get_unchecked((start_bounds * CHANNELS + 16)..)
-                        .as_ptr() as *const __m128i,
-                );
-                let rgb_pixel_2 = _mm_loadu_si128(
-                    src2.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
-                );
-                let rgb_pixel_2_1 = _mm_loadu_si128(
-                    src2.get_unchecked((start_bounds * CHANNELS + 16)..)
-                        .as_ptr() as *const __m128i,
-                );
-                let rgb_pixel_3 = _mm_loadu_si128(
-                    src3.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
-                );
-                let rgb_pixel_3_1 = _mm_loadu_si128(
-                    src3.get_unchecked((start_bounds * CHANNELS + 16)..)
-                        .as_ptr() as *const __m128i,
-                );
-
-                store_0 = hdot4(
-                    store_0,
-                    rgb_pixel_0,
-                    rgb_pixel_0_1,
-                    weight01,
-                    weight23,
-                    weight45,
-                    weight67,
-                );
-                store_1 = hdot4(
-                    store_1,
-                    rgb_pixel_1,
-                    rgb_pixel_1_0,
-                    weight01,
-                    weight23,
-                    weight45,
-                    weight67,
-                );
-                store_2 = hdot4(
-                    store_2,
-                    rgb_pixel_2,
-                    rgb_pixel_2_1,
-                    weight01,
-                    weight23,
-                    weight45,
-                    weight67,
-                );
-                store_3 = hdot4(
-                    store_3,
-                    rgb_pixel_3,
-                    rgb_pixel_3_1,
-                    weight01,
-                    weight23,
-                    weight45,
-                    weight67,
-                );
-
-                jx += 8;
-            }
-
-            while jx + 4 < bounds.size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
-
-                let weight01 = _mm_shuffle_epi8(
-                    _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned()),
-                    shuffle_weights,
-                );
-                let weight23 = _mm_shuffle_epi8(
-                    _mm_set1_epi32(
-                        (w_ptr.get_unchecked(2..).as_ptr() as *const i32).read_unaligned(),
-                    ),
-                    shuffle_weights,
-                );
-                let start_bounds = bounds.start + jx;
-
-                let rgb_pixel_0 = _mm_loadu_si128(
-                    src0.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
-                );
-                let rgb_pixel_1 = _mm_loadu_si128(
-                    src1.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
-                );
-                let rgb_pixel_2 = _mm_loadu_si128(
-                    src2.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
-                );
-                let rgb_pixel_3 = _mm_loadu_si128(
-                    src3.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
-                );
-
-                store_0 = hdot2(store_0, rgb_pixel_0, weight01, weight23);
-                store_1 = hdot2(store_1, rgb_pixel_1, weight01, weight23);
-                store_2 = hdot2(store_2, rgb_pixel_2, weight01, weight23);
-                store_3 = hdot2(store_3, rgb_pixel_3, weight01, weight23);
-
-                jx += 4;
-            }
-
-            while jx + 2 < bounds.size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 2));
-                let bounds_start = bounds.start + jx;
-
-                let weight01 = _mm_shuffle_epi8(
-                    _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned()),
-                    shuffle_weights,
-                );
-
-                let rgb_pixel_0 =
-                    _mm_loadu_si64(src0.get_unchecked((bounds_start * CHANNELS)..).as_ptr());
-                let rgb_pixel_1 =
-                    _mm_loadu_si64(src1.get_unchecked((bounds_start * CHANNELS)..).as_ptr());
-                let rgb_pixel_2 =
-                    _mm_loadu_si64(src2.get_unchecked((bounds_start * CHANNELS)..).as_ptr());
-                let rgb_pixel_3 =
-                    _mm_loadu_si64(src3.get_unchecked((bounds_start * CHANNELS)..).as_ptr());
-
-                store_0 = hdot(store_0, rgb_pixel_0, weight01);
-                store_1 = hdot(store_1, rgb_pixel_1, weight01);
-                store_2 = hdot(store_2, rgb_pixel_2, weight01);
-                store_3 = hdot(store_3, rgb_pixel_3, weight01);
-
-                jx += 2;
-            }
-
-            while jx < bounds.size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 1));
-
-                let weight0 = _mm_set1_epi16(w_ptr[0]);
-
-                let start_bounds = bounds.start + jx;
-
-                store_0 =
-                    convolve_horizontal_parts_one_rgba_sse(start_bounds, src0, weight0, store_0);
-                store_1 =
-                    convolve_horizontal_parts_one_rgba_sse(start_bounds, src1, weight0, store_1);
-                store_2 =
-                    convolve_horizontal_parts_one_rgba_sse(start_bounds, src2, weight0, store_2);
-                store_3 =
-                    convolve_horizontal_parts_one_rgba_sse(start_bounds, src3, weight0, store_3);
-                jx += 1;
-            }
-
-            store_0 = _mm_add_hi_lo_epi16(store_0);
-            store_1 = _mm_add_hi_lo_epi16(store_1);
-            store_2 = _mm_add_hi_lo_epi16(store_2);
-            store_3 = _mm_add_hi_lo_epi16(store_3);
-
-            let store_16_8_0 = _mm_srai_epi16::<V_SHR>(store_0);
-            let store_16_8_1 = _mm_srai_epi16::<V_SHR>(store_1);
-            let store_16_8_2 = _mm_srai_epi16::<V_SHR>(store_2);
-            let store_16_8_3 = _mm_srai_epi16::<V_SHR>(store_3);
-
-            _mm_storeu_si32(
-                chunk0.as_mut_ptr() as *mut _,
-                _mm_packus_epi16(store_16_8_0, store_16_8_0),
+            let weight01 = _mm_shuffle_epi8(
+                _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned()),
+                shuffle_weights,
             );
-            _mm_storeu_si32(
-                chunk1.as_mut_ptr() as *mut _,
-                _mm_packus_epi16(store_16_8_1, store_16_8_1),
+            let weight23 = _mm_shuffle_epi8(
+                _mm_set1_epi32((w_ptr.get_unchecked(2..).as_ptr() as *const i32).read_unaligned()),
+                shuffle_weights,
             );
-            _mm_storeu_si32(
-                chunk2.as_mut_ptr() as *mut _,
-                _mm_packus_epi16(store_16_8_2, store_16_8_2),
+
+            let weight45 = _mm_shuffle_epi8(
+                _mm_set1_epi32((w_ptr.get_unchecked(4..).as_ptr() as *const i32).read_unaligned()),
+                shuffle_weights,
             );
-            _mm_storeu_si32(
-                chunk3.as_mut_ptr() as *mut _,
-                _mm_packus_epi16(store_16_8_3, store_16_8_3),
+
+            let weight67 = _mm_shuffle_epi8(
+                _mm_set1_epi32((w_ptr.get_unchecked(6..).as_ptr() as *const i32).read_unaligned()),
+                shuffle_weights,
             );
+
+            let start_bounds = bounds.start + jx;
+
+            let rgb_pixel_0 = _mm_loadu_si128(
+                src0.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
+            );
+            let rgb_pixel_0_1 = _mm_loadu_si128(
+                src0.get_unchecked((start_bounds * CHANNELS + 16)..)
+                    .as_ptr() as *const __m128i,
+            );
+            let rgb_pixel_1 = _mm_loadu_si128(
+                src1.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
+            );
+            let rgb_pixel_1_0 = _mm_loadu_si128(
+                src1.get_unchecked((start_bounds * CHANNELS + 16)..)
+                    .as_ptr() as *const __m128i,
+            );
+            let rgb_pixel_2 = _mm_loadu_si128(
+                src2.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
+            );
+            let rgb_pixel_2_1 = _mm_loadu_si128(
+                src2.get_unchecked((start_bounds * CHANNELS + 16)..)
+                    .as_ptr() as *const __m128i,
+            );
+            let rgb_pixel_3 = _mm_loadu_si128(
+                src3.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
+            );
+            let rgb_pixel_3_1 = _mm_loadu_si128(
+                src3.get_unchecked((start_bounds * CHANNELS + 16)..)
+                    .as_ptr() as *const __m128i,
+            );
+
+            store_0 = hdot4(
+                store_0,
+                rgb_pixel_0,
+                rgb_pixel_0_1,
+                weight01,
+                weight23,
+                weight45,
+                weight67,
+            );
+            store_1 = hdot4(
+                store_1,
+                rgb_pixel_1,
+                rgb_pixel_1_0,
+                weight01,
+                weight23,
+                weight45,
+                weight67,
+            );
+            store_2 = hdot4(
+                store_2,
+                rgb_pixel_2,
+                rgb_pixel_2_1,
+                weight01,
+                weight23,
+                weight45,
+                weight67,
+            );
+            store_3 = hdot4(
+                store_3,
+                rgb_pixel_3,
+                rgb_pixel_3_1,
+                weight01,
+                weight23,
+                weight45,
+                weight67,
+            );
+
+            jx += 8;
         }
+
+        while jx + 4 < bounds.size {
+            let w_ptr = weights.get_unchecked(jx..(jx + 4));
+
+            let weight01 = _mm_shuffle_epi8(
+                _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned()),
+                shuffle_weights,
+            );
+            let weight23 = _mm_shuffle_epi8(
+                _mm_set1_epi32((w_ptr.get_unchecked(2..).as_ptr() as *const i32).read_unaligned()),
+                shuffle_weights,
+            );
+            let start_bounds = bounds.start + jx;
+
+            let rgb_pixel_0 = _mm_loadu_si128(
+                src0.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
+            );
+            let rgb_pixel_1 = _mm_loadu_si128(
+                src1.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
+            );
+            let rgb_pixel_2 = _mm_loadu_si128(
+                src2.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
+            );
+            let rgb_pixel_3 = _mm_loadu_si128(
+                src3.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
+            );
+
+            store_0 = hdot2(store_0, rgb_pixel_0, weight01, weight23);
+            store_1 = hdot2(store_1, rgb_pixel_1, weight01, weight23);
+            store_2 = hdot2(store_2, rgb_pixel_2, weight01, weight23);
+            store_3 = hdot2(store_3, rgb_pixel_3, weight01, weight23);
+
+            jx += 4;
+        }
+
+        while jx + 2 < bounds.size {
+            let w_ptr = weights.get_unchecked(jx..(jx + 2));
+            let bounds_start = bounds.start + jx;
+
+            let weight01 = _mm_shuffle_epi8(
+                _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned()),
+                shuffle_weights,
+            );
+
+            let rgb_pixel_0 =
+                _mm_loadu_si64(src0.get_unchecked((bounds_start * CHANNELS)..).as_ptr());
+            let rgb_pixel_1 =
+                _mm_loadu_si64(src1.get_unchecked((bounds_start * CHANNELS)..).as_ptr());
+            let rgb_pixel_2 =
+                _mm_loadu_si64(src2.get_unchecked((bounds_start * CHANNELS)..).as_ptr());
+            let rgb_pixel_3 =
+                _mm_loadu_si64(src3.get_unchecked((bounds_start * CHANNELS)..).as_ptr());
+
+            store_0 = hdot(store_0, rgb_pixel_0, weight01);
+            store_1 = hdot(store_1, rgb_pixel_1, weight01);
+            store_2 = hdot(store_2, rgb_pixel_2, weight01);
+            store_3 = hdot(store_3, rgb_pixel_3, weight01);
+
+            jx += 2;
+        }
+
+        while jx < bounds.size {
+            let w_ptr = weights.get_unchecked(jx..(jx + 1));
+
+            let weight0 = _mm_set1_epi16(w_ptr[0]);
+
+            let start_bounds = bounds.start + jx;
+
+            store_0 = convolve_horizontal_parts_one_rgba_sse(start_bounds, src0, weight0, store_0);
+            store_1 = convolve_horizontal_parts_one_rgba_sse(start_bounds, src1, weight0, store_1);
+            store_2 = convolve_horizontal_parts_one_rgba_sse(start_bounds, src2, weight0, store_2);
+            store_3 = convolve_horizontal_parts_one_rgba_sse(start_bounds, src3, weight0, store_3);
+            jx += 1;
+        }
+
+        store_0 = _mm_add_hi_lo_epi16(store_0);
+        store_1 = _mm_add_hi_lo_epi16(store_1);
+        store_2 = _mm_add_hi_lo_epi16(store_2);
+        store_3 = _mm_add_hi_lo_epi16(store_3);
+
+        let store_16_8_0 = _mm_srai_epi16::<V_SHR>(store_0);
+        let store_16_8_1 = _mm_srai_epi16::<V_SHR>(store_1);
+        let store_16_8_2 = _mm_srai_epi16::<V_SHR>(store_2);
+        let store_16_8_3 = _mm_srai_epi16::<V_SHR>(store_3);
+
+        _mm_storeu_si32(
+            chunk0.as_mut_ptr() as *mut _,
+            _mm_packus_epi16(store_16_8_0, store_16_8_0),
+        );
+        _mm_storeu_si32(
+            chunk1.as_mut_ptr() as *mut _,
+            _mm_packus_epi16(store_16_8_1, store_16_8_1),
+        );
+        _mm_storeu_si32(
+            chunk2.as_mut_ptr() as *mut _,
+            _mm_packus_epi16(store_16_8_2, store_16_8_2),
+        );
+        _mm_storeu_si32(
+            chunk3.as_mut_ptr() as *mut _,
+            _mm_packus_epi16(store_16_8_3, store_16_8_3),
+        );
     }
 }
 

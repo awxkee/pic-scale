@@ -1044,3 +1044,196 @@ impl Scaler {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn check_rgba8_resizing_vertical() {
+        let image_width = 255;
+        let image_height = 512;
+        const CN: usize = 4;
+        let mut image = vec![0u8; image_height * image_width * CN];
+        image[image_width * CN * (image_height.div_ceil(2)) + (image_width - 1) * CN] = 174;
+        let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
+        let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
+        scaler
+            .resize_rgba(&src_store, &mut target_store, false)
+            .unwrap();
+        let target_data = target_store.buffer.borrow();
+
+        let resized = target_data
+            [image_width * CN * ((image_height / 2).div_ceil(2)) + (image_width - 1) * CN];
+        assert_ne!(resized, 0);
+    }
+
+    #[test]
+    fn check_rgba8_resizing_both() {
+        let image_width = 255;
+        let image_height = 512;
+        const CN: usize = 4;
+        let mut image = vec![0u8; image_height * image_width * CN];
+        image[0] = 174;
+        let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
+        let mut target_store = ImageStoreMut::alloc(image_width / 2, image_height / 2);
+        scaler
+            .resize_rgba(&src_store, &mut target_store, false)
+            .unwrap();
+        let target_data = target_store.buffer.borrow();
+
+        let resized = target_data[0];
+        assert_ne!(resized, 0);
+    }
+
+    #[test]
+    fn check_rgba8_resizing_alpha() {
+        let image_width = 255;
+        let image_height = 512;
+        const CN: usize = 4;
+        let mut image = vec![0u8; image_height * image_width * CN];
+        image[0] = 174;
+        image[7] = 1;
+        let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
+        let mut target_store = ImageStoreMut::alloc(image_width / 2, image_height / 2);
+        scaler
+            .resize_rgba(&src_store, &mut target_store, true)
+            .unwrap();
+        let target_data = target_store.buffer.borrow();
+
+        let resized = target_data[0];
+        assert_eq!(resized, 0);
+    }
+
+    #[test]
+    fn check_rgb8_resizing_vertical() {
+        let image_width = 255;
+        let image_height = 512;
+        const CN: usize = 3;
+        let mut image = vec![0u8; image_height * image_width * CN];
+        image[image_width * CN * (image_height.div_ceil(2)) + (image_width - 1) * CN] = 174;
+        let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
+        let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
+        scaler.resize_rgb(&src_store, &mut target_store).unwrap();
+        let target_data = target_store.buffer.borrow();
+
+        let resized = target_data
+            [image_width * CN * ((image_height / 2).div_ceil(2)) + (image_width - 1) * CN];
+        assert_ne!(resized, 0);
+    }
+
+    #[test]
+    fn check_rgba10_resizing_vertical() {
+        let image_width = 8;
+        let image_height = 8;
+        const CN: usize = 4;
+        let mut image = vec![0u16; image_height * image_width * CN];
+        image[image_width * CN * (image_height.div_ceil(2)) + (image_width - 1) * CN] = 174;
+        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
+        src_store.bit_depth = 10;
+        let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 10);
+        scaler
+            .resize_rgba_u16(&src_store, &mut target_store, false)
+            .unwrap();
+        let target_data = target_store.buffer.borrow();
+
+        let resized = target_data
+            [image_width * CN * ((image_height / 2).div_ceil(2)) + (image_width - 1) * CN];
+        assert_ne!(resized, 0);
+    }
+
+    #[test]
+    fn check_rgb10_resizing_vertical() {
+        let image_width = 8;
+        let image_height = 4;
+        const CN: usize = 3;
+        let mut image = vec![0; image_height * image_width * CN];
+        image[0] = 174;
+        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
+        src_store.bit_depth = 10;
+        let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 10);
+        scaler
+            .resize_rgb_u16(&src_store, &mut target_store)
+            .unwrap();
+        let target_data = target_store.buffer.borrow();
+
+        let resized = target_data[0];
+        assert_ne!(resized, 0);
+    }
+
+    #[test]
+    fn check_rgb16_resizing_vertical() {
+        let image_width = 8;
+        let image_height = 8;
+        const CN: usize = 3;
+        let mut image = vec![164; image_height * image_width * CN];
+        image[0] = 174;
+        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
+        src_store.bit_depth = 10;
+        let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 16);
+        scaler
+            .resize_rgb_u16(&src_store, &mut target_store)
+            .unwrap();
+        let target_data = target_store.buffer.borrow();
+
+        let resized = target_data[0];
+        assert_ne!(resized, 0);
+    }
+
+    #[test]
+    fn check_rgba16_resizing_vertical() {
+        let image_width = 8;
+        let image_height = 8;
+        const CN: usize = 4;
+        let mut image = vec![0u16; image_height * image_width * CN];
+        image[image_width * CN * (image_height.div_ceil(2)) + (image_width - 1) * CN] = 174;
+        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
+        src_store.bit_depth = 10;
+        let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 16);
+        scaler
+            .resize_rgba_u16(&src_store, &mut target_store, false)
+            .unwrap();
+        let target_data = target_store.buffer.borrow();
+
+        let resized = target_data
+            [image_width * CN * ((image_height / 2).div_ceil(2)) + (image_width - 1) * CN];
+        assert_ne!(resized, 0);
+    }
+
+    #[test]
+    fn check_rgba8_nearest_vertical() {
+        let image_width = 255;
+        let image_height = 512;
+        const CN: usize = 4;
+        let mut image = vec![0u8; image_height * image_width * CN];
+        image[image_width * CN * (image_height.div_ceil(2)) + (image_width - 1) * CN] = 174;
+        let mut scaler = Scaler::new(ResamplingFunction::Nearest);
+        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
+        let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
+        scaler
+            .resize_rgba(&src_store, &mut target_store, false)
+            .unwrap();
+        let target_data = target_store.buffer.borrow();
+
+        let resized = target_data
+            [image_width * CN * ((image_height / 2).div_ceil(2)) + (image_width - 1) * CN];
+        assert_eq!(resized, 174);
+    }
+}
