@@ -121,47 +121,45 @@ unsafe fn xconvolve_horizontal_rgba_neon_row_one_f16_impl(
     src: &[half::f16],
     dst: &mut [half::f16],
 ) {
-    unsafe {
-        const CHANNELS: usize = 4;
-        let mut filter_offset = 0usize;
-        let weights_ptr = filter_weights.weights.as_ptr();
+    const CHANNELS: usize = 4;
+    let mut filter_offset = 0usize;
+    let weights_ptr = filter_weights.weights.as_ptr();
 
-        for x in 0..dst_width {
-            let bounds = filter_weights.bounds.get_unchecked(x);
-            let mut jx = 0usize;
-            let mut store = xvzeros_f16();
+    for x in 0..dst_width {
+        let bounds = filter_weights.bounds.get_unchecked(x);
+        let mut jx = 0usize;
+        let mut store = xvzeros_f16();
 
-            while jx + 4 < bounds.size {
-                let bounds_start = bounds.start + jx;
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let read_weights = xvcvt_f16_f32(vld1q_f32(ptr));
-                store = conv_horiz_rgba_4_f16!(bounds_start, src.as_ptr(), read_weights, store);
-                jx += 4;
-            }
-
-            while jx + 2 < bounds.size {
-                let bounds_start = bounds.start + jx;
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let read_weights_h = vld1_f32(ptr);
-                let read_weights = xvcvt_f16_f32(vcombine_f32(read_weights_h, read_weights_h));
-                store = conv_horiz_rgba_2_f32!(bounds_start, src.as_ptr(), read_weights, store);
-                jx += 2;
-            }
-
-            while jx < bounds.size {
-                let bounds_start = bounds.start + jx;
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = xvcvt_f16_f32(vld1q_dup_f32(ptr));
-                store = conv_horiz_rgba_1_f16!(bounds_start, src.as_ptr(), weight0, store);
-                jx += 1;
-            }
-
-            let px = x * CHANNELS;
-            let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-            xvst_f16(dest_ptr, store);
-
-            filter_offset += filter_weights.aligned_size;
+        while jx + 4 < bounds.size {
+            let bounds_start = bounds.start + jx;
+            let ptr = weights_ptr.add(jx + filter_offset);
+            let read_weights = xvcvt_f16_f32(vld1q_f32(ptr));
+            store = conv_horiz_rgba_4_f16!(bounds_start, src.as_ptr(), read_weights, store);
+            jx += 4;
         }
+
+        while jx + 2 < bounds.size {
+            let bounds_start = bounds.start + jx;
+            let ptr = weights_ptr.add(jx + filter_offset);
+            let read_weights_h = vld1_f32(ptr);
+            let read_weights = xvcvt_f16_f32(vcombine_f32(read_weights_h, read_weights_h));
+            store = conv_horiz_rgba_2_f32!(bounds_start, src.as_ptr(), read_weights, store);
+            jx += 2;
+        }
+
+        while jx < bounds.size {
+            let bounds_start = bounds.start + jx;
+            let ptr = weights_ptr.add(jx + filter_offset);
+            let weight0 = xvcvt_f16_f32(vld1q_dup_f32(ptr));
+            store = conv_horiz_rgba_1_f16!(bounds_start, src.as_ptr(), weight0, store);
+            jx += 1;
+        }
+
+        let px = x * CHANNELS;
+        let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
+        xvst_f16(dest_ptr, store);
+
+        filter_offset += filter_weights.aligned_size;
     }
 }
 

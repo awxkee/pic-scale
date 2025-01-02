@@ -40,29 +40,27 @@ unsafe fn neon_premultiply_alpha_rgba_row_f16_full(dst: &mut [half::f16], src: &
     let mut rem = dst;
     let mut src_rem = src;
 
-    unsafe {
-        for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
-            let src_ptr = src.as_ptr();
-            let pixel = vld4q_u16(src_ptr as *const u16);
+    for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
+        let src_ptr = src.as_ptr();
+        let pixel = vld4q_u16(src_ptr as *const u16);
 
-            let low_alpha = xreinterpretq_f16_u16(pixel.3);
-            let r_values = xvmulq_f16(xreinterpretq_f16_u16(pixel.0), low_alpha);
-            let g_values = xvmulq_f16(xreinterpretq_f16_u16(pixel.1), low_alpha);
-            let b_values = xvmulq_f16(xreinterpretq_f16_u16(pixel.2), low_alpha);
+        let low_alpha = xreinterpretq_f16_u16(pixel.3);
+        let r_values = xvmulq_f16(xreinterpretq_f16_u16(pixel.0), low_alpha);
+        let g_values = xvmulq_f16(xreinterpretq_f16_u16(pixel.1), low_alpha);
+        let b_values = xvmulq_f16(xreinterpretq_f16_u16(pixel.2), low_alpha);
 
-            let dst_ptr = dst.as_mut_ptr();
-            let store_pixel = uint16x8x4_t(
-                xreinterpretq_u16_f16(r_values),
-                xreinterpretq_u16_f16(g_values),
-                xreinterpretq_u16_f16(b_values),
-                pixel.3,
-            );
-            vst4q_u16(dst_ptr as *mut u16, store_pixel);
-        }
-
-        rem = rem.chunks_exact_mut(8 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(8 * 4).remainder();
+        let dst_ptr = dst.as_mut_ptr();
+        let store_pixel = uint16x8x4_t(
+            xreinterpretq_u16_f16(r_values),
+            xreinterpretq_u16_f16(g_values),
+            xreinterpretq_u16_f16(b_values),
+            pixel.3,
+        );
+        vst4q_u16(dst_ptr as *mut u16, store_pixel);
     }
+
+    rem = rem.chunks_exact_mut(8 * 4).into_remainder();
+    src_rem = src_rem.chunks_exact(8 * 4).remainder();
 
     premultiply_pixel_f16_row(rem, src_rem);
 }
@@ -95,42 +93,40 @@ pub(crate) fn neon_premultiply_alpha_rgba_f16_full(
 unsafe fn neon_unpremultiply_alpha_rgba_f16_row_full(in_place: &mut [half::f16]) {
     let mut rem = in_place;
 
-    unsafe {
-        for dst in rem.chunks_exact_mut(8 * 4) {
-            let src_ptr = dst.as_ptr();
-            let pixel = vld4q_u16(src_ptr as *const u16);
+    for dst in rem.chunks_exact_mut(8 * 4) {
+        let src_ptr = dst.as_ptr();
+        let pixel = vld4q_u16(src_ptr as *const u16);
 
-            let alphas = xreinterpretq_f16_u16(pixel.3);
-            let zero_mask = vceqzq_f16(alphas);
+        let alphas = xreinterpretq_f16_u16(pixel.3);
+        let zero_mask = xvceqzq_f16(alphas);
 
-            let r_values = xvbslq_f16(
-                zero_mask,
-                xreinterpretq_f16_u16(pixel.0),
-                xvdivq_f16(xreinterpretq_f16_u16(pixel.0), alphas),
-            );
-            let g_values = xvbslq_f16(
-                zero_mask,
-                xreinterpretq_f16_u16(pixel.1),
-                xvdivq_f16(xreinterpretq_f16_u16(pixel.1), alphas),
-            );
-            let b_values = xvbslq_f16(
-                zero_mask,
-                xreinterpretq_f16_u16(pixel.2),
-                xvdivq_f16(xreinterpretq_f16_u16(pixel.2), alphas),
-            );
+        let r_values = xvbslq_f16(
+            zero_mask,
+            xreinterpretq_f16_u16(pixel.0),
+            xvdivq_f16(xreinterpretq_f16_u16(pixel.0), alphas),
+        );
+        let g_values = xvbslq_f16(
+            zero_mask,
+            xreinterpretq_f16_u16(pixel.1),
+            xvdivq_f16(xreinterpretq_f16_u16(pixel.1), alphas),
+        );
+        let b_values = xvbslq_f16(
+            zero_mask,
+            xreinterpretq_f16_u16(pixel.2),
+            xvdivq_f16(xreinterpretq_f16_u16(pixel.2), alphas),
+        );
 
-            let dst_ptr = dst.as_mut_ptr();
-            let store_pixel = uint16x8x4_t(
-                xreinterpretq_u16_f16(r_values),
-                xreinterpretq_u16_f16(g_values),
-                xreinterpretq_u16_f16(b_values),
-                pixel.3,
-            );
-            vst4q_u16(dst_ptr as *mut u16, store_pixel);
-        }
-
-        rem = rem.chunks_exact_mut(8 * 4).into_remainder();
+        let dst_ptr = dst.as_mut_ptr();
+        let store_pixel = uint16x8x4_t(
+            xreinterpretq_u16_f16(r_values),
+            xreinterpretq_u16_f16(g_values),
+            xreinterpretq_u16_f16(b_values),
+            pixel.3,
+        );
+        vst4q_u16(dst_ptr as *mut u16, store_pixel);
     }
+
+    rem = rem.chunks_exact_mut(8 * 4).into_remainder();
 
     unpremultiply_pixel_f16_row(rem);
 }

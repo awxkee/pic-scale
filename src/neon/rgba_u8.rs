@@ -221,6 +221,9 @@ pub(crate) fn convolve_horizontal_rgba_neon_rows_4_u8_i16(
 }
 
 /// Slightly lower precision scale option
+///
+/// # Safety
+/// - Check `rdm` availability before the call.
 #[target_feature(enable = "rdm")]
 unsafe fn convolve_horizontal_rgba_neon_rows_4_u8_i16_impl(
     src: &[u8],

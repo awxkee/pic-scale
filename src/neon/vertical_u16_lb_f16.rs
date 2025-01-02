@@ -29,7 +29,7 @@
 use crate::filter_weights::FilterBounds;
 use crate::neon::f16_utils::{
     xvcvt_f16_u16, xvcvta_u16_f16, xvcvtaq_u16_f16, xvcvtq_f16_u16, xvfmla_f16, xvfmlaq_f16,
-    xvzerosq_f16,
+    xvfmlaq_lane_f16, xvzerosq_f16,
 };
 use crate::neon::{xreinterpret_f16_u16, xreinterpretq_f16_u16, xvget_low_f16};
 use std::arch::aarch64::*;
@@ -87,17 +87,103 @@ unsafe fn convolve_column_lb_u16_f16_impl(
 
         let v_dx = v_px + x * 16;
 
-        for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
-            let py = bounds.start + j;
-            let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
+        if bounds_size == 2 {
+            let weights = weight.get_unchecked(0..2);
+            let mut u_weight = vld1_dup_u16(weights.as_ptr());
+            u_weight = vld1_lane_u16::<1>(weights.as_ptr().add(1), u_weight);
+            let v_weight = xreinterpret_f16_u16(u_weight);
 
-            let v_weight = xreinterpretq_f16_u16(vdupq_n_u16(k_weight));
+            let py = bounds.start;
+            let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
+            let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
 
-            let item_row0 = vld1q_u16(src_ptr.as_ptr());
-            let item_row1 = vld1q_u16(src_ptr.as_ptr().add(8));
+            let item_row0 = vld1q_u16(src_ptr0.as_ptr());
+            let item_row1 = vld1q_u16(src_ptr0.as_ptr().add(8));
 
-            store0 = xvfmlaq_f16(store0, xvcvtq_f16_u16(item_row0), v_weight);
-            store1 = xvfmlaq_f16(store1, xvcvtq_f16_u16(item_row1), v_weight);
+            store0 = xvfmlaq_lane_f16::<0>(store0, xvcvtq_f16_u16(item_row0), v_weight);
+            store1 = xvfmlaq_lane_f16::<0>(store1, xvcvtq_f16_u16(item_row1), v_weight);
+
+            let item_row0 = vld1q_u16(src_ptr1.as_ptr());
+            let item_row1 = vld1q_u16(src_ptr1.as_ptr().add(8));
+
+            store0 = xvfmlaq_lane_f16::<1>(store0, xvcvtq_f16_u16(item_row0), v_weight);
+            store1 = xvfmlaq_lane_f16::<1>(store1, xvcvtq_f16_u16(item_row1), v_weight);
+        } else if bounds_size == 3 {
+            let weights = weight.get_unchecked(0..3);
+            let mut u_weight = vld1_dup_u16(weights.as_ptr());
+            u_weight = vld1_lane_u16::<1>(weights.as_ptr().add(1), u_weight);
+            u_weight = vld1_lane_u16::<2>(weights.as_ptr().add(2), u_weight);
+            let v_weight = xreinterpret_f16_u16(u_weight);
+
+            let py = bounds.start;
+            let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
+            let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
+            let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
+
+            let item_row0 = vld1q_u16(src_ptr0.as_ptr());
+            let item_row1 = vld1q_u16(src_ptr0.as_ptr().add(8));
+
+            store0 = xvfmlaq_lane_f16::<0>(store0, xvcvtq_f16_u16(item_row0), v_weight);
+            store1 = xvfmlaq_lane_f16::<0>(store1, xvcvtq_f16_u16(item_row1), v_weight);
+
+            let item_row0 = vld1q_u16(src_ptr1.as_ptr());
+            let item_row1 = vld1q_u16(src_ptr1.as_ptr().add(8));
+
+            store0 = xvfmlaq_lane_f16::<1>(store0, xvcvtq_f16_u16(item_row0), v_weight);
+            store1 = xvfmlaq_lane_f16::<1>(store1, xvcvtq_f16_u16(item_row1), v_weight);
+
+            let item_row0 = vld1q_u16(src_ptr2.as_ptr());
+            let item_row1 = vld1q_u16(src_ptr2.as_ptr().add(8));
+
+            store0 = xvfmlaq_lane_f16::<2>(store0, xvcvtq_f16_u16(item_row0), v_weight);
+            store1 = xvfmlaq_lane_f16::<2>(store1, xvcvtq_f16_u16(item_row1), v_weight);
+        } else if bounds_size == 4 {
+            let weights = weight.get_unchecked(0..4);
+            let u_weight = vld1_u16(weights.as_ptr());
+            let v_weight = xreinterpret_f16_u16(u_weight);
+
+            let py = bounds.start;
+            let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
+            let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
+            let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
+            let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + v_dx)..);
+
+            let item_row0 = vld1q_u16(src_ptr0.as_ptr());
+            let item_row1 = vld1q_u16(src_ptr0.as_ptr().add(8));
+
+            store0 = xvfmlaq_lane_f16::<0>(store0, xvcvtq_f16_u16(item_row0), v_weight);
+            store1 = xvfmlaq_lane_f16::<0>(store1, xvcvtq_f16_u16(item_row1), v_weight);
+
+            let item_row0 = vld1q_u16(src_ptr1.as_ptr());
+            let item_row1 = vld1q_u16(src_ptr1.as_ptr().add(8));
+
+            store0 = xvfmlaq_lane_f16::<1>(store0, xvcvtq_f16_u16(item_row0), v_weight);
+            store1 = xvfmlaq_lane_f16::<1>(store1, xvcvtq_f16_u16(item_row1), v_weight);
+
+            let item_row0 = vld1q_u16(src_ptr2.as_ptr());
+            let item_row1 = vld1q_u16(src_ptr2.as_ptr().add(8));
+
+            store0 = xvfmlaq_lane_f16::<2>(store0, xvcvtq_f16_u16(item_row0), v_weight);
+            store1 = xvfmlaq_lane_f16::<2>(store1, xvcvtq_f16_u16(item_row1), v_weight);
+
+            let item_row0 = vld1q_u16(src_ptr3.as_ptr());
+            let item_row1 = vld1q_u16(src_ptr3.as_ptr().add(8));
+
+            store0 = xvfmlaq_lane_f16::<3>(store0, xvcvtq_f16_u16(item_row0), v_weight);
+            store1 = xvfmlaq_lane_f16::<3>(store1, xvcvtq_f16_u16(item_row1), v_weight);
+        } else {
+            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
+                let py = bounds.start + j;
+                let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
+
+                let v_weight = xreinterpretq_f16_u16(vdupq_n_u16(k_weight));
+
+                let item_row0 = vld1q_u16(src_ptr.as_ptr());
+                let item_row1 = vld1q_u16(src_ptr.as_ptr().add(8));
+
+                store0 = xvfmlaq_f16(store0, xvcvtq_f16_u16(item_row0), v_weight);
+                store1 = xvfmlaq_f16(store1, xvcvtq_f16_u16(item_row1), v_weight);
+            }
         }
 
         let item0 = vminq_u16(xvcvtaq_u16_f16(store0), v_max_colors);
@@ -119,15 +205,75 @@ unsafe fn convolve_column_lb_u16_f16_impl(
 
         let v_dx = v_px + x * 8;
 
-        for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
-            let py = bounds.start + j;
-            let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
+        if bounds_size == 2 {
+            let weights = weight.get_unchecked(0..2);
+            let mut u_weight = vld1_dup_u16(weights.as_ptr());
+            u_weight = vld1_lane_u16::<1>(weights.as_ptr().add(1), u_weight);
+            let v_weight = xreinterpret_f16_u16(u_weight);
 
-            let v_weight = xreinterpretq_f16_u16(vdupq_n_u16(k_weight));
+            let py = bounds.start;
+            let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
+            let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
 
-            let item_row = vld1q_u16(src_ptr.as_ptr());
+            let item_row0 = vld1q_u16(src_ptr0.as_ptr());
 
-            store0 = xvfmlaq_f16(store0, xvcvtq_f16_u16(item_row), v_weight);
+            store0 = xvfmlaq_lane_f16::<0>(store0, xvcvtq_f16_u16(item_row0), v_weight);
+
+            let item_row0 = vld1q_u16(src_ptr1.as_ptr());
+            store0 = xvfmlaq_lane_f16::<1>(store0, xvcvtq_f16_u16(item_row0), v_weight);
+        } else if bounds_size == 3 {
+            let weights = weight.get_unchecked(0..3);
+            let mut u_weight = vld1_dup_u16(weights.as_ptr());
+            u_weight = vld1_lane_u16::<1>(weights.as_ptr().add(1), u_weight);
+            u_weight = vld1_lane_u16::<2>(weights.as_ptr().add(2), u_weight);
+            let v_weight = xreinterpret_f16_u16(u_weight);
+
+            let py = bounds.start;
+            let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
+            let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
+            let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
+
+            let item_row0 = vld1q_u16(src_ptr0.as_ptr());
+            store0 = xvfmlaq_lane_f16::<0>(store0, xvcvtq_f16_u16(item_row0), v_weight);
+
+            let item_row0 = vld1q_u16(src_ptr1.as_ptr());
+            store0 = xvfmlaq_lane_f16::<1>(store0, xvcvtq_f16_u16(item_row0), v_weight);
+
+            let item_row0 = vld1q_u16(src_ptr2.as_ptr());
+            store0 = xvfmlaq_lane_f16::<2>(store0, xvcvtq_f16_u16(item_row0), v_weight);
+        } else if bounds_size == 4 {
+            let weights = weight.get_unchecked(0..4);
+            let u_weight = vld1_u16(weights.as_ptr());
+            let v_weight = xreinterpret_f16_u16(u_weight);
+
+            let py = bounds.start;
+            let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
+            let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
+            let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
+            let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + v_dx)..);
+
+            let item_row0 = vld1q_u16(src_ptr0.as_ptr());
+            store0 = xvfmlaq_lane_f16::<0>(store0, xvcvtq_f16_u16(item_row0), v_weight);
+
+            let item_row0 = vld1q_u16(src_ptr1.as_ptr());
+            store0 = xvfmlaq_lane_f16::<1>(store0, xvcvtq_f16_u16(item_row0), v_weight);
+
+            let item_row0 = vld1q_u16(src_ptr2.as_ptr());
+            store0 = xvfmlaq_lane_f16::<2>(store0, xvcvtq_f16_u16(item_row0), v_weight);
+
+            let item_row0 = vld1q_u16(src_ptr3.as_ptr());
+            store0 = xvfmlaq_lane_f16::<3>(store0, xvcvtq_f16_u16(item_row0), v_weight);
+        } else {
+            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
+                let py = bounds.start + j;
+                let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
+
+                let v_weight = xreinterpretq_f16_u16(vdupq_n_u16(k_weight));
+
+                let item_row = vld1q_u16(src_ptr.as_ptr());
+
+                store0 = xvfmlaq_f16(store0, xvcvtq_f16_u16(item_row), v_weight);
+            }
         }
 
         let item = vminq_u16(xvcvtaq_u16_f16(store0), v_max_colors);

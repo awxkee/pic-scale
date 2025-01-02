@@ -28,7 +28,7 @@
  */
 use crate::cpu_features::is_aarch_f16_supported;
 use crate::neon::f16_utils::{xvcvtaq_u16_f16, xvcvtq_f16_u16, xvdivq_f16, xvmulq_f16};
-use crate::neon::xreinterpretq_f16_u16;
+use crate::neon::{x_float16x8_t, xreinterpretq_f16_u16};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
@@ -385,6 +385,50 @@ impl DisassociateAlpha for NeonDisassociateAlpha {
 #[derive(Default)]
 struct NeonDisassociateAlphaFloat16 {}
 
+impl NeonDisassociateAlphaFloat16 {
+    #[inline]
+    #[target_feature(enable = "fp16")]
+    unsafe fn disassociate_chunk(&self, in_place: &mut [u16], v_max_colors_f: x_float16x8_t) {
+        let ones = xreinterpretq_f16_u16(vdupq_n_u16(15360)); // 15360 = 1f16
+        let pixel = vld4q_u16(in_place.as_ptr());
+
+        let is_alpha_zero_mask = vceqzq_u16(pixel.3);
+
+        let a_vals = xvdivq_f16(ones, xvcvtq_f16_u16(pixel.3));
+
+        let new_r = vbslq_u16(
+            is_alpha_zero_mask,
+            pixel.0,
+            xvcvtaq_u16_f16(xvmulq_f16(
+                xvmulq_f16(xvcvtq_f16_u16(pixel.0), a_vals),
+                v_max_colors_f,
+            )),
+        );
+
+        let new_g = vbslq_u16(
+            is_alpha_zero_mask,
+            pixel.1,
+            xvcvtaq_u16_f16(xvmulq_f16(
+                xvmulq_f16(xvcvtq_f16_u16(pixel.1), a_vals),
+                v_max_colors_f,
+            )),
+        );
+
+        let new_b = vbslq_u16(
+            is_alpha_zero_mask,
+            pixel.2,
+            xvcvtaq_u16_f16(xvmulq_f16(
+                xvmulq_f16(xvcvtq_f16_u16(pixel.2), a_vals),
+                v_max_colors_f,
+            )),
+        );
+
+        let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
+
+        vst4q_u16(in_place.as_mut_ptr(), new_px);
+    }
+}
+
 impl DisassociateAlpha for NeonDisassociateAlphaFloat16 {
     #[target_feature(enable = "fp16")]
     unsafe fn disassociate(&self, in_place: &mut [u16], bit_depth: usize) {
@@ -394,45 +438,8 @@ impl DisassociateAlpha for NeonDisassociateAlphaFloat16 {
 
         let v_max_colors_f = xvcvtq_f16_u16(vdupq_n_u16(max_colors as u16));
 
-        let ones = xreinterpretq_f16_u16(vdupq_n_u16(15360)); // 15360 = 1f16
-
         for dst in rem.chunks_exact_mut(8 * 4) {
-            let pixel = vld4q_u16(dst.as_ptr());
-
-            let is_alpha_zero_mask = vceqzq_u16(pixel.3);
-
-            let a_vals = xvdivq_f16(ones, xvcvtq_f16_u16(pixel.3));
-
-            let new_r = vbslq_u16(
-                is_alpha_zero_mask,
-                pixel.0,
-                xvcvtaq_u16_f16(xvmulq_f16(
-                    xvmulq_f16(xvcvtq_f16_u16(pixel.0), a_vals),
-                    v_max_colors_f,
-                )),
-            );
-
-            let new_g = vbslq_u16(
-                is_alpha_zero_mask,
-                pixel.1,
-                xvcvtaq_u16_f16(xvmulq_f16(
-                    xvmulq_f16(xvcvtq_f16_u16(pixel.1), a_vals),
-                    v_max_colors_f,
-                )),
-            );
-
-            let new_b = vbslq_u16(
-                is_alpha_zero_mask,
-                pixel.2,
-                xvcvtaq_u16_f16(xvmulq_f16(
-                    xvmulq_f16(xvcvtq_f16_u16(pixel.2), a_vals),
-                    v_max_colors_f,
-                )),
-            );
-
-            let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
-
-            vst4q_u16(dst.as_mut_ptr(), new_px);
+            self.disassociate_chunk(dst, v_max_colors_f);
         }
 
         rem = rem.chunks_exact_mut(8 * 4).into_remainder();
@@ -442,42 +449,7 @@ impl DisassociateAlpha for NeonDisassociateAlphaFloat16 {
             let mut buffer: [u16; 8 * 4] = [0u16; 8 * 4];
             std::ptr::copy_nonoverlapping(rem.as_ptr(), buffer.as_mut_ptr(), rem.len());
 
-            let pixel = vld4q_u16(buffer.as_ptr());
-
-            let is_alpha_zero_mask = vceqzq_u16(pixel.3);
-
-            let a_vals = xvdivq_f16(ones, xvcvtq_f16_u16(pixel.3));
-
-            let new_r = vbslq_u16(
-                is_alpha_zero_mask,
-                pixel.0,
-                xvcvtaq_u16_f16(xvmulq_f16(
-                    xvmulq_f16(xvcvtq_f16_u16(pixel.0), a_vals),
-                    v_max_colors_f,
-                )),
-            );
-
-            let new_g = vbslq_u16(
-                is_alpha_zero_mask,
-                pixel.1,
-                xvcvtaq_u16_f16(xvmulq_f16(
-                    xvmulq_f16(xvcvtq_f16_u16(pixel.1), a_vals),
-                    v_max_colors_f,
-                )),
-            );
-
-            let new_b = vbslq_u16(
-                is_alpha_zero_mask,
-                pixel.2,
-                xvcvtaq_u16_f16(xvmulq_f16(
-                    xvmulq_f16(xvcvtq_f16_u16(pixel.2), a_vals),
-                    v_max_colors_f,
-                )),
-            );
-
-            let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
-
-            vst4q_u16(buffer.as_mut_ptr(), new_px);
+            self.disassociate_chunk(&mut buffer, v_max_colors_f);
 
             std::ptr::copy_nonoverlapping(buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
         }
