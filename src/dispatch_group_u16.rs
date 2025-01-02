@@ -376,7 +376,7 @@ fn execute_low_precision_row<const COMPONENTS: usize>(
     dst_width: usize,
     destination_image: &mut [u16],
     handler: impl HandleHighBitDepthLower<COMPONENTS> + Sync,
-    weights: impl WeightsConverter,
+    weights: impl WeightsConverter<i16>,
 ) {
     let approx = weights.prepare_weights(filter_weights);
     if is_parallel {

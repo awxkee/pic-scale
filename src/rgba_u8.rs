@@ -62,6 +62,62 @@ impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
         _pool: &Option<ThreadPool>,
     ) {
         let _scale_factor = self.width as f32 / destination.width as f32;
+        #[cfg(all(
+            feature = "nightly_i8mm",
+            target_arch = "aarch64",
+            target_feature = "neon"
+        ))]
+        {
+            if _scale_factor < 6. && std::arch::is_aarch64_feature_detected!("i8mm") {
+                use crate::filter_weights::WeightsConverterQ7;
+                use crate::neon::{
+                    convolve_horizontal_rgba_neon_row_dot, convolve_horizontal_rgba_neon_rows_4_dot,
+                };
+                let _dispatcher_4_rows: Option<
+                    fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i8>),
+                > = Some(convolve_horizontal_rgba_neon_rows_4_dot);
+                let _dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i8>) =
+                    convolve_horizontal_rgba_neon_row_dot;
+                convolve_horizontal_dispatch_u8(
+                    self,
+                    filter_weights,
+                    destination,
+                    _pool,
+                    _dispatcher_4_rows,
+                    _dispatcher_1_row,
+                    WeightsConverterQ7::default(),
+                );
+                return;
+            }
+        }
+        #[cfg(all(
+            feature = "nightly_avx512",
+            any(target_arch = "x86_64", target_arch = "x86")
+        ))]
+        {
+            let has_avxvnni = std::arch::is_x86_feature_detected!("avxvnni");
+            if _scale_factor < 6. && has_avxvnni {
+                use crate::avx512::{
+                    convolve_horizontal_rgba_vnni_row_dot, convolve_horizontal_rgba_vnni_rows_4_dot,
+                };
+                use crate::filter_weights::WeightsConverterQ7;
+                let _dispatcher_4_rows: Option<
+                    fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i8>),
+                > = Some(convolve_horizontal_rgba_vnni_rows_4_dot);
+                let _dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i8>) =
+                    convolve_horizontal_rgba_vnni_row_dot;
+                convolve_horizontal_dispatch_u8(
+                    self,
+                    filter_weights,
+                    destination,
+                    _pool,
+                    _dispatcher_4_rows,
+                    _dispatcher_1_row,
+                    WeightsConverterQ7::default(),
+                );
+                return;
+            }
+        }
         let mut _dispatcher_4_rows: Option<
             fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>),
         > = Some(handle_fixed_rows_4_u8::<4>);
@@ -91,6 +147,16 @@ impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
             if std::arch::is_x86_feature_detected!("avx2") || _scale_factor < 8. {
                 _dispatcher_4_rows = Some(convolve_horizontal_rgba_avx_rows_4_lb);
                 _dispatcher_1_row = convolve_horizontal_rgba_avx_rows_one_lb;
+            }
+            #[cfg(feature = "nightly_avx512")]
+            {
+                if std::arch::is_x86_feature_detected!("avxvnni") {
+                    use crate::avx512::{
+                        convolve_horizontal_rgba_vnni_row_1, convolve_horizontal_rgba_vnni_row_4,
+                    };
+                    _dispatcher_4_rows = Some(convolve_horizontal_rgba_vnni_row_4);
+                    _dispatcher_1_row = convolve_horizontal_rgba_vnni_row_1;
+                }
             }
         }
         convolve_horizontal_dispatch_u8(

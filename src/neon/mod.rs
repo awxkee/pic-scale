@@ -54,6 +54,8 @@ mod rgba_f16_full;
 mod rgba_f32;
 mod rgba_u16_lb;
 mod rgba_u8;
+#[cfg(feature = "nightly_i8mm")]
+mod rgba_u8_dot;
 mod utils;
 mod vertical_ar30;
 #[cfg(feature = "half")]
@@ -117,6 +119,10 @@ pub(crate) use rgba_u16_lb::{
 pub(crate) use rgba_u8::{
     convolve_horizontal_rgba_neon_row, convolve_horizontal_rgba_neon_row_i16,
     convolve_horizontal_rgba_neon_rows_4_u8, convolve_horizontal_rgba_neon_rows_4_u8_i16,
+};
+#[cfg(feature = "nightly_i8mm")]
+pub(crate) use rgba_u8_dot::{
+    convolve_horizontal_rgba_neon_row_dot, convolve_horizontal_rgba_neon_rows_4_dot,
 };
 pub(crate) use vertical_ar30::neon_column_handler_fixed_point_ar30;
 #[cfg(feature = "half")]

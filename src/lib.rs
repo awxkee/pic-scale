@@ -32,6 +32,7 @@
 #![cfg_attr(feature = "nightly_avx512", feature(cfg_version))]
 #![cfg_attr(feature = "nightly_avx512", feature(avx512_target_feature))]
 #![cfg_attr(feature = "nightly_avx512", feature(stdarch_x86_avx512))]
+#![cfg_attr(feature = "nightly_i8mm", feature(stdarch_neon_i8mm))]
 mod alpha_check;
 #[cfg(feature = "half")]
 mod alpha_handle_f16;

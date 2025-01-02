@@ -65,6 +65,7 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 Features: 
  -  To enable support of `f16` the feature `half` should be activated.
  -  `nightly_avx512` activates AVX-512 feature set and requires `nightly` compiler channel 
+ -  `nightly_i8mm` activates `i8mm` NEON feature and required `nightly` compiler channel
 
 #### Target features with runtime dispatch
 
@@ -75,6 +76,8 @@ For x86 and aarch64 NEON runtime dispatch is used.
 `avx2`, `fma`, `sse4.1`, `f16c` will be detected automatically if available, no additional actions need, and called the best path.
 
 `avx512` requires feature `nightly_avx512` and requires `nightly` compiler channel, runtime detection if it is available then will be used.
+
+`avxvnni` requires feature `nightly_avx512` and requires `nightly` compiler channel, runtime detection if it is available then will be used.
 
 `fullfp16` NEON target detection performed in runtime, when available best the best paths for *f16* images are available on ARM.
 

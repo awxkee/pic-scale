@@ -36,14 +36,14 @@ use rayon::ThreadPool;
 use std::sync::Arc;
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn convolve_horizontal_dispatch_u8<const CHANNELS: usize>(
+pub(crate) fn convolve_horizontal_dispatch_u8<V: Send + Sync, const CHANNELS: usize>(
     image_store: &ImageStore<u8, CHANNELS>,
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStoreMut<u8, CHANNELS>,
     pool: &Option<ThreadPool>,
-    dispatcher_4_rows: Option<fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>)>,
-    dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i16>),
-    weights_converter: impl WeightsConverter,
+    dispatcher_4_rows: Option<fn(&[u8], usize, &mut [u8], usize, &FilterWeights<V>)>,
+    dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<V>),
+    weights_converter: impl WeightsConverter<V>,
 ) {
     let approx_weights = weights_converter.prepare_weights(&filter_weights);
 

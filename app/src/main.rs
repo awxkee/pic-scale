@@ -1,3 +1,4 @@
+#![feature(avx512_target_feature)]
 mod merge;
 mod split;
 
@@ -50,7 +51,7 @@ fn main() {
     let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
-    let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
     // resize_plane(378, 257, 257, 257, ResamplingFunction::Bilinear);
@@ -75,8 +76,8 @@ fn main() {
     //     .unwrap();
 
     let mut dst_store = ImageStoreMut::<u8, 4>::alloc_with_depth(
-        dimensions.0 as usize,
-        dimensions.1 as usize / 2,
+        dimensions.0 as usize / 4,
+        dimensions.1 as usize / 4,
         10,
     );
 
