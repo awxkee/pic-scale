@@ -97,10 +97,16 @@ pub(crate) fn convolve_horizontal_dispatch_u8<const CHANNELS: usize>(
     }
 }
 
-#[cfg(all(
-    feature = "nightly_i8mm",
-    target_arch = "aarch64",
-    target_feature = "neon"
+#[cfg(any(
+    all(
+        feature = "nightly_i8mm",
+        target_arch = "aarch64",
+        target_feature = "neon"
+    ),
+    all(
+        feature = "nightly_avx512",
+        any(target_arch = "x86_64", target_arch = "x86")
+    )
 ))]
 #[allow(clippy::type_complexity)]
 pub(crate) fn convolve_horizontal_dispatch_u8_s8<const CHANNELS: usize>(

@@ -1,4 +1,3 @@
-#![feature(stdarch_x86_avx512_f16)]
 /*
  * Copyright (c) Radzivon Bartoshyk. All rights reserved.
  *
@@ -29,8 +28,12 @@
  */
 mod alpha_u8;
 mod avx512_setr;
+mod rgba_u8_dot;
 mod utils;
 mod vertical_u8_lp;
 
 pub(crate) use alpha_u8::{avx512_premultiply_alpha_rgba, avx512_unpremultiply_alpha_rgba};
+pub(crate) use rgba_u8_dot::{
+    convolve_horizontal_rgba_vnni_row_dot, convolve_horizontal_rgba_vnni_rows_4_dot,
+};
 pub(crate) use vertical_u8_lp::convolve_vertical_avx512_row_lp;

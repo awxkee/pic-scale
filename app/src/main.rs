@@ -1,3 +1,4 @@
+#![feature(avx512_target_feature)]
 mod merge;
 mod split;
 
