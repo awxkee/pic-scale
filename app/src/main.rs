@@ -76,8 +76,8 @@ fn main() {
     //     .unwrap();
 
     let mut dst_store = ImageStoreMut::<u8, 4>::alloc_with_depth(
-        dimensions.0 as usize / 2,
-        dimensions.1 as usize / 2,
+        dimensions.0 as usize / 4,
+        dimensions.1 as usize / 4,
         10,
     );
 

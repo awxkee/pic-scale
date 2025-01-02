@@ -36,88 +36,16 @@ use rayon::ThreadPool;
 use std::sync::Arc;
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn convolve_horizontal_dispatch_u8<const CHANNELS: usize>(
+pub(crate) fn convolve_horizontal_dispatch_u8<V: Send + Sync, const CHANNELS: usize>(
     image_store: &ImageStore<u8, CHANNELS>,
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStoreMut<u8, CHANNELS>,
     pool: &Option<ThreadPool>,
-    dispatcher_4_rows: Option<fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>)>,
-    dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i16>),
-    weights_converter: impl WeightsConverter,
+    dispatcher_4_rows: Option<fn(&[u8], usize, &mut [u8], usize, &FilterWeights<V>)>,
+    dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<V>),
+    weights_converter: impl WeightsConverter<V>,
 ) {
     let approx_weights = weights_converter.prepare_weights(&filter_weights);
-
-    let src = image_store.buffer.as_ref();
-    let dst = destination.buffer.borrow_mut();
-
-    let src_stride = image_store.width * image_store.channels;
-    let dst_stride = destination.width * image_store.channels;
-
-    if let Some(pool) = pool {
-        let arc_weights = Arc::new(approx_weights);
-        pool.install(|| {
-            let mut rem = dst;
-            let mut src_rem = src;
-            if let Some(dispatcher_4) = dispatcher_4_rows {
-                rem.par_chunks_exact_mut(dst_stride * 4)
-                    .zip(src_rem.par_chunks_exact(src_stride * 4))
-                    .for_each(|(dst, src)| {
-                        dispatcher_4(src, src_stride, dst, dst_stride, &arc_weights);
-                    });
-
-                rem = rem.chunks_exact_mut(dst_stride * 4).into_remainder();
-                src_rem = src_rem.chunks_exact(src_stride * 4).remainder();
-            }
-
-            rem.par_chunks_exact_mut(dst_stride)
-                .zip(src_rem.par_chunks_exact(src_stride))
-                .for_each(|(dst, src)| {
-                    dispatcher_1_row(src, dst, &arc_weights);
-                });
-        });
-    } else {
-        let mut rem = dst;
-        let mut src_rem = src;
-        if let Some(dispatcher_4) = dispatcher_4_rows {
-            rem.chunks_exact_mut(dst_stride * 4)
-                .zip(src_rem.chunks_exact(src_stride * 4))
-                .for_each(|(dst, src)| {
-                    dispatcher_4(src, src_stride, dst, dst_stride, &approx_weights);
-                });
-
-            rem = rem.chunks_exact_mut(dst_stride * 4).into_remainder();
-            src_rem = src_rem.chunks_exact(src_stride * 4).remainder();
-        }
-
-        rem.chunks_exact_mut(dst_stride)
-            .zip(src_rem.chunks_exact(src_stride))
-            .for_each(|(dst, src)| {
-                dispatcher_1_row(src, dst, &approx_weights);
-            });
-    }
-}
-
-#[cfg(any(
-    all(
-        feature = "nightly_i8mm",
-        target_arch = "aarch64",
-        target_feature = "neon"
-    ),
-    all(
-        feature = "nightly_avx512",
-        any(target_arch = "x86_64", target_arch = "x86")
-    )
-))]
-#[allow(clippy::type_complexity)]
-pub(crate) fn convolve_horizontal_dispatch_u8_s8<const CHANNELS: usize>(
-    image_store: &ImageStore<u8, CHANNELS>,
-    filter_weights: FilterWeights<f32>,
-    destination: &mut ImageStoreMut<u8, CHANNELS>,
-    pool: &Option<ThreadPool>,
-    dispatcher_4_rows: Option<fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i8>)>,
-    dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i8>),
-) {
-    let approx_weights = filter_weights.numerical_approximation::<i8, 7>(0);
 
     let src = image_store.buffer.as_ref();
     let dst = destination.buffer.borrow_mut();

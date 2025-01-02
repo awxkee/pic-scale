@@ -124,17 +124,34 @@ impl FilterWeights<f32> {
     }
 }
 
-pub(crate) trait WeightsConverter {
-    fn prepare_weights(&self, weights: &FilterWeights<f32>) -> FilterWeights<i16>;
+pub(crate) trait WeightsConverter<V> {
+    fn prepare_weights(&self, weights: &FilterWeights<f32>) -> FilterWeights<V>;
 }
 
 #[derive(Default)]
 pub(crate) struct DefaultWeightsConverter {}
 
-impl WeightsConverter for DefaultWeightsConverter {
-    fn prepare_weights(&self, weights: &FilterWeights<f32>) -> FilterWeights<i16> {
+impl<V: Default + Copy + 'static + Clone> WeightsConverter<V> for DefaultWeightsConverter
+where
+    f32: AsPrimitive<V>,
+{
+    fn prepare_weights(&self, weights: &FilterWeights<f32>) -> FilterWeights<V> {
         use crate::support::PRECISION;
-        weights.numerical_approximation_i16::<PRECISION>(0)
+        weights.numerical_approximation::<V, PRECISION>(0)
+    }
+}
+
+#[derive(Default)]
+#[allow(dead_code)]
+pub(crate) struct WeightsConverterQ7 {}
+
+#[allow(dead_code)]
+impl<V: Default + Copy + 'static + Clone> WeightsConverter<V> for WeightsConverterQ7
+where
+    f32: AsPrimitive<V>,
+{
+    fn prepare_weights(&self, weights: &FilterWeights<f32>) -> FilterWeights<V> {
+        weights.numerical_approximation::<V, 7>(0)
     }
 }
 

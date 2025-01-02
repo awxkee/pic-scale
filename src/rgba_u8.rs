@@ -68,8 +68,8 @@ impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
             target_feature = "neon"
         ))]
         {
-            if _scale_factor < 7. && std::arch::is_aarch64_feature_detected!("i8mm") {
-                use crate::dispatch_group_u8::convolve_horizontal_dispatch_u8_s8;
+            if _scale_factor < 6. && std::arch::is_aarch64_feature_detected!("i8mm") {
+                use crate::filter_weights::WeightsConverterQ7;
                 use crate::neon::{
                     convolve_horizontal_rgba_neon_row_dot, convolve_horizontal_rgba_neon_rows_4_dot,
                 };
@@ -78,13 +78,14 @@ impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
                 > = Some(convolve_horizontal_rgba_neon_rows_4_dot);
                 let _dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i8>) =
                     convolve_horizontal_rgba_neon_row_dot;
-                convolve_horizontal_dispatch_u8_s8(
+                convolve_horizontal_dispatch_u8(
                     self,
                     filter_weights,
                     destination,
                     _pool,
                     _dispatcher_4_rows,
                     _dispatcher_1_row,
+                    WeightsConverterQ7::default(),
                 );
                 return;
             }
@@ -95,23 +96,24 @@ impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
         ))]
         {
             let has_avxvnni = std::arch::is_x86_feature_detected!("avxvnni");
-            if _scale_factor < 7. && has_avxvnni {
+            if _scale_factor < 6. && has_avxvnni {
                 use crate::avx512::{
                     convolve_horizontal_rgba_vnni_row_dot, convolve_horizontal_rgba_vnni_rows_4_dot,
                 };
-                use crate::dispatch_group_u8::convolve_horizontal_dispatch_u8_s8;
+                use crate::filter_weights::WeightsConverterQ7;
                 let _dispatcher_4_rows: Option<
                     fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i8>),
                 > = Some(convolve_horizontal_rgba_vnni_rows_4_dot);
                 let _dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i8>) =
                     convolve_horizontal_rgba_vnni_row_dot;
-                convolve_horizontal_dispatch_u8_s8(
+                convolve_horizontal_dispatch_u8(
                     self,
                     filter_weights,
                     destination,
                     _pool,
                     _dispatcher_4_rows,
                     _dispatcher_1_row,
+                    WeightsConverterQ7::default(),
                 );
                 return;
             }

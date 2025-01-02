@@ -49,14 +49,20 @@ pub(crate) fn convolve_horizontal_rgba_vnni_row_dot(
     }
 }
 
-#[target_feature(enable = "avxvnni")]
+#[target_feature(enable = "avxvnni", enable = "avx2")]
 unsafe fn convolve_horizontal_rgba_vnni_row_dot_impl(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i8>,
 ) {
+    const SCALE: i32 = 7;
     const ROUNDING: i16 = 1 << (7 - 1);
     const CHANNELS: usize = 4;
+
+    let shuffle_weights_table = _mm_setr_epi8(0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3);
+    let shuffle_4_table = _mm_setr_epi8(0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15);
+    let shuffle_2_table = _mm_setr_epi8(0, 4, -1, -1, 1, 5, -1, -1, 2, 6, -1, -1, 3, 7, -1, -1);
+    let shuffle_1_table = _mm_setr_epi8(0, -1, -1, -1, 1, -1, -1, -1, 2, -1, -1, -1, 3, -1, -1, -1);
 
     for ((dst, bounds), weights) in dst
         .chunks_exact_mut(CHANNELS)
@@ -71,11 +77,46 @@ unsafe fn convolve_horizontal_rgba_vnni_row_dot_impl(
         let mut jx = 0usize;
         let mut store = _mm_set1_epi32(ROUNDING as i32);
 
-        let shuffle_weights_table = _mm_setr_epi8(0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3);
-        let shuffle_4_table = _mm_setr_epi8(0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15);
-        let shuffle_2_table = _mm_setr_epi8(0, 4, -1, -1, 1, 5, -1, -1, 2, 6, -1, -1, 3, 7, -1, -1);
-        let shuffle_1_table =
-            _mm_setr_epi8(0, -1, -1, -1, 1, -1, -1, -1, 2, -1, -1, -1, 3, -1, -1, -1);
+        if bounds_size > 8 {
+            let shuffle_avx_weights = _mm256_setr_epi8(
+                0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3,
+                0, 1, 2, 3,
+            );
+            let permute_avx_weights = _mm256_setr_epi32(0, 0, 0, 0, 1, 1, 1, 1);
+            let shuffle_8_table = _mm256_setr_epi8(
+                0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15, 0, 4, 8, 12, 1, 5, 9, 13, 2,
+                6, 10, 14, 3, 7, 11, 15,
+            );
+
+            let mut store_avx = _mm256_set1_epi32(ROUNDING as i32);
+
+            while jx + 8 < bounds_size {
+                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                let mut weights = _mm256_permutevar8x32_epi32(
+                    _mm256_castsi128_si256(_mm_loadu_si64(w_ptr.as_ptr() as *const _)),
+                    permute_avx_weights,
+                );
+
+                weights = _mm256_shuffle_epi8(weights, shuffle_avx_weights);
+                let bounds_start = bounds.start + jx;
+
+                const COMPONENTS: usize = 4;
+                let src_ptr = src.get_unchecked((bounds_start * COMPONENTS)..);
+
+                let rgba_pixel = _mm256_shuffle_epi8(
+                    _mm256_loadu_si256(src_ptr.as_ptr() as *const _),
+                    shuffle_8_table,
+                );
+                store_avx = _mm256_dpbusd_avx_epi32(store_avx, rgba_pixel, weights);
+
+                jx += 8;
+            }
+
+            store = _mm_add_epi32(
+                _mm256_castsi256_si128(store_avx),
+                _mm256_extracti128_si256::<1>(store_avx),
+            );
+        }
 
         while jx + 4 < bounds_size {
             let w_ptr = weights.get_unchecked(jx..(jx + 4));
@@ -128,7 +169,7 @@ unsafe fn convolve_horizontal_rgba_vnni_row_dot_impl(
             jx += 1;
         }
 
-        let store_16 = _mm_srai_epi32::<7>(store);
+        let store_16 = _mm_srai_epi32::<SCALE>(store);
         let store_16_8 = _mm_packus_epi32(store_16, store_16);
 
         _mm_storeu_si32(
@@ -163,11 +204,11 @@ pub(crate) fn convolve_horizontal_rgba_vnni_rows_4_dot(
     }
 }
 
-/// Slightly lower precision scale option
+/// Slightly lower precision scale option by utilizing VNNI.
 ///
 /// # Safety
 /// - Check `avxvnni` availability before the call.
-#[target_feature(enable = "avxvnni")]
+#[target_feature(enable = "avxvnni", enable = "avx2")]
 unsafe fn convolve_horizontal_rgba_vnni_rows_4_dot_impl(
     src: &[u8],
     src_stride: usize,
@@ -218,6 +259,79 @@ unsafe fn convolve_horizontal_rgba_vnni_rows_4_dot_impl(
         let src1 = src0.get_unchecked(src_stride..);
         let src2 = src1.get_unchecked(src_stride..);
         let src3 = src2.get_unchecked(src_stride..);
+
+        if bounds_size > 8 {
+            let shuffle_avx_weights = _mm256_setr_epi8(
+                0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3,
+                0, 1, 2, 3,
+            );
+            let permute_avx_weights = _mm256_setr_epi32(0, 0, 0, 0, 1, 1, 1, 1);
+            let shuffle_8_table = _mm256_setr_epi8(
+                0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15, 0, 4, 8, 12, 1, 5, 9, 13, 2,
+                6, 10, 14, 3, 7, 11, 15,
+            );
+
+            let mut store_avx0 = _mm256_set1_epi32(ROUNDING as i32);
+            let mut store_avx1 = _mm256_set1_epi32(ROUNDING as i32);
+            let mut store_avx2 = _mm256_set1_epi32(ROUNDING as i32);
+            let mut store_avx3 = _mm256_set1_epi32(ROUNDING as i32);
+
+            while jx + 8 < bounds_size {
+                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                let mut weights = _mm256_permutevar8x32_epi32(
+                    _mm256_castsi128_si256(_mm_loadu_si64(w_ptr.as_ptr() as *const _)),
+                    permute_avx_weights,
+                );
+
+                weights = _mm256_shuffle_epi8(weights, shuffle_avx_weights);
+                let bounds_start = bounds.start + jx;
+
+                let src_ptr0 = src0.get_unchecked((bounds_start * CHANNELS)..);
+                let src_ptr1 = src1.get_unchecked((bounds_start * CHANNELS)..);
+                let src_ptr2 = src2.get_unchecked((bounds_start * CHANNELS)..);
+                let src_ptr3 = src3.get_unchecked((bounds_start * CHANNELS)..);
+
+                let rgba_pixel0 = _mm256_shuffle_epi8(
+                    _mm256_loadu_si256(src_ptr0.as_ptr() as *const _),
+                    shuffle_8_table,
+                );
+                let rgba_pixel1 = _mm256_shuffle_epi8(
+                    _mm256_loadu_si256(src_ptr1.as_ptr() as *const _),
+                    shuffle_8_table,
+                );
+                let rgba_pixel2 = _mm256_shuffle_epi8(
+                    _mm256_loadu_si256(src_ptr2.as_ptr() as *const _),
+                    shuffle_8_table,
+                );
+                let rgba_pixel3 = _mm256_shuffle_epi8(
+                    _mm256_loadu_si256(src_ptr3.as_ptr() as *const _),
+                    shuffle_8_table,
+                );
+                store_avx0 = _mm256_dpbusd_avx_epi32(store_avx0, rgba_pixel0, weights);
+                store_avx1 = _mm256_dpbusd_avx_epi32(store_avx1, rgba_pixel1, weights);
+                store_avx2 = _mm256_dpbusd_avx_epi32(store_avx2, rgba_pixel2, weights);
+                store_avx3 = _mm256_dpbusd_avx_epi32(store_avx3, rgba_pixel3, weights);
+
+                jx += 8;
+            }
+
+            store_0 = _mm_add_epi32(
+                _mm256_castsi256_si128(store_avx0),
+                _mm256_extracti128_si256::<1>(store_avx0),
+            );
+            store_1 = _mm_add_epi32(
+                _mm256_castsi256_si128(store_avx1),
+                _mm256_extracti128_si256::<1>(store_avx1),
+            );
+            store_2 = _mm_add_epi32(
+                _mm256_castsi256_si128(store_avx2),
+                _mm256_extracti128_si256::<1>(store_avx2),
+            );
+            store_3 = _mm_add_epi32(
+                _mm256_castsi256_si128(store_avx3),
+                _mm256_extracti128_si256::<1>(store_avx3),
+            );
+        }
 
         while jx + 4 < bounds_size {
             let w_ptr = weights.get_unchecked(jx..(jx + 4));
