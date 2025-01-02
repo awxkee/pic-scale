@@ -46,20 +46,18 @@ unsafe fn neon_premultiply_alpha_rgba_row_f32(dst: &mut [f32], src: &[f32]) {
     let mut rem = dst;
     let mut src_rem = src;
 
-    unsafe {
-        for (dst, src) in rem.chunks_exact_mut(4 * 4).zip(src_rem.chunks_exact(4 * 4)) {
-            let src_ptr = src.as_ptr();
-            let mut pixel = vld4q_f32(src_ptr);
-            pixel.0 = vmulq_f32(pixel.0, pixel.3);
-            pixel.1 = vmulq_f32(pixel.1, pixel.3);
-            pixel.2 = vmulq_f32(pixel.2, pixel.3);
-            let dst_ptr = dst.as_mut_ptr();
-            vst4q_f32(dst_ptr, pixel);
-        }
-
-        rem = rem.chunks_exact_mut(4 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(4 * 4).remainder();
+    for (dst, src) in rem.chunks_exact_mut(4 * 4).zip(src_rem.chunks_exact(4 * 4)) {
+        let src_ptr = src.as_ptr();
+        let mut pixel = vld4q_f32(src_ptr);
+        pixel.0 = vmulq_f32(pixel.0, pixel.3);
+        pixel.1 = vmulq_f32(pixel.1, pixel.3);
+        pixel.2 = vmulq_f32(pixel.2, pixel.3);
+        let dst_ptr = dst.as_mut_ptr();
+        vst4q_f32(dst_ptr, pixel);
     }
+
+    rem = rem.chunks_exact_mut(4 * 4).into_remainder();
+    src_rem = src_rem.chunks_exact(4 * 4).remainder();
 
     premultiply_pixel_f32_row(rem, src_rem);
 }
@@ -91,19 +89,17 @@ pub(crate) fn neon_premultiply_alpha_rgba_f32(
 unsafe fn neon_unpremultiply_alpha_rgba_f32_row(in_place: &mut [f32]) {
     let mut rem = in_place;
 
-    unsafe {
-        for dst in rem.chunks_exact_mut(4 * 4) {
-            let src_ptr = dst.as_ptr();
-            let mut pixel = vld4q_f32(src_ptr);
-            pixel.0 = unpremultiply_vec_f32!(pixel.0, pixel.3);
-            pixel.1 = unpremultiply_vec_f32!(pixel.1, pixel.3);
-            pixel.2 = unpremultiply_vec_f32!(pixel.2, pixel.3);
-            let dst_ptr = dst.as_mut_ptr();
-            vst4q_f32(dst_ptr, pixel);
-        }
-
-        rem = rem.chunks_exact_mut(4 * 4).into_remainder();
+    for dst in rem.chunks_exact_mut(4 * 4) {
+        let src_ptr = dst.as_ptr();
+        let mut pixel = vld4q_f32(src_ptr);
+        pixel.0 = unpremultiply_vec_f32!(pixel.0, pixel.3);
+        pixel.1 = unpremultiply_vec_f32!(pixel.1, pixel.3);
+        pixel.2 = unpremultiply_vec_f32!(pixel.2, pixel.3);
+        let dst_ptr = dst.as_mut_ptr();
+        vst4q_f32(dst_ptr, pixel);
     }
+
+    rem = rem.chunks_exact_mut(4 * 4).into_remainder();
 
     unpremultiply_pixel_f32_row(rem);
 }

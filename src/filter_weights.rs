@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use num_traits::AsPrimitive;
 
 #[derive(Debug, Clone)]
 pub(crate) struct FilterWeights<T> {
@@ -74,6 +75,19 @@ impl FilterWeights<f32> {
         &self,
         alignment: usize,
     ) -> FilterWeights<i16> {
+        self.numerical_approximation::<i16, PRECISION>(alignment)
+    }
+
+    pub(crate) fn numerical_approximation<
+        J: Clone + Default + Copy + 'static,
+        const PRECISION: i32,
+    >(
+        &self,
+        alignment: usize,
+    ) -> FilterWeights<J>
+    where
+        f32: AsPrimitive<J>,
+    {
         let align = if alignment != 0 {
             (self.kernel_size.div_ceil(alignment)) * alignment
         } else {
@@ -81,7 +95,7 @@ impl FilterWeights<f32> {
         };
         let precision_scale: f32 = (1 << PRECISION) as f32;
 
-        let mut output_kernel = vec![0i16; self.distinct_elements * align];
+        let mut output_kernel = vec![J::default(); self.distinct_elements * align];
 
         for (chunk, kernel_chunk) in self
             .weights
@@ -89,7 +103,7 @@ impl FilterWeights<f32> {
             .zip(output_kernel.chunks_exact_mut(align))
         {
             for (&weight, kernel) in chunk.iter().zip(kernel_chunk) {
-                *kernel = (weight * precision_scale).round() as i16;
+                *kernel = (weight * precision_scale).round().as_();
             }
         }
 

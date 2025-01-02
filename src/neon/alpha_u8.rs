@@ -149,7 +149,6 @@ impl NeonDisassociateAlpha {
         let lo_hi = vcvtq_f32_u32(vmovl_high_u16(lo));
         let hi_lo = vcvtq_f32_u32(vmovl_u16(vget_low_u16(hi)));
         let hi_hi = vcvtq_f32_u32(vmovl_high_u16(hi));
-        let zero_mask = vmvnq_u8(vceqzq_u8(a_values));
         let a_hi = vmovl_high_u8(a_values);
         let a_lo = vmovl_u8(vget_low_u8(a_values));
         let a_lo_lo = vrecpeq_f32(vcvtq_f32_u32(vmovl_u16(vget_low_u16(a_lo))));
@@ -163,7 +162,11 @@ impl NeonDisassociateAlpha {
         let hi_hi = vcvtaq_u32_f32(vmulq_f32(hi_hi, a_hi_ho));
         let lo = vcombine_u16(vmovn_u32(lo_lo), vmovn_u32(lo_hi));
         let hi = vcombine_u16(vmovn_u32(hi_lo), vmovn_u32(hi_hi));
-        vandq_u8(vcombine_u8(vqmovn_u16(lo), vqmovn_u16(hi)), zero_mask)
+        vbslq_u8(
+            vceqzq_u8(a_values),
+            vdupq_n_u8(0),
+            vcombine_u8(vqmovn_u16(lo), vqmovn_u16(hi)),
+        )
     }
 
     #[inline(always)]
@@ -172,7 +175,6 @@ impl NeonDisassociateAlpha {
         let lo = vmull_u8(v, vget_low_u8(scale));
         let lo_lo = vcvtq_f32_u32(vmovl_u16(vget_low_u16(lo)));
         let lo_hi = vcvtq_f32_u32(vmovl_high_u16(lo));
-        let zero_mask = vmvn_u8(vceqz_u8(a_values));
         let a_lo = vmovl_u8(a_values);
         let a_lo_lo = vrecpeq_f32(vcvtq_f32_u32(vmovl_u16(vget_low_u16(a_lo))));
         let a_lo_hi = vrecpeq_f32(vcvtq_f32_u32(vmovl_high_u16(a_lo)));
@@ -180,7 +182,7 @@ impl NeonDisassociateAlpha {
         let lo_lo = vcvtaq_u32_f32(vmulq_f32(lo_lo, a_lo_lo));
         let lo_hi = vcvtaq_u32_f32(vmulq_f32(lo_hi, a_lo_hi));
         let lo = vcombine_u16(vmovn_u32(lo_lo), vmovn_u32(lo_hi));
-        vand_u8(vqmovn_u16(lo), zero_mask)
+        vbsl_u8(vceqz_u8(a_values), vdup_n_u8(0), vqmovn_u16(lo))
     }
 }
 
@@ -244,11 +246,15 @@ impl NeonDisassociateAlphaFloat16 {
         let lo_a = xvrecpeq_f16(xvcvtq_f16_u16(vmovl_u8(vget_low_u8(a_values))));
         let hi_a = xvrecpeq_f16(xvcvtq_f16_u16(vmovl_high_u8(a_values)));
 
-        let zero_mask = vmvnq_u8(vceqzq_u8(a_values));
+        let zero_mask = vceqzq_u8(a_values);
 
         let lo = xvcvtaq_u16_f16(xvmulq_f16(lo, lo_a));
         let hi = xvcvtaq_u16_f16(xvmulq_f16(hi, hi_a));
-        vandq_u8(vcombine_u8(vqmovn_u16(lo), vqmovn_u16(hi)), zero_mask)
+        vbslq_u8(
+            zero_mask,
+            vdupq_n_u8(0),
+            vcombine_u8(vqmovn_u16(lo), vqmovn_u16(hi)),
+        )
     }
 
     #[inline]
@@ -259,9 +265,8 @@ impl NeonDisassociateAlphaFloat16 {
         let v_scale = xreinterpretq_f16_u16(vdupq_n_u16(23544));
         let lo = xvmulq_f16(xvcvtq_f16_u16(vmovl_u8(v)), v_scale);
         let lo_a = xvrecpeq_f16(xvcvtq_f16_u16(vmovl_u8(a_values)));
-        let zero_mask = vmvn_u8(vceqz_u8(a_values));
         let lo = xvcvtaq_u16_f16(xvmulq_f16(lo, lo_a));
-        vand_u8(vqmovn_u16(lo), zero_mask)
+        vbsl_u8(vceqz_u8(a_values), vdup_n_u8(0), vqmovn_u16(lo))
     }
 }
 
@@ -308,6 +313,7 @@ impl DisassociateAlpha for NeonDisassociateAlphaFloat16 {
     }
 }
 
+#[inline]
 unsafe fn neon_dis_dispatch(in_place: &mut [u8], handler: impl DisassociateAlpha) {
     handler.disassociate(in_place);
 }

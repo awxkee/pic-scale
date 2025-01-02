@@ -80,14 +80,14 @@ fn main() {
         10,
     );
 
-    for i in 0..25 {
-        let start_time = Instant::now();
-        scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
+    // for i in 0..25 {
+    let start_time = Instant::now();
+    scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
 
-        let elapsed_time = start_time.elapsed();
-        // Print the elapsed time in milliseconds
-        println!("Scaler: {:.2?}", elapsed_time);
-    }
+    let elapsed_time = start_time.elapsed();
+    // Print the elapsed time in milliseconds
+    println!("Scaler: {:.2?}", elapsed_time);
+    // }
 
     // let mut resized = vec![0u8; dst_size.width * dst_size.height * 4];
     // ra30_to_rgba8(

@@ -461,7 +461,7 @@ pub(super) unsafe fn xvfmla_lane_f16<const LANE: i32>(
     b: x_float16x4_t,
     c: x_float16x4_t,
 ) -> x_float16x4_t {
-    static_assert_uimm_bits!(LANE, 3);
+    static_assert_uimm_bits!(LANE, 2);
     let mut result: uint16x4_t = xreinterpret_u16_f16(a);
 
     if LANE == 0 {
@@ -498,6 +498,59 @@ pub(super) unsafe fn xvfmla_lane_f16<const LANE: i32>(
         );
     }
     xreinterpret_f16_u16(result)
+}
+
+/// Floating-point fused Multiply-Add to accumulator (vector).
+/// This instruction multiplies corresponding floating-point values in the vectors
+/// in the two source SIMD&FP registers, adds the product to the corresponding
+/// vector element of the destination SIMD&FP register,
+/// and writes the result to the destination SIMD&FP register.
+///
+/// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vfmaq_lane_f16)
+#[target_feature(enable = "fp16")]
+#[inline]
+pub(super) unsafe fn xvfmlaq_lane_f16<const LANE: i32>(
+    a: x_float16x8_t,
+    b: x_float16x8_t,
+    c: x_float16x4_t,
+) -> x_float16x8_t {
+    static_assert_uimm_bits!(LANE, 2);
+    let mut result: uint16x8_t = xreinterpretq_u16_f16(a);
+
+    if LANE == 0 {
+        asm!(
+        "fmla {0:v}.8h, {1:v}.8h, {2:v}.h[0]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpret_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 1 {
+        asm!(
+        "fmla {0:v}.8h, {1:v}.8h, {2:v}.h[1]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpret_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 2 {
+        asm!(
+        "fmla {0:v}.8h, {1:v}.8h, {2:v}.h[2]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpret_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 3 {
+        asm!(
+        "fmla {0:v}.8h, {1:v}.8h, {2:v}.h[3]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpret_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    }
+    xreinterpretq_f16_u16(result)
 }
 
 /// Floating-point fused Multiply-Add to accumulator (vector).
@@ -711,7 +764,7 @@ pub(crate) unsafe fn xvsetq_lane_f16<const LANE: i32>(
 /// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceqzq_f16)
 #[target_feature(enable = "fp16")]
 #[inline]
-pub(crate) unsafe fn vceqzq_f16(a: x_float16x8_t) -> uint16x8_t {
+pub(crate) unsafe fn xvceqzq_f16(a: x_float16x8_t) -> uint16x8_t {
     let mut result: uint16x8_t;
     asm!(
     "fcmeq {0:v}.8h, {1:v}.8h, #0",
