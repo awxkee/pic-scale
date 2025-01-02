@@ -34,7 +34,10 @@ use crate::avx2::{
     convolve_vertical_avx_row, convolve_vertical_avx_row_lp,
 };
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
-use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertical_dispatch_u8};
+use crate::dispatch_group_u8::{
+    convolve_horizontal_dispatch_u8,
+    convolve_vertical_dispatch_u8,
+};
 use crate::filter_weights::{DefaultWeightsConverter, FilterBounds, FilterWeights};
 use crate::handler_provider::{
     handle_fixed_column_u8, handle_fixed_row_u8, handle_fixed_rows_4_u8,
@@ -62,6 +65,33 @@ impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
         _pool: &Option<ThreadPool>,
     ) {
         let _scale_factor = self.width as f32 / destination.width as f32;
+        #[cfg(all(
+            feature = "nightly_i8mm",
+            target_arch = "aarch64",
+            target_feature = "neon"
+        ))]
+        {
+            if _scale_factor < 7. && std::arch::is_aarch64_feature_detected!("i8mm") {
+                use crate::neon::{
+                    convolve_horizontal_rgba_neon_row_dot, convolve_horizontal_rgba_neon_rows_4_dot,
+                };
+                use crate::dispatch_group_u8::convolve_horizontal_dispatch_u8_s8;
+                let _dispatcher_4_rows: Option<
+                    fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i8>),
+                > = Some(convolve_horizontal_rgba_neon_rows_4_dot);
+                let _dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i8>) =
+                    convolve_horizontal_rgba_neon_row_dot;
+                convolve_horizontal_dispatch_u8_s8(
+                    self,
+                    filter_weights,
+                    destination,
+                    _pool,
+                    _dispatcher_4_rows,
+                    _dispatcher_1_row,
+                );
+                return;
+            }
+        }
         let mut _dispatcher_4_rows: Option<
             fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>),
         > = Some(handle_fixed_rows_4_u8::<4>);

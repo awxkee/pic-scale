@@ -65,6 +65,7 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 Features: 
  -  To enable support of `f16` the feature `half` should be activated.
  -  `nightly_avx512` activates AVX-512 feature set and requires `nightly` compiler channel 
+ -  `nightly_i8mm` activates `i8mm` NEON feature and required `nightly` compiler channel
 
 #### Target features with runtime dispatch
 
