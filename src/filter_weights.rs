@@ -160,7 +160,7 @@ where
 pub(crate) struct WeightFloat16Converter {}
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-impl WeightsConverter for WeightFloat16Converter {
+impl WeightsConverter<i16> for WeightFloat16Converter {
     fn prepare_weights(&self, weights: &FilterWeights<f32>) -> FilterWeights<i16> {
         use crate::neon::convert_weights_to_f16;
         let converted_weights = convert_weights_to_f16(&weights.weights);

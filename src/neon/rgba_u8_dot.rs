@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter_weights::FilterWeights;
+use crate::neon::utils::xvld1q_u8_x2;
 use std::arch::aarch64::*;
 
 /// Checking NEON `i8mm` availability is required before a call.
@@ -52,8 +53,26 @@ unsafe fn convolve_horizontal_rgba_neon_row_dot_impl(
     dst: &mut [u8],
     filter_weights: &FilterWeights<i8>,
 ) {
-    const ROUNDING: i16 = 1 << (7 - 1);
+    const SCALE: i32 = 7;
+    const ROUNDING: i16 = 1 << (SCALE - 1);
     const CHANNELS: usize = 4;
+
+    let q_shuf_weights: [u8; 16] = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3];
+    let q_shuf_weights1: [u8; 16] = [4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7];
+
+    let q_shuf_4: [u8; 16] = [0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15];
+    let q_shuf_2: [u8; 16] = [
+        0, 4, 255, 255, 1, 5, 255, 255, 2, 6, 255, 255, 3, 7, 255, 255,
+    ];
+    let q_shuf_1: [u8; 16] = [
+        0, 255, 255, 255, 1, 255, 255, 255, 2, 255, 255, 255, 3, 255, 255, 255,
+    ];
+    let shuffle_weights_table = vld1q_u8(q_shuf_weights.as_ptr());
+    let shuffle_weights_table1 = vld1q_u8(q_shuf_weights1.as_ptr());
+
+    let shuffle_4_table = vld1q_u8(q_shuf_4.as_ptr());
+    let shuffle_2_table = vld1q_u8(q_shuf_2.as_ptr());
+    let shuffle_1_table = vld1q_u8(q_shuf_1.as_ptr());
 
     for ((dst, bounds), weights) in dst
         .chunks_exact_mut(CHANNELS)
@@ -68,18 +87,22 @@ unsafe fn convolve_horizontal_rgba_neon_row_dot_impl(
         let mut jx = 0usize;
         let mut store = vdupq_n_s32(ROUNDING as i32);
 
-        let q_shuf_weights: [u8; 16] = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3];
-        let q_shuf_4: [u8; 16] = [0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15];
-        let q_shuf_2: [u8; 16] = [
-            0, 4, 255, 255, 1, 5, 255, 255, 2, 6, 255, 255, 3, 7, 255, 255,
-        ];
-        let q_shuf_1: [u8; 16] = [
-            0, 255, 255, 255, 1, 255, 255, 255, 2, 255, 255, 255, 3, 255, 255, 255,
-        ];
-        let shuffle_weights_table = vld1q_u8(q_shuf_weights.as_ptr());
-        let shuffle_4_table = vld1q_u8(q_shuf_4.as_ptr());
-        let shuffle_2_table = vld1q_u8(q_shuf_2.as_ptr());
-        let shuffle_1_table = vld1q_u8(q_shuf_1.as_ptr());
+        while jx + 8 < bounds_size {
+            let w_ptr = weights.get_unchecked(jx..(jx + 8));
+            let weights = vreinterpretq_u8_u64(vld1q_dup_u64(w_ptr.as_ptr() as *const _));
+            let weights0 = vreinterpretq_s8_u8(vqtbl1q_u8(weights, shuffle_weights_table));
+            let weights1 = vreinterpretq_s8_u8(vqtbl1q_u8(weights, shuffle_weights_table1));
+            let bounds_start = bounds.start + jx;
+
+            const COMPONENTS: usize = 4;
+            let src_ptr = src.get_unchecked((bounds_start * COMPONENTS)..);
+
+            let ld = xvld1q_u8_x2(src_ptr.as_ptr());
+            store = vusdotq_s32(store, vqtbl1q_u8(ld.0, shuffle_4_table), weights0);
+            store = vusdotq_s32(store, vqtbl1q_u8(ld.1, shuffle_4_table), weights1);
+
+            jx += 8;
+        }
 
         while jx + 4 < bounds_size {
             let w_ptr = weights.get_unchecked(jx..(jx + 4));
@@ -130,7 +153,7 @@ unsafe fn convolve_horizontal_rgba_neon_row_dot_impl(
             jx += 1;
         }
 
-        let store_16 = vqshrun_n_s32::<7>(store);
+        let store_16 = vqshrun_n_s32::<SCALE>(store);
         let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
 
         vst1_lane_u32::<0>(
@@ -192,6 +215,8 @@ unsafe fn convolve_horizontal_rgba_neon_rows_4_dot_impl(
     let iter_row3 = row3_ref.chunks_exact_mut(CHANNELS);
 
     let q_shuf_weights: [u8; 16] = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3];
+    let q_shuf_weights1: [u8; 16] = [4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7];
+
     let q_shuf_4: [u8; 16] = [0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15];
     let q_shuf_2: [u8; 16] = [
         0, 4, 255, 255, 1, 5, 255, 255, 2, 6, 255, 255, 3, 7, 255, 255,
@@ -200,6 +225,7 @@ unsafe fn convolve_horizontal_rgba_neon_rows_4_dot_impl(
         0, 255, 255, 255, 1, 255, 255, 255, 2, 255, 255, 255, 3, 255, 255, 255,
     ];
     let shuffle_weights_table = vld1q_u8(q_shuf_weights.as_ptr());
+    let shuffle_weights_table1 = vld1q_u8(q_shuf_weights1.as_ptr());
     let shuffle_4_table = vld1q_u8(q_shuf_4.as_ptr());
     let shuffle_2_table = vld1q_u8(q_shuf_2.as_ptr());
     let shuffle_1_table = vld1q_u8(q_shuf_1.as_ptr());
@@ -228,6 +254,36 @@ unsafe fn convolve_horizontal_rgba_neon_rows_4_dot_impl(
         let src1 = src0.get_unchecked(src_stride..);
         let src2 = src1.get_unchecked(src_stride..);
         let src3 = src2.get_unchecked(src_stride..);
+
+        while jx + 8 < bounds_size {
+            let w_ptr = weights.get_unchecked(jx..(jx + 8));
+
+            let weights = vreinterpretq_u8_u64(vld1q_dup_u64(w_ptr.as_ptr() as *const _));
+            let weights0 = vreinterpretq_s8_u8(vqtbl1q_u8(weights, shuffle_weights_table));
+            let weights1 = vreinterpretq_s8_u8(vqtbl1q_u8(weights, shuffle_weights_table1));
+
+            let bounds_start = bounds.start + jx;
+
+            let src_ptr0 = src0.get_unchecked((bounds_start * CHANNELS)..);
+            let src_ptr1 = src1.get_unchecked((bounds_start * CHANNELS)..);
+            let src_ptr2 = src2.get_unchecked((bounds_start * CHANNELS)..);
+            let src_ptr3 = src3.get_unchecked((bounds_start * CHANNELS)..);
+
+            let ld0 = xvld1q_u8_x2(src_ptr0.as_ptr());
+            store_0 = vusdotq_s32(store_0, vqtbl1q_u8(ld0.0, shuffle_4_table), weights0);
+            store_0 = vusdotq_s32(store_0, vqtbl1q_u8(ld0.1, shuffle_4_table), weights1);
+            let ld1 = xvld1q_u8_x2(src_ptr1.as_ptr());
+            store_1 = vusdotq_s32(store_1, vqtbl1q_u8(ld1.0, shuffle_4_table), weights0);
+            store_1 = vusdotq_s32(store_1, vqtbl1q_u8(ld1.1, shuffle_4_table), weights1);
+            let ld2 = xvld1q_u8_x2(src_ptr2.as_ptr());
+            store_2 = vusdotq_s32(store_2, vqtbl1q_u8(ld2.0, shuffle_4_table), weights0);
+            store_2 = vusdotq_s32(store_2, vqtbl1q_u8(ld2.1, shuffle_4_table), weights1);
+            let ld3 = xvld1q_u8_x2(src_ptr3.as_ptr());
+            store_3 = vusdotq_s32(store_3, vqtbl1q_u8(ld3.0, shuffle_4_table), weights0);
+            store_3 = vusdotq_s32(store_3, vqtbl1q_u8(ld3.1, shuffle_4_table), weights1);
+
+            jx += 8;
+        }
 
         while jx + 4 < bounds_size {
             let w_ptr = weights.get_unchecked(jx..(jx + 4));

@@ -25,6 +25,7 @@ jobs:
       - run: rustup target add aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu i686-unknown-linux-gnu powerpc-unknown-linux-gnu riscv64gc-unknown-linux-gnu
       - run: RUSTFLAGS="-C target-feature=+neon,-fp16" cargo build --target aarch64-unknown-linux-gnu --features half
       - run: RUSTFLAGS="-C target-feature=+neon,+fp16" cargo build --target aarch64-unknown-linux-gnu --features half
+      - run: RUSTFLAGS="-C target-feature=+neon,+fp16" cargo build --target aarch64-unknown-linux-gnu --features half,nightly_i8mm
       - run: RUSTFLAGS="-C target-feature=+sse4.1" cargo build --target i686-unknown-linux-gnu
       - run: cargo build --target powerpc-unknown-linux-gnu
       - run: cargo build --target riscv64gc-unknown-linux-gnu
