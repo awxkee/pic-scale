@@ -148,6 +148,16 @@ impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
                 _dispatcher_4_rows = Some(convolve_horizontal_rgba_avx_rows_4_lb);
                 _dispatcher_1_row = convolve_horizontal_rgba_avx_rows_one_lb;
             }
+            #[cfg(feature = "nightly_avx512")]
+            {
+                if std::arch::is_x86_feature_detected!("avxvnni") {
+                    use crate::avx512::{
+                        convolve_horizontal_rgba_vnni_row_1, convolve_horizontal_rgba_vnni_row_4,
+                    };
+                    _dispatcher_4_rows = Some(convolve_horizontal_rgba_vnni_row_4);
+                    _dispatcher_1_row = convolve_horizontal_rgba_vnni_row_1;
+                }
+            }
         }
         convolve_horizontal_dispatch_u8(
             self,
