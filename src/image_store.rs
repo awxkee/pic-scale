@@ -53,7 +53,7 @@ pub struct ImageStore<'a, T, const N: usize>
 where
     T: FromPrimitive + Clone + Copy + Debug,
 {
-    pub(crate) buffer: std::borrow::Cow<'a, [T]>,
+    pub buffer: std::borrow::Cow<'a, [T]>,
     /// Channels in the image
     pub channels: usize,
     /// Image width
@@ -80,7 +80,7 @@ pub struct ImageStoreMut<'a, T, const N: usize>
 where
     T: FromPrimitive + Clone + Copy + Debug,
 {
-    pub(crate) buffer: BufferStore<'a, T>,
+    pub buffer: BufferStore<'a, T>,
     /// Channels in the image
     pub channels: usize,
     /// Image width
@@ -98,20 +98,20 @@ pub(crate) trait CheckStoreDensity {
 }
 
 #[derive(Debug)]
-pub(crate) enum BufferStore<'a, T: Copy + Debug> {
+pub enum BufferStore<'a, T: Copy + Debug> {
     Borrowed(&'a mut [T]),
     Owned(Vec<T>),
 }
 
 impl<T: Copy + Debug> BufferStore<'_, T> {
-    pub(crate) fn borrow(&self) -> &[T] {
+    pub fn borrow(&self) -> &[T] {
         match self {
             Self::Borrowed(p_ref) => p_ref,
             Self::Owned(vec) => vec,
         }
     }
 
-    pub(crate) fn borrow_mut(&mut self) -> &mut [T] {
+    pub fn borrow_mut(&mut self) -> &mut [T] {
         match self {
             Self::Borrowed(p_ref) => p_ref,
             Self::Owned(vec) => vec,

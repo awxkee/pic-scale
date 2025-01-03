@@ -123,7 +123,7 @@ impl Scaling for LinearScaler {
             channels: COMPONENTS,
             width: store.width,
             height: store.height,
-            stride: store.stride * COMPONENTS,
+            stride: store.width * COMPONENTS,
             bit_depth: into.bit_depth,
         };
 
