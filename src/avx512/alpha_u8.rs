@@ -160,46 +160,48 @@ fn avx_premultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8], executor: imp
 
 pub(crate) fn avx512_premultiply_alpha_rgba(
     dst: &mut [u8],
+    dst_stride: usize,
     src: &[u8],
     width: usize,
     _: usize,
+    src_stride: usize,
     pool: &Option<ThreadPool>,
 ) {
     let has_vbmi = std::arch::is_x86_feature_detected!("avx512vbmi");
     if let Some(pool) = pool {
         pool.install(|| {
-            dst.par_chunks_exact_mut(width * 4)
-                .zip(src.par_chunks_exact(width * 4))
+            dst.par_chunks_exact_mut(dst_stride)
+                .zip(src.par_chunks_exact(src_stride))
                 .for_each(|(dst, src)| {
                     if has_vbmi {
                         avx_premultiply_alpha_rgba_impl_row(
-                            dst,
-                            src,
+                            &mut dst[..width * 4],
+                            &src[..width * 4],
                             AssociateAlphaDefault::<true>::default(),
                         );
                     } else {
                         avx_premultiply_alpha_rgba_impl_row(
-                            dst,
-                            src,
+                            &mut dst[..width * 4],
+                            &src[..width * 4],
                             AssociateAlphaDefault::<false>::default(),
                         );
                     }
                 });
         });
     } else {
-        dst.chunks_exact_mut(width * 4)
-            .zip(src.chunks_exact(width * 4))
+        dst.chunks_exact_mut(dst_stride)
+            .zip(src.chunks_exact(src_stride))
             .for_each(|(dst, src)| {
                 if has_vbmi {
                     avx_premultiply_alpha_rgba_impl_row(
-                        dst,
-                        src,
+                        &mut dst[..width * 4],
+                        &src[..width * 4],
                         AssociateAlphaDefault::<true>::default(),
                     );
                 } else {
                     avx_premultiply_alpha_rgba_impl_row(
-                        dst,
-                        src,
+                        &mut dst[..width * 4],
+                        &src[..width * 4],
                         AssociateAlphaDefault::<false>::default(),
                     );
                 }
@@ -346,6 +348,7 @@ pub(crate) fn avx512_unpremultiply_alpha_rgba(
     in_place: &mut [u8],
     width: usize,
     _: usize,
+    stride: usize,
     pool: &Option<ThreadPool>,
 ) {
     let has_vbmi = std::arch::is_x86_feature_detected!("avx512vbmi");
@@ -353,21 +356,33 @@ pub(crate) fn avx512_unpremultiply_alpha_rgba(
     if let Some(pool) = pool {
         pool.install(|| {
             in_place
-                .par_chunks_exact_mut(width * 4)
+                .par_chunks_exact_mut(stride)
                 .for_each(|row| unsafe {
                     if has_vbmi {
-                        avx512_unp_row(row, Avx512DisassociateAlpha::<true>::default());
+                        avx512_unp_row(
+                            &mut row[..width * 4],
+                            Avx512DisassociateAlpha::<true>::default(),
+                        );
                     } else {
-                        avx512_unp_row(row, Avx512DisassociateAlpha::<false>::default());
+                        avx512_unp_row(
+                            &mut row[..width * 4],
+                            Avx512DisassociateAlpha::<false>::default(),
+                        );
                     }
                 });
         });
     } else {
-        in_place.chunks_exact_mut(width * 4).for_each(|row| unsafe {
+        in_place.chunks_exact_mut(stride).for_each(|row| unsafe {
             if has_vbmi {
-                avx512_unp_row(row, Avx512DisassociateAlpha::<true>::default());
+                avx512_unp_row(
+                    &mut row[..width * 4],
+                    Avx512DisassociateAlpha::<true>::default(),
+                );
             } else {
-                avx512_unp_row(row, Avx512DisassociateAlpha::<false>::default());
+                avx512_unp_row(
+                    &mut row[..width * 4],
+                    Avx512DisassociateAlpha::<false>::default(),
+                );
             }
         });
     }

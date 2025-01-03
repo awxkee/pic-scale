@@ -58,24 +58,26 @@ pub(crate) fn premultiply_alpha_rgba_row_impl(dst: &mut [u8], src: &[u8]) {
 
 fn premultiply_alpha_rgba_impl(
     dst: &mut [u8],
+    dst_stride: usize,
     src: &[u8],
     width: usize,
     _: usize,
+    stride: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            dst.par_chunks_exact_mut(width * 4)
-                .zip(src.par_chunks_exact(width * 4))
+            dst.par_chunks_exact_mut(dst_stride)
+                .zip(src.par_chunks_exact(stride))
                 .for_each(|(dst, src)| {
-                    premultiply_alpha_rgba_row_impl(dst, src);
+                    premultiply_alpha_rgba_row_impl(&mut dst[..width * 4], &src[..width * 4]);
                 });
         });
     } else {
-        dst.chunks_exact_mut(width * 4)
-            .zip(src.chunks_exact(width * 4))
+        dst.chunks_exact_mut(dst_stride)
+            .zip(src.chunks_exact(stride))
             .for_each(|(dst, src)| {
-                premultiply_alpha_rgba_row_impl(dst, src);
+                premultiply_alpha_rgba_row_impl(&mut dst[..width * 4], &src[..width * 4]);
             });
     }
 }
@@ -98,29 +100,32 @@ fn unpremultiply_alpha_rgba_impl(
     in_place: &mut [u8],
     width: usize,
     _: usize,
+    stride: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            in_place.par_chunks_exact_mut(width * 4).for_each(|row| {
-                unpremultiply_alpha_rgba_row_impl(row);
+            in_place.par_chunks_exact_mut(stride).for_each(|row| {
+                unpremultiply_alpha_rgba_row_impl(&mut row[..width * 4]);
             });
         });
     } else {
-        in_place.chunks_exact_mut(width * 4).for_each(|row| {
-            unpremultiply_alpha_rgba_row_impl(row);
+        in_place.chunks_exact_mut(stride).for_each(|row| {
+            unpremultiply_alpha_rgba_row_impl(&mut row[..width * 4]);
         });
     }
 }
 
 pub(crate) fn premultiply_alpha_rgba(
     dst: &mut [u8],
+    dst_stride: usize,
     src: &[u8],
     width: usize,
     height: usize,
+    src_stride: usize,
     pool: &Option<ThreadPool>,
 ) {
-    let mut _dispatcher: fn(&mut [u8], &[u8], usize, usize, &Option<ThreadPool>) =
+    let mut _dispatcher: fn(&mut [u8], usize, &[u8], usize, usize, usize, &Option<ThreadPool>) =
         premultiply_alpha_rgba_impl;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
@@ -149,16 +154,17 @@ pub(crate) fn premultiply_alpha_rgba(
     {
         _dispatcher = wasm_premultiply_alpha_rgba;
     }
-    _dispatcher(dst, src, width, height, pool);
+    _dispatcher(dst, dst_stride, src, width, height, src_stride, pool);
 }
 
 pub(crate) fn unpremultiply_alpha_rgba(
     in_place: &mut [u8],
     width: usize,
     height: usize,
+    stride: usize,
     pool: &Option<ThreadPool>,
 ) {
-    let mut _dispatcher: fn(&mut [u8], usize, usize, &Option<ThreadPool>) =
+    let mut _dispatcher: fn(&mut [u8], usize, usize, usize, &Option<ThreadPool>) =
         unpremultiply_alpha_rgba_impl;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
@@ -187,5 +193,5 @@ pub(crate) fn unpremultiply_alpha_rgba(
     {
         _dispatcher = wasm_unpremultiply_alpha_rgba;
     }
-    _dispatcher(in_place, width, height, pool);
+    _dispatcher(in_place, width, height, stride, pool);
 }

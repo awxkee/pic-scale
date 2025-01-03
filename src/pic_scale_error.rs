@@ -44,12 +44,17 @@ pub enum PicScaleError {
     SourceImageIsTooLarge,
     DestinationImageIsTooLarge,
     BufferMismatch(PicScaleBufferMismatch),
+    InvalidStride(usize, usize),
     UnsupportedBitDepth(usize),
 }
 
 impl Display for PicScaleError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            PicScaleError::InvalidStride(min_stride, real_stride) => f.write_fmt(format_args!(
+                "Stride must be at least {}, but received {}",
+                min_stride, real_stride
+            )),
             PicScaleError::ZeroImageDimensions => {
                 f.write_str("One of image dimensions is 0, this should not happen")
             }

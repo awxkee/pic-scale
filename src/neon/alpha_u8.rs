@@ -110,24 +110,26 @@ unsafe fn neon_premultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8]) {
 
 pub(crate) fn neon_premultiply_alpha_rgba(
     dst: &mut [u8],
+    dst_stride: usize,
     src: &[u8],
     width: usize,
     _: usize,
+    src_stride: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            dst.par_chunks_exact_mut(width * 4)
-                .zip(src.par_chunks_exact(width * 4))
+            dst.par_chunks_exact_mut(dst_stride)
+                .zip(src.par_chunks_exact(src_stride))
                 .for_each(|(dst, src)| unsafe {
-                    neon_premultiply_alpha_rgba_impl_row(dst, src);
+                    neon_premultiply_alpha_rgba_impl_row(&mut dst[..width * 4], &src[..width * 4]);
                 });
         });
     } else {
-        dst.chunks_exact_mut(width * 4)
-            .zip(src.chunks_exact(width * 4))
+        dst.chunks_exact_mut(dst_stride)
+            .zip(src.chunks_exact(src_stride))
             .for_each(|(dst, src)| unsafe {
-                neon_premultiply_alpha_rgba_impl_row(dst, src);
+                neon_premultiply_alpha_rgba_impl_row(&mut dst[..width * 4], &src[..width * 4]);
             });
     }
 }
@@ -330,19 +332,20 @@ pub(crate) fn neon_unpremultiply_alpha_rgba(
     in_place: &mut [u8],
     width: usize,
     _: usize,
+    stride: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
             in_place
-                .par_chunks_exact_mut(width * 4)
+                .par_chunks_exact_mut(stride)
                 .for_each(|row| unsafe {
-                    neon_unpremultiply_alpha_rgba_impl_row(row);
+                    neon_unpremultiply_alpha_rgba_impl_row(&mut row[..width * 4]);
                 });
         });
     } else {
-        in_place.chunks_exact_mut(width * 4).for_each(|row| unsafe {
-            neon_unpremultiply_alpha_rgba_impl_row(row);
+        in_place.chunks_exact_mut(stride).for_each(|row| unsafe {
+            neon_unpremultiply_alpha_rgba_impl_row(&mut row[..width * 4]);
         });
     }
 }

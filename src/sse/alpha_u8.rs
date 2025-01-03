@@ -93,13 +93,15 @@ pub(crate) unsafe fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
 
 pub(crate) fn sse_premultiply_alpha_rgba(
     dst: &mut [u8],
+    dst_stride: usize,
     src: &[u8],
     width: usize,
     height: usize,
+    src_stride: usize,
     pool: &Option<ThreadPool>,
 ) {
     unsafe {
-        sse_premultiply_alpha_rgba_impl(dst, src, width, height, pool);
+        sse_premultiply_alpha_rgba_impl(dst, dst_stride, src, width, height, src_stride, pool);
     }
 }
 
@@ -201,30 +203,32 @@ unsafe fn sse_premultiply_alpha_rgba_impl_row(
 #[target_feature(enable = "sse4.1")]
 unsafe fn sse_premultiply_alpha_rgba_impl(
     dst: &mut [u8],
+    dst_stride: usize,
     src: &[u8],
     width: usize,
     _: usize,
+    src_stride: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            dst.par_chunks_exact_mut(width * 4)
-                .zip(src.par_chunks_exact(width * 4))
+            dst.par_chunks_exact_mut(dst_stride)
+                .zip(src.par_chunks_exact(src_stride))
                 .for_each(|(dst, src)| unsafe {
                     sse_premultiply_alpha_rgba_impl_row(
-                        dst,
-                        src,
+                        &mut dst[..width * 4],
+                        &src[..width * 4],
                         Sse41PremultiplyExecutor8Default::default(),
                     );
                 });
         });
     } else {
-        dst.chunks_exact_mut(width * 4)
-            .zip(src.chunks_exact(width * 4))
+        dst.chunks_exact_mut(dst_stride)
+            .zip(src.chunks_exact(src_stride))
             .for_each(|(dst, src)| unsafe {
                 sse_premultiply_alpha_rgba_impl_row(
-                    dst,
-                    src,
+                    &mut dst[..width * 4],
+                    &src[..width * 4],
                     Sse41PremultiplyExecutor8Default::default(),
                 );
             });
@@ -235,10 +239,11 @@ pub(crate) fn sse_unpremultiply_alpha_rgba(
     in_place: &mut [u8],
     width: usize,
     height: usize,
+    stride: usize,
     pool: &Option<ThreadPool>,
 ) {
     unsafe {
-        sse_unpremultiply_alpha_rgba_impl(in_place, width, height, pool);
+        sse_unpremultiply_alpha_rgba_impl(in_place, width, height, stride, pool);
     }
 }
 
@@ -312,19 +317,26 @@ unsafe fn sse_unpremultiply_alpha_rgba_impl(
     in_place: &mut [u8],
     width: usize,
     _: usize,
+    stride: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
             in_place
-                .par_chunks_exact_mut(width * 4)
+                .par_chunks_exact_mut(stride)
                 .for_each(|row| unsafe {
-                    sse_unpremultiply_alpha_rgba_impl_row(row, DisassociateAlphaDefault::default());
+                    sse_unpremultiply_alpha_rgba_impl_row(
+                        &mut row[..width * 4],
+                        DisassociateAlphaDefault::default(),
+                    );
                 });
         });
     } else {
-        in_place.chunks_exact_mut(width * 4).for_each(|row| unsafe {
-            sse_unpremultiply_alpha_rgba_impl_row(row, DisassociateAlphaDefault::default());
+        in_place.chunks_exact_mut(stride).for_each(|row| unsafe {
+            sse_unpremultiply_alpha_rgba_impl_row(
+                &mut row[..width * 4],
+                DisassociateAlphaDefault::default(),
+            );
         });
     }
 }

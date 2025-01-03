@@ -492,6 +492,7 @@ impl Scaler {
     {
         let new_size = into.get_size();
         into.validate()?;
+        store.validate()?;
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
             return Err(PicScaleError::ZeroImageDimensions);
         }
@@ -551,6 +552,7 @@ impl Scaler {
                 channels: N,
                 width: store.width,
                 height: new_size.height,
+                stride: store.width * N,
                 bit_depth: into.bit_depth,
             };
             let horizontal_filters = self.generate_weights(store.width, new_size.width);
@@ -608,6 +610,7 @@ impl Scaler {
                     channels: N,
                     width: src_store.width,
                     height: src_store.height,
+                    stride: src_store.width * N,
                     bit_depth: into.bit_depth,
                 });
                 has_alpha_premultiplied = true;
@@ -630,6 +633,7 @@ impl Scaler {
             channels: N,
             width: src_store.width,
             height: new_size.height,
+            stride: src_store.width * N,
             bit_depth: into.bit_depth,
         };
         let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
@@ -681,6 +685,7 @@ impl Scaler {
                     channels: N,
                     width: src_store.width,
                     height: src_store.height,
+                    stride: src_store.width * N,
                     bit_depth: into.bit_depth,
                 });
                 has_alpha_premultiplied = true;
@@ -736,6 +741,7 @@ impl Scaler {
                     channels: N,
                     width: src_store.width,
                     height: src_store.height,
+                    stride: src_store.width * N,
                     bit_depth: into.bit_depth,
                 });
                 has_alpha_premultiplied = true;
@@ -769,6 +775,7 @@ impl Scaler {
     {
         let new_size = into.get_size();
         into.validate()?;
+        store.validate()?;
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
             return Err(PicScaleError::ZeroImageDimensions);
         }

@@ -48,10 +48,12 @@ pub(crate) fn convolve_horizontal_dispatch_u8<V: Send + Sync, const CHANNELS: us
     let approx_weights = weights_converter.prepare_weights(&filter_weights);
 
     let src = image_store.buffer.as_ref();
+
+    let dst_stride = destination.stride();
+
     let dst = destination.buffer.borrow_mut();
 
-    let src_stride = image_store.width * image_store.channels;
-    let dst_stride = destination.width * image_store.channels;
+    let src_stride = image_store.stride();
 
     if let Some(pool) = pool {
         let arc_weights = Arc::new(approx_weights);
@@ -105,8 +107,8 @@ pub(crate) fn convolve_vertical_dispatch_u8<'a, const COMPONENTS: usize>(
     pool: &Option<ThreadPool>,
     dispatcher: fn(usize, &FilterBounds, &[u8], &mut [u8], usize, &[i16]),
 ) {
-    let src_stride = image_store.width * image_store.channels;
-    let dst_stride = destination.width * image_store.channels;
+    let src_stride = image_store.stride();
+    let dst_stride = destination.stride();
 
     let dst_width = destination.width;
 
@@ -122,7 +124,14 @@ pub(crate) fn convolve_vertical_dispatch_u8<'a, const COMPONENTS: usize>(
                     let filter_offset = y * filter_weights.aligned_size;
                     let weights = &approx.weights[filter_offset..];
                     let source_buffer = image_store.buffer.as_ref();
-                    dispatcher(dst_width, &bounds, source_buffer, row, src_stride, weights);
+                    dispatcher(
+                        dst_width,
+                        &bounds,
+                        source_buffer,
+                        &mut row[..dst_width * COMPONENTS],
+                        src_stride,
+                        weights,
+                    );
                 });
         });
     } else {
@@ -136,7 +145,14 @@ pub(crate) fn convolve_vertical_dispatch_u8<'a, const COMPONENTS: usize>(
                 let filter_offset = y * filter_weights.aligned_size;
                 let weights = &approx.weights[filter_offset..];
                 let source_buffer = image_store.buffer.as_ref();
-                dispatcher(dst_width, &bounds, source_buffer, row, src_stride, weights);
+                dispatcher(
+                    dst_width,
+                    &bounds,
+                    source_buffer,
+                    &mut row[..dst_width * COMPONENTS],
+                    src_stride,
+                    weights,
+                );
             });
     }
 }

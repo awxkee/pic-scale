@@ -249,25 +249,35 @@ fn neon_pa_dispatch(
 
 pub(crate) fn neon_premultiply_alpha_rgba_u16(
     dst: &mut [u16],
+    dst_stride: usize,
     src: &[u16],
     width: usize,
     _: usize,
+    src_stride: usize,
     bit_depth: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            dst.par_chunks_exact_mut(width * 4)
-                .zip(src.par_chunks_exact(width * 4))
+            dst.par_chunks_exact_mut(dst_stride)
+                .zip(src.par_chunks_exact(src_stride))
                 .for_each(|(dst, src)| {
-                    neon_premultiply_alpha_rgba_row_u16(dst, src, bit_depth);
+                    neon_premultiply_alpha_rgba_row_u16(
+                        &mut dst[..width * 4],
+                        &src[..width * 4],
+                        bit_depth,
+                    );
                 });
         });
     } else {
-        dst.chunks_exact_mut(width * 4)
-            .zip(src.chunks_exact(width * 4))
+        dst.chunks_exact_mut(dst_stride)
+            .zip(src.chunks_exact(src_stride))
             .for_each(|(dst, src)| {
-                neon_premultiply_alpha_rgba_row_u16(dst, src, bit_depth);
+                neon_premultiply_alpha_rgba_row_u16(
+                    &mut dst[..width * 4],
+                    &src[..width * 4],
+                    bit_depth,
+                );
             });
     }
 }
@@ -473,6 +483,7 @@ fn neon_unpremultiply_alpha_rgba_row_u16(in_place: &mut [u16], bit_depth: usize)
 
 pub(crate) fn neon_unpremultiply_alpha_rgba_u16(
     in_place: &mut [u16],
+    src_stride: usize,
     width: usize,
     _: usize,
     bit_depth: usize,
@@ -480,13 +491,13 @@ pub(crate) fn neon_unpremultiply_alpha_rgba_u16(
 ) {
     if let Some(pool) = pool.as_ref() {
         pool.install(|| {
-            in_place.par_chunks_exact_mut(width * 4).for_each(|row| {
-                neon_unpremultiply_alpha_rgba_row_u16(row, bit_depth);
+            in_place.par_chunks_exact_mut(src_stride).for_each(|row| {
+                neon_unpremultiply_alpha_rgba_row_u16(&mut row[..width * 4], bit_depth);
             });
         });
     } else {
-        in_place.chunks_exact_mut(width * 4).for_each(|row| {
-            neon_unpremultiply_alpha_rgba_row_u16(row, bit_depth);
+        in_place.chunks_exact_mut(src_stride).for_each(|row| {
+            neon_unpremultiply_alpha_rgba_row_u16(&mut row[..width * 4], bit_depth);
         });
     }
 }

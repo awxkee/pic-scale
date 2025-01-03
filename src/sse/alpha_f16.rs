@@ -158,15 +158,16 @@ unsafe fn sse_premultiply_alpha_rgba_f16_impl<const F16C: bool>(
 
 pub(crate) fn sse_unpremultiply_alpha_rgba_f16(
     in_place: &mut [half::f16],
+    stride: usize,
     width: usize,
     height: usize,
     pool: &Option<ThreadPool>,
 ) {
     unsafe {
         if is_x86_feature_detected!("f16c") {
-            sse_unpremultiply_alpha_rgba_f16c(in_place, width, height, pool);
+            sse_unpremultiply_alpha_rgba_f16c(in_place, stride, width, height, pool);
         } else {
-            sse_unpremultiply_alpha_rgba_f16_regular(in_place, width, height, pool);
+            sse_unpremultiply_alpha_rgba_f16_regular(in_place, stride, width, height, pool);
         }
     }
 }
@@ -174,21 +175,23 @@ pub(crate) fn sse_unpremultiply_alpha_rgba_f16(
 #[target_feature(enable = "sse4.1")]
 unsafe fn sse_unpremultiply_alpha_rgba_f16_regular(
     in_place: &mut [half::f16],
+    stride: usize,
     width: usize,
     height: usize,
     pool: &Option<ThreadPool>,
 ) {
-    sse_unpremultiply_alpha_rgba_f16_impl::<false>(in_place, width, height, pool);
+    sse_unpremultiply_alpha_rgba_f16_impl::<false>(in_place, stride, width, height, pool);
 }
 
 #[target_feature(enable = "sse4.1", enable = "f16c")]
 unsafe fn sse_unpremultiply_alpha_rgba_f16c(
     in_place: &mut [half::f16],
+    stride: usize,
     width: usize,
     height: usize,
     pool: &Option<ThreadPool>,
 ) {
-    sse_unpremultiply_alpha_rgba_f16_impl::<true>(in_place, width, height, pool);
+    sse_unpremultiply_alpha_rgba_f16_impl::<true>(in_place, stride, width, height, pool);
 }
 
 #[inline(always)]
@@ -271,6 +274,7 @@ unsafe fn sse_unpremultiply_alpha_rgba_f16_row_impl<const F16C: bool>(in_place: 
 #[inline(always)]
 unsafe fn sse_unpremultiply_alpha_rgba_f16_impl<const F16C: bool>(
     in_place: &mut [half::f16],
+    stride: usize,
     width: usize,
     _: usize,
     pool: &Option<ThreadPool>,
@@ -278,14 +282,14 @@ unsafe fn sse_unpremultiply_alpha_rgba_f16_impl<const F16C: bool>(
     if let Some(pool) = pool {
         pool.install(|| {
             in_place
-                .par_chunks_exact_mut(width * 4)
+                .par_chunks_exact_mut(stride)
                 .for_each(|row| unsafe {
-                    sse_unpremultiply_alpha_rgba_f16_row_impl::<F16C>(row);
+                    sse_unpremultiply_alpha_rgba_f16_row_impl::<F16C>(&mut row[..width * 4]);
                 });
         });
     } else {
-        in_place.chunks_exact_mut(width * 4).for_each(|row| unsafe {
-            sse_unpremultiply_alpha_rgba_f16_row_impl::<F16C>(row);
+        in_place.chunks_exact_mut(stride).for_each(|row| unsafe {
+            sse_unpremultiply_alpha_rgba_f16_row_impl::<F16C>(&mut row[..width * 4]);
         });
     }
 }

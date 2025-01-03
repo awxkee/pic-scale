@@ -139,12 +139,13 @@ unsafe fn avx_premultiply_alpha_rgba_f16_impl(
 
 pub(crate) fn avx_unpremultiply_alpha_rgba_f16(
     in_place: &mut [half::f16],
+    stride: usize,
     width: usize,
     height: usize,
     pool: &Option<ThreadPool>,
 ) {
     unsafe {
-        avx_unpremultiply_alpha_rgba_f16_impl(in_place, width, height, pool);
+        avx_unpremultiply_alpha_rgba_f16_impl(in_place, stride, width, height, pool);
     }
 }
 
@@ -236,6 +237,7 @@ unsafe fn avx_unpremultiply_alpha_rgba_f16_row_impl(in_place: &mut [half::f16]) 
 /// This inlining is required to activate all features for runtime dispatch
 unsafe fn avx_unpremultiply_alpha_rgba_f16_impl(
     in_place: &mut [half::f16],
+    stride: usize,
     width: usize,
     _: usize,
     pool: &Option<ThreadPool>,
@@ -243,14 +245,14 @@ unsafe fn avx_unpremultiply_alpha_rgba_f16_impl(
     if let Some(pool) = pool {
         pool.install(|| {
             in_place
-                .par_chunks_exact_mut(width * 4)
+                .par_chunks_exact_mut(stride)
                 .for_each(|row| unsafe {
-                    avx_unpremultiply_alpha_rgba_f16_row_impl(row);
+                    avx_unpremultiply_alpha_rgba_f16_row_impl(&mut row[..width * 4]);
                 });
         });
     } else {
-        in_place.chunks_exact_mut(width * 4).for_each(|row| unsafe {
-            avx_unpremultiply_alpha_rgba_f16_row_impl(row);
+        in_place.chunks_exact_mut(stride).for_each(|row| unsafe {
+            avx_unpremultiply_alpha_rgba_f16_row_impl(&mut row[..width * 4]);
         });
     }
 }

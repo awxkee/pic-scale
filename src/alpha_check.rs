@@ -31,17 +31,25 @@ use num_traits::AsPrimitive;
 use std::ops::{AddAssign, BitXor};
 
 #[allow(dead_code)]
-pub(crate) fn has_non_constant_cap_alpha_rgba8(store: &[u8], width: usize) -> bool {
-    has_non_constant_cap_alpha::<u8, u32, 3, 4>(store, width)
+pub(crate) fn has_non_constant_cap_alpha_rgba8(store: &[u8], width: usize, stride: usize) -> bool {
+    has_non_constant_cap_alpha::<u8, u32, 3, 4>(store, width, stride)
 }
 
 #[allow(dead_code)]
-pub(crate) fn has_non_constant_cap_alpha_rgba16(store: &[u16], width: usize) -> bool {
-    has_non_constant_cap_alpha::<u16, u64, 3, 4>(store, width)
+pub(crate) fn has_non_constant_cap_alpha_rgba16(
+    store: &[u16],
+    width: usize,
+    stride: usize,
+) -> bool {
+    has_non_constant_cap_alpha::<u16, u64, 3, 4>(store, width, stride)
 }
 
-pub(crate) fn has_non_constant_cap_alpha_rgba_f32(store: &[f32], width: usize) -> bool {
-    has_non_constant_cap_alpha_f32_impl::<3, 4>(store, width)
+pub(crate) fn has_non_constant_cap_alpha_rgba_f32(
+    store: &[f32],
+    width: usize,
+    stride: usize,
+) -> bool {
+    has_non_constant_cap_alpha_f32_impl::<3, 4>(store, width, stride)
 }
 
 /// Scans an image to check if alpha is not constant
@@ -53,6 +61,7 @@ pub(crate) fn has_non_constant_cap_alpha<
 >(
     store: &[V],
     width: usize,
+    stride: usize,
 ) -> bool
 where
     i32: AsPrimitive<V>,
@@ -65,7 +74,8 @@ where
     }
     let first = store[ALPHA_CHANNEL_INDEX];
     let mut row_sums: J = 0u32.as_();
-    for row in store.chunks_exact(width * CHANNELS) {
+    for row in store.chunks_exact(stride) {
+        let row = &row[..width * CHANNELS];
         for color in row.chunks_exact(CHANNELS) {
             row_sums += color[ALPHA_CHANNEL_INDEX].bitxor(first).as_();
         }
@@ -83,6 +93,7 @@ where
 fn has_non_constant_cap_alpha_f32_impl<const ALPHA_CHANNEL_INDEX: usize, const CHANNELS: usize>(
     store: &[f32],
     width: usize,
+    stride: usize,
 ) -> bool {
     assert!(ALPHA_CHANNEL_INDEX < CHANNELS);
     assert!(CHANNELS <= 4);
@@ -91,7 +102,8 @@ fn has_non_constant_cap_alpha_f32_impl<const ALPHA_CHANNEL_INDEX: usize, const C
     }
     let first = store[ALPHA_CHANNEL_INDEX].to_bits();
     let mut row_sums: u64 = 0u64;
-    for row in store.chunks_exact(width * CHANNELS) {
+    for row in store.chunks_exact(stride) {
+        let row = &row[..width * CHANNELS];
         for color in row.chunks_exact(CHANNELS) {
             row_sums += color[ALPHA_CHANNEL_INDEX].to_bits().bitxor(first) as u64;
         }

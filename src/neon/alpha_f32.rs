@@ -106,6 +106,7 @@ unsafe fn neon_unpremultiply_alpha_rgba_f32_row(in_place: &mut [f32]) {
 
 pub(crate) fn neon_unpremultiply_alpha_rgba_f32(
     in_place: &mut [f32],
+    stride: usize,
     width: usize,
     _: usize,
     pool: &Option<ThreadPool>,
@@ -113,14 +114,14 @@ pub(crate) fn neon_unpremultiply_alpha_rgba_f32(
     if let Some(pool) = pool {
         pool.install(|| {
             in_place
-                .par_chunks_exact_mut(width * 4)
+                .par_chunks_exact_mut(stride)
                 .for_each(|row| unsafe {
-                    neon_unpremultiply_alpha_rgba_f32_row(row);
+                    neon_unpremultiply_alpha_rgba_f32_row(&mut row[..width * 4]);
                 });
         });
     } else {
-        in_place.chunks_exact_mut(width * 4).for_each(|row| unsafe {
-            neon_unpremultiply_alpha_rgba_f32_row(row);
+        in_place.chunks_exact_mut(stride).for_each(|row| unsafe {
+            neon_unpremultiply_alpha_rgba_f32_row(&mut row[..width * 4]);
         });
     }
 }

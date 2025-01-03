@@ -75,6 +75,8 @@ impl Scaling for LinearApproxScaler {
         into: &mut ImageStoreMut<'a, u8, 3>,
     ) -> Result<(), PicScaleError> {
         let new_size = into.get_size();
+        into.validate()?;
+        store.validate()?;
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
             return Err(PicScaleError::ZeroImageDimensions);
         }
@@ -121,6 +123,7 @@ impl Scaling for LinearApproxScaler {
             channels: COMPONENTS,
             width: store.width,
             height: store.height,
+            stride: store.width * COMPONENTS,
             bit_depth: into.bit_depth,
         };
 
@@ -149,6 +152,8 @@ impl Scaling for LinearApproxScaler {
         premultiply_alpha: bool,
     ) -> Result<(), PicScaleError> {
         let new_size = into.get_size();
+        into.validate()?;
+        store.validate()?;
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
             return Err(PicScaleError::ZeroImageDimensions);
         }
@@ -195,6 +200,7 @@ impl Scaling for LinearApproxScaler {
             channels: COMPONENTS,
             width: store.width,
             height: store.height,
+            stride: store.width * COMPONENTS,
             bit_depth: into.bit_depth,
         };
 

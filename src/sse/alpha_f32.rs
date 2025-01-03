@@ -46,12 +46,13 @@ unsafe fn sse_unpremultiply_row_f32(x: __m128, a: __m128) -> __m128 {
 
 pub(crate) fn sse_unpremultiply_alpha_rgba_f32(
     in_place: &mut [f32],
+    stride: usize,
     width: usize,
     height: usize,
     pool: &Option<ThreadPool>,
 ) {
     unsafe {
-        sse_unpremultiply_alpha_rgba_f32_impl(in_place, width, height, pool);
+        sse_unpremultiply_alpha_rgba_f32_impl(in_place, stride, width, height, pool);
     }
 }
 
@@ -87,6 +88,7 @@ unsafe fn sse_unpremultiply_alpha_rgba_f32_row_impl(in_place: &mut [f32]) {
 #[target_feature(enable = "sse4.1")]
 unsafe fn sse_unpremultiply_alpha_rgba_f32_impl(
     in_place: &mut [f32],
+    stride: usize,
     width: usize,
     _: usize,
     pool: &Option<ThreadPool>,
@@ -94,14 +96,14 @@ unsafe fn sse_unpremultiply_alpha_rgba_f32_impl(
     if let Some(pool) = pool {
         pool.install(|| {
             in_place
-                .par_chunks_exact_mut(width * 4)
+                .par_chunks_exact_mut(stride)
                 .for_each(|row| unsafe {
-                    sse_unpremultiply_alpha_rgba_f32_row_impl(row);
+                    sse_unpremultiply_alpha_rgba_f32_row_impl(&mut row[..width * 4]);
                 });
         });
     } else {
-        in_place.chunks_exact_mut(width * 4).for_each(|row| unsafe {
-            sse_unpremultiply_alpha_rgba_f32_row_impl(row);
+        in_place.chunks_exact_mut(stride).for_each(|row| unsafe {
+            sse_unpremultiply_alpha_rgba_f32_row_impl(&mut row[..width * 4]);
         });
     }
 }
