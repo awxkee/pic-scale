@@ -78,6 +78,7 @@ For x86 and aarch64 NEON runtime dispatch is used.
 `avx512` requires feature `nightly_avx512` and requires `nightly` compiler channel, runtime detection if it is available then will be used.
 
 `avxvnni` requires feature `nightly_avx512` and requires `nightly` compiler channel, runtime detection if it is available then will be used.
+AVX-VNNI is helpful extension on modern Intel and AMD CPU's, consider turn it on to ger maximum performance.
 
 `fullfp16` NEON target detection performed in runtime, when available best the best paths for *f16* images are available on ARM.
 
