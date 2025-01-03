@@ -156,22 +156,20 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_impl(
         while jx + 8 < bounds.size {
             let w_ptr = weights.get_unchecked(jx..(jx + 8));
 
-            let weight01 = _mm_shuffle_epi8(
-                _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned()),
-                shuffle_weights,
-            );
+            let weight01 =
+                _mm_shuffle_epi8(_mm_loadu_si32(w_ptr.as_ptr() as *const u8), shuffle_weights);
             let weight23 = _mm_shuffle_epi8(
-                _mm_set1_epi32((w_ptr.get_unchecked(2..).as_ptr() as *const i32).read_unaligned()),
+                _mm_loadu_si32(w_ptr.get_unchecked(2..).as_ptr() as *const u8),
                 shuffle_weights,
             );
 
             let weight45 = _mm_shuffle_epi8(
-                _mm_set1_epi32((w_ptr.get_unchecked(4..).as_ptr() as *const i32).read_unaligned()),
+                _mm_loadu_si32(w_ptr.get_unchecked(4..).as_ptr() as *const u8),
                 shuffle_weights,
             );
 
             let weight67 = _mm_shuffle_epi8(
-                _mm_set1_epi32((w_ptr.get_unchecked(6..).as_ptr() as *const i32).read_unaligned()),
+                _mm_loadu_si32(w_ptr.get_unchecked(6..).as_ptr() as *const u8),
                 shuffle_weights,
             );
 
@@ -249,12 +247,10 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_impl(
         while jx + 4 < bounds.size {
             let w_ptr = weights.get_unchecked(jx..(jx + 4));
 
-            let weight01 = _mm_shuffle_epi8(
-                _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned()),
-                shuffle_weights,
-            );
+            let weight01 =
+                _mm_shuffle_epi8(_mm_loadu_si32(w_ptr.as_ptr() as *const u8), shuffle_weights);
             let weight23 = _mm_shuffle_epi8(
-                _mm_set1_epi32((w_ptr.get_unchecked(2..).as_ptr() as *const i32).read_unaligned()),
+                _mm_loadu_si32(w_ptr.get_unchecked(2..).as_ptr() as *const u8),
                 shuffle_weights,
             );
             let start_bounds = bounds.start + jx;
@@ -284,10 +280,8 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_impl(
             let w_ptr = weights.get_unchecked(jx..(jx + 2));
             let bounds_start = bounds.start + jx;
 
-            let weight01 = _mm_shuffle_epi8(
-                _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned()),
-                shuffle_weights,
-            );
+            let weight01 =
+                _mm_shuffle_epi8(_mm_loadu_si32(w_ptr.as_ptr() as *const u8), shuffle_weights);
 
             let rgb_pixel_0 =
                 _mm_loadu_si64(src0.get_unchecked((bounds_start * CHANNELS)..).as_ptr());
@@ -390,22 +384,20 @@ unsafe fn convolve_horizontal_rgba_sse_rows_one_impl(
         while jx + 8 < bounds.size {
             let w_ptr = weights.get_unchecked(jx..(jx + 8));
 
-            let weight01 = _mm_shuffle_epi8(
-                _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned()),
-                shuffle_weights,
-            );
+            let weight01 =
+                _mm_shuffle_epi8(_mm_loadu_si32(w_ptr.as_ptr() as *const u8), shuffle_weights);
             let weight23 = _mm_shuffle_epi8(
-                _mm_set1_epi32((w_ptr.get_unchecked(2..).as_ptr() as *const i32).read_unaligned()),
+                _mm_loadu_si32(w_ptr.get_unchecked(2..).as_ptr() as *const u8),
                 shuffle_weights,
             );
 
             let weight45 = _mm_shuffle_epi8(
-                _mm_set1_epi32((w_ptr.get_unchecked(4..).as_ptr() as *const i32).read_unaligned()),
+                _mm_loadu_si32(w_ptr.get_unchecked(4..).as_ptr() as *const u8),
                 shuffle_weights,
             );
 
             let weight67 = _mm_shuffle_epi8(
-                _mm_set1_epi32((w_ptr.get_unchecked(6..).as_ptr() as *const i32).read_unaligned()),
+                _mm_loadu_si32(w_ptr.get_unchecked(6..).as_ptr() as *const u8),
                 shuffle_weights,
             );
 
@@ -435,12 +427,10 @@ unsafe fn convolve_horizontal_rgba_sse_rows_one_impl(
             let w_ptr = weights.get_unchecked(jx..(jx + 4));
             let bounds_start = bounds.start + jx;
 
-            let weight01 = _mm_shuffle_epi8(
-                _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned()),
-                shuffle_weights,
-            );
+            let weight01 =
+                _mm_shuffle_epi8(_mm_loadu_si32(w_ptr.as_ptr() as *const u8), shuffle_weights);
             let weight23 = _mm_shuffle_epi8(
-                _mm_set1_epi32((w_ptr.get_unchecked(2..).as_ptr() as *const i32).read_unaligned()),
+                _mm_loadu_si32(w_ptr.get_unchecked(2..).as_ptr() as *const u8),
                 shuffle_weights,
             );
 
@@ -457,10 +447,8 @@ unsafe fn convolve_horizontal_rgba_sse_rows_one_impl(
             let w_ptr = weights.get_unchecked(jx..(jx + 2));
             let bounds_start = bounds.start + jx;
 
-            let weight01 = _mm_shuffle_epi8(
-                _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned()),
-                shuffle_weights,
-            );
+            let weight01 =
+                _mm_shuffle_epi8(_mm_loadu_si32(w_ptr.as_ptr() as *const u8), shuffle_weights);
 
             let src_ptr = src.get_unchecked((bounds_start * CHANNELS)..);
 
