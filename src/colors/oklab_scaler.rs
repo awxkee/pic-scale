@@ -62,6 +62,8 @@ impl Scaling for OklabScaler {
         into: &mut ImageStoreMut<'a, u8, 3>,
     ) -> Result<(), PicScaleError> {
         let new_size = into.get_size();
+        into.validate()?;
+        store.validate()?;
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
             return Err(PicScaleError::ZeroImageDimensions);
         }
@@ -137,6 +139,8 @@ impl Scaling for OklabScaler {
         premultiply_alpha: bool,
     ) -> Result<(), PicScaleError> {
         let new_size = into.get_size();
+        into.validate()?;
+        store.validate()?;
         if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
             return Err(PicScaleError::ZeroImageDimensions);
         }
