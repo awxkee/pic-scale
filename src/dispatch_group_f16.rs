@@ -43,8 +43,8 @@ pub(crate) fn convolve_vertical_dispatch_f16<const COMPONENTS: usize>(
     pool: &Option<ThreadPool>,
     dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[f32]),
 ) {
-    let src_stride = image_store.width * image_store.channels;
-    let dst_stride = destination.width * image_store.channels;
+    let src_stride = image_store.stride();
+    let dst_stride = destination.stride();
 
     let dst_width = destination.width;
 
@@ -60,7 +60,14 @@ pub(crate) fn convolve_vertical_dispatch_f16<const COMPONENTS: usize>(
                     let filter_offset = y * filter_weights.aligned_size;
                     let weights = &filter_weights.weights[filter_offset..];
                     let source_buffer = image_store.buffer.as_ref();
-                    dispatcher(dst_width, &bounds, source_buffer, row, src_stride, weights);
+                    dispatcher(
+                        dst_width,
+                        &bounds,
+                        source_buffer,
+                        &mut row[..dst_width * COMPONENTS],
+                        src_stride,
+                        weights,
+                    );
                 });
         });
     } else {
@@ -74,7 +81,14 @@ pub(crate) fn convolve_vertical_dispatch_f16<const COMPONENTS: usize>(
                 let filter_offset = y * filter_weights.aligned_size;
                 let weights = &filter_weights.weights[filter_offset..];
                 let source_buffer = image_store.buffer.as_ref();
-                dispatcher(dst_width, &bounds, source_buffer, row, src_stride, weights);
+                dispatcher(
+                    dst_width,
+                    &bounds,
+                    source_buffer,
+                    &mut row[..dst_width * COMPONENTS],
+                    src_stride,
+                    weights,
+                );
             });
     }
 }
@@ -90,8 +104,8 @@ pub(crate) fn convolve_horizontal_dispatch_f16<const CHANNELS: usize>(
     >,
     dispatcher_row: fn(usize, usize, &FilterWeights<f32>, &[f16], &mut [f16]),
 ) {
-    let src_stride = image_store.width * image_store.channels;
-    let dst_stride = destination.width * image_store.channels;
+    let src_stride = image_store.stride();
+    let dst_stride = destination.stride();
     let dst_width = destination.width;
     let src_width = image_store.width;
 

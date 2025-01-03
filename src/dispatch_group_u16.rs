@@ -51,10 +51,10 @@ pub(crate) fn convolve_horizontal_dispatch_u16<const CHANNELS: usize>(
     pool: &Option<ThreadPool>,
 ) {
     let src = image_store.buffer.as_ref();
+    let dst_stride = destination.stride();
     let dst = destination.buffer.borrow_mut();
 
-    let src_stride = image_store.width * image_store.channels;
-    let dst_stride = destination.width * image_store.channels;
+    let src_stride = image_store.stride();
     let bit_depth = destination.bit_depth;
 
     if let Some(pool) = pool {
@@ -164,8 +164,8 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
     destination: &mut ImageStoreMut<'_, u16, COMPONENTS>,
     pool: &Option<ThreadPool>,
 ) {
-    let src_stride = image_store.width * image_store.channels;
-    let dst_stride = destination.width * image_store.channels;
+    let src_stride = image_store.stride();
+    let dst_stride = destination.stride();
     let bit_depth = destination.bit_depth;
 
     let dst_width = destination.width;
@@ -186,7 +186,7 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
                             dst_width,
                             &bounds,
                             source_buffer,
-                            row,
+                            &mut row[..dst_width * COMPONENTS],
                             src_stride,
                             weights,
                             bit_depth as u32,
@@ -253,7 +253,7 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
                     dst_width,
                     &bounds,
                     source_buffer,
-                    row,
+                    &mut row[..dst_width * COMPONENTS],
                     src_stride,
                     weights,
                     bit_depth as u32,
@@ -392,7 +392,7 @@ fn execute_low_precision_row<const COMPONENTS: usize>(
                     dst_width,
                     &bounds,
                     source_buffer,
-                    row,
+                    &mut row[..dst_width * COMPONENTS],
                     src_stride,
                     weights,
                     bit_depth as u32,
@@ -411,7 +411,7 @@ fn execute_low_precision_row<const COMPONENTS: usize>(
                     dst_width,
                     &bounds,
                     source_buffer,
-                    row,
+                    &mut row[..dst_width * COMPONENTS],
                     src_stride,
                     weights,
                     bit_depth as u32,

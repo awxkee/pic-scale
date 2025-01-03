@@ -102,6 +102,7 @@ impl Scaling for SigmoidalScaler {
             channels: COMPONENTS,
             width: store.width,
             height: store.height,
+            stride: store.width * COMPONENTS,
             bit_depth: into.bit_depth,
         };
 
@@ -174,6 +175,7 @@ impl Scaling for SigmoidalScaler {
             channels: COMPONENTS,
             width: store.width,
             height: store.height,
+            stride: store.width * COMPONENTS,
             bit_depth: into.bit_depth,
         };
 

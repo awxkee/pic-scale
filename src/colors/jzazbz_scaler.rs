@@ -77,6 +77,7 @@ impl JzazbzScaler {
             channels: 4,
             width: store.width,
             height: store.height,
+            stride: store.width * 4,
             bit_depth: store.bit_depth,
         };
         new_store
@@ -154,6 +155,7 @@ impl Scaling for JzazbzScaler {
             channels: COMPONENTS,
             width: store.width,
             height: store.height,
+            stride: store.width * COMPONENTS,
             bit_depth: into.bit_depth,
         };
 

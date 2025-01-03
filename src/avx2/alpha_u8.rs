@@ -40,13 +40,15 @@ use std::arch::x86_64::*;
 
 pub(crate) fn avx_premultiply_alpha_rgba(
     dst: &mut [u8],
+    dst_stride: usize,
     src: &[u8],
     width: usize,
     height: usize,
+    src_stride: usize,
     pool: &Option<ThreadPool>,
 ) {
     unsafe {
-        avx_premultiply_alpha_rgba_impl(dst, src, width, height, pool);
+        avx_premultiply_alpha_rgba_impl(dst, dst_stride, src, width, height, src_stride, pool);
     }
 }
 
@@ -146,24 +148,34 @@ unsafe fn avx_premultiply_alpha_rgba_impl_row(
 #[target_feature(enable = "avx2")]
 unsafe fn avx_premultiply_alpha_rgba_impl(
     dst: &mut [u8],
+    dst_stride: usize,
     src: &[u8],
     width: usize,
     _: usize,
+    src_stride: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            dst.par_chunks_exact_mut(width * 4)
-                .zip(src.par_chunks_exact(width * 4))
+            dst.par_chunks_exact_mut(dst_stride)
+                .zip(src.par_chunks_exact(src_stride))
                 .for_each(|(dst, src)| unsafe {
-                    avx_premultiply_alpha_rgba_impl_row(dst, src, AssociateAlphaDefault::default());
+                    avx_premultiply_alpha_rgba_impl_row(
+                        &mut dst[..width * 4],
+                        &src[..width * 4],
+                        AssociateAlphaDefault::default(),
+                    );
                 });
         });
     } else {
-        dst.chunks_exact_mut(width * 4)
-            .zip(src.chunks_exact(width * 4))
+        dst.chunks_exact_mut(dst_stride)
+            .zip(src.chunks_exact(src_stride))
             .for_each(|(dst, src)| unsafe {
-                avx_premultiply_alpha_rgba_impl_row(dst, src, AssociateAlphaDefault::default());
+                avx_premultiply_alpha_rgba_impl_row(
+                    &mut dst[..width * 4],
+                    &src[..width * 4],
+                    AssociateAlphaDefault::default(),
+                );
             });
     }
 }
@@ -172,10 +184,11 @@ pub(crate) fn avx_unpremultiply_alpha_rgba(
     in_place: &mut [u8],
     width: usize,
     height: usize,
+    stride: usize,
     pool: &Option<ThreadPool>,
 ) {
     unsafe {
-        avx_unpremultiply_alpha_rgba_impl(in_place, width, height, pool);
+        avx_unpremultiply_alpha_rgba_impl(in_place, width, height, stride, pool);
     }
 }
 
@@ -297,19 +310,26 @@ unsafe fn avx_unpremultiply_alpha_rgba_impl(
     in_place: &mut [u8],
     width: usize,
     _: usize,
+    stride: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
             in_place
-                .par_chunks_exact_mut(width * 4)
+                .par_chunks_exact_mut(stride)
                 .for_each(|row| unsafe {
-                    avx_unpremultiply_alpha_rgba_impl_row(row, Avx2DisassociateAlpha::default());
+                    avx_unpremultiply_alpha_rgba_impl_row(
+                        &mut row[..width * 4],
+                        Avx2DisassociateAlpha::default(),
+                    );
                 });
         });
     } else {
-        in_place.chunks_exact_mut(width * 4).for_each(|row| unsafe {
-            avx_unpremultiply_alpha_rgba_impl_row(row, Avx2DisassociateAlpha::default());
+        in_place.chunks_exact_mut(stride).for_each(|row| unsafe {
+            avx_unpremultiply_alpha_rgba_impl_row(
+                &mut row[..width * 4],
+                Avx2DisassociateAlpha::default(),
+            );
         });
     }
 }

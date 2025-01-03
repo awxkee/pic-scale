@@ -195,6 +195,7 @@ unsafe fn neon_unpremultiply_alpha_rgba_row_f16(in_place: &mut [half::f16]) {
 
 pub(crate) fn neon_unpremultiply_alpha_rgba_f16(
     in_place: &mut [half::f16],
+    stride: usize,
     width: usize,
     _: usize,
     pool: &Option<ThreadPool>,
@@ -202,14 +203,14 @@ pub(crate) fn neon_unpremultiply_alpha_rgba_f16(
     if let Some(pool) = pool {
         pool.install(|| {
             in_place
-                .par_chunks_exact_mut(width * 4)
+                .par_chunks_exact_mut(stride)
                 .for_each(|row| unsafe {
-                    neon_unpremultiply_alpha_rgba_row_f16(row);
+                    neon_unpremultiply_alpha_rgba_row_f16(&mut row[..width * 4]);
                 });
         });
     } else {
-        in_place.chunks_exact_mut(width * 4).for_each(|row| unsafe {
-            neon_unpremultiply_alpha_rgba_row_f16(row);
+        in_place.chunks_exact_mut(stride).for_each(|row| unsafe {
+            neon_unpremultiply_alpha_rgba_row_f16(&mut row[..width * 4]);
         });
     }
 }

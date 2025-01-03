@@ -119,32 +119,39 @@ pub(crate) fn unpremultiply_alpha_rgba_row(in_place: &mut [u16], max_colors: u32
 
 fn premultiply_alpha_rgba_impl(
     dst: &mut [u16],
+    dst_stride: usize,
     src: &[u16],
     width: usize,
     _: usize,
+    src_stride: usize,
     bit_depth: usize,
     pool: &Option<ThreadPool>,
 ) {
     let max_colors = (1 << bit_depth) - 1;
     if let Some(pool) = pool {
         pool.install(|| {
-            dst.par_chunks_exact_mut(width * 4)
-                .zip(src.par_chunks_exact(width * 4))
+            dst.par_chunks_exact_mut(dst_stride)
+                .zip(src.par_chunks_exact(src_stride))
                 .for_each(|(dst, src)| {
-                    premultiply_alpha_rgba_row(dst, src, max_colors);
+                    premultiply_alpha_rgba_row(
+                        &mut dst[..width * 4],
+                        &src[..width * 4],
+                        max_colors,
+                    );
                 });
         });
     } else {
-        dst.chunks_exact_mut(width * 4)
-            .zip(src.chunks_exact(width * 4))
+        dst.chunks_exact_mut(dst_stride)
+            .zip(src.chunks_exact(src_stride))
             .for_each(|(dst, src)| {
-                premultiply_alpha_rgba_row(dst, src, max_colors);
+                premultiply_alpha_rgba_row(&mut dst[..width * 4], &src[..width * 4], max_colors);
             });
     }
 }
 
 fn unpremultiply_alpha_rgba_impl(
     in_place: &mut [u16],
+    src_stride: usize,
     width: usize,
     _: usize,
     bit_depth: usize,
@@ -153,28 +160,38 @@ fn unpremultiply_alpha_rgba_impl(
     let max_colors = (1 << bit_depth) - 1;
     if let Some(pool) = pool {
         pool.install(|| {
-            in_place.par_chunks_exact_mut(width * 4).for_each(|row| {
-                unpremultiply_alpha_rgba_row(row, max_colors);
+            in_place.par_chunks_exact_mut(src_stride).for_each(|row| {
+                unpremultiply_alpha_rgba_row(&mut row[..width * 4], max_colors);
             });
         });
     } else {
-        in_place.chunks_exact_mut(width * 4).for_each(|row| {
-            unpremultiply_alpha_rgba_row(row, max_colors);
+        in_place.chunks_exact_mut(src_stride).for_each(|row| {
+            unpremultiply_alpha_rgba_row(&mut row[..width * 4], max_colors);
         });
     }
 }
 
 pub(crate) fn premultiply_alpha_rgba_u16(
     dst: &mut [u16],
+    dst_stride: usize,
     src: &[u16],
     width: usize,
     height: usize,
+    src_stride: usize,
     bit_depth: usize,
     pool: &Option<ThreadPool>,
 ) {
     #[allow(clippy::type_complexity)]
-    let mut _dispatcher: fn(&mut [u16], &[u16], usize, usize, usize, &Option<ThreadPool>) =
-        premultiply_alpha_rgba_impl;
+    let mut _dispatcher: fn(
+        &mut [u16],
+        usize,
+        &[u16],
+        usize,
+        usize,
+        usize,
+        usize,
+        &Option<ThreadPool>,
+    ) = premultiply_alpha_rgba_impl;
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
         if std::is_x86_feature_detected!("sse4.1") {
@@ -191,18 +208,21 @@ pub(crate) fn premultiply_alpha_rgba_u16(
     {
         _dispatcher = neon_premultiply_alpha_rgba_u16;
     }
-    _dispatcher(dst, src, width, height, bit_depth, pool);
+    _dispatcher(
+        dst, dst_stride, src, width, height, src_stride, bit_depth, pool,
+    );
 }
 
 pub(crate) fn unpremultiply_alpha_rgba_u16(
     in_place: &mut [u16],
+    src_stride: usize,
     width: usize,
     height: usize,
     bit_depth: usize,
     pool: &Option<ThreadPool>,
 ) {
     #[allow(clippy::type_complexity)]
-    let mut _dispatcher: fn(&mut [u16], usize, usize, usize, &Option<ThreadPool>) =
+    let mut _dispatcher: fn(&mut [u16], usize, usize, usize, usize, &Option<ThreadPool>) =
         unpremultiply_alpha_rgba_impl;
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
@@ -220,5 +240,5 @@ pub(crate) fn unpremultiply_alpha_rgba_u16(
     {
         _dispatcher = neon_unpremultiply_alpha_rgba_u16;
     }
-    _dispatcher(in_place, width, height, bit_depth, pool);
+    _dispatcher(in_place, src_stride, width, height, bit_depth, pool);
 }

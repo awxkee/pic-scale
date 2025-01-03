@@ -102,19 +102,20 @@ fn premultiply_alpha_rgba_impl_f32(
 
 fn unpremultiply_alpha_rgba_impl_f32(
     in_place: &mut [f32],
+    stride: usize,
     width: usize,
     _: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            in_place.par_chunks_exact_mut(width * 4).for_each(|row| {
-                unpremultiply_pixel_f32_row(row);
+            in_place.par_chunks_exact_mut(stride).for_each(|row| {
+                unpremultiply_pixel_f32_row(&mut row[..width * 4]);
             });
         });
     } else {
-        in_place.chunks_exact_mut(width * 4).for_each(|row| {
-            unpremultiply_pixel_f32_row(row);
+        in_place.chunks_exact_mut(stride).for_each(|row| {
+            unpremultiply_pixel_f32_row(&mut row[..width * 4]);
         });
     }
 }
@@ -149,11 +150,12 @@ pub(crate) fn premultiply_alpha_rgba_f32(
 
 pub(crate) fn unpremultiply_alpha_rgba_f32(
     in_place: &mut [f32],
+    stride: usize,
     width: usize,
     height: usize,
     pool: &Option<ThreadPool>,
 ) {
-    let mut _dispatcher: fn(&mut [f32], usize, usize, &Option<ThreadPool>) =
+    let mut _dispatcher: fn(&mut [f32], usize, usize, usize, &Option<ThreadPool>) =
         unpremultiply_alpha_rgba_impl_f32;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
@@ -171,5 +173,5 @@ pub(crate) fn unpremultiply_alpha_rgba_f32(
             _dispatcher = avx_unpremultiply_alpha_rgba_f32;
         }
     }
-    _dispatcher(in_place, width, height, pool);
+    _dispatcher(in_place, stride, width, height, pool);
 }

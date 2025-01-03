@@ -103,13 +103,14 @@ unsafe fn _mm_div_by<const BIT_DEPTH: usize>(v: __m128i) -> __m128i {
 
 pub(crate) fn unpremultiply_alpha_sse_rgba_u16(
     in_place: &mut [u16],
+    stride: usize,
     width: usize,
     height: usize,
     bit_depth: usize,
     pool: &Option<ThreadPool>,
 ) {
     unsafe {
-        unpremultiply_alpha_sse_rgba_u16_impl(in_place, width, height, bit_depth, pool);
+        unpremultiply_alpha_sse_rgba_u16_impl(in_place, stride, width, height, bit_depth, pool);
     }
 }
 
@@ -201,6 +202,7 @@ unsafe fn unpremultiply_alpha_sse_rgba_u16_row_impl(
 #[target_feature(enable = "sse4.1")]
 unsafe fn unpremultiply_alpha_sse_rgba_u16_impl(
     in_place: &mut [u16],
+    stride: usize,
     width: usize,
     _: usize,
     bit_depth: usize,
@@ -209,10 +211,10 @@ unsafe fn unpremultiply_alpha_sse_rgba_u16_impl(
     if let Some(pool) = pool {
         pool.install(|| {
             in_place
-                .par_chunks_exact_mut(width * 4)
+                .par_chunks_exact_mut(stride)
                 .for_each(|row| unsafe {
                     unpremultiply_alpha_sse_rgba_u16_row_impl(
-                        row,
+                        &mut row[..width * 4],
                         bit_depth,
                         DisassociateAlphaDefault::default(),
                     );
@@ -220,10 +222,10 @@ unsafe fn unpremultiply_alpha_sse_rgba_u16_impl(
         });
     } else {
         in_place
-            .par_chunks_exact_mut(width * 4)
+            .par_chunks_exact_mut(stride)
             .for_each(|row| unsafe {
                 unpremultiply_alpha_sse_rgba_u16_row_impl(
-                    row,
+                    &mut row[..width * 4],
                     bit_depth,
                     DisassociateAlphaDefault::default(),
                 );
@@ -256,25 +258,35 @@ unsafe fn sse_premultiply_row_u16(
 
 pub(crate) fn premultiply_alpha_sse_rgba_u16(
     dst: &mut [u16],
+    dst_stride: usize,
     src: &[u16],
     width: usize,
     _: usize,
+    src_stride: usize,
     bit_depth: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            dst.par_chunks_exact_mut(width * 4)
-                .zip(src.par_chunks_exact(width * 4))
+            dst.par_chunks_exact_mut(dst_stride)
+                .zip(src.par_chunks_exact(src_stride))
                 .for_each(|(dst, src)| unsafe {
-                    premultiply_alpha_sse_rgba_u16_row_impl(dst, src, bit_depth);
+                    premultiply_alpha_sse_rgba_u16_row_impl(
+                        &mut dst[..width * 4],
+                        &src[..width * 4],
+                        bit_depth,
+                    );
                 });
         });
     } else {
-        dst.chunks_exact_mut(width * 4)
-            .zip(src.chunks_exact(width * 4))
+        dst.chunks_exact_mut(dst_stride)
+            .zip(src.chunks_exact(src_stride))
             .for_each(|(dst, src)| unsafe {
-                premultiply_alpha_sse_rgba_u16_row_impl(dst, src, bit_depth);
+                premultiply_alpha_sse_rgba_u16_row_impl(
+                    &mut dst[..width * 4],
+                    &src[..width * 4],
+                    bit_depth,
+                );
             });
     }
 }
