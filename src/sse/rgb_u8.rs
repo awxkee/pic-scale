@@ -211,6 +211,11 @@ unsafe fn convolve_horizontal_rgb_sse_rows_4_impl(
         let store_2_8 = compress_i32(store_2);
         let store_3_8 = compress_i32(store_3);
 
+        let store_0_8 = _mm_packus_epi16(store_0_8, store_0_8);
+        let store_1_8 = _mm_packus_epi16(store_1_8, store_1_8);
+        let store_2_8 = _mm_packus_epi16(store_2_8, store_2_8);
+        let store_3_8 = _mm_packus_epi16(store_3_8, store_3_8);
+
         let element_0 = _mm_extract_epi32::<0>(store_0_8);
         let element_1 = _mm_extract_epi32::<0>(store_1_8);
         let element_2 = _mm_extract_epi32::<0>(store_2_8);
@@ -312,6 +317,7 @@ unsafe fn convolve_horizontal_rgb_sse_row_one_impl(
         }
 
         let store_16_8 = compress_i32(store);
+        let store_16_8 = _mm_packus_epi16(store_16_8, store_16_8);
 
         let element = _mm_extract_epi32::<0>(store_16_8);
         let bytes = element.to_le_bytes();

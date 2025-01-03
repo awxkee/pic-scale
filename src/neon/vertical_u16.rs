@@ -28,7 +28,7 @@
  */
 use crate::filter_weights::FilterBounds;
 use crate::mlaf::mlaf;
-use crate::neon::utils::prefer_vfmaq_f32;
+use crate::neon::utils::{prefer_vfmaq_f32, prefer_vfmaq_lane_f32, prefer_vfmaq_laneq_f32};
 use std::arch::aarch64::*;
 
 #[inline(always)]
@@ -69,8 +69,7 @@ pub(crate) fn convolve_column_u16(
                 let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
 
-                let v_weight0 = vdupq_n_f32(weights[0]);
-                let v_weight1 = vdupq_n_f32(weights[1]);
+                let weights = vld1_f32(weights.as_ptr());
 
                 let item_row0 = vld1q_u16(src_ptr0.as_ptr());
                 let item_row1 = vld1q_u16(src_ptr0.as_ptr().add(8));
@@ -79,10 +78,10 @@ pub(crate) fn convolve_column_u16(
                 let hi0 = vcvtq_f32_u32(vmovl_high_u16(item_row0));
                 let lo1 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(item_row1)));
                 let hi1 = vcvtq_f32_u32(vmovl_high_u16(item_row1));
-                store0 = prefer_vfmaq_f32(store0, lo0, v_weight0);
-                store1 = prefer_vfmaq_f32(store1, hi0, v_weight0);
-                store2 = prefer_vfmaq_f32(store2, lo1, v_weight0);
-                store3 = prefer_vfmaq_f32(store3, hi1, v_weight0);
+                store0 = prefer_vfmaq_lane_f32::<0>(store0, lo0, weights);
+                store1 = prefer_vfmaq_lane_f32::<0>(store1, hi0, weights);
+                store2 = prefer_vfmaq_lane_f32::<0>(store2, lo1, weights);
+                store3 = prefer_vfmaq_lane_f32::<0>(store3, hi1, weights);
 
                 let item_row10 = vld1q_u16(src_ptr1.as_ptr());
                 let item_row11 = vld1q_u16(src_ptr1.as_ptr().add(8));
@@ -91,10 +90,10 @@ pub(crate) fn convolve_column_u16(
                 let hi10 = vcvtq_f32_u32(vmovl_high_u16(item_row10));
                 let lo11 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(item_row11)));
                 let hi11 = vcvtq_f32_u32(vmovl_high_u16(item_row11));
-                store0 = prefer_vfmaq_f32(store0, lo10, v_weight1);
-                store1 = prefer_vfmaq_f32(store1, hi10, v_weight1);
-                store2 = prefer_vfmaq_f32(store2, lo11, v_weight1);
-                store3 = prefer_vfmaq_f32(store3, hi11, v_weight1);
+                store0 = prefer_vfmaq_lane_f32::<1>(store0, lo10, weights);
+                store1 = prefer_vfmaq_lane_f32::<1>(store1, hi10, weights);
+                store2 = prefer_vfmaq_lane_f32::<1>(store2, lo11, weights);
+                store3 = prefer_vfmaq_lane_f32::<1>(store3, hi11, weights);
             } else if bounds_size == 3 {
                 let weights = weight.get_unchecked(0..3);
                 let py = bounds.start;
@@ -149,10 +148,7 @@ pub(crate) fn convolve_column_u16(
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
                 let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + v_dx)..);
 
-                let v_weight0 = vdupq_n_f32(weights[0]);
-                let v_weight1 = vdupq_n_f32(weights[1]);
-                let v_weight2 = vdupq_n_f32(weights[2]);
-                let v_weight3 = vdupq_n_f32(weights[3]);
+                let weights = vld1q_f32(weights.as_ptr());
 
                 let item_row0 = vld1q_u16(src_ptr0.as_ptr());
                 let item_row1 = vld1q_u16(src_ptr0.as_ptr().add(8));
@@ -161,10 +157,10 @@ pub(crate) fn convolve_column_u16(
                 let hi0 = vcvtq_f32_u32(vmovl_high_u16(item_row0));
                 let lo1 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(item_row1)));
                 let hi1 = vcvtq_f32_u32(vmovl_high_u16(item_row1));
-                store0 = prefer_vfmaq_f32(store0, lo0, v_weight0);
-                store1 = prefer_vfmaq_f32(store1, hi0, v_weight0);
-                store2 = prefer_vfmaq_f32(store2, lo1, v_weight0);
-                store3 = prefer_vfmaq_f32(store3, hi1, v_weight0);
+                store0 = prefer_vfmaq_laneq_f32::<0>(store0, lo0, weights);
+                store1 = prefer_vfmaq_laneq_f32::<0>(store1, hi0, weights);
+                store2 = prefer_vfmaq_laneq_f32::<0>(store2, lo1, weights);
+                store3 = prefer_vfmaq_laneq_f32::<0>(store3, hi1, weights);
 
                 let item_row10 = vld1q_u16(src_ptr1.as_ptr());
                 let item_row11 = vld1q_u16(src_ptr1.as_ptr().add(8));
@@ -173,10 +169,10 @@ pub(crate) fn convolve_column_u16(
                 let hi10 = vcvtq_f32_u32(vmovl_high_u16(item_row10));
                 let lo11 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(item_row11)));
                 let hi11 = vcvtq_f32_u32(vmovl_high_u16(item_row11));
-                store0 = prefer_vfmaq_f32(store0, lo10, v_weight1);
-                store1 = prefer_vfmaq_f32(store1, hi10, v_weight1);
-                store2 = prefer_vfmaq_f32(store2, lo11, v_weight1);
-                store3 = prefer_vfmaq_f32(store3, hi11, v_weight1);
+                store0 = prefer_vfmaq_laneq_f32::<1>(store0, lo10, weights);
+                store1 = prefer_vfmaq_laneq_f32::<1>(store1, hi10, weights);
+                store2 = prefer_vfmaq_laneq_f32::<1>(store2, lo11, weights);
+                store3 = prefer_vfmaq_laneq_f32::<1>(store3, hi11, weights);
 
                 let item_row20 = vld1q_u16(src_ptr2.as_ptr());
                 let item_row21 = vld1q_u16(src_ptr2.as_ptr().add(8));
@@ -185,10 +181,10 @@ pub(crate) fn convolve_column_u16(
                 let hi20 = vcvtq_f32_u32(vmovl_high_u16(item_row20));
                 let lo21 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(item_row21)));
                 let hi21 = vcvtq_f32_u32(vmovl_high_u16(item_row21));
-                store0 = prefer_vfmaq_f32(store0, lo20, v_weight2);
-                store1 = prefer_vfmaq_f32(store1, hi20, v_weight2);
-                store2 = prefer_vfmaq_f32(store2, lo21, v_weight2);
-                store3 = prefer_vfmaq_f32(store3, hi21, v_weight2);
+                store0 = prefer_vfmaq_laneq_f32::<2>(store0, lo20, weights);
+                store1 = prefer_vfmaq_laneq_f32::<2>(store1, hi20, weights);
+                store2 = prefer_vfmaq_laneq_f32::<2>(store2, lo21, weights);
+                store3 = prefer_vfmaq_laneq_f32::<2>(store3, hi21, weights);
 
                 let item_row30 = vld1q_u16(src_ptr3.as_ptr());
                 let item_row31 = vld1q_u16(src_ptr3.as_ptr().add(8));
@@ -197,10 +193,10 @@ pub(crate) fn convolve_column_u16(
                 let hi30 = vcvtq_f32_u32(vmovl_high_u16(item_row30));
                 let lo31 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(item_row31)));
                 let hi31 = vcvtq_f32_u32(vmovl_high_u16(item_row31));
-                store0 = prefer_vfmaq_f32(store0, lo30, v_weight3);
-                store1 = prefer_vfmaq_f32(store1, hi30, v_weight3);
-                store2 = prefer_vfmaq_f32(store2, lo31, v_weight3);
-                store3 = prefer_vfmaq_f32(store3, hi31, v_weight3);
+                store0 = prefer_vfmaq_laneq_f32::<3>(store0, lo30, weights);
+                store1 = prefer_vfmaq_laneq_f32::<3>(store1, hi30, weights);
+                store2 = prefer_vfmaq_laneq_f32::<3>(store2, lo31, weights);
+                store3 = prefer_vfmaq_laneq_f32::<3>(store3, hi31, weights);
             } else {
                 for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
                     let py = bounds.start + j;
@@ -251,21 +247,20 @@ pub(crate) fn convolve_column_u16(
                 let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
 
-                let v_weight0 = vdupq_n_f32(weights[0]);
-                let v_weight1 = vdupq_n_f32(weights[1]);
+                let weights = vld1_f32(weights.as_ptr());
 
                 let item_row0 = vld1q_u16(src_ptr0.as_ptr());
                 let item_row1 = vld1q_u16(src_ptr1.as_ptr());
 
                 let lo0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(item_row0)));
                 let hi0 = vcvtq_f32_u32(vmovl_high_u16(item_row0));
-                store0 = prefer_vfmaq_f32(store0, lo0, v_weight0);
-                store1 = prefer_vfmaq_f32(store1, hi0, v_weight0);
+                store0 = prefer_vfmaq_lane_f32::<0>(store0, lo0, weights);
+                store1 = prefer_vfmaq_lane_f32::<0>(store1, hi0, weights);
 
                 let lo1 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(item_row1)));
                 let hi1 = vcvtq_f32_u32(vmovl_high_u16(item_row1));
-                store0 = prefer_vfmaq_f32(store0, lo1, v_weight1);
-                store1 = prefer_vfmaq_f32(store1, hi1, v_weight1);
+                store0 = prefer_vfmaq_lane_f32::<1>(store0, lo1, weights);
+                store1 = prefer_vfmaq_lane_f32::<1>(store1, hi1, weights);
             } else if bounds_size == 3 {
                 let weights = weight.get_unchecked(0..3);
                 let py = bounds.start;
@@ -303,10 +298,7 @@ pub(crate) fn convolve_column_u16(
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
                 let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + v_dx)..);
 
-                let v_weight0 = vdupq_n_f32(weights[0]);
-                let v_weight1 = vdupq_n_f32(weights[1]);
-                let v_weight2 = vdupq_n_f32(weights[2]);
-                let v_weight3 = vdupq_n_f32(weights[3]);
+                let weights = vld1q_f32(weights.as_ptr());
 
                 let item_row0 = vld1q_u16(src_ptr0.as_ptr());
                 let item_row1 = vld1q_u16(src_ptr1.as_ptr());
@@ -315,23 +307,23 @@ pub(crate) fn convolve_column_u16(
 
                 let lo0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(item_row0)));
                 let hi0 = vcvtq_f32_u32(vmovl_high_u16(item_row0));
-                store0 = prefer_vfmaq_f32(store0, lo0, v_weight0);
-                store1 = prefer_vfmaq_f32(store1, hi0, v_weight0);
+                store0 = prefer_vfmaq_laneq_f32::<0>(store0, lo0, weights);
+                store1 = prefer_vfmaq_laneq_f32::<0>(store1, hi0, weights);
 
                 let lo1 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(item_row1)));
                 let hi1 = vcvtq_f32_u32(vmovl_high_u16(item_row1));
-                store0 = prefer_vfmaq_f32(store0, lo1, v_weight1);
-                store1 = prefer_vfmaq_f32(store1, hi1, v_weight1);
+                store0 = prefer_vfmaq_laneq_f32::<1>(store0, lo1, weights);
+                store1 = prefer_vfmaq_laneq_f32::<1>(store1, hi1, weights);
 
                 let lo2 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(item_row2)));
                 let hi2 = vcvtq_f32_u32(vmovl_high_u16(item_row2));
-                store0 = prefer_vfmaq_f32(store0, lo2, v_weight2);
-                store1 = prefer_vfmaq_f32(store1, hi2, v_weight2);
+                store0 = prefer_vfmaq_laneq_f32::<2>(store0, lo2, weights);
+                store1 = prefer_vfmaq_laneq_f32::<2>(store1, hi2, weights);
 
                 let lo3 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(item_row3)));
                 let hi3 = vcvtq_f32_u32(vmovl_high_u16(item_row3));
-                store0 = prefer_vfmaq_f32(store0, lo3, v_weight3);
-                store1 = prefer_vfmaq_f32(store1, hi3, v_weight3);
+                store0 = prefer_vfmaq_laneq_f32::<3>(store0, lo3, weights);
+                store1 = prefer_vfmaq_laneq_f32::<3>(store1, hi3, weights);
             } else {
                 for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
                     let py = bounds.start + j;
@@ -373,16 +365,15 @@ pub(crate) fn convolve_column_u16(
                 let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
 
-                let v_weight0 = vdupq_n_f32(weights[0]);
-                let v_weight1 = vdupq_n_f32(weights[1]);
+                let weights = vld1_f32(weights.as_ptr());
 
                 let item_row0 = vld1_u16(src_ptr0.as_ptr());
                 let item_row1 = vld1_u16(src_ptr1.as_ptr());
 
                 let lo0 = vcvtq_f32_u32(vmovl_u16(item_row0));
                 let lo1 = vcvtq_f32_u32(vmovl_u16(item_row1));
-                store0 = prefer_vfmaq_f32(store0, lo0, v_weight0);
-                store0 = prefer_vfmaq_f32(store0, lo1, v_weight1);
+                store0 = prefer_vfmaq_lane_f32::<0>(store0, lo0, weights);
+                store0 = prefer_vfmaq_lane_f32::<1>(store0, lo1, weights);
             } else if bounds_size == 3 {
                 let weights = weight.get_unchecked(0..3);
                 let py = bounds.start;
@@ -390,9 +381,9 @@ pub(crate) fn convolve_column_u16(
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
 
-                let v_weight0 = vdupq_n_f32(weights[0]);
-                let v_weight1 = vdupq_n_f32(weights[1]);
-                let v_weight2 = vdupq_n_f32(weights[2]);
+                let v_weight0 = vld1q_dup_f32(weights.as_ptr());
+                let v_weight1 = vld1q_dup_f32(weights.as_ptr().add(1));
+                let v_weight2 = vld1q_dup_f32(weights.as_ptr().add(2));
 
                 let item_row0 = vld1_u16(src_ptr0.as_ptr());
                 let item_row1 = vld1_u16(src_ptr1.as_ptr());
@@ -412,10 +403,7 @@ pub(crate) fn convolve_column_u16(
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
                 let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + v_dx)..);
 
-                let v_weight0 = vdupq_n_f32(weights[0]);
-                let v_weight1 = vdupq_n_f32(weights[1]);
-                let v_weight2 = vdupq_n_f32(weights[2]);
-                let v_weight3 = vdupq_n_f32(weights[3]);
+                let weights = vld1q_f32(weights.as_ptr());
 
                 let item_row0 = vld1_u16(src_ptr0.as_ptr());
                 let item_row1 = vld1_u16(src_ptr1.as_ptr());
@@ -426,10 +414,11 @@ pub(crate) fn convolve_column_u16(
                 let lo1 = vcvtq_f32_u32(vmovl_u16(item_row1));
                 let lo2 = vcvtq_f32_u32(vmovl_u16(item_row2));
                 let lo3 = vcvtq_f32_u32(vmovl_u16(item_row3));
-                store0 = prefer_vfmaq_f32(store0, lo0, v_weight0);
-                store0 = prefer_vfmaq_f32(store0, lo1, v_weight1);
-                store0 = prefer_vfmaq_f32(store0, lo2, v_weight2);
-                store0 = prefer_vfmaq_f32(store0, lo3, v_weight3);
+
+                store0 = prefer_vfmaq_laneq_f32::<0>(store0, lo0, weights);
+                store0 = prefer_vfmaq_laneq_f32::<1>(store0, lo1, weights);
+                store0 = prefer_vfmaq_laneq_f32::<2>(store0, lo2, weights);
+                store0 = prefer_vfmaq_laneq_f32::<3>(store0, lo3, weights);
             } else {
                 for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
                     let py = bounds.start + j;
