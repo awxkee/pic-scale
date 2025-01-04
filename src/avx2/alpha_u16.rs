@@ -101,7 +101,7 @@ pub(crate) fn avx_premultiply_alpha_rgba_u16(
 ) {
     unsafe {
         avx_premultiply_alpha_rgba_u16_impl(
-            dst, dst_stride, src, width, height, bit_depth, src_stride, pool,
+            dst, dst_stride, src, width, height, src_stride, bit_depth, pool,
         );
     }
 }
