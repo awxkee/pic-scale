@@ -125,6 +125,7 @@ pub(crate) fn premultiply_alpha_rgba(
     src_stride: usize,
     pool: &Option<ThreadPool>,
 ) {
+    #[allow(clippy::type_complexity)]
     let mut _dispatcher: fn(&mut [u8], usize, &[u8], usize, usize, usize, &Option<ThreadPool>) =
         premultiply_alpha_rgba_impl;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
