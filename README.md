@@ -1,5 +1,8 @@
 # Image scaling library in Rust
 
+[![crates.io](https://img.shields.io/crates/v/pic-scale.svg)](https://crates.io/crates/pic-scale)
+![Build](https://github.com/awxkee/pic-scale/actions/workflows/build_push.yml/badge.svg)
+
 Rust image scale in different color spaces using SIMD and multithreading.
 
 Supported NEON, SSE, AVX-2, WASM.
@@ -44,21 +47,21 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 
 `~` - Partially implemented
 
-|                | NEON | SSE | AVX2 | AVX-512 | WASM | 
-|----------------|------|-----|------|---------|------| 
-| RGBA (8 bit)   | x    | x   | x    | ~       | ~    | 
-| RGB (8 bit)    | x    | x   | ~    | ~       | ~    | 
-| Plane (8 bit)  | x    | x   | ~    | ~       | ~    | 
-| RGBA (8+ bit)  | x    | x   | ~    | -       | -    | 
-| RGB (8+ bit)   | x    | x   | ~    | -       | -    | 
-| Plane (8+ bit) | ~    | ~   | ~    | -       | -    | 
-| RGBA (f32)     | x    | x   | x    | -       | -    | 
-| RGB (f32)      | x    | x   | ~    | -       | -    | 
-| Plane (f32)    | x    | x   | ~    | -       | -    | 
-| RGBA (f16)     | x    | x   | x    | -       | -    | 
-| RGB (f16)      | x    | ~   | ~    | -       | -    | 
-| Plane (f16)    | ~    | ~   | ~    | -       | -    |
-| AR30/RA30      | x    | -   | -    | -       | -    |
+|                | NEON | SSE | AVX2 | AVX-512    | WASM | 
+|----------------|------|-----|------|------------|------| 
+| RGBA (8 bit)   | x    | x   | x    | x(avxvnni) | ~    | 
+| RGB (8 bit)    | x    | x   | ~    | ~          | ~    | 
+| Plane (8 bit)  | x    | x   | ~    | ~          | ~    | 
+| RGBA (8+ bit)  | x    | x   | ~    | -          | -    | 
+| RGB (8+ bit)   | x    | x   | ~    | -          | -    | 
+| Plane (8+ bit) | ~    | ~   | ~    | -          | -    | 
+| RGBA (f32)     | x    | x   | x    | -          | -    | 
+| RGB (f32)      | x    | x   | ~    | -          | -    | 
+| Plane (f32)    | x    | x   | ~    | -          | -    | 
+| RGBA (f16)     | x    | x   | x    | -          | -    | 
+| RGB (f16)      | x    | ~   | ~    | -          | -    | 
+| Plane (f16)    | ~    | ~   | ~    | -          | -    |
+| AR30/RA30      | x    | -   | -    | -          | -    |
 
 #### Features
 
