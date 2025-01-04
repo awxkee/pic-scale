@@ -133,21 +133,21 @@ pub(crate) fn convolve_horizontal_dispatch_u16<const CHANNELS: usize>(
             });
     } else {
         let approx = filter_weights.numerical_approximation_i16::<PRECISION>(0);
-        // dst.chunks_exact_mut(dst_stride * 4)
-        //     .zip(src.chunks_exact(src_stride * 4))
-        //     .for_each(|(dst, src)| {
-        //         u16::handle_fixed_row_4::<i32, CHANNELS>(
-        //             src,
-        //             src_stride,
-        //             dst,
-        //             dst_stride,
-        //             &approx,
-        //             bit_depth as u32,
-        //         );
-        //     });
+        dst.chunks_exact_mut(dst_stride * 4)
+            .zip(src.chunks_exact(src_stride * 4))
+            .for_each(|(dst, src)| {
+                u16::handle_fixed_row_4::<i32, CHANNELS>(
+                    src,
+                    src_stride,
+                    dst,
+                    dst_stride,
+                    &approx,
+                    bit_depth as u32,
+                );
+            });
 
-        let remainder = dst;//dst.chunks_exact_mut(dst_stride * 4).into_remainder();
-        let src_remainder = src;//;src.chunks_exact(src_stride * 4).remainder();
+        let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
+        let src_remainder = src.chunks_exact(src_stride * 4).remainder();
 
         remainder
             .chunks_exact_mut(dst_stride)
