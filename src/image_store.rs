@@ -104,6 +104,7 @@ pub enum BufferStore<'a, T: Copy + Debug> {
 }
 
 impl<T: Copy + Debug> BufferStore<'_, T> {
+    #[allow(clippy::should_implement_trait)]
     pub fn borrow(&self) -> &[T] {
         match self {
             Self::Borrowed(p_ref) => p_ref,
@@ -111,6 +112,7 @@ impl<T: Copy + Debug> BufferStore<'_, T> {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn borrow_mut(&mut self) -> &mut [T] {
         match self {
             Self::Borrowed(p_ref) => p_ref,
@@ -295,7 +297,7 @@ where
     }
 }
 
-impl<'a, T, const N: usize> ImageStoreMut<'a, T, N>
+impl<T, const N: usize> ImageStoreMut<'_, T, N>
 where
     T: FromPrimitive + Clone + Copy + Debug,
 {
@@ -311,7 +313,7 @@ where
     }
 }
 
-impl<'a, T, const N: usize> ImageStore<'a, T, N>
+impl<T, const N: usize> ImageStore<'_, T, N>
 where
     T: FromPrimitive + Clone + Copy + Debug,
 {
