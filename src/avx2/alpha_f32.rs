@@ -114,13 +114,15 @@ unsafe fn avx_unpremultiply_alpha_rgba_f32_impl(
 
 pub(crate) fn avx_premultiply_alpha_rgba_f32(
     dst: &mut [f32],
+    dst_stride: usize,
     src: &[f32],
+    src_stride: usize,
     width: usize,
     height: usize,
     pool: &Option<ThreadPool>,
 ) {
     unsafe {
-        avx_premultiply_alpha_rgba_f32_impl(dst, src, width, height, pool);
+        avx_premultiply_alpha_rgba_f32_impl(dst, dst_stride, src, src_stride, width, height, pool);
     }
 }
 
@@ -163,24 +165,29 @@ unsafe fn avx_premultiply_alpha_rgba_f32_row_impl(dst: &mut [f32], src: &[f32]) 
 #[target_feature(enable = "avx2")]
 unsafe fn avx_premultiply_alpha_rgba_f32_impl(
     dst: &mut [f32],
+    dst_stride: usize,
     src: &[f32],
+    src_stride: usize,
     width: usize,
     _: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            dst.par_chunks_exact_mut(width * 4)
-                .zip(src.par_chunks_exact(width * 4))
+            dst.par_chunks_exact_mut(dst_stride)
+                .zip(src.par_chunks_exact(src_stride))
                 .for_each(|(dst, src)| unsafe {
-                    avx_premultiply_alpha_rgba_f32_row_impl(dst, src);
+                    avx_premultiply_alpha_rgba_f32_row_impl(
+                        &mut dst[..width * 4],
+                        &src[..width * 4],
+                    );
                 });
         });
     } else {
-        dst.chunks_exact_mut(width * 4)
-            .zip(src.chunks_exact(width * 4))
+        dst.chunks_exact_mut(dst_stride)
+            .zip(src.chunks_exact(src_stride))
             .for_each(|(dst, src)| unsafe {
-                avx_premultiply_alpha_rgba_f32_row_impl(dst, src);
+                avx_premultiply_alpha_rgba_f32_row_impl(&mut dst[..width * 4], &src[..width * 4]);
             });
     }
 }

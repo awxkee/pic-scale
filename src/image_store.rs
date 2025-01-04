@@ -586,9 +586,19 @@ impl AssociateAlpha<u16, 4> for ImageStore<'_, u16, 4> {
 
 impl AssociateAlpha<f32, 4> for ImageStore<'_, f32, 4> {
     fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, f32, 4>, pool: &Option<ThreadPool>) {
+        let src_stride = self.stride();
+        let dst_stride = into.stride();
         let dst = into.buffer.borrow_mut();
         let src = self.buffer.as_ref();
-        premultiply_alpha_rgba_f32(dst, src, self.width, self.height, pool);
+        premultiply_alpha_rgba_f32(
+            dst,
+            dst_stride,
+            src,
+            src_stride,
+            self.width,
+            self.height,
+            pool,
+        );
     }
 
     fn is_alpha_premultiplication_needed(&self) -> bool {
@@ -603,9 +613,19 @@ impl AssociateAlpha<half::f16, 4> for ImageStore<'_, half::f16, 4> {
         into: &mut ImageStoreMut<'_, half::f16, 4>,
         pool: &Option<ThreadPool>,
     ) {
+        let src_stride = self.stride();
+        let dst_stride = into.stride();
         let dst = into.buffer.borrow_mut();
         let src = self.buffer.as_ref();
-        premultiply_alpha_rgba_f16(dst, src, self.width, self.height, pool);
+        premultiply_alpha_rgba_f16(
+            dst,
+            dst_stride,
+            src,
+            src_stride,
+            self.width,
+            self.height,
+            pool,
+        );
     }
 
     fn is_alpha_premultiplication_needed(&self) -> bool {

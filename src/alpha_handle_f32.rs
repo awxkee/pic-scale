@@ -78,24 +78,26 @@ pub(crate) fn premultiply_pixel_f32_row(dst: &mut [f32], src: &[f32]) {
 
 fn premultiply_alpha_rgba_impl_f32(
     dst: &mut [f32],
+    dst_stride: usize,
     src: &[f32],
+    src_stride: usize,
     width: usize,
     _: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            dst.par_chunks_exact_mut(width * 4)
-                .zip(src.par_chunks_exact(width * 4))
+            dst.par_chunks_exact_mut(dst_stride)
+                .zip(src.par_chunks_exact(src_stride))
                 .for_each(|(dst, src)| {
-                    premultiply_pixel_f32_row(dst, src);
+                    premultiply_pixel_f32_row(&mut dst[..width * 4], &src[..width * 4]);
                 });
         });
     } else {
-        dst.chunks_exact_mut(width * 4)
-            .zip(src.chunks_exact(width * 4))
+        dst.chunks_exact_mut(dst_stride)
+            .zip(src.chunks_exact(src_stride))
             .for_each(|(dst, src)| {
-                premultiply_pixel_f32_row(dst, src);
+                premultiply_pixel_f32_row(&mut dst[..width * 4], &src[..width * 4]);
             });
     }
 }
@@ -122,12 +124,14 @@ fn unpremultiply_alpha_rgba_impl_f32(
 
 pub(crate) fn premultiply_alpha_rgba_f32(
     dst: &mut [f32],
+    dst_stride: usize,
     src: &[f32],
+    src_stride: usize,
     width: usize,
     height: usize,
     pool: &Option<ThreadPool>,
 ) {
-    let mut _dispatcher: fn(&mut [f32], &[f32], usize, usize, &Option<ThreadPool>) =
+    let mut _dispatcher: fn(&mut [f32], usize, &[f32], usize, usize, usize, &Option<ThreadPool>) =
         premultiply_alpha_rgba_impl_f32;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
@@ -145,7 +149,7 @@ pub(crate) fn premultiply_alpha_rgba_f32(
             _dispatcher = avx_premultiply_alpha_rgba_f32;
         }
     }
-    _dispatcher(dst, src, width, height, pool);
+    _dispatcher(dst, dst_stride, src, src_stride, width, height, pool);
 }
 
 pub(crate) fn unpremultiply_alpha_rgba_f32(
