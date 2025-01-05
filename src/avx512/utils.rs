@@ -139,3 +139,16 @@ pub(crate) unsafe fn avx512_div_by255(v: __m512i) -> __m512i {
         _mm512_srli_epi16::<8>(v),
     ))
 }
+
+#[inline(always)]
+pub(crate) unsafe fn _mm512_dot16_epi32<const HAS_DOT: bool>(
+    a: __m512i,
+    b: __m512i,
+    c: __m512i,
+) -> __m512i {
+    if HAS_DOT {
+        _mm512_dpwssd_epi32(a, b, c)
+    } else {
+        _mm512_add_epi32(a, _mm512_madd_epi16(b, c))
+    }
+}

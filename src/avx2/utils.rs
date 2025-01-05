@@ -352,3 +352,23 @@ pub(crate) unsafe fn _mm256_cvtepi64_epi32x(v: __m256i) -> __m128i {
     let packed = _mm_shuffle_ps::<FLAGS>(lo, hi);
     _mm_castps_si128(packed)
 }
+
+#[inline(always)]
+pub(crate) unsafe fn _mm256_dot16_avx_epi32<const HAS_DOT: bool>(
+    a: __m256i,
+    b: __m256i,
+    c: __m256i,
+) -> __m256i {
+    #[cfg(feature = "nightly_avx512")]
+    {
+        if HAS_DOT {
+            _mm256_dpwssd_avx_epi32(a, b, c)
+        } else {
+            _mm256_add_epi32(a, _mm256_madd_epi16(b, c))
+        }
+    }
+    #[cfg(not(feature = "nightly_avx512"))]
+    {
+        _mm256_add_epi32(a, _mm256_madd_epi16(b, c))
+    }
+}

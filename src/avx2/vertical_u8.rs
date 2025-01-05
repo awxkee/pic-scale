@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::avx2::utils::shuffle;
+use crate::avx2::utils::{_mm256_dot16_avx_epi32, shuffle};
 use crate::filter_weights::FilterBounds;
 use crate::support::{PRECISION, ROUNDING_CONST};
 #[cfg(target_arch = "x86")]
@@ -35,7 +35,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-unsafe fn dot_prod(
+unsafe fn dot_prod<const HAS_DOT: bool>(
     store_0: __m256i,
     store_1: __m256i,
     store_2: __m256i,
@@ -46,20 +46,20 @@ unsafe fn dot_prod(
     let zeros = _mm256_setzero_si256();
     let interleaved = _mm256_unpacklo_epi8(v, zeros);
     let pix = _mm256_unpacklo_epi8(interleaved, zeros);
-    let store_0 = _mm256_add_epi32(store_0, _mm256_madd_epi16(pix, w));
+    let store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, pix, w);
     let pix = _mm256_unpackhi_epi8(interleaved, zeros);
-    let store_1 = _mm256_add_epi32(store_1, _mm256_madd_epi16(pix, w));
+    let store_1 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_1, pix, w);
 
     let interleaved = _mm256_unpackhi_epi8(v, zeros);
     let pix = _mm256_unpacklo_epi8(interleaved, zeros);
-    let store_2 = _mm256_add_epi32(store_2, _mm256_madd_epi16(pix, w));
+    let store_2 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_2, pix, w);
     let pix = _mm256_unpackhi_epi8(interleaved, zeros);
-    let store_3 = _mm256_add_epi32(store_3, _mm256_madd_epi16(pix, w));
+    let store_3 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_3, pix, w);
     (store_0, store_1, store_2, store_3)
 }
 
 #[inline(always)]
-unsafe fn convolve_vertical_part_avx_64(
+unsafe fn convolve_vertical_part_avx_64<const HAS_DOT: bool>(
     start_y: usize,
     start_x: usize,
     src: &[u8],
@@ -98,15 +98,15 @@ unsafe fn convolve_vertical_part_avx_64(
 
         let interleaved = _mm256_unpacklo_epi8(item_row_0, item_row_1);
         let pix = _mm256_unpacklo_epi8(interleaved, zeros);
-        store_0 = _mm256_add_epi32(store_0, _mm256_madd_epi16(pix, v_weight_2));
+        store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, pix, v_weight_2);
         let pix = _mm256_unpackhi_epi8(interleaved, zeros);
-        store_1 = _mm256_add_epi32(store_1, _mm256_madd_epi16(pix, v_weight_2));
+        store_1 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_1, pix, v_weight_2);
 
         let interleaved = _mm256_unpackhi_epi8(item_row_0, item_row_1);
         let pix = _mm256_unpacklo_epi8(interleaved, zeros);
-        store_2 = _mm256_add_epi32(store_2, _mm256_madd_epi16(pix, v_weight_2));
+        store_2 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_2, pix, v_weight_2);
         let pix = _mm256_unpackhi_epi8(interleaved, zeros);
-        store_3 = _mm256_add_epi32(store_3, _mm256_madd_epi16(pix, v_weight_2));
+        store_3 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_3, pix, v_weight_2);
 
         let item_row_0 = _mm256_loadu_si256(src_ptr.get_unchecked(32..).as_ptr() as *const __m256i);
         let item_row_1 =
@@ -114,15 +114,15 @@ unsafe fn convolve_vertical_part_avx_64(
 
         let interleaved = _mm256_unpacklo_epi8(item_row_0, item_row_1);
         let pix = _mm256_unpacklo_epi8(interleaved, zeros);
-        store_4 = _mm256_add_epi32(store_4, _mm256_madd_epi16(pix, v_weight_2));
+        store_4 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_4, pix, v_weight_2);
         let pix = _mm256_unpackhi_epi8(interleaved, zeros);
-        store_5 = _mm256_add_epi32(store_5, _mm256_madd_epi16(pix, v_weight_2));
+        store_5 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_5, pix, v_weight_2);
 
         let interleaved = _mm256_unpackhi_epi8(item_row_0, item_row_1);
         let pix = _mm256_unpacklo_epi8(interleaved, zeros);
-        store_6 = _mm256_add_epi32(store_6, _mm256_madd_epi16(pix, v_weight_2));
+        store_6 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_6, pix, v_weight_2);
         let pix = _mm256_unpackhi_epi8(interleaved, zeros);
-        store_7 = _mm256_add_epi32(store_7, _mm256_madd_epi16(pix, v_weight_2));
+        store_7 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_7, pix, v_weight_2);
 
         jj += 2;
     }
@@ -137,9 +137,9 @@ unsafe fn convolve_vertical_part_avx_64(
         let item_row_1 = _mm256_loadu_si256(src_ptr.get_unchecked(32..).as_ptr() as *const __m256i);
 
         (store_0, store_1, store_2, store_3) =
-            dot_prod(store_0, store_1, store_2, store_3, item_row_0, v_weight);
+            dot_prod::<HAS_DOT>(store_0, store_1, store_2, store_3, item_row_0, v_weight);
         (store_4, store_5, store_6, store_7) =
-            dot_prod(store_4, store_5, store_6, store_7, item_row_1, v_weight);
+            dot_prod::<HAS_DOT>(store_4, store_5, store_6, store_7, item_row_1, v_weight);
     }
 
     store_0 = _mm256_srai_epi32::<PRECISION>(store_0);
@@ -167,7 +167,7 @@ unsafe fn convolve_vertical_part_avx_64(
 }
 
 #[inline(always)]
-unsafe fn convolve_vertical_part_avx_32(
+unsafe fn convolve_vertical_part_avx_32<const HAS_DOT: bool>(
     start_y: usize,
     start_x: usize,
     src: &[u8],
@@ -195,7 +195,7 @@ unsafe fn convolve_vertical_part_avx_32(
         let item_row = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
 
         (store_0, store_1, store_2, store_3) =
-            dot_prod(store_0, store_1, store_2, store_3, item_row, v_weight);
+            dot_prod::<HAS_DOT>(store_0, store_1, store_2, store_3, item_row, v_weight);
     }
 
     store_0 = _mm256_srai_epi32::<PRECISION>(store_0);
@@ -212,7 +212,7 @@ unsafe fn convolve_vertical_part_avx_32(
 }
 
 #[inline(always)]
-unsafe fn convolve_vertical_part_8_avx(
+unsafe fn convolve_vertical_part_8_avx<const HAS_DOT: bool>(
     start_y: usize,
     start_x: usize,
     src: &[u8],
@@ -240,7 +240,7 @@ unsafe fn convolve_vertical_part_8_avx(
             _mm_setzero_si128(),
         ));
 
-        store_0 = _mm256_add_epi32(store_0, _mm256_madd_epi16(item_row, v_weight));
+        store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row, v_weight);
     }
 
     const MASK: i32 = shuffle(3, 1, 2, 0);
@@ -258,7 +258,7 @@ unsafe fn convolve_vertical_part_8_avx(
 }
 
 #[inline(always)]
-unsafe fn convolve_vertical_part_avx(
+unsafe fn convolve_vertical_part_avx<const HAS_DOT: bool>(
     start_y: usize,
     start_x: usize,
     src: &[u8],
@@ -286,8 +286,8 @@ unsafe fn convolve_vertical_part_avx(
         let item_row0 = _mm256_insert_epi8::<0>(_mm256_setzero_si256(), *src_ptr0 as i8);
         let item_row1 = _mm256_insert_epi8::<0>(_mm256_setzero_si256(), *src_ptr1 as i8);
 
-        store_0 = _mm256_add_epi32(store_0, _mm256_madd_epi16(item_row0, v_weight0));
-        store_0 = _mm256_add_epi32(store_0, _mm256_madd_epi16(item_row1, v_weight1));
+        store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row0, v_weight0);
+        store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row1, v_weight1);
     } else if bounds_size == 3 {
         let py = start_y;
         let weight = filter.get_unchecked(0..3);
@@ -301,9 +301,9 @@ unsafe fn convolve_vertical_part_avx(
         let item_row1 = _mm256_insert_epi8::<0>(_mm256_setzero_si256(), *src_ptr1 as i8);
         let item_row2 = _mm256_insert_epi8::<0>(_mm256_setzero_si256(), *src_ptr2 as i8);
 
-        store_0 = _mm256_add_epi32(store_0, _mm256_madd_epi16(item_row0, v_weight0));
-        store_0 = _mm256_add_epi32(store_0, _mm256_madd_epi16(item_row1, v_weight1));
-        store_0 = _mm256_add_epi32(store_0, _mm256_madd_epi16(item_row2, v_weight2));
+        store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row0, v_weight0);
+        store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row1, v_weight1);
+        store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row2, v_weight2);
     } else if bounds_size == 4 {
         let py = start_y;
         let weight = filter.get_unchecked(0..4);
@@ -320,10 +320,10 @@ unsafe fn convolve_vertical_part_avx(
         let item_row2 = _mm256_insert_epi8::<0>(_mm256_setzero_si256(), *src_ptr2 as i8);
         let item_row3 = _mm256_insert_epi8::<0>(_mm256_setzero_si256(), *src_ptr3 as i8);
 
-        store_0 = _mm256_add_epi32(store_0, _mm256_madd_epi16(item_row0, v_weight0));
-        store_0 = _mm256_add_epi32(store_0, _mm256_madd_epi16(item_row1, v_weight1));
-        store_0 = _mm256_add_epi32(store_0, _mm256_madd_epi16(item_row2, v_weight2));
-        store_0 = _mm256_add_epi32(store_0, _mm256_madd_epi16(item_row3, v_weight3));
+        store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row0, v_weight0);
+        store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row1, v_weight1);
+        store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row2, v_weight2);
+        store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row3, v_weight3);
     } else {
         for j in 0..bounds.size {
             let py = start_y + j;
@@ -332,7 +332,7 @@ unsafe fn convolve_vertical_part_avx(
             let src_ptr = src.get_unchecked(src_stride * py + px);
             let item_row = _mm256_setr_epi32(*src_ptr as i32, 0, 0, 0, 0, 0, 0, 0);
 
-            store_0 = _mm256_add_epi32(store_0, _mm256_madd_epi16(item_row, v_weight));
+            store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row, v_weight);
         }
     }
 
@@ -353,13 +353,43 @@ pub(crate) fn convolve_vertical_avx_row(
     weights: &[i16],
 ) {
     unsafe {
-        convolve_vertical_avx_row_impl(dst_width, bounds, src, dst, src_stride, weights);
+        #[cfg(feature = "nightly_avx512")]
+        if std::arch::is_x86_feature_detected!("avxvnni") {
+            return convolve_vertical_avx_row_dot(dst_width, bounds, src, dst, src_stride, weights);
+        }
+        convolve_vertical_avx_row_reg(dst_width, bounds, src, dst, src_stride, weights);
     }
 }
 
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_vertical_avx_row_impl(
+unsafe fn convolve_vertical_avx_row_reg(
+    _ignored: usize,
+    bounds: &FilterBounds,
+    src: &[u8],
+    dst: &mut [u8],
+    src_stride: usize,
+    weights: &[i16],
+) {
+    convolve_vertical_avx_row_impl::<false>(_ignored, bounds, src, dst, src_stride, weights);
+}
+
+#[target_feature(enable = "avx2", enable = "avxvnni")]
+/// This inlining is required to activate all features for runtime dispatch
+unsafe fn convolve_vertical_avx_row_dot(
+    _ignored: usize,
+    bounds: &FilterBounds,
+    src: &[u8],
+    dst: &mut [u8],
+    src_stride: usize,
+    weights: &[i16],
+) {
+    convolve_vertical_avx_row_impl::<true>(_ignored, bounds, src, dst, src_stride, weights);
+}
+
+#[inline(always)]
+/// This inlining is required to activate all features for runtime dispatch
+unsafe fn convolve_vertical_avx_row_impl<const HAS_DOT: bool>(
     _: usize,
     bounds: &FilterBounds,
     src: &[u8],
@@ -372,7 +402,15 @@ unsafe fn convolve_vertical_avx_row_impl(
 
     while cx + 64 < total_width {
         unsafe {
-            convolve_vertical_part_avx_64(bounds.start, cx, src, src_stride, dst, weights, bounds);
+            convolve_vertical_part_avx_64::<HAS_DOT>(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weights,
+                bounds,
+            );
         }
 
         cx += 64;
@@ -380,7 +418,15 @@ unsafe fn convolve_vertical_avx_row_impl(
 
     while cx + 32 < total_width {
         unsafe {
-            convolve_vertical_part_avx_32(bounds.start, cx, src, src_stride, dst, weights, bounds);
+            convolve_vertical_part_avx_32::<HAS_DOT>(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weights,
+                bounds,
+            );
         }
 
         cx += 32;
@@ -388,7 +434,15 @@ unsafe fn convolve_vertical_avx_row_impl(
 
     while cx + 8 < total_width {
         unsafe {
-            convolve_vertical_part_8_avx(bounds.start, cx, src, src_stride, dst, weights, bounds);
+            convolve_vertical_part_8_avx::<HAS_DOT>(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weights,
+                bounds,
+            );
         }
 
         cx += 8;
@@ -396,7 +450,15 @@ unsafe fn convolve_vertical_avx_row_impl(
 
     while cx < total_width {
         unsafe {
-            convolve_vertical_part_avx(bounds.start, cx, src, src_stride, dst, weights, bounds);
+            convolve_vertical_part_avx::<HAS_DOT>(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weights,
+                bounds,
+            );
         }
 
         cx += 1;
