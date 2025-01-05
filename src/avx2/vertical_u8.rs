@@ -374,6 +374,7 @@ unsafe fn convolve_vertical_avx_row_reg(
     convolve_vertical_avx_row_impl::<false>(_ignored, bounds, src, dst, src_stride, weights);
 }
 
+#[cfg(feature = "nightly_avx512")]
 #[target_feature(enable = "avx2", enable = "avxvnni")]
 /// This inlining is required to activate all features for runtime dispatch
 unsafe fn convolve_vertical_avx_row_dot(
