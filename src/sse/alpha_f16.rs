@@ -40,16 +40,20 @@ use std::arch::x86_64::*;
 
 pub(crate) fn sse_premultiply_alpha_rgba_f16(
     dst: &mut [half::f16],
+    dst_stride: usize,
     src: &[half::f16],
+    src_stride: usize,
     width: usize,
     height: usize,
     pool: &Option<ThreadPool>,
 ) {
     unsafe {
         if is_x86_feature_detected!("f16c") {
-            sse_premultiply_alpha_rgba_f16c(dst, src, width, height, pool);
+            sse_premultiply_alpha_rgba_f16c(dst, dst_stride, src, src_stride, width, height, pool);
         } else {
-            sse_premultiply_alpha_rgba_f16_regular(dst, src, width, height, pool);
+            sse_premultiply_alpha_rgba_f16_regular(
+                dst, dst_stride, src, src_stride, width, height, pool,
+            );
         }
     }
 }
@@ -57,23 +61,31 @@ pub(crate) fn sse_premultiply_alpha_rgba_f16(
 #[target_feature(enable = "sse4.1")]
 unsafe fn sse_premultiply_alpha_rgba_f16_regular(
     dst: &mut [half::f16],
+    dst_stride: usize,
     src: &[half::f16],
+    src_stride: usize,
     width: usize,
     height: usize,
     pool: &Option<ThreadPool>,
 ) {
-    sse_premultiply_alpha_rgba_f16_impl::<false>(dst, src, width, height, pool);
+    sse_premultiply_alpha_rgba_f16_impl::<false>(
+        dst, dst_stride, src, src_stride, width, height, pool,
+    );
 }
 
 #[target_feature(enable = "sse4.1", enable = "f16c")]
 unsafe fn sse_premultiply_alpha_rgba_f16c(
     dst: &mut [half::f16],
+    dst_stride: usize,
     src: &[half::f16],
+    src_stride: usize,
     width: usize,
     height: usize,
     pool: &Option<ThreadPool>,
 ) {
-    sse_premultiply_alpha_rgba_f16_impl::<true>(dst, src, width, height, pool);
+    sse_premultiply_alpha_rgba_f16_impl::<true>(
+        dst, dst_stride, src, src_stride, width, height, pool,
+    );
 }
 
 #[inline(always)]
@@ -134,24 +146,32 @@ unsafe fn sse_premultiply_alpha_rgba_row_f16_impl<const F16C: bool>(
 #[inline(always)]
 unsafe fn sse_premultiply_alpha_rgba_f16_impl<const F16C: bool>(
     dst: &mut [half::f16],
+    dst_stride: usize,
     src: &[half::f16],
+    src_stride: usize,
     width: usize,
     _: usize,
     pool: &Option<ThreadPool>,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
-            dst.par_chunks_exact_mut(width * 4)
-                .zip(src.par_chunks_exact(width * 4))
+            dst.par_chunks_exact_mut(dst_stride)
+                .zip(src.par_chunks_exact(src_stride))
                 .for_each(|(dst, src)| unsafe {
-                    sse_premultiply_alpha_rgba_row_f16_impl::<F16C>(dst, src);
+                    sse_premultiply_alpha_rgba_row_f16_impl::<F16C>(
+                        &mut dst[..width * 4],
+                        &src[..width * 4],
+                    );
                 });
         });
     } else {
-        dst.chunks_exact_mut(width * 4)
-            .zip(src.chunks_exact(width * 4))
+        dst.chunks_exact_mut(dst_stride)
+            .zip(src.chunks_exact(src_stride))
             .for_each(|(dst, src)| unsafe {
-                sse_premultiply_alpha_rgba_row_f16_impl::<F16C>(dst, src);
+                sse_premultiply_alpha_rgba_row_f16_impl::<F16C>(
+                    &mut dst[..width * 4],
+                    &src[..width * 4],
+                );
             });
     }
 }

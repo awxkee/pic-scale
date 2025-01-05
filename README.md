@@ -53,8 +53,8 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 | RGB (8 bit)    | x    | x   | ~    | ~          | ~    | 
 | Plane (8 bit)  | x    | x   | ~    | ~          | ~    | 
 | RGBA (8+ bit)  | x    | x   | ~    | x(avxvnni) | -    | 
-| RGB (8+ bit)   | x    | x   | ~    | -          | -    | 
-| Plane (8+ bit) | ~    | ~   | ~    | -          | -    | 
+| RGB (8+ bit)   | x    | x   | ~    | ~          | -    | 
+| Plane (8+ bit) | ~    | ~   | ~    | ~          | -    | 
 | RGBA (f32)     | x    | x   | x    | -          | -    | 
 | RGB (f32)      | x    | x   | ~    | -          | -    | 
 | Plane (f32)    | x    | x   | ~    | -          | -    | 
