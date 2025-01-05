@@ -22,7 +22,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
-      - run: cat /proc/cpuinfo
       - run: rustup target add aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu i686-unknown-linux-gnu powerpc-unknown-linux-gnu riscv64gc-unknown-linux-gnu
       - run: RUSTFLAGS="-C target-feature=+neon,-fp16" cargo build --target aarch64-unknown-linux-gnu --features half
       - run: RUSTFLAGS="-C target-feature=+neon,+fp16" cargo build --target aarch64-unknown-linux-gnu --features half
