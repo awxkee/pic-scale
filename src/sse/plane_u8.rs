@@ -50,11 +50,10 @@ macro_rules! s_accumulate_8_horiz {
 
 macro_rules! s_accumulate_4_horiz {
     ($store: expr, $ptr: expr, $weights: expr) => {{
-        let pixel_colors = _mm_setr_epi32(
-            $ptr.read_unaligned() as i32,
-            $ptr.add(1).read_unaligned() as i32,
-            $ptr.add(2).read_unaligned() as i32,
-            $ptr.add(3).read_unaligned() as i32,
+        let zeros = _mm_setzero_si128();
+        let pixel_colors = _mm_unpacklo_epi16(
+            _mm_unpacklo_epi8(_mm_loadu_si32($ptr as *const _), zeros),
+            zeros,
         );
         $store = _mm_muladd_wide_epi16($store, pixel_colors, $weights);
     }};
@@ -84,8 +83,6 @@ pub(crate) fn convolve_horizontal_plane_sse_rows_4_u8(
         );
     }
 }
-
-#[inline]
 #[target_feature(enable = "sse4.1")]
 unsafe fn convolve_horizontal_plane_sse_rows_4_u8_impl(
     src: &[u8],
@@ -223,7 +220,6 @@ pub(crate) fn convolve_horizontal_plane_sse_row(
     }
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1")]
 unsafe fn convolve_horizontal_plane_sse_row_impl(
     src: &[u8],
