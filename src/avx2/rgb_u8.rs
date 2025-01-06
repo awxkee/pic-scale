@@ -468,8 +468,8 @@ unsafe fn add_one_weight<const HAS_DOT: bool>(
 ) -> __m128i {
     const COMPONENTS: usize = 3;
     let src_ptr = src.get_unchecked((start_x * COMPONENTS)..).as_ptr();
-    let base_pixel = _mm_loadu_si32(src.as_ptr());
-    let m_vl = _mm_insert_epi16::<2>(base_pixel, src_ptr.add(2).read_unaligned() as i32);
+    let base_pixel = _mm_loadu_si16(src.as_ptr());
+    let m_vl = _mm_insert_epi8::<2>(base_pixel, src_ptr.add(2).read_unaligned() as i32);
     let lo = _mm_unpacklo_epi8(m_vl, _mm_setzero_si128());
     _mm_dot16_avx_epi32::<HAS_DOT>(
         store_0,
