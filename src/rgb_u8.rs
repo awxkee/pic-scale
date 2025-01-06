@@ -54,11 +54,42 @@ impl HorizontalConvolutionPass<u8, 3> for ImageStore<'_, u8, 3> {
         destination: &mut ImageStoreMut<u8, 3>,
         pool: &Option<ThreadPool>,
     ) {
+        let _scale_factor = self.width as f32 / destination.width as f32;
+        #[cfg(all(
+            feature = "nightly_avx512",
+            any(target_arch = "x86_64", target_arch = "x86")
+        ))]
+        {
+            let has_avxvnni = std::arch::is_x86_feature_detected!("avxvnni");
+            if _scale_factor < 6. && has_avxvnni {
+                use crate::avx2::{
+                    convolve_horizontal_rgb_avx_row_i8_one, convolve_horizontal_rgb_avx_rows_4_i8,
+                };
+                use crate::filter_weights::WeightsConverterQ7;
+                let _dispatcher_4_rows: Option<
+                    fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i8>),
+                > = Some(convolve_horizontal_rgb_avx_rows_4_i8);
+                let _dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i8>) =
+                    convolve_horizontal_rgb_avx_row_i8_one;
+                convolve_horizontal_dispatch_u8(
+                    self,
+                    filter_weights,
+                    destination,
+                    pool,
+                    _dispatcher_4_rows,
+                    _dispatcher_1_row,
+                    WeightsConverterQ7::default(),
+                );
+                return;
+            }
+        }
+
         let mut _dispatcher_4_rows: Option<
             fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>),
         > = Some(handle_fixed_rows_4_u8::<3>);
         let mut _dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i16>) =
             handle_fixed_row_u8::<3>;
+
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rows_4);
