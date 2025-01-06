@@ -277,7 +277,7 @@ unsafe fn convolve_horizontal_rgb_sse_row_one_impl(
     {
         let bounds_size = bounds.size;
         let mut jx = 0usize;
-        let mut store = _mm_setzero_si128();
+        let mut store = _mm_set1_epi32(ROUNDING_CONST);
 
         while jx + 4 < bounds.size {
             let w_ptr = weights.get_unchecked(jx..(jx + 4));

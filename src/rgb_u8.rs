@@ -66,9 +66,16 @@ impl HorizontalConvolutionPass<u8, 3> for ImageStore<'_, u8, 3> {
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            if is_x86_feature_detected!("sse4.1") {
+            if std::arch::is_x86_feature_detected!("sse4.1") {
                 _dispatcher_4_rows = Some(convolve_horizontal_rgb_sse_rows_4);
                 _dispatcher_1_row = convolve_horizontal_rgb_sse_row_one;
+            }
+            if std::arch::is_x86_feature_detected!("avx2") {
+                use crate::avx2::{
+                    convolve_horizontal_rgb_avx_row_one, convolve_horizontal_rgb_avx_rows_4,
+                };
+                _dispatcher_4_rows = Some(convolve_horizontal_rgb_avx_rows_4);
+                _dispatcher_1_row = convolve_horizontal_rgb_avx_row_one;
             }
         }
         convolve_horizontal_dispatch_u8(

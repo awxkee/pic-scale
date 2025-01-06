@@ -479,14 +479,12 @@ pub(crate) fn avx512_unpremultiply_alpha_rgba(
 
     if let Some(pool) = pool {
         pool.install(|| {
-            in_place
-                .par_chunks_exact_mut(stride)
-                .for_each(|row| unsafe {
-                    executor(&mut row[..width * 4]);
-                });
+            in_place.par_chunks_exact_mut(stride).for_each(|row| {
+                executor(&mut row[..width * 4]);
+            });
         });
     } else {
-        in_place.chunks_exact_mut(stride).for_each(|row| unsafe {
+        in_place.chunks_exact_mut(stride).for_each(|row| {
             executor(&mut row[..width * 4]);
         });
     }
