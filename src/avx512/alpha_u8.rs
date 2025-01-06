@@ -168,43 +168,29 @@ pub(crate) fn avx512_premultiply_alpha_rgba(
     pool: &Option<ThreadPool>,
 ) {
     let has_vbmi = std::arch::is_x86_feature_detected!("avx512vbmi");
+
+    let mut executor: fn(&mut [u8], &[u8]) = |dst: &mut [u8], src: &[u8]| {
+        avx_premultiply_alpha_rgba_impl_row(dst, src, AssociateAlphaDefault::<false>::default());
+    };
+    if has_vbmi {
+        executor = |dst: &mut [u8], src: &[u8]| {
+            avx_premultiply_alpha_rgba_impl_row(dst, src, AssociateAlphaDefault::<true>::default());
+        };
+    }
+
     if let Some(pool) = pool {
         pool.install(|| {
             dst.par_chunks_exact_mut(dst_stride)
                 .zip(src.par_chunks_exact(src_stride))
                 .for_each(|(dst, src)| {
-                    if has_vbmi {
-                        avx_premultiply_alpha_rgba_impl_row(
-                            &mut dst[..width * 4],
-                            &src[..width * 4],
-                            AssociateAlphaDefault::<true>::default(),
-                        );
-                    } else {
-                        avx_premultiply_alpha_rgba_impl_row(
-                            &mut dst[..width * 4],
-                            &src[..width * 4],
-                            AssociateAlphaDefault::<false>::default(),
-                        );
-                    }
+                    executor(&mut dst[..width * 4], &src[..width * 4]);
                 });
         });
     } else {
         dst.chunks_exact_mut(dst_stride)
             .zip(src.chunks_exact(src_stride))
             .for_each(|(dst, src)| {
-                if has_vbmi {
-                    avx_premultiply_alpha_rgba_impl_row(
-                        &mut dst[..width * 4],
-                        &src[..width * 4],
-                        AssociateAlphaDefault::<true>::default(),
-                    );
-                } else {
-                    avx_premultiply_alpha_rgba_impl_row(
-                        &mut dst[..width * 4],
-                        &src[..width * 4],
-                        AssociateAlphaDefault::<false>::default(),
-                    );
-                }
+                executor(&mut dst[..width * 4], &src[..width * 4]);
             });
     }
 }
@@ -271,6 +257,7 @@ impl<const HAS_VBMI: bool> Avx512DisassociateAlpha<HAS_VBMI> {
         let rgba1 = _mm512_loadu_si512(src_ptr.add(64) as *const _);
         let rgba2 = _mm512_loadu_si512(src_ptr.add(128) as *const _);
         let rgba3 = _mm512_loadu_si512(src_ptr.add(64 + 128) as *const _);
+
         let (rrr, ggg, bbb, aaa) = avx512_deinterleave_rgba::<HAS_VBMI>(rgba0, rgba1, rgba2, rgba3);
 
         let rrr = self.avx512_unpremultiply_row(rrr, aaa);
@@ -339,6 +326,122 @@ impl DisassociateAlpha for Avx512DisassociateAlpha<true> {
     }
 }
 
+/// Uses f16 instead of f32 to unpremultiply alpha
+#[derive(Default)]
+#[cfg(feature = "nightly_avx512fp16")]
+struct Avx512DisassociateAlphaFloat16<const HAS_VBMI: bool> {}
+
+#[cfg(feature = "nightly_avx512fp16")]
+impl<const HAS_VBMI: bool> Avx512DisassociateAlphaFloat16<HAS_VBMI> {
+    #[inline(always)]
+    unsafe fn avx512_unpremultiply_row(&self, x: __m512i, a: __m512i) -> __m512i {
+        let zeros = _mm512_setzero_si512();
+        let lo = _mm512_unpacklo_epi8(x, zeros);
+        let hi = _mm512_unpackhi_epi8(x, zeros);
+
+        let is_zero_mask = _mm512_cmp_epi8_mask::<0>(a, zeros);
+
+        let scale_ps = _mm512_castsi512_ph(_mm512_set1_epi16(23544));
+
+        let lo = _mm512_mul_ph(_mm512_cvtepu16_ph(lo), scale_ps);
+        let hi = _mm512_mul_ph(_mm512_cvtepu16_ph(hi), scale_ps);
+
+        let a_lo = _mm512_unpacklo_epi8(a, zeros);
+        let a_hi = _mm512_unpackhi_epi8(a, zeros);
+
+        let a_lo = _mm512_rcp_ph(_mm512_cvtepu16_ph(a_lo));
+        let a_hi = _mm512_rcp_ph(_mm512_cvtepu16_ph(a_hi));
+        const FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+        let lo = _mm512_cvtph_epi16(_mm512_mul_round_ph::<FLAGS>(lo, a_lo));
+        let hi = _mm512_cvtph_epi16(_mm512_mul_round_ph::<FLAGS>(hi, a_hi));
+
+        let packed = _mm512_packus_epi16(lo, hi);
+        _mm512_mask_blend_epi8(is_zero_mask, packed, _mm512_setzero_si512())
+    }
+
+    #[inline(always)]
+    unsafe fn disassociate_chunk(&self, in_place: &mut [u8]) {
+        let src_ptr = in_place.as_ptr();
+        let rgba0 = _mm512_loadu_si512(src_ptr as *const _);
+        let rgba1 = _mm512_loadu_si512(src_ptr.add(64) as *const _);
+        let rgba2 = _mm512_loadu_si512(src_ptr.add(128) as *const _);
+        let rgba3 = _mm512_loadu_si512(src_ptr.add(64 + 128) as *const _);
+
+        let (rrr, ggg, bbb, aaa) = avx512_deinterleave_rgba::<HAS_VBMI>(rgba0, rgba1, rgba2, rgba3);
+
+        let rrr = self.avx512_unpremultiply_row(rrr, aaa);
+        let ggg = self.avx512_unpremultiply_row(ggg, aaa);
+        let bbb = self.avx512_unpremultiply_row(bbb, aaa);
+
+        let (rgba0, rgba1, rgba2, rgba3) = avx512_interleave_rgba::<HAS_VBMI>(rrr, ggg, bbb, aaa);
+
+        let dst_ptr = in_place.as_mut_ptr();
+        _mm512_storeu_si512(dst_ptr as *mut _, rgba0);
+        _mm512_storeu_si512(dst_ptr.add(64) as *mut _, rgba1);
+        _mm512_storeu_si512(dst_ptr.add(128) as *mut _, rgba2);
+        _mm512_storeu_si512(dst_ptr.add(128 + 64) as *mut _, rgba3);
+    }
+}
+
+#[cfg(feature = "nightly_avx512fp16")]
+impl DisassociateAlpha for Avx512DisassociateAlphaFloat16<false> {
+    #[target_feature(enable = "avx512f", enable = "avx512bw", enable = "avx512fp16")]
+    unsafe fn disassociate(&self, in_place: &mut [u8]) {
+        let mut rem = in_place;
+
+        for dst in rem.chunks_exact_mut(64 * 4) {
+            self.disassociate_chunk(dst);
+        }
+
+        rem = rem.chunks_exact_mut(64 * 4).into_remainder();
+
+        if !rem.is_empty() {
+            const PART_SIZE: usize = 64 * 4;
+            assert!(rem.len() < PART_SIZE);
+
+            let mut buffer: [u8; PART_SIZE] = [0u8; PART_SIZE];
+
+            std::ptr::copy_nonoverlapping(rem.as_ptr(), buffer.as_mut_ptr(), rem.len());
+
+            self.disassociate_chunk(&mut buffer);
+
+            std::ptr::copy_nonoverlapping(buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
+        }
+    }
+}
+
+#[cfg(feature = "nightly_avx512fp16")]
+impl DisassociateAlpha for Avx512DisassociateAlphaFloat16<true> {
+    #[target_feature(
+        enable = "avx512f",
+        enable = "avx512bw",
+        enable = "avx512vbmi",
+        enable = "avx512fp16"
+    )]
+    unsafe fn disassociate(&self, in_place: &mut [u8]) {
+        let mut rem = in_place;
+
+        for dst in rem.chunks_exact_mut(64 * 4) {
+            self.disassociate_chunk(dst);
+        }
+
+        rem = rem.chunks_exact_mut(64 * 4).into_remainder();
+
+        if !rem.is_empty() {
+            const PART_SIZE: usize = 64 * 4;
+            assert!(rem.len() < PART_SIZE);
+
+            let mut buffer: [u8; PART_SIZE] = [0u8; PART_SIZE];
+
+            std::ptr::copy_nonoverlapping(rem.as_ptr(), buffer.as_mut_ptr(), rem.len());
+
+            self.disassociate_chunk(&mut buffer);
+
+            std::ptr::copy_nonoverlapping(buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
+        }
+    }
+}
+
 #[target_feature(enable = "avx512f", enable = "avx512bw")]
 unsafe fn avx512_unp_row(in_place: &mut [u8], executor: impl DisassociateAlpha) {
     executor.disassociate(in_place);
@@ -352,38 +455,37 @@ pub(crate) fn avx512_unpremultiply_alpha_rgba(
     pool: &Option<ThreadPool>,
 ) {
     let has_vbmi = std::arch::is_x86_feature_detected!("avx512vbmi");
+    let mut executor: fn(&mut [u8]) = |row: &mut [u8]| unsafe {
+        avx512_unp_row(row, Avx512DisassociateAlpha::<false>::default());
+    };
+    if has_vbmi {
+        executor = |row: &mut [u8]| unsafe {
+            avx512_unp_row(row, Avx512DisassociateAlpha::<true>::default());
+        };
+    }
+    #[cfg(feature = "nightly_avx512fp16")]
+    {
+        let has_fp16 = std::arch::is_x86_feature_detected!("avx512fp16");
+        if has_fp16 && has_vbmi {
+            executor = |row: &mut [u8]| unsafe {
+                avx512_unp_row(row, Avx512DisassociateAlphaFloat16::<true>::default());
+            };
+        } else if has_fp16 {
+            executor = |row: &mut [u8]| unsafe {
+                avx512_unp_row(row, Avx512DisassociateAlphaFloat16::<false>::default());
+            };
+        }
+    }
 
     if let Some(pool) = pool {
         pool.install(|| {
-            in_place
-                .par_chunks_exact_mut(stride)
-                .for_each(|row| unsafe {
-                    if has_vbmi {
-                        avx512_unp_row(
-                            &mut row[..width * 4],
-                            Avx512DisassociateAlpha::<true>::default(),
-                        );
-                    } else {
-                        avx512_unp_row(
-                            &mut row[..width * 4],
-                            Avx512DisassociateAlpha::<false>::default(),
-                        );
-                    }
-                });
+            in_place.par_chunks_exact_mut(stride).for_each(|row| {
+                executor(&mut row[..width * 4]);
+            });
         });
     } else {
-        in_place.chunks_exact_mut(stride).for_each(|row| unsafe {
-            if has_vbmi {
-                avx512_unp_row(
-                    &mut row[..width * 4],
-                    Avx512DisassociateAlpha::<true>::default(),
-                );
-            } else {
-                avx512_unp_row(
-                    &mut row[..width * 4],
-                    Avx512DisassociateAlpha::<false>::default(),
-                );
-            }
+        in_place.chunks_exact_mut(stride).for_each(|row| {
+            executor(&mut row[..width * 4]);
         });
     }
 }
