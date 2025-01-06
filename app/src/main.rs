@@ -43,7 +43,7 @@ fn resize_plane(
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
+    let img = ImageReader::open("./assets/asset_4.png")
         .unwrap()
         .decode()
         .unwrap();
