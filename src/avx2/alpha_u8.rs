@@ -62,44 +62,29 @@ struct AssociateAlphaDefault {}
 impl AssociateAlphaDefault {
     #[inline(always)]
     unsafe fn associate_chunk(&self, dst: &mut [u8], src: &[u8]) {
+        let shuffle = _mm256_setr_epi8(
+            3, 3, 3, 3, 7, 7, 7, 7, 11, 11, 11, 11, 15, 15, 15, 15, 3, 3, 3, 3, 7, 7, 7, 7, 11, 11,
+            11, 11, 15, 15, 15, 15,
+        );
         let src_ptr = src.as_ptr();
         let rgba0 = _mm256_loadu_si256(src_ptr as *const __m256i);
-        let rgba1 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
-        let rgba2 = _mm256_loadu_si256(src_ptr.add(64) as *const __m256i);
-        let rgba3 = _mm256_loadu_si256(src_ptr.add(96) as *const __m256i);
-        let (rrr, ggg, bbb, aaa) = avx2_deinterleave_rgba(rgba0, rgba1, rgba2, rgba3);
+        let multiplicand = _mm256_shuffle_epi8(rgba0, shuffle);
 
         let zeros = _mm256_setzero_si256();
 
-        let mut rrr_low = _mm256_unpacklo_epi8(rrr, zeros);
-        let mut rrr_high = _mm256_unpackhi_epi8(rrr, zeros);
+        let mut v_ll = _mm256_unpacklo_epi8(rgba0, zeros);
+        let mut v_hi = _mm256_unpackhi_epi8(rgba0, zeros);
 
-        let mut ggg_low = _mm256_unpacklo_epi8(ggg, zeros);
-        let mut ggg_high = _mm256_unpackhi_epi8(ggg, zeros);
+        let a_lo = _mm256_unpacklo_epi8(multiplicand, zeros);
+        let a_hi = _mm256_unpackhi_epi8(multiplicand, zeros);
 
-        let mut bbb_low = _mm256_unpacklo_epi8(bbb, zeros);
-        let mut bbb_high = _mm256_unpackhi_epi8(bbb, zeros);
+        v_ll = avx2_div_by255(_mm256_mullo_epi16(v_ll, a_lo));
+        v_hi = avx2_div_by255(_mm256_mullo_epi16(v_hi, a_hi));
 
-        let aaa_low = _mm256_unpacklo_epi8(aaa, zeros);
-        let aaa_high = _mm256_unpackhi_epi8(aaa, zeros);
+        let values = _mm256_packus_epi16(v_ll, v_hi);
 
-        rrr_low = avx2_div_by255(_mm256_mullo_epi16(rrr_low, aaa_low));
-        rrr_high = avx2_div_by255(_mm256_mullo_epi16(rrr_high, aaa_high));
-        ggg_low = avx2_div_by255(_mm256_mullo_epi16(ggg_low, aaa_low));
-        ggg_high = avx2_div_by255(_mm256_mullo_epi16(ggg_high, aaa_high));
-        bbb_low = avx2_div_by255(_mm256_mullo_epi16(bbb_low, aaa_low));
-        bbb_high = avx2_div_by255(_mm256_mullo_epi16(bbb_high, aaa_high));
-
-        let rrr = _mm256_packus_epi16(rrr_low, rrr_high);
-        let ggg = _mm256_packus_epi16(ggg_low, ggg_high);
-        let bbb = _mm256_packus_epi16(bbb_low, bbb_high);
-
-        let (rgba0, rgba1, rgba2, rgba3) = avx2_interleave_rgba(rrr, ggg, bbb, aaa);
         let dst_ptr = dst.as_mut_ptr();
-        _mm256_storeu_si256(dst_ptr as *mut __m256i, rgba0);
-        _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, rgba1);
-        _mm256_storeu_si256(dst_ptr.add(64) as *mut __m256i, rgba2);
-        _mm256_storeu_si256(dst_ptr.add(96) as *mut __m256i, rgba3);
+        _mm256_storeu_si256(dst_ptr as *mut __m256i, values);
     }
 }
 
@@ -109,18 +94,15 @@ impl AssociateAlpha for AssociateAlphaDefault {
         let mut rem = dst;
         let mut src_rem = src;
 
-        for (dst, src) in rem
-            .chunks_exact_mut(32 * 4)
-            .zip(src_rem.chunks_exact(32 * 4))
-        {
+        for (dst, src) in rem.chunks_exact_mut(32).zip(src_rem.chunks_exact(32)) {
             self.associate_chunk(dst, src);
         }
 
-        rem = rem.chunks_exact_mut(32 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(32 * 4).remainder();
+        rem = rem.chunks_exact_mut(32).into_remainder();
+        src_rem = src_rem.chunks_exact(32).remainder();
 
         if !rem.is_empty() {
-            const PART_SIZE: usize = 32 * 4;
+            const PART_SIZE: usize = 32;
             assert!(src_rem.len() < PART_SIZE);
             assert!(rem.len() < PART_SIZE);
             assert_eq!(src_rem.len(), rem.len());
