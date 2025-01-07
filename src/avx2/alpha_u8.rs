@@ -208,12 +208,13 @@ impl Avx2DisassociateAlpha {
             _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(hi, zeros)),
             scale_ps,
         );
-        let a_lo = _mm256_unpacklo_epi8(a, zeros);
-        let a_hi = _mm256_unpackhi_epi8(a, zeros);
-        let a_lo_lo = _mm256_rcp_ps(_mm256_cvtepi32_ps(_mm256_unpacklo_epi16(a_lo, zeros)));
-        let a_lo_hi = _mm256_rcp_ps(_mm256_cvtepi32_ps(_mm256_unpackhi_epi16(a_lo, zeros)));
-        let a_hi_lo = _mm256_rcp_ps(_mm256_cvtepi32_ps(_mm256_unpacklo_epi16(a_hi, zeros)));
-        let a_hi_hi = _mm256_rcp_ps(_mm256_cvtepi32_ps(_mm256_unpackhi_epi16(a_hi, zeros)));
+
+        let alphas = _mm256_rcp_ps(_mm256_cvtepi32_ps(_mm256_srli_epi32::<24>(a)));
+
+        let a_lo_lo = _mm256_permutevar8x32_ps(alphas, _mm256_setr_epi32(0, 0, 0, 0, 4, 4, 4, 4));
+        let a_lo_hi = _mm256_permutevar8x32_ps(alphas, _mm256_setr_epi32(1, 1, 1, 1, 5, 5, 5, 5));
+        let a_hi_lo = _mm256_permutevar8x32_ps(alphas, _mm256_setr_epi32(2, 2, 2, 2, 6, 6, 6, 6));
+        let a_hi_hi = _mm256_permutevar8x32_ps(alphas, _mm256_setr_epi32(3, 3, 3, 3, 7, 7, 7, 7));
 
         let lo_lo = _mm256_cvtps_epi32(_mm256_round_ps::<0x00>(_mm256_mul_ps(lo_lo, a_lo_lo)));
         let lo_hi = _mm256_cvtps_epi32(_mm256_round_ps::<0x00>(_mm256_mul_ps(lo_hi, a_lo_hi)));
