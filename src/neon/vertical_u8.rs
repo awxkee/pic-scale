@@ -690,8 +690,7 @@ fn convolve_vertical_neon_row_full(
             if bounds_size == 2 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..2);
-                let mut v_weight = vld1_dup_s16(weight.as_ptr());
-                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
+                let v_weight = vreinterpret_s16_s32(vld1_dup_s32(weight.as_ptr() as *const i32));
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
 
@@ -719,8 +718,8 @@ fn convolve_vertical_neon_row_full(
             } else if bounds_size == 3 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..3);
-                let mut v_weight = vld1_dup_s16(weight.as_ptr());
-                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
+                let mut v_weight =
+                    vreinterpret_s16_s32(vld1_dup_s32(weight.as_ptr() as *const i32));
                 v_weight = vld1_lane_s16::<2>(weight.as_ptr().add(2), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
@@ -855,8 +854,7 @@ fn convolve_vertical_neon_row_full(
             if bounds_size == 2 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..2);
-                let mut v_weight = vld1_dup_s16(weight.as_ptr());
-                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
+                let v_weight = vreinterpret_s16_s32(vld1_dup_s32(weight.as_ptr() as *const i32));
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let items0 = xvld1q_u8_x2(src_ptr0.as_ptr());
@@ -871,8 +869,8 @@ fn convolve_vertical_neon_row_full(
             } else if bounds_size == 3 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..3);
-                let mut v_weight = vld1_dup_s16(weight.as_ptr());
-                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
+                let mut v_weight =
+                    vreinterpret_s16_s32(vld1_dup_s32(weight.as_ptr() as *const i32));
                 v_weight = vld1_lane_s16::<2>(weight.as_ptr().add(2), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
@@ -955,8 +953,7 @@ fn convolve_vertical_neon_row_full(
             if bounds_size == 2 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..2);
-                let mut v_weight = vld1_dup_s16(weight.as_ptr());
-                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
+                let v_weight = vreinterpret_s16_s32(vld1_dup_s32(weight.as_ptr() as *const i32));
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let item_row0 = vld1q_u8(src_ptr0.as_ptr());
@@ -966,8 +963,8 @@ fn convolve_vertical_neon_row_full(
             } else if bounds_size == 3 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..3);
-                let mut v_weight = vld1_dup_s16(weight.as_ptr());
-                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
+                let mut v_weight =
+                    vreinterpret_s16_s32(vld1_dup_s32(weight.as_ptr() as *const i32));
                 v_weight = vld1_lane_s16::<2>(weight.as_ptr().add(2), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
@@ -1025,8 +1022,7 @@ fn convolve_vertical_neon_row_full(
             if bounds_size == 2 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..2);
-                let mut v_weight = vld1_dup_s16(weight.as_ptr());
-                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
+                let v_weight = vreinterpret_s16_s32(vld1_dup_s32(weight.as_ptr() as *const i32));
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let item_row0 = vld1_u8(src_ptr0.as_ptr());
@@ -1041,8 +1037,8 @@ fn convolve_vertical_neon_row_full(
             } else if bounds_size == 3 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..3);
-                let mut v_weight = vld1_dup_s16(weight.as_ptr());
-                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
+                let mut v_weight =
+                    vreinterpret_s16_s32(vld1_dup_s32(weight.as_ptr() as *const i32));
                 v_weight = vld1_lane_s16::<2>(weight.as_ptr().add(2), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
@@ -1123,8 +1119,7 @@ fn convolve_vertical_neon_row_full(
             if bounds_size == 2 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..2);
-                let mut v_weight = vld1_dup_s16(weight.as_ptr());
-                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
+                let v_weight = vreinterpret_s16_s32(vld1_dup_s32(weight.as_ptr() as *const i32));
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
                 let item_row0 = vld1_dup_u8(src_ptr0.as_ptr());
@@ -1137,8 +1132,8 @@ fn convolve_vertical_neon_row_full(
             } else if bounds_size == 3 {
                 let py = bounds.start;
                 let weight = weight.get_unchecked(0..3);
-                let mut v_weight = vld1_dup_s16(weight.as_ptr());
-                v_weight = vld1_lane_s16::<1>(weight.as_ptr().add(1), v_weight);
+                let mut v_weight =
+                    vreinterpret_s16_s32(vld1_dup_s32(weight.as_ptr() as *const i32));
                 v_weight = vld1_lane_s16::<2>(weight.as_ptr().add(2), v_weight);
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);

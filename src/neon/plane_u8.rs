@@ -56,16 +56,11 @@ macro_rules! accumulate_8_horiz {
 
 macro_rules! accumulate_4_horiz {
     ($store: expr, $ptr: expr, $weights: expr) => {{
-        let pixel_colors = vld1_u16(
-            [
-                $ptr.read_unaligned() as u16,
-                $ptr.add(1).read_unaligned() as u16,
-                $ptr.add(2).read_unaligned() as u16,
-                $ptr.add(3).read_unaligned() as u16,
-            ]
-            .as_ptr(),
-        );
-        let px_16 = vreinterpret_s16_u16(pixel_colors);
+        let pixel_colors = vmovl_u8(vreinterpret_u8_u32(vld1_lane_u32::<0>(
+            $ptr as *const u32,
+            vdup_n_u32(0),
+        )));
+        let px_16 = vreinterpret_s16_u16(vget_low_u16(pixel_colors));
 
         $store = vmlal_s16($store, px_16, $weights);
     }};
