@@ -28,7 +28,7 @@
  */
 
 use crate::avx2::utils::{
-    _mm256_select_si256, avx2_div_by255,
+    _mm256_select_si256, avx2_deinterleave_rgba, avx2_div_by255, avx2_interleave_rgba,
 };
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
@@ -183,47 +183,73 @@ struct Avx2DisassociateAlpha {}
 
 impl Avx2DisassociateAlpha {
     #[inline(always)]
-    unsafe fn avx2_unpremultiply_row(&self, x: __m256i) -> __m256i {
+    unsafe fn avx2_unpremultiply_row(&self, x: __m256i, a: __m256i) -> __m256i {
+        let zeros = _mm256_setzero_si256();
+        let lo = _mm256_unpacklo_epi8(x, zeros);
+        let hi = _mm256_unpackhi_epi8(x, zeros);
 
-        let is_zero_mask = _mm256_set1_epi32(0xff000000u32 as i32);
+        let is_zero_mask = _mm256_cmpeq_epi8(a, zeros);
 
-        let shuffle_lo = _mm256_setr_epi8(
-            0, 1, 0, 1, 0, 1, 0, 1, 4, 5, 4, 5, 4, 5, 4, 5, 0, 1, 0, 1, 0, 1, 0, 1, 4, 5, 4, 5, 4,
-            5, 4, 5,
+        let scale_ps = _mm256_set1_ps(255f32);
+
+        let lo_lo = _mm256_mul_ps(
+            _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(lo, zeros)),
+            scale_ps,
         );
-
-        let shuffle_hi = _mm256_setr_epi8(
-            8, 9, 8, 9, 8, 9, 8, 9, 12, 13, 12, 13, 12, 13, 12, 13, 8, 9, 8, 9, 8, 9, 8, 9, 12, 13,
-            12, 13, 12, 13, 12, 13,
+        let lo_hi = _mm256_mul_ps(
+            _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(lo, zeros)),
+            scale_ps,
         );
+        let hi_lo = _mm256_mul_ps(
+            _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(hi, zeros)),
+            scale_ps,
+        );
+        let hi_hi = _mm256_mul_ps(
+            _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(hi, zeros)),
+            scale_ps,
+        );
+        let a_lo = _mm256_unpacklo_epi8(a, zeros);
+        let a_hi = _mm256_unpackhi_epi8(a, zeros);
+        let a_lo_lo = _mm256_rcp_ps(_mm256_cvtepi32_ps(_mm256_unpacklo_epi16(a_lo, zeros)));
+        let a_lo_hi = _mm256_rcp_ps(_mm256_cvtepi32_ps(_mm256_unpackhi_epi16(a_lo, zeros)));
+        let a_hi_lo = _mm256_rcp_ps(_mm256_cvtepi32_ps(_mm256_unpacklo_epi16(a_hi, zeros)));
+        let a_hi_hi = _mm256_rcp_ps(_mm256_cvtepi32_ps(_mm256_unpackhi_epi16(a_hi, zeros)));
 
-        let scale_ps = _mm256_set1_ps((255 * 257) as f32);
-        let alpha_cvt = _mm256_cvtepi32_ps(_mm256_srli_epi32::<24>(x));
-        let numer = _mm256_cvtps_epi32(_mm256_mul_ps(_mm256_rcp_ps(alpha_cvt), scale_ps));
+        let lo_lo = _mm256_cvtps_epi32(_mm256_round_ps::<0x00>(_mm256_mul_ps(lo_lo, a_lo_lo)));
+        let lo_hi = _mm256_cvtps_epi32(_mm256_round_ps::<0x00>(_mm256_mul_ps(lo_hi, a_lo_hi)));
+        let hi_lo = _mm256_cvtps_epi32(_mm256_round_ps::<0x00>(_mm256_mul_ps(hi_lo, a_hi_lo)));
+        let hi_hi = _mm256_cvtps_epi32(_mm256_round_ps::<0x00>(_mm256_mul_ps(hi_hi, a_hi_hi)));
 
-        let px_lo = _mm256_unpacklo_epi8(x, x);
-        let px_hi = _mm256_unpackhi_epi8(x, x);
-
-        let numer_lo = _mm256_shuffle_epi8(numer, shuffle_lo);
-        let numer_hi = _mm256_shuffle_epi8(numer, shuffle_hi);
-
-        let v_lo = _mm256_mulhi_epu16(px_lo, numer_lo);
-        let v_hi = _mm256_mulhi_epu16(px_hi, numer_hi);
-
-        // _mm256_select_si256(is_zero_mask, zeros, _mm256_packus_epi16(v_lo, v_hi))
-        let alpha = _mm256_and_si256(x, is_zero_mask);
-        _mm256_blendv_epi8(_mm256_packus_epi16(v_lo, v_hi), alpha, is_zero_mask)
+        _mm256_select_si256(
+            is_zero_mask,
+            zeros,
+            _mm256_packus_epi16(
+                _mm256_packus_epi32(lo_lo, lo_hi),
+                _mm256_packus_epi32(hi_lo, hi_hi),
+            ),
+        )
     }
 
     #[inline(always)]
     unsafe fn disassociate_chunk(&self, in_place: &mut [u8]) {
         let src_ptr = in_place.as_ptr();
         let rgba0 = _mm256_loadu_si256(src_ptr as *const __m256i);
+        let rgba1 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
+        let rgba2 = _mm256_loadu_si256(src_ptr.add(64) as *const __m256i);
+        let rgba3 = _mm256_loadu_si256(src_ptr.add(96) as *const __m256i);
+        let (rrr, ggg, bbb, aaa) = avx2_deinterleave_rgba(rgba0, rgba1, rgba2, rgba3);
 
-        let rrr = self.avx2_unpremultiply_row(rgba0);
+        let rrr = self.avx2_unpremultiply_row(rrr, aaa);
+        let ggg = self.avx2_unpremultiply_row(ggg, aaa);
+        let bbb = self.avx2_unpremultiply_row(bbb, aaa);
+
+        let (rgba0, rgba1, rgba2, rgba3) = avx2_interleave_rgba(rrr, ggg, bbb, aaa);
 
         let dst_ptr = in_place.as_mut_ptr();
-        _mm256_storeu_si256(dst_ptr as *mut __m256i, rrr);
+        _mm256_storeu_si256(dst_ptr as *mut __m256i, rgba0);
+        _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, rgba1);
+        _mm256_storeu_si256(dst_ptr.add(64) as *mut __m256i, rgba2);
+        _mm256_storeu_si256(dst_ptr.add(96) as *mut __m256i, rgba3);
     }
 }
 
@@ -232,14 +258,14 @@ impl DisassociateAlpha for Avx2DisassociateAlpha {
     unsafe fn disassociate(&self, in_place: &mut [u8]) {
         let mut rem = in_place;
 
-        for dst in rem.chunks_exact_mut(32) {
+        for dst in rem.chunks_exact_mut(32 * 4) {
             self.disassociate_chunk(dst);
         }
 
-        rem = rem.chunks_exact_mut(32).into_remainder();
+        rem = rem.chunks_exact_mut(32 * 4).into_remainder();
 
         if !rem.is_empty() {
-            const PART_SIZE: usize = 32;
+            const PART_SIZE: usize = 32 * 4;
             assert!(rem.len() < PART_SIZE);
 
             let mut buffer: [u8; PART_SIZE] = [0u8; PART_SIZE];
