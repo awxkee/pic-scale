@@ -226,56 +226,54 @@ unsafe fn convolve_horizontal_plane_sse_row_impl(
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
 ) {
-    unsafe {
-        let zeros = _mm_setzero_si128();
+    let zeros = _mm_setzero_si128();
 
-        for ((dst, bounds), weights) in dst.iter_mut().zip(filter_weights.bounds.iter()).zip(
-            filter_weights
-                .weights
-                .chunks_exact(filter_weights.aligned_size),
-        ) {
-            let mut jx = 0usize;
-            let mut store = _mm_setr_epi32(ROUNDING_CONST, 0i32, 0i32, 0i32);
+    for ((dst, bounds), weights) in dst.iter_mut().zip(filter_weights.bounds.iter()).zip(
+        filter_weights
+            .weights
+            .chunks_exact(filter_weights.aligned_size),
+    ) {
+        let mut jx = 0usize;
+        let mut store = _mm_setr_epi32(ROUNDING_CONST, 0i32, 0i32, 0i32);
 
-            while jx + 8 < bounds.size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 8));
-                let weights_i16 = _mm_loadu_si128(w_ptr.as_ptr() as *const __m128i);
-                let weights = (
-                    _mm_unpacklo_epi16(weights_i16, zeros),
-                    _mm_unpackhi_epi16(weights_i16, zeros),
-                );
-                let bounds_start = bounds.start + jx;
+        while jx + 8 < bounds.size {
+            let w_ptr = weights.get_unchecked(jx..(jx + 8));
+            let weights_i16 = _mm_loadu_si128(w_ptr.as_ptr() as *const __m128i);
+            let weights = (
+                _mm_unpacklo_epi16(weights_i16, zeros),
+                _mm_unpackhi_epi16(weights_i16, zeros),
+            );
+            let bounds_start = bounds.start + jx;
 
-                let src_ptr = src.get_unchecked(bounds_start..);
-                s_accumulate_8_horiz!(store, src_ptr.as_ptr(), weights);
+            let src_ptr = src.get_unchecked(bounds_start..);
+            s_accumulate_8_horiz!(store, src_ptr.as_ptr(), weights);
 
-                jx += 8;
-            }
-
-            while jx + 4 < bounds.size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
-                let weights = _mm_cvtepi16_epi32(_mm_loadu_si64(w_ptr.as_ptr() as *const u8));
-                let bounds_start = bounds.start + jx;
-
-                let src_ptr = src.get_unchecked(bounds_start..);
-                s_accumulate_4_horiz!(store, src_ptr.as_ptr(), weights);
-
-                jx += 4;
-            }
-
-            while jx < bounds.size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 1));
-                let weight = _mm_setr_epi32(w_ptr.as_ptr().read_unaligned() as i32, 0, 0, 0);
-                let bounds_start = bounds.start + jx;
-                let src_ptr = src.get_unchecked(bounds_start..);
-                s_accumulate_1_horiz!(store, src_ptr.as_ptr(), weight);
-                jx += 1;
-            }
-
-            let sums = _mm_hsum_epi32(store).max(0);
-            let shifted = sums >> PRECISION;
-            let value = shifted.min(255) as u8;
-            *dst = value;
+            jx += 8;
         }
+
+        while jx + 4 < bounds.size {
+            let w_ptr = weights.get_unchecked(jx..(jx + 4));
+            let weights = _mm_cvtepi16_epi32(_mm_loadu_si64(w_ptr.as_ptr() as *const u8));
+            let bounds_start = bounds.start + jx;
+
+            let src_ptr = src.get_unchecked(bounds_start..);
+            s_accumulate_4_horiz!(store, src_ptr.as_ptr(), weights);
+
+            jx += 4;
+        }
+
+        while jx < bounds.size {
+            let w_ptr = weights.get_unchecked(jx..(jx + 1));
+            let weight = _mm_setr_epi32(w_ptr.as_ptr().read_unaligned() as i32, 0, 0, 0);
+            let bounds_start = bounds.start + jx;
+            let src_ptr = src.get_unchecked(bounds_start..);
+            s_accumulate_1_horiz!(store, src_ptr.as_ptr(), weight);
+            jx += 1;
+        }
+
+        let sums = _mm_hsum_epi32(store).max(0);
+        let shifted = sums >> PRECISION;
+        let value = shifted.min(255) as u8;
+        *dst = value;
     }
 }
