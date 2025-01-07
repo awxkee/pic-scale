@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+use crate::avx2::utils::{_mm256_reduce_dot_epi16, _mm256_udot8_epi16, _mm_udot8_epi16};
 use crate::filter_weights::FilterWeights;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
@@ -34,10 +35,14 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-fn compress_i32(x: __m128i) -> __m128i {
+fn compress_i32<const DOT: bool>(x: __m128i) -> __m128i {
     unsafe {
-        let store_32 = _mm_srai_epi32::<7>(x);
-        _mm_packus_epi32(store_32, store_32)
+        if DOT {
+            let store_32 = _mm_srai_epi32::<7>(x);
+            _mm_packus_epi32(store_32, store_32)
+        } else {
+            _mm_srai_epi16::<7>(_mm_hadds_epi16(x, x))
+        }
     }
 }
 
@@ -49,13 +54,18 @@ pub(crate) fn convolve_horizontal_rgb_avx_rows_4_i8(
     filter_weights: &FilterWeights<i8>,
 ) {
     unsafe {
-        convolve_horizontal_rgb_avx_rows_i8_4_impl(
-            src,
-            src_stride,
-            dst,
-            dst_stride,
-            filter_weights,
-        );
+        #[cfg(feature = "nightly_avx512")]
+        if std::arch::is_x86_feature_detected!("avxvnni") {
+            return convolve_horizontal_rgb_avx_rows_i8_4_dot(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                filter_weights,
+            );
+        }
+
+        convolve_horizontal_rgb_avx_rows_i8_4_ubs(src, src_stride, dst, dst_stride, filter_weights);
     }
 }
 
@@ -103,8 +113,43 @@ unsafe fn make_tuple_x8(pixel: __m128i, pixel2: __m128i, shuf: __m256i) -> __m25
     )
 }
 
+#[cfg(feature = "nightly_avx512")]
 #[target_feature(enable = "avx2", enable = "avxvnni")]
-unsafe fn convolve_horizontal_rgb_avx_rows_i8_4_impl(
+unsafe fn convolve_horizontal_rgb_avx_rows_i8_4_dot(
+    src: &[u8],
+    src_stride: usize,
+    dst: &mut [u8],
+    dst_stride: usize,
+    filter_weights: &FilterWeights<i8>,
+) {
+    convolve_horizontal_rgb_avx_rows_i8_4_impl::<true>(
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+        filter_weights,
+    );
+}
+
+#[target_feature(enable = "avx2")]
+unsafe fn convolve_horizontal_rgb_avx_rows_i8_4_ubs(
+    src: &[u8],
+    src_stride: usize,
+    dst: &mut [u8],
+    dst_stride: usize,
+    filter_weights: &FilterWeights<i8>,
+) {
+    convolve_horizontal_rgb_avx_rows_i8_4_impl::<false>(
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+        filter_weights,
+    );
+}
+
+#[inline(always)]
+unsafe fn convolve_horizontal_rgb_avx_rows_i8_4_impl<const DOT: bool>(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -131,7 +176,52 @@ unsafe fn convolve_horizontal_rgb_avx_rows_i8_4_impl(
         -1, -1, -1, -1,
     );
 
-    let vld = _mm_set1_epi32(ROUNDING_CONST);
+    let vld = if DOT {
+        _mm_set1_epi32(ROUNDING_CONST)
+    } else {
+        _mm_setr_epi16(
+            ROUNDING_CONST as i16,
+            0,
+            ROUNDING_CONST as i16,
+            0,
+            ROUNDING_CONST as i16,
+            0,
+            0,
+            0,
+        )
+    };
+
+    let vld_avx = if DOT {
+        _mm256_setr_epi32(
+            ROUNDING_CONST,
+            ROUNDING_CONST,
+            ROUNDING_CONST,
+            0,
+            0,
+            0,
+            0,
+            0,
+        )
+    } else {
+        _mm256_setr_epi16(
+            ROUNDING_CONST as i16,
+            0,
+            ROUNDING_CONST as i16,
+            0,
+            ROUNDING_CONST as i16,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        )
+    };
 
     let (row0_ref, rest) = dst.split_at_mut(dst_stride);
     let (row1_ref, rest) = rest.split_at_mut(dst_stride);
@@ -167,46 +257,10 @@ unsafe fn convolve_horizontal_rgb_avx_rows_i8_4_impl(
         // [R0, G0, B0] [R1, G1, B1] [R2 G2 B2] [R3 G3 B3]
 
         if bounds.size > 4 {
-            let mut store0 = _mm256_setr_epi32(
-                ROUNDING_CONST,
-                ROUNDING_CONST,
-                ROUNDING_CONST,
-                0,
-                0,
-                0,
-                0,
-                0,
-            );
-            let mut store1 = _mm256_setr_epi32(
-                ROUNDING_CONST,
-                ROUNDING_CONST,
-                ROUNDING_CONST,
-                0,
-                0,
-                0,
-                0,
-                0,
-            );
-            let mut store2 = _mm256_setr_epi32(
-                ROUNDING_CONST,
-                ROUNDING_CONST,
-                ROUNDING_CONST,
-                0,
-                0,
-                0,
-                0,
-                0,
-            );
-            let mut store3 = _mm256_setr_epi32(
-                ROUNDING_CONST,
-                ROUNDING_CONST,
-                ROUNDING_CONST,
-                0,
-                0,
-                0,
-                0,
-                0,
-            );
+            let mut store0 = vld_avx;
+            let mut store1 = vld_avx;
+            let mut store2 = vld_avx;
+            let mut store3 = vld_avx;
 
             while jx + 8 < bounds.size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 8));
@@ -229,30 +283,18 @@ unsafe fn convolve_horizontal_rgb_avx_rows_i8_4_impl(
                 let rgb_pixel_3 =
                     load_distr_x8_rgb(src3.get_unchecked(bounds_start..), shuffle_pixels_4);
 
-                store0 = _mm256_dpbusd_avx_epi32(store0, rgb_pixel_0, w0);
-                store1 = _mm256_dpbusd_avx_epi32(store1, rgb_pixel_1, w0);
-                store2 = _mm256_dpbusd_avx_epi32(store2, rgb_pixel_2, w0);
-                store3 = _mm256_dpbusd_avx_epi32(store3, rgb_pixel_3, w0);
+                store0 = _mm256_udot8_epi16::<DOT>(store0, rgb_pixel_0, w0);
+                store1 = _mm256_udot8_epi16::<DOT>(store1, rgb_pixel_1, w0);
+                store2 = _mm256_udot8_epi16::<DOT>(store2, rgb_pixel_2, w0);
+                store3 = _mm256_udot8_epi16::<DOT>(store3, rgb_pixel_3, w0);
 
                 jx += 8;
             }
 
-            store_0 = _mm_add_epi32(
-                _mm256_castsi256_si128(store0),
-                _mm256_extracti128_si256::<1>(store0),
-            );
-            store_1 = _mm_add_epi32(
-                _mm256_castsi256_si128(store1),
-                _mm256_extracti128_si256::<1>(store1),
-            );
-            store_2 = _mm_add_epi32(
-                _mm256_castsi256_si128(store2),
-                _mm256_extracti128_si256::<1>(store2),
-            );
-            store_3 = _mm_add_epi32(
-                _mm256_castsi256_si128(store3),
-                _mm256_extracti128_si256::<1>(store3),
-            );
+            store_0 = _mm256_reduce_dot_epi16::<DOT>(store0);
+            store_1 = _mm256_reduce_dot_epi16::<DOT>(store1);
+            store_2 = _mm256_reduce_dot_epi16::<DOT>(store2);
+            store_3 = _mm256_reduce_dot_epi16::<DOT>(store3);
         }
 
         while jx + 4 < bounds.size {
@@ -272,10 +314,10 @@ unsafe fn convolve_horizontal_rgb_avx_rows_i8_4_impl(
             let lo_2 = _mm_shuffle_epi8(rgb_pixel_2, shuffle_v);
             let lo_3 = _mm_shuffle_epi8(rgb_pixel_4, shuffle_v);
 
-            store_0 = _mm_dpbusd_avx_epi32(store_0, lo_0, weight0);
-            store_1 = _mm_dpbusd_avx_epi32(store_1, lo_1, weight0);
-            store_2 = _mm_dpbusd_avx_epi32(store_2, lo_2, weight0);
-            store_3 = _mm_dpbusd_avx_epi32(store_3, lo_3, weight0);
+            store_0 = _mm_udot8_epi16::<DOT>(store_0, lo_0, weight0);
+            store_1 = _mm_udot8_epi16::<DOT>(store_1, lo_1, weight0);
+            store_2 = _mm_udot8_epi16::<DOT>(store_2, lo_2, weight0);
+            store_3 = _mm_udot8_epi16::<DOT>(store_3, lo_3, weight0);
 
             jx += 4;
         }
@@ -296,10 +338,10 @@ unsafe fn convolve_horizontal_rgb_avx_rows_i8_4_impl(
             let lo_2 = _mm_shuffle_epi8(rgb_pixel_2, shuffle_v);
             let lo_3 = _mm_shuffle_epi8(rgb_pixel_4, shuffle_v);
 
-            store_0 = _mm_dpbusd_avx_epi32(store_0, lo_0, weight0);
-            store_1 = _mm_dpbusd_avx_epi32(store_1, lo_1, weight0);
-            store_2 = _mm_dpbusd_avx_epi32(store_2, lo_2, weight0);
-            store_3 = _mm_dpbusd_avx_epi32(store_3, lo_3, weight0);
+            store_0 = _mm_udot8_epi16::<DOT>(store_0, lo_0, weight0);
+            store_1 = _mm_udot8_epi16::<DOT>(store_1, lo_1, weight0);
+            store_2 = _mm_udot8_epi16::<DOT>(store_2, lo_2, weight0);
+            store_3 = _mm_udot8_epi16::<DOT>(store_3, lo_3, weight0);
 
             jx += 2;
         }
@@ -313,17 +355,17 @@ unsafe fn convolve_horizontal_rgb_avx_rows_i8_4_impl(
                 shuffle_weights,
             );
 
-            store_0 = add_one_weight(bounds_start, src0, weight0, store_0);
-            store_1 = add_one_weight(bounds_start, src1, weight0, store_1);
-            store_2 = add_one_weight(bounds_start, src2, weight0, store_2);
-            store_3 = add_one_weight(bounds_start, src3, weight0, store_3);
+            store_0 = add_one_weight::<DOT>(bounds_start, src0, weight0, store_0);
+            store_1 = add_one_weight::<DOT>(bounds_start, src1, weight0, store_1);
+            store_2 = add_one_weight::<DOT>(bounds_start, src2, weight0, store_2);
+            store_3 = add_one_weight::<DOT>(bounds_start, src3, weight0, store_3);
             jx += 1;
         }
 
-        let store_0_8 = compress_i32(store_0);
-        let store_1_8 = compress_i32(store_1);
-        let store_2_8 = compress_i32(store_2);
-        let store_3_8 = compress_i32(store_3);
+        let store_0_8 = compress_i32::<DOT>(store_0);
+        let store_1_8 = compress_i32::<DOT>(store_1);
+        let store_2_8 = compress_i32::<DOT>(store_2);
+        let store_3_8 = compress_i32::<DOT>(store_3);
 
         let store_0_8 = _mm_packus_epi16(store_0_8, store_0_8);
         let store_1_8 = _mm_packus_epi16(store_1_8, store_1_8);
@@ -363,12 +405,16 @@ pub(crate) fn convolve_horizontal_rgb_avx_row_i8_one(
     filter_weights: &FilterWeights<i8>,
 ) {
     unsafe {
-        convolve_horizontal_rgb_avx_row_i8_one_impl(src, dst, filter_weights);
+        #[cfg(feature = "nightly_avx512")]
+        if std::arch::is_x86_feature_detected!("avxvnni") {
+            return convolve_horizontal_rgb_avx_row_i8_dot_one_impl(src, dst, filter_weights);
+        }
+        convolve_horizontal_rgb_avx_row_i8_ubs_one_impl(src, dst, filter_weights);
     }
 }
 
 #[inline(always)]
-unsafe fn add_one_weight(
+unsafe fn add_one_weight<const DOT: bool>(
     start_x: usize,
     src: &[u8],
     weight0: __m128i,
@@ -379,11 +425,30 @@ unsafe fn add_one_weight(
     let base_pixel = _mm_loadu_si16(src.as_ptr());
     let m_vl = _mm_insert_epi8::<2>(base_pixel, src_ptr.add(2).read_unaligned() as i32);
     let lo = _mm_unpacklo_epi8(m_vl, _mm_setzero_si128());
-    _mm_dpbusd_avx_epi32(store_0, lo, weight0)
+    _mm_udot8_epi16::<DOT>(store_0, lo, weight0)
 }
 
+#[cfg(feature = "nightly_avx512")]
 #[target_feature(enable = "avx2", enable = "avxvnni")]
-unsafe fn convolve_horizontal_rgb_avx_row_i8_one_impl(
+unsafe fn convolve_horizontal_rgb_avx_row_i8_dot_one_impl(
+    src: &[u8],
+    dst: &mut [u8],
+    filter_weights: &FilterWeights<i8>,
+) {
+    convolve_horizontal_rgb_avx_row_i8_one_impl::<true>(src, dst, filter_weights);
+}
+
+#[target_feature(enable = "avx2")]
+unsafe fn convolve_horizontal_rgb_avx_row_i8_ubs_one_impl(
+    src: &[u8],
+    dst: &mut [u8],
+    filter_weights: &FilterWeights<i8>,
+) {
+    convolve_horizontal_rgb_avx_row_i8_one_impl::<false>(src, dst, filter_weights);
+}
+
+#[inline(always)]
+unsafe fn convolve_horizontal_rgb_avx_row_i8_one_impl<const DOT: bool>(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i8>,
@@ -413,6 +478,53 @@ unsafe fn convolve_horizontal_rgb_avx_row_i8_one_impl(
     const PRECISION: i32 = 7;
     const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
 
+    let vld = if DOT {
+        _mm_set1_epi32(ROUNDING_CONST)
+    } else {
+        _mm_setr_epi16(
+            ROUNDING_CONST as i16,
+            0,
+            ROUNDING_CONST as i16,
+            0,
+            ROUNDING_CONST as i16,
+            0,
+            0,
+            0,
+        )
+    };
+
+    let vld_avx = if DOT {
+        _mm256_setr_epi32(
+            ROUNDING_CONST,
+            ROUNDING_CONST,
+            ROUNDING_CONST,
+            0,
+            0,
+            0,
+            0,
+            0,
+        )
+    } else {
+        _mm256_setr_epi16(
+            ROUNDING_CONST as i16,
+            0,
+            ROUNDING_CONST as i16,
+            0,
+            ROUNDING_CONST as i16,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        )
+    };
+
     for ((dst, bounds), weights) in dst
         .chunks_exact_mut(CHANNELS)
         .zip(filter_weights.bounds.iter())
@@ -424,18 +536,9 @@ unsafe fn convolve_horizontal_rgb_avx_row_i8_one_impl(
     {
         let bounds_size = bounds.size;
         let mut jx = 0usize;
-        let mut store = _mm256_setr_epi32(
-            ROUNDING_CONST,
-            ROUNDING_CONST,
-            ROUNDING_CONST,
-            0,
-            0,
-            0,
-            0,
-            0,
-        );
 
         let mut store = if bounds_size > 4 {
+            let mut store = vld_avx;
             while jx + 8 < bounds.size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 8));
                 let full_weights =
@@ -454,17 +557,14 @@ unsafe fn convolve_horizontal_rgb_avx_row_i8_one_impl(
 
                 let px = make_tuple_x8(pixel_lo, pixel_hi, shuffle_pixels_4);
 
-                store = _mm256_dpbusd_avx_epi32(store, px, w0);
+                store = _mm256_udot8_epi16::<DOT>(store, px, w0);
 
                 jx += 8;
             }
 
-            _mm_add_epi32(
-                _mm256_castsi256_si128(store),
-                _mm256_extracti128_si256::<1>(store),
-            )
+            _mm256_reduce_dot_epi16::<DOT>(store)
         } else {
-            _mm_set1_epi32(ROUNDING_CONST)
+            vld
         };
 
         while jx + 4 < bounds.size {
@@ -474,7 +574,7 @@ unsafe fn convolve_horizontal_rgb_avx_row_i8_one_impl(
             let src_ptr = src.get_unchecked(((bounds.start + jx) * 3)..);
             let rgb_pixel = load_rgb_x4(src_ptr);
             let lo = _mm_shuffle_epi8(rgb_pixel, shuffle_v);
-            store = _mm_dpbusd_avx_epi32(store, lo, weight0);
+            store = _mm_udot8_epi16::<DOT>(store, lo, weight0);
             jx += 4;
         }
 
@@ -485,7 +585,7 @@ unsafe fn convolve_horizontal_rgb_avx_row_i8_one_impl(
             let src_ptr = src.get_unchecked(((bounds.start + jx) * 3)..);
             let rgb_pixel = load_rgb_x2(src_ptr);
             let lo = _mm_shuffle_epi8(rgb_pixel, shuffle_v);
-            store = _mm_dpbusd_avx_epi32(store, lo, weight0);
+            store = _mm_udot8_epi16::<DOT>(store, lo, weight0);
             jx += 2;
         }
 
@@ -495,11 +595,11 @@ unsafe fn convolve_horizontal_rgb_avx_row_i8_one_impl(
                 _mm_set1_epi8(w_ptr.as_ptr().read_unaligned()),
                 shuffle_weights,
             );
-            store = add_one_weight(bounds.start + jx, src, weight0, store);
+            store = add_one_weight::<DOT>(bounds.start + jx, src, weight0, store);
             jx += 1;
         }
 
-        let store_16_8 = compress_i32(store);
+        let store_16_8 = compress_i32::<DOT>(store);
         let store_16_8 = _mm_packus_epi16(store_16_8, store_16_8);
 
         let element = _mm_extract_epi32::<0>(store_16_8);
