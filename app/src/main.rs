@@ -83,7 +83,9 @@ fn main() {
 
     // for i in 0..25 {
     let start_time = Instant::now();
-    scaler.resize_rgba_u16(&store, &mut dst_store, true).unwrap();
+    scaler
+        .resize_rgba_u16(&store, &mut dst_store, true)
+        .unwrap();
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
