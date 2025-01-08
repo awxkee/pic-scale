@@ -84,7 +84,10 @@ impl HorizontalConvolutionPass<u8, 3> for ImageStore<'_, u8, 3> {
                 return;
             }
         }
-        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "nightly_avx512"))]
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            feature = "nightly_avx512"
+        ))]
         {
             // Precision is too low without vnni
             let has_vnni = std::arch::is_x86_feature_detected!("avxvnni");
