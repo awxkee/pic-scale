@@ -70,7 +70,7 @@ unsafe fn conv_horiz_rgba_2_u8(
 ) -> int32x4_t {
     const COMPONENTS: usize = 3;
     let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
-    let mut rgb_pixel = vld1_lane_u32(src_ptr.as_ptr() as *const u32, vdup_n_u32(0));
+    let mut rgb_pixel = vld1_lane_u32::<0>(src_ptr.as_ptr() as *const u32, vdup_n_u32(0));
     rgb_pixel = vreinterpret_u32_u16(vset_lane_u16::<2>(
         (src_ptr.get_unchecked(4..).as_ptr() as *const u16).read_unaligned(),
         vreinterpret_u16_u32(rgb_pixel),
