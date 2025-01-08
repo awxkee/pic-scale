@@ -17,13 +17,10 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let src_bytes = binding.as_bytes();
 
     c.bench_function("Pic scale RGB: Lanczos 3", |b| {
-        let mut copied: Vec<u8> = Vec::from(src_bytes);
-        let store = ImageStore::<u8, 3>::from_slice(
-            &mut copied,
-            dimensions.0 as usize,
-            dimensions.1 as usize,
-        )
-        .unwrap();
+        let copied: Vec<u8> = Vec::from(src_bytes);
+        let store =
+            ImageStore::<u8, 3>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
+                .unwrap();
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
             scaler.set_threading_policy(ThreadingPolicy::Single);
