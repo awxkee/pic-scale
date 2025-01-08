@@ -47,7 +47,7 @@ unsafe fn convolve_horizontal_parts_one_rgba_sse(
     let rgba_pixel = _mm_cvtsi32_si128(src_ptr_32.read_unaligned());
     let lo = _mm_srli_epi16::<2>(_mm_unpacklo_epi8(rgba_pixel, rgba_pixel));
 
-    _mm_add_epi16(store_0, _mm_mulhrs_epi16(lo, weight0))
+    _mm_adds_epi16(store_0, _mm_mulhrs_epi16(lo, weight0))
 }
 
 pub(crate) fn convolve_horizontal_rgba_avx_rows_4_lb(
@@ -67,26 +67,26 @@ unsafe fn hdot4(store: __m256i, v0: __m256i, w01: __m256i, w23: __m256i) -> __m2
     let lo0 = _mm256_srli_epi16::<2>(_mm256_unpacklo_epi8(v0, v0));
     let hi0 = _mm256_srli_epi16::<2>(_mm256_unpackhi_epi8(v0, v0));
     let mut p = _mm256_mulhrs_epi16(lo0, w01);
-    p = _mm256_add_epi16(p, _mm256_mulhrs_epi16(hi0, w23));
-    _mm256_add_epi16(store, p)
+    p = _mm256_adds_epi16(p, _mm256_mulhrs_epi16(hi0, w23));
+    _mm256_adds_epi16(store, p)
 }
 
 #[inline(always)]
 unsafe fn hdot2(store: __m256i, v: __m256i, w0123: __m256i) -> __m256i {
     let lo = _mm256_srli_epi16::<2>(_mm256_unpacklo_epi8(v, v));
-    _mm256_add_epi16(store, _mm256_mulhrs_epi16(lo, w0123))
+    _mm256_adds_epi16(store, _mm256_mulhrs_epi16(lo, w0123))
 }
 
 #[inline(always)]
 unsafe fn hdot(store: __m128i, v: __m128i, w01: __m128i) -> __m128i {
     let lo = _mm_srli_epi16::<2>(_mm_unpacklo_epi8(v, v));
-    _mm_add_epi16(store, _mm_mulhrs_epi16(lo, w01))
+    _mm_adds_epi16(store, _mm_mulhrs_epi16(lo, w01))
 }
 
 #[inline(always)]
 unsafe fn _mm_add_hi_lo_epi16(v: __m128i) -> __m128i {
     let p = _mm_unpackhi_epi64(v, v);
-    _mm_add_epi16(v, p)
+    _mm_adds_epi16(v, p)
 }
 
 #[target_feature(enable = "avx2")]
@@ -223,19 +223,19 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_impl(
             jx += 4;
         }
 
-        let mut store_0 = _mm_add_epi16(
+        let mut store_0 = _mm_adds_epi16(
             _mm256_castsi256_si128(store_0),
             _mm256_extracti128_si256::<1>(store_0),
         );
-        let mut store_1 = _mm_add_epi16(
+        let mut store_1 = _mm_adds_epi16(
             _mm256_castsi256_si128(store_1),
             _mm256_extracti128_si256::<1>(store_1),
         );
-        let mut store_2 = _mm_add_epi16(
+        let mut store_2 = _mm_adds_epi16(
             _mm256_castsi256_si128(store_2),
             _mm256_extracti128_si256::<1>(store_2),
         );
-        let mut store_3 = _mm_add_epi16(
+        let mut store_3 = _mm_adds_epi16(
             _mm256_castsi256_si128(store_3),
             _mm256_extracti128_si256::<1>(store_3),
         );
@@ -404,7 +404,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
             jx += 4;
         }
 
-        let mut store = _mm_add_epi16(
+        let mut store = _mm_adds_epi16(
             _mm256_castsi256_si128(store),
             _mm256_extracti128_si256::<1>(store),
         );

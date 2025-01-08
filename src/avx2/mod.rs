@@ -39,8 +39,6 @@ mod rgb_u8_dot_i8;
 #[cfg(feature = "half")]
 mod rgba_f16;
 mod rgba_f32;
-#[cfg(feature = "nightly_avx512")]
-mod rgba_u8_dot_lp;
 mod rgba_u8_lb;
 pub(crate) mod utils;
 #[cfg(feature = "half")]
@@ -50,10 +48,6 @@ mod vertical_u16_lb;
 mod vertical_u8;
 mod vertical_u8_lp;
 
-#[cfg(feature = "nightly_avx512")]
-pub(crate) use crate::avx2::rgba_u8_dot_lp::{
-    convolve_horizontal_rgba_row_dot, convolve_horizontal_rgba_rows_4_dot,
-};
 #[cfg(feature = "half")]
 pub(crate) use alpha_f16::{avx_premultiply_alpha_rgba_f16, avx_unpremultiply_alpha_rgba_f16};
 pub(crate) use alpha_f32::avx_premultiply_alpha_rgba_f32;

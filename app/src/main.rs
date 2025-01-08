@@ -43,7 +43,7 @@ fn resize_plane(
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/asset_4.png")
+    let img = ImageReader::open("./assets/winter_test.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -76,8 +76,8 @@ fn main() {
     //     .unwrap();
 
     let mut dst_store = ImageStoreMut::<u8, 4>::alloc_with_depth(
-        dimensions.0 as usize / 2,
-        dimensions.1 as usize / 2,
+        dimensions.0 as usize / 6,
+        dimensions.1 as usize / 6,
         10,
     );
 

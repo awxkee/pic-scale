@@ -30,6 +30,17 @@
 use std::arch::aarch64::*;
 
 #[inline(always)]
+pub(crate) unsafe fn expand8_to_14(row: uint8x8_t) -> int16x8_t {
+    let row = vcombine_u8(row, row);
+    vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip1q_u8(row, row))))
+}
+
+#[inline(always)]
+pub(crate) unsafe fn expand8_high_to_14(row: uint8x16_t) -> int16x8_t {
+    vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip2q_u8(row, row))))
+}
+
+#[inline(always)]
 pub(crate) unsafe fn xvld1q_u8_x2(ptr: *const u8) -> uint8x16x2_t {
     uint8x16x2_t(vld1q_u8(ptr), vld1q_u8(ptr.add(16)))
 }
@@ -168,4 +179,9 @@ pub(crate) unsafe fn load_12b_as_u8x16(src_ptr: *const u8) -> uint8x16_t {
 pub(crate) unsafe fn load_4b_as_u16x4(src_ptr: *const u8) -> uint16x4_t {
     let j = vreinterpret_u8_u32(vld1_lane_u32::<0>(src_ptr as *const u32, vdup_n_u32(0)));
     vget_low_u16(vmovl_u8(j))
+}
+
+#[inline(always)]
+pub(crate) unsafe fn load_4b_as_u8x8(src_ptr: *const u8) -> uint8x8_t {
+    vreinterpret_u8_u32(vld1_lane_u32::<0>(src_ptr as *const u32, vdup_n_u32(0)))
 }

@@ -61,7 +61,7 @@ impl HorizontalConvolutionPass<u8, 3> for ImageStore<'_, u8, 3> {
             target_feature = "neon"
         ))]
         {
-            if _scale_factor < 5.1 && std::arch::is_aarch64_feature_detected!("i8mm") {
+            if _scale_factor <= 2. && std::arch::is_aarch64_feature_detected!("i8mm") {
                 use crate::filter_weights::WeightsConverterQ7;
                 use crate::neon::{
                     convolve_horizontal_rgb_neon_dot_row_one,
@@ -91,7 +91,7 @@ impl HorizontalConvolutionPass<u8, 3> for ImageStore<'_, u8, 3> {
         {
             // Precision is too low without vnni
             let has_vnni = std::arch::is_x86_feature_detected!("avxvnni");
-            if _scale_factor < 5.1 && has_vnni {
+            if _scale_factor <= 2. && has_vnni {
                 use crate::avx2::{
                     convolve_horizontal_rgb_avx_row_i8_one, convolve_horizontal_rgb_avx_rows_4_i8,
                 };

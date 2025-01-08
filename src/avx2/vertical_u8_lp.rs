@@ -56,11 +56,11 @@ unsafe fn m256dot(
     let lo = _mm256_unpacklo_epi8(row, row);
     let hi = _mm256_unpackhi_epi8(row, row);
 
-    let store0 = _mm256_add_epi16(
+    let store0 = _mm256_adds_epi16(
         store0,
         _mm256_mulhrs_epi16(_mm256_srli_epi16::<2>(lo), weight),
     );
-    let store1 = _mm256_add_epi16(
+    let store1 = _mm256_adds_epi16(
         store1,
         _mm256_mulhrs_epi16(_mm256_srli_epi16::<2>(hi), weight),
     );
@@ -341,7 +341,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
                 _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i),
             ));
             item_row = _mm256_unpacklo_epi8(item_row, item_row);
-            store0 = _mm256_add_epi16(
+            store0 = _mm256_adds_epi16(
                 store0,
                 _mm256_mulhrs_epi16(_mm256_srli_epi16::<2>(item_row), v_weight),
             );
@@ -375,7 +375,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
             item_row = _mm_unpacklo_epi8(item_row, item_row);
 
             let low = _mm_srli_epi16::<2>(item_row);
-            store = _mm_add_epi16(store, _mm_mulhrs_epi16(low, v_weight));
+            store = _mm_adds_epi16(store, _mm_mulhrs_epi16(low, v_weight));
         }
 
         let rebased = _mm_srai_epi16::<R_SHR_SCALE>(store);
@@ -401,7 +401,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
             let src_ptr = src.get_unchecked(v_offset..(v_offset + 1));
             let item_row = _mm_set1_epi8(src_ptr[0] as i8);
 
-            store = _mm_add_epi16(
+            store = _mm_adds_epi16(
                 store,
                 _mm_mulhrs_epi16(
                     _mm_srli_epi16::<2>(_mm_unpacklo_epi8(item_row, item_row)),
