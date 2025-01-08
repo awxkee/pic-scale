@@ -115,7 +115,7 @@ pub(crate) fn avx512_premultiply_alpha_rgba(
     src_stride: usize,
     pool: &Option<ThreadPool>,
 ) {
-    let mut executor: fn(&mut [u8], &[u8]) = |dst: &mut [u8], src: &[u8]| {
+    let executor: fn(&mut [u8], &[u8]) = |dst: &mut [u8], src: &[u8]| {
         avx_premultiply_alpha_rgba_impl_row(dst, src, AssociateAlphaDefault::default());
     };
 
