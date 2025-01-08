@@ -34,10 +34,12 @@ mod alpha_u16;
 mod alpha_u8;
 mod check_alpha;
 mod rgb_u8;
+#[cfg(feature = "nightly_avx512")]
 mod rgb_u8_dot_i8;
 #[cfg(feature = "half")]
 mod rgba_f16;
 mod rgba_f32;
+#[cfg(feature = "nightly_avx512")]
 mod rgba_u8_dot_lp;
 mod rgba_u8_lb;
 pub(crate) mod utils;
@@ -48,6 +50,7 @@ mod vertical_u16_lb;
 mod vertical_u8;
 mod vertical_u8_lp;
 
+#[cfg(feature = "nightly_avx512")]
 pub(crate) use crate::avx2::rgba_u8_dot_lp::{
     convolve_horizontal_rgba_row_dot, convolve_horizontal_rgba_rows_4_dot,
 };
@@ -62,6 +65,7 @@ pub(crate) use check_alpha::{
     avx_has_non_constant_cap_alpha_rgba16, avx_has_non_constant_cap_alpha_rgba8,
 };
 pub(crate) use rgb_u8::{convolve_horizontal_rgb_avx_row_one, convolve_horizontal_rgb_avx_rows_4};
+#[cfg(feature = "nightly_avx512")]
 pub(crate) use rgb_u8_dot_i8::{
     convolve_horizontal_rgb_avx_row_i8_one, convolve_horizontal_rgb_avx_rows_4_i8,
 };

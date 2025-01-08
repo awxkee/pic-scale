@@ -132,6 +132,13 @@ impl VerticalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
         {
             _dispatcher = wasm_vertical_neon_row;
         }
-        convolve_vertical_dispatch_u8(self, filter_weights, destination, pool, _dispatcher);
+        convolve_vertical_dispatch_u8(
+            self,
+            filter_weights,
+            destination,
+            pool,
+            _dispatcher,
+            DefaultWeightsConverter::default(),
+        );
     }
 }

@@ -43,7 +43,7 @@ fn resize_plane(
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
+    let img = ImageReader::open("./assets/asset_4.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -76,16 +76,14 @@ fn main() {
     //     .unwrap();
 
     let mut dst_store = ImageStoreMut::<u8, 4>::alloc_with_depth(
-        dimensions.0 as usize / 4,
-        dimensions.1 as usize / 4,
+        dimensions.0 as usize / 2,
+        dimensions.1 as usize / 2,
         10,
     );
 
     // for i in 0..25 {
     let start_time = Instant::now();
-    scaler
-        .resize_rgba(&store, &mut dst_store, true)
-        .unwrap();
+    scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds

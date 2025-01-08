@@ -28,7 +28,6 @@
  */
 use crate::filter_weights::{FilterBounds, FilterWeights, WeightsConverter};
 use crate::image_store::ImageStoreMut;
-use crate::support::PRECISION;
 use crate::ImageStore;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
@@ -100,12 +99,13 @@ pub(crate) fn convolve_horizontal_dispatch_u8<V: Send + Sync, const CHANNELS: us
 }
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn convolve_vertical_dispatch_u8<'a, const COMPONENTS: usize>(
+pub(crate) fn convolve_vertical_dispatch_u8<'a, V: Copy + Send + Sync, const COMPONENTS: usize>(
     image_store: &ImageStore<u8, COMPONENTS>,
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStoreMut<'a, u8, COMPONENTS>,
     pool: &Option<ThreadPool>,
-    dispatcher: fn(usize, &FilterBounds, &[u8], &mut [u8], usize, &[i16]),
+    dispatcher: fn(usize, &FilterBounds, &[u8], &mut [u8], usize, &[V]),
+    weights_converter: impl WeightsConverter<V>,
 ) {
     let src_stride = image_store.stride();
     let dst_stride = destination.stride();
@@ -113,9 +113,9 @@ pub(crate) fn convolve_vertical_dispatch_u8<'a, const COMPONENTS: usize>(
     let dst_width = destination.width;
 
     if let Some(pool) = pool {
+        let approx = weights_converter.prepare_weights(&filter_weights);
         pool.install(|| {
             let destination_image = destination.buffer.borrow_mut();
-            let approx = filter_weights.numerical_approximation_i16::<PRECISION>(0);
             destination_image
                 .par_chunks_exact_mut(dst_stride)
                 .enumerate()
@@ -136,7 +136,7 @@ pub(crate) fn convolve_vertical_dispatch_u8<'a, const COMPONENTS: usize>(
         });
     } else {
         let destination_image = destination.buffer.borrow_mut();
-        let approx = filter_weights.numerical_approximation_i16::<PRECISION>(0);
+        let approx = weights_converter.prepare_weights(&filter_weights);
         destination_image
             .chunks_exact_mut(dst_stride)
             .enumerate()
