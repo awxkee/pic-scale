@@ -54,18 +54,13 @@ pub(crate) fn convolve_horizontal_rgb_avx_rows_4_i8(
     filter_weights: &FilterWeights<i8>,
 ) {
     unsafe {
-        #[cfg(feature = "nightly_avx512")]
-        if std::arch::is_x86_feature_detected!("avxvnni") {
-            return convolve_horizontal_rgb_avx_rows_i8_4_dot(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                filter_weights,
-            );
-        }
-
-        convolve_horizontal_rgb_avx_rows_i8_4_ubs(src, src_stride, dst, dst_stride, filter_weights);
+        convolve_horizontal_rgb_avx_rows_i8_4_impl(
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+            filter_weights,
+        );
     }
 }
 
@@ -113,43 +108,8 @@ unsafe fn make_tuple_x8(pixel: __m128i, pixel2: __m128i, shuf: __m256i) -> __m25
     )
 }
 
-#[cfg(feature = "nightly_avx512")]
 #[target_feature(enable = "avx2", enable = "avxvnni")]
-unsafe fn convolve_horizontal_rgb_avx_rows_i8_4_dot(
-    src: &[u8],
-    src_stride: usize,
-    dst: &mut [u8],
-    dst_stride: usize,
-    filter_weights: &FilterWeights<i8>,
-) {
-    convolve_horizontal_rgb_avx_rows_i8_4_impl::<true>(
-        src,
-        src_stride,
-        dst,
-        dst_stride,
-        filter_weights,
-    );
-}
-
-#[target_feature(enable = "avx2")]
-unsafe fn convolve_horizontal_rgb_avx_rows_i8_4_ubs(
-    src: &[u8],
-    src_stride: usize,
-    dst: &mut [u8],
-    dst_stride: usize,
-    filter_weights: &FilterWeights<i8>,
-) {
-    convolve_horizontal_rgb_avx_rows_i8_4_impl::<false>(
-        src,
-        src_stride,
-        dst,
-        dst_stride,
-        filter_weights,
-    );
-}
-
-#[inline(always)]
-unsafe fn convolve_horizontal_rgb_avx_rows_i8_4_impl<const DOT: bool>(
+unsafe fn convolve_horizontal_rgb_avx_rows_i8_4_impl(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -160,6 +120,7 @@ unsafe fn convolve_horizontal_rgb_avx_rows_i8_4_impl<const DOT: bool>(
 
     const PRECISION: i32 = 7;
     const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
+    const DOT: bool = true;
 
     let shuffle_v = _mm_setr_epi8(0, 3, 6, 9, 1, 4, 7, 10, 2, 5, 8, 11, -1, -1, -1, -1);
 
@@ -176,52 +137,18 @@ unsafe fn convolve_horizontal_rgb_avx_rows_i8_4_impl<const DOT: bool>(
         -1, -1, -1, -1,
     );
 
-    let vld = if DOT {
-        _mm_set1_epi32(ROUNDING_CONST)
-    } else {
-        _mm_setr_epi16(
-            ROUNDING_CONST as i16,
-            0,
-            ROUNDING_CONST as i16,
-            0,
-            ROUNDING_CONST as i16,
-            0,
-            0,
-            0,
-        )
-    };
+    let vld = _mm_set1_epi32(ROUNDING_CONST);
 
-    let vld_avx = if DOT {
-        _mm256_setr_epi32(
-            ROUNDING_CONST,
-            ROUNDING_CONST,
-            ROUNDING_CONST,
-            0,
-            0,
-            0,
-            0,
-            0,
-        )
-    } else {
-        _mm256_setr_epi16(
-            ROUNDING_CONST as i16,
-            0,
-            ROUNDING_CONST as i16,
-            0,
-            ROUNDING_CONST as i16,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-        )
-    };
+    let vld_avx = _mm256_setr_epi32(
+        ROUNDING_CONST,
+        ROUNDING_CONST,
+        ROUNDING_CONST,
+        0,
+        0,
+        0,
+        0,
+        0,
+    );
 
     let (row0_ref, rest) = dst.split_at_mut(dst_stride);
     let (row1_ref, rest) = rest.split_at_mut(dst_stride);
@@ -405,11 +332,7 @@ pub(crate) fn convolve_horizontal_rgb_avx_row_i8_one(
     filter_weights: &FilterWeights<i8>,
 ) {
     unsafe {
-        #[cfg(feature = "nightly_avx512")]
-        if std::arch::is_x86_feature_detected!("avxvnni") {
-            return convolve_horizontal_rgb_avx_row_i8_dot_one_impl(src, dst, filter_weights);
-        }
-        convolve_horizontal_rgb_avx_row_i8_ubs_one_impl(src, dst, filter_weights);
+        convolve_horizontal_rgb_avx_row_i8_one_impl(src, dst, filter_weights);
     }
 }
 
@@ -428,32 +351,14 @@ unsafe fn add_one_weight<const DOT: bool>(
     _mm_udot8_epi16::<DOT>(store_0, lo, weight0)
 }
 
-#[cfg(feature = "nightly_avx512")]
 #[target_feature(enable = "avx2", enable = "avxvnni")]
-unsafe fn convolve_horizontal_rgb_avx_row_i8_dot_one_impl(
-    src: &[u8],
-    dst: &mut [u8],
-    filter_weights: &FilterWeights<i8>,
-) {
-    convolve_horizontal_rgb_avx_row_i8_one_impl::<true>(src, dst, filter_weights);
-}
-
-#[target_feature(enable = "avx2")]
-unsafe fn convolve_horizontal_rgb_avx_row_i8_ubs_one_impl(
-    src: &[u8],
-    dst: &mut [u8],
-    filter_weights: &FilterWeights<i8>,
-) {
-    convolve_horizontal_rgb_avx_row_i8_one_impl::<false>(src, dst, filter_weights);
-}
-
-#[inline(always)]
-unsafe fn convolve_horizontal_rgb_avx_row_i8_one_impl<const DOT: bool>(
+unsafe fn convolve_horizontal_rgb_avx_row_i8_one_impl(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i8>,
 ) {
     const CHANNELS: usize = 3;
+    const DOT: bool = true;
 
     let shuffle_v = _mm_setr_epi8(0, 3, 6, 9, 1, 4, 7, 10, 2, 5, 8, 11, -1, -1, -1, -1);
 
@@ -478,52 +383,18 @@ unsafe fn convolve_horizontal_rgb_avx_row_i8_one_impl<const DOT: bool>(
     const PRECISION: i32 = 7;
     const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
 
-    let vld = if DOT {
-        _mm_set1_epi32(ROUNDING_CONST)
-    } else {
-        _mm_setr_epi16(
-            ROUNDING_CONST as i16,
-            0,
-            ROUNDING_CONST as i16,
-            0,
-            ROUNDING_CONST as i16,
-            0,
-            0,
-            0,
-        )
-    };
+    let vld = _mm_set1_epi32(ROUNDING_CONST);
 
-    let vld_avx = if DOT {
-        _mm256_setr_epi32(
-            ROUNDING_CONST,
-            ROUNDING_CONST,
-            ROUNDING_CONST,
-            0,
-            0,
-            0,
-            0,
-            0,
-        )
-    } else {
-        _mm256_setr_epi16(
-            ROUNDING_CONST as i16,
-            0,
-            ROUNDING_CONST as i16,
-            0,
-            ROUNDING_CONST as i16,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-        )
-    };
+    let vld_avx = _mm256_setr_epi32(
+        ROUNDING_CONST,
+        ROUNDING_CONST,
+        ROUNDING_CONST,
+        0,
+        0,
+        0,
+        0,
+        0,
+    );
 
     for ((dst, bounds), weights) in dst
         .chunks_exact_mut(CHANNELS)

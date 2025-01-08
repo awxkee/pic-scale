@@ -353,6 +353,7 @@ pub(crate) unsafe fn _mm256_cvtepi64_epi32x(v: __m256i) -> __m128i {
     _mm_castps_si128(packed)
 }
 
+#[allow(dead_code)]
 #[inline(always)]
 pub(crate) unsafe fn _mm256_dot16_avx_epi32<const HAS_DOT: bool>(
     a: __m256i,
@@ -373,6 +374,7 @@ pub(crate) unsafe fn _mm256_dot16_avx_epi32<const HAS_DOT: bool>(
     }
 }
 
+#[allow(dead_code)]
 #[inline(always)]
 pub(crate) unsafe fn _mm_udot8_epi16<const DOT: bool>(
     a: __m128i,
@@ -391,6 +393,7 @@ pub(crate) unsafe fn _mm_udot8_epi16<const DOT: bool>(
     }
 }
 
+#[allow(dead_code)]
 #[inline(always)]
 pub(crate) unsafe fn _mm256_udot8_epi16<const DOT: bool>(
     a: __m256i,
@@ -407,6 +410,7 @@ pub(crate) unsafe fn _mm256_udot8_epi16<const DOT: bool>(
     _mm256_adds_epi16(a, _mm256_maddubs_epi16(b, c))
 }
 
+#[allow(dead_code)]
 #[inline(always)]
 pub(crate) unsafe fn _mm256_reduce_dot_epi16<const DOT: bool>(a: __m256i) -> __m128i {
     #[cfg(feature = "nightly_avx512")]

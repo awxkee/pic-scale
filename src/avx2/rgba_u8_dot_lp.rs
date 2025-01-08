@@ -33,44 +33,21 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-/// Will use `avxvnni` if available, if not `maddubs16`
+/// Will use `avxvnni` if available
 ///
 /// `avxvnni` feature has slightly lower precision and won't work really well on huge kernel which
 /// edges fades out fast. Therefore, it would be reasonable to avoid using feature for huge downscaling.
 ///
 /// # Safety
-/// - Check `avx2` availability before the call.
+/// - Check `avxvnni` availability before the call.
 pub(crate) fn convolve_horizontal_rgba_row_dot(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i8>,
 ) {
     unsafe {
-        #[cfg(feature = "nightly_avx512")]
-        if std::arch::is_x86_feature_detected!("avxvnni") {
-            return convolve_horizontal_rgba_vnni_row_dot_impl(src, dst, filter_weights);
-        }
-        convolve_horizontal_rgba_ubs_row_dot_impl(src, dst, filter_weights);
+        convolve_horizontal_rgba_row_dot_impl(src, dst, filter_weights);
     }
-}
-
-#[cfg(feature = "nightly_avx512")]
-#[target_feature(enable = "avxvnni", enable = "avx2")]
-unsafe fn convolve_horizontal_rgba_vnni_row_dot_impl(
-    src: &[u8],
-    dst: &mut [u8],
-    filter_weights: &FilterWeights<i8>,
-) {
-    convolve_horizontal_rgba_row_dot_impl::<true>(src, dst, filter_weights);
-}
-
-#[target_feature(enable = "avx2")]
-unsafe fn convolve_horizontal_rgba_ubs_row_dot_impl(
-    src: &[u8],
-    dst: &mut [u8],
-    filter_weights: &FilterWeights<i8>,
-) {
-    convolve_horizontal_rgba_row_dot_impl::<false>(src, dst, filter_weights);
 }
 
 #[inline(always)]
@@ -85,14 +62,15 @@ fn compress_i32<const DOT: bool>(x: __m128i) -> __m128i {
     }
 }
 
-#[inline(always)]
-unsafe fn convolve_horizontal_rgba_row_dot_impl<const DOT: bool>(
+#[target_feature(enable = "avxvnni", enable = "avx2")]
+unsafe fn convolve_horizontal_rgba_row_dot_impl(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i8>,
 ) {
     const ROUNDING: i16 = 1 << (7 - 1);
     const CHANNELS: usize = 4;
+    const DOT: bool = true;
 
     let shuffle_weights_table = _mm_setr_epi8(0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3);
     let shuffle_4_table = _mm_setr_epi8(0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15);
@@ -110,11 +88,7 @@ unsafe fn convolve_horizontal_rgba_row_dot_impl<const DOT: bool>(
     {
         let bounds_size = bounds.size;
         let mut jx = 0usize;
-        let mut store = if DOT {
-            _mm_set1_epi32(ROUNDING as i32)
-        } else {
-            _mm_setr_epi16(ROUNDING, 0, ROUNDING, 0, ROUNDING, 0, ROUNDING, 0)
-        };
+        let mut store = _mm_set1_epi32(ROUNDING as i32);
 
         if bounds_size > 8 {
             let shuffle_avx_weights = _mm256_setr_epi8(
@@ -127,22 +101,16 @@ unsafe fn convolve_horizontal_rgba_row_dot_impl<const DOT: bool>(
                 6, 10, 14, 3, 7, 11, 15,
             );
 
-            let mut store_avx = if DOT {
-                _mm256_setr_epi32(
-                    ROUNDING as i32,
-                    ROUNDING as i32,
-                    ROUNDING as i32,
-                    ROUNDING as i32,
-                    0,
-                    0,
-                    0,
-                    0,
-                )
-            } else {
-                _mm256_setr_epi16(
-                    ROUNDING, 0, ROUNDING, 0, ROUNDING, 0, ROUNDING, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                )
-            };
+            let mut store_avx = _mm256_setr_epi32(
+                ROUNDING as i32,
+                ROUNDING as i32,
+                ROUNDING as i32,
+                ROUNDING as i32,
+                0,
+                0,
+                0,
+                0,
+            );
 
             while jx + 8 < bounds_size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 8));
@@ -229,13 +197,13 @@ unsafe fn convolve_horizontal_rgba_row_dot_impl<const DOT: bool>(
     }
 }
 
-/// Will use `avxvnni` if available, if not `maddubs16`
+/// Will use `avxvnni` if available
 ///
 /// `avxvnni` feature has slightly lower precision and won't work really well on huge kernel which
 /// edges fades out fast. Therefore, it would be reasonable to avoid using feature for huge downscaling.
 ///
 /// # Safety
-/// - Check `avx2` availability before the call.
+/// - Check `avxvnni` availability before the call.
 pub(crate) fn convolve_horizontal_rgba_rows_4_dot(
     src: &[u8],
     src_stride: usize,
@@ -244,57 +212,18 @@ pub(crate) fn convolve_horizontal_rgba_rows_4_dot(
     filter_weights: &FilterWeights<i8>,
 ) {
     unsafe {
-        #[cfg(feature = "nightly_avx512")]
-        if std::arch::is_x86_feature_detected!("avxvnni") {
-            return convolve_horizontal_rgba_vnni_rows_4_dot(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                filter_weights,
-            );
-        }
-        convolve_horizontal_rgba_vnni_rows_4_ubs(src, src_stride, dst, dst_stride, filter_weights);
+        convolve_horizontal_rgba_vnni_rows_4_dot_impl(
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+            filter_weights,
+        );
     }
 }
 
-#[cfg(feature = "nightly_avx512")]
 #[target_feature(enable = "avxvnni", enable = "avx2")]
-unsafe fn convolve_horizontal_rgba_vnni_rows_4_dot(
-    src: &[u8],
-    src_stride: usize,
-    dst: &mut [u8],
-    dst_stride: usize,
-    filter_weights: &FilterWeights<i8>,
-) {
-    convolve_horizontal_rgba_vnni_rows_4_dot_impl::<true>(
-        src,
-        src_stride,
-        dst,
-        dst_stride,
-        filter_weights,
-    );
-}
-
-#[target_feature(enable = "avx2")]
-unsafe fn convolve_horizontal_rgba_vnni_rows_4_ubs(
-    src: &[u8],
-    src_stride: usize,
-    dst: &mut [u8],
-    dst_stride: usize,
-    filter_weights: &FilterWeights<i8>,
-) {
-    convolve_horizontal_rgba_vnni_rows_4_dot_impl::<false>(
-        src,
-        src_stride,
-        dst,
-        dst_stride,
-        filter_weights,
-    );
-}
-
-#[inline(always)]
-unsafe fn convolve_horizontal_rgba_vnni_rows_4_dot_impl<const DOT: bool>(
+unsafe fn convolve_horizontal_rgba_vnni_rows_4_dot_impl(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -305,28 +234,20 @@ unsafe fn convolve_horizontal_rgba_vnni_rows_4_dot_impl<const DOT: bool>(
     const SCALE: i32 = 7;
     const ROUNDING: i16 = 1 << (SCALE - 1);
 
-    let init = if DOT {
-        _mm_set1_epi32(ROUNDING as i32)
-    } else {
-        _mm_setr_epi16(ROUNDING, 0, ROUNDING, 0, ROUNDING, 0, ROUNDING, 0)
-    };
+    const DOT: bool = true;
 
-    let init_avx = if DOT {
-        _mm256_setr_epi32(
-            ROUNDING as i32,
-            ROUNDING as i32,
-            ROUNDING as i32,
-            ROUNDING as i32,
-            0,
-            0,
-            0,
-            0,
-        )
-    } else {
-        _mm256_setr_epi16(
-            ROUNDING, 0, ROUNDING, 0, ROUNDING, 0, ROUNDING, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        )
-    };
+    let init = _mm_set1_epi32(ROUNDING as i32);
+
+    let init_avx = _mm256_setr_epi32(
+        ROUNDING as i32,
+        ROUNDING as i32,
+        ROUNDING as i32,
+        ROUNDING as i32,
+        0,
+        0,
+        0,
+        0,
+    );
 
     let (row0_ref, rest) = dst.split_at_mut(dst_stride);
     let (row1_ref, rest) = rest.split_at_mut(dst_stride);
