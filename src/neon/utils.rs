@@ -191,3 +191,12 @@ pub(crate) unsafe fn xvld1q_s16_x2(a: *const i16) -> int16x8x2_t {
     let v1 = vld1q_s16(a.add(8));
     int16x8x2_t(v0, v1)
 }
+
+#[inline(always)]
+pub(crate) unsafe fn xvld1q_s16_x4(a: *const i16) -> int16x8x4_t {
+    let v0 = vld1q_s16(a);
+    let v1 = vld1q_s16(a.add(8));
+    let v2 = vld1q_s16(a.add(16));
+    let v3 = vld1q_s16(a.add(24));
+    int16x8x4_t(v0, v1, v2, v3)
+}

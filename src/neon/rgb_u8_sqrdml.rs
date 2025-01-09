@@ -146,7 +146,7 @@ unsafe fn convolve_horizontal_rgb_neon_rdm_rows_4_impl(
     let weights23_shuf: [u8; 16] = [4, 5, 4, 5, 4, 5, 255, 255, 6, 7, 6, 7, 6, 7, 255, 255];
     let w23 = vld1q_u8(weights23_shuf.as_ptr());
 
-    const ROUNDING_CONST: i16 = 1 << 6;
+    const ROUNDING_CONST: i16 = 1 << 5;
     let base_values: [i16; 8] = [
         ROUNDING_CONST,
         ROUNDING_CONST,
@@ -261,7 +261,8 @@ unsafe fn convolve_horizontal_rgb_neon_row_rdm_one_impl(
     let weights23_shuf: [u8; 16] = [4, 5, 4, 5, 4, 5, 255, 255, 6, 7, 6, 7, 6, 7, 255, 255];
     let w23 = vld1q_u8(weights23_shuf.as_ptr());
 
-    const ROUNDING_CONST: i16 = 1 << 6;
+    const ROUNDING_CONST: i16 = 1 << 5;
+
     let base_values: [i16; 8] = [
         ROUNDING_CONST,
         ROUNDING_CONST,
