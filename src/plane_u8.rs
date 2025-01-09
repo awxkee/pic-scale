@@ -57,6 +57,7 @@ impl HorizontalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
         destination: &mut ImageStoreMut<u8, 1>,
         _pool: &Option<ThreadPool>,
     ) {
+        let _scale_factor = self.height as f32 / destination.height as f32;
         let mut _dispatcher_4_rows: Option<
             fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>),
         > = Some(handle_fixed_rows_4_u8::<1>);
@@ -66,12 +67,28 @@ impl HorizontalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
         {
             _dispatcher_4_rows = Some(convolve_horizontal_plane_neon_rows_4_u8);
             _dispatcher_1_row = convolve_horizontal_plane_neon_row;
+            if _scale_factor < 8. && crate::cpu_features::is_aarch_rdm_supported() {
+                use crate::neon::{
+                    convolve_horizontal_plane_neon_rdm_row,
+                    convolve_horizontal_plane_neon_rows_rdm_4_u8,
+                };
+                _dispatcher_4_rows = Some(convolve_horizontal_plane_neon_rows_rdm_4_u8);
+                _dispatcher_1_row = convolve_horizontal_plane_neon_rdm_row;
+            }
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
             if is_x86_feature_detected!("sse4.1") {
                 _dispatcher_4_rows = Some(convolve_horizontal_plane_sse_rows_4_u8);
                 _dispatcher_1_row = convolve_horizontal_plane_sse_row;
+                if _scale_factor < 8. {
+                    use crate::sse::{
+                        convolve_horizontal_plane_sse_row_hrs,
+                        convolve_horizontal_plane_sse_rows_hrs_4_u8,
+                    };
+                    _dispatcher_4_rows = Some(convolve_horizontal_plane_sse_rows_hrs_4_u8);
+                    _dispatcher_1_row = convolve_horizontal_plane_sse_row_hrs;
+                }
             }
         }
         convolve_horizontal_dispatch_u8(

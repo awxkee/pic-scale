@@ -41,6 +41,7 @@ mod f16_utils;
 mod horizontal_ar30;
 mod plane_f32;
 mod plane_u8;
+mod plane_u8_rdm;
 #[cfg(feature = "half")]
 mod rgb_f16;
 #[cfg(feature = "half")]
@@ -89,6 +90,9 @@ pub(crate) use horizontal_ar30::neon_convolve_horizontal_rgba_rows_4_ar30;
 pub(crate) use plane_f32::convolve_horizontal_plane_neon_row_one;
 pub(crate) use plane_f32::convolve_horizontal_plane_neon_rows_4;
 pub use plane_u8::{convolve_horizontal_plane_neon_row, convolve_horizontal_plane_neon_rows_4_u8};
+pub(crate) use plane_u8_rdm::{
+    convolve_horizontal_plane_neon_rdm_row, convolve_horizontal_plane_neon_rows_rdm_4_u8,
+};
 #[cfg(feature = "half")]
 pub(crate) use rgb_f16::{
     convolve_horizontal_rgb_neon_row_one_f16, convolve_horizontal_rgb_neon_rows_4_f16,

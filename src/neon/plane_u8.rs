@@ -27,9 +27,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter_weights::FilterWeights;
+use crate::neon::utils::xvld1q_s16_x2;
 use crate::support::{PRECISION, ROUNDING_CONST};
 use std::arch::aarch64::*;
-use crate::neon::utils::xvld1q_s16_x2;
 
 macro_rules! accumulate_16_horiz {
     ($store: expr, $ptr: expr, $weights: expr) => {{

@@ -37,6 +37,7 @@ mod check_alpha;
 mod f16_utils;
 mod plane_f32;
 mod plane_u8;
+mod plane_u8_hrs;
 #[cfg(feature = "half")]
 mod rgb_f16;
 mod rgb_f32;
@@ -72,6 +73,9 @@ pub(crate) use plane_f32::convolve_horizontal_plane_sse_row_one;
 pub(crate) use plane_f32::convolve_horizontal_plane_sse_rows_4;
 pub(crate) use plane_u8::{
     convolve_horizontal_plane_sse_row, convolve_horizontal_plane_sse_rows_4_u8,
+};
+pub(crate) use plane_u8_hrs::{
+    convolve_horizontal_plane_sse_row_hrs, convolve_horizontal_plane_sse_rows_hrs_4_u8,
 };
 #[cfg(feature = "half")]
 pub(crate) use rgb_f16::{
