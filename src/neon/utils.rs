@@ -155,7 +155,6 @@ pub(crate) unsafe fn load_3b_as_u16x4(src_ptr: *const u8) -> uint16x4_t {
 }
 
 #[inline(always)]
-#[cfg(feature = "nightly_i8mm")]
 pub(crate) unsafe fn load_3b_as_u8x16(src_ptr: *const u8) -> uint8x16_t {
     let v = vreinterpretq_u8_u16(vld1q_lane_u16::<0>(src_ptr as *const u16, vdupq_n_u16(0)));
     vld1q_lane_u8::<2>(src_ptr.add(2), v)
@@ -184,4 +183,11 @@ pub(crate) unsafe fn load_4b_as_u16x4(src_ptr: *const u8) -> uint16x4_t {
 #[inline(always)]
 pub(crate) unsafe fn load_4b_as_u8x8(src_ptr: *const u8) -> uint8x8_t {
     vreinterpret_u8_u32(vld1_lane_u32::<0>(src_ptr as *const u32, vdup_n_u32(0)))
+}
+
+#[inline(always)]
+pub(crate) unsafe fn xvld1q_s16_x2(a: *const i16) -> int16x8x2_t {
+    let v0 = vld1q_s16(a);
+    let v1 = vld1q_s16(a.add(8));
+    int16x8x2_t(v0, v1)
 }

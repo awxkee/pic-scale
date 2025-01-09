@@ -158,7 +158,7 @@ impl HorizontalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
     }
 }
 
-fn convolve_vertical_rgb_native_row_f16<const COMPONENTS: usize>(
+fn convolve_vertical_rgb_native_row_f16(
     _: usize,
     bounds: &FilterBounds,
     src: &[f16],
@@ -178,13 +178,13 @@ impl VerticalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
     ) {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[f32]) =
-            convolve_vertical_rgb_native_row_f16::<4>;
+            convolve_vertical_rgb_native_row_f16;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if is_aarch_f16c_supported() {
-                _dispatcher = convolve_vertical_rgb_neon_row_f16::<4>;
+                _dispatcher = convolve_vertical_rgb_neon_row_f16;
                 if is_aarch_f16_supported() {
-                    _dispatcher = xconvolve_vertical_rgb_neon_row_f16::<4>;
+                    _dispatcher = xconvolve_vertical_rgb_neon_row_f16;
                 }
             }
         }
@@ -193,20 +193,20 @@ impl VerticalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
             let is_f16c_available = is_x86_feature_detected!("f16c");
             let is_fma_available = is_x86_feature_detected!("fma");
             if is_x86_feature_detected!("sse4.1") {
-                _dispatcher = convolve_vertical_sse_row_f16::<4, false, false>;
+                _dispatcher = convolve_vertical_sse_row_f16::<false, false>;
                 if is_f16c_available {
                     if is_fma_available {
-                        _dispatcher = convolve_vertical_sse_row_f16::<4, true, true>;
+                        _dispatcher = convolve_vertical_sse_row_f16::<true, true>;
                     } else {
-                        _dispatcher = convolve_vertical_sse_row_f16::<4, true, false>;
+                        _dispatcher = convolve_vertical_sse_row_f16::<true, false>;
                     }
                 }
             }
 
             if is_x86_feature_detected!("avx2") && is_f16c_available {
-                _dispatcher = convolve_vertical_avx_row_f16::<4, false>;
+                _dispatcher = convolve_vertical_avx_row_f16::<false>;
                 if is_fma_available {
-                    _dispatcher = convolve_vertical_avx_row_f16::<4, true>;
+                    _dispatcher = convolve_vertical_avx_row_f16::<true>;
                 }
             }
         }
@@ -277,13 +277,13 @@ impl VerticalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
     ) {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[f32]) =
-            convolve_vertical_rgb_native_row_f16::<3>;
+            convolve_vertical_rgb_native_row_f16;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if is_aarch_f16c_supported() {
-                _dispatcher = convolve_vertical_rgb_neon_row_f16::<3>;
+                _dispatcher = convolve_vertical_rgb_neon_row_f16;
                 if is_aarch_f16_supported() {
-                    _dispatcher = xconvolve_vertical_rgb_neon_row_f16::<3>;
+                    _dispatcher = xconvolve_vertical_rgb_neon_row_f16;
                 }
             }
         }
@@ -292,20 +292,20 @@ impl VerticalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
             let is_f16c_available = is_x86_feature_detected!("f16c");
             let is_fma_available = is_x86_feature_detected!("fma");
             if is_x86_feature_detected!("sse4.1") {
-                _dispatcher = convolve_vertical_sse_row_f16::<3, false, false>;
+                _dispatcher = convolve_vertical_sse_row_f16::<false, false>;
                 if is_f16c_available {
                     if is_fma_available {
-                        _dispatcher = convolve_vertical_sse_row_f16::<3, true, true>;
+                        _dispatcher = convolve_vertical_sse_row_f16::<true, true>;
                     } else {
-                        _dispatcher = convolve_vertical_sse_row_f16::<3, true, false>;
+                        _dispatcher = convolve_vertical_sse_row_f16::<true, false>;
                     }
                 }
             }
 
             if is_x86_feature_detected!("avx2") && is_f16c_available {
-                _dispatcher = convolve_vertical_avx_row_f16::<3, false>;
+                _dispatcher = convolve_vertical_avx_row_f16::<false>;
                 if is_fma_available {
-                    _dispatcher = convolve_vertical_avx_row_f16::<3, true>;
+                    _dispatcher = convolve_vertical_avx_row_f16::<true>;
                 }
             }
         }
@@ -346,13 +346,13 @@ impl VerticalConvolutionPass<f16, 1> for ImageStore<'_, f16, 1> {
     ) {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[f32]) =
-            convolve_vertical_rgb_native_row_f16::<1>;
+            convolve_vertical_rgb_native_row_f16;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if is_aarch_f16c_supported() {
-                _dispatcher = convolve_vertical_rgb_neon_row_f16::<1>;
+                _dispatcher = convolve_vertical_rgb_neon_row_f16;
                 if is_aarch_f16_supported() {
-                    _dispatcher = xconvolve_vertical_rgb_neon_row_f16::<1>;
+                    _dispatcher = xconvolve_vertical_rgb_neon_row_f16;
                 }
             }
         }
@@ -361,19 +361,87 @@ impl VerticalConvolutionPass<f16, 1> for ImageStore<'_, f16, 1> {
             let is_f16c_available = is_x86_feature_detected!("f16c");
             let is_fma_available = is_x86_feature_detected!("fma");
             if is_x86_feature_detected!("sse4.1") {
-                _dispatcher = convolve_vertical_sse_row_f16::<1, false, false>;
+                _dispatcher = convolve_vertical_sse_row_f16::<false, false>;
                 if is_f16c_available {
                     if is_fma_available {
-                        _dispatcher = convolve_vertical_sse_row_f16::<1, true, true>;
+                        _dispatcher = convolve_vertical_sse_row_f16::<true, true>;
                     } else {
-                        _dispatcher = convolve_vertical_sse_row_f16::<1, true, false>;
+                        _dispatcher = convolve_vertical_sse_row_f16::<true, false>;
                     }
                 }
             }
             if is_x86_feature_detected!("avx2") && is_f16c_available {
-                _dispatcher = convolve_vertical_avx_row_f16::<1, false>;
+                _dispatcher = convolve_vertical_avx_row_f16::<false>;
                 if is_fma_available {
-                    _dispatcher = convolve_vertical_avx_row_f16::<1, true>;
+                    _dispatcher = convolve_vertical_avx_row_f16::<true>;
+                }
+            }
+        }
+        convolve_vertical_dispatch_f16(self, filter_weights, destination, pool, _dispatcher);
+    }
+}
+
+impl HorizontalConvolutionPass<f16, 2> for ImageStore<'_, f16, 2> {
+    fn convolve_horizontal(
+        &self,
+        filter_weights: FilterWeights<f32>,
+        destination: &mut ImageStoreMut<f16, 2>,
+        pool: &Option<ThreadPool>,
+    ) {
+        #[allow(clippy::type_complexity)]
+        let _dispatcher_4_rows: Option<
+            fn(usize, usize, &FilterWeights<f32>, &[f16], usize, &mut [f16], usize),
+        > = Some(convolve_horizontal_rgba_4_row_f16::<2>);
+        let _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, &[f16], &mut [f16]) =
+            convolve_horizontal_rgb_native_row_f16::<2>;
+        convolve_horizontal_dispatch_f16(
+            self,
+            filter_weights,
+            destination,
+            pool,
+            _dispatcher_4_rows,
+            _dispatcher_row,
+        );
+    }
+}
+
+impl VerticalConvolutionPass<f16, 2> for ImageStore<'_, f16, 2> {
+    fn convolve_vertical(
+        &self,
+        filter_weights: FilterWeights<f32>,
+        destination: &mut ImageStoreMut<f16, 2>,
+        pool: &Option<ThreadPool>,
+    ) {
+        #[allow(clippy::type_complexity)]
+        let mut _dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[f32]) =
+            convolve_vertical_rgb_native_row_f16;
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            if is_aarch_f16c_supported() {
+                _dispatcher = convolve_vertical_rgb_neon_row_f16;
+                if is_aarch_f16_supported() {
+                    _dispatcher = xconvolve_vertical_rgb_neon_row_f16;
+                }
+            }
+        }
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            let is_f16c_available = is_x86_feature_detected!("f16c");
+            let is_fma_available = is_x86_feature_detected!("fma");
+            if is_x86_feature_detected!("sse4.1") {
+                _dispatcher = convolve_vertical_sse_row_f16::<false, false>;
+                if is_f16c_available {
+                    if is_fma_available {
+                        _dispatcher = convolve_vertical_sse_row_f16::<true, true>;
+                    } else {
+                        _dispatcher = convolve_vertical_sse_row_f16::<true, false>;
+                    }
+                }
+            }
+            if is_x86_feature_detected!("avx2") && is_f16c_available {
+                _dispatcher = convolve_vertical_avx_row_f16::<false>;
+                if is_fma_available {
+                    _dispatcher = convolve_vertical_avx_row_f16::<true>;
                 }
             }
         }

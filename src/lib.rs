@@ -49,6 +49,9 @@ mod avx2;
     feature = "nightly_avx512"
 ))]
 mod avx512;
+mod cbcr16;
+mod cbcr8;
+mod cbcr_f32;
 mod color_group;
 #[cfg(feature = "colorspaces")]
 mod colors;

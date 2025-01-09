@@ -31,7 +31,9 @@ use crate::avx2::{convolve_vertical_avx_row, convolve_vertical_avx_row_lp};
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertical_dispatch_u8};
 use crate::filter_weights::{DefaultWeightsConverter, FilterBounds, FilterWeights};
-use crate::handler_provider::{handle_fixed_column_u8, handle_fixed_row_u8};
+use crate::handler_provider::{
+    handle_fixed_column_u8, handle_fixed_row_u8, handle_fixed_rows_4_u8,
+};
 use crate::image_store::ImageStoreMut;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
 use crate::neon::{convolve_horizontal_plane_neon_row, convolve_horizontal_plane_neon_rows_4_u8};
@@ -57,7 +59,7 @@ impl HorizontalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
     ) {
         let mut _dispatcher_4_rows: Option<
             fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>),
-        > = None;
+        > = Some(handle_fixed_rows_4_u8::<1>);
         let mut _dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i16>) =
             handle_fixed_row_u8::<1>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]

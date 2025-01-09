@@ -29,6 +29,7 @@
 use crate::filter_weights::FilterWeights;
 use crate::support::{PRECISION, ROUNDING_CONST};
 use std::arch::aarch64::*;
+use crate::neon::utils::xvld1q_s16_x2;
 
 macro_rules! accumulate_16_horiz {
     ($store: expr, $ptr: expr, $weights: expr) => {{
@@ -91,6 +92,11 @@ pub fn convolve_horizontal_plane_neon_rows_4_u8(
         let iter_row2 = row2_ref.iter_mut();
         let iter_row3 = row3_ref.iter_mut();
 
+        let base_val = {
+            let j = vdupq_n_s32(0);
+            vsetq_lane_s32::<0>(ROUNDING_CONST, j)
+        };
+
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
             .zip(iter_row1)
             .zip(iter_row2)
@@ -103,14 +109,10 @@ pub fn convolve_horizontal_plane_neon_rows_4_u8(
             )
         {
             let mut jx = 0usize;
-            let mut store0 = vdupq_n_s32(0i32);
-            store0 = vsetq_lane_s32::<0>(ROUNDING_CONST, store0);
-            let mut store1 = vdupq_n_s32(0i32);
-            store1 = vsetq_lane_s32::<0>(ROUNDING_CONST, store1);
-            let mut store2 = vdupq_n_s32(0i32);
-            store2 = vsetq_lane_s32::<0>(ROUNDING_CONST, store2);
-            let mut store3 = vdupq_n_s32(0i32);
-            store3 = vsetq_lane_s32::<0>(ROUNDING_CONST, store3);
+            let mut store0 = base_val;
+            let mut store1 = base_val;
+            let mut store2 = base_val;
+            let mut store3 = base_val;
 
             let src0 = src;
             let src1 = src0.get_unchecked(src_stride..);
@@ -119,7 +121,7 @@ pub fn convolve_horizontal_plane_neon_rows_4_u8(
 
             while jx + 16 < bounds.size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 16));
-                let weights = vld1q_s16_x2(w_ptr.as_ptr());
+                let weights = xvld1q_s16_x2(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
 
                 let src_ptr = src0.get_unchecked(bounds_start..);
@@ -226,6 +228,11 @@ pub fn convolve_horizontal_plane_neon_row(
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
+        let base_val = {
+            let j = vdupq_n_s32(0);
+            vsetq_lane_s32::<0>(ROUNDING_CONST, j)
+        };
+
         for ((dst, bounds), weights) in dst.iter_mut().zip(filter_weights.bounds.iter()).zip(
             filter_weights
                 .weights
@@ -234,12 +241,11 @@ pub fn convolve_horizontal_plane_neon_row(
             let bounds_size = bounds.size;
 
             let mut jx = 0usize;
-            let mut store = vdupq_n_s32(0i32);
-            store = vsetq_lane_s32::<0>(ROUNDING_CONST, store);
+            let mut store = base_val;
 
             while jx + 16 < bounds_size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 16));
-                let weights = vld1q_s16_x2(w_ptr.as_ptr());
+                let weights = xvld1q_s16_x2(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
 
                 let src_ptr = src.get_unchecked(bounds_start..).as_ptr();

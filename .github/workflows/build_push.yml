@@ -68,6 +68,7 @@ jobs:
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run resize_rgba -- -max_total_time=30
       - run: cargo fuzz run resize_rgb -- -max_total_time=30
+      - run: cargo fuzz run resize_cbcr8 -- -max_total_time=30
       - run: cargo fuzz run resize_plane -- -max_total_time=30
       - run: cargo fuzz run colorspaces -- -max_total_time=10
 
@@ -83,6 +84,7 @@ jobs:
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run resize_rgba_u16 -- -max_total_time=30
       - run: cargo fuzz run resize_rgb_u16 -- -max_total_time=30
+      - run: cargo fuzz run resize_cbcr16 -- -max_total_time=30
       - run: cargo fuzz run resize_plane_u16 -- -max_total_time=30
 
   fuzz_rgba_f32:
@@ -97,4 +99,5 @@ jobs:
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run resize_rgba_f32 -- -max_total_time=30
       - run: cargo fuzz run resize_rgb_f32 -- -max_total_time=30
+      - run: cargo fuzz run resize_cbcr_f32 -- -max_total_time=30
       - run: cargo fuzz run resize_plane_f32 -- -max_total_time=30

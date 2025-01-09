@@ -113,15 +113,15 @@ impl VerticalConvolutionPass<f32, 4> for ImageStore<'_, f32, 4> {
             let has_fma = std::is_x86_feature_detected!("fma");
             if std::is_x86_feature_detected!("sse4.1") {
                 if has_fma {
-                    _dispatcher = convolve_vertical_rgb_sse_row_f32::<4, true>;
+                    _dispatcher = convolve_vertical_rgb_sse_row_f32::<true>;
                 } else {
-                    _dispatcher = convolve_vertical_rgb_sse_row_f32::<4, false>;
+                    _dispatcher = convolve_vertical_rgb_sse_row_f32::<false>;
                 }
             }
             if std::is_x86_feature_detected!("avx2") {
-                _dispatcher = convolve_vertical_avx_row_f32::<4, false>;
+                _dispatcher = convolve_vertical_avx_row_f32::<false>;
                 if has_fma {
-                    _dispatcher = convolve_vertical_avx_row_f32::<4, true>;
+                    _dispatcher = convolve_vertical_avx_row_f32::<true>;
                 }
             }
         }
