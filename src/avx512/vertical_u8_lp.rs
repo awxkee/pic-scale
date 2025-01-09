@@ -41,7 +41,7 @@ pub(crate) fn convolve_vertical_avx512_row_lp(
     weights: &[i16],
 ) {
     unsafe {
-        convolve_vertical_avx2_row_masked_impl(dst_width, bounds, src, dst, src_stride, weights);
+        convolve_vertical_avx512_row_masked_impl(dst_width, bounds, src, dst, src_stride, weights);
     }
 }
 
@@ -55,11 +55,11 @@ unsafe fn m512dot(
     let lo = _mm512_unpacklo_epi8(row, row);
     let hi = _mm512_unpackhi_epi8(row, row);
 
-    let store0 = _mm512_add_epi16(
+    let store0 = _mm512_adds_epi16(
         store0,
         _mm512_mulhrs_epi16(_mm512_srli_epi16::<2>(lo), weight),
     );
-    let store1 = _mm512_add_epi16(
+    let store1 = _mm512_adds_epi16(
         store1,
         _mm512_mulhrs_epi16(_mm512_srli_epi16::<2>(hi), weight),
     );
@@ -69,7 +69,7 @@ unsafe fn m512dot(
 #[target_feature(enable = "avx512f", enable = "avx512bw")]
 /// This inlining is required to activate all features for runtime dispatch
 /// Protected loads with masking if available
-unsafe fn convolve_vertical_avx2_row_masked_impl(
+unsafe fn convolve_vertical_avx512_row_masked_impl(
     _: usize,
     bounds: &FilterBounds,
     src: &[u8],

@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 image = { version = "0.25.5", features = ["default"] }
 #image = { path= "../../../RustroverProjects/image", features = ["default", "avif", "avif-native"] }
-pic-scale = { path = "..", features = ["half", "nightly_i8mm"], default-features = true }
+pic-scale = { path = "..", features = ["half", "nightly_avx512"], default-features = true }
 fast_image_resize = { version = "5.0.0", features = [] }
 half = { version = "2.4.1", default-features = true }
 

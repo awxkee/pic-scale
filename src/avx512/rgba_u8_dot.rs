@@ -43,12 +43,12 @@ pub(crate) fn convolve_horizontal_rgba_vnni_row_4(
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        convolve_horizontal_rgba_anni_row_4_impl(src, src_stride, dst, dst_stride, filter_weights);
+        convolve_horizontal_rgba_vnni_row_4_impl(src, src_stride, dst, dst_stride, filter_weights);
     }
 }
 
 #[target_feature(enable = "avxvnni", enable = "avx2")]
-unsafe fn convolve_horizontal_rgba_anni_row_4_impl(
+unsafe fn convolve_horizontal_rgba_vnni_row_4_impl(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],

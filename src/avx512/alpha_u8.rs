@@ -40,114 +40,61 @@ trait AssociateAlpha {
 }
 
 #[derive(Default)]
-struct AssociateAlphaDefault<const HAS_VBMI: bool> {}
+struct AssociateAlphaDefault {}
 
-impl<const HAS_VBMI: bool> AssociateAlphaDefault<HAS_VBMI> {
+impl AssociateAlphaDefault {
     #[inline(always)]
     unsafe fn associate_chunk(&self, dst: &mut [u8], src: &[u8]) {
+        let working_mask: __mmask64 = if dst.len() == 64 {
+            0xffff_ffff_ffff_ffff
+        } else {
+            0xffff_ffff_ffff_ffff >> (64 - dst.len())
+        };
+
+        let shuffle = _mm512_set_epi8(
+            63, 63, 63, 63, 59, 59, 59, 59, 55, 55, 55, 55, 51, 51, 51, 51, 47, 47, 47, 47, 43, 43,
+            43, 43, 39, 39, 39, 39, 35, 35, 35, 35, 31, 31, 31, 31, 27, 27, 27, 27, 23, 23, 23, 23,
+            19, 19, 19, 19, 15, 15, 15, 15, 11, 11, 11, 11, 7, 7, 7, 7, 3, 3, 3, 3,
+        );
         let src_ptr = src.as_ptr();
-        let rgba0 = _mm512_loadu_si512(src_ptr as *const _);
-        let rgba1 = _mm512_loadu_si512(src_ptr.add(64) as *const _);
-        let rgba2 = _mm512_loadu_si512(src_ptr.add(128) as *const _);
-        let rgba3 = _mm512_loadu_si512(src_ptr.add(128 + 64) as *const _);
-        let (rrr, ggg, bbb, aaa) = avx512_deinterleave_rgba::<HAS_VBMI>(rgba0, rgba1, rgba2, rgba3);
+        let rgba0 = _mm512_maskz_loadu_epi8(working_mask, src_ptr as *const _);
+        let multiplicand = _mm512_shuffle_epi8(rgba0, shuffle);
 
         let zeros = _mm512_setzero_si512();
 
-        let mut rrr_low = _mm512_unpacklo_epi8(rrr, zeros);
-        let mut rrr_high = _mm512_unpackhi_epi8(rrr, zeros);
+        let mut v_ll = _mm512_unpacklo_epi8(rgba0, zeros);
+        let mut v_hi = _mm512_unpackhi_epi8(rgba0, zeros);
 
-        let mut ggg_low = _mm512_unpacklo_epi8(ggg, zeros);
-        let mut ggg_high = _mm512_unpackhi_epi8(ggg, zeros);
+        let a_lo = _mm512_unpacklo_epi8(multiplicand, zeros);
+        let a_hi = _mm512_unpackhi_epi8(multiplicand, zeros);
 
-        let mut bbb_low = _mm512_unpacklo_epi8(bbb, zeros);
-        let mut bbb_high = _mm512_unpackhi_epi8(bbb, zeros);
+        v_ll = avx512_div_by255(_mm512_mullo_epi16(v_ll, a_lo));
+        v_hi = avx512_div_by255(_mm512_mullo_epi16(v_hi, a_hi));
 
-        let aaa_low = _mm512_unpacklo_epi8(aaa, zeros);
-        let aaa_high = _mm512_unpackhi_epi8(aaa, zeros);
+        let values = _mm512_packus_epi16(v_ll, v_hi);
 
-        rrr_low = avx512_div_by255(_mm512_mullo_epi16(rrr_low, aaa_low));
-        rrr_high = avx512_div_by255(_mm512_mullo_epi16(rrr_high, aaa_high));
-        ggg_low = avx512_div_by255(_mm512_mullo_epi16(ggg_low, aaa_low));
-        ggg_high = avx512_div_by255(_mm512_mullo_epi16(ggg_high, aaa_high));
-        bbb_low = avx512_div_by255(_mm512_mullo_epi16(bbb_low, aaa_low));
-        bbb_high = avx512_div_by255(_mm512_mullo_epi16(bbb_high, aaa_high));
-
-        let rrr = _mm512_packus_epi16(rrr_low, rrr_high);
-        let ggg = _mm512_packus_epi16(ggg_low, ggg_high);
-        let bbb = _mm512_packus_epi16(bbb_low, bbb_high);
-
-        let (rgba0, rgba1, rgba2, rgba3) = avx512_interleave_rgba::<HAS_VBMI>(rrr, ggg, bbb, aaa);
         let dst_ptr = dst.as_mut_ptr();
-        _mm512_storeu_si512(dst_ptr as *mut _, rgba0);
-        _mm512_storeu_si512(dst_ptr.add(64) as *mut _, rgba1);
-        _mm512_storeu_si512(dst_ptr.add(128) as *mut _, rgba2);
-        _mm512_storeu_si512(dst_ptr.add(128 + 64) as *mut _, rgba3);
+        _mm512_mask_storeu_epi8(dst_ptr as *mut _, working_mask, values);
     }
 }
 
-impl AssociateAlpha for AssociateAlphaDefault<false> {
+impl AssociateAlpha for AssociateAlphaDefault {
     #[target_feature(enable = "avx512f", enable = "avx512bw")]
     unsafe fn associate(&self, dst: &mut [u8], src: &[u8]) {
         let mut rem = dst;
         let mut src_rem = src;
 
-        for (dst, src) in rem
-            .chunks_exact_mut(64 * 4)
-            .zip(src_rem.chunks_exact(64 * 4))
-        {
+        for (dst, src) in rem.chunks_exact_mut(64).zip(src_rem.chunks_exact(64)) {
             self.associate_chunk(dst, src);
         }
 
-        rem = rem.chunks_exact_mut(64 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(64 * 4).remainder();
+        rem = rem.chunks_exact_mut(64).into_remainder();
+        src_rem = src_rem.chunks_exact(64).remainder();
 
         if !rem.is_empty() {
-            const PART_SIZE: usize = 64 * 4;
-            assert!(src_rem.len() < PART_SIZE);
-            assert!(rem.len() < PART_SIZE);
-            assert_eq!(src_rem.len(), rem.len());
-
-            let mut buffer: [u8; PART_SIZE] = [0u8; PART_SIZE];
-            let mut dst_buffer: [u8; PART_SIZE] = [0u8; PART_SIZE];
-            std::ptr::copy_nonoverlapping(src_rem.as_ptr(), buffer.as_mut_ptr(), src_rem.len());
-
-            self.associate_chunk(&mut dst_buffer, &buffer);
-
-            std::ptr::copy_nonoverlapping(dst_buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
-        }
-    }
-}
-
-impl AssociateAlpha for AssociateAlphaDefault<true> {
-    #[target_feature(enable = "avx512f", enable = "avx512bw", enable = "avx512vbmi")]
-    unsafe fn associate(&self, dst: &mut [u8], src: &[u8]) {
-        let mut rem = dst;
-        let mut src_rem = src;
-
-        for (dst, src) in rem
-            .chunks_exact_mut(64 * 4)
-            .zip(src_rem.chunks_exact(64 * 4))
-        {
-            self.associate_chunk(dst, src);
-        }
-
-        rem = rem.chunks_exact_mut(64 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(64 * 4).remainder();
-
-        if !rem.is_empty() {
-            const PART_SIZE: usize = 64 * 4;
-            assert!(src_rem.len() < PART_SIZE);
-            assert!(rem.len() < PART_SIZE);
-            assert_eq!(src_rem.len(), rem.len());
-
-            let mut buffer: [u8; PART_SIZE] = [0u8; PART_SIZE];
-            let mut dst_buffer: [u8; PART_SIZE] = [0u8; PART_SIZE];
-            std::ptr::copy_nonoverlapping(src_rem.as_ptr(), buffer.as_mut_ptr(), src_rem.len());
-
-            self.associate_chunk(&mut dst_buffer, &buffer);
-
-            std::ptr::copy_nonoverlapping(dst_buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
+            assert!(rem.len() <= 64);
+            assert!(src_rem.len() <= 64);
+            self.associate_chunk(&mut rem, &src_rem);
         }
     }
 }
@@ -167,16 +114,9 @@ pub(crate) fn avx512_premultiply_alpha_rgba(
     src_stride: usize,
     pool: &Option<ThreadPool>,
 ) {
-    let has_vbmi = std::arch::is_x86_feature_detected!("avx512vbmi");
-
-    let mut executor: fn(&mut [u8], &[u8]) = |dst: &mut [u8], src: &[u8]| {
-        avx_premultiply_alpha_rgba_impl_row(dst, src, AssociateAlphaDefault::<false>::default());
+    let executor: fn(&mut [u8], &[u8]) = |dst: &mut [u8], src: &[u8]| {
+        avx_premultiply_alpha_rgba_impl_row(dst, src, AssociateAlphaDefault::default());
     };
-    if has_vbmi {
-        executor = |dst: &mut [u8], src: &[u8]| {
-            avx_premultiply_alpha_rgba_impl_row(dst, src, AssociateAlphaDefault::<true>::default());
-        };
-    }
 
     if let Some(pool) = pool {
         pool.install(|| {

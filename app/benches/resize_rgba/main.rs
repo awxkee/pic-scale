@@ -16,12 +16,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let dimensions = img.dimensions();
     let src_bytes = img.as_bytes();
     c.bench_function("Pic scale RGBA with alpha: Lanczos 3", |b| {
-        let mut copied: Vec<u8> = Vec::from(src_bytes);
+        let copied: Vec<u8> = Vec::from(src_bytes);
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
             scaler.set_threading_policy(ThreadingPolicy::Single);
             let store = ImageStore::<u8, 4>::from_slice(
-                &mut copied,
+                &copied,
                 dimensions.0 as usize,
                 dimensions.1 as usize,
             )
@@ -35,12 +35,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let f32_image: Vec<f32> = src_bytes.iter().map(|&x| x as f32 / 255f32).collect();
 
     c.bench_function("Pic scale RGBA with alpha f32: Lanczos 3", |b| {
-        let mut copied: Vec<f32> = Vec::from(f32_image.clone());
+        let copied: Vec<f32> = Vec::from(f32_image.clone());
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
             scaler.set_threading_policy(ThreadingPolicy::Single);
             let store = ImageStore::<f32, 4>::from_slice(
-                &mut copied,
+                &copied,
                 dimensions.0 as usize,
                 dimensions.1 as usize,
             )
@@ -81,12 +81,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     });
 
     c.bench_function("Pic scale RGBA without alpha: Lanczos 3", |b| {
-        let mut copied: Vec<u8> = Vec::from(src_bytes);
+        let copied: Vec<u8> = Vec::from(src_bytes);
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
             scaler.set_threading_policy(ThreadingPolicy::Single);
             let store = ImageStore::<u8, 4>::from_slice(
-                &mut copied,
+                &copied,
                 dimensions.0 as usize,
                 dimensions.1 as usize,
             )
