@@ -29,57 +29,32 @@
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::avx2::convolve_vertical_avx_row_f32;
 use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
-use crate::convolve_naive_f32::*;
+use crate::convolve_naive_f32::{
+    convolve_horizontal_rgb_native_row, convolve_horizontal_rgba_4_row_f32,
+};
 use crate::dispatch_group_f32::{convolve_horizontal_dispatch_f32, convolve_vertical_dispatch_f32};
 use crate::filter_weights::{FilterBounds, FilterWeights};
-use crate::floating_point_vertical::column_handler_floating_point;
 use crate::image_store::{ImageStore, ImageStoreMut};
-#[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::*;
+use crate::rgb_f32::convolve_vertical_rgb_native_row_f32;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::*;
 use rayon::ThreadPool;
 
-pub(crate) fn convolve_vertical_rgb_native_row_f32<const COMPONENTS: usize>(
-    _: usize,
-    bounds: &FilterBounds,
-    src: &[f32],
-    dst: &mut [f32],
-    src_stride: usize,
-    weight: &[f32],
-) {
-    column_handler_floating_point::<f32, f32, f32>(bounds, src, dst, src_stride, weight, 8);
-}
-
-impl HorizontalConvolutionPass<f32, 3> for ImageStore<'_, f32, 3> {
+impl HorizontalConvolutionPass<f32, 2> for ImageStore<'_, f32, 2> {
     #[allow(clippy::type_complexity)]
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStoreMut<f32, 3>,
+        destination: &mut ImageStoreMut<f32, 2>,
         pool: &Option<ThreadPool>,
     ) {
-        let mut _dispatcher_4_rows: Option<
+        let _dispatcher_4_rows: Option<
             fn(usize, usize, &FilterWeights<f32>, &[f32], usize, &mut [f32], usize),
-        > = Some(convolve_horizontal_rgba_4_row_f32::<3>);
-        let mut _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, &[f32], &mut [f32]) =
-            convolve_horizontal_rgb_native_row::<3>;
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rows_4_f32);
-            _dispatcher_row = convolve_horizontal_rgb_neon_row_one_f32;
-        }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        {
-            if is_x86_feature_detected!("sse4.1") {
-                _dispatcher_4_rows = Some(convolve_horizontal_rgb_sse_rows_4_f32::<false>);
-                _dispatcher_row = convolve_horizontal_rgb_sse_row_one_f32::<false>;
-                if is_x86_feature_detected!("fma") {
-                    _dispatcher_4_rows = Some(convolve_horizontal_rgb_sse_rows_4_f32::<true>);
-                    _dispatcher_row = convolve_horizontal_rgb_sse_row_one_f32::<true>;
-                }
-            }
-        }
+        > = Some(convolve_horizontal_rgba_4_row_f32::<2>);
+        let _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, &[f32], &mut [f32]) =
+            convolve_horizontal_rgb_native_row::<2>;
         convolve_horizontal_dispatch_f32(
             self,
             filter_weights,
@@ -91,19 +66,19 @@ impl HorizontalConvolutionPass<f32, 3> for ImageStore<'_, f32, 3> {
     }
 }
 
-impl VerticalConvolutionPass<f32, 3> for ImageStore<'_, f32, 3> {
+impl VerticalConvolutionPass<f32, 2> for ImageStore<'_, f32, 2> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStoreMut<f32, 3>,
+        destination: &mut ImageStoreMut<f32, 2>,
         pool: &Option<ThreadPool>,
     ) {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(usize, &FilterBounds, &[f32], &mut [f32], usize, &[f32]) =
-            convolve_vertical_rgb_native_row_f32::<3>;
+            convolve_vertical_rgb_native_row_f32::<2>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            _dispatcher = convolve_vertical_rgb_neon_row_f32::<3>;
+            _dispatcher = convolve_vertical_rgb_neon_row_f32::<2>;
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {

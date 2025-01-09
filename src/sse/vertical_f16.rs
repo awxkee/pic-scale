@@ -189,11 +189,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_8_f16<const F16C: bool, const FM
     _mm_storeu_si128(dst_ptr as *mut __m128i, acc0);
 }
 
-pub(crate) fn convolve_vertical_sse_row_f16<
-    const CHANNELS: usize,
-    const F16C: bool,
-    const FMA: bool,
->(
+pub(crate) fn convolve_vertical_sse_row_f16<const F16C: bool, const FMA: bool>(
     width: usize,
     bounds: &FilterBounds,
     src: &[half::f16],
@@ -204,18 +200,12 @@ pub(crate) fn convolve_vertical_sse_row_f16<
     unsafe {
         if F16C {
             if FMA {
-                convolve_vertical_sse_row_f16c_fma::<CHANNELS>(
-                    width, bounds, src, dst, src_stride, weight_ptr,
-                );
+                convolve_vertical_sse_row_f16c_fma(width, bounds, src, dst, src_stride, weight_ptr);
             } else {
-                convolve_vertical_sse_row_f16c::<CHANNELS>(
-                    width, bounds, src, dst, src_stride, weight_ptr,
-                );
+                convolve_vertical_sse_row_f16c(width, bounds, src, dst, src_stride, weight_ptr);
             }
         } else {
-            convolve_vertical_sse_row_f16_regular::<CHANNELS>(
-                width, bounds, src, dst, src_stride, weight_ptr,
-            );
+            convolve_vertical_sse_row_f16_regular(width, bounds, src, dst, src_stride, weight_ptr);
         }
     }
 }
@@ -224,7 +214,7 @@ pub(crate) fn convolve_vertical_sse_row_f16<
 /// This inlining is required to activate all features for runtime dispatch.
 ///
 /// Crate has a safe fallback for f16c conversion even it is not supported.
-unsafe fn convolve_vertical_sse_row_f16_regular<const CHANNELS: usize>(
+unsafe fn convolve_vertical_sse_row_f16_regular(
     width: usize,
     bounds: &FilterBounds,
     src: &[half::f16],
@@ -232,7 +222,7 @@ unsafe fn convolve_vertical_sse_row_f16_regular<const CHANNELS: usize>(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    convolve_vertical_sse_row_f16_impl::<CHANNELS, false, false>(
+    convolve_vertical_sse_row_f16_impl::<false, false>(
         width, bounds, src, dst, src_stride, weight_ptr,
     );
 }
@@ -241,7 +231,7 @@ unsafe fn convolve_vertical_sse_row_f16_regular<const CHANNELS: usize>(
 /// This inlining is required to activate all features for runtime dispatch.
 ///
 /// Crate has a safe fallback for f16c conversion even it is not supported.
-unsafe fn convolve_vertical_sse_row_f16c_fma<const CHANNELS: usize>(
+unsafe fn convolve_vertical_sse_row_f16c_fma(
     width: usize,
     bounds: &FilterBounds,
     src: &[half::f16],
@@ -249,7 +239,7 @@ unsafe fn convolve_vertical_sse_row_f16c_fma<const CHANNELS: usize>(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    convolve_vertical_sse_row_f16_impl::<CHANNELS, true, true>(
+    convolve_vertical_sse_row_f16_impl::<true, true>(
         width, bounds, src, dst, src_stride, weight_ptr,
     );
 }
@@ -258,7 +248,7 @@ unsafe fn convolve_vertical_sse_row_f16c_fma<const CHANNELS: usize>(
 /// This inlining is required to activate all features for runtime dispatch.
 ///
 /// Crate has a safe fallback for f16c conversion even it is not supported.
-unsafe fn convolve_vertical_sse_row_f16c<const CHANNELS: usize>(
+unsafe fn convolve_vertical_sse_row_f16c(
     width: usize,
     bounds: &FilterBounds,
     src: &[half::f16],
@@ -266,18 +256,14 @@ unsafe fn convolve_vertical_sse_row_f16c<const CHANNELS: usize>(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    convolve_vertical_sse_row_f16_impl::<CHANNELS, false, true>(
+    convolve_vertical_sse_row_f16_impl::<false, true>(
         width, bounds, src, dst, src_stride, weight_ptr,
     );
 }
 
 #[inline(always)]
-unsafe fn convolve_vertical_sse_row_f16_impl<
-    const CHANNELS: usize,
-    const FMA: bool,
-    const F16C: bool,
->(
-    width: usize,
+unsafe fn convolve_vertical_sse_row_f16_impl<const FMA: bool, const F16C: bool>(
+    _: usize,
     bounds: &FilterBounds,
     src: &[half::f16],
     dst: &mut [half::f16],
@@ -285,7 +271,7 @@ unsafe fn convolve_vertical_sse_row_f16_impl<
     weight_ptr: &[f32],
 ) {
     let mut cx = 0usize;
-    let dst_width = CHANNELS * width;
+    let dst_width = dst.len();
 
     while cx + 16 < dst_width {
         unsafe {

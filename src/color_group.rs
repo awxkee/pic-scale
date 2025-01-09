@@ -87,7 +87,7 @@ where
         } else if COMPS == 4 {
             ColorGroup::from_components(self.r * rhs, self.g * rhs, self.b * rhs, self.a * rhs)
         } else {
-            unimplemented!("Not implemented.");
+            unimplemented!();
         }
     }
 }
@@ -156,7 +156,7 @@ where
                 self.a * rhs.b,
             )
         } else {
-            unimplemented!("Not implemented.");
+            unimplemented!();
         }
     }
 }
@@ -197,7 +197,7 @@ where
         } else if COMPS == 4 {
             ColorGroup::from_components(self.r - rhs, self.g - rhs, self.b - rhs, self.a - rhs)
         } else {
-            unimplemented!("Not implemented.");
+            unimplemented!();
         }
     }
 }
@@ -351,7 +351,7 @@ where
                 mlaf(self.a, a.a, b),
             )
         } else {
-            unimplemented!("Not implemented.");
+            unimplemented!();
         }
     }
 }
@@ -490,7 +490,7 @@ macro_rules! load_color_group {
                 a: $store.get_unchecked(3).as_(),
             }
         } else {
-            unimplemented!("Not implemented.")
+            unimplemented!()
         }
     }};
 }
@@ -528,7 +528,7 @@ macro_rules! load_color_group_with_offset {
                 a: $store[$offset + 3].as_(),
             }
         } else {
-            panic!("Not implemented.")
+            unimplemented!()
         }
     }};
 }

@@ -56,6 +56,14 @@ impl Scaling for OklabScaler {
         self.scaler.threading_policy = threading_policy;
     }
 
+    fn resize_cbcr8<'a>(
+        &'a self,
+        _: &ImageStore<'a, u8, 2>,
+        _: &mut ImageStoreMut<'a, u8, 2>,
+    ) -> Result<(), PicScaleError> {
+        unimplemented!()
+    }
+
     fn resize_rgb<'a>(
         &self,
         store: &ImageStore<'a, u8, 3>,

@@ -49,6 +49,7 @@ mod rgb_f32;
 mod rgb_u8;
 #[cfg(feature = "nightly_i8mm")]
 mod rgb_u8_dot;
+mod rgb_u8_sqrdml;
 #[cfg(feature = "half")]
 mod rgba_f16;
 #[cfg(feature = "half")]
@@ -105,6 +106,9 @@ pub(crate) use rgb_u8::{
 #[cfg(feature = "nightly_i8mm")]
 pub(crate) use rgb_u8_dot::{
     convolve_horizontal_rgb_neon_dot_row_one, convolve_horizontal_rgb_neon_dot_rows_4,
+};
+pub(crate) use rgb_u8_sqrdml::{
+    convolve_horizontal_rgb_neon_rdm_row_one, convolve_horizontal_rgb_neon_rdm_rows_4,
 };
 #[cfg(feature = "half")]
 pub(crate) use rgba_f16::convolve_horizontal_rgba_neon_row_one_f16;

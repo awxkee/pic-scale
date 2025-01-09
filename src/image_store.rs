@@ -39,7 +39,6 @@ use rayon::ThreadPool;
 use std::borrow::Cow;
 use std::fmt::Debug;
 
-#[derive(Debug, Clone)]
 /// Holds an image
 ///
 /// # Arguments
@@ -49,6 +48,7 @@ use std::fmt::Debug;
 /// ImageStore<u8, 4> - represents RGBA
 /// ImageStore<u8, 3> - represents RGB
 /// ImageStore<f32, 3> - represents RGB in f32 and etc
+#[derive(Debug, Clone)]
 pub struct ImageStore<'a, T, const N: usize>
 where
     T: FromPrimitive + Clone + Copy + Debug,
@@ -66,7 +66,6 @@ where
     pub bit_depth: usize,
 }
 
-#[derive(Debug)]
 /// Holds an image
 ///
 /// # Arguments
@@ -76,6 +75,7 @@ where
 /// ImageStore<u8, 4> - represents RGBA
 /// ImageStore<u8, 3> - represents RGB
 /// ImageStore<f32, 3> - represents RGB in f32 and etc
+#[derive(Debug)]
 pub struct ImageStoreMut<'a, T, const N: usize>
 where
     T: FromPrimitive + Clone + Copy + Debug,

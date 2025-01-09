@@ -30,6 +30,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "resize_cbcr8"
+path = "resize_cbcr8/resize_cbcr8.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "resize_plane"
 path = "resize_plane/resize_plane.rs"
 test = false
@@ -39,6 +46,20 @@ bench = false
 [[bin]]
 name = "resize_rgba_u16"
 path = "resize_rgba_u16/resize_rgba_u16.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "resize_cbcr16"
+path = "resize_cbcr16/resize_cbcr16.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "resize_cbcr_f32"
+path = "resize_cbcr_f32/resize_cbcr_f32.rs"
 test = false
 doc = false
 bench = false

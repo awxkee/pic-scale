@@ -32,9 +32,29 @@ use crate::pic_scale_error::PicScaleError;
 use crate::{ImageStore, Scaler};
 use half::f16;
 
-// f16
+/// Implements `f16` type support
 impl Scaler {
-    /// Resize f16 RGBA image
+    /// Performs rescaling for RGBA f16
+    ///
+    /// Scales RGBA high bit-depth interleaved image in `f16` type.
+    /// Channel order does not matter.
+    /// To handle alpha pre-multiplication alpha channel expected to be at last position.
+    ///
+    /// # Arguments
+    /// `store` - original image store
+    /// `into` - target image store
+    /// `premultiply_alpha` - flag if it should handle alpha or not
+    ///
+    /// # Example
+    ///
+    /// #[no_build]
+    /// ```rust
+    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler};
+    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+    ///  let src_store = ImageStore::alloc(100, 100);
+    ///  let mut dst_store = ImageStoreMut::<half::f16, 4>::alloc_with_depth(50, 50, 10);
+    ///  scaler.resize_rgba_f16(&src_store, &mut dst_store, false).unwrap();
+    /// ```
     pub fn resize_rgba_f16<'a>(
         &'a self,
         store: &ImageStore<'a, f16, 4>,
@@ -44,7 +64,25 @@ impl Scaler {
         self.generic_resize_with_alpha(store, into, premultiply_alpha)
     }
 
-    /// Resize f16 RGB image
+    /// Performs rescaling for RGB f16
+    ///
+    /// Scales RGB high bit-depth interleaved image in `f16` type.
+    /// Channel order does not matter.
+    ///
+    /// # Arguments
+    /// `store` - original image store
+    /// `into` - target image store
+    ///
+    /// # Example
+    ///
+    /// #[no_build]
+    /// ```rust
+    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler};
+    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+    ///  let src_store = ImageStore::alloc(100, 100);
+    ///  let mut dst_store = ImageStoreMut::<half::f16, 3>::alloc_with_depth(50, 50, 10);
+    ///  scaler.resize_rgb_f16(&src_store, &mut dst_store).unwrap();
+    /// ```
     pub fn resize_rgb_f16<'a>(
         &'a self,
         store: &ImageStore<'a, f16, 3>,
@@ -53,7 +91,53 @@ impl Scaler {
         self.generic_resize(store, into)
     }
 
-    /// Resize f16 plane
+    /// Performs rescaling for CbCr f16
+    ///
+    /// Scales CbCr high bit-depth interleaved image in `f16` type, optionally it could handle LumaAlpha images also
+    /// Channel order does not matter.
+    ///
+    /// # Arguments
+    /// `store` - original image store
+    /// `into` - target image store
+    ///
+    /// # Example
+    ///
+    /// #[no_build]
+    /// ```rust
+    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler};
+    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+    ///  let src_store = ImageStore::alloc(100, 100);
+    ///  let mut dst_store = ImageStoreMut::<half::f16, 2>::alloc_with_depth(50, 50, 10);
+    ///  scaler.resize_cbcr_f16(&src_store, &mut dst_store).unwrap();
+    /// ```
+    pub fn resize_cbcr_f16<'a>(
+        &'a self,
+        store: &ImageStore<'a, f16, 2>,
+        into: &mut ImageStoreMut<'a, f16, 2>,
+    ) -> Result<(), PicScaleError> {
+        self.generic_resize(store, into)
+    }
+
+    /// Performs rescaling for Planar image f16
+    ///
+    /// Scales planar high bit-depth image in `f16` type, optionally it could handle LumaAlpha images also
+    /// Channel order does not matter.
+    ///
+    /// # Arguments
+    /// `store` - original image store
+    /// `into` - target image store
+    ///
+    /// # Example
+    ///
+    /// #[no_build]
+    /// ```rust
+    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler};
+    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+    ///  let src_store = ImageStore::alloc(100, 100);
+    ///  let mut dst_store = ImageStoreMut::<half::f16, 1>::alloc_with_depth(50, 50, 10);
+    ///  scaler.resize_plane_f16(&src_store, &mut dst_store).unwrap();
+    /// ```
+    ///
     pub fn resize_plane_f16<'a>(
         &'a self,
         store: &ImageStore<'a, f16, 1>,

@@ -201,7 +201,7 @@ unsafe fn convolve_vertical_part_avx_16_f16<const FMA: bool>(
     _mm256_storeu_si256(dst_ptr as *mut __m256i, acc0);
 }
 
-pub(crate) fn convolve_vertical_avx_row_f16<const CHANNELS: usize, const FMA: bool>(
+pub(crate) fn convolve_vertical_avx_row_f16<const FMA: bool>(
     width: usize,
     bounds: &FilterBounds,
     src: &[half::f16],
@@ -211,20 +211,16 @@ pub(crate) fn convolve_vertical_avx_row_f16<const CHANNELS: usize, const FMA: bo
 ) {
     unsafe {
         if FMA {
-            convolve_vertical_avx_row_f16_fma::<CHANNELS>(
-                width, bounds, src, dst, src_stride, weight_ptr,
-            );
+            convolve_vertical_avx_row_f16_fma(width, bounds, src, dst, src_stride, weight_ptr);
         } else {
-            convolve_vertical_avx_row_f16_regular::<CHANNELS>(
-                width, bounds, src, dst, src_stride, weight_ptr,
-            );
+            convolve_vertical_avx_row_f16_regular(width, bounds, src, dst, src_stride, weight_ptr);
         }
     }
 }
 
 #[target_feature(enable = "avx2", enable = "f16c")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_vertical_avx_row_f16_regular<const CHANNELS: usize>(
+unsafe fn convolve_vertical_avx_row_f16_regular(
     width: usize,
     bounds: &FilterBounds,
     src: &[half::f16],
@@ -232,14 +228,12 @@ unsafe fn convolve_vertical_avx_row_f16_regular<const CHANNELS: usize>(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    convolve_vertical_avx_row_f16_impl::<CHANNELS, false>(
-        width, bounds, src, dst, src_stride, weight_ptr,
-    );
+    convolve_vertical_avx_row_f16_impl::<false>(width, bounds, src, dst, src_stride, weight_ptr);
 }
 
 #[target_feature(enable = "avx2", enable = "fma", enable = "f16c")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_vertical_avx_row_f16_fma<const CHANNELS: usize>(
+unsafe fn convolve_vertical_avx_row_f16_fma(
     width: usize,
     bounds: &FilterBounds,
     src: &[half::f16],
@@ -247,14 +241,12 @@ unsafe fn convolve_vertical_avx_row_f16_fma<const CHANNELS: usize>(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    convolve_vertical_avx_row_f16_impl::<CHANNELS, true>(
-        width, bounds, src, dst, src_stride, weight_ptr,
-    );
+    convolve_vertical_avx_row_f16_impl::<true>(width, bounds, src, dst, src_stride, weight_ptr);
 }
 
 #[inline(always)]
-unsafe fn convolve_vertical_avx_row_f16_impl<const CHANNELS: usize, const FMA: bool>(
-    width: usize,
+unsafe fn convolve_vertical_avx_row_f16_impl<const FMA: bool>(
+    _: usize,
     bounds: &FilterBounds,
     src: &[half::f16],
     dst: &mut [half::f16],
@@ -262,7 +254,7 @@ unsafe fn convolve_vertical_avx_row_f16_impl<const CHANNELS: usize, const FMA: b
     weight_ptr: &[f32],
 ) {
     let mut cx = 0usize;
-    let dst_width = CHANNELS * width;
+    let dst_width = dst.len();
 
     while cx + 32 < dst_width {
         convolve_vertical_part_avx_32_f16::<FMA>(

@@ -66,6 +66,26 @@ pub trait Scaling {
     /// ```
     fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy);
 
+    /// Performs rescaling for CbCr8 ( or 2 interleaved channels )
+    ///
+    /// Scales 2 interleaved channels as CbCr8, optionally it could handle LumaAlpha images also
+    ///
+    /// # Example
+    ///
+    /// #[no_build]
+    /// ```rust
+    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling};
+    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+    ///  let src_store = ImageStore::alloc(100, 100);
+    ///  let mut dst_store = ImageStoreMut::<u8, 2>::alloc(50, 50);
+    ///  scaler.resize_cbcr8(&src_store, &mut dst_store).unwrap();
+    /// ```
+    fn resize_cbcr8<'a>(
+        &'a self,
+        store: &ImageStore<'a, u8, 2>,
+        into: &mut ImageStoreMut<'a, u8, 2>,
+    ) -> Result<(), PicScaleError>;
+
     /// Performs rescaling for RGB, channel order does not matter
     ///
     /// # Example
@@ -108,6 +128,26 @@ pub trait Scaling {
 }
 
 pub trait ScalingF32 {
+    /// Performs rescaling for CbCr f32
+    ///
+    /// Scales an interleaved CbCr f32. Also could handle LumaAlpha images.
+    ///
+    /// # Example
+    ///
+    /// #[no_build]
+    /// ```rust
+    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32};
+    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    ///  let src_store = ImageStore::alloc(100, 100);
+    ///  let mut dst_store = ImageStoreMut::<f32, 2>::alloc(50, 50);
+    ///  scaler.resize_cbcr_f32(&src_store, &mut dst_store).unwrap();
+    /// ```
+    fn resize_cbcr_f32<'a>(
+        &'a self,
+        store: &ImageStore<'a, f32, 2>,
+        into: &mut ImageStoreMut<'a, f32, 2>,
+    ) -> Result<(), PicScaleError>;
+
     /// Performs rescaling for RGB f32
     ///
     /// Scales an image RGB f32, channel order does not matter
@@ -179,6 +219,37 @@ pub trait ScalingU16 {
         &'a self,
         store: &ImageStore<'a, u16, 1>,
         into: &mut ImageStoreMut<'a, u16, 1>,
+    ) -> Result<(), PicScaleError>;
+
+    /// Performs rescaling for CbCr16
+    ///
+    /// Scales CbCr high bit-depth interleaved image in `u16` type, optionally it could handle LumaAlpha images also
+    /// To perform scaling image bit-depth should be set in target image,
+    /// source image expects to have the same one.
+    /// Channel order does not matter.
+    ///
+    /// # Arguments
+    /// `store` - original image store
+    /// `into` - target image store
+    ///
+    /// # Panics
+    /// Method panics if bit-depth < 1 or bit-depth > 16
+    ///
+    /// # Example
+    ///
+    /// #[no_build]
+    /// ```rust
+    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16};
+    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+    ///  let src_store = ImageStore::alloc(100, 100);
+    ///  let mut dst_store = ImageStoreMut::<u16, 2>::alloc_with_depth(50, 50, 10);
+    ///  scaler.resize_cbcr_u16(&src_store, &mut dst_store).unwrap();
+    /// ```
+    ///
+    fn resize_cbcr_u16<'a>(
+        &'a self,
+        store: &ImageStore<'a, u16, 2>,
+        into: &mut ImageStoreMut<'a, u16, 2>,
     ) -> Result<(), PicScaleError>;
 
     /// Performs rescaling for RGB
@@ -839,6 +910,14 @@ impl Scaling for Scaler {
         self.threading_policy = threading_policy;
     }
 
+    fn resize_cbcr8<'a>(
+        &'a self,
+        store: &ImageStore<'a, u8, 2>,
+        into: &mut ImageStoreMut<'a, u8, 2>,
+    ) -> Result<(), PicScaleError> {
+        self.generic_resize(store, into)
+    }
+
     fn resize_rgb<'a>(
         &'a self,
         store: &ImageStore<'a, u8, 3>,
@@ -858,6 +937,14 @@ impl Scaling for Scaler {
 }
 
 impl ScalingF32 for Scaler {
+    fn resize_cbcr_f32<'a>(
+        &'a self,
+        store: &ImageStore<'a, f32, 2>,
+        into: &mut ImageStoreMut<'a, f32, 2>,
+    ) -> Result<(), PicScaleError> {
+        self.generic_resize(store, into)
+    }
+
     fn resize_rgb_f32<'a>(
         &'a self,
         store: &ImageStore<'a, f32, 3>,
@@ -928,6 +1015,14 @@ impl ScalingU16 for Scaler {
         &'a self,
         store: &ImageStore<'a, u16, 3>,
         into: &mut ImageStoreMut<'a, u16, 3>,
+    ) -> Result<(), PicScaleError> {
+        self.generic_resize(store, into)
+    }
+
+    fn resize_cbcr_u16<'a>(
+        &'a self,
+        store: &ImageStore<'a, u16, 2>,
+        into: &mut ImageStoreMut<'a, u16, 2>,
     ) -> Result<(), PicScaleError> {
         self.generic_resize(store, into)
     }

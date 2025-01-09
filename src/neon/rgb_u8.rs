@@ -238,8 +238,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_row_one(
             while jx + 2 < bounds_size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 2));
                 let bounds_start = bounds.start + jx;
-                let mut v_weight = vld1_dup_s16(w_ptr.as_ptr());
-                v_weight = vld1_lane_s16::<1>(w_ptr.as_ptr().add(1), v_weight);
+                let v_weight = vreinterpret_s16_s32(vld1_dup_s32(w_ptr.as_ptr() as *const _));
                 store = conv_horiz_rgba_2_u8(bounds_start, src, v_weight, store, shuffle_1);
                 jx += 2;
             }

@@ -215,7 +215,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_f32<const FMA: bool>(
     (dst_ptr as *mut i32).write_unaligned(_mm_extract_ps::<0>(store_0));
 }
 
-pub(crate) fn convolve_vertical_rgb_sse_row_f32<const CHANNELS: usize, const FMA: bool>(
+pub(crate) fn convolve_vertical_rgb_sse_row_f32<const FMA: bool>(
     width: usize,
     bounds: &FilterBounds,
     src: &[f32],
@@ -225,11 +225,9 @@ pub(crate) fn convolve_vertical_rgb_sse_row_f32<const CHANNELS: usize, const FMA
 ) {
     unsafe {
         if FMA {
-            convolve_vertical_rgb_sse_row_f32_fma::<CHANNELS>(
-                width, bounds, src, dst, src_stride, weight_ptr,
-            );
+            convolve_vertical_rgb_sse_row_f32_fma(width, bounds, src, dst, src_stride, weight_ptr);
         } else {
-            convolve_vertical_rgb_sse_row_f32_regular::<CHANNELS>(
+            convolve_vertical_rgb_sse_row_f32_regular(
                 width, bounds, src, dst, src_stride, weight_ptr,
             );
         }
@@ -238,7 +236,7 @@ pub(crate) fn convolve_vertical_rgb_sse_row_f32<const CHANNELS: usize, const FMA
 
 #[target_feature(enable = "sse4.1")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_vertical_rgb_sse_row_f32_regular<const CHANNELS: usize>(
+unsafe fn convolve_vertical_rgb_sse_row_f32_regular(
     width: usize,
     bounds: &FilterBounds,
     src: &[f32],
@@ -246,14 +244,14 @@ unsafe fn convolve_vertical_rgb_sse_row_f32_regular<const CHANNELS: usize>(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    convolve_vertical_rgb_sse_row_f32_impl::<CHANNELS, false>(
+    convolve_vertical_rgb_sse_row_f32_impl::<false>(
         width, bounds, src, dst, src_stride, weight_ptr,
     );
 }
 
 #[target_feature(enable = "sse4.1", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_vertical_rgb_sse_row_f32_fma<const CHANNELS: usize>(
+unsafe fn convolve_vertical_rgb_sse_row_f32_fma(
     width: usize,
     bounds: &FilterBounds,
     src: &[f32],
@@ -261,14 +259,12 @@ unsafe fn convolve_vertical_rgb_sse_row_f32_fma<const CHANNELS: usize>(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    convolve_vertical_rgb_sse_row_f32_impl::<CHANNELS, true>(
-        width, bounds, src, dst, src_stride, weight_ptr,
-    );
+    convolve_vertical_rgb_sse_row_f32_impl::<true>(width, bounds, src, dst, src_stride, weight_ptr);
 }
 
 #[inline(always)]
-unsafe fn convolve_vertical_rgb_sse_row_f32_impl<const CHANNELS: usize, const FMA: bool>(
-    width: usize,
+unsafe fn convolve_vertical_rgb_sse_row_f32_impl<const FMA: bool>(
+    _: usize,
     bounds: &FilterBounds,
     src: &[f32],
     dst: &mut [f32],
@@ -276,7 +272,7 @@ unsafe fn convolve_vertical_rgb_sse_row_f32_impl<const CHANNELS: usize, const FM
     weight_ptr: &[f32],
 ) {
     let mut cx = 0usize;
-    let dst_width = CHANNELS * width;
+    let dst_width = dst.len();
 
     while cx + 24 < dst_width {
         convolve_vertical_part_sse_24_f32::<FMA>(
