@@ -91,7 +91,7 @@ pub(crate) use plane_f32::convolve_horizontal_plane_neon_row_one;
 pub(crate) use plane_f32::convolve_horizontal_plane_neon_rows_4;
 pub use plane_u8::{convolve_horizontal_plane_neon_row, convolve_horizontal_plane_neon_rows_4_u8};
 pub(crate) use plane_u8_rdm::{
-    convolve_horizontal_plane_neon_rdm_row, convolve_horizontal_plane_neon_rows_rdm_4_u8
+    convolve_horizontal_plane_neon_rdm_row, convolve_horizontal_plane_neon_rows_rdm_4_u8,
 };
 #[cfg(feature = "half")]
 pub(crate) use rgb_f16::{

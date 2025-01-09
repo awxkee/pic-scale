@@ -198,6 +198,20 @@ pub(crate) unsafe fn sse_interleave_rgba_epi16(
     (v0, v1, v2, v3)
 }
 
+/// Horizontal add i16 across vector
+#[allow(dead_code)]
+#[inline(always)]
+pub(crate) unsafe fn _mm_hsum_epi16(x: __m128i) -> i16 {
+    // [v0 + v4] [v1 + v5] [v2 + v6] [v3 + v7]
+    let v0 = _mm_hadd_epi16(x, x);
+    // Shuffle to [v2 + v6] [v3 + v7] [v0 + v4] [v1 + v5]
+    const MASK: i32 = shuffle(0, 0, 0, 1);
+    let v1 = _mm_shuffle_epi32::<MASK>(v0);
+    // [v2 + v6 + v0 + v4] [v3 + v7 + v1 + v5]
+    let v2 = _mm_add_epi16(v0, v1);
+    _mm_extract_epi16::<0>(_mm_hadd_epi16(v2, v2)) as i16
+}
+
 #[inline(always)]
 pub(crate) unsafe fn _mm_hsum_epi32(x: __m128i) -> i32 {
     const FIRST_MASK: i32 = shuffle(1, 0, 3, 2);
@@ -282,5 +296,21 @@ pub(crate) unsafe fn _mm_dot16_avx_epi32<const HAS_DOT: bool>(
     #[cfg(not(feature = "nightly_avx512"))]
     {
         _mm_add_epi32(a, _mm_madd_epi16(b, c))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_horizontal_add() {
+        unsafe {
+            let original: [i16; 8] = [0, 1, 2, 3, 4, 5, 6, 7];
+            let original_sum = original.iter().sum::<i16>();
+            let v_sse = _mm_loadu_si128(original.as_ptr() as *const __m128i);
+            let h_sum = _mm_hsum_epi16(v_sse);
+            assert_eq!(h_sum, original_sum);
+        }
     }
 }

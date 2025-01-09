@@ -81,6 +81,14 @@ impl HorizontalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
             if is_x86_feature_detected!("sse4.1") {
                 _dispatcher_4_rows = Some(convolve_horizontal_plane_sse_rows_4_u8);
                 _dispatcher_1_row = convolve_horizontal_plane_sse_row;
+                if _scale_factor < 8. {
+                    use crate::sse::{
+                        convolve_horizontal_plane_sse_row_hrs,
+                        convolve_horizontal_plane_sse_rows_hrs_4_u8,
+                    };
+                    _dispatcher_4_rows = Some(convolve_horizontal_plane_sse_rows_hrs_4_u8);
+                    _dispatcher_1_row = convolve_horizontal_plane_sse_row_hrs;
+                }
             }
         }
         convolve_horizontal_dispatch_u8(
