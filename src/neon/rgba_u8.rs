@@ -35,6 +35,7 @@ use crate::support::PRECISION;
 use crate::support::ROUNDING_CONST;
 use std::arch::aarch64::*;
 
+#[must_use]
 #[inline(always)]
 unsafe fn conv_horiz_rgba_8_u8(
     start_x: usize,
@@ -64,6 +65,7 @@ unsafe fn conv_horiz_rgba_8_u8(
     acc
 }
 
+#[must_use]
 #[inline(always)]
 unsafe fn conv_horiz_rgba_8_u8_i16<const SCALE: i32>(
     start_x: usize,
@@ -90,6 +92,7 @@ unsafe fn conv_horiz_rgba_8_u8_i16<const SCALE: i32>(
     vqrdmlahq_s16(p, hi1, w3)
 }
 
+#[must_use]
 #[inline(always)]
 unsafe fn conv_horiz_rgba_2_u8(
     start_x: usize,
@@ -107,6 +110,7 @@ unsafe fn conv_horiz_rgba_2_u8(
     vmlal_lane_s16::<0>(acc, vget_low_s16(wide), weights)
 }
 
+#[must_use]
 #[inline(always)]
 unsafe fn conv_horiz_rgba_2_u8_i16<const SCALE: i32>(
     start_x: usize,
@@ -123,6 +127,7 @@ unsafe fn conv_horiz_rgba_2_u8_i16<const SCALE: i32>(
     vqrdmlahq_s16(store, wide, weights)
 }
 
+#[must_use]
 #[inline(always)]
 unsafe fn conv_horiz_rgba_4_u8(
     start_x: usize,
@@ -164,6 +169,7 @@ unsafe fn conv_horiz_rgba_4_u8_i16<const SCALE: i32>(
     vqrdmlahq_s16(p, hi, w1)
 }
 
+#[must_use]
 #[inline(always)]
 unsafe fn conv_horiz_rgba_1_u8(
     start_x: usize,
@@ -178,6 +184,7 @@ unsafe fn conv_horiz_rgba_1_u8(
     vmlal_s16(store, lo, w0)
 }
 
+#[must_use]
 #[inline(always)]
 unsafe fn conv_horiz_rgba_1_u8_i16<const SCALE: i32>(
     start_x: usize,

@@ -30,6 +30,7 @@ use crate::filter_weights::FilterWeights;
 use crate::neon::utils::{expand8_high_to_14, expand8_to_14};
 use std::arch::aarch64::*;
 
+#[must_use]
 #[inline(always)]
 unsafe fn accumulate_8_horiz(
     store: int16x8_t,
@@ -44,6 +45,7 @@ unsafe fn accumulate_8_horiz(
     vqrdmlahq_s16(p, hi, w1)
 }
 
+#[must_use]
 #[inline(always)]
 unsafe fn accumulate_4_horiz(store: int16x8_t, ptr: *const u8, weights: int16x8_t) -> int16x8_t {
     let pixel_colors = vld1_u8(ptr);
@@ -51,6 +53,7 @@ unsafe fn accumulate_4_horiz(store: int16x8_t, ptr: *const u8, weights: int16x8_
     vqrdmlahq_s16(store, lo, weights)
 }
 
+#[must_use]
 #[inline(always)]
 unsafe fn accumulate_1_horiz(store: int16x8_t, ptr: *const u8, weights: int16x8_t) -> int16x8_t {
     let pixel_colors = vreinterpret_u8_u16(vld1_lane_u16::<0>(ptr as *const u16, vdup_n_u16(0)));

@@ -31,6 +31,7 @@ use crate::filter_weights::FilterWeights;
 use crate::neon::utils::load_3b_as_u8x16;
 use std::arch::aarch64::*;
 
+#[must_use]
 #[inline(always)]
 unsafe fn conv_horiz_rgb_4(
     start_x: usize,
@@ -59,6 +60,7 @@ unsafe fn conv_horiz_rgb_4(
     vqrdmlahq_s16(p, vreinterpretq_s16_u16(hi), w1)
 }
 
+#[must_use]
 #[inline(always)]
 unsafe fn conv_horiz_rgb_2(
     start_x: usize,
@@ -81,6 +83,7 @@ unsafe fn conv_horiz_rgb_2(
     vqrdmlahq_s16(store, vreinterpretq_s16_u16(pixel_14), weights)
 }
 
+#[must_use]
 #[inline(always)]
 unsafe fn conv_hor_rgb_1(
     start_x: usize,
