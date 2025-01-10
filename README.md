@@ -102,8 +102,8 @@ Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 ima
 
 | Lanczos3  |  AVX  | NEON  |
 |-----------|:-----:|:-----:|
-| pic-scale | 32.67 | 22.15 |
-| fir       | 22.83 | 24.94 |
+| pic-scale | 10.47 | 6.97  |
+| fir       | 15.62 | 21.74 |
 
 Example comparison time for downscale RGBA 4928x3279 image in 4 times with pre-multiplying alpha.
 
@@ -116,7 +116,7 @@ Example comparison time for downscale RGBA 4928x3279 image in 4 times without pr
 
 | Lanczos3         |  AVX  | NEON  |
 |------------------|:-----:|:-----:|
-| pic-scale        | 11.61 | 7.76  |
+| pic-scale        | 11.13 | 7.76  |
 | fir              | 20.17 | 25.92 |
 | Apple Accelerate |   -   | 9.98  |
 
@@ -131,16 +131,16 @@ RGBA 4928x3279 10 bit downscale 4 two times without pre-multiplying alpha
 
 | Lanczos3         |  AVX  | NEON  |
 |------------------|:-----:|:-----:|
-| pic-scale        | 20.29 | 8.91  |
-| fir              | 59.54 | 38.46 |
+| pic-scale        | 19.15 | 8.91  |
+| fir              | 58.57 | 38.46 |
 | Apple Accelerate |   -   | 27.63 |
 
 Example comparison time for downscale RGB 4000x6000 10 bit image in 4 times using *NEON*.
 
-| Lanczos3  |  AVX   | NEON  |
-|-----------|:------:|:-----:|
-| pic-scale | 138.75 | 25.31 |
-| fir       | 125.85 | 39.68 |
+| Lanczos3  |  AVX  | NEON  |
+|-----------|:-----:|:-----:|
+| pic-scale | 25.68 | 15.56 |
+| fir       | 68.84 | 39.40 |
 
 #### Example in sRGB
 
