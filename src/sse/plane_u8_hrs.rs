@@ -57,7 +57,7 @@ unsafe fn s_accumulate_1_horiz(store: __m128i, ptr: *const u8, weight: __m128i) 
     let pixel_colors = _mm_srli_epi16::<2>(_mm_setr_epi8(
         value, value, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     ));
-    _mm_adds_epi16(store, _mm_mulhrs_epi16(pixel_colors, weight))
+    _mm_add_epi16(store, _mm_mulhrs_epi16(pixel_colors, weight))
 }
 
 #[must_use]
@@ -65,7 +65,7 @@ unsafe fn s_accumulate_1_horiz(store: __m128i, ptr: *const u8, weight: __m128i) 
 unsafe fn s_accumulate_4_horiz(store: __m128i, ptr: *const u8, weight: __m128i) -> __m128i {
     let px = _mm_loadu_si32(ptr as *const _);
     let pixel_colors = _mm_srli_epi16::<2>(_mm_unpacklo_epi8(px, px));
-    _mm_adds_epi16(store, _mm_mulhrs_epi16(pixel_colors, weight))
+    _mm_add_epi16(store, _mm_mulhrs_epi16(pixel_colors, weight))
 }
 
 #[must_use]
@@ -73,7 +73,7 @@ unsafe fn s_accumulate_4_horiz(store: __m128i, ptr: *const u8, weight: __m128i) 
 unsafe fn s_accumulate_8_horiz(store: __m128i, ptr: *const u8, weight: __m128i) -> __m128i {
     let px = _mm_loadu_si64(ptr as *const _);
     let pixel_colors = _mm_srli_epi16::<2>(_mm_unpacklo_epi8(px, px));
-    _mm_adds_epi16(store, _mm_mulhrs_epi16(pixel_colors, weight))
+    _mm_add_epi16(store, _mm_mulhrs_epi16(pixel_colors, weight))
 }
 
 #[must_use]
@@ -87,8 +87,8 @@ unsafe fn s_accumulate_16_horiz(
     let lo = _mm_srli_epi16::<2>(_mm_unpacklo_epi8(px, px));
     let hi = _mm_srli_epi16::<2>(_mm_unpackhi_epi8(px, px));
 
-    let v0 = _mm_adds_epi16(store, _mm_mulhrs_epi16(lo, weight.0));
-    _mm_adds_epi16(v0, _mm_mulhrs_epi16(hi, weight.1))
+    let v0 = _mm_add_epi16(store, _mm_mulhrs_epi16(lo, weight.0));
+    _mm_add_epi16(v0, _mm_mulhrs_epi16(hi, weight.1))
 }
 
 pub(crate) fn convolve_horizontal_plane_sse_rows_hrs_4_u8(

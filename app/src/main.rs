@@ -189,7 +189,7 @@ fn main() {
         .unwrap();
     } else {
         image::save_buffer(
-            "converted_o.png",
+            "converted.png",
             &dst,
             dst_store.width as u32,
             dst_store.height as u32,

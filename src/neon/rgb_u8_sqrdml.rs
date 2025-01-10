@@ -104,7 +104,7 @@ unsafe fn conv_hor_rgb_1(
 #[inline(always)]
 unsafe fn write_accumulator_u8(store: int16x8_t, dst: &mut [u8]) {
     let store_16 = vqshrun_n_s16::<6>(vcombine_s16(
-        vqadd_s16(vget_low_s16(store), vget_high_s16(store)),
+        vadd_s16(vget_low_s16(store), vget_high_s16(store)),
         vdup_n_s16(0),
     ));
     vst1_lane_u16::<0>(dst.as_mut_ptr() as *mut u16, vreinterpret_u16_u8(store_16));

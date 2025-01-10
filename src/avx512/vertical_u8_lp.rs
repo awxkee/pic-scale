@@ -55,11 +55,11 @@ unsafe fn m512dot(
     let lo = _mm512_unpacklo_epi8(row, row);
     let hi = _mm512_unpackhi_epi8(row, row);
 
-    let store0 = _mm512_adds_epi16(
+    let store0 = _mm512_add_epi16(
         store0,
         _mm512_mulhrs_epi16(_mm512_srli_epi16::<2>(lo), weight),
     );
-    let store1 = _mm512_adds_epi16(
+    let store1 = _mm512_add_epi16(
         store1,
         _mm512_mulhrs_epi16(_mm512_srli_epi16::<2>(hi), weight),
     );

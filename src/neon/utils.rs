@@ -161,20 +161,6 @@ pub(crate) unsafe fn load_3b_as_u8x16(src_ptr: *const u8) -> uint8x16_t {
 }
 
 #[inline(always)]
-#[cfg(feature = "nightly_i8mm")]
-pub(crate) unsafe fn load_6b_as_u8x16(src_ptr: *const u8) -> uint8x16_t {
-    let v = vreinterpretq_u16_u32(vld1q_lane_u32::<0>(src_ptr as *const u32, vdupq_n_u32(0)));
-    vreinterpretq_u8_u16(vld1q_lane_u16::<2>(src_ptr.add(4) as *const _, v))
-}
-
-#[inline(always)]
-#[cfg(feature = "nightly_i8mm")]
-pub(crate) unsafe fn load_12b_as_u8x16(src_ptr: *const u8) -> uint8x16_t {
-    let v = vreinterpretq_u32_u64(vld1q_lane_u64::<0>(src_ptr as *const u64, vdupq_n_u64(0)));
-    vreinterpretq_u8_u32(vld1q_lane_u32::<2>(src_ptr.add(8) as *const _, v))
-}
-
-#[inline(always)]
 pub(crate) unsafe fn load_4b_as_u16x4(src_ptr: *const u8) -> uint16x4_t {
     let j = vreinterpret_u8_u32(vld1_lane_u32::<0>(src_ptr as *const u32, vdup_n_u32(0)));
     vget_low_u16(vmovl_u8(j))
