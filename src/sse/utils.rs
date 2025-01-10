@@ -212,6 +212,7 @@ pub(crate) unsafe fn _mm_hsum_epi16(x: __m128i) -> i16 {
     _mm_extract_epi16::<0>(_mm_hadd_epi16(v2, v2)) as i16
 }
 
+#[allow(dead_code)]
 #[inline(always)]
 pub(crate) unsafe fn _mm_hsum_epi32(x: __m128i) -> i32 {
     const FIRST_MASK: i32 = shuffle(1, 0, 3, 2);

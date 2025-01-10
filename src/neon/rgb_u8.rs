@@ -32,6 +32,7 @@ use crate::neon::utils::load_3b_as_u16x4;
 use crate::support::{PRECISION, ROUNDING_CONST};
 use std::arch::aarch64::*;
 
+#[must_use]
 #[inline(always)]
 unsafe fn conv_horiz_rgba_4_u8(
     start_x: usize,
@@ -60,6 +61,7 @@ unsafe fn conv_horiz_rgba_4_u8(
     vmlal_lane_s16::<0>(acc, vget_low_s16(lo), weights)
 }
 
+#[must_use]
 #[inline(always)]
 unsafe fn conv_horiz_rgba_2_u8(
     start_x: usize,
@@ -83,6 +85,7 @@ unsafe fn conv_horiz_rgba_2_u8(
     vmlal_lane_s16::<0>(acc, vget_low_s16(wide), weights)
 }
 
+#[must_use]
 #[inline(always)]
 unsafe fn conv_horiz_rgba_1_u8(
     start_x: usize,

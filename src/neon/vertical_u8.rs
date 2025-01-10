@@ -100,6 +100,7 @@ pub(crate) fn convolve_vertical_neon_i32_precision(
     convolve_vertical_neon_row_full(width, bounds, src, dst, src_stride, weight);
 }
 
+#[must_use]
 #[inline(always)]
 unsafe fn vdot<const SCALE: i32>(
     store0: int16x8_t,
@@ -114,6 +115,7 @@ unsafe fn vdot<const SCALE: i32>(
     (store0, store1)
 }
 
+#[must_use]
 #[inline(always)]
 unsafe fn vdot_lane<const SCALE: i32, const LANE: i32>(
     store0: int16x8_t,
