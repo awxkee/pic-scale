@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use num_traits::AsPrimitive;
+use num_traits::{AsPrimitive, Bounded};
 
 #[derive(Debug, Clone)]
 pub(crate) struct FilterWeights<T> {
@@ -79,7 +79,7 @@ impl FilterWeights<f32> {
     }
 
     pub(crate) fn numerical_approximation<
-        J: Clone + Default + Copy + 'static,
+        J: Clone + Default + Copy + 'static + Bounded + AsPrimitive<f32>,
         const PRECISION: i32,
     >(
         &self,
@@ -97,13 +97,20 @@ impl FilterWeights<f32> {
 
         let mut output_kernel = vec![J::default(); self.distinct_elements * align];
 
+        let lower_bound = J::min_value().as_();
+        let upper_bound = J::max_value().as_();
+
         for (chunk, kernel_chunk) in self
             .weights
             .chunks_exact(self.kernel_size)
             .zip(output_kernel.chunks_exact_mut(align))
         {
             for (&weight, kernel) in chunk.iter().zip(kernel_chunk) {
-                *kernel = (weight * precision_scale).round().as_();
+                *kernel = (weight * precision_scale)
+                    .round()
+                    .min(upper_bound)
+                    .max(lower_bound)
+                    .as_();
             }
         }
 
@@ -131,27 +138,14 @@ pub(crate) trait WeightsConverter<V> {
 #[derive(Default)]
 pub(crate) struct DefaultWeightsConverter {}
 
-impl<V: Default + Copy + 'static + Clone> WeightsConverter<V> for DefaultWeightsConverter
+impl<V: Default + Copy + 'static + Clone + Bounded + AsPrimitive<f32>> WeightsConverter<V>
+    for DefaultWeightsConverter
 where
     f32: AsPrimitive<V>,
 {
     fn prepare_weights(&self, weights: &FilterWeights<f32>) -> FilterWeights<V> {
         use crate::support::PRECISION;
         weights.numerical_approximation::<V, PRECISION>(0)
-    }
-}
-
-#[derive(Default)]
-#[allow(dead_code)]
-pub(crate) struct WeightsConverterQ7 {}
-
-#[allow(dead_code)]
-impl<V: Default + Copy + 'static + Clone> WeightsConverter<V> for WeightsConverterQ7
-where
-    f32: AsPrimitive<V>,
-{
-    fn prepare_weights(&self, weights: &FilterWeights<f32>) -> FilterWeights<V> {
-        weights.numerical_approximation::<V, 7>(0)
     }
 }
 

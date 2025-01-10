@@ -12,7 +12,6 @@ libfuzzer-sys = "0.4"
 pic-scale = { path = "../" }
 
 [features]
-nightly_i8mm = ["pic-scale/nightly_i8mm"]
 nightly_avx512 = ["pic-scale/nightly_avx512"]
 
 [[bin]]

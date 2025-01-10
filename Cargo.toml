@@ -29,5 +29,4 @@ libc = "0.2.158"
 default = ["colorspaces"]
 colorspaces = ["dep:colorutils-rs"]
 nightly_avx512 = []
-nightly_i8mm = []
 nightly_avx512fp16 = ["nightly_avx512"]
