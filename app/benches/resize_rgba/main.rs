@@ -15,6 +15,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         .unwrap();
     let dimensions = img.dimensions();
     let src_bytes = img.as_bytes();
+
     c.bench_function("Pic scale RGBA with alpha: Lanczos 3", |b| {
         let copied: Vec<u8> = Vec::from(src_bytes);
         b.iter(|| {
@@ -97,13 +98,52 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    c.bench_function("Apple Accelerate: Lanczos 3", |b| {
+        let copied: Vec<u8> = Vec::from(src_bytes);
+        use accelerate::{kvImageDoNotTile, vImageScale_ARGB8888, vImage_Buffer};
+        b.iter(|| {
+            let mut target =
+                ImageStoreMut::<u8, 4>::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+
+            let src_buffer = vImage_Buffer {
+                data: copied.as_ptr() as *mut libc::c_void,
+                width: dimensions.0 as usize,
+                height: dimensions.1 as usize,
+                row_bytes: dimensions.0 as usize * 4,
+            };
+
+            let target_stride = target.stride();
+            let target_ptr = target.buffer.borrow_mut().as_mut_ptr() as *mut libc::c_void;
+
+            let mut dst_buffer = vImage_Buffer {
+                data: target_ptr,
+                width: target.width,
+                height: target.height,
+                row_bytes: target_stride,
+            };
+
+            let result = unsafe {
+                vImageScale_ARGB8888(
+                    &src_buffer,
+                    &mut dst_buffer,
+                    std::ptr::null_mut(),
+                    kvImageDoNotTile,
+                )
+            };
+            if result != 0 {
+                panic!("Can't resize by accelerate");
+            }
+        })
+    });
+
     c.bench_function("Fast image resize RGBA without alpha: Lanczos 3", |b| {
         let mut vc = Vec::from(img.as_bytes());
         b.iter(|| {
             let pixel_type: PixelType = PixelType::U8x4;
             let src_image =
                 Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
-            let mut dst_image = Image::new(dimensions.0 / 2, dimensions.1 / 2, pixel_type);
+            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
 
             let mut resizer = Resizer::new();
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -151,6 +191,76 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
+    c.bench_function("Fir RGBA10 with alpha: Lanczos 3", |b| {
+        let mut copied: Vec<u8> = Vec::from(
+            src_bytes
+                .iter()
+                .map(|&x| (((x as u16) << 2) | ((x as u16) >> 6)).to_ne_bytes())
+                .flat_map(|x| x)
+                .collect::<Vec<_>>(),
+        );
+        b.iter(|| {
+            let pixel_type: PixelType = PixelType::U16x4;
+            let src_image =
+                Image::from_slice_u8(dimensions.0, dimensions.1, &mut copied, pixel_type).unwrap();
+            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
+
+            let mut resizer = Resizer::new();
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            unsafe {
+                resizer.set_cpu_extensions(CpuExtensions::Neon);
+            }
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            unsafe {
+                resizer.set_cpu_extensions(CpuExtensions::Avx2);
+            }
+            resizer
+                .resize(
+                    &src_image,
+                    &mut dst_image,
+                    &ResizeOptions::new()
+                        .resize_alg(ResizeAlg::Convolution(Lanczos3))
+                        .use_alpha(true),
+                )
+                .unwrap();
+        })
+    });
+
+    c.bench_function("Fir RGBA10 without alpha: Lanczos 3", |b| {
+        let mut copied: Vec<u8> = Vec::from(
+            src_bytes
+                .iter()
+                .map(|&x| (((x as u16) << 2) | ((x as u16) >> 6)).to_ne_bytes())
+                .flat_map(|x| x)
+                .collect::<Vec<_>>(),
+        );
+        b.iter(|| {
+            let pixel_type: PixelType = PixelType::U16x4;
+            let src_image =
+                Image::from_slice_u8(dimensions.0, dimensions.1, &mut copied, pixel_type).unwrap();
+            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
+
+            let mut resizer = Resizer::new();
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            unsafe {
+                resizer.set_cpu_extensions(CpuExtensions::Neon);
+            }
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            unsafe {
+                resizer.set_cpu_extensions(CpuExtensions::Avx2);
+            }
+            resizer
+                .resize(
+                    &src_image,
+                    &mut dst_image,
+                    &ResizeOptions::new()
+                        .resize_alg(ResizeAlg::Convolution(Lanczos3))
+                        .use_alpha(false),
+                )
+                .unwrap();
+        })
+    });
+
     c.bench_function("Pic scale RGBA10 without alpha: Lanczos 3", |b| {
         let mut copied: Vec<u16> = Vec::from(
             src_bytes
@@ -173,6 +283,52 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 10,
             );
             _ = scaler.resize_rgba_u16(&store, &mut target, false);
+        })
+    });
+
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    c.bench_function("Apple Accelerate RGBA10: Lanczos 3", |b| {
+        let copied: Vec<u16> = Vec::from(
+            src_bytes
+                .iter()
+                .map(|&x| ((x as u16) << 2) | ((x as u16) >> 6))
+                .collect::<Vec<_>>(),
+        );
+        use accelerate::{kvImageDoNotTile, vImageScale_ARGB16U, vImage_Buffer};
+        b.iter(|| {
+            let mut target = ImageStoreMut::<u16, 4>::alloc(
+                dimensions.0 as usize / 4,
+                dimensions.1 as usize / 4,
+            );
+
+            let src_buffer = vImage_Buffer {
+                data: copied.as_ptr() as *mut libc::c_void,
+                width: dimensions.0 as usize,
+                height: dimensions.1 as usize,
+                row_bytes: dimensions.0 as usize * 4 * std::mem::size_of::<u16>(),
+            };
+
+            let target_stride = target.stride();
+            let target_ptr = target.buffer.borrow_mut().as_mut_ptr() as *mut libc::c_void;
+
+            let mut dst_buffer = vImage_Buffer {
+                data: target_ptr,
+                width: target.width,
+                height: target.height,
+                row_bytes: target_stride * std::mem::size_of::<u16>(),
+            };
+
+            let result = unsafe {
+                vImageScale_ARGB16U(
+                    &src_buffer,
+                    &mut dst_buffer,
+                    std::ptr::null_mut(),
+                    kvImageDoNotTile,
+                )
+            };
+            if result != 0 {
+                panic!("Can't resize by accelerate");
+            }
         })
     });
 }

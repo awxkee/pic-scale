@@ -9,6 +9,7 @@ use fast_image_resize::{
     CpuExtensions, FilterType, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
+use accelerate::{kvImageDoNotTile, vImageScale_ARGB8888, vImage_Buffer};
 use pic_scale::{
     ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingU16,
     ThreadingPolicy,
@@ -43,12 +44,12 @@ fn resize_plane(
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/asset_4.png")
+    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
         .unwrap()
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
-    let transient = img.to_rgb8();
+    let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
     let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
@@ -60,7 +61,7 @@ fn main() {
 
     //
     let store =
-        ImageStore::<u8, 3>::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize)
+        ImageStore::<u8, 4>::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
 
     let dst_size = ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
@@ -75,85 +76,45 @@ fn main() {
     //     )
     //     .unwrap();
 
-    let mut dst_store = ImageStoreMut::<u8, 3>::alloc_with_depth(
-        dimensions.0 as usize / 3 * 2,
-        dimensions.1 as usize / 3 * 2,
+    let mut dst_store = ImageStoreMut::<u8, 4>::alloc_with_depth(
+        dimensions.0 as usize / 4,
+        dimensions.1 as usize / 4,
         10,
     );
 
     // for i in 0..25 {
     let start_time = Instant::now();
-    scaler.resize_rgb(&store, &mut dst_store).unwrap();
+    scaler.resize_rgba(&store, &mut dst_store, false).unwrap();
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
     println!("Scaler: {:.2?}", elapsed_time);
-    // }
 
-    // let mut resized = vec![0u8; dst_size.width * dst_size.height * 4];
-    // ra30_to_rgba8(
-    //     &resized_ar,
-    //     dst_size.width as u32,
-    //     Rgb30ByteOrder::Host,
-    //     &mut resized,
-    //     dst_size.width as u32 * 4,
-    //     dst_size.width as u32,
-    //     dst_size.height as u32,
-    // )
-    // .unwrap();
+    let src_buffer = vImage_Buffer {
+        data: store.buffer.as_ptr() as *mut libc::c_void,
+        height: store.height,
+        width: store.width,
+        row_bytes: store.stride(),
+    };
 
-    // let dst: Vec<u8> = resized.as_bytes().iter().map(|&x| x).collect::<Vec<_>>();
-    // println!("f1 {}, f2 {}, f3 {}, f4 {}", dst[0], dst[1], dst[2], dst[3]);
-    // let dst: Vec<u8> = resized
-    //     .as_bytes()
-    //     .iter()
-    //     .map(|&x| (x * 255f32) as u8)
-    //     .collect();
+    let mut dst_buffer = vImage_Buffer {
+        data: dst_store.buffer.borrow_mut().as_mut_ptr() as *mut libc::c_void,
+        height: dst_store.height,
+        width: dst_store.width,
+        row_bytes: dst_store.stride(),
+    };
 
-    // let mut r_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];
-    // let mut g_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];
-    // let mut b_chan = vec![0u8; dimensions.0 as usize * dimensions.1 as usize];
-    // split_channels_3(
-    //     &bytes,
-    //     dimensions.0 as usize,
-    //     dimensions.1 as usize,
-    //     &mut r_chan,
-    //     &mut g_chan,
-    //     &mut b_chan,
-    // );
-    //
-    // let store =
-    //     ImageStore::<u8, 1>::from_slice(&mut r_chan, dimensions.0 as usize, dimensions.1 as usize).unwrap();
-    // let resized = scaler.resize_plane(
-    //     ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-    //     store,
-    // );
-    //
-    // let store1 =
-    //     ImageStore::<u8, 1>::from_slice(&mut g_chan, dimensions.0 as usize, dimensions.1 as usize).unwrap();
-    // let resized1 = scaler.resize_plane(
-    //     ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-    //     store1,
-    // );
-    //
-    // let store2 =
-    //     ImageStore::<u8, 1>::from_slice(&mut b_chan, dimensions.0 as usize, dimensions.1 as usize).unwrap();
-    // let resized2 = scaler.resize_plane(
-    //     ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-    //     store2,
-    // );
-    //
-    // let mut dst = vec![0u8; resized.width * resized.height * 3];
-    // merge_channels_3(
-    //     &mut dst,
-    //     resized.width,
-    //     resized.height,
-    //     &resized.as_bytes(),
-    //     &resized1.as_bytes(),
-    //     &resized2.as_bytes(),
-    // );
+    let start_time = Instant::now();
+    let result = unsafe {
+        vImageScale_ARGB8888(&src_buffer, &mut dst_buffer, std::ptr::null_mut(), kvImageDoNotTile)
+    };
+    if result != 0 {
+        panic!("Can' resize by accelerate");
+    }
 
-    //
+    let elapsed_time = start_time.elapsed();
+    // Print the elapsed time in milliseconds
+    println!("Accelerate: {:.2?}", elapsed_time);
 
     // let dst: Vec<u8> = resized
     //     .as_bytes()

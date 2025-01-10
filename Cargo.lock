@@ -3,6 +3,13 @@
 version = 4
 
 [[package]]
+name = "accelerate"
+version = "0.1.0"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "adler2"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -45,10 +52,12 @@ checksum = "34ac096ce696dc2fcabef30516bb13c0a68a11d30131d3df6f04711467681b04"
 name = "app"
 version = "0.1.0"
 dependencies = [
+ "accelerate",
  "criterion",
  "fast_image_resize",
  "half",
  "image",
+ "libc",
  "pic-scale",
 ]
 
