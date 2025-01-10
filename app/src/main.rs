@@ -48,7 +48,7 @@ fn main() {
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
-    let transient = img.to_luma_alpha8();
+    let transient = img.to_rgb8();
     let mut bytes = Vec::from(transient.as_bytes());
 
     let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
@@ -60,7 +60,7 @@ fn main() {
 
     //
     let store =
-        ImageStore::<u8, 2>::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize)
+        ImageStore::<u8, 3>::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
 
     let dst_size = ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
@@ -75,15 +75,15 @@ fn main() {
     //     )
     //     .unwrap();
 
-    let mut dst_store = ImageStoreMut::<u8, 2>::alloc_with_depth(
-        dimensions.0 as usize / 3,
-        dimensions.1 as usize / 3,
+    let mut dst_store = ImageStoreMut::<u8, 3>::alloc_with_depth(
+        dimensions.0 as usize / 3 * 2,
+        dimensions.1 as usize / 3 * 2,
         10,
     );
 
     // for i in 0..25 {
     let start_time = Instant::now();
-    scaler.resize_cbcr8(&store, &mut dst_store).unwrap();
+    scaler.resize_rgb(&store, &mut dst_store).unwrap();
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
@@ -189,11 +189,11 @@ fn main() {
         .unwrap();
     } else {
         image::save_buffer(
-            "converted.webp",
+            "converted_o.png",
             &dst,
             dst_store.width as u32,
             dst_store.height as u32,
-            image::ColorType::La8,
+            image::ColorType::Rgb8,
         )
         .unwrap();
     }
