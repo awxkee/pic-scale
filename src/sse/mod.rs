@@ -32,6 +32,7 @@ mod alpha_f16;
 mod alpha_f32;
 mod alpha_u16;
 mod alpha_u8;
+mod cbcr8_hrs;
 mod check_alpha;
 #[cfg(feature = "half")]
 mod f16_utils;
@@ -66,6 +67,9 @@ pub(crate) use alpha_f32::sse_premultiply_alpha_rgba_f32;
 pub(crate) use alpha_f32::sse_unpremultiply_alpha_rgba_f32;
 pub(crate) use alpha_u16::{premultiply_alpha_sse_rgba_u16, unpremultiply_alpha_sse_rgba_u16};
 pub(crate) use alpha_u8::{sse_premultiply_alpha_rgba, sse_unpremultiply_alpha_rgba};
+pub(crate) use cbcr8_hrs::{
+    convolve_horizontal_cbcr_sse_hrs_row_one, convolve_horizontal_cbcr_sse_hrs_rows_4,
+};
 pub(crate) use check_alpha::{
     sse_has_non_constant_cap_alpha_rgba16, sse_has_non_constant_cap_alpha_rgba8,
 };

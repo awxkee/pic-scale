@@ -68,6 +68,19 @@ impl HorizontalConvolutionPass<u8, 2> for ImageStore<'_, u8, 2> {
                 _dispatcher_1_row = convolve_horizontal_cbcr_neon_rdm_row;
             }
         }
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            if std::arch::is_x86_feature_detected!("sse4.1") {
+                if _scale_factor < 8. {
+                    use crate::sse::{
+                        convolve_horizontal_cbcr_sse_hrs_row_one,
+                        convolve_horizontal_cbcr_sse_hrs_rows_4,
+                    };
+                    _dispatcher_4_rows = Some(convolve_horizontal_cbcr_sse_hrs_rows_4);
+                    _dispatcher_1_row = convolve_horizontal_cbcr_sse_hrs_row_one;
+                }
+            }
+        }
         convolve_horizontal_dispatch_u8(
             self,
             filter_weights,
