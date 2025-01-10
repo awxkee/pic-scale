@@ -226,6 +226,31 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
+    c.bench_function("Pic scale RGBA10 without alpha: Lanczos 3", |b| {
+        let mut copied: Vec<u16> = Vec::from(
+            src_bytes
+                .iter()
+                .map(|&x| ((x as u16) << 2) | ((x as u16) >> 6))
+                .collect::<Vec<_>>(),
+        );
+        b.iter(|| {
+            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+            scaler.set_threading_policy(ThreadingPolicy::Single);
+            let store = ImageStore::<u16, 4>::from_slice(
+                &mut copied,
+                dimensions.0 as usize,
+                dimensions.1 as usize,
+            )
+                .unwrap();
+            let mut target = ImageStoreMut::alloc_with_depth(
+                dimensions.0 as usize / 4,
+                dimensions.1 as usize / 4,
+                10,
+            );
+            _ = scaler.resize_rgba_u16(&store, &mut target, false);
+        })
+    });
+
     c.bench_function("Fir RGBA10 without alpha: Lanczos 3", |b| {
         let mut copied: Vec<u8> = Vec::from(
             src_bytes
@@ -258,31 +283,6 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                         .use_alpha(false),
                 )
                 .unwrap();
-        })
-    });
-
-    c.bench_function("Pic scale RGBA10 without alpha: Lanczos 3", |b| {
-        let mut copied: Vec<u16> = Vec::from(
-            src_bytes
-                .iter()
-                .map(|&x| ((x as u16) << 2) | ((x as u16) >> 6))
-                .collect::<Vec<_>>(),
-        );
-        b.iter(|| {
-            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Single);
-            let store = ImageStore::<u16, 4>::from_slice(
-                &mut copied,
-                dimensions.0 as usize,
-                dimensions.1 as usize,
-            )
-            .unwrap();
-            let mut target = ImageStoreMut::alloc_with_depth(
-                dimensions.0 as usize / 4,
-                dimensions.1 as usize / 4,
-                10,
-            );
-            _ = scaler.resize_rgba_u16(&store, &mut target, false);
         })
     });
 
