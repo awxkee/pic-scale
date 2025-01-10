@@ -34,6 +34,7 @@ mod alpha_f32;
 mod alpha_u16;
 mod alpha_u8;
 mod ar30;
+mod cbcr8_rdm;
 mod check_alpha;
 #[cfg(feature = "half")]
 mod convolve_f16;
@@ -82,6 +83,9 @@ pub(crate) use alpha_f32::neon_unpremultiply_alpha_rgba_f32;
 pub(crate) use alpha_u16::{neon_premultiply_alpha_rgba_u16, neon_unpremultiply_alpha_rgba_u16};
 pub(crate) use alpha_u8::neon_premultiply_alpha_rgba;
 pub(crate) use alpha_u8::neon_unpremultiply_alpha_rgba;
+pub(crate) use cbcr8_rdm::{
+    convolve_horizontal_cbcr_neon_rdm_row, convolve_horizontal_cbcr_neon_rows_rdm_4_u8,
+};
 pub(crate) use check_alpha::{
     neon_has_non_constant_cap_alpha_rgba16, neon_has_non_constant_cap_alpha_rgba8,
 };

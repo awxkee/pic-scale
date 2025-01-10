@@ -51,9 +51,23 @@ impl HorizontalConvolutionPass<u8, 2> for ImageStore<'_, u8, 2> {
         destination: &mut ImageStoreMut<u8, 2>,
         _pool: &Option<ThreadPool>,
     ) {
-        let _dispatcher_4_rows: Option<fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>)> =
-            Some(handle_fixed_rows_4_u8::<2>);
-        let _dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i16>) = handle_fixed_row_u8::<2>;
+        let _scale_factor = self.width as f32 / destination.width as f32;
+        let mut _dispatcher_4_rows: Option<
+            fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>),
+        > = Some(handle_fixed_rows_4_u8::<2>);
+        let mut _dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i16>) =
+            handle_fixed_row_u8::<2>;
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            if _scale_factor < 8. && crate::cpu_features::is_aarch_rdm_supported() {
+                use crate::neon::{
+                    convolve_horizontal_cbcr_neon_rdm_row,
+                    convolve_horizontal_cbcr_neon_rows_rdm_4_u8,
+                };
+                _dispatcher_4_rows = Some(convolve_horizontal_cbcr_neon_rows_rdm_4_u8);
+                _dispatcher_1_row = convolve_horizontal_cbcr_neon_rdm_row;
+            }
+        }
         convolve_horizontal_dispatch_u8(
             self,
             filter_weights,

@@ -33,7 +33,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 use crate::filter_weights::FilterWeights;
-use crate::sse::{_mm_hsum_epi32, _mm_muladd_wide_epi16};
+use crate::sse::{_mm_muladd_wide_epi16, shuffle};
 use crate::support::{PRECISION, ROUNDING_CONST};
 
 macro_rules! s_accumulate_8_horiz {
@@ -83,6 +83,20 @@ pub(crate) fn convolve_horizontal_plane_sse_rows_4_u8(
         );
     }
 }
+
+#[inline(always)]
+unsafe fn _mm_hsum_reduce_epi32<const PRECISION: i32>(x: __m128i) -> u8 {
+    const FIRST_MASK: i32 = shuffle(1, 0, 3, 2);
+    let hi64 = _mm_shuffle_epi32::<FIRST_MASK>(x);
+    let sum64 = _mm_add_epi32(hi64, x);
+    const SM: i32 = shuffle(1, 0, 3, 2);
+    let hi32 = _mm_shufflelo_epi16::<SM>(sum64);
+    let sum32 = _mm_srai_epi32::<PRECISION>(_mm_add_epi32(sum64, hi32));
+    let v0 = _mm_packus_epi32(sum32, sum32);
+    let v1 = _mm_packus_epi16(v0, v0);
+    _mm_extract_epi8::<0>(v1) as u8
+}
+
 #[target_feature(enable = "sse4.1")]
 unsafe fn convolve_horizontal_plane_sse_rows_4_u8_impl(
     src: &[u8],
@@ -188,25 +202,17 @@ unsafe fn convolve_horizontal_plane_sse_rows_4_u8_impl(
             jx += 1;
         }
 
-        let sums = _mm_hsum_epi32(store0).max(0);
-        let shifted = sums >> PRECISION;
-        let value = shifted.min(255) as u8;
-        *chunk0 = value;
+        let value0 = _mm_hsum_reduce_epi32::<PRECISION>(store0);
+        *chunk0 = value0;
 
-        let sums = _mm_hsum_epi32(store1).max(0);
-        let shifted = sums >> PRECISION;
-        let value = shifted.min(255) as u8;
-        *chunk1 = value;
+        let value1 = _mm_hsum_reduce_epi32::<PRECISION>(store1);
+        *chunk1 = value1;
 
-        let sums = _mm_hsum_epi32(store2).max(0);
-        let shifted = sums >> PRECISION;
-        let value = shifted.min(255) as u8;
-        *chunk2 = value;
+        let value2 = _mm_hsum_reduce_epi32::<PRECISION>(store2);
+        *chunk2 = value2;
 
-        let sums = _mm_hsum_epi32(store3).max(0);
-        let shifted = sums >> PRECISION;
-        let value = shifted.min(255) as u8;
-        *chunk3 = value;
+        let value3 = _mm_hsum_reduce_epi32::<PRECISION>(store3);
+        *chunk3 = value3;
     }
 }
 
@@ -271,9 +277,7 @@ unsafe fn convolve_horizontal_plane_sse_row_impl(
             jx += 1;
         }
 
-        let sums = _mm_hsum_epi32(store).max(0);
-        let shifted = sums >> PRECISION;
-        let value = shifted.min(255) as u8;
+        let value = _mm_hsum_reduce_epi32::<PRECISION>(store);
         *dst = value;
     }
 }
