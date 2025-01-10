@@ -96,7 +96,7 @@ Even when `half` feature activated but platform do not support or features not e
 ### Performance
 
 NEON test made on Apple M3 Pro.
-AVX test made on c5.large AWS instance.
+AVX2 test made on Premium Intel CPU Optimized 4 vCPU Digital Ocean instance.
 
 Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 image in 4 times.
 
@@ -105,14 +105,14 @@ Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 ima
 | pic-scale | 16.67 | 22.15 |
 | fir       | 22.83 | 24.94 |
 
-Example comparison time for downscale RGBA 4928x3279 image in 4 times with premultiplying alpha.
+Example comparison time for downscale RGBA 4928x3279 image in 4 times with pre-multiplying alpha.
 
 | Lanczos3  |  AVX  | NEON  |
 |-----------|:-----:|:-----:|
 | pic-scale | 35.82 | 13.56 |
 | fir       | 54.40 | 33.32 |
 
-Example comparison time for downscale RGBA 4928x3279 image in 4 times without premultiplying alpha.
+Example comparison time for downscale RGBA 4928x3279 image in 4 times without pre-multiplying alpha.
 
 | Lanczos3         |  AVX  | NEON  |
 |------------------|:-----:|:-----:|
@@ -120,14 +120,14 @@ Example comparison time for downscale RGBA 4928x3279 image in 4 times without pr
 | fir              | 35.07 | 25.92 |
 | Apple Accelerate |   -   | 9.98  |
 
-Example comparison time for downscale RGBA 4928x3279 10 bit image in 4 times with premultiplying alpha.
+Example comparison time for downscale RGBA 4928x3279 10 bit image in 4 times with pre-multiplying alpha.
 
 | Lanczos3         |  AVX   | NEON  |
 |------------------|:------:|:-----:|
 | pic-scale        | 77.59  | 22.68 |
 | fir              | 128.71 | 53.95 |
 
-RGBA 4928x3279 10 bit downscale 4 two times without premultiplying alpha
+RGBA 4928x3279 10 bit downscale 4 two times without pre-multiplying alpha
 
 | Lanczos3         |  AVX  | NEON  |
 |------------------|:-----:|:-----:|

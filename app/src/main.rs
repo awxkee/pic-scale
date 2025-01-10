@@ -9,7 +9,6 @@ use fast_image_resize::{
     CpuExtensions, FilterType, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
-use accelerate::{kvImageDoNotTile, vImageScale_ARGB8888, vImage_Buffer};
 use pic_scale::{
     ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingU16,
     ThreadingPolicy,
@@ -90,31 +89,35 @@ fn main() {
     // Print the elapsed time in milliseconds
     println!("Scaler: {:.2?}", elapsed_time);
 
-    let src_buffer = vImage_Buffer {
-        data: store.buffer.as_ptr() as *mut libc::c_void,
-        height: store.height,
-        width: store.width,
-        row_bytes: store.stride(),
-    };
-
-    let mut dst_buffer = vImage_Buffer {
-        data: dst_store.buffer.borrow_mut().as_mut_ptr() as *mut libc::c_void,
-        height: dst_store.height,
-        width: dst_store.width,
-        row_bytes: dst_store.stride(),
-    };
-
-    let start_time = Instant::now();
-    let result = unsafe {
-        vImageScale_ARGB8888(&src_buffer, &mut dst_buffer, std::ptr::null_mut(), kvImageDoNotTile)
-    };
-    if result != 0 {
-        panic!("Can' resize by accelerate");
-    }
-
-    let elapsed_time = start_time.elapsed();
-    // Print the elapsed time in milliseconds
-    println!("Accelerate: {:.2?}", elapsed_time);
+    // #[cfg(target_os = "macos")]
+    // {
+    //     use accelerate::{kvImageDoNotTile, vImageScale_ARGB8888, vImage_Buffer};
+    //     let src_buffer = vImage_Buffer {
+    //         data: store.buffer.as_ptr() as *mut libc::c_void,
+    //         height: store.height,
+    //         width: store.width,
+    //         row_bytes: store.stride(),
+    //     };
+    //
+    //     let mut dst_buffer = vImage_Buffer {
+    //         data: dst_store.buffer.borrow_mut().as_mut_ptr() as *mut libc::c_void,
+    //         height: dst_store.height,
+    //         width: dst_store.width,
+    //         row_bytes: dst_store.stride(),
+    //     };
+    //
+    //     let start_time = Instant::now();
+    //     let result = unsafe {
+    //         vImageScale_ARGB8888(&src_buffer, &mut dst_buffer, std::ptr::null_mut(), kvImageDoNotTile)
+    //     };
+    //     if result != 0 {
+    //         panic!("Can' resize by accelerate");
+    //     }
+    //
+    //     let elapsed_time = start_time.elapsed();
+    //     // Print the elapsed time in milliseconds
+    //     println!("Accelerate: {:.2?}", elapsed_time);
+    // }
 
     // let dst: Vec<u8> = resized
     //     .as_bytes()
