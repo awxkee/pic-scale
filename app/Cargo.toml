@@ -9,6 +9,8 @@ image = { version = "0.25.5", features = ["default"] }
 pic-scale = { path = "..", features = ["half"], default-features = true }
 fast_image_resize = { version = "5.0.0", features = [] }
 half = { version = "2.4.1", default-features = true }
+accelerate = {path = "accelerate/"}
+libc = "0.2.169"
 
 [dev-dependencies]
 criterion = "0.5.1"

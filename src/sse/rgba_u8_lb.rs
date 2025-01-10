@@ -47,7 +47,7 @@ unsafe fn convolve_horizontal_parts_one_rgba_sse(
     let rgba_pixel = _mm_cvtsi32_si128(src_ptr_32.read_unaligned());
     let lo = _mm_srli_epi16::<2>(_mm_unpacklo_epi8(rgba_pixel, rgba_pixel));
 
-    _mm_adds_epi16(store_0, _mm_mulhrs_epi16(lo, weight0))
+    _mm_add_epi16(store_0, _mm_mulhrs_epi16(lo, weight0))
 }
 
 pub(crate) fn convolve_horizontal_rgba_sse_rows_4_lb(
@@ -77,10 +77,10 @@ unsafe fn hdot4(
     let lo1 = _mm_srli_epi16::<2>(_mm_unpacklo_epi8(v1, v1));
     let hi1 = _mm_srli_epi16::<2>(_mm_unpackhi_epi8(v1, v1));
     let mut p = _mm_mulhrs_epi16(lo0, w01);
-    p = _mm_adds_epi16(p, _mm_mulhrs_epi16(hi0, w23));
-    p = _mm_adds_epi16(p, _mm_mulhrs_epi16(lo1, w45));
-    p = _mm_adds_epi16(p, _mm_mulhrs_epi16(hi1, w67));
-    _mm_adds_epi16(store, p)
+    p = _mm_add_epi16(p, _mm_mulhrs_epi16(hi0, w23));
+    p = _mm_add_epi16(p, _mm_mulhrs_epi16(lo1, w45));
+    p = _mm_add_epi16(p, _mm_mulhrs_epi16(hi1, w67));
+    _mm_add_epi16(store, p)
 }
 
 #[inline(always)]
@@ -88,20 +88,20 @@ unsafe fn hdot2(store: __m128i, v: __m128i, w01: __m128i, w23: __m128i) -> __m12
     let lo = _mm_srli_epi16::<2>(_mm_unpacklo_epi8(v, v));
     let hi = _mm_srli_epi16::<2>(_mm_unpackhi_epi8(v, v));
     let mut p = _mm_mulhrs_epi16(lo, w01);
-    p = _mm_adds_epi16(p, _mm_mulhrs_epi16(hi, w23));
-    _mm_adds_epi16(store, p)
+    p = _mm_add_epi16(p, _mm_mulhrs_epi16(hi, w23));
+    _mm_add_epi16(store, p)
 }
 
 #[inline(always)]
 unsafe fn hdot(store: __m128i, v: __m128i, w01: __m128i) -> __m128i {
     let lo = _mm_srli_epi16::<2>(_mm_unpacklo_epi8(v, v));
-    _mm_adds_epi16(store, _mm_mulhrs_epi16(lo, w01))
+    _mm_add_epi16(store, _mm_mulhrs_epi16(lo, w01))
 }
 
 #[inline(always)]
 unsafe fn _mm_add_hi_lo_epi16(v: __m128i) -> __m128i {
     let p = _mm_unpackhi_epi64(v, v);
-    _mm_adds_epi16(v, p)
+    _mm_add_epi16(v, p)
 }
 
 #[target_feature(enable = "sse4.1")]

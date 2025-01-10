@@ -55,8 +55,8 @@ unsafe fn mdot(
     let lo = _mm_unpacklo_epi8(row, row);
     let hi = _mm_unpackhi_epi8(row, row);
 
-    let store0 = _mm_adds_epi16(store0, _mm_mulhrs_epi16(_mm_srli_epi16::<2>(lo), weight));
-    let store1 = _mm_adds_epi16(store1, _mm_mulhrs_epi16(_mm_srli_epi16::<2>(hi), weight));
+    let store0 = _mm_add_epi16(store0, _mm_mulhrs_epi16(_mm_srli_epi16::<2>(lo), weight));
+    let store1 = _mm_add_epi16(store1, _mm_mulhrs_epi16(_mm_srli_epi16::<2>(hi), weight));
     (store0, store1)
 }
 
@@ -285,7 +285,7 @@ unsafe fn convolve_vertical_sse_row_impl(
             item_row = _mm_unpacklo_epi8(item_row, item_row);
 
             let low = _mm_srli_epi16::<2>(item_row);
-            store = _mm_adds_epi16(store, _mm_mulhrs_epi16(low, v_weight));
+            store = _mm_add_epi16(store, _mm_mulhrs_epi16(low, v_weight));
         }
 
         let rebased = _mm_srai_epi16::<R_SHR_SCALE>(store);
@@ -312,7 +312,7 @@ unsafe fn convolve_vertical_sse_row_impl(
             let mut item_row = _mm_set1_epi8(src_ptr[0] as i8);
             item_row = _mm_unpacklo_epi8(item_row, item_row);
 
-            store = _mm_adds_epi16(
+            store = _mm_add_epi16(
                 store,
                 _mm_mulhrs_epi16(_mm_srli_epi16::<2>(item_row), v_weight),
             );

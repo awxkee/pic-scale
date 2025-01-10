@@ -354,10 +354,10 @@ unsafe fn convolve_horizontal_rgba_neon_rows_4_u8_i16_impl(
             jx += 2;
         }
 
-        let mut store_0 = vqadd_s16(vget_low_s16(store_0), vget_high_s16(store_0));
-        let mut store_1 = vqadd_s16(vget_low_s16(store_1), vget_high_s16(store_1));
-        let mut store_2 = vqadd_s16(vget_low_s16(store_2), vget_high_s16(store_2));
-        let mut store_3 = vqadd_s16(vget_low_s16(store_3), vget_high_s16(store_3));
+        let mut store_0 = vadd_s16(vget_low_s16(store_0), vget_high_s16(store_0));
+        let mut store_1 = vadd_s16(vget_low_s16(store_1), vget_high_s16(store_1));
+        let mut store_2 = vadd_s16(vget_low_s16(store_2), vget_high_s16(store_2));
+        let mut store_3 = vadd_s16(vget_low_s16(store_3), vget_high_s16(store_3));
 
         while jx < bounds_size {
             let w_ptr = weights.get_unchecked(jx..(jx + 1));
@@ -691,7 +691,7 @@ unsafe fn convolve_horizontal_rgba_neon_row_i16_impl(
             jx += 2;
         }
 
-        let mut store = vqadd_s16(vget_low_s16(store), vget_high_s16(store));
+        let mut store = vadd_s16(vget_low_s16(store), vget_high_s16(store));
 
         while jx < bounds_size {
             let w_ptr = weights.get_unchecked(jx..(jx + 1));

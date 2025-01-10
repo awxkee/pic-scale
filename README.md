@@ -68,7 +68,6 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 Features: 
  -  To enable support of `f16` the feature `half` should be activated.
  -  `nightly_avx512` activates AVX-512 feature set and requires `nightly` compiler channel 
- -  `nightly_i8mm` activates `i8mm` NEON feature and required `nightly` compiler channel
 
 #### Target features with runtime dispatch
 
@@ -96,47 +95,52 @@ Even when `half` feature activated but platform do not support or features not e
 
 ### Performance
 
+NEON test made on Apple M3 Pro.
+AVX2 test made on Premium Intel CPU Optimized 4 vCPU Digital Ocean instance.
+
 Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 image in 4 times.
 
 | Lanczos3  |  AVX  | NEON  |
 |-----------|:-----:|:-----:|
-| pic-scale | 16.67 | 8.54  |
-| fir       | 22.83 | 24.97 |
+| pic-scale | 10.47 | 6.97  |
+| fir       | 15.62 | 21.74 |
 
-Example comparison time for downscale RGBA 4928x3279 image in two times with premultiplying alpha.
+Example comparison time for downscale RGBA 4928x3279 image in 4 times with pre-multiplying alpha.
 
-| Lanczos3  |  SSE  |  AVX  | NEON  |
-|-----------|:-----:|:-----:|:-----:|
-| pic-scale | 68.51 | 35.82 | 17.27 |
-| fir       | 73.28 | 54.40 | 45.62 |
-
-Example comparison time for downscale RGBA 4928x3279 image in two times without premultiplying alpha.
-
-| Lanczos3  |  SSE  |  AVX  | NEON  |
-|-----------|:-----:|:-----:|:-----:|
-| pic-scale | 52.42 | 29.96 | 13.84 |
-| fir       | 51.89 | 35.07 | 36.50 |
-
-Example comparison time for downscale RGBA 4928x3279 10 bit image in 2 times with premultiplying alpha.
-
-| Lanczos3  |  AVX   | NEON  |
-|-----------|:------:|:-----:|
-| pic-scale | 77.59  | 38.92 |
-| fir       | 128.71 | 91.08 |
-
-RGBA 4928x3279 10 bit downscale 2 two times without premultiplying alpha
-
-| Lanczos3  |  SSE  | NEON  |
+| Lanczos3  |  AVX  | NEON  |
 |-----------|:-----:|:-----:|
-| pic-scale | 41.08 | 17.85 |
-| fir       | 94.23 | 73.82 |
+| pic-scale | 43.72 | 13.56 |
+| fir       | 62.31 | 33.32 |
 
-Example comparison time for downscale RGB 4000x6000 10 bit image in two times using *NEON*.
+Example comparison time for downscale RGBA 4928x3279 image in 4 times without pre-multiplying alpha.
 
-| Lanczos3  |  SSE   |  NEON  |
-|-----------|:------:|:------:|
-| pic-scale | 138.75 | 25.31  |
-| fir       | 125.85 | 100.36 |
+| Lanczos3         |  AVX  | NEON  |
+|------------------|:-----:|:-----:|
+| pic-scale        | 11.13 | 7.76  |
+| fir              | 20.17 | 25.92 |
+| Apple Accelerate |   -   | 9.98  |
+
+Example comparison time for downscale RGBA 4928x3279 10 bit image in 4 times with pre-multiplying alpha.
+
+| Lanczos3         |  AVX   | NEON  |
+|------------------|:------:|:-----:|
+| pic-scale        | 85.34  | 22.68 |
+| fir              | 146.23 | 53.95 |
+
+RGBA 4928x3279 10 bit downscale 4 two times without pre-multiplying alpha
+
+| Lanczos3         |  AVX  | NEON  |
+|------------------|:-----:|:-----:|
+| pic-scale        | 19.15 | 8.91  |
+| fir              | 58.57 | 38.46 |
+| Apple Accelerate |   -   | 27.63 |
+
+Example comparison time for downscale RGB 4000x6000 10 bit image in 4 times using *NEON*.
+
+| Lanczos3  |  AVX  | NEON  |
+|-----------|:-----:|:-----:|
+| pic-scale | 25.68 | 15.56 |
+| fir       | 68.84 | 39.40 |
 
 #### Example in sRGB
 
