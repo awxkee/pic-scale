@@ -674,6 +674,50 @@ impl UnassociateAlpha<half::f16, 4> for ImageStoreMut<'_, half::f16, 4> {
     }
 }
 
+pub type Planar8ImageStore<'a> = ImageStore<'a, u8, 1>;
+pub type Planar8ImageStoreMut<'a> = ImageStoreMut<'a, u8, 1>;
+pub type CbCr8ImageStore<'a> = ImageStore<'a, u8, 2>;
+pub type CbCr8ImageStoreMut<'a> = ImageStoreMut<'a, u8, 2>;
+pub type Rgba8ImageStore<'a> = ImageStore<'a, u8, 4>;
+pub type Rgba8ImageStoreMut<'a> = ImageStoreMut<'a, u8, 4>;
+pub type Rgb8ImageStore<'a> = ImageStore<'a, u8, 3>;
+pub type Rgb8ImageStoreMut<'a> = ImageStoreMut<'a, u8, 3>;
+
+pub type Planar16ImageStore<'a> = ImageStore<'a, u16, 1>;
+pub type Planar16ImageStoreMut<'a> = ImageStoreMut<'a, u16, 1>;
+pub type CbCr16ImageStore<'a> = ImageStore<'a, u16, 2>;
+pub type CbCr16ImageStoreMut<'a> = ImageStoreMut<'a, u16, 2>;
+pub type Rgba16ImageStore<'a> = ImageStore<'a, u16, 4>;
+pub type Rgba16ImageStoreMut<'a> = ImageStoreMut<'a, u16, 4>;
+pub type Rgb16ImageStore<'a> = ImageStore<'a, u16, 3>;
+pub type Rgb16ImageStoreMut<'a> = ImageStoreMut<'a, u16, 3>;
+
+#[cfg(feature = "half")]
+pub type PlanarF16ImageStore<'a> = ImageStore<'a, half::f16, 1>;
+#[cfg(feature = "half")]
+pub type PlanarF16ImageStoreMut<'a> = ImageStoreMut<'a, half::f16, 1>;
+#[cfg(feature = "half")]
+pub type CbCrF16ImageStore<'a> = ImageStore<'a, half::f16, 2>;
+#[cfg(feature = "half")]
+pub type CbCrF16ImageStoreMut<'a> = ImageStoreMut<'a, half::f16, 2>;
+#[cfg(feature = "half")]
+pub type RgbaF16ImageStore<'a> = ImageStore<'a, half::f16, 4>;
+#[cfg(feature = "half")]
+pub type RgbaF16ImageStoreMut<'a> = ImageStoreMut<'a, half::f16, 4>;
+#[cfg(feature = "half")]
+pub type RgbF16ImageStore<'a> = ImageStore<'a, half::f16, 3>;
+#[cfg(feature = "half")]
+pub type RgbF16ImageStoreMut<'a> = ImageStoreMut<'a, half::f16, 3>;
+
+pub type PlanarF32ImageStore<'a> = ImageStore<'a, f32, 1>;
+pub type PlanarF32ImageStoreMut<'a> = ImageStoreMut<'a, f32, 1>;
+pub type CbCrF32ImageStore<'a> = ImageStore<'a, f32, 2>;
+pub type CbCrF32ImageStoreMut<'a> = ImageStoreMut<'a, f32, 2>;
+pub type RgbaF32ImageStore<'a> = ImageStore<'a, f32, 4>;
+pub type RgbaF32ImageStoreMut<'a> = ImageStoreMut<'a, f32, 4>;
+pub type RgbF32ImageStore<'a> = ImageStore<'a, f32, 3>;
+pub type RgbF32ImageStoreMut<'a> = ImageStoreMut<'a, f32, 3>;
+
 #[cfg(test)]
 mod tests {
     use super::*;

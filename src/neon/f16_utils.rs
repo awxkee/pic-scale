@@ -463,37 +463,38 @@ pub(super) unsafe fn xvfmla_lane_f16<const LANE: i32>(
 ) -> x_float16x4_t {
     static_assert_uimm_bits!(LANE, 2);
     let mut result: uint16x4_t = xreinterpret_u16_f16(a);
+    let lanes: uint16x8_t = vdupq_n_u16(vget_lane_u16::<LANE>(xreinterpret_u16_f16(c)));
 
     if LANE == 0 {
         asm!(
-        "fmla {0:v}.4h, {1:v}.4h, {2:v}.h[0]",
+        "fmla {0:v}.4h, {1:v}.4h, {2:v}.4h",
         inout(vreg) result,
         in(vreg) xreinterpret_u16_f16(b),
-        in(vreg) xreinterpret_u16_f16(c),
+        in(vreg) lanes,
         options(pure, nomem, nostack)
         );
     } else if LANE == 1 {
         asm!(
-        "fmla {0:v}.4h, {1:v}.4h, {2:v}.h[1]",
+        "fmla {0:v}.4h, {1:v}.4h, {2:v}.4h",
         inout(vreg) result,
         in(vreg) xreinterpret_u16_f16(b),
-        in(vreg) xreinterpret_u16_f16(c),
+        in(vreg) lanes,
         options(pure, nomem, nostack)
         );
     } else if LANE == 2 {
         asm!(
-        "fmla {0:v}.4h, {1:v}.4h, {2:v}.h[2]",
+        "fmla {0:v}.4h, {1:v}.4h, {2:v}.4h",
         inout(vreg) result,
         in(vreg) xreinterpret_u16_f16(b),
-        in(vreg) xreinterpret_u16_f16(c),
+        in(vreg) lanes,
         options(pure, nomem, nostack)
         );
     } else if LANE == 3 {
         asm!(
-        "fmla {0:v}.4h, {1:v}.4h, {2:v}.h[3]",
+        "fmla {0:v}.4h, {1:v}.4h, {2:v}.4h",
         inout(vreg) result,
         in(vreg) xreinterpret_u16_f16(b),
-        in(vreg) xreinterpret_u16_f16(c),
+        in(vreg) lanes,
         options(pure, nomem, nostack)
         );
     }

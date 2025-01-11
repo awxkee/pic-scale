@@ -10,8 +10,8 @@ use fast_image_resize::{
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
-    ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingU16,
-    ThreadingPolicy,
+    CbCr8ImageStore, CbCr8ImageStoreMut, ImageSize, ImageStore, ImageStoreMut, ImageStoreScaling,
+    ResamplingFunction, Scaler, Scaling, ScalingU16, ThreadingPolicy,
 };
 
 fn resize_plane(
@@ -60,8 +60,7 @@ fn main() {
 
     //
     let store =
-        ImageStore::<u8, 2>::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize)
-            .unwrap();
+        CbCr8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
 
     let dst_size = ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
     // let mut resized_ar = vec![0u32; dst_size.width * dst_size.height];
@@ -75,7 +74,7 @@ fn main() {
     //     )
     //     .unwrap();
 
-    let mut dst_store = ImageStoreMut::<u8, 2>::alloc_with_depth(
+    let mut dst_store = CbCr8ImageStoreMut::alloc_with_depth(
         dimensions.0 as usize / 4,
         dimensions.1 as usize / 4,
         10,
