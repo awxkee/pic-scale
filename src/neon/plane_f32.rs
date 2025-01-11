@@ -151,8 +151,8 @@ pub(crate) fn convolve_horizontal_plane_neon_row_one(
             }
 
             let px = x;
-            let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-            dest_ptr.write_unaligned(vaddvq_f32(store));
+            let dest_ptr = dst.get_unchecked_mut(px);
+            *dest_ptr = vaddvq_f32(store);
 
             filter_offset += filter_weights.aligned_size;
         }
@@ -279,17 +279,17 @@ pub(crate) fn convolve_horizontal_plane_neon_rows_4(
             }
 
             let px = x;
-            let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-            dest_ptr.write_unaligned(vaddvq_f32(store_0));
+            let dest_ptr0 = dst.get_unchecked_mut(px);
+            *dest_ptr0 = vaddvq_f32(store_0);
 
-            let dest_ptr = dst.get_unchecked_mut(px + dst_stride..).as_mut_ptr();
-            dest_ptr.write_unaligned(vaddvq_f32(store_1));
+            let dest_ptr1 = dst.get_unchecked_mut(px + dst_stride);
+            *dest_ptr1 = vaddvq_f32(store_1);
 
-            let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 2..).as_mut_ptr();
-            dest_ptr.write_unaligned(vaddvq_f32(store_2));
+            let dest_ptr2 = dst.get_unchecked_mut(px + dst_stride * 2);
+            *dest_ptr2 = vaddvq_f32(store_2);
 
-            let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 3..).as_mut_ptr();
-            dest_ptr.write_unaligned(vaddvq_f32(store_3));
+            let dest_ptr3 = dst.get_unchecked_mut(px + dst_stride * 3);
+            *dest_ptr3 = vaddvq_f32(store_3);
 
             filter_offset += filter_weights.aligned_size;
         }

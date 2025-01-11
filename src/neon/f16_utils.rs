@@ -579,34 +579,6 @@ pub(super) unsafe fn xvfmlaq_f16(
     xreinterpretq_f16_u16(result)
 }
 
-// #[cfg(all(target_arch = "aarch64", target_feature = "fhm"))]
-// #[inline]
-// pub(super) unsafe fn p_xvmlaq_f16(
-//     a: x_float16x8_t,
-//     b: x_float16x8_t,
-//     c: x_float16x8_t,
-// ) -> x_float16x8_t {
-//     xvfmlaq_f16(a, b, c)
-// }
-
-// #[inline]
-// pub(super) unsafe fn xvmlaq_f16(
-//     a: x_float16x8_t,
-//     b: x_float16x8_t,
-//     c: x_float16x8_t,
-// ) -> x_float16x8_t {
-//     xvaddq_f16(a, xvmulq_f16(b, c))
-// }
-
-// #[inline]
-// pub(super) unsafe fn xvmla_f16(
-//     a: x_float16x4_t,
-//     b: x_float16x4_t,
-//     c: x_float16x4_t,
-// ) -> x_float16x4_t {
-//     xvadd_f16(a, xvmul_f16(b, c))
-// }
-
 /// Floating-point Multiply (vector).
 /// This instruction multiplies corresponding floating-point values in the vectors in the two
 /// source SIMD&FP registers,
