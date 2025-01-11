@@ -46,6 +46,22 @@ pub enum PicScaleError {
     BufferMismatch(PicScaleBufferMismatch),
     InvalidStride(usize, usize),
     UnsupportedBitDepth(usize),
+    UnknownResizingFilter,
+}
+
+impl PicScaleError {
+    #[inline]
+    pub fn code(&self) -> usize {
+        match self {
+            PicScaleError::ZeroImageDimensions => 1,
+            PicScaleError::SourceImageIsTooLarge => 2,
+            PicScaleError::DestinationImageIsTooLarge => 3,
+            PicScaleError::BufferMismatch(_) => 4,
+            PicScaleError::InvalidStride(_, _) => 5,
+            PicScaleError::UnsupportedBitDepth(_) => 6,
+            PicScaleError::UnknownResizingFilter => 7,
+        }
+    }
 }
 
 impl Display for PicScaleError {
@@ -76,6 +92,9 @@ impl Display for PicScaleError {
                 "Bit depth must be in [1, 16] but got {}",
                 depth
             )),
+            PicScaleError::UnknownResizingFilter => {
+                f.write_str("Unknown resizing filter was requested")
+            }
         }
     }
 }

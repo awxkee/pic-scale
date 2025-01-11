@@ -239,6 +239,14 @@ let resized = scaler.resize_rgba(
 );
 ```
 
+### Build C bindings
+
+See `picscale/include/picscale.h` for more info
+
+```bash
+cd picscale && RUSTFLAGS="-C strip=symbols" cargo +nightly build -Z build-std=std,panic_abort --release
+```
+
 #### Resampling filters
 
 Over 30 resampling filters is supported.

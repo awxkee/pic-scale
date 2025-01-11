@@ -29,7 +29,11 @@
 
 use crate::image_store::ImageStoreMut;
 use crate::pic_scale_error::PicScaleError;
-use crate::{ImageStore, Scaler};
+use crate::scaler::ScalingOptions;
+use crate::{
+    CbCrF16ImageStore, ImageStore, ImageStoreScaling, PlanarF16ImageStore, RgbF16ImageStore,
+    RgbaF16ImageStore, Scaler, Scaling, ThreadingPolicy,
+};
 use half::f16;
 
 /// Implements `f16` type support
@@ -144,5 +148,69 @@ impl Scaler {
         into: &mut ImageStoreMut<'a, f16, 1>,
     ) -> Result<(), PicScaleError> {
         self.generic_resize(store, into)
+    }
+}
+
+impl<'b> ImageStoreScaling<'b, f16, 1> for PlanarF16ImageStore<'b> {
+    fn scale(
+        &self,
+        store: &mut ImageStoreMut<'b, f16, 1>,
+        options: ScalingOptions,
+    ) -> Result<(), PicScaleError> {
+        let mut scaler = Scaler::new(options.resampling_function);
+        scaler.set_threading_policy(if options.use_multithreading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        });
+        scaler.generic_resize(self, store)
+    }
+}
+
+impl<'b> ImageStoreScaling<'b, f16, 2> for CbCrF16ImageStore<'b> {
+    fn scale(
+        &self,
+        store: &mut ImageStoreMut<'b, f16, 2>,
+        options: ScalingOptions,
+    ) -> Result<(), PicScaleError> {
+        let mut scaler = Scaler::new(options.resampling_function);
+        scaler.set_threading_policy(if options.use_multithreading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        });
+        scaler.generic_resize(self, store)
+    }
+}
+
+impl<'b> ImageStoreScaling<'b, f16, 3> for RgbF16ImageStore<'b> {
+    fn scale(
+        &self,
+        store: &mut ImageStoreMut<'b, f16, 3>,
+        options: ScalingOptions,
+    ) -> Result<(), PicScaleError> {
+        let mut scaler = Scaler::new(options.resampling_function);
+        scaler.set_threading_policy(if options.use_multithreading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        });
+        scaler.generic_resize(self, store)
+    }
+}
+
+impl<'b> ImageStoreScaling<'b, f16, 4> for RgbaF16ImageStore<'b> {
+    fn scale(
+        &self,
+        store: &mut ImageStoreMut<'b, f16, 4>,
+        options: ScalingOptions,
+    ) -> Result<(), PicScaleError> {
+        let mut scaler = Scaler::new(options.resampling_function);
+        scaler.set_threading_policy(if options.use_multithreading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        });
+        scaler.generic_resize_with_alpha(self, store, options.premultiply_alpha)
     }
 }

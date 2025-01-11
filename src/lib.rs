@@ -110,11 +110,24 @@ pub use colors::*;
 #[cfg(feature = "colorspaces")]
 pub use colorutils_rs::TransferFunction;
 pub use image_size::ImageSize;
-pub use image_store::{BufferStore, ImageStore, ImageStoreMut};
+pub use image_store::{
+    BufferStore, CbCr16ImageStore, CbCr16ImageStoreMut, CbCr8ImageStore, CbCr8ImageStoreMut,
+    CbCrF32ImageStore, CbCrF32ImageStoreMut, ImageStore, ImageStoreMut, Planar16ImageStore,
+    Planar16ImageStoreMut, Planar8ImageStore, Planar8ImageStoreMut, PlanarF32ImageStore,
+    PlanarF32ImageStoreMut, Rgb16ImageStore, Rgb16ImageStoreMut, Rgb8ImageStore, Rgb8ImageStoreMut,
+    RgbF32ImageStore, RgbF32ImageStoreMut, Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore,
+    Rgba8ImageStoreMut, RgbaF32ImageStore, RgbaF32ImageStoreMut,
+};
+#[cfg(feature = "half")]
+pub use image_store::{
+    CbCrF16ImageStore, CbCrF16ImageStoreMut, PlanarF16ImageStore, PlanarF16ImageStoreMut,
+    RgbF16ImageStore, RgbF16ImageStoreMut, RgbaF16ImageStore, RgbaF16ImageStoreMut,
+};
 pub use math::*;
 pub use sampler::*;
-pub use scaler::Scaler;
 pub use scaler::Scaling;
 pub use scaler::ScalingF32;
 pub use scaler::ScalingU16;
+pub use scaler::{ImageStoreScaling, Scaler, ScalingOptions};
 pub use threading_policy::*;
+pub use pic_scale_error::{PicScaleError, PicScaleBufferMismatch};

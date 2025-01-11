@@ -1,0 +1,28 @@
+[package]
+name = "picscale"
+version = "0.1.0"
+edition = "2024"
+build = "build.rs"
+
+[dependencies]
+pic-scale = { path = "../", features = ["half"] }
+half = "2.4.1"
+num-traits = "0.2.19"
+
+[features]
+nightly_avx512 = ["pic-scale/nightly_avx512"]
+full_support = []
+
+[lib]
+crate-type = ["staticlib", "rlib", "dylib"]
+
+[build-dependencies]
+cbindgen = "0.27.0"
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+debug = false

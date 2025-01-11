@@ -38,7 +38,12 @@ use crate::pic_scale_error::PicScaleError;
 use crate::resize_ar30::resize_ar30_impl;
 use crate::support::check_image_size_overflow;
 use crate::threading_policy::ThreadingPolicy;
-use crate::{ConstPI, ConstSqrt2, Jinc, ResamplingFunction};
+use crate::{
+    CbCr16ImageStore, CbCr8ImageStore, CbCrF32ImageStore, ConstPI, ConstSqrt2, Jinc,
+    Planar16ImageStore, Planar8ImageStore, PlanarF32ImageStore, ResamplingFunction,
+    Rgb16ImageStore, Rgb8ImageStore, RgbF32ImageStore, Rgba16ImageStore, Rgba8ImageStore,
+    RgbaF32ImageStore,
+};
 use num_traits::{AsPrimitive, Float, FromPrimitive, Signed};
 use rayon::ThreadPool;
 use std::fmt::Debug;
@@ -553,7 +558,7 @@ impl Scaler {
         T: FromPrimitive + Clone + Copy + Debug + Send + Sync + Default + 'static,
         const N: usize,
     >(
-        &'a self,
+        &self,
         store: &ImageStore<'a, T, N>,
         into: &mut ImageStoreMut<'a, T, N>,
     ) -> Result<(), PicScaleError>
@@ -646,7 +651,7 @@ impl Scaler {
         T: FromPrimitive + Clone + Copy + Debug + Send + Sync + Default + 'static,
         const N: usize,
     >(
-        &'a self,
+        &self,
         store: &ImageStore<'a, T, N>,
         into: &mut ImageStoreMut<'a, T, N>,
         premultiply_alpha_requested: bool,
@@ -722,7 +727,7 @@ impl Scaler {
         T: FromPrimitive + Clone + Copy + Debug + Send + Sync + Default + 'static,
         const N: usize,
     >(
-        &'a self,
+        &self,
         store: &ImageStore<'a, T, N>,
         into: &mut ImageStoreMut<'a, T, N>,
         premultiply_alpha_requested: bool,
@@ -778,7 +783,7 @@ impl Scaler {
         T: FromPrimitive + Clone + Copy + Debug + Send + Sync + Default + 'static,
         const N: usize,
     >(
-        &'a self,
+        &self,
         store: &ImageStore<'a, T, N>,
         into: &mut ImageStoreMut<'a, T, N>,
         premultiply_alpha_requested: bool,
@@ -834,7 +839,7 @@ impl Scaler {
         T: FromPrimitive + Clone + Copy + Debug + Send + Sync + Default + 'static,
         const N: usize,
     >(
-        &'a self,
+        &self,
         store: &ImageStore<'a, T, N>,
         into: &mut ImageStoreMut<'a, T, N>,
         premultiply_alpha_requested: bool,
@@ -1144,6 +1149,217 @@ impl Scaler {
                 { Ar30ByteOrder::Network as usize },
             >(src, src_size, dst, new_size, self),
         }
+    }
+}
+
+/// Declares default scaling options
+#[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Default)]
+pub struct ScalingOptions {
+    pub resampling_function: ResamplingFunction,
+    pub premultiply_alpha: bool,
+    pub use_multithreading: bool,
+}
+
+pub trait ImageStoreScaling<'b, T, const N: usize>
+where
+    T: FromPrimitive + Clone + Copy + Debug,
+{
+    fn scale(
+        &self,
+        store: &mut ImageStoreMut<'b, T, N>,
+        options: ScalingOptions,
+    ) -> Result<(), PicScaleError>;
+}
+
+impl<'b> ImageStoreScaling<'b, u8, 4> for Rgba8ImageStore<'b> {
+    fn scale(
+        &self,
+        store: &mut ImageStoreMut<'b, u8, 4>,
+        options: ScalingOptions,
+    ) -> Result<(), PicScaleError> {
+        let mut scaler = Scaler::new(options.resampling_function);
+        scaler.set_threading_policy(if options.use_multithreading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        });
+        scaler.generic_resize_with_alpha(self, store, options.premultiply_alpha)
+    }
+}
+
+impl<'b> ImageStoreScaling<'b, u8, 3> for Rgb8ImageStore<'b> {
+    fn scale(
+        &self,
+        store: &mut ImageStoreMut<'b, u8, 3>,
+        options: ScalingOptions,
+    ) -> Result<(), PicScaleError> {
+        let mut scaler = Scaler::new(options.resampling_function);
+        scaler.set_threading_policy(if options.use_multithreading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        });
+        scaler.generic_resize(self, store)
+    }
+}
+
+impl<'b> ImageStoreScaling<'b, u8, 2> for CbCr8ImageStore<'b> {
+    fn scale(
+        &self,
+        store: &mut ImageStoreMut<'b, u8, 2>,
+        options: ScalingOptions,
+    ) -> Result<(), PicScaleError> {
+        let mut scaler = Scaler::new(options.resampling_function);
+        scaler.set_threading_policy(if options.use_multithreading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        });
+        scaler.generic_resize(self, store)
+    }
+}
+
+impl<'b> ImageStoreScaling<'b, u8, 1> for Planar8ImageStore<'b> {
+    fn scale(
+        &self,
+        store: &mut ImageStoreMut<'b, u8, 1>,
+        options: ScalingOptions,
+    ) -> Result<(), PicScaleError> {
+        let mut scaler = Scaler::new(options.resampling_function);
+        scaler.set_threading_policy(if options.use_multithreading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        });
+        scaler.generic_resize(self, store)
+    }
+}
+
+impl<'b> ImageStoreScaling<'b, u16, 1> for Planar16ImageStore<'b> {
+    fn scale(
+        &self,
+        store: &mut ImageStoreMut<'b, u16, 1>,
+        options: ScalingOptions,
+    ) -> Result<(), PicScaleError> {
+        let mut scaler = Scaler::new(options.resampling_function);
+        scaler.set_threading_policy(if options.use_multithreading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        });
+        scaler.generic_resize(self, store)
+    }
+}
+
+impl<'b> ImageStoreScaling<'b, u16, 2> for CbCr16ImageStore<'b> {
+    fn scale<'a>(
+        &self,
+        store: &mut ImageStoreMut<'b, u16, 2>,
+        options: ScalingOptions,
+    ) -> Result<(), PicScaleError> {
+        let mut scaler = Scaler::new(options.resampling_function);
+        scaler.set_threading_policy(if options.use_multithreading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        });
+        scaler.generic_resize(self, store)
+    }
+}
+
+impl<'b> ImageStoreScaling<'b, u16, 3> for Rgb16ImageStore<'b> {
+    fn scale(
+        &self,
+        store: &mut ImageStoreMut<'b, u16, 3>,
+        options: ScalingOptions,
+    ) -> Result<(), PicScaleError> {
+        let mut scaler = Scaler::new(options.resampling_function);
+        scaler.set_threading_policy(if options.use_multithreading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        });
+        scaler.generic_resize(self, store)
+    }
+}
+
+impl<'b> ImageStoreScaling<'b, u16, 4> for Rgba16ImageStore<'b> {
+    fn scale(
+        &self,
+        store: &mut ImageStoreMut<'b, u16, 4>,
+        options: ScalingOptions,
+    ) -> Result<(), PicScaleError> {
+        let mut scaler = Scaler::new(options.resampling_function);
+        scaler.set_threading_policy(if options.use_multithreading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        });
+        scaler.generic_resize_with_alpha(self, store, options.premultiply_alpha)
+    }
+}
+
+impl<'b> ImageStoreScaling<'b, f32, 1> for PlanarF32ImageStore<'b> {
+    fn scale<'a>(
+        &self,
+        store: &mut ImageStoreMut<'b, f32, 1>,
+        options: ScalingOptions,
+    ) -> Result<(), PicScaleError> {
+        let mut scaler = Scaler::new(options.resampling_function);
+        scaler.set_threading_policy(if options.use_multithreading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        });
+        scaler.generic_resize(self, store)
+    }
+}
+
+impl<'b> ImageStoreScaling<'b, f32, 2> for CbCrF32ImageStore<'b> {
+    fn scale<'a>(
+        &self,
+        store: &mut ImageStoreMut<'b, f32, 2>,
+        options: ScalingOptions,
+    ) -> Result<(), PicScaleError> {
+        let mut scaler = Scaler::new(options.resampling_function);
+        scaler.set_threading_policy(if options.use_multithreading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        });
+        scaler.generic_resize(self, store)
+    }
+}
+
+impl<'b> ImageStoreScaling<'b, f32, 3> for RgbF32ImageStore<'b> {
+    fn scale(
+        &self,
+        store: &mut ImageStoreMut<'b, f32, 3>,
+        options: ScalingOptions,
+    ) -> Result<(), PicScaleError> {
+        let mut scaler = Scaler::new(options.resampling_function);
+        scaler.set_threading_policy(if options.use_multithreading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        });
+        scaler.generic_resize(self, store)
+    }
+}
+
+impl<'b> ImageStoreScaling<'b, f32, 4> for RgbaF32ImageStore<'b> {
+    fn scale(
+        &self,
+        store: &mut ImageStoreMut<'b, f32, 4>,
+        options: ScalingOptions,
+    ) -> Result<(), PicScaleError> {
+        let mut scaler = Scaler::new(options.resampling_function);
+        scaler.set_threading_policy(if options.use_multithreading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        });
+        scaler.generic_resize_with_alpha(self, store, options.premultiply_alpha)
     }
 }
 
