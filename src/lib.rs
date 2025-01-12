@@ -124,10 +124,10 @@ pub use image_store::{
     RgbF16ImageStore, RgbF16ImageStoreMut, RgbaF16ImageStore, RgbaF16ImageStoreMut,
 };
 pub use math::*;
+pub use pic_scale_error::{PicScaleBufferMismatch, PicScaleError};
 pub use sampler::*;
 pub use scaler::Scaling;
 pub use scaler::ScalingF32;
 pub use scaler::ScalingU16;
 pub use scaler::{ImageStoreScaling, Scaler, ScalingOptions};
 pub use threading_policy::*;
-pub use pic_scale_error::{PicScaleError, PicScaleBufferMismatch};

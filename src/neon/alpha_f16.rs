@@ -121,69 +121,55 @@ unsafe fn neon_unpremultiply_alpha_rgba_row_f16(in_place: &mut [half::f16]) {
         let src_ptr = dst.as_ptr();
         let pixel = vld4q_u16(src_ptr as *const u16);
 
-        let low_alpha = xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.3)));
-        let low_zero_mask = vceqzq_f32(low_alpha);
-        let zeros = vdupq_n_f32(0.);
+        let zero_mask = vceqzq_u16(pixel.3);
 
-        let low_r = vbslq_f32(
-            low_zero_mask,
-            zeros,
-            vdivq_f32(
-                xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.0))),
-                low_alpha,
-            ),
+        let low_alpha = xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.3)));
+
+        let low_r = vdivq_f32(
+            xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.0))),
+            low_alpha,
         );
-        let low_g = vbslq_f32(
-            low_zero_mask,
-            zeros,
-            vdivq_f32(
-                xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.1))),
-                low_alpha,
-            ),
+        let low_g = vdivq_f32(
+            xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.1))),
+            low_alpha,
         );
-        let low_b = vbslq_f32(
-            low_zero_mask,
-            zeros,
-            vdivq_f32(
-                xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.2))),
-                low_alpha,
-            ),
+        let low_b = vdivq_f32(
+            xvcvt_f32_f16(xreinterpret_f16_u16(vget_low_u16(pixel.2))),
+            low_alpha,
         );
 
         let high_alpha = xvcvt_f32_f16(xreinterpret_f16_u16(vget_high_u16(pixel.3)));
-        let high_zero_mask = vceqzq_f32(high_alpha);
 
-        let high_r = vbslq_f32(
-            high_zero_mask,
-            zeros,
-            vdivq_f32(
-                xvcvt_f32_f16(xreinterpret_f16_u16(vget_high_u16(pixel.0))),
-                high_alpha,
-            ),
+        let high_r = vdivq_f32(
+            xvcvt_f32_f16(xreinterpret_f16_u16(vget_high_u16(pixel.0))),
+            high_alpha,
         );
-        let high_g = vbslq_f32(
-            high_zero_mask,
-            zeros,
-            vdivq_f32(
-                xvcvt_f32_f16(xreinterpret_f16_u16(vget_high_u16(pixel.1))),
-                high_alpha,
-            ),
+        let high_g = vdivq_f32(
+            xvcvt_f32_f16(xreinterpret_f16_u16(vget_high_u16(pixel.1))),
+            high_alpha,
         );
-        let high_b = vbslq_f32(
-            high_zero_mask,
-            zeros,
-            vdivq_f32(
-                xvcvt_f32_f16(xreinterpret_f16_u16(vget_high_u16(pixel.2))),
-                high_alpha,
-            ),
+        let high_b = vdivq_f32(
+            xvcvt_f32_f16(xreinterpret_f16_u16(vget_high_u16(pixel.2))),
+            high_alpha,
         );
 
-        let r_values =
-            xreinterpretq_u16_f16(xcombine_f16(xvcvt_f16_f32(low_r), xvcvt_f16_f32(high_r)));
-        let g_values =
-            xreinterpretq_u16_f16(xcombine_f16(xvcvt_f16_f32(low_g), xvcvt_f16_f32(high_g)));
-        let b_values =
-            xreinterpretq_u16_f16(xcombine_f16(xvcvt_f16_f32(low_b), xvcvt_f16_f32(high_b)));
+        let u_zeros = vdupq_n_u16(0);
+
+        let r_values = vbslq_u16(
+            zero_mask,
+            u_zeros,
+            xreinterpretq_u16_f16(xcombine_f16(xvcvt_f16_f32(low_r), xvcvt_f16_f32(high_r))),
+        );
+        let g_values = vbslq_u16(
+            zero_mask,
+            u_zeros,
+            xreinterpretq_u16_f16(xcombine_f16(xvcvt_f16_f32(low_g), xvcvt_f16_f32(high_g))),
+        );
+        let b_values = vbslq_u16(
+            zero_mask,
+            u_zeros,
+            xreinterpretq_u16_f16(xcombine_f16(xvcvt_f16_f32(low_b), xvcvt_f16_f32(high_b))),
+        );
 
         let dst_ptr = dst.as_mut_ptr();
         let store_pixel = uint16x8x4_t(r_values, g_values, b_values, pixel.3);
