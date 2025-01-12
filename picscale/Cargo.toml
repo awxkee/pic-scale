@@ -14,14 +14,14 @@ nightly_avx512 = ["pic-scale/nightly_avx512"]
 full_support = []
 
 [lib]
-crate-type = ["staticlib", "rlib", "dylib"]
+crate-type = ["staticlib", "rlib"]
 
 [build-dependencies]
 cbindgen = "0.27.0"
 
 [profile.release]
 strip = true
-opt-level = "z"
+opt-level = 3
 lto = true
 codegen-units = 1
 panic = "abort"
