@@ -26,9 +26,8 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::avx2::utils::{_mm256_dot16_avx_epi32, avx2_pack_u32};
+use crate::avx2::utils::{_mm256_dot16_avx_epi32, _mm_dot16_avx_epi32, avx2_pack_u32};
 use crate::filter_weights::FilterBounds;
-use crate::sse::_mm_dot16_avx_epi32;
 use crate::support::{PRECISION, ROUNDING_CONST};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;

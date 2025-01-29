@@ -423,10 +423,9 @@ impl RowHandlerFixedPoint<u16> for u16 {
         i16: AsPrimitive<J>,
         u16: AsPrimitive<J>,
     {
-        #[cfg(feature = "nightly_avx512")]
-        if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("avxvnni") {
-            use crate::avx512::convolve_horizontal_rgba_vnni_rows_4_u16;
-            return convolve_horizontal_rgba_vnni_rows_4_u16(
+        if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("avx2") {
+            use crate::avx2::convolve_horizontal_rgba_avx_rows_4_u16;
+            return convolve_horizontal_rgba_avx_rows_4_u16(
                 src,
                 src_stride,
                 dst,
@@ -531,10 +530,9 @@ impl RowHandlerFixedPoint<u16> for u16 {
         i16: AsPrimitive<J>,
         u16: AsPrimitive<J>,
     {
-        #[cfg(feature = "nightly_avx512")]
-        if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("avxvnni") {
-            use crate::avx512::convolve_horizontal_rgba_vnni_u16lp_row;
-            return convolve_horizontal_rgba_vnni_u16lp_row(src, dst, filter_weights, bit_depth);
+        if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("avx2") {
+            use crate::avx2::convolve_horizontal_rgba_avx_u16lp_row;
+            return convolve_horizontal_rgba_avx_u16lp_row(src, dst, filter_weights, bit_depth);
         }
         if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("sse4.1") {
             convolve_horizontal_rgba_sse_u16_lb_row(src, dst, filter_weights, bit_depth);

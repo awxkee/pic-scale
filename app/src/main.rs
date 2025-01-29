@@ -13,8 +13,9 @@ use fast_image_resize::{
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
     Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, ImageStoreScaling, ResamplingFunction,
-    RgbF16ImageStore, RgbF16ImageStoreMut, Rgba16ImageStoreMut, RgbaF16ImageStore,
-    RgbaF16ImageStoreMut, Scaler, Scaling, ScalingU16, ThreadingPolicy, WorkloadStrategy,
+    RgbF16ImageStore, RgbF16ImageStoreMut, Rgba16ImageStore, Rgba16ImageStoreMut,
+    RgbaF16ImageStore, RgbaF16ImageStoreMut, Scaler, Scaling, ScalingU16, ThreadingPolicy,
+    WorkloadStrategy,
 };
 
 fn resize_plane(
@@ -51,26 +52,26 @@ fn main() {
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
-    let transient = img.to_rgb8();
+    let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
     let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
-    scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
+    scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
 
     // resize_plane(378, 257, 257, 257, ResamplingFunction::Bilinear);
 
-    // let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 2).collect();
+    let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 2).collect();
 
-    let rgb_feature16 = transient
-        .iter()
-        .map(|&x| (x as f32 / 255f32) as f16)
-        .collect::<Vec<_>>();
+    // let rgb_feature16 = transient
+    //     .iter()
+    //     .map(|&x| (x as f32 / 255f32) as f16)
+    //     .collect::<Vec<_>>();
 
     //
-    let store =
-        RgbF16ImageStore::from_slice(&rgb_feature16, dimensions.0 as usize, dimensions.1 as usize)
-            .unwrap();
+    let mut store =
+        Rgba16ImageStore::from_slice(&choke, dimensions.0 as usize, dimensions.1 as usize).unwrap();
+    store.bit_depth = 10;
 
     // let dst_size = ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
     // // let mut resized_ar = vec![0u32; dst_size.width * dst_size.height];
@@ -84,15 +85,17 @@ fn main() {
     // //     )
     // //     .unwrap();
     //
-    let mut dst_store = RgbF16ImageStoreMut::alloc_with_depth(
-        dimensions.0 as usize / 4,
-        dimensions.1 as usize / 4,
+    let mut dst_store = Rgba16ImageStoreMut::alloc_with_depth(
+        dimensions.0 as usize / 2,
+        dimensions.1 as usize / 2,
         10,
     );
     //
     // // for i in 0..25 {
     // let start_time = Instant::now();
-    scaler.resize_rgb_f16(&store, &mut dst_store).unwrap();
+    scaler
+        .resize_rgba_u16(&store, &mut dst_store, false)
+        .unwrap();
     //
     // let elapsed_time = start_time.elapsed();
     // // Print the elapsed time in milliseconds
@@ -134,17 +137,17 @@ fn main() {
     // //     .map(|&x| (x * 255f32) as u8)
     // //     .collect();
     //
-    // // let dst: Vec<u8> = dst_store
-    // //     .as_bytes()
-    // //     .iter()
-    // //     .map(|&x| (x >> 2) as u8)
-    // //     .collect();
-    //
-    let dst = dst_store
+    let dst: Vec<u8> = dst_store
         .as_bytes()
         .iter()
-        .map(|&x| (x as f32 * 255.).round() as u8)
-        .collect::<Vec<_>>();
+        .map(|&x| (x >> 2) as u8)
+        .collect();
+
+    // let dst = dst_store
+    //     .as_bytes()
+    //     .iter()
+    //     .map(|&x| (x as f32 * 255.).round() as u8)
+    //     .collect::<Vec<_>>();
     // let dst = resized;
     // image::save_buffer(
     //     "converted.png",
