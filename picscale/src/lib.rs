@@ -740,6 +740,8 @@ pub extern "C" fn pic_scale_resize_planar_f32(
     )
 }
 
+use core::f16;
+
 /// Resizes an RGBAF16 image
 ///
 /// # Arguments
@@ -769,12 +771,12 @@ pub extern "C" fn pic_scale_resize_rgba_f16(
     resizing_filter: ScalingFilter,
     flags: u32,
 ) -> usize {
-    pic_scale_scale_generic::<half::f16, 4>(
-        src as *const half::f16,
+    pic_scale_scale_generic::<f16, 4>(
+        src as *const f16,
         src_stride,
         width,
         height,
-        dst as *mut half::f16,
+        dst as *mut f16,
         dst_stride,
         new_width,
         new_height,
@@ -814,12 +816,12 @@ pub extern "C" fn pic_scale_resize_rgb_f16(
     resizing_filter: ScalingFilter,
     flags: u32,
 ) -> usize {
-    pic_scale_scale_generic::<half::f16, 3>(
-        src as *const half::f16,
+    pic_scale_scale_generic::<f16, 3>(
+        src as *const f16,
         src_stride,
         width,
         height,
-        dst as *mut half::f16,
+        dst as *mut f16,
         dst_stride,
         new_width,
         new_height,
@@ -859,12 +861,12 @@ pub extern "C" fn pic_scale_resize_cbcr_f16(
     resizing_filter: ScalingFilter,
     flags: u32,
 ) -> usize {
-    pic_scale_scale_generic::<half::f16, 2>(
-        src as *const half::f16,
+    pic_scale_scale_generic::<f16, 2>(
+        src as *const f16,
         src_stride,
         width,
         height,
-        dst as *mut half::f16,
+        dst as *mut f16,
         dst_stride,
         new_width,
         new_height,
@@ -904,12 +906,12 @@ pub extern "C" fn pic_scale_resize_planar_f16(
     resizing_filter: ScalingFilter,
     flags: u32,
 ) -> usize {
-    pic_scale_scale_generic::<half::f16, 1>(
-        src as *const half::f16,
+    pic_scale_scale_generic::<f16, 1>(
+        src as *const f16,
         src_stride,
         width,
         height,
-        dst as *mut half::f16,
+        dst as *mut f16,
         dst_stride,
         new_width,
         new_height,

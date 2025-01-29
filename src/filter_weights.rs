@@ -189,6 +189,7 @@ impl WeightsConverter<i16> for WeightFloat16ConverterCast {
 pub(crate) struct WeightFloat16Converter {}
 
 #[cfg(feature = "nightly_f16")]
+#[allow(unused)]
 use core::f16;
 
 #[cfg(feature = "nightly_f16")]

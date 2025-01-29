@@ -310,7 +310,6 @@ name = "picscale"
 version = "0.1.0"
 dependencies = [
  "cbindgen",
- "half",
  "num-traits",
  "pic-scale",
 ]

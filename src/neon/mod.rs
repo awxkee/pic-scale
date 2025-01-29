@@ -48,6 +48,8 @@ mod plane_u8_rdm;
 #[cfg(feature = "nightly_f16")]
 mod rgb_f16;
 #[cfg(feature = "nightly_f16")]
+mod rgb_f16_fhm;
+#[cfg(feature = "nightly_f16")]
 mod rgb_f16_full;
 mod rgb_f32;
 mod rgb_u8;
@@ -80,8 +82,6 @@ mod vertical_u8;
 #[cfg(feature = "rdm")]
 mod vertical_u8_rdm;
 mod weights;
-#[cfg(feature = "nightly_f16")]
-mod rgb_f16_fhm;
 
 #[cfg(feature = "nightly_f16")]
 pub(crate) use alpha_f16::{neon_premultiply_alpha_rgba_f16, neon_unpremultiply_alpha_rgba_f16};
@@ -116,6 +116,10 @@ pub(crate) use plane_u8_rdm::{
 #[cfg(feature = "nightly_f16")]
 pub(crate) use rgb_f16::{
     convolve_horizontal_rgb_neon_row_one_f16, convolve_horizontal_rgb_neon_rows_4_f16,
+};
+#[cfg(feature = "nightly_f16")]
+pub(crate) use rgb_f16_fhm::{
+    convolve_horizontal_rgb_neon_row_one_f16_fhm, convolve_horizontal_rgb_neon_rows_4_f16_fhm,
 };
 #[cfg(feature = "nightly_f16")]
 pub(crate) use rgb_f16_full::{
@@ -177,5 +181,3 @@ pub(crate) use vertical_u8_rdm::convolve_vertical_neon_i16_precision;
 pub(crate) use weights::convert_weights_to_f16;
 #[cfg(feature = "nightly_f16")]
 pub(crate) use weights::convert_weights_to_f16_fhm;
-#[cfg(feature = "nightly_f16")]
-pub(crate) use rgb_f16_fhm::{convolve_horizontal_rgb_neon_rows_4_f16_fhm, convolve_horizontal_rgb_neon_row_one_f16_fhm};

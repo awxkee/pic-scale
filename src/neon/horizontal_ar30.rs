@@ -63,7 +63,8 @@ unsafe fn conv_horiz_rgba_8_u8_i16<
 ) -> int16x4_t {
     let src_ptr = src.get_unchecked(start_x * 4..);
 
-    let rgba_pixel = vunzip_4_ar30_separate::<AR_TYPE, AR_ORDER>(vld1q_u32_x2(src_ptr.as_ptr() as *const _));
+    let rgba_pixel =
+        vunzip_4_ar30_separate::<AR_TYPE, AR_ORDER>(vld1q_u32_x2(src_ptr.as_ptr() as *const _));
 
     let hi0 = vshlq_n_s16::<SCALE>(rgba_pixel.1);
     let lo0 = vshlq_n_s16::<SCALE>(rgba_pixel.0);
@@ -97,7 +98,8 @@ unsafe fn conv_horiz_rgba_4_u8_i16<
 ) -> int16x4_t {
     let src_ptr = src.get_unchecked(start_x * 4..);
 
-    let rgba_pixel = vunzips_4_ar30_separate::<AR_TYPE, AR_ORDER>(vld1q_u32(src_ptr.as_ptr() as *const _));
+    let rgba_pixel =
+        vunzips_4_ar30_separate::<AR_TYPE, AR_ORDER>(vld1q_u32(src_ptr.as_ptr() as *const _));
 
     let hi = vshlq_n_s16::<SCALE>(rgba_pixel.1);
     let lo = vshlq_n_s16::<SCALE>(rgba_pixel.0);

@@ -84,9 +84,6 @@ jobs:
 
   fuzz_rgba_8bit_no_rdm:
     name: Fuzzing 8bit wo RDM
-    strategy:
-      matrix:
-        os: [ ubuntu-latest, macos-latest ]
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4

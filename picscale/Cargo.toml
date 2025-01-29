@@ -6,7 +6,6 @@ build = "build.rs"
 
 [dependencies]
 pic-scale = { path = "../", features = ["nightly_f16"] }
-half = "2.4.1"
 num-traits = "0.2.19"
 
 [features]

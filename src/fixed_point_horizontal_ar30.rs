@@ -103,7 +103,11 @@ pub(crate) fn convolve_row_handler_fixed_point_ar30<
                 + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 5) * weight5;
         } else {
             let src_ptr0 = &src[px..(px + bounds_size)];
-            for (&k_weight, src) in weights.iter().zip(src_ptr0.chunks_exact(4)).take(bounds.size) {
+            for (&k_weight, src) in weights
+                .iter()
+                .zip(src_ptr0.chunks_exact(4))
+                .take(bounds.size)
+            {
                 let weight: i32 = k_weight as i32;
                 let new_px = load_ar30_p!(src, AR30_TYPE, AR30_ORDER);
                 sums += new_px * weight;

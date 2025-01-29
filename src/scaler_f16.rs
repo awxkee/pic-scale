@@ -56,7 +56,7 @@ impl Scaler {
     ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler};
     ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
     ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<half::f16, 4>::alloc_with_depth(50, 50, 10);
+    ///  let mut dst_store = ImageStoreMut::<f16, 4>::alloc_with_depth(50, 50, 10);
     ///  scaler.resize_rgba_f16(&src_store, &mut dst_store, false).unwrap();
     /// ```
     pub fn resize_rgba_f16<'a>(
@@ -84,7 +84,7 @@ impl Scaler {
     ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler};
     ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
     ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<half::f16, 3>::alloc_with_depth(50, 50, 10);
+    ///  let mut dst_store = ImageStoreMut::<f16, 3>::alloc_with_depth(50, 50, 10);
     ///  scaler.resize_rgb_f16(&src_store, &mut dst_store).unwrap();
     /// ```
     pub fn resize_rgb_f16<'a>(
@@ -111,7 +111,7 @@ impl Scaler {
     ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler};
     ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
     ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<half::f16, 2>::alloc_with_depth(50, 50, 10);
+    ///  let mut dst_store = ImageStoreMut::<f16, 2>::alloc_with_depth(50, 50, 10);
     ///  scaler.resize_cbcr_f16(&src_store, &mut dst_store).unwrap();
     /// ```
     pub fn resize_cbcr_f16<'a>(
@@ -138,7 +138,7 @@ impl Scaler {
     ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler};
     ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
     ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<half::f16, 1>::alloc_with_depth(50, 50, 10);
+    ///  let mut dst_store = ImageStoreMut::<f16, 1>::alloc_with_depth(50, 50, 10);
     ///  scaler.resize_plane_f16(&src_store, &mut dst_store).unwrap();
     /// ```
     ///
