@@ -35,9 +35,9 @@ use crate::support::check_image_size_overflow;
 use crate::{ImageSize, ResamplingFunction, Scaler};
 
 pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
-    src: &[u32],
+    src: &[u8],
     src_size: ImageSize,
-    dst: &mut [u32],
+    dst: &mut [u8],
     dst_size: ImageSize,
     scaler: &Scaler,
 ) -> Result<(), PicScaleError> {
@@ -45,11 +45,11 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
         return Err(PicScaleError::ZeroImageDimensions);
     }
 
-    if check_image_size_overflow(src_size.width, src_size.height, 1) {
+    if check_image_size_overflow(src_size.width, src_size.height, 4) {
         return Err(PicScaleError::SourceImageIsTooLarge);
     }
 
-    if check_image_size_overflow(dst_size.width, dst_size.height, 1) {
+    if check_image_size_overflow(dst_size.width, dst_size.height, 4) {
         return Err(PicScaleError::DestinationImageIsTooLarge);
     }
 
@@ -65,12 +65,12 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
         .get_pool(ImageSize::new(dst_size.width, dst_size.height));
 
     if scaler.function == ResamplingFunction::Nearest {
-        resize_nearest::<u32, 1>(
+        resize_nearest::<u8, 4>(
             src,
-            src_size.width,
+            src_size.width * 4,
             src_size.height,
             dst,
-            dst_size.width,
+            dst_size.width * 4,
             dst_size.height,
             &pool,
         );
@@ -85,26 +85,28 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
         let vertical_filters = scaler.generate_weights(src_size.height, dst_size.height);
         convolve_vertical_dispatch_ar30::<AR30_TYPE, AR30_ORDER>(
             src,
-            src_size.width,
+            src_size.width * 4,
             vertical_filters,
             dst,
-            src_size.width,
+            src_size.width * 4,
             &pool,
+            src_size.width,
         );
         return Ok(());
     }
 
     let working_store = if should_do_vertical {
-        let mut target = vec![0u32; src_size.width * dst_size.height];
+        let mut target = vec![0u8; src_size.width * dst_size.height * 4];
 
         let vertical_filters = scaler.generate_weights(src_size.height, dst_size.height);
         convolve_vertical_dispatch_ar30::<AR30_TYPE, AR30_ORDER>(
             src,
-            src_size.width,
+            src_size.width * 4,
             vertical_filters,
             &mut target,
-            src_size.width,
+            src_size.width * 4,
             &pool,
+            src_size.width,
         );
 
         std::borrow::Cow::Owned(target)
@@ -116,10 +118,10 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
         let horizontal_filters = scaler.generate_weights(src_size.width, dst_size.width);
         convolve_horizontal_dispatch_ar30::<AR30_TYPE, AR30_ORDER>(
             working_store.as_ref(),
-            src_size.width,
+            src_size.width * 4,
             horizontal_filters,
             dst,
-            dst_size.width,
+            dst_size.width * 4,
             &pool,
         );
     }

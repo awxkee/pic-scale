@@ -32,6 +32,7 @@ use crate::filter_weights::FilterBounds;
 use crate::neon::convolve_f16::convolve_vertical_part_neon_8_f16;
 use crate::neon::utils::prefer_vfmaq_f32;
 use crate::neon::*;
+use core::f16;
 
 macro_rules! conv_vertical_part_neon_16_f16 {
     ($start_y: expr, $start_x: expr, $src: expr, $src_stride: expr, $dst: expr, $filter: expr, $bounds: expr) => {{
@@ -239,8 +240,8 @@ macro_rules! conv_vertical_part_neon_48_f16 {
 pub(crate) fn convolve_vertical_rgb_neon_row_f16(
     _: usize,
     bounds: &FilterBounds,
-    src: &[half::f16],
-    dst: &mut [half::f16],
+    src: &[f16],
+    dst: &mut [f16],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {

@@ -28,6 +28,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#[cfg(feature = "nightly_f16")]
+use core::f16;
 use std::arch::aarch64::*;
 use std::arch::asm;
 
@@ -89,22 +91,22 @@ pub(crate) struct x_float16x8x4_t(
 );
 
 #[inline]
-#[cfg(feature = "half")]
-pub(crate) unsafe fn xvld_f16(ptr: *const half::f16) -> x_float16x4_t {
+#[cfg(feature = "nightly_f16")]
+pub(crate) unsafe fn xvld_f16(ptr: *const f16) -> x_float16x4_t {
     let store: uint16x4_t = vld1_u16(ptr as *const _);
     std::mem::transmute(store)
 }
 
 #[inline]
-#[cfg(feature = "half")]
-pub(crate) unsafe fn xvldq_f16(ptr: *const half::f16) -> x_float16x8_t {
+#[cfg(feature = "nightly_f16")]
+pub(crate) unsafe fn xvldq_f16(ptr: *const f16) -> x_float16x8_t {
     let store: uint16x8_t = vld1q_u16(ptr as *const _);
     std::mem::transmute(store)
 }
 
 #[inline]
-#[cfg(feature = "half")]
-pub(crate) unsafe fn xvldq_f16_x2(ptr: *const half::f16) -> x_float16x8x2_t {
+#[cfg(feature = "nightly_f16")]
+pub(crate) unsafe fn xvldq_f16_x2(ptr: *const f16) -> x_float16x8x2_t {
     let ptr_u16 = ptr as *const u16;
     x_float16x8x2_t(
         xreinterpretq_f16_u16(vld1q_u16(ptr_u16)),
@@ -113,8 +115,8 @@ pub(crate) unsafe fn xvldq_f16_x2(ptr: *const half::f16) -> x_float16x8x2_t {
 }
 
 #[inline]
-#[cfg(feature = "half")]
-pub(crate) unsafe fn xvldq_f16_x4(ptr: *const half::f16) -> x_float16x8x4_t {
+#[cfg(feature = "nightly_f16")]
+pub(crate) unsafe fn xvldq_f16_x4(ptr: *const f16) -> x_float16x8x4_t {
     let ptr_u16 = ptr as *const u16;
     x_float16x8x4_t(
         xreinterpretq_f16_u16(vld1q_u16(ptr_u16)),
@@ -360,6 +362,330 @@ pub(super) unsafe fn xvfmla_f16(
     options(pure, nomem, nostack)
     );
     xreinterpret_f16_u16(result)
+}
+
+/// Floating-point fused Multiply-Add Long to accumulator (vector).
+/// This instruction multiplies corresponding half-precision floating-point values
+/// in the vectors in the two source SIMD&FP registers, and accumulates the product
+/// to the corresponding vector element of the destination SIMD&FP register.
+/// The instruction does not round the result of the multiply before the accumulation.
+///
+/// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vfmlalq_high_f16)
+#[target_feature(enable = "fhm")]
+#[inline]
+pub(super) unsafe fn xvfmlalq_high_f16(
+    a: float32x4_t,
+    b: x_float16x8_t,
+    c: x_float16x8_t,
+) -> float32x4_t {
+    let mut result: float32x4_t = a;
+    asm!(
+    "fmlal2 {0:v}.4s, {1:v}.4h, {2:v}.4h",
+    inout(vreg) result,
+    in(vreg) xreinterpretq_u16_f16(b),
+    in(vreg) xreinterpretq_u16_f16(c),
+    options(pure, nomem, nostack)
+    );
+    result
+}
+
+/// Floating-point fused Multiply-Add Long to accumulator (vector).
+/// This instruction multiplies corresponding half-precision floating-point values
+/// in the vectors in the two source SIMD&FP registers, and accumulates the product
+/// to the corresponding vector element of the destination SIMD&FP register.
+/// The instruction does not round the result of the multiply before the accumulation.
+///
+/// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vfmlalq_low_f16)
+#[target_feature(enable = "fhm")]
+#[inline]
+pub(super) unsafe fn xvfmlalq_low_f16(
+    a: float32x4_t,
+    b: x_float16x8_t,
+    c: x_float16x8_t,
+) -> float32x4_t {
+    let mut result: float32x4_t = a;
+    asm!(
+    "fmlal {0:v}.4s, {1:v}.4h, {2:v}.4h",
+    inout(vreg) result,
+    in(vreg) xreinterpretq_u16_f16(b),
+    in(vreg) xreinterpretq_u16_f16(c),
+    options(pure, nomem, nostack)
+    );
+    result
+}
+
+/// Floating-point fused Multiply-Add Long to accumulator (vector).
+/// This instruction multiplies corresponding half-precision floating-point values
+/// in the vectors in the two source SIMD&FP registers, and accumulates the product
+/// to the corresponding vector element of the destination SIMD&FP register.
+/// The instruction does not round the result of the multiply before the accumulation.
+///
+/// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vfmlalq_lane_low_f16)
+#[target_feature(enable = "fhm")]
+#[inline]
+pub(super) unsafe fn xvfmlalq_lane_low_f16<const LANE: i32>(
+    a: float32x4_t,
+    b: x_float16x8_t,
+    c: x_float16x4_t,
+) -> float32x4_t {
+    let mut result: float32x4_t = a;
+    static_assert_uimm_bits!(LANE, 3);
+    let full_lane = xvcombine_f16(c, c);
+    if LANE == 0 {
+        asm!(
+        "fmlal {0:v}.4s, {1:v}.4h, {2:v}.h[0]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(full_lane),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 1 {
+        asm!(
+        "fmlal {0:v}.4s, {1:v}.4h, {2:v}.h[1]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(full_lane),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 2 {
+        asm!(
+        "fmlal {0:v}.4s, {1:v}.4h, {2:v}.h[2]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(full_lane),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 3 {
+        asm!(
+        "fmlal {0:v}.4s, {1:v}.4h, {2:v}.h[3]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(full_lane),
+        options(pure, nomem, nostack)
+        );
+    }
+    result
+}
+
+/// Floating-point fused Multiply-Add Long to accumulator (vector).
+/// This instruction multiplies corresponding half-precision floating-point values
+/// in the vectors in the two source SIMD&FP registers, and accumulates the product
+/// to the corresponding vector element of the destination SIMD&FP register.
+/// The instruction does not round the result of the multiply before the accumulation.
+///
+/// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vfmlalq_laneq_low_f16)
+#[target_feature(enable = "fhm")]
+#[inline]
+pub(super) unsafe fn xvfmlalq_laneq_low_f16<const LANE: i32>(
+    a: float32x4_t,
+    b: x_float16x8_t,
+    c: x_float16x8_t,
+) -> float32x4_t {
+    let mut result: float32x4_t = a;
+    static_assert_uimm_bits!(LANE, 3);
+    if LANE == 0 {
+        asm!(
+        "fmlal {0:v}.4s, {1:v}.4h, {2:v}.h[0]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 1 {
+        asm!(
+        "fmlal {0:v}.4s, {1:v}.4h, {2:v}.h[1]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 2 {
+        asm!(
+        "fmlal {0:v}.4s, {1:v}.4h, {2:v}.h[2]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 3 {
+        asm!(
+        "fmlal {0:v}.4s, {1:v}.4h, {2:v}.h[3]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 4 {
+        asm!(
+        "fmlal {0:v}.4s, {1:v}.4h, {2:v}.h[4]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 5 {
+        asm!(
+        "fmlal {0:v}.4s, {1:v}.4h, {2:v}.h[5]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 6 {
+        asm!(
+        "fmlal {0:v}.4s, {1:v}.4h, {2:v}.h[6]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 7 {
+        asm!(
+        "fmlal {0:v}.4s, {1:v}.4h, {2:v}.h[7]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    }
+    result
+}
+
+/// Floating-point fused Multiply-Add Long to accumulator (vector).
+/// This instruction multiplies corresponding half-precision floating-point values
+/// in the vectors in the two source SIMD&FP registers, and accumulates the product
+/// to the corresponding vector element of the destination SIMD&FP register.
+/// The instruction does not round the result of the multiply before the accumulation.
+///
+/// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/xvfmlalq_lane_high_f16)
+#[target_feature(enable = "fhm")]
+#[inline]
+pub(super) unsafe fn xvfmlalq_lane_high_f16<const LANE: i32>(
+    a: float32x4_t,
+    b: x_float16x8_t,
+    c: x_float16x4_t,
+) -> float32x4_t {
+    let mut result: float32x4_t = a;
+    static_assert_uimm_bits!(LANE, 3);
+    let full_lane = xvcombine_f16(c, c);
+    if LANE == 0 {
+        asm!(
+        "fmlal2 {0:v}.4s, {1:v}.4h, {2:v}.h[0]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(full_lane),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 1 {
+        asm!(
+        "fmlal2 {0:v}.4s, {1:v}.4h, {2:v}.h[1]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(full_lane),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 2 {
+        asm!(
+        "fmlal2 {0:v}.4s, {1:v}.4h, {2:v}.h[2]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(full_lane),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 3 {
+        asm!(
+        "fmlal2 {0:v}.4s, {1:v}.4h, {2:v}.h[3]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(full_lane),
+        options(pure, nomem, nostack)
+        );
+    }
+    result
+}
+
+/// Floating-point fused Multiply-Add Long to accumulator (vector).
+/// This instruction multiplies corresponding half-precision floating-point values
+/// in the vectors in the two source SIMD&FP registers, and accumulates the product
+/// to the corresponding vector element of the destination SIMD&FP register.
+/// The instruction does not round the result of the multiply before the accumulation.
+///
+/// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/xvfmlalq_laneq_high_f16)
+#[target_feature(enable = "fhm")]
+#[inline]
+pub(super) unsafe fn xvfmlalq_laneq_high_f16<const LANE: i32>(
+    a: float32x4_t,
+    b: x_float16x8_t,
+    c: x_float16x8_t,
+) -> float32x4_t {
+    let mut result: float32x4_t = a;
+    static_assert_uimm_bits!(LANE, 3);
+    if LANE == 0 {
+        asm!(
+        "fmlal2 {0:v}.4s, {1:v}.4h, {2:v}.h[0]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 1 {
+        asm!(
+        "fmlal2 {0:v}.4s, {1:v}.4h, {2:v}.h[1]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 2 {
+        asm!(
+        "fmlal2 {0:v}.4s, {1:v}.4h, {2:v}.h[2]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 3 {
+        asm!(
+        "fmlal2 {0:v}.4s, {1:v}.4h, {2:v}.h[3]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 4 {
+        asm!(
+        "fmlal2 {0:v}.4s, {1:v}.4h, {2:v}.h[4]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 5 {
+        asm!(
+        "fmlal2 {0:v}.4s, {1:v}.4h, {2:v}.h[5]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 6 {
+        asm!(
+        "fmlal2 {0:v}.4s, {1:v}.4h, {2:v}.h[6]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    } else if LANE == 7 {
+        asm!(
+        "fmlal2 {0:v}.4s, {1:v}.4h, {2:v}.h[7]",
+        inout(vreg) result,
+        in(vreg) xreinterpretq_u16_f16(b),
+        in(vreg) xreinterpretq_u16_f16(c),
+        options(pure, nomem, nostack)
+        );
+    }
+    result
 }
 
 /// Floating-point fused Multiply-Add to accumulator (vector).
@@ -665,28 +991,28 @@ pub(super) unsafe fn xvbslq_f16(
 }
 
 #[inline]
-#[cfg(feature = "half")]
-pub(crate) unsafe fn xvst_f16(ptr: *mut half::f16, x: x_float16x4_t) {
+#[cfg(feature = "nightly_f16")]
+pub(crate) unsafe fn xvst_f16(ptr: *mut f16, x: x_float16x4_t) {
     vst1_u16(ptr as *mut u16, xreinterpret_u16_f16(x))
 }
 
 #[inline]
-#[cfg(feature = "half")]
-pub(crate) unsafe fn xvstq_f16(ptr: *mut half::f16, x: x_float16x8_t) {
+#[cfg(feature = "nightly_f16")]
+pub(crate) unsafe fn xvstq_f16(ptr: *mut f16, x: x_float16x8_t) {
     vst1q_u16(ptr as *mut u16, xreinterpretq_u16_f16(x))
 }
 
 #[inline]
-#[cfg(feature = "half")]
-pub(crate) unsafe fn xvstq_f16_x2(ptr: *mut half::f16, x: x_float16x8x2_t) {
+#[cfg(feature = "nightly_f16")]
+pub(crate) unsafe fn xvstq_f16_x2(ptr: *mut f16, x: x_float16x8x2_t) {
     let ptr_u16 = ptr as *mut u16;
     vst1q_u16(ptr_u16, xreinterpretq_u16_f16(x.0));
     vst1q_u16(ptr_u16.add(8), xreinterpretq_u16_f16(x.1));
 }
 
 #[inline]
-#[cfg(feature = "half")]
-pub(crate) unsafe fn xvstq_f16_x4(ptr: *const half::f16, x: x_float16x8x4_t) {
+#[cfg(feature = "nightly_f16")]
+pub(crate) unsafe fn xvstq_f16_x4(ptr: *const f16, x: x_float16x8x4_t) {
     let ptr_u16 = ptr as *mut u16;
     vst1q_u16(ptr_u16, xreinterpretq_u16_f16(x.0));
     vst1q_u16(ptr_u16.add(8), xreinterpretq_u16_f16(x.1));
@@ -705,9 +1031,9 @@ pub(crate) unsafe fn xvdup_laneq_f16<const N: i32>(a: x_float16x8_t) -> x_float1
 }
 
 #[inline]
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 pub(crate) unsafe fn xvld1q_lane_f16<const LANE: i32>(
-    ptr: *const half::f16,
+    ptr: *const f16,
     src: x_float16x8_t,
 ) -> x_float16x8_t {
     xreinterpretq_f16_u16(vld1q_lane_u16::<LANE>(
@@ -717,11 +1043,8 @@ pub(crate) unsafe fn xvld1q_lane_f16<const LANE: i32>(
 }
 
 #[inline]
-#[cfg(feature = "half")]
-pub(crate) unsafe fn xvsetq_lane_f16<const LANE: i32>(
-    v: half::f16,
-    r: x_float16x8_t,
-) -> x_float16x8_t {
+#[cfg(feature = "nightly_f16")]
+pub(crate) unsafe fn xvsetq_lane_f16<const LANE: i32>(v: f16, r: x_float16x8_t) -> x_float16x8_t {
     xreinterpretq_f16_u16(vsetq_lane_u16::<LANE>(
         v.to_bits(),
         xreinterpretq_u16_f16(r),

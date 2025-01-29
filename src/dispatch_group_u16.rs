@@ -196,7 +196,7 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
                 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
                 {
                     if is_aarch_f16_supported() {
-                        use crate::filter_weights::WeightFloat16Converter;
+                        use crate::filter_weights::WeightFloat16ConverterCast;
                         execute_low_precision_row(
                             true,
                             image_store,
@@ -207,7 +207,7 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
                             dst_width,
                             destination_image,
                             HighBitDepthFloat16LowerHandler::default(),
-                            WeightFloat16Converter::default(),
+                            WeightFloat16ConverterCast::default(),
                         );
                     } else {
                         execute_low_precision_row(
@@ -263,7 +263,7 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if is_aarch_f16_supported() {
-                use crate::filter_weights::WeightFloat16Converter;
+                use crate::filter_weights::WeightFloat16ConverterCast;
                 execute_low_precision_row(
                     false,
                     image_store,
@@ -274,7 +274,7 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
                     dst_width,
                     destination.buffer.borrow_mut(),
                     HighBitDepthFloat16LowerHandler::default(),
-                    WeightFloat16Converter::default(),
+                    WeightFloat16ConverterCast::default(),
                 );
             } else {
                 execute_low_precision_row(

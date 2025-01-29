@@ -34,7 +34,7 @@ use crate::{
     CbCrF16ImageStore, ImageStore, ImageStoreScaling, PlanarF16ImageStore, RgbF16ImageStore,
     RgbaF16ImageStore, Scaler, Scaling, ThreadingPolicy,
 };
-use half::f16;
+use core::f16;
 
 /// Implements `f16` type support
 impl Scaler {

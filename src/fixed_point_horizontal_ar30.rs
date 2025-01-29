@@ -37,31 +37,36 @@ pub(crate) fn convolve_row_handler_fixed_point_ar30<
     const AR30_TYPE: usize,
     const AR30_ORDER: usize,
 >(
-    src: &[u32],
-    dst: &mut [u32],
+    src: &[u8],
+    dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
 ) {
-    for ((chunk, &bounds), weights) in dst.iter_mut().zip(filter_weights.bounds.iter()).zip(
-        filter_weights
-            .weights
-            .chunks_exact(filter_weights.aligned_size),
-    ) {
+    for ((chunk, &bounds), weights) in dst
+        .chunks_exact_mut(4)
+        .zip(filter_weights.bounds.iter())
+        .zip(
+            filter_weights
+                .weights
+                .chunks_exact(filter_weights.aligned_size),
+        )
+    {
         let mut sums = ColorGroup::<4, i32>::dup(ROUNDING_CONST.as_());
 
         let start_x = bounds.start;
         let bounds_size = bounds.size;
 
-        let px = start_x;
+        const CN: usize = 4;
+        let px = start_x * CN;
 
         if bounds_size == 2 {
-            let src_ptr0 = &src[px..(px + 2)];
+            let src_ptr0 = &src[px..(px + 2 * CN)];
             let sliced_weights = &weights[0..2];
             let weight0 = sliced_weights[0] as i32;
             let weight1 = sliced_weights[1] as i32;
             sums += load_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER) * weight0
                 + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1) * weight1;
         } else if bounds_size == 3 {
-            let src_ptr0 = &src[px..(px + 3)];
+            let src_ptr0 = &src[px..(px + 3 * CN)];
             let sliced_weights = &weights[0..3];
             let weight0 = sliced_weights[0] as i32;
             let weight1 = sliced_weights[1] as i32;
@@ -70,7 +75,7 @@ pub(crate) fn convolve_row_handler_fixed_point_ar30<
                 + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1) * weight1
                 + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 2) * weight2;
         } else if bounds_size == 4 {
-            let src_ptr0 = &src[px..(px + 4)];
+            let src_ptr0 = &src[px..(px + 4 * CN)];
             let sliced_weights = &weights[0..4];
             let weight0 = sliced_weights[0] as i32;
             let weight1 = sliced_weights[1] as i32;
@@ -81,7 +86,7 @@ pub(crate) fn convolve_row_handler_fixed_point_ar30<
                 + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 2) * weight2
                 + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 3) * weight3;
         } else if bounds_size == 6 {
-            let src_ptr0 = &src[px..(px + 6)];
+            let src_ptr0 = &src[px..(px + 6 * CN)];
 
             let sliced_weights = &weights[0..6];
             let weight0 = sliced_weights[0] as i32;
@@ -98,7 +103,7 @@ pub(crate) fn convolve_row_handler_fixed_point_ar30<
                 + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 5) * weight5;
         } else {
             let src_ptr0 = &src[px..(px + bounds_size)];
-            for (&k_weight, src) in weights.iter().zip(src_ptr0.iter()).take(bounds.size) {
+            for (&k_weight, src) in weights.iter().zip(src_ptr0.chunks_exact(4)).take(bounds.size) {
                 let weight: i32 = k_weight as i32;
                 let new_px = load_ar30_p!(src, AR30_TYPE, AR30_ORDER);
                 sums += new_px * weight;
@@ -106,7 +111,11 @@ pub(crate) fn convolve_row_handler_fixed_point_ar30<
         }
 
         let narrowed = sums.saturate_ar30();
-        *chunk = narrowed.to_ar30::<AR30_TYPE, AR30_ORDER>();
+        let bytes0 = narrowed.to_ar30::<AR30_TYPE, AR30_ORDER>().to_ne_bytes();
+        chunk[0] = bytes0[0];
+        chunk[1] = bytes0[1];
+        chunk[2] = bytes0[2];
+        chunk[3] = bytes0[3];
     }
 }
 
@@ -115,9 +124,9 @@ pub(crate) fn convolve_row_handler_fixed_point_4_ar30<
     const AR30_TYPE: usize,
     const AR30_ORDER: usize,
 >(
-    src: &[u32],
+    src: &[u8],
     src_stride: usize,
-    dst: &mut [u32],
+    dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
 ) {
@@ -125,10 +134,12 @@ pub(crate) fn convolve_row_handler_fixed_point_4_ar30<
     let (row1_ref, rest) = rest.split_at_mut(dst_stride);
     let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-    let iter_row0 = row0_ref.iter_mut();
-    let iter_row1 = row1_ref.iter_mut();
-    let iter_row2 = row2_ref.iter_mut();
-    let iter_row3 = row3_ref.iter_mut();
+    const CN: usize = 4;
+
+    let iter_row0 = row0_ref.chunks_exact_mut(CN);
+    let iter_row1 = row1_ref.chunks_exact_mut(CN);
+    let iter_row2 = row2_ref.chunks_exact_mut(CN);
+    let iter_row3 = row3_ref.chunks_exact_mut(CN);
 
     for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
         .zip(iter_row1)
@@ -148,11 +159,11 @@ pub(crate) fn convolve_row_handler_fixed_point_4_ar30<
 
         let start_x = bounds.start;
 
-        let px = start_x;
+        let px = start_x * CN;
         let bounds_size = bounds.size;
 
         if bounds_size == 2 {
-            let src_ptr0 = &src[px..(px + 2)];
+            let src_ptr0 = &src[px..(px + 2 * CN)];
             let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 2)];
             let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + 2)];
             let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + 2)];
@@ -169,7 +180,7 @@ pub(crate) fn convolve_row_handler_fixed_point_4_ar30<
             sums3 += load_ar30!(src_ptr3, AR30_TYPE, AR30_ORDER) * weight0
                 + load_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 1) * weight1;
         } else if bounds_size == 3 {
-            let src_ptr0 = &src[px..(px + 3)];
+            let src_ptr0 = &src[px..(px + 3 * CN)];
             let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 3)];
             let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + 3)];
             let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + 3)];
@@ -191,7 +202,7 @@ pub(crate) fn convolve_row_handler_fixed_point_4_ar30<
                 + load_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 1) * weight1
                 + load_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 2) * weight2;
         } else if bounds_size == 4 {
-            let src_ptr0 = &src[px..(px + 4)];
+            let src_ptr0 = &src[px..(px + 4 * CN)];
             let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 4)];
             let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + 4)];
             let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + 4)];
@@ -218,7 +229,7 @@ pub(crate) fn convolve_row_handler_fixed_point_4_ar30<
                 + load_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 2) * weight2
                 + load_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 3) * weight3;
         } else if bounds_size == 6 {
-            let src_ptr0 = &src[px..(px + 6)];
+            let src_ptr0 = &src[px..(px + 6 * CN)];
             let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 6)];
             let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + 6)];
             let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + 6)];
@@ -255,17 +266,17 @@ pub(crate) fn convolve_row_handler_fixed_point_4_ar30<
                 + load_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 4) * weight4
                 + load_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 5) * weight5;
         } else {
-            let src_ptr0 = &src[px..(px + bounds_size)];
-            let src_ptr1 = &src[(px + src_stride)..(px + src_stride + bounds_size)];
-            let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + bounds_size)];
-            let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + bounds_size)];
+            let src_ptr0 = &src[px..(px + bounds_size * CN)];
+            let src_ptr1 = &src[(px + src_stride)..(px + src_stride + bounds_size * CN)];
+            let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + bounds_size * CN)];
+            let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + bounds_size * CN)];
 
             for ((((&k_weight, src0), src1), src2), src3) in weights
                 .iter()
-                .zip(src_ptr0.iter())
-                .zip(src_ptr1.iter())
-                .zip(src_ptr2.iter())
-                .zip(src_ptr3.iter())
+                .zip(src_ptr0.chunks_exact(4))
+                .zip(src_ptr1.chunks_exact(4))
+                .zip(src_ptr2.chunks_exact(4))
+                .zip(src_ptr3.chunks_exact(4))
                 .take(bounds.size)
             {
                 let weight: i32 = k_weight as i32;
@@ -287,9 +298,28 @@ pub(crate) fn convolve_row_handler_fixed_point_4_ar30<
         let narrowed2 = sums2.saturate_ar30();
         let narrowed3 = sums3.saturate_ar30();
 
-        *chunk0 = narrowed0.to_ar30::<AR30_TYPE, AR30_ORDER>();
-        *chunk1 = narrowed1.to_ar30::<AR30_TYPE, AR30_ORDER>();
-        *chunk2 = narrowed2.to_ar30::<AR30_TYPE, AR30_ORDER>();
-        *chunk3 = narrowed3.to_ar30::<AR30_TYPE, AR30_ORDER>();
+        let bytes0 = narrowed0.to_ar30::<AR30_TYPE, AR30_ORDER>().to_ne_bytes();
+        chunk0[0] = bytes0[0];
+        chunk0[1] = bytes0[1];
+        chunk0[2] = bytes0[2];
+        chunk0[3] = bytes0[3];
+
+        let bytes1 = narrowed1.to_ar30::<AR30_TYPE, AR30_ORDER>().to_ne_bytes();
+        chunk1[0] = bytes1[0];
+        chunk1[1] = bytes1[1];
+        chunk1[2] = bytes1[2];
+        chunk1[3] = bytes1[3];
+
+        let bytes2 = narrowed2.to_ar30::<AR30_TYPE, AR30_ORDER>().to_ne_bytes();
+        chunk2[0] = bytes2[0];
+        chunk2[1] = bytes2[1];
+        chunk2[2] = bytes2[2];
+        chunk2[3] = bytes2[3];
+
+        let bytes3 = narrowed3.to_ar30::<AR30_TYPE, AR30_ORDER>().to_ne_bytes();
+        chunk3[0] = bytes3[0];
+        chunk3[1] = bytes3[1];
+        chunk3[2] = bytes3[2];
+        chunk3[3] = bytes3[3];
     }
 }

@@ -27,55 +27,102 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter_weights::FilterWeights;
-use crate::neon::utils::xvld1q_s16_x2;
-use crate::support::{PRECISION, ROUNDING_CONST};
+use crate::neon::utils::{vxmlal_high_s16, vxmlal_s16, xvld1q_s16_x2};
+use crate::support::PRECISION;
 use std::arch::aarch64::*;
 
-macro_rules! accumulate_16_horiz {
-    ($store: expr, $ptr: expr, $weights: expr) => {{
-        let pixel_colors = vld1q_u8($ptr);
-        let px_high_16 = vreinterpretq_s16_u16(vmovl_high_u8(pixel_colors));
-        let px_low_16 = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(pixel_colors)));
+#[must_use]
+#[inline(always)]
+unsafe fn accumulate_16_horiz<const D: bool>(
+    store: int32x4_t,
+    ptr: &[u8],
+    weights: int16x8x2_t,
+) -> int32x4_t {
+    let pixel_colors = vld1q_u8(ptr.as_ptr());
+    let px_high_16 = vreinterpretq_s16_u16(vmovl_high_u8(pixel_colors));
+    let px_low_16 = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(pixel_colors)));
 
-        $store = vmlal_high_s16($store, px_high_16, $weights.1);
-        $store = vmlal_s16($store, vget_low_s16(px_high_16), vget_low_s16($weights.1));
+    let mut store = vxmlal_high_s16::<D>(store, px_high_16, weights.1);
+    store = vxmlal_s16::<D>(store, vget_low_s16(px_high_16), vget_low_s16(weights.1));
 
-        $store = vmlal_high_s16($store, px_low_16, $weights.0);
-        $store = vmlal_s16($store, vget_low_s16(px_low_16), vget_low_s16($weights.0));
-    }};
+    store = vxmlal_high_s16::<D>(store, px_low_16, weights.0);
+    store = vxmlal_s16::<D>(store, vget_low_s16(px_low_16), vget_low_s16(weights.0));
+    store
 }
 
-macro_rules! accumulate_8_horiz {
-    ($store: expr, $ptr: expr, $weights: expr) => {{
-        let pixel_colors = vld1_u8($ptr);
-        let px_16 = vreinterpretq_s16_u16(vmovl_u8(pixel_colors));
+#[must_use]
+#[inline(always)]
+unsafe fn accumulate_8_horiz<const D: bool>(
+    store: int32x4_t,
+    ptr: &[u8],
+    weight: int16x8_t,
+) -> int32x4_t {
+    let pixel_colors = vld1_u8(ptr.as_ptr());
+    let px_16 = vreinterpretq_s16_u16(vmovl_u8(pixel_colors));
 
-        $store = vmlal_high_s16($store, px_16, $weights);
-        $store = vmlal_s16($store, vget_low_s16(px_16), vget_low_s16($weights));
-    }};
+    let mut store = vxmlal_high_s16::<D>(store, px_16, weight);
+    store = vxmlal_s16::<D>(store, vget_low_s16(px_16), vget_low_s16(weight));
+    store
 }
 
-macro_rules! accumulate_4_horiz {
-    ($store: expr, $ptr: expr, $weights: expr) => {{
-        let pixel_colors = vmovl_u8(vreinterpret_u8_u32(vld1_lane_u32::<0>(
-            $ptr as *const u32,
-            vdup_n_u32(0),
-        )));
-        let px_16 = vreinterpret_s16_u16(vget_low_u16(pixel_colors));
-
-        $store = vmlal_s16($store, px_16, $weights);
-    }};
+#[inline(always)]
+unsafe fn accumulate_4_horiz<const D: bool>(
+    store: int32x4_t,
+    ptr: &[u8],
+    weight: int16x4_t,
+) -> int32x4_t {
+    let pixel_colors = vmovl_u8(vreinterpret_u8_u32(vld1_lane_u32::<0>(
+        ptr.as_ptr() as *const u32,
+        vdup_n_u32(0),
+    )));
+    let px_16 = vreinterpret_s16_u16(vget_low_u16(pixel_colors));
+    vxmlal_s16::<D>(store, px_16, weight)
 }
 
-macro_rules! accumulate_1_horiz {
-    ($store: expr, $ptr: expr, $weight: expr) => {{
-        let pixel_colors = vld1_u16([$ptr.read_unaligned() as u16, 0u16, 0u16, 0u16].as_ptr());
-        let px_16 = vreinterpret_s16_u16(pixel_colors);
-        $store = vmlal_s16($store, px_16, $weight);
-    }};
+#[inline(always)]
+unsafe fn accumulate_1_horiz<const D: bool>(
+    store: int32x4_t,
+    ptr: &[u8],
+    weight: int16x4_t,
+) -> int32x4_t {
+    let pixel_colors = vmovl_u8(vld1_lane_u8::<0>(ptr.as_ptr(), vdup_n_u8(0)));
+    let px_16 = vreinterpret_s16_u16(vget_low_u16(pixel_colors));
+    vxmlal_s16::<D>(store, px_16, weight)
 }
 
 pub fn convolve_horizontal_plane_neon_rows_4_u8(
+    src: &[u8],
+    src_stride: usize,
+    dst: &mut [u8],
+    dst_stride: usize,
+    filter_weights: &FilterWeights<i16>,
+) {
+    convolve_horizontal_plane_neon_rows_4_u8_impl::<false, PRECISION>(
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+        filter_weights,
+    );
+}
+
+pub fn convolve_horizontal_plane_neon_rows_4_u8_q(
+    src: &[u8],
+    src_stride: usize,
+    dst: &mut [u8],
+    dst_stride: usize,
+    filter_weights: &FilterWeights<i16>,
+) {
+    convolve_horizontal_plane_neon_rows_4_u8_impl::<true, 16>(
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+        filter_weights,
+    );
+}
+
+fn convolve_horizontal_plane_neon_rows_4_u8_impl<const D: bool, const PRECISION: i32>(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -92,9 +139,11 @@ pub fn convolve_horizontal_plane_neon_rows_4_u8(
         let iter_row2 = row2_ref.iter_mut();
         let iter_row3 = row3_ref.iter_mut();
 
+        let rnd_const = (1 << (PRECISION - 1)) - 1;
+
         let base_val = {
             let j = vdupq_n_s32(0);
-            vsetq_lane_s32::<0>(ROUNDING_CONST, j)
+            vsetq_lane_s32::<0>(rnd_const, j)
         };
 
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
@@ -125,16 +174,16 @@ pub fn convolve_horizontal_plane_neon_rows_4_u8(
                 let bounds_start = bounds.start + jx;
 
                 let src_ptr = src0.get_unchecked(bounds_start..);
-                accumulate_16_horiz!(store0, src_ptr.as_ptr(), weights);
+                store0 = accumulate_16_horiz::<D>(store0, src_ptr, weights);
 
                 let src_ptr1 = src1.get_unchecked(bounds_start..);
-                accumulate_16_horiz!(store1, src_ptr1.as_ptr(), weights);
+                store1 = accumulate_16_horiz::<D>(store1, src_ptr1, weights);
 
                 let src_ptr2 = src2.get_unchecked(bounds_start..);
-                accumulate_16_horiz!(store2, src_ptr2.as_ptr(), weights);
+                store2 = accumulate_16_horiz::<D>(store2, src_ptr2, weights);
 
                 let src_ptr3 = src3.get_unchecked(bounds_start..);
-                accumulate_16_horiz!(store3, src_ptr3.as_ptr(), weights);
+                store3 = accumulate_16_horiz::<D>(store3, src_ptr3, weights);
 
                 jx += 16;
             }
@@ -145,16 +194,16 @@ pub fn convolve_horizontal_plane_neon_rows_4_u8(
                 let bounds_start = bounds.start + jx;
 
                 let src_ptr = src0.get_unchecked(bounds_start..);
-                accumulate_8_horiz!(store0, src_ptr.as_ptr(), weights);
+                store0 = accumulate_8_horiz::<D>(store0, src_ptr, weights);
 
                 let src_ptr1 = src1.get_unchecked(bounds_start..);
-                accumulate_8_horiz!(store1, src_ptr1.as_ptr(), weights);
+                store1 = accumulate_8_horiz::<D>(store1, src_ptr1, weights);
 
                 let src_ptr2 = src2.get_unchecked(bounds_start..);
-                accumulate_8_horiz!(store2, src_ptr2.as_ptr(), weights);
+                store2 = accumulate_8_horiz::<D>(store2, src_ptr2, weights);
 
                 let src_ptr3 = src3.get_unchecked(bounds_start..);
-                accumulate_8_horiz!(store3, src_ptr3.as_ptr(), weights);
+                store3 = accumulate_8_horiz::<D>(store3, src_ptr3, weights);
 
                 jx += 8;
             }
@@ -165,16 +214,16 @@ pub fn convolve_horizontal_plane_neon_rows_4_u8(
                 let bounds_start = bounds.start + jx;
 
                 let src_ptr = src0.get_unchecked(bounds_start..);
-                accumulate_4_horiz!(store0, src_ptr.as_ptr(), weights);
+                accumulate_4_horiz::<D>(store0, src_ptr, weights);
 
                 let src_ptr1 = src1.get_unchecked(bounds_start..);
-                accumulate_4_horiz!(store1, src_ptr1.as_ptr(), weights);
+                accumulate_4_horiz::<D>(store1, src_ptr1, weights);
 
                 let src_ptr2 = src2.get_unchecked(bounds_start..);
-                accumulate_4_horiz!(store2, src_ptr2.as_ptr(), weights);
+                accumulate_4_horiz::<D>(store2, src_ptr2, weights);
 
                 let src_ptr3 = src3.get_unchecked(bounds_start..);
-                accumulate_4_horiz!(store3, src_ptr3.as_ptr(), weights);
+                accumulate_4_horiz::<D>(store3, src_ptr3, weights);
 
                 jx += 4;
             }
@@ -185,16 +234,16 @@ pub fn convolve_horizontal_plane_neon_rows_4_u8(
                 let bounds_start = bounds.start + jx;
 
                 let src_ptr = src0.get_unchecked(bounds_start..);
-                accumulate_1_horiz!(store0, src_ptr.as_ptr(), weight);
+                accumulate_1_horiz::<D>(store0, src_ptr, weight);
 
                 let src_ptr1 = src1.get_unchecked(bounds_start..);
-                accumulate_1_horiz!(store1, src_ptr1.as_ptr(), weight);
+                accumulate_1_horiz::<D>(store1, src_ptr1, weight);
 
                 let src_ptr2 = src2.get_unchecked(bounds_start..);
-                accumulate_1_horiz!(store2, src_ptr2.as_ptr(), weight);
+                accumulate_1_horiz::<D>(store2, src_ptr2, weight);
 
                 let src_ptr3 = src3.get_unchecked(bounds_start..);
-                accumulate_1_horiz!(store3, src_ptr3.as_ptr(), weight);
+                accumulate_1_horiz::<D>(store3, src_ptr3, weight);
 
                 jx += 1;
             }
@@ -227,10 +276,27 @@ pub fn convolve_horizontal_plane_neon_row(
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
 ) {
+    convolve_horizontal_plane_neon_row_impl::<false, PRECISION>(src, dst, filter_weights);
+}
+
+pub fn convolve_horizontal_plane_neon_row_q(
+    src: &[u8],
+    dst: &mut [u8],
+    filter_weights: &FilterWeights<i16>,
+) {
+    convolve_horizontal_plane_neon_row_impl::<true, 16>(src, dst, filter_weights);
+}
+
+fn convolve_horizontal_plane_neon_row_impl<const D: bool, const PRECISION: i32>(
+    src: &[u8],
+    dst: &mut [u8],
+    filter_weights: &FilterWeights<i16>,
+) {
     unsafe {
+        let rnd_const = (1 << (PRECISION - 1)) - 1;
         let base_val = {
             let j = vdupq_n_s32(0);
-            vsetq_lane_s32::<0>(ROUNDING_CONST, j)
+            vsetq_lane_s32::<0>(rnd_const, j)
         };
 
         for ((dst, bounds), weights) in dst.iter_mut().zip(filter_weights.bounds.iter()).zip(
@@ -248,8 +314,8 @@ pub fn convolve_horizontal_plane_neon_row(
                 let weights = xvld1q_s16_x2(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
 
-                let src_ptr = src.get_unchecked(bounds_start..).as_ptr();
-                accumulate_16_horiz!(store, src_ptr, weights);
+                let src_ptr = src.get_unchecked(bounds_start..);
+                store = accumulate_16_horiz::<D>(store, src_ptr, weights);
 
                 jx += 16;
             }
@@ -259,8 +325,8 @@ pub fn convolve_horizontal_plane_neon_row(
                 let weights = vld1q_s16(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
 
-                let src_ptr = src.get_unchecked(bounds_start..).as_ptr();
-                accumulate_8_horiz!(store, src_ptr, weights);
+                let src_ptr = src.get_unchecked(bounds_start..);
+                store = accumulate_8_horiz::<D>(store, src_ptr, weights);
 
                 jx += 8;
             }
@@ -270,8 +336,8 @@ pub fn convolve_horizontal_plane_neon_row(
                 let weights = vld1_s16(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
 
-                let src_ptr = src.get_unchecked(bounds_start..).as_ptr();
-                accumulate_4_horiz!(store, src_ptr, weights);
+                let src_ptr = src.get_unchecked(bounds_start..);
+                accumulate_4_horiz::<D>(store, src_ptr, weights);
 
                 jx += 4;
             }
@@ -280,8 +346,8 @@ pub fn convolve_horizontal_plane_neon_row(
                 let w_ptr = weights.get_unchecked(jx..(jx + 1));
                 let weight = vld1_lane_s16::<0>(w_ptr.as_ptr(), vdup_n_s16(0));
                 let bounds_start = bounds.start + jx;
-                let src_ptr = src.get_unchecked(bounds_start..).as_ptr();
-                accumulate_1_horiz!(store, src_ptr, weight);
+                let src_ptr = src.get_unchecked(bounds_start..);
+                accumulate_1_horiz::<D>(store, src_ptr, weight);
                 jx += 1;
             }
 

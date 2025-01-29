@@ -30,12 +30,14 @@
 use std::arch::aarch64::*;
 
 #[inline(always)]
+#[cfg(feature = "rdm")]
 pub(crate) unsafe fn expand8_to_14(row: uint8x8_t) -> int16x8_t {
     let row = vcombine_u8(row, row);
     vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip1q_u8(row, row))))
 }
 
 #[inline(always)]
+#[cfg(feature = "rdm")]
 pub(crate) unsafe fn expand8_high_to_14(row: uint8x16_t) -> int16x8_t {
     vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip2q_u8(row, row))))
 }
@@ -155,6 +157,7 @@ pub(crate) unsafe fn load_3b_as_u16x4(src_ptr: *const u8) -> uint16x4_t {
 }
 
 #[inline(always)]
+#[cfg(feature = "rdm")]
 pub(crate) unsafe fn load_3b_as_u8x16(src_ptr: *const u8) -> uint8x16_t {
     let v = vreinterpretq_u8_u16(vld1q_lane_u16::<0>(src_ptr as *const u16, vdupq_n_u16(0)));
     vld1q_lane_u8::<2>(src_ptr.add(2), v)
@@ -167,6 +170,7 @@ pub(crate) unsafe fn load_4b_as_u16x4(src_ptr: *const u8) -> uint16x4_t {
 }
 
 #[inline(always)]
+#[cfg(feature = "rdm")]
 pub(crate) unsafe fn load_4b_as_u8x8(src_ptr: *const u8) -> uint8x8_t {
     vreinterpret_u8_u32(vld1_lane_u32::<0>(src_ptr as *const u32, vdup_n_u32(0)))
 }
@@ -179,10 +183,89 @@ pub(crate) unsafe fn xvld1q_s16_x2(a: *const i16) -> int16x8x2_t {
 }
 
 #[inline(always)]
+#[cfg(feature = "rdm")]
 pub(crate) unsafe fn xvld1q_s16_x4(a: *const i16) -> int16x8x4_t {
     let v0 = vld1q_s16(a);
     let v1 = vld1q_s16(a.add(8));
     let v2 = vld1q_s16(a.add(16));
     let v3 = vld1q_s16(a.add(24));
     int16x8x4_t(v0, v1, v2, v3)
+}
+
+#[inline(always)]
+pub(crate) unsafe fn vxmlal_high_lane_s16<const D: bool, const LANE: i32>(
+    a: int32x4_t,
+    b: int16x8_t,
+    c: int16x4_t,
+) -> int32x4_t {
+    if D {
+        vqdmlal_high_lane_s16::<LANE>(a, b, c)
+    } else {
+        vmlal_high_lane_s16::<LANE>(a, b, c)
+    }
+}
+
+#[inline(always)]
+pub(crate) unsafe fn vxmlal_lane_s16<const D: bool, const LANE: i32>(
+    a: int32x4_t,
+    b: int16x4_t,
+    c: int16x4_t,
+) -> int32x4_t {
+    if D {
+        vqdmlal_lane_s16::<LANE>(a, b, c)
+    } else {
+        vmlal_lane_s16::<LANE>(a, b, c)
+    }
+}
+
+#[inline(always)]
+pub(crate) unsafe fn vxmlal_s16<const D: bool>(
+    a: int32x4_t,
+    b: int16x4_t,
+    c: int16x4_t,
+) -> int32x4_t {
+    if D {
+        vqdmlal_s16(a, b, c)
+    } else {
+        vmlal_s16(a, b, c)
+    }
+}
+
+#[inline(always)]
+pub(crate) unsafe fn vxmlal_high_s16<const D: bool>(
+    a: int32x4_t,
+    b: int16x8_t,
+    c: int16x8_t,
+) -> int32x4_t {
+    if D {
+        vqdmlal_high_s16(a, b, c)
+    } else {
+        vmlal_high_s16(a, b, c)
+    }
+}
+
+#[inline(always)]
+pub(crate) unsafe fn vxmlal_high_laneq_s16<const D: bool, const LANE: i32>(
+    a: int32x4_t,
+    b: int16x8_t,
+    c: int16x8_t,
+) -> int32x4_t {
+    if D {
+        vqdmlal_high_laneq_s16::<LANE>(a, b, c)
+    } else {
+        vmlal_high_laneq_s16::<LANE>(a, b, c)
+    }
+}
+
+#[inline(always)]
+pub unsafe fn vxmlal_laneq_s16<const D: bool, const LANE: i32>(
+    a: int32x4_t,
+    b: int16x4_t,
+    c: int16x8_t,
+) -> int32x4_t {
+    if D {
+        vqdmlal_laneq_s16::<LANE>(a, b, c)
+    } else {
+        vmlal_laneq_s16::<LANE>(a, b, c)
+    }
 }

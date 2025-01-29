@@ -417,7 +417,8 @@ where
 macro_rules! load_ar30 {
     ($store: expr, $ar_type: expr, $ar_order: ty) => {{
         let ar_type: crate::ar30::Rgb30 = $ar_type.into();
-        let unpacked = ar_type.unpack::<$ar_order>($store[0]);
+        let read_bits = u32::from_ne_bytes([$store[0], $store[1], $store[2], $store[3]]);
+        let unpacked = ar_type.unpack::<$ar_order>(read_bits);
         ColorGroup::<4, i32> {
             r: unpacked.0 as i32,
             g: unpacked.1 as i32,
@@ -432,7 +433,8 @@ pub(crate) use load_ar30;
 macro_rules! load_ar30_p {
     ($store: expr, $ar_type: expr, $ar_order: ty) => {{
         let ar_type: crate::ar30::Rgb30 = $ar_type.into();
-        let unpacked = ar_type.unpack::<$ar_order>(*$store);
+        let read_bits = u32::from_ne_bytes([$store[0], $store[1], $store[2], $store[3]]);
+        let unpacked = ar_type.unpack::<$ar_order>(read_bits);
         ColorGroup::<4, i32> {
             r: unpacked.0 as i32,
             g: unpacked.1 as i32,
@@ -447,7 +449,9 @@ pub(crate) use load_ar30_p;
 macro_rules! load_ar30_with_offset {
     ($store: expr, $ar_type: expr, $ar_order: ty, $offset: expr) => {{
         let ar_type: crate::ar30::Rgb30 = $ar_type.into();
-        let unpacked = ar_type.unpack::<$ar_order>($store[$offset]);
+        let cn = $offset * 4;
+        let read_bits = u32::from_ne_bytes([$store[cn], $store[cn + 1], $store[cn + 2], $store[cn + 3]]);
+        let unpacked = ar_type.unpack::<$ar_order>(read_bits);
         ColorGroup::<4, i32> {
             r: unpacked.0 as i32,
             g: unpacked.1 as i32,

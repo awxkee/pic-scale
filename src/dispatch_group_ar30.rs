@@ -43,10 +43,10 @@ use rayon::ThreadPool;
 
 #[allow(clippy::type_complexity)]
 pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
-    src: &[u32],
+    src: &[u8],
     src_stride: usize,
     filter_weights: FilterWeights<f32>,
-    dst: &mut [u32],
+    dst: &mut [u8],
     dst_stride: usize,
     pool: &Option<ThreadPool>,
 ) {
@@ -58,7 +58,7 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
             dst.par_chunks_exact_mut(dst_stride * 4)
                 .zip(src.par_chunks_exact(src_stride * 4))
                 .for_each(|(dst, src)| {
-                    let mut _dispatch: fn(&[u32], usize, &mut [u32], usize, &FilterWeights<i16>) =
+                    let mut _dispatch: fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>) =
                         convolve_row_handler_fixed_point_4_ar30::<AR30_TYPE, AR30_ORDER>;
                     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
                     if is_rdm_available {
@@ -85,7 +85,7 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
         dst.chunks_exact_mut(dst_stride * 4)
             .zip(src.chunks_exact(src_stride * 4))
             .for_each(|(dst, src)| {
-                let mut _dispatch: fn(&[u32], usize, &mut [u32], usize, &FilterWeights<i16>) =
+                let mut _dispatch: fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>) =
                     convolve_row_handler_fixed_point_4_ar30::<AR30_TYPE, AR30_ORDER>;
                 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
                 if is_rdm_available {
@@ -107,12 +107,13 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
 }
 
 pub(crate) fn convolve_vertical_dispatch_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
-    src: &[u32],
+    src: &[u8],
     src_stride: usize,
     filter_weights: FilterWeights<f32>,
-    dst: &mut [u32],
+    dst: &mut [u8],
     dst_stride: usize,
     pool: &Option<ThreadPool>,
+    width: usize,
 ) {
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     let is_rdm_available = std::arch::is_aarch64_feature_detected!("rdm");
@@ -125,12 +126,14 @@ pub(crate) fn convolve_vertical_dispatch_ar30<const AR30_TYPE: usize, const AR30
                     let bounds = approx.bounds[y];
                     let filter_offset = y * approx.aligned_size;
                     let weights = &approx.weights[filter_offset..];
-                    let mut _dispatch: fn(&FilterBounds, &[u32], &mut [u32], usize, &[i16]) =
+                    let mut _dispatch: fn(&FilterBounds, &[u8], &mut [u8], usize, &[i16]) =
                         column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
                     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
                     if is_rdm_available {
                         _dispatch = neon_column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
                     }
+
+                    let row = &mut row[0..4 * width];
 
                     _dispatch(&bounds, src, row, src_stride, weights);
                 });
@@ -144,12 +147,14 @@ pub(crate) fn convolve_vertical_dispatch_ar30<const AR30_TYPE: usize, const AR30
                 let filter_offset = y * approx.aligned_size;
                 let weights = &approx.weights[filter_offset..];
 
-                let mut _dispatch: fn(&FilterBounds, &[u32], &mut [u32], usize, &[i16]) =
+                let mut _dispatch: fn(&FilterBounds, &[u8], &mut [u8], usize, &[i16]) =
                     column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
                 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
                 if is_rdm_available {
                     _dispatch = neon_column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
                 }
+
+                let row = &mut row[0..4 * width];
 
                 _dispatch(&bounds, src, row, src_stride, weights);
             });

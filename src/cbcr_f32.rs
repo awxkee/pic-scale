@@ -28,7 +28,7 @@
  */
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::avx2::convolve_vertical_avx_row_f32;
-use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
+use crate::convolution::{ConvolutionOptions, HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_naive_f32::{
     convolve_horizontal_rgb_native_row, convolve_horizontal_rgba_4_row_f32,
 };
@@ -49,6 +49,7 @@ impl HorizontalConvolutionPass<f32, 2> for ImageStore<'_, f32, 2> {
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f32, 2>,
         pool: &Option<ThreadPool>,
+        _: ConvolutionOptions,
     ) {
         let _dispatcher_4_rows: Option<
             fn(usize, usize, &FilterWeights<f32>, &[f32], usize, &mut [f32], usize),
@@ -72,6 +73,7 @@ impl VerticalConvolutionPass<f32, 2> for ImageStore<'_, f32, 2> {
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f32, 2>,
         pool: &Option<ThreadPool>,
+        _: ConvolutionOptions,
     ) {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(usize, &FilterBounds, &[f32], &mut [f32], usize, &[f32]) =

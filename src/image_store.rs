@@ -27,14 +27,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::alpha_check::has_non_constant_cap_alpha_rgba_f32;
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 use crate::alpha_handle_f16::{premultiply_alpha_rgba_f16, unpremultiply_alpha_rgba_f16};
 use crate::alpha_handle_f32::{premultiply_alpha_rgba_f32, unpremultiply_alpha_rgba_f32};
 use crate::alpha_handle_u16::{premultiply_alpha_rgba_u16, unpremultiply_alpha_rgba_u16};
 use crate::alpha_handle_u8::{premultiply_alpha_rgba, unpremultiply_alpha_rgba};
 use crate::pic_scale_error::{PicScaleBufferMismatch, PicScaleError};
 use crate::ImageSize;
-use num_traits::FromPrimitive;
+#[cfg(feature = "nightly_f16")]
+use core::f16;
 use rayon::ThreadPool;
 use std::borrow::Cow;
 use std::fmt::Debug;
@@ -51,7 +52,7 @@ use std::fmt::Debug;
 #[derive(Debug, Clone)]
 pub struct ImageStore<'a, T, const N: usize>
 where
-    T: FromPrimitive + Clone + Copy + Debug,
+    T: Clone + Copy + Debug,
 {
     pub buffer: std::borrow::Cow<'a, [T]>,
     /// Channels in the image
@@ -78,7 +79,7 @@ where
 #[derive(Debug)]
 pub struct ImageStoreMut<'a, T, const N: usize>
 where
-    T: FromPrimitive + Clone + Copy + Debug,
+    T: Clone + Copy + Debug,
 {
     pub buffer: BufferStore<'a, T>,
     /// Channels in the image
@@ -123,7 +124,7 @@ impl<T: Copy + Debug> BufferStore<'_, T> {
 
 impl<'a, T, const N: usize> ImageStore<'a, T, N>
 where
-    T: FromPrimitive + Clone + Copy + Debug + Default,
+    T: Clone + Copy + Debug + Default,
 {
     pub fn new(
         slice_ref: Vec<T>,
@@ -151,7 +152,7 @@ where
     }
 
     pub fn alloc(width: usize, height: usize) -> ImageStore<'a, T, N> {
-        let vc = vec![T::from_u32(0).unwrap_or_default(); width * N * height];
+        let vc = vec![T::default(); width * N * height];
         ImageStore::<T, N> {
             buffer: std::borrow::Cow::Owned(vc),
             channels: N,
@@ -175,8 +176,8 @@ impl<const N: usize> CheckStoreDensity for ImageStoreMut<'_, f32, N> {
     }
 }
 
-#[cfg(feature = "half")]
-impl<const N: usize> CheckStoreDensity for ImageStoreMut<'_, half::f16, N> {
+#[cfg(feature = "nightly_f16")]
+impl<const N: usize> CheckStoreDensity for ImageStoreMut<'_, f16, N> {
     fn should_have_bit_depth(&self) -> bool {
         false
     }
@@ -190,7 +191,7 @@ impl<const N: usize> CheckStoreDensity for ImageStoreMut<'_, u16, N> {
 
 impl<T, const N: usize> ImageStoreMut<'_, T, N>
 where
-    T: FromPrimitive + Clone + Copy + Debug + Default,
+    T: Clone + Copy + Debug + Default,
 {
     pub(crate) fn validate(&self) -> Result<(), PicScaleError> {
         let expected_size = self.stride() * self.height;
@@ -212,7 +213,7 @@ where
 
 impl<T, const N: usize> ImageStore<'_, T, N>
 where
-    T: FromPrimitive + Clone + Copy + Debug + Default,
+    T: Clone + Copy + Debug + Default,
 {
     pub(crate) fn validate(&self) -> Result<(), PicScaleError> {
         let expected_size = self.stride() * self.height;
@@ -234,7 +235,7 @@ where
 
 impl<'a, T, const N: usize> ImageStoreMut<'a, T, N>
 where
-    T: FromPrimitive + Clone + Copy + Debug + Default,
+    T: Clone + Copy + Debug + Default,
 {
     /// Creates new mutable storage from vectors
     ///
@@ -268,7 +269,7 @@ where
     ///
     /// Always sets bit depth to `0`
     pub fn alloc(width: usize, height: usize) -> ImageStoreMut<'a, T, N> {
-        let vc = vec![T::from_u32(0).unwrap_or_default(); width * N * height];
+        let vc = vec![T::default(); width * N * height];
         ImageStoreMut::<T, N> {
             buffer: BufferStore::Owned(vc),
             channels: N,
@@ -285,7 +286,7 @@ where
         height: usize,
         bit_depth: usize,
     ) -> ImageStoreMut<'a, T, N> {
-        let vc = vec![T::from_u32(0).unwrap_or_default(); width * N * height];
+        let vc = vec![T::default(); width * N * height];
         ImageStoreMut::<T, N> {
             buffer: BufferStore::Owned(vc),
             channels: N,
@@ -299,7 +300,7 @@ where
 
 impl<T, const N: usize> ImageStoreMut<'_, T, N>
 where
-    T: FromPrimitive + Clone + Copy + Debug,
+    T: Clone + Copy + Debug,
 {
     /// Returns safe stride
     ///
@@ -315,7 +316,7 @@ where
 
 impl<T, const N: usize> ImageStore<'_, T, N>
 where
-    T: FromPrimitive + Clone + Copy + Debug,
+    T: Clone + Copy + Debug,
 {
     /// Returns safe stride
     ///
@@ -331,7 +332,7 @@ where
 
 impl<'a, T, const N: usize> ImageStore<'a, T, N>
 where
-    T: FromPrimitive + Clone + Copy + Debug,
+    T: Clone + Copy + Debug,
 {
     /// Returns bounded image size
     pub fn get_size(&self) -> ImageSize {
@@ -398,7 +399,7 @@ where
 
 impl<'a, T, const N: usize> ImageStoreMut<'a, T, N>
 where
-    T: FromPrimitive + Clone + Copy + Debug,
+    T: Clone + Copy + Debug,
 {
     /// Returns bounded image size
     pub fn get_size(&self) -> ImageSize {
@@ -460,12 +461,12 @@ where
     }
 }
 
-pub(crate) trait AssociateAlpha<T: FromPrimitive + Clone + Copy + Debug, const N: usize> {
+pub(crate) trait AssociateAlpha<T: Clone + Copy + Debug, const N: usize> {
     fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, T, N>, pool: &Option<ThreadPool>);
     fn is_alpha_premultiplication_needed(&self) -> bool;
 }
 
-pub(crate) trait UnassociateAlpha<T: FromPrimitive + Clone + Copy + Debug, const N: usize> {
+pub(crate) trait UnassociateAlpha<T: Clone + Copy + Debug, const N: usize> {
     fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>);
 }
 
@@ -615,13 +616,9 @@ impl AssociateAlpha<f32, 4> for ImageStore<'_, f32, 4> {
     }
 }
 
-#[cfg(feature = "half")]
-impl AssociateAlpha<half::f16, 4> for ImageStore<'_, half::f16, 4> {
-    fn premultiply_alpha(
-        &self,
-        into: &mut ImageStoreMut<'_, half::f16, 4>,
-        pool: &Option<ThreadPool>,
-    ) {
+#[cfg(feature = "nightly_f16")]
+impl AssociateAlpha<f16, 4> for ImageStore<'_, f16, 4> {
+    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, f16, 4>, pool: &Option<ThreadPool>) {
         let src_stride = self.stride();
         let dst_stride = into.stride();
         let dst = into.buffer.borrow_mut();
@@ -665,8 +662,8 @@ impl UnassociateAlpha<f32, 4> for ImageStoreMut<'_, f32, 4> {
     }
 }
 
-#[cfg(feature = "half")]
-impl UnassociateAlpha<half::f16, 4> for ImageStoreMut<'_, half::f16, 4> {
+#[cfg(feature = "nightly_f16")]
+impl UnassociateAlpha<f16, 4> for ImageStoreMut<'_, f16, 4> {
     fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
         let stride = self.stride();
         let dst = self.buffer.borrow_mut();
@@ -692,22 +689,22 @@ pub type Rgba16ImageStoreMut<'a> = ImageStoreMut<'a, u16, 4>;
 pub type Rgb16ImageStore<'a> = ImageStore<'a, u16, 3>;
 pub type Rgb16ImageStoreMut<'a> = ImageStoreMut<'a, u16, 3>;
 
-#[cfg(feature = "half")]
-pub type PlanarF16ImageStore<'a> = ImageStore<'a, half::f16, 1>;
-#[cfg(feature = "half")]
-pub type PlanarF16ImageStoreMut<'a> = ImageStoreMut<'a, half::f16, 1>;
-#[cfg(feature = "half")]
-pub type CbCrF16ImageStore<'a> = ImageStore<'a, half::f16, 2>;
-#[cfg(feature = "half")]
-pub type CbCrF16ImageStoreMut<'a> = ImageStoreMut<'a, half::f16, 2>;
-#[cfg(feature = "half")]
-pub type RgbaF16ImageStore<'a> = ImageStore<'a, half::f16, 4>;
-#[cfg(feature = "half")]
-pub type RgbaF16ImageStoreMut<'a> = ImageStoreMut<'a, half::f16, 4>;
-#[cfg(feature = "half")]
-pub type RgbF16ImageStore<'a> = ImageStore<'a, half::f16, 3>;
-#[cfg(feature = "half")]
-pub type RgbF16ImageStoreMut<'a> = ImageStoreMut<'a, half::f16, 3>;
+#[cfg(feature = "nightly_f16")]
+pub type PlanarF16ImageStore<'a> = ImageStore<'a, f16, 1>;
+#[cfg(feature = "nightly_f16")]
+pub type PlanarF16ImageStoreMut<'a> = ImageStoreMut<'a, f16, 1>;
+#[cfg(feature = "nightly_f16")]
+pub type CbCrF16ImageStore<'a> = ImageStore<'a, f16, 2>;
+#[cfg(feature = "nightly_f16")]
+pub type CbCrF16ImageStoreMut<'a> = ImageStoreMut<'a, f16, 2>;
+#[cfg(feature = "nightly_f16")]
+pub type RgbaF16ImageStore<'a> = ImageStore<'a, f16, 4>;
+#[cfg(feature = "nightly_f16")]
+pub type RgbaF16ImageStoreMut<'a> = ImageStoreMut<'a, f16, 4>;
+#[cfg(feature = "nightly_f16")]
+pub type RgbF16ImageStore<'a> = ImageStore<'a, f16, 3>;
+#[cfg(feature = "nightly_f16")]
+pub type RgbF16ImageStoreMut<'a> = ImageStoreMut<'a, f16, 3>;
 
 pub type PlanarF32ImageStore<'a> = ImageStore<'a, f32, 1>;
 pub type PlanarF32ImageStoreMut<'a> = ImageStoreMut<'a, f32, 1>;

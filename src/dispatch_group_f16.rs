@@ -27,24 +27,27 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::filter_weights::{FilterBounds, FilterWeights};
+use crate::filter_weights::{FilterBounds, FilterWeights, WeightsConverter};
 use crate::image_store::ImageStoreMut;
 use crate::ImageStore;
-use half::f16;
+use core::f16;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn convolve_vertical_dispatch_f16<const COMPONENTS: usize>(
+pub(crate) fn convolve_vertical_dispatch_f16<V: Copy + Send + Sync, const COMPONENTS: usize>(
     image_store: &ImageStore<f16, COMPONENTS>,
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStoreMut<f16, COMPONENTS>,
     pool: &Option<ThreadPool>,
-    dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[f32]),
+    dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[V]),
+    weights_converter: impl WeightsConverter<V>,
 ) {
     let src_stride = image_store.stride();
     let dst_stride = destination.stride();
+
+    let c_weights = weights_converter.prepare_weights(&filter_weights).weights;
 
     let dst_width = destination.width;
 
@@ -58,7 +61,7 @@ pub(crate) fn convolve_vertical_dispatch_f16<const COMPONENTS: usize>(
                 .for_each(|(y, row)| {
                     let bounds = filter_weights.bounds[y];
                     let filter_offset = y * filter_weights.aligned_size;
-                    let weights = &filter_weights.weights[filter_offset..];
+                    let weights = &c_weights[filter_offset..];
                     let source_buffer = image_store.buffer.as_ref();
                     dispatcher(
                         dst_width,
@@ -79,7 +82,7 @@ pub(crate) fn convolve_vertical_dispatch_f16<const COMPONENTS: usize>(
             .for_each(|(y, row)| {
                 let bounds = filter_weights.bounds[y];
                 let filter_offset = y * filter_weights.aligned_size;
-                let weights = &filter_weights.weights[filter_offset..];
+                let weights = &c_weights[filter_offset..];
                 let source_buffer = image_store.buffer.as_ref();
                 dispatcher(
                     dst_width,
@@ -94,20 +97,23 @@ pub(crate) fn convolve_vertical_dispatch_f16<const COMPONENTS: usize>(
 }
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn convolve_horizontal_dispatch_f16<const CHANNELS: usize>(
+pub(crate) fn convolve_horizontal_dispatch_f16<V: Copy + Send + Sync, const CHANNELS: usize>(
     image_store: &ImageStore<f16, CHANNELS>,
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStoreMut<f16, CHANNELS>,
     pool: &Option<ThreadPool>,
     dispatcher_4_rows: Option<
-        fn(usize, usize, &FilterWeights<f32>, &[f16], usize, &mut [f16], usize),
+        fn(usize, usize, &FilterWeights<V>, &[f16], usize, &mut [f16], usize),
     >,
-    dispatcher_row: fn(usize, usize, &FilterWeights<f32>, &[f16], &mut [f16]),
+    dispatcher_row: fn(usize, usize, &FilterWeights<V>, &[f16], &mut [f16]),
+    weights_converter: impl WeightsConverter<V>,
 ) {
     let src_stride = image_store.stride();
     let dst_stride = destination.stride();
     let dst_width = destination.width;
     let src_width = image_store.width;
+
+    let c_weights = weights_converter.prepare_weights(&filter_weights);
 
     if let Some(pool) = pool {
         pool.install(|| {
@@ -126,13 +132,7 @@ pub(crate) fn convolve_horizontal_dispatch_f16<const CHANNELS: usize>(
                     )
                     .for_each(|(src, dst)| {
                         dispatcher(
-                            dst_width,
-                            src_width,
-                            &filter_weights,
-                            src,
-                            src_stride,
-                            dst,
-                            dst_stride,
+                            dst_width, src_width, &c_weights, src, src_stride, dst, dst_stride,
                         );
                     });
                 processed_4 = true;
@@ -161,7 +161,7 @@ pub(crate) fn convolve_horizontal_dispatch_f16<const CHANNELS: usize>(
                 .par_chunks_exact(src_stride)
                 .zip(left_dst_rows.par_chunks_exact_mut(dst_stride))
                 .for_each(|(src, dst)| {
-                    dispatcher_row(dst_width, src_width, &filter_weights, src, dst);
+                    dispatcher_row(dst_width, src_width, &c_weights, src, dst);
                 });
         });
     } else {
@@ -179,13 +179,7 @@ pub(crate) fn convolve_horizontal_dispatch_f16<const CHANNELS: usize>(
                 )
             {
                 dispatcher(
-                    dst_width,
-                    src_width,
-                    &filter_weights,
-                    src,
-                    src_stride,
-                    dst,
-                    dst_stride,
+                    dst_width, src_width, &c_weights, src, src_stride, dst, dst_stride,
                 );
             }
             processed_4 = true;
@@ -213,7 +207,7 @@ pub(crate) fn convolve_horizontal_dispatch_f16<const CHANNELS: usize>(
             .chunks_exact(src_stride)
             .zip(left_dst_rows.chunks_exact_mut(dst_stride))
         {
-            dispatcher_row(dst_width, src_width, &filter_weights, src, dst);
+            dispatcher_row(dst_width, src_width, &c_weights, src, dst);
         }
     }
 }

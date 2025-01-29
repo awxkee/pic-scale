@@ -1,17 +1,20 @@
 #![feature(avx512_target_feature)]
+#![feature(f16)]
 mod merge;
 mod split;
 
 use std::time::Instant;
 
+use core::f16;
 use fast_image_resize::images::Image;
 use fast_image_resize::{
     CpuExtensions, FilterType, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
-    CbCr8ImageStore, CbCr8ImageStoreMut, ImageSize, ImageStore, ImageStoreMut, ImageStoreScaling,
-    ResamplingFunction, Scaler, Scaling, ScalingU16, ThreadingPolicy,
+    ImageSize, ImageStore, ImageStoreMut, ImageStoreScaling, ResamplingFunction, RgbF16ImageStore,
+    RgbF16ImageStoreMut, Rgba16ImageStoreMut, RgbaF16ImageStore, RgbaF16ImageStoreMut, Scaler,
+    Scaling, ScalingU16, ThreadingPolicy, WorkloadStrategy,
 };
 
 fn resize_plane(
@@ -48,19 +51,26 @@ fn main() {
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
-    let transient = img.to_luma_alpha8();
+    let transient = img.to_rgb8();
     let mut bytes = Vec::from(transient.as_bytes());
 
     let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
+    scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
 
     // resize_plane(378, 257, 257, 257, ResamplingFunction::Bilinear);
 
     // let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 2).collect();
 
+    let rgb_feature16 = transient
+        .iter()
+        .map(|&x| (x as f32 / 255f32) as f16)
+        .collect::<Vec<_>>();
+
     //
     let store =
-        CbCr8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
+        RgbF16ImageStore::from_slice(&rgb_feature16, dimensions.0 as usize, dimensions.1 as usize)
+            .unwrap();
 
     let dst_size = ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
     // let mut resized_ar = vec![0u32; dst_size.width * dst_size.height];
@@ -74,7 +84,7 @@ fn main() {
     //     )
     //     .unwrap();
 
-    let mut dst_store = CbCr8ImageStoreMut::alloc_with_depth(
+    let mut dst_store = RgbF16ImageStoreMut::alloc_with_depth(
         dimensions.0 as usize / 4,
         dimensions.1 as usize / 4,
         10,
@@ -82,7 +92,7 @@ fn main() {
 
     // for i in 0..25 {
     let start_time = Instant::now();
-    scaler.resize_cbcr8(&store, &mut dst_store).unwrap();
+    scaler.resize_rgb_f16(&store, &mut dst_store).unwrap();
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
@@ -130,7 +140,11 @@ fn main() {
     //     .map(|&x| (x >> 2) as u8)
     //     .collect();
 
-    let dst = dst_store.as_bytes();
+    let dst = dst_store
+        .as_bytes()
+        .iter()
+        .map(|&x| (x as f32 * 255.).round() as u8)
+        .collect::<Vec<_>>();
     // let dst = resized;
     // image::save_buffer(
     //     "converted.png",
@@ -152,11 +166,11 @@ fn main() {
         .unwrap();
     } else {
         image::save_buffer(
-            "converted.webp",
+            "converted.png",
             &dst,
             dst_store.width as u32,
             dst_store.height as u32,
-            image::ColorType::La8,
+            image::ColorType::Rgb8,
         )
         .unwrap();
     }

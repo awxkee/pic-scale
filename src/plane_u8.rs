@@ -28,7 +28,7 @@
  */
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::avx2::{convolve_vertical_avx_row, convolve_vertical_avx_row_lp};
-use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
+use crate::convolution::{ConvolutionOptions, HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertical_dispatch_u8};
 use crate::filter_weights::{DefaultWeightsConverter, FilterBounds, FilterWeights};
 use crate::handler_provider::{
@@ -37,8 +37,6 @@ use crate::handler_provider::{
 use crate::image_store::ImageStoreMut;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
 use crate::neon::{convolve_horizontal_plane_neon_row, convolve_horizontal_plane_neon_rows_4_u8};
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::neon::{convolve_vertical_neon_i16_precision, convolve_vertical_neon_i32_precision};
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{
     convolve_horizontal_plane_sse_row, convolve_horizontal_plane_sse_rows_4_u8,
@@ -56,6 +54,7 @@ impl HorizontalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<u8, 1>,
         _pool: &Option<ThreadPool>,
+        _options: ConvolutionOptions,
     ) {
         let _scale_factor = self.height as f32 / destination.height as f32;
         let mut _dispatcher_4_rows: Option<
@@ -65,15 +64,31 @@ impl HorizontalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
             handle_fixed_row_u8::<1>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            _dispatcher_4_rows = Some(convolve_horizontal_plane_neon_rows_4_u8);
-            _dispatcher_1_row = convolve_horizontal_plane_neon_row;
-            if _scale_factor < 8. && crate::cpu_features::is_aarch_rdm_supported() {
-                use crate::neon::{
-                    convolve_horizontal_plane_neon_rdm_row,
-                    convolve_horizontal_plane_neon_rows_rdm_4_u8,
-                };
-                _dispatcher_4_rows = Some(convolve_horizontal_plane_neon_rows_rdm_4_u8);
-                _dispatcher_1_row = convolve_horizontal_plane_neon_rdm_row;
+            match _options.workload_strategy {
+                crate::WorkloadStrategy::PreferQuality => {
+                    use crate::neon::{
+                        convolve_horizontal_plane_neon_row_q,
+                        convolve_horizontal_plane_neon_rows_4_u8_q,
+                    };
+                    _dispatcher_4_rows = Some(convolve_horizontal_plane_neon_rows_4_u8_q);
+                    _dispatcher_1_row = convolve_horizontal_plane_neon_row_q;
+                }
+                crate::WorkloadStrategy::PreferSpeed => {
+                    _dispatcher_4_rows = Some(convolve_horizontal_plane_neon_rows_4_u8);
+                    _dispatcher_1_row = convolve_horizontal_plane_neon_row;
+                    #[cfg(feature = "rdm")]
+                    if _scale_factor < 8.
+                        && crate::cpu_features::is_aarch_rdm_supported()
+                        && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
+                    {
+                        use crate::neon::{
+                            convolve_horizontal_plane_neon_rdm_row,
+                            convolve_horizontal_plane_neon_rows_rdm_4_u8,
+                        };
+                        _dispatcher_4_rows = Some(convolve_horizontal_plane_neon_rows_rdm_4_u8);
+                        _dispatcher_1_row = convolve_horizontal_plane_neon_rdm_row;
+                    }
+                }
             }
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -81,7 +96,9 @@ impl HorizontalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
             if is_x86_feature_detected!("sse4.1") {
                 _dispatcher_4_rows = Some(convolve_horizontal_plane_sse_rows_4_u8);
                 _dispatcher_1_row = convolve_horizontal_plane_sse_row;
-                if _scale_factor < 8. {
+                if _scale_factor < 8.
+                    && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
+                {
                     use crate::sse::{
                         convolve_horizontal_plane_sse_row_hrs,
                         convolve_horizontal_plane_sse_rows_hrs_4_u8,
@@ -109,6 +126,7 @@ impl VerticalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<u8, 1>,
         pool: &Option<ThreadPool>,
+        _options: ConvolutionOptions,
     ) {
         let _scale_factor = self.height as f32 / destination.height as f32;
         #[allow(clippy::type_complexity)]
@@ -116,24 +134,44 @@ impl VerticalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
             handle_fixed_column_u8;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            // For more downscaling better to use more precise version
-            if _scale_factor < 8. && crate::cpu_features::is_aarch_rdm_supported() {
-                _dispatcher = convolve_vertical_neon_i16_precision;
-            } else {
-                _dispatcher = convolve_vertical_neon_i32_precision;
+            match _options.workload_strategy {
+                crate::WorkloadStrategy::PreferQuality => {
+                    use crate::neon::convolve_vertical_neon_i32_precision_d;
+                    _dispatcher = convolve_vertical_neon_i32_precision_d;
+                }
+                crate::WorkloadStrategy::PreferSpeed => {
+                    // For more downscaling better to use more precise version
+                    #[cfg(feature = "rdm")]
+                    if _scale_factor < 8. && crate::cpu_features::is_aarch_rdm_supported() {
+                        use crate::neon::convolve_vertical_neon_i16_precision;
+                        _dispatcher = convolve_vertical_neon_i16_precision;
+                    } else {
+                        use crate::neon::convolve_vertical_neon_i32_precision;
+                        _dispatcher = convolve_vertical_neon_i32_precision;
+                    }
+                    #[cfg(not(feature = "rdm"))]
+                    {
+                        use crate::neon::convolve_vertical_neon_i32_precision;
+                        _dispatcher = convolve_vertical_neon_i32_precision;
+                    }
+                }
             }
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
             if is_x86_feature_detected!("sse4.1") {
-                if _scale_factor < 8. {
+                if _scale_factor < 8.
+                    && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
+                {
                     _dispatcher = convolve_vertical_sse_row_lp;
                 } else {
                     _dispatcher = convolve_vertical_sse_row;
                 }
             }
             if is_x86_feature_detected!("avx2") {
-                if _scale_factor < 8. {
+                if _scale_factor < 8.
+                    && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
+                {
                     _dispatcher = convolve_vertical_avx_row_lp;
                 } else {
                     _dispatcher = convolve_vertical_avx_row;
@@ -141,7 +179,9 @@ impl VerticalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
             }
             #[cfg(feature = "nightly_avx512")]
             if std::arch::is_x86_feature_detected!("avx512bw") {
-                if _scale_factor < 8. {
+                if _scale_factor < 8.
+                    && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
+                {
                     use crate::avx512::convolve_vertical_avx512_row_lp;
                     _dispatcher = convolve_vertical_avx512_row_lp;
                 }

@@ -39,9 +39,9 @@ pub(crate) fn convolve_column_handler_fip_db_ar30<
     const AR30_ORDER: usize,
     const BUFFER_SIZE: usize,
 >(
-    src: &[u32],
+    src: &[u8],
     src_stride: usize,
-    dst: &mut [u32],
+    dst: &mut [u8],
     filter: &[i16],
     bounds: &FilterBounds,
     x: usize,
@@ -56,10 +56,10 @@ pub(crate) fn convolve_column_handler_fip_db_ar30<
 
     let py = bounds.start;
     let weight = filter[0] as i32;
-    let offset = src_stride * py + v_start_px;
-    let src_ptr = &src[offset..(offset + BUFFER_SIZE)];
+    let offset = src_stride * py + v_start_px * 4;
+    let src_ptr = &src[offset..(offset + BUFFER_SIZE * 4)];
 
-    for (dst, src) in direct_store.iter_mut().zip(src_ptr) {
+    for (dst, src) in direct_store.iter_mut().zip(src_ptr.chunks_exact(4)) {
         *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
     }
 
@@ -67,18 +67,24 @@ pub(crate) fn convolve_column_handler_fip_db_ar30<
         // Adding 1 is necessary because skip do not incrementing value on values that skipped
         let py = bounds.start + j + 1;
         let weight = k_weight as i32;
-        let offset = src_stride * py + v_start_px;
-        let src_ptr = &src[offset..(offset + BUFFER_SIZE)];
+        let offset = src_stride * py + v_start_px * 4;
+        let src_ptr = &src[offset..(offset + BUFFER_SIZE * 4)];
 
-        for (dst, src) in direct_store.iter_mut().zip(src_ptr.iter()) {
+        for (dst, src) in direct_store.iter_mut().zip(src_ptr.chunks_exact(4)) {
             *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
         }
     }
 
-    let v_dst = &mut dst[v_start_px..(v_start_px + BUFFER_SIZE)];
-    for (dst, src) in v_dst.iter_mut().zip(direct_store) {
-        let saturated = src.saturate_ar30().to_ar30::<AR30_TYPE, AR30_ORDER>();
-        *dst = saturated;
+    let v_dst = &mut dst[v_start_px * 4..(v_start_px * 4 + BUFFER_SIZE * 4)];
+    for (dst, src) in v_dst.chunks_exact_mut(4).zip(direct_store) {
+        let saturated = src
+            .saturate_ar30()
+            .to_ar30::<AR30_TYPE, AR30_ORDER>()
+            .to_ne_bytes();
+        dst[0] = saturated[0];
+        dst[1] = saturated[1];
+        dst[2] = saturated[2];
+        dst[3] = saturated[3];
     }
 }
 
@@ -91,9 +97,9 @@ fn convolve_column_handler_fixed_point_direct_buffer_double<
     const AR30_ORDER: usize,
     const BUFFER_SIZE: usize,
 >(
-    src: &[u32],
+    src: &[u8],
     src_stride: usize,
-    dst: &mut [u32],
+    dst: &mut [u8],
     filter: &[i16],
     bounds: &FilterBounds,
     x: usize,
@@ -110,15 +116,15 @@ fn convolve_column_handler_fixed_point_direct_buffer_double<
 
     let py = bounds.start;
     let weight = filter[0] as i32;
-    let offset = src_stride * py + v_start_px;
-    let src_ptr0 = &src[offset..(offset + BUFFER_SIZE)];
-    let src_ptr1 = &src[(offset + BUFFER_SIZE)..(offset + BUFFER_SIZE * 2)];
+    let offset = src_stride * py + v_start_px * 4;
+    let src_ptr0 = &src[offset..(offset + BUFFER_SIZE * 4)];
+    let src_ptr1 = &src[(offset + BUFFER_SIZE * 4)..(offset + BUFFER_SIZE * 2 * 4)];
 
-    for (dst, src) in direct_store0.iter_mut().zip(src_ptr0) {
+    for (dst, src) in direct_store0.iter_mut().zip(src_ptr0.chunks_exact(4)) {
         *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
     }
 
-    for (dst, src) in direct_store1.iter_mut().zip(src_ptr1) {
+    for (dst, src) in direct_store1.iter_mut().zip(src_ptr1.chunks_exact(4)) {
         *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
     }
 
@@ -126,28 +132,41 @@ fn convolve_column_handler_fixed_point_direct_buffer_double<
         // Adding 1 is necessary because skip do not incrementing value on values that skipped
         let py = bounds.start + j + 1;
         let weight = k_weight as i32;
-        let offset = src_stride * py + v_start_px;
-        let src_ptr0 = &src[offset..(offset + BUFFER_SIZE)];
-        let src_ptr1 = &src[(offset + BUFFER_SIZE)..(offset + BUFFER_SIZE * 2)];
+        let offset = src_stride * py + v_start_px * 4;
+        let src_ptr0 = &src[offset..(offset + BUFFER_SIZE * 4)];
+        let src_ptr1 = &src[(offset + BUFFER_SIZE * 4)..(offset + BUFFER_SIZE * 2 * 4)];
 
-        for (dst, src) in direct_store0.iter_mut().zip(src_ptr0.iter()) {
+        for (dst, src) in direct_store0.iter_mut().zip(src_ptr0.chunks_exact(4)) {
             *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
         }
-        for (dst, src) in direct_store1.iter_mut().zip(src_ptr1.iter()) {
+        for (dst, src) in direct_store1.iter_mut().zip(src_ptr1.chunks_exact(4)) {
             *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
         }
     }
 
-    let v_dst0 = &mut dst[v_start_px..(v_start_px + BUFFER_SIZE)];
-    for (dst, src) in v_dst0.iter_mut().zip(direct_store0) {
-        let saturated = src.saturate_ar30().to_ar30::<AR30_TYPE, AR30_ORDER>();
-        *dst = saturated;
+    let v_dst0 = &mut dst[v_start_px * 4..(v_start_px + BUFFER_SIZE * 4)];
+    for (dst, src) in v_dst0.chunks_exact_mut(4).zip(direct_store0) {
+        let saturated = src
+            .saturate_ar30()
+            .to_ar30::<AR30_TYPE, AR30_ORDER>()
+            .to_ne_bytes();
+        dst[0] = saturated[0];
+        dst[1] = saturated[1];
+        dst[2] = saturated[2];
+        dst[3] = saturated[3];
     }
 
-    let v_dst1 = &mut dst[(v_start_px + BUFFER_SIZE)..(v_start_px + BUFFER_SIZE * 2)];
-    for (dst, src) in v_dst1.iter_mut().zip(direct_store1) {
-        let saturated = src.saturate_ar30().to_ar30::<AR30_TYPE, AR30_ORDER>();
-        *dst = saturated;
+    let v_dst1 =
+        &mut dst[(v_start_px * 4 + BUFFER_SIZE * 4)..(v_start_px * 4 + BUFFER_SIZE * 2 * 4)];
+    for (dst, src) in v_dst1.chunks_exact_mut(4).zip(direct_store1) {
+        let saturated = src
+            .saturate_ar30()
+            .to_ar30::<AR30_TYPE, AR30_ORDER>()
+            .to_ne_bytes();
+        dst[0] = saturated[0];
+        dst[1] = saturated[1];
+        dst[2] = saturated[2];
+        dst[3] = saturated[3];
     }
 }
 
@@ -160,9 +179,9 @@ fn convolve_column_handler_fixed_point_direct_buffer_four<
     const AR30_ORDER: usize,
     const BUFFER_SIZE: usize,
 >(
-    src: &[u32],
+    src: &[u8],
     src_stride: usize,
-    dst: &mut [u32],
+    dst: &mut [u8],
     filter: &[i16],
     bounds: &FilterBounds,
     x: usize,
@@ -179,29 +198,29 @@ fn convolve_column_handler_fixed_point_direct_buffer_four<
     let mut direct_store3: [ColorGroup<4, i32>; BUFFER_SIZE] =
         [ColorGroup::<4, i32>::dup(ROUNDING_CONST); BUFFER_SIZE];
 
-    let v_start_px = x;
+    let v_start_px = x * 4;
 
     let py = bounds.start;
     let weight = filter[0] as i32;
     let offset = src_stride * py + v_start_px;
-    let src_ptr0 = &src[offset..(offset + BUFFER_SIZE)];
-    let src_ptr1 = &src[(offset + BUFFER_SIZE)..(offset + BUFFER_SIZE * 2)];
-    let src_ptr2 = &src[(offset + BUFFER_SIZE * 2)..(offset + BUFFER_SIZE * 3)];
-    let src_ptr3 = &src[(offset + BUFFER_SIZE * 3)..(offset + BUFFER_SIZE * 4)];
+    let src_ptr0 = &src[offset..(offset + BUFFER_SIZE * 4)];
+    let src_ptr1 = &src[(offset + BUFFER_SIZE * 4)..(offset + BUFFER_SIZE * 2 * 4)];
+    let src_ptr2 = &src[(offset + BUFFER_SIZE * 2 * 4)..(offset + BUFFER_SIZE * 3 * 4)];
+    let src_ptr3 = &src[(offset + BUFFER_SIZE * 3 * 4)..(offset + BUFFER_SIZE * 4 * 4)];
 
-    for (dst, src) in direct_store0.iter_mut().zip(src_ptr0) {
+    for (dst, src) in direct_store0.iter_mut().zip(src_ptr0.chunks_exact(4)) {
         *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
     }
 
-    for (dst, src) in direct_store1.iter_mut().zip(src_ptr1) {
+    for (dst, src) in direct_store1.iter_mut().zip(src_ptr1.chunks_exact(4)) {
         *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
     }
 
-    for (dst, src) in direct_store2.iter_mut().zip(src_ptr2) {
+    for (dst, src) in direct_store2.iter_mut().zip(src_ptr2.chunks_exact(4)) {
         *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
     }
 
-    for (dst, src) in direct_store3.iter_mut().zip(src_ptr3) {
+    for (dst, src) in direct_store3.iter_mut().zip(src_ptr3.chunks_exact(4)) {
         *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
     }
 
@@ -210,60 +229,84 @@ fn convolve_column_handler_fixed_point_direct_buffer_four<
         let py = bounds.start + j + 1;
         let weight = k_weight as i32;
         let offset = src_stride * py + v_start_px;
-        let src_ptr0 = &src[offset..(offset + BUFFER_SIZE)];
-        let src_ptr1 = &src[(offset + BUFFER_SIZE)..(offset + BUFFER_SIZE * 2)];
-        let src_ptr2 = &src[(offset + BUFFER_SIZE * 2)..(offset + BUFFER_SIZE * 3)];
-        let src_ptr3 = &src[(offset + BUFFER_SIZE * 3)..(offset + BUFFER_SIZE * 4)];
+        let src_ptr0 = &src[offset..(offset + BUFFER_SIZE * 4)];
+        let src_ptr1 = &src[(offset + BUFFER_SIZE * 4)..(offset + BUFFER_SIZE * 2 * 4)];
+        let src_ptr2 = &src[(offset + BUFFER_SIZE * 2 * 4)..(offset + BUFFER_SIZE * 3 * 4)];
+        let src_ptr3 = &src[(offset + BUFFER_SIZE * 3 * 4)..(offset + BUFFER_SIZE * 4 * 4)];
 
-        for (dst, src) in direct_store0.iter_mut().zip(src_ptr0.iter()) {
+        for (dst, src) in direct_store0.iter_mut().zip(src_ptr0.chunks_exact(4)) {
             *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
         }
-        for (dst, src) in direct_store1.iter_mut().zip(src_ptr1.iter()) {
+        for (dst, src) in direct_store1.iter_mut().zip(src_ptr1.chunks_exact(4)) {
             *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
         }
-        for (dst, src) in direct_store2.iter_mut().zip(src_ptr2.iter()) {
+        for (dst, src) in direct_store2.iter_mut().zip(src_ptr2.chunks_exact(4)) {
             *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
         }
-        for (dst, src) in direct_store3.iter_mut().zip(src_ptr3.iter()) {
+        for (dst, src) in direct_store3.iter_mut().zip(src_ptr3.chunks_exact(4)) {
             *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
         }
     }
 
-    let v_dst0 = &mut dst[v_start_px..(v_start_px + BUFFER_SIZE)];
-    for (dst, src) in v_dst0.iter_mut().zip(direct_store0) {
-        let saturated = src.saturate_ar30().to_ar30::<AR30_TYPE, AR30_ORDER>();
-        *dst = saturated;
+    let v_dst0 = &mut dst[v_start_px..(v_start_px + BUFFER_SIZE * 4)];
+    for (dst, src) in v_dst0.chunks_exact_mut(4).zip(direct_store0) {
+        let saturated = src
+            .saturate_ar30()
+            .to_ar30::<AR30_TYPE, AR30_ORDER>()
+            .to_ne_bytes();
+        dst[0] = saturated[0];
+        dst[1] = saturated[1];
+        dst[2] = saturated[2];
+        dst[3] = saturated[3];
     }
 
-    let v_dst1 = &mut dst[(v_start_px + BUFFER_SIZE)..(v_start_px + BUFFER_SIZE * 2)];
-    for (dst, src) in v_dst1.iter_mut().zip(direct_store1) {
-        let saturated = src.saturate_ar30().to_ar30::<AR30_TYPE, AR30_ORDER>();
-        *dst = saturated;
+    let v_dst1 = &mut dst[(v_start_px + BUFFER_SIZE * 4)..(v_start_px + BUFFER_SIZE * 2 * 4)];
+    for (dst, src) in v_dst1.chunks_exact_mut(4).zip(direct_store1) {
+        let saturated = src
+            .saturate_ar30()
+            .to_ar30::<AR30_TYPE, AR30_ORDER>()
+            .to_ne_bytes();
+        dst[0] = saturated[0];
+        dst[1] = saturated[1];
+        dst[2] = saturated[2];
+        dst[3] = saturated[3];
     }
 
-    let v_dst2 = &mut dst[(v_start_px + BUFFER_SIZE * 2)..(v_start_px + BUFFER_SIZE * 3)];
-    for (dst, src) in v_dst2.iter_mut().zip(direct_store2) {
-        let saturated = src.saturate_ar30().to_ar30::<AR30_TYPE, AR30_ORDER>();
-        *dst = saturated;
+    let v_dst2 = &mut dst[(v_start_px + BUFFER_SIZE * 2 * 4)..(v_start_px + BUFFER_SIZE * 3 * 4)];
+    for (dst, src) in v_dst2.chunks_exact_mut(4).zip(direct_store2) {
+        let saturated = src
+            .saturate_ar30()
+            .to_ar30::<AR30_TYPE, AR30_ORDER>()
+            .to_ne_bytes();
+        dst[0] = saturated[0];
+        dst[1] = saturated[1];
+        dst[2] = saturated[2];
+        dst[3] = saturated[3];
     }
 
-    let v_dst3 = &mut dst[(v_start_px + BUFFER_SIZE * 3)..(v_start_px + BUFFER_SIZE * 4)];
-    for (dst, src) in v_dst3.iter_mut().zip(direct_store3) {
-        let saturated = src.saturate_ar30().to_ar30::<AR30_TYPE, AR30_ORDER>();
-        *dst = saturated;
+    let v_dst3 = &mut dst[(v_start_px + BUFFER_SIZE * 3 * 4)..(v_start_px + BUFFER_SIZE * 4 * 4)];
+    for (dst, src) in v_dst3.chunks_exact_mut(4).zip(direct_store3) {
+        let saturated = src
+            .saturate_ar30()
+            .to_ar30::<AR30_TYPE, AR30_ORDER>()
+            .to_ne_bytes();
+        dst[0] = saturated[0];
+        dst[1] = saturated[1];
+        dst[2] = saturated[2];
+        dst[3] = saturated[3];
     }
 }
 
 pub(crate) fn column_handler_fixed_point_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     bounds: &FilterBounds,
-    src: &[u32],
-    dst: &mut [u32],
+    src: &[u8],
+    dst: &mut [u8],
     src_stride: usize,
     weight: &[i16],
 ) {
     let mut cx = 0usize;
 
-    let total_width = dst.len();
+    let total_width = dst.len() / 4;
 
     while cx + 64 < total_width {
         convolve_column_handler_fixed_point_direct_buffer_four::<AR30_TYPE, AR30_ORDER, 16>(

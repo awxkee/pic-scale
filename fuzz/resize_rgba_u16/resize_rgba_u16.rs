@@ -32,15 +32,23 @@
 use libfuzzer_sys::fuzz_target;
 use pic_scale::{
     Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16,
+    WorkloadStrategy,
 };
 
-fuzz_target!(|data: (u16, u16, u16, u16)| {
+fuzz_target!(|data: (u16, u16, u16, u16, bool, bool)| {
+    let strategy = if data.5 {
+        WorkloadStrategy::PreferQuality
+    } else {
+        WorkloadStrategy::PreferSpeed
+    };
     resize_rgba(
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
         data.3 as usize,
         ResamplingFunction::Lanczos3,
+        data.4,
+        strategy,
     )
 });
 
@@ -50,6 +58,8 @@ fn resize_rgba(
     dst_width: usize,
     dst_height: usize,
     sampler: ResamplingFunction,
+    premultiply_alpha: bool,
+    workload_strategy: WorkloadStrategy,
 ) {
     if src_width == 0
         || src_width > 2000
@@ -66,21 +76,21 @@ fn resize_rgba(
     let store = ImageStore::<u16, 4>::alloc(src_width, src_height);
     let mut target = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 10);
 
-    let scaler = Scaler::new(sampler);
-    scaler.resize_rgba_u16(&store, &mut target, false).unwrap();
-    let store = ImageStore::<u16, 4>::alloc(src_width, src_height);
-    scaler.resize_rgba_u16(&store, &mut target, true).unwrap();
+    let mut scaler = Scaler::new(sampler);
+    scaler.set_workload_strategy(workload_strategy);
+    scaler
+        .resize_rgba_u16(&store, &mut target, premultiply_alpha)
+        .unwrap();
 
     let mut target = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
 
     let store = ImageStore::<u16, 4>::alloc(src_width, src_height);
-    scaler.resize_rgba_u16(&store, &mut target, false).unwrap();
+    scaler
+        .resize_rgba_u16(&store, &mut target, premultiply_alpha)
+        .unwrap();
 
-    let store = ImageStore::<u16, 4>::alloc(src_width, src_height);
-    scaler.resize_rgba_u16(&store, &mut target, true).unwrap();
-
-    let src_data_ar30 = vec![1u32; src_width * src_height];
-    let mut dst_data_ar30 = vec![1u32; dst_width * dst_height];
+    let src_data_ar30 = vec![1u8; src_width * src_height * 4];
+    let mut dst_data_ar30 = vec![1u8; dst_width * dst_height * 4];
     _ = scaler.resize_ar30(
         &src_data_ar30,
         ImageSize::new(src_width, src_height),

@@ -284,9 +284,14 @@ pub(crate) unsafe fn vzip_4_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize
 
 #[inline(always)]
 pub(crate) unsafe fn vld1_ar30_s16<const AR30_TYPE: usize, const AR30_ORDER: usize>(
-    arr: &[u32],
+    arr: &[u8],
 ) -> int16x4_t {
-    let item = *arr.get_unchecked(0);
+    let item = u32::from_ne_bytes([
+        *arr.get_unchecked(0),
+        *arr.get_unchecked(1),
+        *arr.get_unchecked(2),
+        *arr.get_unchecked(3),
+    ]);
     let ar_type: Rgb30 = AR30_TYPE.into();
     let vl = ar_type.unpack::<AR30_ORDER>(item);
     let a_rep = (vl.3 as i16) << 8;

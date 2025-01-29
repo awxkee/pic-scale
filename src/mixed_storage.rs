@@ -55,12 +55,15 @@ impl MixedStorage<u16> for f32 {
     }
 }
 
-#[cfg(feature = "half")]
-impl MixedStorage<half::f16> for f32 {
+#[cfg(feature = "nightly_f16")]
+use core::f16;
+
+#[cfg(feature = "nightly_f16")]
+impl MixedStorage<f16> for f32 {
     #[inline(always)]
     #[allow(clippy::manual_clamp)]
-    fn to_mixed(self, _: u32) -> half::f16 {
-        half::f16::from_f32(self)
+    fn to_mixed(self, _: u32) -> f16 {
+        self as f16
     }
 }
 

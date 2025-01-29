@@ -32,12 +32,12 @@ use crate::neon::{xreinterpret_u16_f16, xreinterpretq_u16_f16};
 use std::arch::aarch64::*;
 
 pub(crate) fn convert_weights_to_f16(weights: &[f32]) -> Vec<i16> {
-    unsafe { convert_weights_to_f16_impl(weights) }
+    unsafe { convert_weights_to_f16_impl::<i16>(weights) }
 }
 
 #[target_feature(enable = "fp16")]
-unsafe fn convert_weights_to_f16_impl(weights: &[f32]) -> Vec<i16> {
-    let mut new_weights = vec![0i16; weights.len()];
+unsafe fn convert_weights_to_f16_impl<J: Default + Clone>(weights: &[f32]) -> Vec<J> {
+    let mut new_weights = vec![J::default(); weights.len()];
 
     for (dst, src) in new_weights.chunks_exact_mut(8).zip(weights.chunks_exact(8)) {
         let j = xvld1q_f32_x2(src.as_ptr());
@@ -67,4 +67,12 @@ unsafe fn convert_weights_to_f16_impl(weights: &[f32]) -> Vec<i16> {
     }
 
     new_weights
+}
+
+#[cfg(feature = "nightly_f16")]
+use core::f16;
+
+#[cfg(feature = "nightly_f16")]
+pub(crate) fn convert_weights_to_f16_fhm(weights: &[f32]) -> Vec<f16> {
+    unsafe { convert_weights_to_f16_impl(weights) }
 }

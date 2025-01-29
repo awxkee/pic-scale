@@ -150,14 +150,53 @@ where
 }
 
 #[derive(Default)]
+#[cfg(feature = "nightly_f16")]
+pub(crate) struct PasshroughWeightsConverter {}
+
+#[cfg(feature = "nightly_f16")]
+impl WeightsConverter<f32> for PasshroughWeightsConverter {
+    fn prepare_weights(&self, weights: &FilterWeights<f32>) -> FilterWeights<f32> {
+        weights.clone()
+    }
+}
+
+#[derive(Default)]
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-pub(crate) struct WeightFloat16Converter {}
+pub(crate) struct WeightFloat16ConverterCast {}
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-impl WeightsConverter<i16> for WeightFloat16Converter {
+impl WeightsConverter<i16> for WeightFloat16ConverterCast {
     fn prepare_weights(&self, weights: &FilterWeights<f32>) -> FilterWeights<i16> {
         use crate::neon::convert_weights_to_f16;
         let converted_weights = convert_weights_to_f16(&weights.weights);
+
+        let new_bounds = weights.bounds.to_vec();
+
+        FilterWeights::new(
+            converted_weights,
+            weights.kernel_size,
+            weights.kernel_size,
+            weights.distinct_elements,
+            weights.coeffs_size,
+            new_bounds,
+        )
+    }
+}
+
+#[derive(Default)]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(feature = "nightly_f16")]
+pub(crate) struct WeightFloat16Converter {}
+
+#[cfg(feature = "nightly_f16")]
+use core::f16;
+
+#[cfg(feature = "nightly_f16")]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+impl WeightsConverter<f16> for WeightFloat16Converter {
+    fn prepare_weights(&self, weights: &FilterWeights<f32>) -> FilterWeights<f16> {
+        use crate::neon::convert_weights_to_f16_fhm;
+        let converted_weights = convert_weights_to_f16_fhm(&weights.weights);
 
         let new_bounds = weights.bounds.to_vec();
 

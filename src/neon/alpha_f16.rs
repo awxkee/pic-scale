@@ -31,11 +31,12 @@ use std::arch::aarch64::*;
 
 use crate::alpha_handle_f16::{premultiply_pixel_f16_row, unpremultiply_pixel_f16_row};
 use crate::neon::f16_utils::*;
+use core::f16;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
 
-unsafe fn neon_premultiply_alpha_rgba_row_f16(dst: &mut [half::f16], src: &[half::f16]) {
+unsafe fn neon_premultiply_alpha_rgba_row_f16(dst: &mut [f16], src: &[f16]) {
     let mut rem = dst;
     let mut src_rem = src;
 
@@ -89,9 +90,9 @@ unsafe fn neon_premultiply_alpha_rgba_row_f16(dst: &mut [half::f16], src: &[half
 }
 
 pub(crate) fn neon_premultiply_alpha_rgba_f16(
-    dst: &mut [half::f16],
+    dst: &mut [f16],
     dst_stride: usize,
-    src: &[half::f16],
+    src: &[f16],
     src_stride: usize,
     width: usize,
     _: usize,
@@ -114,7 +115,7 @@ pub(crate) fn neon_premultiply_alpha_rgba_f16(
     }
 }
 
-unsafe fn neon_unpremultiply_alpha_rgba_row_f16(in_place: &mut [half::f16]) {
+unsafe fn neon_unpremultiply_alpha_rgba_row_f16(in_place: &mut [f16]) {
     let mut rem = in_place;
 
     for dst in rem.chunks_exact_mut(8 * 4) {
@@ -182,7 +183,7 @@ unsafe fn neon_unpremultiply_alpha_rgba_row_f16(in_place: &mut [half::f16]) {
 }
 
 pub(crate) fn neon_unpremultiply_alpha_rgba_f16(
-    in_place: &mut [half::f16],
+    in_place: &mut [f16],
     stride: usize,
     width: usize,
     _: usize,
