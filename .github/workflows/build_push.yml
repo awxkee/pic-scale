@@ -53,7 +53,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
-      - run: cargo +nightly clippy --all-features -- -D warnings
+      - run: rustup component add clippy
+      - run: cargo clippy --all-features -- -D warnings
 
   tests:
     name: Testing
