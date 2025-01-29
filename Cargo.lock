@@ -55,7 +55,6 @@ dependencies = [
  "accelerate",
  "criterion",
  "fast_image_resize",
- "half",
  "image",
  "libc",
  "pic-scale",
