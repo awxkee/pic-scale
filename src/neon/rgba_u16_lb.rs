@@ -28,7 +28,6 @@
  */
 use crate::filter_weights::FilterWeights;
 use crate::neon::utils::{xvld1q_u16_x2, xvld1q_u16_x4};
-use crate::support::{PRECISION, ROUNDING_CONST};
 use std::arch::aarch64::*;
 
 #[must_use]
@@ -43,7 +42,7 @@ unsafe fn conv_horiz_rgba_1_u16(
     let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
     let rgba_pixel = vld1_u16(src_ptr.as_ptr());
     let lo = vreinterpret_s16_u16(rgba_pixel);
-    vmlal_s16(store, lo, w0)
+    vqdmlal_s16(store, lo, w0)
 }
 
 #[must_use]
@@ -62,7 +61,7 @@ unsafe fn conv_horiz_rgba_2_u16(
     let wide = vreinterpretq_s16_u16(rgb_pixel);
 
     let acc = vmlal_high_s16(store, wide, w1);
-    vmlal_s16(acc, vget_low_s16(wide), w0)
+    vqdmlal_s16(acc, vget_low_s16(wide), w0)
 }
 
 #[must_use]
@@ -81,10 +80,10 @@ unsafe fn conv_horiz_rgba_4_u16(
     let hi = vreinterpretq_s16_u16(rgba_pixel.1);
     let lo = vreinterpretq_s16_u16(rgba_pixel.0);
 
-    let acc = vmlal_high_lane_s16::<3>(store, hi, weights);
-    let acc = vmlal_lane_s16::<2>(acc, vget_low_s16(hi), weights);
-    let acc = vmlal_high_lane_s16::<1>(acc, lo, weights);
-    vmlal_lane_s16::<0>(acc, vget_low_s16(lo), weights)
+    let acc = vqdmlal_high_lane_s16::<3>(store, hi, weights);
+    let acc = vqdmlal_lane_s16::<2>(acc, vget_low_s16(hi), weights);
+    let acc = vqdmlal_high_lane_s16::<1>(acc, lo, weights);
+    vqdmlal_lane_s16::<0>(acc, vget_low_s16(lo), weights)
 }
 
 #[must_use]
@@ -105,15 +104,15 @@ unsafe fn conv_horiz_rgba_8_u16(
     let hi1 = vreinterpretq_s16_u16(rgba_pixel.3);
     let lo1 = vreinterpretq_s16_u16(rgba_pixel.2);
 
-    let mut acc = vmlal_high_laneq_s16::<3>(store, hi0, weights);
-    acc = vmlal_laneq_s16::<2>(acc, vget_low_s16(hi0), weights);
-    acc = vmlal_high_laneq_s16::<1>(acc, lo0, weights);
-    acc = vmlal_laneq_s16::<0>(acc, vget_low_s16(lo0), weights);
+    let mut acc = vqdmlal_high_laneq_s16::<3>(store, hi0, weights);
+    acc = vqdmlal_laneq_s16::<2>(acc, vget_low_s16(hi0), weights);
+    acc = vqdmlal_high_laneq_s16::<1>(acc, lo0, weights);
+    acc = vqdmlal_laneq_s16::<0>(acc, vget_low_s16(lo0), weights);
 
-    acc = vmlal_high_laneq_s16::<7>(acc, hi1, weights);
-    acc = vmlal_laneq_s16::<6>(acc, vget_low_s16(hi1), weights);
-    acc = vmlal_high_laneq_s16::<5>(acc, lo1, weights);
-    acc = vmlal_laneq_s16::<4>(acc, vget_low_s16(lo1), weights);
+    acc = vqdmlal_high_laneq_s16::<7>(acc, hi1, weights);
+    acc = vqdmlal_laneq_s16::<6>(acc, vget_low_s16(hi1), weights);
+    acc = vqdmlal_high_laneq_s16::<5>(acc, lo1, weights);
+    acc = vqdmlal_laneq_s16::<4>(acc, vget_low_s16(lo1), weights);
     acc
 }
 
@@ -127,6 +126,8 @@ pub(crate) fn convolve_horizontal_rgba_neon_rows_4_lb_u16(
 ) {
     unsafe {
         const CHANNELS: usize = 4;
+        const PRECISION: i32 = 16;
+        const ROUNDING_CONST: i32 = (1 << (PRECISION - 1)) - 1;
         let init = vdupq_n_s32(ROUNDING_CONST);
 
         let v_max_colors = vdup_n_u16((1 << bit_depth) - 1);
@@ -209,10 +210,15 @@ pub(crate) fn convolve_horizontal_rgba_neon_rows_4_lb_u16(
                 jx += 1;
             }
 
-            let store_16_0 = vmin_u16(vqshrun_n_s32::<PRECISION>(store_0), v_max_colors);
-            let store_16_1 = vmin_u16(vqshrun_n_s32::<PRECISION>(store_1), v_max_colors);
-            let store_16_2 = vmin_u16(vqshrun_n_s32::<PRECISION>(store_2), v_max_colors);
-            let store_16_3 = vmin_u16(vqshrun_n_s32::<PRECISION>(store_3), v_max_colors);
+            let j0 = vqshrun_n_s32::<PRECISION>(store_0);
+            let j1 = vqshrun_n_s32::<PRECISION>(store_1);
+            let j2 = vqshrun_n_s32::<PRECISION>(store_2);
+            let j3 = vqshrun_n_s32::<PRECISION>(store_3);
+
+            let store_16_0 = vmin_u16(j0, v_max_colors);
+            let store_16_1 = vmin_u16(j1, v_max_colors);
+            let store_16_2 = vmin_u16(j2, v_max_colors);
+            let store_16_3 = vmin_u16(j3, v_max_colors);
 
             vst1_u16(chunk0.as_mut_ptr(), store_16_0);
             vst1_u16(chunk1.as_mut_ptr(), store_16_1);
@@ -232,6 +238,9 @@ pub(crate) fn convolve_horizontal_rgba_neon_u16_lb_row(
         const CHANNELS: usize = 4;
 
         let v_max_colors = vdup_n_u16((1 << bit_depth) - 1);
+
+        const PRECISION: i32 = 16;
+        const ROUNDING_CONST: i32 = (1 << (PRECISION - 1)) - 1;
 
         for ((dst, bounds), weights) in dst
             .chunks_exact_mut(CHANNELS)

@@ -76,10 +76,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
-      - run: cargo fuzz run resize_rgba -- -max_total_time=30
-      - run: cargo fuzz run resize_rgb -- -max_total_time=30
-      - run: cargo fuzz run resize_cbcr8 -- -max_total_time=30
-      - run: cargo fuzz run resize_plane -- -max_total_time=30
+      - run: cargo fuzz run resize_rgba -- -max_total_time=15
+      - run: cargo fuzz run resize_rgb -- -max_total_time=15
+      - run: cargo fuzz run resize_cbcr8 -- -max_total_time=15
+      - run: cargo fuzz run resize_plane -- -max_total_time=15
       - run: cargo fuzz run colorspaces -- -max_total_time=10
 
   fuzz_rgba_8bit_no_rdm:
@@ -89,10 +89,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
-      - run: cargo fuzz run resize_rgba --no-default-features -- -max_total_time=30
-      - run: cargo fuzz run resize_rgb --no-default-features -- -max_total_time=30
-      - run: cargo fuzz run resize_cbcr8 --no-default-features -- -max_total_time=30
-      - run: cargo fuzz run resize_plane --no-default-features -- -max_total_time=30
+      - run: cargo fuzz run resize_rgba --no-default-features -- -max_total_time=15
+      - run: cargo fuzz run resize_rgb --no-default-features -- -max_total_time=15
+      - run: cargo fuzz run resize_cbcr8 --no-default-features -- -max_total_time=15
+      - run: cargo fuzz run resize_plane --no-default-features -- -max_total_time=15
+      - run: cargo fuzz run resize_rgba_u16 -- -max_total_time=15
 
   fuzz_rgba_high_bit:
     name: Fuzzing High bit-depth
@@ -104,11 +105,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
-      - run: cargo fuzz run resize_rgba_u16 -- -max_total_time=30
-      - run: cargo fuzz run resize_rgba_f16 -- -max_total_time=30
-      - run: cargo fuzz run resize_rgb_u16 -- -max_total_time=30
-      - run: cargo fuzz run resize_cbcr16 -- -max_total_time=30
-      - run: cargo fuzz run resize_plane_u16 -- -max_total_time=30
+      - run: cargo fuzz run resize_rgba_u16 -- -max_total_time=15
+      - run: cargo fuzz run resize_rgba_f16 -- -max_total_time=15
+      - run: cargo fuzz run resize_rgb_u16 -- -max_total_time=15
+      - run: cargo fuzz run resize_rgb_f16 -- -max_total_time=15
+      - run: cargo fuzz run resize_cbcr16 -- -max_total_time=15
+      - run: cargo fuzz run resize_cbcr_f16 -- -max_total_time=15
+      - run: cargo fuzz run resize_plane_u16 -- -max_total_time=15
 
   fuzz_rgba_f32:
     name: Fuzzing floating point
@@ -120,7 +123,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
-      - run: cargo fuzz run resize_rgba_f32 -- -max_total_time=30
-      - run: cargo fuzz run resize_rgb_f32 -- -max_total_time=30
-      - run: cargo fuzz run resize_cbcr_f32 -- -max_total_time=30
-      - run: cargo fuzz run resize_plane_f32 -- -max_total_time=30
+      - run: cargo fuzz run resize_rgba_f32 -- -max_total_time=15
+      - run: cargo fuzz run resize_rgb_f32 -- -max_total_time=15
+      - run: cargo fuzz run resize_cbcr_f32 -- -max_total_time=15
+      - run: cargo fuzz run resize_plane_f32 -- -max_total_time=15

@@ -35,7 +35,7 @@ use std::arch::aarch64::{
 };
 
 #[inline(always)]
-pub(crate) fn neon_column_handler_fixed_point_ar30<
+pub(crate) fn neon_column_handler_fixed_point_ar30_rdm<
     const AR30_TYPE: usize,
     const AR30_ORDER: usize,
 >(

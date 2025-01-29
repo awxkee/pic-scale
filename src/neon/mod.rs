@@ -33,7 +33,6 @@ mod alpha_f16_full;
 mod alpha_f32;
 mod alpha_u16;
 mod alpha_u8;
-#[cfg(feature = "rdm")]
 mod ar30;
 #[cfg(feature = "rdm")]
 mod cbcr8_rdm;
@@ -41,6 +40,7 @@ mod check_alpha;
 #[cfg(feature = "nightly_f16")]
 mod convolve_f16;
 mod f16_utils;
+mod horizontal_ar30;
 #[cfg(feature = "rdm")]
 mod horizontal_ar30_rdm;
 mod plane_f32;
@@ -69,6 +69,7 @@ mod rgba_u8;
 #[cfg(feature = "rdm")]
 mod rgba_u8_rdm;
 mod utils;
+mod vertical_ar30;
 #[cfg(feature = "rdm")]
 mod vertical_ar30_rdm;
 #[cfg(feature = "nightly_f16")]
@@ -105,8 +106,11 @@ pub(crate) use check_alpha::{
     neon_has_non_constant_cap_alpha_rgba16, neon_has_non_constant_cap_alpha_rgba8,
 };
 pub(crate) use f16_utils::*;
+pub(crate) use horizontal_ar30::{
+    neon_convolve_horizontal_rgba_rows_4_ar30, neon_convolve_horizontal_rgba_rows_ar30,
+};
 #[cfg(feature = "rdm")]
-pub(crate) use horizontal_ar30_rdm::neon_convolve_horizontal_rgba_rows_4_ar30;
+pub(crate) use horizontal_ar30_rdm::neon_convolve_horizontal_rgba_rows_4_ar30_rdm;
 pub(crate) use plane_f32::convolve_horizontal_plane_neon_row_one;
 pub(crate) use plane_f32::convolve_horizontal_plane_neon_rows_4;
 pub use plane_u8::{
@@ -166,8 +170,9 @@ pub(crate) use rgba_u8::{
 pub(crate) use rgba_u8_rdm::{
     convolve_horizontal_rgba_neon_row_i16, convolve_horizontal_rgba_neon_rows_4_u8_i16,
 };
+pub(crate) use vertical_ar30::neon_column_handler_fixed_point_ar30;
 #[cfg(feature = "rdm")]
-pub(crate) use vertical_ar30_rdm::neon_column_handler_fixed_point_ar30;
+pub(crate) use vertical_ar30_rdm::neon_column_handler_fixed_point_ar30_rdm;
 #[cfg(feature = "nightly_f16")]
 pub(crate) use vertical_f16::convolve_vertical_rgb_neon_row_f16;
 #[cfg(feature = "nightly_f16")]

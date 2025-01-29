@@ -58,6 +58,20 @@ doc = false
 bench = false
 
 [[bin]]
+name = "resize_rgb_f16"
+path = "resize_rgb_f16/resize_rgb_f16.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "resize_cbcr_f16"
+path = "resize_cbcr_f16/resize_cbcr_f16.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "resize_cbcr16"
 path = "resize_cbcr16/resize_cbcr16.rs"
 test = false
