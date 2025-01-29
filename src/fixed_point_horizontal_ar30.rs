@@ -169,8 +169,8 @@ pub(crate) fn convolve_row_handler_fixed_point_4_ar30<
         if bounds_size == 2 {
             let src_ptr0 = &src[px..(px + 2 * CN)];
             let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 2 * 4)];
-            let src_ptr2 = &src[(px + src_stride * 2 * 4)..(px + src_stride * 2 + 2 * 4)];
-            let src_ptr3 = &src[(px + src_stride * 3 * 4)..(px + src_stride * 3 + 2 * 4)];
+            let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + 2 * 4)];
+            let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + 2 * 4)];
 
             let sliced_weights = &weights[0..2];
             let weight0 = sliced_weights[0] as i32;
@@ -186,8 +186,8 @@ pub(crate) fn convolve_row_handler_fixed_point_4_ar30<
         } else if bounds_size == 3 {
             let src_ptr0 = &src[px..(px + 3 * CN)];
             let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 3 * 4)];
-            let src_ptr2 = &src[(px + src_stride * 2 * 4)..(px + src_stride * 2 + 3 * 4)];
-            let src_ptr3 = &src[(px + src_stride * 3 * 4)..(px + src_stride * 3 + 3 * 4)];
+            let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + 3 * 4)];
+            let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + 3 * 4)];
 
             let sliced_weights = &weights[0..3];
             let weight0 = sliced_weights[0] as i32;
@@ -208,8 +208,8 @@ pub(crate) fn convolve_row_handler_fixed_point_4_ar30<
         } else if bounds_size == 4 {
             let src_ptr0 = &src[px..(px + 4 * CN)];
             let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 4 * 4)];
-            let src_ptr2 = &src[(px + src_stride * 2 * 4)..(px + src_stride * 2 + 4 * 4)];
-            let src_ptr3 = &src[(px + src_stride * 3 * 4)..(px + src_stride * 3 + 4 * 4)];
+            let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + 4 * 4)];
+            let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + 4 * 4)];
 
             let sliced_weights = &weights[0..4];
             let weight0 = sliced_weights[0] as i32;
@@ -235,8 +235,8 @@ pub(crate) fn convolve_row_handler_fixed_point_4_ar30<
         } else if bounds_size == 6 {
             let src_ptr0 = &src[px..(px + 6 * CN)];
             let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 6 * 4)];
-            let src_ptr2 = &src[(px + src_stride * 2 * 4)..(px + src_stride * 2 + 6 * 4)];
-            let src_ptr3 = &src[(px + src_stride * 3 * 4)..(px + src_stride * 3 + 6 * 4)];
+            let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + 6 * 4)];
+            let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + 6 * 4)];
 
             let sliced_weights = &weights[0..6];
             let weight0 = sliced_weights[0] as i32;
@@ -272,8 +272,8 @@ pub(crate) fn convolve_row_handler_fixed_point_4_ar30<
         } else {
             let src_ptr0 = &src[px..(px + bounds_size * CN)];
             let src_ptr1 = &src[(px + src_stride)..(px + src_stride + bounds_size * CN)];
-            let src_ptr2 = &src[(px + src_stride * 2 * CN)..(px + src_stride * 2 + bounds_size * CN)];
-            let src_ptr3 = &src[(px + src_stride * 3 * CN)..(px + src_stride * 3 + bounds_size * CN)];
+            let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + bounds_size * CN)];
+            let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + bounds_size * CN)];
 
             for ((((&k_weight, src0), src1), src2), src3) in weights
                 .iter()
