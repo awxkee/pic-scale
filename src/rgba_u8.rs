@@ -196,13 +196,12 @@ impl VerticalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
                 }
             }
             #[cfg(feature = "nightly_avx512")]
-            if std::arch::is_x86_feature_detected!("avx512bw") {
-                if _scale_factor < 8.
-                    && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
-                {
-                    use crate::avx512::convolve_vertical_avx512_row_lp;
-                    _dispatcher = convolve_vertical_avx512_row_lp;
-                }
+            if std::arch::is_x86_feature_detected!("avx512bw")
+                && _scale_factor < 8.
+                && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
+            {
+                use crate::avx512::convolve_vertical_avx512_row_lp;
+                _dispatcher = convolve_vertical_avx512_row_lp;
             }
         }
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]

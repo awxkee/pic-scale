@@ -94,7 +94,7 @@ impl AssociateAlpha for AssociateAlphaDefault {
         if !rem.is_empty() {
             assert!(rem.len() <= 64);
             assert!(src_rem.len() <= 64);
-            self.associate_chunk(&mut rem, &src_rem);
+            self.associate_chunk(rem, src_rem);
         }
     }
 }

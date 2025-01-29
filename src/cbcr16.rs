@@ -51,8 +51,8 @@ impl VerticalConvolutionPass<u16, 2> for ImageStore<'_, u16, 2> {
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<u16, 2>,
         pool: &Option<ThreadPool>,
-        _: ConvolutionOptions,
+        options: ConvolutionOptions,
     ) {
-        convolve_vertical_dispatch_u16(self, filter_weights, destination, pool);
+        convolve_vertical_dispatch_u16(self, filter_weights, destination, pool, options);
     }
 }
