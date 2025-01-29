@@ -144,7 +144,7 @@ fn convolve_column_handler_fixed_point_direct_buffer_double<
         }
     }
 
-    let v_dst0 = &mut dst[v_start_px * 4..(v_start_px + BUFFER_SIZE * 4)];
+    let v_dst0 = &mut dst[v_start_px * 4..(v_start_px * 4 + BUFFER_SIZE * 4)];
     for (dst, src) in v_dst0.chunks_exact_mut(4).zip(direct_store0) {
         let saturated = src
             .saturate_ar30()
