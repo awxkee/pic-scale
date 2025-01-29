@@ -58,11 +58,24 @@ const fn ntohl(netlong: u32) -> u32 {
 }
 
 impl Rgb30 {
+    // #[inline]
+    // pub(crate) const fn pack_w_a<const STORE: usize>(self, r: i32, g: i32, b: i32, a: i32) -> u32 {
+    //     let value: u32 = match self {
+    //         Rgb30::Ar30 => (((a << 30) | (b << 20)) | ((g << 10) | r)) as u32,
+    //         Rgb30::Ra30 => (((r << 22) | (g << 12)) | ((b << 2) | a)) as u32,
+    //     };
+    //     if STORE == 0 {
+    //         value
+    //     } else {
+    //         htonl(value)
+    //     }
+    // }
+
     #[inline]
-    pub(crate) const fn pack_w_a<const STORE: usize>(self, r: i32, g: i32, b: i32, a: i32) -> u32 {
+    pub(crate) const fn pack_w_a<const STORE: usize>(self, r: i32, g: i32, b: i32, _: i32) -> u32 {
         let value: u32 = match self {
-            Rgb30::Ar30 => (((a << 30) | (b << 20)) | ((g << 10) | r)) as u32,
-            Rgb30::Ra30 => (((r << 22) | (g << 12)) | ((b << 2) | a)) as u32,
+            Rgb30::Ar30 => (((3 << 30) | (b << 20)) | ((g << 10) | r)) as u32,
+            Rgb30::Ra30 => (((r << 22) | (g << 12)) | ((b << 2) | 3)) as u32,
         };
         if STORE == 0 {
             value
@@ -79,15 +92,15 @@ impl Rgb30 {
                 let r10 = pixel & 0x3ff;
                 let g10 = (pixel >> 10) & 0x3ff;
                 let b10 = (pixel >> 20) & 0x3ff;
-                let a10 = pixel >> 30;
-                (r10, g10, b10, a10)
+                // let a10 = pixel >> 30;
+                (r10, g10, b10, 3)
             }
             Rgb30::Ra30 => {
-                let a2 = pixel & 0x3;
+                // let a2 = pixel & 0x3;
                 let r10 = (pixel >> 22) & 0x3ff;
                 let g10 = (pixel >> 12) & 0x3ff;
                 let b10 = (pixel >> 2) & 0x3ff;
-                (r10, g10, b10, a2)
+                (r10, g10, b10, 3)
             }
         }
     }

@@ -11,7 +11,11 @@ use fast_image_resize::{
     CpuExtensions, FilterType, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
-use pic_scale::{Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, ImageStoreScaling, ResamplingFunction, RgbF16ImageStore, RgbF16ImageStoreMut, Rgba16ImageStoreMut, RgbaF16ImageStore, RgbaF16ImageStoreMut, Scaler, Scaling, ScalingU16, ThreadingPolicy, WorkloadStrategy};
+use pic_scale::{
+    Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, ImageStoreScaling, ResamplingFunction,
+    RgbF16ImageStore, RgbF16ImageStoreMut, Rgba16ImageStoreMut, RgbaF16ImageStore,
+    RgbaF16ImageStoreMut, Scaler, Scaling, ScalingU16, ThreadingPolicy, WorkloadStrategy,
+};
 
 fn resize_plane(
     src_width: usize,
@@ -57,6 +61,24 @@ fn main() {
     // resize_plane(378, 257, 257, 257, ResamplingFunction::Bilinear);
 
     // let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 2).collect();
+
+    let src_width = 289;
+    let src_height = 257;
+    let dst_width = 257;
+    let dst_height = 511;
+    let src_data_ar30 = vec![1u8; src_width * src_height * 4];
+    let mut dst_data_ar30 = vec![1u8; dst_width * dst_height * 4];
+    scaler
+        .resize_ar30(
+            &src_data_ar30,
+            src_width * 4,
+            ImageSize::new(src_width, src_height),
+            &mut dst_data_ar30,
+            dst_width * 4,
+            ImageSize::new(dst_width, dst_height),
+            Ar30ByteOrder::Host,
+        )
+        .unwrap();
 
     let rgb_feature16 = transient
         .iter()

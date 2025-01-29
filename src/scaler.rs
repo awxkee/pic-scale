@@ -1120,6 +1120,8 @@ impl ScalingU16 for Scaler {
 impl Scaler {
     /// Resizes RGBA2101010 image
     ///
+    /// This method ignores alpha scaling.
+    ///
     /// # Arguments
     /// `src` - source slice
     /// `src_size` - Source Image size
@@ -1151,6 +1153,8 @@ impl Scaler {
     }
 
     /// Resizes RGBA1010102 image
+    ///
+    /// This method ignores alpha scaling.
     ///
     /// # Arguments
     /// `src` - source slice

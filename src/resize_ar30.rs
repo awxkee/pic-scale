@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::convolution::ConvolutionOptions;
 use crate::dispatch_group_ar30::{
     convolve_horizontal_dispatch_ar30, convolve_vertical_dispatch_ar30,
 };
@@ -109,6 +110,8 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     let should_do_vertical = src_size.height != dst_size.height;
     assert!(should_do_horizontal || should_do_vertical);
 
+    let options = ConvolutionOptions::new(scaler.workload_strategy);
+
     if should_do_vertical && !should_do_horizontal {
         let vertical_filters = scaler.generate_weights(src_size.height, dst_size.height);
         convolve_vertical_dispatch_ar30::<AR30_TYPE, AR30_ORDER>(
@@ -119,6 +122,7 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
             src_stride,
             &pool,
             src_size.width,
+            options,
         );
         return Ok(());
     } else if should_do_horizontal && should_do_vertical {
@@ -133,6 +137,7 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
             src_size.width * 4,
             &pool,
             src_size.width,
+            options,
         );
 
         let horizontal_filters = scaler.generate_weights(src_size.width, dst_size.width);
@@ -143,6 +148,7 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
             dst,
             dst_stride,
             &pool,
+            options,
         );
     } else {
         let horizontal_filters = scaler.generate_weights(src_size.width, dst_size.width);
@@ -153,6 +159,7 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
             dst,
             dst_stride,
             &pool,
+            options,
         );
     }
 

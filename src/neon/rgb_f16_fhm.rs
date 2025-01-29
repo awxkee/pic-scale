@@ -197,10 +197,8 @@ unsafe fn convolve_horizontal_rgb_neon_rows_4_f16_impl(
         while jx + 2 < bounds.size {
             let bounds_start = bounds.start + jx;
             let ptr = weights_ptr.add(jx + filter_offset);
-            let read_weights = xreinterpret_f16_u16(vreinterpret_u16_u32(vld1_lane_u32::<0>(
-                ptr as *const _,
-                vdup_n_u32(0),
-            )));
+            let read_weights =
+                xreinterpret_f16_u16(vreinterpret_u16_u32(vld1_dup_u32(ptr as *const _)));
             store_0 = conv_horiz_2_rgb_f16(bounds_start, src, read_weights, store_0);
             let s_ptr_1 = src.get_unchecked(src_stride..);
             store_1 = conv_horiz_2_rgb_f16(bounds_start, s_ptr_1, read_weights, store_1);
@@ -280,10 +278,8 @@ unsafe fn convolve_horizontal_rgb_neon_row_one_f16_impl(
         while jx + 2 < bounds.size {
             let bounds_start = bounds.start + jx;
             let ptr = weights_ptr.add(jx + filter_offset);
-            let read_weights = xreinterpret_f16_u16(vreinterpret_u16_u32(vld1_lane_u32::<0>(
-                ptr as *const _,
-                vdup_n_u32(0),
-            )));
+            let read_weights =
+                xreinterpret_f16_u16(vreinterpret_u16_u32(vld1_dup_u32(ptr as *const _)));
             store = conv_horiz_2_rgb_f16(bounds_start, src, read_weights, store);
             jx += 2;
         }

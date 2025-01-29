@@ -44,6 +44,15 @@ mod accelerate {
 
         #[allow(non_camel_case_types)]
         #[allow(non_snake_case)]
+        pub fn vImageScale_XRGB2101010W(
+            src: *const vImage_Buffer,
+            dest: *mut vImage_Buffer,
+            temp_buffer: *mut libc::c_void,
+            flags: libc::c_uint,
+        ) -> libc::c_int;
+
+        #[allow(non_camel_case_types)]
+        #[allow(non_snake_case)]
         pub fn vImageScale_ARGBFFFF(
             src: *const vImage_Buffer,
             dest: *mut vImage_Buffer,

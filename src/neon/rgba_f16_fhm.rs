@@ -153,7 +153,7 @@ unsafe fn convolve_horizontal_rgba_neon_row_one_f16_impl(
             let bounds_start = bounds.start + jx;
             let ptr = weights_ptr.add(jx + filter_offset);
             let read_weights =
-                xreinterpret_f16_u16(vreinterpret_u16_f32(vld1_f32(ptr as *const _)));
+                xreinterpret_f16_u16(vreinterpret_u16_u32(vld1_dup_u32(ptr as *const _)));
             store = conv_horiz_rgba_2_f32(bounds_start, src, read_weights, store);
             jx += 2;
         }
@@ -250,7 +250,7 @@ unsafe fn convolve_horizontal_rgba_neon_rows_4_f16_impl(
         while jx + 2 < bounds.size {
             let ptr = weights_ptr.add(jx + filter_offset);
             let read_weights =
-                xreinterpret_f16_u16(vreinterpret_u16_f32(vld1_f32(ptr as *const _)));
+                xreinterpret_f16_u16(vreinterpret_u16_u32(vld1_dup_u32(ptr as *const _)));
             let bounds_start = bounds.start + jx;
             store_0 = conv_horiz_rgba_2_f32(bounds_start, src, read_weights, store_0);
             let ptr_1 = src.get_unchecked(src_stride..);

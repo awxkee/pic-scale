@@ -27,15 +27,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+use crate::convolution::ConvolutionOptions;
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::fixed_point_horizontal_ar30::{
     convolve_row_handler_fixed_point_4_ar30, convolve_row_handler_fixed_point_ar30,
 };
 use crate::fixed_point_vertical_ar30::column_handler_fixed_point_ar30;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::neon::{
-    neon_column_handler_fixed_point_ar30, neon_convolve_horizontal_rgba_rows_4_ar30,
-};
 use crate::support::PRECISION;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
@@ -49,8 +46,9 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
     dst: &mut [u8],
     dst_stride: usize,
     pool: &Option<ThreadPool>,
+    _options: ConvolutionOptions,
 ) {
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
     let is_rdm_available = std::arch::is_aarch64_feature_detected!("rdm");
     if let Some(pool) = pool {
         pool.install(|| {
@@ -60,8 +58,11 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
                 .for_each(|(dst, src)| {
                     let mut _dispatch: fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>) =
                         convolve_row_handler_fixed_point_4_ar30::<AR30_TYPE, AR30_ORDER>;
-                    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-                    if is_rdm_available {
+                    #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
+                    if is_rdm_available
+                        && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
+                    {
+                        use crate::neon::neon_convolve_horizontal_rgba_rows_4_ar30;
                         _dispatch =
                             neon_convolve_horizontal_rgba_rows_4_ar30::<AR30_TYPE, AR30_ORDER>;
                     }
@@ -87,8 +88,11 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
             .for_each(|(dst, src)| {
                 let mut _dispatch: fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>) =
                     convolve_row_handler_fixed_point_4_ar30::<AR30_TYPE, AR30_ORDER>;
-                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-                if is_rdm_available {
+                #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
+                if is_rdm_available
+                    && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
+                {
+                    use crate::neon::neon_convolve_horizontal_rgba_rows_4_ar30;
                     _dispatch = neon_convolve_horizontal_rgba_rows_4_ar30::<AR30_TYPE, AR30_ORDER>;
                 }
                 _dispatch(src, src_stride, dst, dst_stride, &approx);
@@ -114,8 +118,9 @@ pub(crate) fn convolve_vertical_dispatch_ar30<const AR30_TYPE: usize, const AR30
     dst_stride: usize,
     pool: &Option<ThreadPool>,
     width: usize,
+    _options: ConvolutionOptions,
 ) {
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
     let is_rdm_available = std::arch::is_aarch64_feature_detected!("rdm");
     if let Some(pool) = pool {
         pool.install(|| {
@@ -128,8 +133,11 @@ pub(crate) fn convolve_vertical_dispatch_ar30<const AR30_TYPE: usize, const AR30
                     let weights = &approx.weights[filter_offset..];
                     let mut _dispatch: fn(&FilterBounds, &[u8], &mut [u8], usize, &[i16]) =
                         column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
-                    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-                    if is_rdm_available {
+                    #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
+                    if is_rdm_available
+                        && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
+                    {
+                        use crate::neon::neon_column_handler_fixed_point_ar30;
                         _dispatch = neon_column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
                     }
 
@@ -149,8 +157,11 @@ pub(crate) fn convolve_vertical_dispatch_ar30<const AR30_TYPE: usize, const AR30
 
                 let mut _dispatch: fn(&FilterBounds, &[u8], &mut [u8], usize, &[i16]) =
                     column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
-                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-                if is_rdm_available {
+                #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
+                if is_rdm_available
+                    && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
+                {
+                    use crate::neon::neon_column_handler_fixed_point_ar30;
                     _dispatch = neon_column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
                 }
 
