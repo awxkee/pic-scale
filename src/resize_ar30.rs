@@ -32,12 +32,14 @@ use crate::dispatch_group_ar30::{
 use crate::nearest_sampler::resize_nearest;
 use crate::pic_scale_error::PicScaleError;
 use crate::support::check_image_size_overflow;
-use crate::{ImageSize, ResamplingFunction, Scaler};
+use crate::{ImageSize, PicScaleBufferMismatch, ResamplingFunction, Scaler};
 
 pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     src: &[u8],
+    src_stride: usize,
     src_size: ImageSize,
     dst: &mut [u8],
+    dst_stride: usize,
     dst_size: ImageSize,
     scaler: &Scaler,
 ) -> Result<(), PicScaleError> {
@@ -51,6 +53,32 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
 
     if check_image_size_overflow(dst_size.width, dst_size.height, 4) {
         return Err(PicScaleError::DestinationImageIsTooLarge);
+    }
+
+    if src.len() != src_stride * src_size.height {
+        return Err(PicScaleError::BufferMismatch(PicScaleBufferMismatch {
+            expected: src_stride * src_size.height,
+            width: src_size.width,
+            height: src_size.height,
+            channels: 4,
+            slice_len: src.len(),
+        }));
+    }
+    if src_stride < src_size.width * 4 {
+        return Err(PicScaleError::InvalidStride(src_size.width * 4, src_stride));
+    }
+
+    if dst.len() != dst_stride * dst_size.height {
+        return Err(PicScaleError::BufferMismatch(PicScaleBufferMismatch {
+            expected: dst_stride * dst_size.height,
+            width: dst_size.width,
+            height: dst_size.height,
+            channels: 4,
+            slice_len: dst.len(),
+        }));
+    }
+    if dst_stride < dst_size.width * 4 {
+        return Err(PicScaleError::InvalidStride(dst_size.width * 4, dst_stride));
     }
 
     if src_size.width == dst_size.width && src_size.height == dst_size.height {
@@ -67,10 +95,10 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     if scaler.function == ResamplingFunction::Nearest {
         resize_nearest::<u8, 4>(
             src,
-            src_size.width * 4,
+            src_stride,
             src_size.height,
             dst,
-            dst_size.width * 4,
+            dst_stride,
             dst_size.height,
             &pool,
         );
@@ -85,23 +113,21 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
         let vertical_filters = scaler.generate_weights(src_size.height, dst_size.height);
         convolve_vertical_dispatch_ar30::<AR30_TYPE, AR30_ORDER>(
             src,
-            src_size.width * 4,
+            src_stride,
             vertical_filters,
             dst,
-            src_size.width * 4,
+            src_stride,
             &pool,
             src_size.width,
         );
         return Ok(());
-    }
-
-    let working_store = if should_do_vertical {
+    } else if should_do_horizontal && should_do_vertical {
         let mut target = vec![0u8; src_size.width * dst_size.height * 4];
 
         let vertical_filters = scaler.generate_weights(src_size.height, dst_size.height);
         convolve_vertical_dispatch_ar30::<AR30_TYPE, AR30_ORDER>(
             src,
-            src_size.width * 4,
+            src_stride,
             vertical_filters,
             &mut target,
             src_size.width * 4,
@@ -109,19 +135,23 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
             src_size.width,
         );
 
-        std::borrow::Cow::Owned(target)
-    } else {
-        std::borrow::Cow::Borrowed(src)
-    };
-
-    if should_do_horizontal {
         let horizontal_filters = scaler.generate_weights(src_size.width, dst_size.width);
         convolve_horizontal_dispatch_ar30::<AR30_TYPE, AR30_ORDER>(
-            working_store.as_ref(),
+            &target,
             src_size.width * 4,
             horizontal_filters,
             dst,
-            dst_size.width * 4,
+            dst_stride,
+            &pool,
+        );
+    } else {
+        let horizontal_filters = scaler.generate_weights(src_size.width, dst_size.width);
+        convolve_horizontal_dispatch_ar30::<AR30_TYPE, AR30_ORDER>(
+            src,
+            src_stride,
+            horizontal_filters,
+            dst,
+            dst_stride,
             &pool,
         );
     }

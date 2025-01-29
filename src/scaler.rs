@@ -1129,20 +1129,24 @@ impl Scaler {
     pub fn resize_ar30(
         &self,
         src: &[u8],
+        src_stride: usize,
         src_size: ImageSize,
         dst: &mut [u8],
+        dst_stride: usize,
         new_size: ImageSize,
         order: Ar30ByteOrder,
     ) -> Result<(), PicScaleError> {
         match order {
-            Ar30ByteOrder::Host => resize_ar30_impl::<
-                { Rgb30::Ar30 as usize },
-                { Ar30ByteOrder::Host as usize },
-            >(src, src_size, dst, new_size, self),
-            Ar30ByteOrder::Network => resize_ar30_impl::<
-                { Rgb30::Ar30 as usize },
-                { Ar30ByteOrder::Network as usize },
-            >(src, src_size, dst, new_size, self),
+            Ar30ByteOrder::Host => {
+                resize_ar30_impl::<{ Rgb30::Ar30 as usize }, { Ar30ByteOrder::Host as usize }>(
+                    src, src_stride, src_size, dst, dst_stride, new_size, self,
+                )
+            }
+            Ar30ByteOrder::Network => {
+                resize_ar30_impl::<{ Rgb30::Ar30 as usize }, { Ar30ByteOrder::Network as usize }>(
+                    src, src_stride, src_size, dst, dst_stride, new_size, self,
+                )
+            }
         }
     }
 
@@ -1157,20 +1161,24 @@ impl Scaler {
     pub fn resize_ra30(
         &self,
         src: &[u8],
+        src_stride: usize,
         src_size: ImageSize,
         dst: &mut [u8],
+        dst_stride: usize,
         new_size: ImageSize,
         order: Ar30ByteOrder,
     ) -> Result<(), PicScaleError> {
         match order {
-            Ar30ByteOrder::Host => resize_ar30_impl::<
-                { Rgb30::Ra30 as usize },
-                { Ar30ByteOrder::Host as usize },
-            >(src, src_size, dst, new_size, self),
-            Ar30ByteOrder::Network => resize_ar30_impl::<
-                { Rgb30::Ra30 as usize },
-                { Ar30ByteOrder::Network as usize },
-            >(src, src_size, dst, new_size, self),
+            Ar30ByteOrder::Host => {
+                resize_ar30_impl::<{ Rgb30::Ra30 as usize }, { Ar30ByteOrder::Host as usize }>(
+                    src, src_stride, src_size, dst, dst_stride, new_size, self,
+                )
+            }
+            Ar30ByteOrder::Network => {
+                resize_ar30_impl::<{ Rgb30::Ra30 as usize }, { Ar30ByteOrder::Network as usize }>(
+                    src, src_stride, src_size, dst, dst_stride, new_size, self,
+                )
+            }
         }
     }
 }

@@ -93,8 +93,10 @@ fn resize_rgba(
     let mut dst_data_ar30 = vec![1u8; dst_width * dst_height * 4];
     _ = scaler.resize_ar30(
         &src_data_ar30,
+        src_width * 4,
         ImageSize::new(src_width, src_height),
         &mut dst_data_ar30,
+        dst_height * 4,
         ImageSize::new(dst_width, dst_height),
         Ar30ByteOrder::Host,
     );
