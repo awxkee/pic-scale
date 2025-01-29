@@ -10,6 +10,7 @@ fast_image_resize = { version = "5.0.0", features = [] }
 half = { version = "2.4.1", default-features = true }
 accelerate = {path = "accelerate/"}
 libc = "0.2.169"
+yuvutils-rs = {path = "../../../RustroverProjects/yuvutils-rs"}
 
 [dev-dependencies]
 criterion = "0.5.1"

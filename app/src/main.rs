@@ -11,6 +11,7 @@ use fast_image_resize::{
     CpuExtensions, FilterType, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
+use yuvutils_rs::{ar30_to_rgb8, rgb8_to_ar30, Rgb30ByteOrder};
 use pic_scale::{
     Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, ImageStoreScaling, ResamplingFunction,
     RgbF16ImageStore, RgbF16ImageStoreMut, Rgba16ImageStoreMut, RgbaF16ImageStore,
@@ -56,29 +57,11 @@ fn main() {
 
     let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
-    scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
+    scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
     // resize_plane(378, 257, 257, 257, ResamplingFunction::Bilinear);
 
     // let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 2).collect();
-
-    let src_width = 289;
-    let src_height = 257;
-    let dst_width = 257;
-    let dst_height = 511;
-    let src_data_ar30 = vec![1u8; src_width * src_height * 4];
-    let mut dst_data_ar30 = vec![1u8; dst_width * dst_height * 4];
-    scaler
-        .resize_ar30(
-            &src_data_ar30,
-            src_width * 4,
-            ImageSize::new(src_width, src_height),
-            &mut dst_data_ar30,
-            dst_width * 4,
-            ImageSize::new(dst_width, dst_height),
-            Ar30ByteOrder::Host,
-        )
-        .unwrap();
 
     let rgb_feature16 = transient
         .iter()
@@ -90,74 +73,74 @@ fn main() {
         RgbF16ImageStore::from_slice(&rgb_feature16, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
 
-    let dst_size = ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
-    // let mut resized_ar = vec![0u32; dst_size.width * dst_size.height];
-    // scaler
-    //     .resize_ra30(
-    //         &ar30_src,
-    //         ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-    //         &mut resized_ar,
-    //         dst_size,
-    //         Ar30ByteOrder::Host,
-    //     )
-    //     .unwrap();
-
+    // let dst_size = ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+    // // let mut resized_ar = vec![0u32; dst_size.width * dst_size.height];
+    // // scaler
+    // //     .resize_ra30(
+    // //         &ar30_src,
+    // //         ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+    // //         &mut resized_ar,
+    // //         dst_size,
+    // //         Ar30ByteOrder::Host,
+    // //     )
+    // //     .unwrap();
+    //
     let mut dst_store = RgbF16ImageStoreMut::alloc_with_depth(
         dimensions.0 as usize / 4,
         dimensions.1 as usize / 4,
         10,
     );
-
-    // for i in 0..25 {
-    let start_time = Instant::now();
+    //
+    // // for i in 0..25 {
+    // let start_time = Instant::now();
     scaler.resize_rgb_f16(&store, &mut dst_store).unwrap();
-
-    let elapsed_time = start_time.elapsed();
-    // Print the elapsed time in milliseconds
-    println!("Scaler: {:.2?}", elapsed_time);
-
-    // #[cfg(target_os = "macos")]
-    // {
-    //     use accelerate::{kvImageDoNotTile, vImageScale_ARGB8888, vImage_Buffer};
-    //     let src_buffer = vImage_Buffer {
-    //         data: store.buffer.as_ptr() as *mut libc::c_void,
-    //         height: store.height,
-    //         width: store.width,
-    //         row_bytes: store.stride(),
-    //     };
     //
-    //     let mut dst_buffer = vImage_Buffer {
-    //         data: dst_store.buffer.borrow_mut().as_mut_ptr() as *mut libc::c_void,
-    //         height: dst_store.height,
-    //         width: dst_store.width,
-    //         row_bytes: dst_store.stride(),
-    //     };
+    // let elapsed_time = start_time.elapsed();
+    // // Print the elapsed time in milliseconds
+    // println!("Scaler: {:.2?}", elapsed_time);
     //
-    //     let start_time = Instant::now();
-    //     let result = unsafe {
-    //         vImageScale_ARGB8888(&src_buffer, &mut dst_buffer, std::ptr::null_mut(), kvImageDoNotTile)
-    //     };
-    //     if result != 0 {
-    //         panic!("Can' resize by accelerate");
-    //     }
+    // // #[cfg(target_os = "macos")]
+    // // {
+    // //     use accelerate::{kvImageDoNotTile, vImageScale_ARGB8888, vImage_Buffer};
+    // //     let src_buffer = vImage_Buffer {
+    // //         data: store.buffer.as_ptr() as *mut libc::c_void,
+    // //         height: store.height,
+    // //         width: store.width,
+    // //         row_bytes: store.stride(),
+    // //     };
+    // //
+    // //     let mut dst_buffer = vImage_Buffer {
+    // //         data: dst_store.buffer.borrow_mut().as_mut_ptr() as *mut libc::c_void,
+    // //         height: dst_store.height,
+    // //         width: dst_store.width,
+    // //         row_bytes: dst_store.stride(),
+    // //     };
+    // //
+    // //     let start_time = Instant::now();
+    // //     let result = unsafe {
+    // //         vImageScale_ARGB8888(&src_buffer, &mut dst_buffer, std::ptr::null_mut(), kvImageDoNotTile)
+    // //     };
+    // //     if result != 0 {
+    // //         panic!("Can' resize by accelerate");
+    // //     }
+    // //
+    // //     let elapsed_time = start_time.elapsed();
+    // //     // Print the elapsed time in milliseconds
+    // //     println!("Accelerate: {:.2?}", elapsed_time);
+    // // }
     //
-    //     let elapsed_time = start_time.elapsed();
-    //     // Print the elapsed time in milliseconds
-    //     println!("Accelerate: {:.2?}", elapsed_time);
-    // }
-
-    // let dst: Vec<u8> = resized
-    //     .as_bytes()
-    //     .iter()
-    //     .map(|&x| (x * 255f32) as u8)
-    //     .collect();
-
-    // let dst: Vec<u8> = dst_store
-    //     .as_bytes()
-    //     .iter()
-    //     .map(|&x| (x >> 2) as u8)
-    //     .collect();
-
+    // // let dst: Vec<u8> = resized
+    // //     .as_bytes()
+    // //     .iter()
+    // //     .map(|&x| (x * 255f32) as u8)
+    // //     .collect();
+    //
+    // // let dst: Vec<u8> = dst_store
+    // //     .as_bytes()
+    // //     .iter()
+    // //     .map(|&x| (x >> 2) as u8)
+    // //     .collect();
+    //
     let dst = dst_store
         .as_bytes()
         .iter()

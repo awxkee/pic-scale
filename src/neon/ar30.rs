@@ -359,23 +359,24 @@ pub(crate) unsafe fn vextract_ar30<const AR30_TYPE: usize, const AR30_ORDER: usi
     v: uint16x4_t,
 ) -> u32 {
     let v0 = vreinterpret_u64_u16(v);
-    let a_mask = vdup_n_u64(0x3);
     let v_mask = vdup_n_u64(0x3ff);
-    let mut a = vand_u64(vshr_n_u64::<48>(v0), a_mask);
     let r = vand_u64(v0, v_mask);
     let g = vand_u64(vshr_n_u64::<16>(v0), v_mask);
     let b = vand_u64(vshr_n_u64::<32>(v0), v_mask);
 
     let ar_type: Rgb30 = AR30_TYPE.into();
 
+    let mut a;
+
     match ar_type {
         Rgb30::Ar30 => {
-            a = vshl_n_u64::<30>(a);
+            a = vdup_n_u64(3 << 30);
             a = vorr_u64(a, vshl_n_u64::<20>(b));
             a = vorr_u64(a, vshl_n_u64::<10>(g));
             a = vorr_u64(a, r);
         }
         Rgb30::Ra30 => {
+            a = vdup_n_u64(3);
             a = vorr_u64(a, vshl_n_u64::<2>(b));
             a = vorr_u64(a, vshl_n_u64::<12>(g));
             a = vorr_u64(a, vshl_n_u64::<22>(r));
