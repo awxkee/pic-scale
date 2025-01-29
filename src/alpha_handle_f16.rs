@@ -36,17 +36,18 @@ use crate::neon::{neon_premultiply_alpha_rgba_f16, neon_unpremultiply_alpha_rgba
 use crate::neon::{neon_premultiply_alpha_rgba_f16_full, neon_unpremultiply_alpha_rgba_f16_full};
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{sse_premultiply_alpha_rgba_f16, sse_unpremultiply_alpha_rgba_f16};
+use core::f16;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
 
 #[inline]
-pub(crate) fn unpremultiply_pixel_f16_row(in_place: &mut [half::f16]) {
+pub(crate) fn unpremultiply_pixel_f16_row(in_place: &mut [f16]) {
     for dst in in_place.chunks_exact_mut(4) {
-        let mut r = dst[0].to_f32();
-        let mut g = dst[1].to_f32();
-        let mut b = dst[2].to_f32();
-        let a = dst[3].to_f32();
+        let mut r = dst[0] as f32;
+        let mut g = dst[1] as f32;
+        let mut b = dst[2] as f32;
+        let a = dst[3] as f32;
         if a != 0. {
             let scale_alpha = 1. / a;
             r *= scale_alpha;
@@ -57,33 +58,33 @@ pub(crate) fn unpremultiply_pixel_f16_row(in_place: &mut [half::f16]) {
             g = 0.;
             b = 0.;
         }
-        dst[0] = half::f16::from_f32(r);
-        dst[1] = half::f16::from_f32(g);
-        dst[2] = half::f16::from_f32(b);
+        dst[0] = r as f16;
+        dst[1] = g as f16;
+        dst[2] = b as f16;
     }
 }
 
 #[inline]
-pub(crate) fn premultiply_pixel_f16_row(dst: &mut [half::f16], src: &[half::f16]) {
+pub(crate) fn premultiply_pixel_f16_row(dst: &mut [f16], src: &[f16]) {
     for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
-        let mut r = src[0].to_f32();
-        let mut g = src[1].to_f32();
-        let mut b = src[2].to_f32();
-        let a = src[3].to_f32();
+        let mut r = src[0] as f32;
+        let mut g = src[1] as f32;
+        let mut b = src[2] as f32;
+        let a = src[3] as f32;
         r *= a;
         g *= a;
         b *= a;
-        dst[0] = half::f16::from_f32(r);
-        dst[1] = half::f16::from_f32(g);
-        dst[2] = half::f16::from_f32(b);
-        dst[3] = half::f16::from_f32(a);
+        dst[0] = r as f16;
+        dst[1] = g as f16;
+        dst[2] = b as f16;
+        dst[3] = a as f16;
     }
 }
 
 fn premultiply_alpha_rgba_impl_f16(
-    dst: &mut [half::f16],
+    dst: &mut [f16],
     dst_stride: usize,
-    src: &[half::f16],
+    src: &[f16],
     src_stride: usize,
     width: usize,
     _: usize,
@@ -107,7 +108,7 @@ fn premultiply_alpha_rgba_impl_f16(
 }
 
 fn unpremultiply_alpha_rgba_impl_f16(
-    dst: &mut [half::f16],
+    dst: &mut [f16],
     stride: usize,
     width: usize,
     _: usize,
@@ -127,18 +128,19 @@ fn unpremultiply_alpha_rgba_impl_f16(
 }
 
 pub(crate) fn premultiply_alpha_rgba_f16(
-    dst: &mut [half::f16],
+    dst: &mut [f16],
     dst_stride: usize,
-    src: &[half::f16],
+    src: &[f16],
     src_stride: usize,
     width: usize,
     height: usize,
     pool: &Option<ThreadPool>,
 ) {
+    #[allow(clippy::type_complexity)]
     let mut _dispatcher: fn(
-        &mut [half::f16],
+        &mut [f16],
         usize,
-        &[half::f16],
+        &[f16],
         usize,
         usize,
         usize,
@@ -167,13 +169,13 @@ pub(crate) fn premultiply_alpha_rgba_f16(
 }
 
 pub(crate) fn unpremultiply_alpha_rgba_f16(
-    in_place: &mut [half::f16],
+    in_place: &mut [f16],
     stride: usize,
     width: usize,
     height: usize,
     pool: &Option<ThreadPool>,
 ) {
-    let mut _dispatcher: fn(&mut [half::f16], usize, usize, usize, &Option<ThreadPool>) =
+    let mut _dispatcher: fn(&mut [f16], usize, usize, usize, &Option<ThreadPool>) =
         unpremultiply_alpha_rgba_impl_f16;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {

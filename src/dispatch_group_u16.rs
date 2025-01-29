@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+use crate::convolution::ConvolutionOptions;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::cpu_features::is_aarch_f16_supported;
 use crate::filter_weights::{
@@ -163,6 +164,7 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStoreMut<'_, u16, COMPONENTS>,
     pool: &Option<ThreadPool>,
+    _options: ConvolutionOptions,
 ) {
     let src_stride = image_store.stride();
     let dst_stride = destination.stride();
@@ -195,8 +197,10 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
             } else {
                 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
                 {
-                    if is_aarch_f16_supported() {
-                        use crate::filter_weights::WeightFloat16Converter;
+                    if is_aarch_f16_supported()
+                        && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
+                    {
+                        use crate::filter_weights::WeightFloat16ConverterCast;
                         execute_low_precision_row(
                             true,
                             image_store,
@@ -207,7 +211,7 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
                             dst_width,
                             destination_image,
                             HighBitDepthFloat16LowerHandler::default(),
-                            WeightFloat16Converter::default(),
+                            WeightFloat16ConverterCast::default(),
                         );
                     } else {
                         execute_low_precision_row(
@@ -262,8 +266,10 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
     } else {
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            if is_aarch_f16_supported() {
-                use crate::filter_weights::WeightFloat16Converter;
+            if is_aarch_f16_supported()
+                && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
+            {
+                use crate::filter_weights::WeightFloat16ConverterCast;
                 execute_low_precision_row(
                     false,
                     image_store,
@@ -274,7 +280,7 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
                     dst_width,
                     destination.buffer.borrow_mut(),
                     HighBitDepthFloat16LowerHandler::default(),
-                    WeightFloat16Converter::default(),
+                    WeightFloat16ConverterCast::default(),
                 );
             } else {
                 execute_low_precision_row(

@@ -26,18 +26,21 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::convolution::ConvolutionOptions;
 use crate::dispatch_group_ar30::{
     convolve_horizontal_dispatch_ar30, convolve_vertical_dispatch_ar30,
 };
 use crate::nearest_sampler::resize_nearest;
 use crate::pic_scale_error::PicScaleError;
 use crate::support::check_image_size_overflow;
-use crate::{ImageSize, ResamplingFunction, Scaler};
+use crate::{ImageSize, PicScaleBufferMismatch, ResamplingFunction, Scaler};
 
 pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
-    src: &[u32],
+    src: &[u8],
+    src_stride: usize,
     src_size: ImageSize,
-    dst: &mut [u32],
+    dst: &mut [u8],
+    dst_stride: usize,
     dst_size: ImageSize,
     scaler: &Scaler,
 ) -> Result<(), PicScaleError> {
@@ -45,12 +48,38 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
         return Err(PicScaleError::ZeroImageDimensions);
     }
 
-    if check_image_size_overflow(src_size.width, src_size.height, 1) {
+    if check_image_size_overflow(src_size.width, src_size.height, 4) {
         return Err(PicScaleError::SourceImageIsTooLarge);
     }
 
-    if check_image_size_overflow(dst_size.width, dst_size.height, 1) {
+    if check_image_size_overflow(dst_size.width, dst_size.height, 4) {
         return Err(PicScaleError::DestinationImageIsTooLarge);
+    }
+
+    if src.len() != src_stride * src_size.height {
+        return Err(PicScaleError::BufferMismatch(PicScaleBufferMismatch {
+            expected: src_stride * src_size.height,
+            width: src_size.width,
+            height: src_size.height,
+            channels: 4,
+            slice_len: src.len(),
+        }));
+    }
+    if src_stride < src_size.width * 4 {
+        return Err(PicScaleError::InvalidStride(src_size.width * 4, src_stride));
+    }
+
+    if dst.len() != dst_stride * dst_size.height {
+        return Err(PicScaleError::BufferMismatch(PicScaleBufferMismatch {
+            expected: dst_stride * dst_size.height,
+            width: dst_size.width,
+            height: dst_size.height,
+            channels: 4,
+            slice_len: dst.len(),
+        }));
+    }
+    if dst_stride < dst_size.width * 4 {
+        return Err(PicScaleError::InvalidStride(dst_size.width * 4, dst_stride));
     }
 
     if src_size.width == dst_size.width && src_size.height == dst_size.height {
@@ -65,12 +94,12 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
         .get_pool(ImageSize::new(dst_size.width, dst_size.height));
 
     if scaler.function == ResamplingFunction::Nearest {
-        resize_nearest::<u32, 1>(
+        resize_nearest::<u8, 4>(
             src,
-            src_size.width,
+            src_stride,
             src_size.height,
             dst,
-            dst_size.width,
+            dst_stride,
             dst_size.height,
             &pool,
         );
@@ -81,46 +110,56 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     let should_do_vertical = src_size.height != dst_size.height;
     assert!(should_do_horizontal || should_do_vertical);
 
+    let options = ConvolutionOptions::new(scaler.workload_strategy);
+
     if should_do_vertical && !should_do_horizontal {
         let vertical_filters = scaler.generate_weights(src_size.height, dst_size.height);
         convolve_vertical_dispatch_ar30::<AR30_TYPE, AR30_ORDER>(
             src,
-            src_size.width,
+            src_stride,
             vertical_filters,
             dst,
-            src_size.width,
+            src_stride,
             &pool,
+            src_size.width,
+            options,
         );
         return Ok(());
-    }
-
-    let working_store = if should_do_vertical {
-        let mut target = vec![0u32; src_size.width * dst_size.height];
+    } else if should_do_horizontal && should_do_vertical {
+        let mut target = vec![0u8; src_size.width * dst_size.height * 4];
 
         let vertical_filters = scaler.generate_weights(src_size.height, dst_size.height);
         convolve_vertical_dispatch_ar30::<AR30_TYPE, AR30_ORDER>(
             src,
-            src_size.width,
+            src_stride,
             vertical_filters,
             &mut target,
-            src_size.width,
+            src_size.width * 4,
             &pool,
+            src_size.width,
+            options,
         );
 
-        std::borrow::Cow::Owned(target)
-    } else {
-        std::borrow::Cow::Borrowed(src)
-    };
-
-    if should_do_horizontal {
         let horizontal_filters = scaler.generate_weights(src_size.width, dst_size.width);
         convolve_horizontal_dispatch_ar30::<AR30_TYPE, AR30_ORDER>(
-            working_store.as_ref(),
-            src_size.width,
+            &target,
+            src_size.width * 4,
             horizontal_filters,
             dst,
-            dst_size.width,
+            dst_stride,
             &pool,
+            options,
+        );
+    } else {
+        let horizontal_filters = scaler.generate_weights(src_size.width, dst_size.width);
+        convolve_horizontal_dispatch_ar30::<AR30_TYPE, AR30_ORDER>(
+            src,
+            src_stride,
+            horizontal_filters,
+            dst,
+            dst_stride,
+            &pool,
+            options,
         );
     }
 

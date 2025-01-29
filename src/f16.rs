@@ -34,11 +34,11 @@ use crate::avx2::{
     convolve_horizontal_rgba_avx_row_one_f16, convolve_horizontal_rgba_avx_rows_4_f16,
     convolve_vertical_avx_row_f16,
 };
-use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
+use crate::convolution::{ConvolutionOptions, HorizontalConvolutionPass, VerticalConvolutionPass};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
 use crate::cpu_features::{is_aarch_f16_supported, is_aarch_f16c_supported};
 use crate::dispatch_group_f16::{convolve_horizontal_dispatch_f16, convolve_vertical_dispatch_f16};
-use crate::filter_weights::{FilterBounds, FilterWeights};
+use crate::filter_weights::{FilterBounds, FilterWeights, PasshroughWeightsConverter};
 use crate::floating_point_horizontal::{
     convolve_row_handler_floating_point, convolve_row_handler_floating_point_4,
 };
@@ -63,7 +63,7 @@ use crate::sse::{
     convolve_vertical_sse_row_f16,
 };
 use crate::ImageStore;
-use half::f16;
+use core::{f16, f32};
 use rayon::ThreadPool;
 
 fn convolve_horizontal_rgba_4_row_f16<const CHANNELS: usize>(
@@ -75,14 +75,19 @@ fn convolve_horizontal_rgba_4_row_f16<const CHANNELS: usize>(
     dst: &mut [f16],
     dst_stride: usize,
 ) {
-    convolve_row_handler_floating_point_4::<f16, f32, f32, CHANNELS>(
-        src,
+    let transient_src = src.iter().map(|&x| x as f32).collect::<Vec<f32>>();
+    let mut transient_dst = vec![0f32; dst.len()];
+    convolve_row_handler_floating_point_4::<f32, f32, f32, CHANNELS>(
+        &transient_src,
         src_stride,
-        dst,
+        &mut transient_dst,
         dst_stride,
         filter_weights,
         8,
-    )
+    );
+    for (dst, src) in dst.iter_mut().zip(transient_dst.iter()) {
+        *dst = *src as f16;
+    }
 }
 
 fn convolve_horizontal_rgb_native_row_f16<const CHANNELS: usize>(
@@ -92,7 +97,17 @@ fn convolve_horizontal_rgb_native_row_f16<const CHANNELS: usize>(
     src: &[f16],
     dst: &mut [f16],
 ) {
-    convolve_row_handler_floating_point::<f16, f32, f32, CHANNELS>(src, dst, filter_weights, 8)
+    let transient_src = src.iter().map(|&x| x as f32).collect::<Vec<f32>>();
+    let mut transient_dst = vec![0f32; dst.len()];
+    convolve_row_handler_floating_point::<f32, f32, f32, CHANNELS>(
+        &transient_src,
+        &mut transient_dst,
+        filter_weights,
+        8,
+    );
+    for (dst, src) in dst.iter_mut().zip(transient_dst.iter()) {
+        *dst = *src as f16;
+    }
 }
 
 impl HorizontalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
@@ -101,6 +116,7 @@ impl HorizontalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 4>,
         pool: &Option<ThreadPool>,
+        _options: ConvolutionOptions,
     ) {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher_4_rows: Option<
@@ -114,9 +130,31 @@ impl HorizontalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
             if is_aarch_f16c_supported() {
                 _dispatcher_4_rows = Some(convolve_horizontal_rgba_neon_rows_4_f16);
                 _dispatcher_row = convolve_horizontal_rgba_neon_row_one_f16;
-                if is_aarch_f16_supported() {
-                    _dispatcher_4_rows = Some(xconvolve_horizontal_rgba_neon_rows_4_f16);
-                    _dispatcher_row = xconvolve_horizontal_rgba_neon_row_one_f16;
+                match _options.workload_strategy {
+                    crate::WorkloadStrategy::PreferSpeed => {
+                        if is_aarch_f16_supported() {
+                            _dispatcher_4_rows = Some(xconvolve_horizontal_rgba_neon_rows_4_f16);
+                            _dispatcher_row = xconvolve_horizontal_rgba_neon_row_one_f16;
+                        }
+                    }
+                    crate::WorkloadStrategy::PreferQuality => {
+                        if std::arch::is_aarch64_feature_detected!("fhm") {
+                            use crate::filter_weights::WeightFloat16Converter;
+                            use crate::neon::{
+                                convolve_horizontal_rgba_neon_row_one_f16_fhm,
+                                convolve_horizontal_rgba_neon_rows_4_f16_fhm,
+                            };
+                            return convolve_horizontal_dispatch_f16(
+                                self,
+                                filter_weights,
+                                destination,
+                                pool,
+                                Some(convolve_horizontal_rgba_neon_rows_4_f16_fhm),
+                                convolve_horizontal_rgba_neon_row_one_f16_fhm,
+                                WeightFloat16Converter::default(),
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -154,6 +192,7 @@ impl HorizontalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
             pool,
             _dispatcher_4_rows,
             _dispatcher_row,
+            PasshroughWeightsConverter::default(),
         );
     }
 }
@@ -166,7 +205,19 @@ fn convolve_vertical_rgb_native_row_f16(
     src_stride: usize,
     weight: &[f32],
 ) {
-    column_handler_floating_point::<f16, f32, f32>(bounds, src, dst, src_stride, weight, 8);
+    let transient_src = src.iter().map(|&x| x as f32).collect::<Vec<f32>>();
+    let mut transient_dst = vec![0f32; dst.len()];
+    column_handler_floating_point::<f32, f32, f32>(
+        bounds,
+        &transient_src,
+        &mut transient_dst,
+        src_stride,
+        weight,
+        8,
+    );
+    for (dst, src) in dst.iter_mut().zip(transient_dst.iter()) {
+        *dst = *src as f16;
+    }
 }
 
 impl VerticalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
@@ -175,6 +226,7 @@ impl VerticalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 4>,
         pool: &Option<ThreadPool>,
+        _options: ConvolutionOptions,
     ) {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[f32]) =
@@ -183,8 +235,26 @@ impl VerticalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
         {
             if is_aarch_f16c_supported() {
                 _dispatcher = convolve_vertical_rgb_neon_row_f16;
-                if is_aarch_f16_supported() {
-                    _dispatcher = xconvolve_vertical_rgb_neon_row_f16;
+                match _options.workload_strategy {
+                    crate::WorkloadStrategy::PreferQuality => {
+                        use crate::filter_weights::WeightFloat16Converter;
+                        use crate::neon::convolve_vertical_rgb_neon_row_f16_fhm;
+                        if std::arch::is_aarch64_feature_detected!("fhm") {
+                            return convolve_vertical_dispatch_f16(
+                                self,
+                                filter_weights,
+                                destination,
+                                pool,
+                                convolve_vertical_rgb_neon_row_f16_fhm,
+                                WeightFloat16Converter {},
+                            );
+                        }
+                    }
+                    crate::WorkloadStrategy::PreferSpeed => {
+                        if is_aarch_f16_supported() {
+                            _dispatcher = xconvolve_vertical_rgb_neon_row_f16;
+                        }
+                    }
                 }
             }
         }
@@ -210,7 +280,14 @@ impl VerticalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
                 }
             }
         }
-        convolve_vertical_dispatch_f16(self, filter_weights, destination, pool, _dispatcher);
+        convolve_vertical_dispatch_f16(
+            self,
+            filter_weights,
+            destination,
+            pool,
+            _dispatcher,
+            PasshroughWeightsConverter {},
+        );
     }
 }
 
@@ -220,6 +297,7 @@ impl HorizontalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 3>,
         pool: &Option<ThreadPool>,
+        _options: ConvolutionOptions,
     ) {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher_4_rows: Option<
@@ -233,9 +311,33 @@ impl HorizontalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
             if is_aarch_f16c_supported() {
                 _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rows_4_f16);
                 _dispatcher_row = convolve_horizontal_rgb_neon_row_one_f16;
-                if is_aarch_f16_supported() {
-                    _dispatcher_4_rows = Some(xconvolve_horizontal_rgb_neon_rows_4_f16);
-                    _dispatcher_row = xconvolve_horizontal_rgb_neon_row_one_f16;
+            }
+            match _options.workload_strategy {
+                crate::WorkloadStrategy::PreferQuality => {
+                    if std::arch::is_aarch64_feature_detected!("fhm") {
+                        use crate::filter_weights::WeightFloat16Converter;
+                        use crate::neon::{
+                            convolve_horizontal_rgb_neon_row_one_f16_fhm,
+                            convolve_horizontal_rgb_neon_rows_4_f16_fhm,
+                        };
+                        return convolve_horizontal_dispatch_f16(
+                            self,
+                            filter_weights,
+                            destination,
+                            pool,
+                            Some(convolve_horizontal_rgb_neon_rows_4_f16_fhm),
+                            convolve_horizontal_rgb_neon_row_one_f16_fhm,
+                            WeightFloat16Converter::default(),
+                        );
+                    }
+                }
+                crate::WorkloadStrategy::PreferSpeed => {
+                    if is_aarch_f16_supported()
+                        && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
+                    {
+                        _dispatcher_4_rows = Some(xconvolve_horizontal_rgb_neon_rows_4_f16);
+                        _dispatcher_row = xconvolve_horizontal_rgb_neon_row_one_f16;
+                    }
                 }
             }
         }
@@ -264,6 +366,7 @@ impl HorizontalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
             pool,
             _dispatcher_4_rows,
             _dispatcher_row,
+            PasshroughWeightsConverter::default(),
         );
     }
 }
@@ -274,6 +377,7 @@ impl VerticalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 3>,
         pool: &Option<ThreadPool>,
+        _options: ConvolutionOptions,
     ) {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[f32]) =
@@ -282,8 +386,26 @@ impl VerticalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
         {
             if is_aarch_f16c_supported() {
                 _dispatcher = convolve_vertical_rgb_neon_row_f16;
-                if is_aarch_f16_supported() {
-                    _dispatcher = xconvolve_vertical_rgb_neon_row_f16;
+                match _options.workload_strategy {
+                    crate::WorkloadStrategy::PreferQuality => {
+                        use crate::filter_weights::WeightFloat16Converter;
+                        use crate::neon::convolve_vertical_rgb_neon_row_f16_fhm;
+                        if std::arch::is_aarch64_feature_detected!("fhm") {
+                            return convolve_vertical_dispatch_f16(
+                                self,
+                                filter_weights,
+                                destination,
+                                pool,
+                                convolve_vertical_rgb_neon_row_f16_fhm,
+                                WeightFloat16Converter {},
+                            );
+                        }
+                    }
+                    crate::WorkloadStrategy::PreferSpeed => {
+                        if is_aarch_f16_supported() {
+                            _dispatcher = xconvolve_vertical_rgb_neon_row_f16;
+                        }
+                    }
                 }
             }
         }
@@ -309,7 +431,14 @@ impl VerticalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
                 }
             }
         }
-        convolve_vertical_dispatch_f16(self, filter_weights, destination, pool, _dispatcher);
+        convolve_vertical_dispatch_f16(
+            self,
+            filter_weights,
+            destination,
+            pool,
+            _dispatcher,
+            PasshroughWeightsConverter::default(),
+        );
     }
 }
 
@@ -319,6 +448,7 @@ impl HorizontalConvolutionPass<f16, 1> for ImageStore<'_, f16, 1> {
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 1>,
         pool: &Option<ThreadPool>,
+        _: ConvolutionOptions,
     ) {
         #[allow(clippy::type_complexity)]
         let _dispatcher_4_rows: Option<
@@ -333,6 +463,7 @@ impl HorizontalConvolutionPass<f16, 1> for ImageStore<'_, f16, 1> {
             pool,
             _dispatcher_4_rows,
             _dispatcher_row,
+            PasshroughWeightsConverter::default(),
         );
     }
 }
@@ -343,6 +474,7 @@ impl VerticalConvolutionPass<f16, 1> for ImageStore<'_, f16, 1> {
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 1>,
         pool: &Option<ThreadPool>,
+        _options: ConvolutionOptions,
     ) {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[f32]) =
@@ -351,8 +483,26 @@ impl VerticalConvolutionPass<f16, 1> for ImageStore<'_, f16, 1> {
         {
             if is_aarch_f16c_supported() {
                 _dispatcher = convolve_vertical_rgb_neon_row_f16;
-                if is_aarch_f16_supported() {
-                    _dispatcher = xconvolve_vertical_rgb_neon_row_f16;
+                match _options.workload_strategy {
+                    crate::WorkloadStrategy::PreferQuality => {
+                        use crate::filter_weights::WeightFloat16Converter;
+                        use crate::neon::convolve_vertical_rgb_neon_row_f16_fhm;
+                        if std::arch::is_aarch64_feature_detected!("fhm") {
+                            return convolve_vertical_dispatch_f16(
+                                self,
+                                filter_weights,
+                                destination,
+                                pool,
+                                convolve_vertical_rgb_neon_row_f16_fhm,
+                                WeightFloat16Converter {},
+                            );
+                        }
+                    }
+                    crate::WorkloadStrategy::PreferSpeed => {
+                        if is_aarch_f16_supported() {
+                            _dispatcher = xconvolve_vertical_rgb_neon_row_f16;
+                        }
+                    }
                 }
             }
         }
@@ -377,7 +527,14 @@ impl VerticalConvolutionPass<f16, 1> for ImageStore<'_, f16, 1> {
                 }
             }
         }
-        convolve_vertical_dispatch_f16(self, filter_weights, destination, pool, _dispatcher);
+        convolve_vertical_dispatch_f16(
+            self,
+            filter_weights,
+            destination,
+            pool,
+            _dispatcher,
+            PasshroughWeightsConverter::default(),
+        );
     }
 }
 
@@ -387,6 +544,7 @@ impl HorizontalConvolutionPass<f16, 2> for ImageStore<'_, f16, 2> {
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 2>,
         pool: &Option<ThreadPool>,
+        _: ConvolutionOptions,
     ) {
         #[allow(clippy::type_complexity)]
         let _dispatcher_4_rows: Option<
@@ -401,6 +559,7 @@ impl HorizontalConvolutionPass<f16, 2> for ImageStore<'_, f16, 2> {
             pool,
             _dispatcher_4_rows,
             _dispatcher_row,
+            PasshroughWeightsConverter::default(),
         );
     }
 }
@@ -411,6 +570,7 @@ impl VerticalConvolutionPass<f16, 2> for ImageStore<'_, f16, 2> {
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 2>,
         pool: &Option<ThreadPool>,
+        _options: ConvolutionOptions,
     ) {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[f32]) =
@@ -419,8 +579,26 @@ impl VerticalConvolutionPass<f16, 2> for ImageStore<'_, f16, 2> {
         {
             if is_aarch_f16c_supported() {
                 _dispatcher = convolve_vertical_rgb_neon_row_f16;
-                if is_aarch_f16_supported() {
-                    _dispatcher = xconvolve_vertical_rgb_neon_row_f16;
+                match _options.workload_strategy {
+                    crate::WorkloadStrategy::PreferQuality => {
+                        use crate::filter_weights::WeightFloat16Converter;
+                        use crate::neon::convolve_vertical_rgb_neon_row_f16_fhm;
+                        if std::arch::is_aarch64_feature_detected!("fhm") {
+                            return convolve_vertical_dispatch_f16(
+                                self,
+                                filter_weights,
+                                destination,
+                                pool,
+                                convolve_vertical_rgb_neon_row_f16_fhm,
+                                WeightFloat16Converter {},
+                            );
+                        }
+                    }
+                    crate::WorkloadStrategy::PreferSpeed => {
+                        if is_aarch_f16_supported() {
+                            _dispatcher = xconvolve_vertical_rgb_neon_row_f16;
+                        }
+                    }
                 }
             }
         }
@@ -445,6 +623,13 @@ impl VerticalConvolutionPass<f16, 2> for ImageStore<'_, f16, 2> {
                 }
             }
         }
-        convolve_vertical_dispatch_f16(self, filter_weights, destination, pool, _dispatcher);
+        convolve_vertical_dispatch_f16(
+            self,
+            filter_weights,
+            destination,
+            pool,
+            _dispatcher,
+            PasshroughWeightsConverter::default(),
+        );
     }
 }

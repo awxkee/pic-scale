@@ -29,13 +29,38 @@
 #![deny(deprecated)]
 // #![deny(unreachable_code, unused)]
 #![allow(clippy::too_many_arguments)]
-#![cfg_attr(feature = "nightly_avx512", feature(cfg_version))]
-#![cfg_attr(feature = "nightly_avx512", feature(avx512_target_feature))]
-#![cfg_attr(feature = "nightly_avx512", feature(stdarch_x86_avx512))]
-#![cfg_attr(feature = "nightly_avx512fp16", feature(stdarch_x86_avx512_f16))]
+#![cfg_attr(
+    all(
+        feature = "nightly_avx512",
+        any(target_arch = "x86", target_arch = "x86_64")
+    ),
+    feature(cfg_version)
+)]
+#![cfg_attr(
+    all(
+        feature = "nightly_avx512",
+        any(target_arch = "x86", target_arch = "x86_64")
+    ),
+    feature(avx512_target_feature)
+)]
+#![cfg_attr(
+    all(
+        feature = "nightly_avx512",
+        any(target_arch = "x86", target_arch = "x86_64")
+    ),
+    feature(stdarch_x86_avx512)
+)]
+#![cfg_attr(
+    all(
+        feature = "nightly_avx512fp16",
+        any(target_arch = "x86", target_arch = "x86_64")
+    ),
+    feature(stdarch_x86_avx512_f16)
+)]
+#![cfg_attr(feature = "nightly_f16", feature(f16))]
 
 mod alpha_check;
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 mod alpha_handle_f16;
 mod alpha_handle_f32;
 mod alpha_handle_u16;
@@ -58,12 +83,12 @@ mod convolution;
 mod convolve_naive_f32;
 mod cpu_features;
 mod dispatch_group_ar30;
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 mod dispatch_group_f16;
 mod dispatch_group_f32;
 mod dispatch_group_u16;
 mod dispatch_group_u8;
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 mod f16;
 mod filter_weights;
 mod fixed_point_horizontal;
@@ -95,7 +120,7 @@ mod rgba_u8;
 mod sampler;
 mod saturate_narrow;
 mod scaler;
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 mod scaler_f16;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod sse;
@@ -118,7 +143,7 @@ pub use image_store::{
     RgbF32ImageStore, RgbF32ImageStoreMut, Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore,
     Rgba8ImageStoreMut, RgbaF32ImageStore, RgbaF32ImageStoreMut,
 };
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 pub use image_store::{
     CbCrF16ImageStore, CbCrF16ImageStoreMut, PlanarF16ImageStore, PlanarF16ImageStoreMut,
     RgbF16ImageStore, RgbF16ImageStoreMut, RgbaF16ImageStore, RgbaF16ImageStoreMut,
@@ -129,5 +154,5 @@ pub use sampler::*;
 pub use scaler::Scaling;
 pub use scaler::ScalingF32;
 pub use scaler::ScalingU16;
-pub use scaler::{ImageStoreScaling, Scaler, ScalingOptions};
+pub use scaler::{ImageStoreScaling, Scaler, ScalingOptions, WorkloadStrategy};
 pub use threading_policy::*;

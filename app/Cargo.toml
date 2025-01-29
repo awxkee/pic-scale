@@ -5,8 +5,7 @@ edition = "2021"
 
 [dependencies]
 image = { version = "0.25.5", features = ["default"] }
-#image = { path= "../../../RustroverProjects/image", features = ["default", "avif", "avif-native"] }
-pic-scale = { path = "..", features = ["half"], default-features = true }
+pic-scale = { path = "..", features = ["nightly_f16"], default-features = false }
 fast_image_resize = { version = "5.0.0", features = [] }
 half = { version = "2.4.1", default-features = true }
 accelerate = {path = "accelerate/"}
@@ -16,7 +15,7 @@ libc = "0.2.169"
 criterion = "0.5.1"
 #image = { version = "0.25.2", features = ["default"] }
 fast_image_resize = { version = "5.0.0", features = [] }
-pic-scale = { path = "..", features = ["half"] }
+pic-scale = { path = "..", features = ["nightly_f16", "rdm"], default-features = false }
 
 [[bench]]
 name = "resize_rgb"

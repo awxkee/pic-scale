@@ -5,7 +5,7 @@ use fast_image_resize::{CpuExtensions, PixelType, ResizeAlg, ResizeOptions, Resi
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
     ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32, ScalingU16,
-    ThreadingPolicy,
+    ThreadingPolicy, WorkloadStrategy,
 };
 
 pub fn criterion_benchmark(c: &mut Criterion) {
@@ -25,6 +25,22 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
             scaler.set_threading_policy(ThreadingPolicy::Single);
+            scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
+            let mut target =
+                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+            scaler.resize_rgb(&store, &mut target).unwrap();
+        })
+    });
+
+    c.bench_function("Pic scale RGB: Lanczos 3/Quality", |b| {
+        let copied: Vec<u8> = Vec::from(src_bytes);
+        let store =
+            ImageStore::<u8, 3>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
+                .unwrap();
+        b.iter(|| {
+            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+            scaler.set_threading_policy(ThreadingPolicy::Single);
+            scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
             let mut target =
                 ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
             scaler.resize_rgb(&store, &mut target).unwrap();

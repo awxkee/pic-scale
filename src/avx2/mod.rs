@@ -27,26 +27,26 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 mod alpha_f16;
 mod alpha_f32;
 mod alpha_u16;
 mod alpha_u8;
 mod check_alpha;
 mod rgb_u8;
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 mod rgba_f16;
 mod rgba_f32;
 mod rgba_u8_lb;
 pub(crate) mod utils;
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 mod vertical_f16;
 mod vertical_f32;
 mod vertical_u16_lb;
 mod vertical_u8;
 mod vertical_u8_lp;
 
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 pub(crate) use alpha_f16::{avx_premultiply_alpha_rgba_f16, avx_unpremultiply_alpha_rgba_f16};
 pub(crate) use alpha_f32::avx_premultiply_alpha_rgba_f32;
 pub(crate) use alpha_f32::avx_unpremultiply_alpha_rgba_f32;
@@ -57,7 +57,7 @@ pub(crate) use check_alpha::{
     avx_has_non_constant_cap_alpha_rgba16, avx_has_non_constant_cap_alpha_rgba8,
 };
 pub(crate) use rgb_u8::{convolve_horizontal_rgb_avx_row_one, convolve_horizontal_rgb_avx_rows_4};
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 pub(crate) use rgba_f16::{
     convolve_horizontal_rgba_avx_row_one_f16, convolve_horizontal_rgba_avx_rows_4_f16,
 };
@@ -67,7 +67,7 @@ pub(crate) use rgba_f32::{
 pub(crate) use rgba_u8_lb::{
     convolve_horizontal_rgba_avx_rows_4_lb, convolve_horizontal_rgba_avx_rows_one_lb,
 };
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 pub(crate) use vertical_f16::convolve_vertical_avx_row_f16;
 pub(crate) use vertical_f32::convolve_vertical_avx_row_f32;
 pub(crate) use vertical_u16_lb::convolve_column_lb_avx2_u16;

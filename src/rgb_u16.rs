@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
+use crate::convolution::{ConvolutionOptions, HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::dispatch_group_u16::{convolve_horizontal_dispatch_u16, convolve_vertical_dispatch_u16};
 use crate::filter_weights::FilterWeights;
 use crate::image_store::ImageStoreMut;
@@ -41,6 +41,7 @@ impl HorizontalConvolutionPass<u16, 3> for ImageStore<'_, u16, 3> {
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<u16, 3>,
         _pool: &Option<ThreadPool>,
+        _: ConvolutionOptions,
     ) {
         convolve_horizontal_dispatch_u16(self, filter_weights, destination, _pool);
     }
@@ -52,7 +53,8 @@ impl VerticalConvolutionPass<u16, 3> for ImageStore<'_, u16, 3> {
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<u16, 3>,
         pool: &Option<ThreadPool>,
+        options: ConvolutionOptions,
     ) {
-        convolve_vertical_dispatch_u16(self, filter_weights, destination, pool);
+        convolve_vertical_dispatch_u16(self, filter_weights, destination, pool, options);
     }
 }

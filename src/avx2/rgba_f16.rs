@@ -32,7 +32,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-use half::f16;
+use core::f16;
 
 use crate::avx2::utils::{_mm256_fma_ps, avx_combine_ps};
 use crate::filter_weights::FilterWeights;

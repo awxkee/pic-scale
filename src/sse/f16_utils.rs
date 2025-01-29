@@ -211,7 +211,7 @@ pub(crate) unsafe fn _mm_cvtph_psx<const F16C: bool>(x: __m128i) -> __m128 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use half::f16;
+    use f16;
 
     #[test]
     fn test_conversion_into_f16() {

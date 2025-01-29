@@ -28,7 +28,7 @@
  */
 use crate::filter_weights::FilterWeights;
 use crate::neon::ar30::{
-    vextract_ar30, vld1_ar30_s16, vunzip_4_ar30_separate, vunzips_4_ar30_separate,
+    vextract_ar30, vld1_ar30_s16, vunzip_3_ar30_separate, vunzips_4_ar30_separate,
 };
 use std::arch::aarch64::*;
 
@@ -39,11 +39,11 @@ unsafe fn conv_horiz_rgba_1_u8_i16<
     const AR_ORDER: usize,
 >(
     start_x: usize,
-    src: &[u32],
+    src: &[u8],
     w0: int16x4_t,
     store: int16x4_t,
 ) -> int16x4_t {
-    let src_ptr = src.get_unchecked(start_x..);
+    let src_ptr = src.get_unchecked(start_x * 4..);
     let ld = vld1_ar30_s16::<AR_TYPE, AR_ORDER>(src_ptr);
     let rgba_pixel = vshl_n_s16::<SCALE>(ld);
     vqrdmlah_s16(store, rgba_pixel, w0)
@@ -56,14 +56,15 @@ unsafe fn conv_horiz_rgba_8_u8_i16<
     const AR_ORDER: usize,
 >(
     start_x: usize,
-    src: &[u32],
+    src: &[u8],
     set1: (int16x4_t, int16x4_t, int16x4_t, int16x4_t),
     set2: (int16x4_t, int16x4_t, int16x4_t, int16x4_t),
     store: int16x4_t,
 ) -> int16x4_t {
-    let src_ptr = src.get_unchecked(start_x..);
+    let src_ptr = src.get_unchecked(start_x * 4..);
 
-    let rgba_pixel = vunzip_4_ar30_separate::<AR_TYPE, AR_ORDER>(vld1q_u32_x2(src_ptr.as_ptr()));
+    let rgba_pixel =
+        vunzip_3_ar30_separate::<AR_TYPE, AR_ORDER>(vld1q_u32_x2(src_ptr.as_ptr() as *const _));
 
     let hi0 = vshlq_n_s16::<SCALE>(rgba_pixel.1);
     let lo0 = vshlq_n_s16::<SCALE>(rgba_pixel.0);
@@ -88,16 +89,17 @@ unsafe fn conv_horiz_rgba_4_u8_i16<
     const AR_ORDER: usize,
 >(
     start_x: usize,
-    src: &[u32],
+    src: &[u8],
     w0: int16x4_t,
     w1: int16x4_t,
     w2: int16x4_t,
     w3: int16x4_t,
     store: int16x4_t,
 ) -> int16x4_t {
-    let src_ptr = src.get_unchecked(start_x..);
+    let src_ptr = src.get_unchecked(start_x * 4..);
 
-    let rgba_pixel = vunzips_4_ar30_separate::<AR_TYPE, AR_ORDER>(vld1q_u32(src_ptr.as_ptr()));
+    let rgba_pixel =
+        vunzips_4_ar30_separate::<AR_TYPE, AR_ORDER>(vld1q_u32(src_ptr.as_ptr() as *const _));
 
     let hi = vshlq_n_s16::<SCALE>(rgba_pixel.1);
     let lo = vshlq_n_s16::<SCALE>(rgba_pixel.0);
@@ -115,9 +117,9 @@ pub(crate) fn neon_convolve_horizontal_rgba_rows_4_ar30<
     const AR_TYPE: usize,
     const AR_ORDER: usize,
 >(
-    src: &[u32],
+    src: &[u8],
     src_stride: usize,
-    dst: &mut [u32],
+    dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
 ) {
@@ -134,9 +136,9 @@ pub(crate) fn neon_convolve_horizontal_rgba_rows_4_ar30<
 
 #[target_feature(enable = "rdm")]
 unsafe fn neon_convolve_horizontal_rgba_rows_4_impl<const AR_TYPE: usize, const AR_ORDER: usize>(
-    src: &[u32],
+    src: &[u8],
     src_stride: usize,
-    dst: &mut [u32],
+    dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
 ) {
@@ -153,10 +155,10 @@ unsafe fn neon_convolve_horizontal_rgba_rows_4_impl<const AR_TYPE: usize, const 
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
         let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let iter_row0 = row0_ref.iter_mut();
-        let iter_row1 = row1_ref.iter_mut();
-        let iter_row2 = row2_ref.iter_mut();
-        let iter_row3 = row3_ref.iter_mut();
+        let iter_row0 = row0_ref.chunks_exact_mut(4);
+        let iter_row1 = row1_ref.chunks_exact_mut(4);
+        let iter_row2 = row2_ref.chunks_exact_mut(4);
+        let iter_row3 = row3_ref.chunks_exact_mut(4);
 
         let v_shl_back = vld1_s16(
             [
@@ -333,14 +335,26 @@ unsafe fn neon_convolve_horizontal_rgba_rows_4_impl<const AR_TYPE: usize, const 
                 v_cut_off,
             ));
 
-            let packed0 = vextract_ar30::<AR_TYPE, AR_ORDER>(store_16_0);
-            *chunk0 = packed0;
-            let packed1 = vextract_ar30::<AR_TYPE, AR_ORDER>(store_16_1);
-            *chunk1 = packed1;
-            let packed2 = vextract_ar30::<AR_TYPE, AR_ORDER>(store_16_2);
-            *chunk2 = packed2;
-            let packed3 = vextract_ar30::<AR_TYPE, AR_ORDER>(store_16_3);
-            *chunk3 = packed3;
+            let packed0 = vextract_ar30::<AR_TYPE, AR_ORDER>(store_16_0).to_ne_bytes();
+            chunk0[0] = packed0[0];
+            chunk0[1] = packed0[1];
+            chunk0[2] = packed0[2];
+            chunk0[3] = packed0[3];
+            let packed1 = vextract_ar30::<AR_TYPE, AR_ORDER>(store_16_1).to_ne_bytes();
+            chunk1[0] = packed1[0];
+            chunk1[1] = packed1[1];
+            chunk1[2] = packed1[2];
+            chunk1[3] = packed1[3];
+            let packed2 = vextract_ar30::<AR_TYPE, AR_ORDER>(store_16_2).to_ne_bytes();
+            chunk2[0] = packed2[0];
+            chunk2[1] = packed2[1];
+            chunk2[2] = packed2[2];
+            chunk2[3] = packed2[3];
+            let packed3 = vextract_ar30::<AR_TYPE, AR_ORDER>(store_16_3).to_ne_bytes();
+            chunk3[0] = packed3[0];
+            chunk3[1] = packed3[1];
+            chunk3[2] = packed3[2];
+            chunk3[3] = packed3[3];
         }
     }
 }

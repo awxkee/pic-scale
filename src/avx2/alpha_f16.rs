@@ -29,6 +29,7 @@
 
 use crate::alpha_handle_f16::{premultiply_pixel_f16_row, unpremultiply_pixel_f16_row};
 use crate::avx2::utils::{avx_combine_epi, avx_deinterleave_rgba_epi16, avx_interleave_rgba_epi16};
+use core::f16;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
@@ -38,9 +39,9 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 pub(crate) fn avx_premultiply_alpha_rgba_f16(
-    dst: &mut [half::f16],
+    dst: &mut [f16],
     dst_stride: usize,
-    src: &[half::f16],
+    src: &[f16],
     src_stride: usize,
     width: usize,
     height: usize,
@@ -53,7 +54,7 @@ pub(crate) fn avx_premultiply_alpha_rgba_f16(
 
 #[target_feature(enable = "avx2", enable = "f16c")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn avx_premultiply_alpha_rgba_f16_row_impl(dst: &mut [half::f16], src: &[half::f16]) {
+unsafe fn avx_premultiply_alpha_rgba_f16_row_impl(dst: &mut [f16], src: &[f16]) {
     let mut rem = dst;
     let mut src_rem = src;
 
@@ -116,9 +117,9 @@ unsafe fn avx_premultiply_alpha_rgba_f16_row_impl(dst: &mut [half::f16], src: &[
 #[target_feature(enable = "avx2", enable = "f16c")]
 /// This inlining is required to activate all features for runtime dispatch
 unsafe fn avx_premultiply_alpha_rgba_f16_impl(
-    dst: &mut [half::f16],
+    dst: &mut [f16],
     dst_stride: usize,
-    src: &[half::f16],
+    src: &[f16],
     src_stride: usize,
     width: usize,
     _: usize,
@@ -145,7 +146,7 @@ unsafe fn avx_premultiply_alpha_rgba_f16_impl(
 }
 
 pub(crate) fn avx_unpremultiply_alpha_rgba_f16(
-    in_place: &mut [half::f16],
+    in_place: &mut [f16],
     stride: usize,
     width: usize,
     height: usize,
@@ -158,7 +159,7 @@ pub(crate) fn avx_unpremultiply_alpha_rgba_f16(
 
 #[target_feature(enable = "avx2", enable = "f16c")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn avx_unpremultiply_alpha_rgba_f16_row_impl(in_place: &mut [half::f16]) {
+unsafe fn avx_unpremultiply_alpha_rgba_f16_row_impl(in_place: &mut [f16]) {
     let mut rem = in_place;
 
     for dst in rem.chunks_exact_mut(16 * 4) {
@@ -243,7 +244,7 @@ unsafe fn avx_unpremultiply_alpha_rgba_f16_row_impl(in_place: &mut [half::f16]) 
 #[target_feature(enable = "avx2", enable = "f16c")]
 /// This inlining is required to activate all features for runtime dispatch
 unsafe fn avx_unpremultiply_alpha_rgba_f16_impl(
-    in_place: &mut [half::f16],
+    in_place: &mut [f16],
     stride: usize,
     width: usize,
     _: usize,

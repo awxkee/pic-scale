@@ -28,6 +28,7 @@
  */
 use crate::avx2::utils::{_mm256_fma_ps, avx_combine_epi};
 use crate::filter_weights::FilterBounds;
+use core::f16;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -37,9 +38,9 @@ use std::arch::x86_64::*;
 unsafe fn convolve_vertical_part_avx_f16<const FMA: bool>(
     start_y: usize,
     start_x: usize,
-    src: &[half::f16],
+    src: &[f16],
     src_stride: usize,
-    dst: &mut [half::f16],
+    dst: &mut [f16],
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
@@ -76,9 +77,9 @@ unsafe fn convolve_vertical_part_avx_f16<const FMA: bool>(
 unsafe fn convolve_vertical_part_avx_4_f16<const FMA: bool>(
     start_y: usize,
     start_x: usize,
-    src: &[half::f16],
+    src: &[f16],
     src_stride: usize,
-    dst: &mut [half::f16],
+    dst: &mut [f16],
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
@@ -109,9 +110,9 @@ unsafe fn convolve_vertical_part_avx_4_f16<const FMA: bool>(
 unsafe fn convolve_vertical_part_avx_32_f16<const FMA: bool>(
     start_y: usize,
     start_x: usize,
-    src: &[half::f16],
+    src: &[f16],
     src_stride: usize,
-    dst: &mut [half::f16],
+    dst: &mut [f16],
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
@@ -164,9 +165,9 @@ unsafe fn convolve_vertical_part_avx_32_f16<const FMA: bool>(
 unsafe fn convolve_vertical_part_avx_16_f16<const FMA: bool>(
     start_y: usize,
     start_x: usize,
-    src: &[half::f16],
+    src: &[f16],
     src_stride: usize,
-    dst: &mut [half::f16],
+    dst: &mut [f16],
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
@@ -204,8 +205,8 @@ unsafe fn convolve_vertical_part_avx_16_f16<const FMA: bool>(
 pub(crate) fn convolve_vertical_avx_row_f16<const FMA: bool>(
     width: usize,
     bounds: &FilterBounds,
-    src: &[half::f16],
-    dst: &mut [half::f16],
+    src: &[f16],
+    dst: &mut [f16],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
@@ -223,8 +224,8 @@ pub(crate) fn convolve_vertical_avx_row_f16<const FMA: bool>(
 unsafe fn convolve_vertical_avx_row_f16_regular(
     width: usize,
     bounds: &FilterBounds,
-    src: &[half::f16],
-    dst: &mut [half::f16],
+    src: &[f16],
+    dst: &mut [f16],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
@@ -236,8 +237,8 @@ unsafe fn convolve_vertical_avx_row_f16_regular(
 unsafe fn convolve_vertical_avx_row_f16_fma(
     width: usize,
     bounds: &FilterBounds,
-    src: &[half::f16],
-    dst: &mut [half::f16],
+    src: &[f16],
+    dst: &mut [f16],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
@@ -248,8 +249,8 @@ unsafe fn convolve_vertical_avx_row_f16_fma(
 unsafe fn convolve_vertical_avx_row_f16_impl<const FMA: bool>(
     _: usize,
     bounds: &FilterBounds,
-    src: &[half::f16],
-    dst: &mut [half::f16],
+    src: &[f16],
+    dst: &mut [f16],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {

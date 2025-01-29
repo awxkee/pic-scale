@@ -1,11 +1,12 @@
+#![feature(f16)]
 use criterion::{criterion_group, criterion_main, Criterion};
 use fast_image_resize::images::Image;
 use fast_image_resize::FilterType::Lanczos3;
 use fast_image_resize::{CpuExtensions, PixelType, ResizeAlg, ResizeOptions, Resizer};
 use image::{GenericImageView, ImageReader};
 use pic_scale::{
-    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32, ScalingU16,
-    ThreadingPolicy,
+    Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling,
+    ScalingF32, ScalingU16, ThreadingPolicy, WorkloadStrategy,
 };
 
 pub fn criterion_benchmark(c: &mut Criterion) {
@@ -16,7 +17,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let dimensions = img.dimensions();
     let src_bytes = img.as_bytes();
 
-    c.bench_function("Pic scale RGBA with alpha: Lanczos 3", |b| {
+    /*c.bench_function("Pic scale RGBA with alpha: Lanczos 3", |b| {
         let copied: Vec<u8> = Vec::from(src_bytes);
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
@@ -98,8 +99,26 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
+    c.bench_function("Pic scale RGBA without alpha: Lanczos 3/Quality", |b| {
+        let copied: Vec<u8> = Vec::from(src_bytes);
+        b.iter(|| {
+            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+            scaler.set_threading_policy(ThreadingPolicy::Single);
+            scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
+            let store = ImageStore::<u8, 4>::from_slice(
+                &copied,
+                dimensions.0 as usize,
+                dimensions.1 as usize,
+            )
+            .unwrap();
+            let mut target =
+                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+            _ = scaler.resize_rgba(&store, &mut target, false);
+        })
+    });
+
     #[cfg(any(target_os = "macos", target_os = "ios"))]
-    c.bench_function("Apple Accelerate: Lanczos 3", |b| {
+    c.bench_function("Apple Accelerate RGBA: Lanczos 3", |b| {
         let copied: Vec<u8> = Vec::from(src_bytes);
         use accelerate::{kvImageDoNotTile, vImageScale_ARGB8888, vImage_Buffer};
         b.iter(|| {
@@ -320,6 +339,152 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
             let result = unsafe {
                 vImageScale_ARGB16U(
+                    &src_buffer,
+                    &mut dst_buffer,
+                    std::ptr::null_mut(),
+                    kvImageDoNotTile,
+                )
+            };
+            if result != 0 {
+                panic!("Can't resize by accelerate");
+            }
+        })
+    });
+
+    use core::f16;
+
+    c.bench_function("Pic scale RGBA F16 without alpha: Lanczos 3/Quality", |b| {
+        let copied: Vec<f16> = vec![0.; src_bytes.len()];
+        b.iter(|| {
+            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+            scaler.set_threading_policy(ThreadingPolicy::Single);
+            scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
+            let store = ImageStore::<f16, 4>::from_slice(
+                &copied,
+                dimensions.0 as usize,
+                dimensions.1 as usize,
+            )
+            .unwrap();
+            let mut target =
+                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+            scaler.resize_rgba_f16(&store, &mut target, false).unwrap();
+        })
+    });
+
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    c.bench_function("Apple Accelerate RGBAF16: Lanczos 3", |b| {
+        let copied: Vec<f16> = vec![0.; src_bytes.len()];
+        use accelerate::{kvImageDoNotTile, vImageScale_ARGB16F, vImage_Buffer};
+        b.iter(|| {
+            let mut target = ImageStoreMut::<f16, 4>::alloc(
+                dimensions.0 as usize / 4,
+                dimensions.1 as usize / 4,
+            );
+
+            let src_buffer = vImage_Buffer {
+                data: copied.as_ptr() as *mut libc::c_void,
+                width: dimensions.0 as usize,
+                height: dimensions.1 as usize,
+                row_bytes: dimensions.0 as usize * 4 * std::mem::size_of::<f16>(),
+            };
+
+            let target_stride = target.stride();
+            let target_ptr = target.buffer.borrow_mut().as_mut_ptr() as *mut libc::c_void;
+
+            let mut dst_buffer = vImage_Buffer {
+                data: target_ptr,
+                width: target.width,
+                height: target.height,
+                row_bytes: target_stride * std::mem::size_of::<f16>(),
+            };
+
+            let result = unsafe {
+                vImageScale_ARGB16F(
+                    &src_buffer,
+                    &mut dst_buffer,
+                    std::ptr::null_mut(),
+                    kvImageDoNotTile,
+                )
+            };
+            if result != 0 {
+                panic!("Can't resize by accelerate");
+            }
+        })
+    });*/
+
+    c.bench_function("Pic scale RGBA1010102(N0: Lanczos 3/Speed", |b| {
+        let copied: Vec<u8> = Vec::from(src_bytes);
+        b.iter(|| {
+            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+            scaler.set_threading_policy(ThreadingPolicy::Single);
+            scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
+
+            let mut dst_data_ar30 =
+                vec![1u8; (dimensions.0 as usize / 4) * (dimensions.1 as usize / 4) * 4];
+            scaler
+                .resize_ar30(
+                    &copied,
+                    dimensions.0 as usize * 4,
+                    ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+                    &mut dst_data_ar30,
+                    (dimensions.0 as usize / 4) * 4,
+                    ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+                    Ar30ByteOrder::Network,
+                )
+                .unwrap();
+        })
+    });
+
+    c.bench_function("Pic scale RGBA1010102(N): Lanczos 3/Quality", |b| {
+        let copied: Vec<u8> = Vec::from(src_bytes);
+        b.iter(|| {
+            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+            scaler.set_threading_policy(ThreadingPolicy::Single);
+            scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
+
+            let mut dst_data_ar30 =
+                vec![1u8; (dimensions.0 as usize / 4) * (dimensions.1 as usize / 4) * 4];
+            scaler
+                .resize_ar30(
+                    &copied,
+                    dimensions.0 as usize * 4,
+                    ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+                    &mut dst_data_ar30,
+                    (dimensions.0 as usize / 4) * 4,
+                    ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+                    Ar30ByteOrder::Network,
+                )
+                .unwrap();
+        })
+    });
+
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    c.bench_function("Apple Accelerate RGBX1010102(N): Lanczos 3", |b| {
+        let copied: Vec<u8> = Vec::from(src_bytes);
+        use accelerate::{kvImageDoNotTile, vImageScale_XRGB2101010W, vImage_Buffer};
+        b.iter(|| {
+            let mut target =
+                ImageStoreMut::<u8, 4>::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+
+            let src_buffer = vImage_Buffer {
+                data: copied.as_ptr() as *mut libc::c_void,
+                width: dimensions.0 as usize,
+                height: dimensions.1 as usize,
+                row_bytes: dimensions.0 as usize * 4,
+            };
+
+            let target_stride = target.stride();
+            let target_ptr = target.buffer.borrow_mut().as_mut_ptr() as *mut libc::c_void;
+
+            let mut dst_buffer = vImage_Buffer {
+                data: target_ptr,
+                width: target.width,
+                height: target.height,
+                row_bytes: target_stride,
+            };
+
+            let result = unsafe {
+                vImageScale_XRGB2101010W(
                     &src_buffer,
                     &mut dst_buffer,
                     std::ptr::null_mut(),

@@ -5,8 +5,7 @@ edition = "2024"
 build = "build.rs"
 
 [dependencies]
-pic-scale = { path = "../", features = ["half"] }
-half = "2.4.1"
+pic-scale = { path = "../", features = ["nightly_f16"] }
 num-traits = "0.2.19"
 
 [features]
@@ -17,7 +16,7 @@ full_support = []
 crate-type = ["staticlib", "rlib"]
 
 [build-dependencies]
-cbindgen = "0.27.0"
+cbindgen = "0.28.0"
 
 [profile.release]
 strip = true

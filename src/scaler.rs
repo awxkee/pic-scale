@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::ar30::{Ar30ByteOrder, Rgb30};
-use crate::convolution::{HorizontalConvolutionPass, VerticalConvolutionPass};
+use crate::convolution::{ConvolutionOptions, HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::image_size::ImageSize;
 use crate::image_store::{
@@ -44,7 +44,7 @@ use crate::{
     Rgb16ImageStore, Rgb8ImageStore, RgbF32ImageStore, Rgba16ImageStore, Rgba8ImageStore,
     RgbaF32ImageStore,
 };
-use num_traits::{AsPrimitive, Float, FromPrimitive, Signed};
+use num_traits::{AsPrimitive, Float, Signed};
 use rayon::ThreadPool;
 use std::fmt::Debug;
 use std::ops::{AddAssign, MulAssign, Neg};
@@ -54,6 +54,7 @@ use std::ops::{AddAssign, MulAssign, Neg};
 pub struct Scaler {
     pub(crate) function: ResamplingFunction,
     pub(crate) threading_policy: ThreadingPolicy,
+    pub workload_strategy: WorkloadStrategy,
 }
 
 pub trait Scaling {
@@ -196,6 +197,15 @@ pub trait ScalingF32 {
     ) -> Result<(), PicScaleError>;
 }
 
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Default)]
+pub enum WorkloadStrategy {
+    /// Prefers quality to speed
+    PreferQuality,
+    /// Prefers speed to quality
+    #[default]
+    PreferSpeed,
+}
+
 pub trait ScalingU16 {
     /// Performs rescaling for Planar u16
     ///
@@ -332,7 +342,12 @@ impl Scaler {
         Scaler {
             function: filter,
             threading_policy: ThreadingPolicy::Single,
+            workload_strategy: WorkloadStrategy::default(),
         }
+    }
+
+    pub fn set_workload_strategy(&mut self, workload_strategy: WorkloadStrategy) {
+        self.workload_strategy = workload_strategy;
     }
 
     pub(crate) fn generate_weights<T>(&self, in_size: usize, out_size: usize) -> FilterWeights<T>
@@ -555,7 +570,7 @@ impl Scaler {
 impl Scaler {
     pub(crate) fn generic_resize<
         'a,
-        T: FromPrimitive + Clone + Copy + Debug + Send + Sync + Default + 'static,
+        T: Clone + Copy + Debug + Send + Sync + Default + 'static,
         const N: usize,
     >(
         &self,
@@ -621,7 +636,8 @@ impl Scaler {
             )?;
             new_image_vertical.bit_depth = into.bit_depth;
             let vertical_filters = self.generate_weights(store.height, new_size.height);
-            store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool);
+            let options = ConvolutionOptions::new(self.workload_strategy);
+            store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool, options);
 
             let new_immutable_store = ImageStore::<T, N> {
                 buffer: std::borrow::Cow::Owned(target_vertical),
@@ -632,23 +648,26 @@ impl Scaler {
                 bit_depth: into.bit_depth,
             };
             let horizontal_filters = self.generate_weights(store.width, new_size.width);
-            new_immutable_store.convolve_horizontal(horizontal_filters, into, &pool);
+            let options = ConvolutionOptions::new(self.workload_strategy);
+            new_immutable_store.convolve_horizontal(horizontal_filters, into, &pool, options);
             Ok(())
         } else if should_do_vertical {
             let vertical_filters = self.generate_weights(store.height, new_size.height);
-            store.convolve_vertical(vertical_filters, into, &pool);
+            let options = ConvolutionOptions::new(self.workload_strategy);
+            store.convolve_vertical(vertical_filters, into, &pool, options);
             Ok(())
         } else {
             assert!(should_do_horizontal);
             let horizontal_filters = self.generate_weights(store.width, new_size.width);
-            store.convolve_horizontal(horizontal_filters, into, &pool);
+            let options = ConvolutionOptions::new(self.workload_strategy);
+            store.convolve_horizontal(horizontal_filters, into, &pool, options);
             Ok(())
         }
     }
 
     fn forward_resize_with_alpha<
         'a,
-        T: FromPrimitive + Clone + Copy + Debug + Send + Sync + Default + 'static,
+        T: Clone + Copy + Debug + Send + Sync + Default + 'static,
         const N: usize,
     >(
         &self,
@@ -702,7 +721,8 @@ impl Scaler {
         )?;
         new_image_vertical.bit_depth = into.bit_depth;
         let vertical_filters = self.generate_weights(src_store.height, new_size.height);
-        src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, pool);
+        let options = ConvolutionOptions::new(self.workload_strategy);
+        src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, pool, options);
 
         let new_immutable_store = ImageStore::<T, N> {
             buffer: std::borrow::Cow::Owned(target_vertical),
@@ -713,7 +733,8 @@ impl Scaler {
             bit_depth: into.bit_depth,
         };
         let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
-        new_immutable_store.convolve_horizontal(horizontal_filters, into, pool);
+        let options = ConvolutionOptions::new(self.workload_strategy);
+        new_immutable_store.convolve_horizontal(horizontal_filters, into, pool, options);
 
         if premultiply_alpha_requested && has_alpha_premultiplied {
             into.unpremultiply_alpha(pool);
@@ -724,7 +745,7 @@ impl Scaler {
 
     fn forward_resize_vertical_with_alpha<
         'a,
-        T: FromPrimitive + Clone + Copy + Debug + Send + Sync + Default + 'static,
+        T: Clone + Copy + Debug + Send + Sync + Default + 'static,
         const N: usize,
     >(
         &self,
@@ -769,7 +790,8 @@ impl Scaler {
         }
 
         let vertical_filters = self.generate_weights(src_store.height, new_size.height);
-        src_store.convolve_vertical(vertical_filters, into, pool);
+        let options = ConvolutionOptions::new(self.workload_strategy);
+        src_store.convolve_vertical(vertical_filters, into, pool, options);
 
         if premultiply_alpha_requested && has_alpha_premultiplied {
             into.unpremultiply_alpha(pool);
@@ -780,7 +802,7 @@ impl Scaler {
 
     fn forward_resize_horizontal_with_alpha<
         'a,
-        T: FromPrimitive + Clone + Copy + Debug + Send + Sync + Default + 'static,
+        T: Clone + Copy + Debug + Send + Sync + Default + 'static,
         const N: usize,
     >(
         &self,
@@ -825,7 +847,8 @@ impl Scaler {
         }
 
         let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
-        src_store.convolve_horizontal(horizontal_filters, into, pool);
+        let options = ConvolutionOptions::new(self.workload_strategy);
+        src_store.convolve_horizontal(horizontal_filters, into, pool, options);
 
         if premultiply_alpha_requested && has_alpha_premultiplied {
             into.unpremultiply_alpha(pool);
@@ -836,7 +859,7 @@ impl Scaler {
 
     pub(crate) fn generic_resize_with_alpha<
         'a,
-        T: FromPrimitive + Clone + Copy + Debug + Send + Sync + Default + 'static,
+        T: Clone + Copy + Debug + Send + Sync + Default + 'static,
         const N: usize,
     >(
         &self,
@@ -1097,6 +1120,8 @@ impl ScalingU16 for Scaler {
 impl Scaler {
     /// Resizes RGBA2101010 image
     ///
+    /// This method ignores alpha scaling.
+    ///
     /// # Arguments
     /// `src` - source slice
     /// `src_size` - Source Image size
@@ -1105,25 +1130,31 @@ impl Scaler {
     ///
     pub fn resize_ar30(
         &self,
-        src: &[u32],
+        src: &[u8],
+        src_stride: usize,
         src_size: ImageSize,
-        dst: &mut [u32],
+        dst: &mut [u8],
+        dst_stride: usize,
         new_size: ImageSize,
         order: Ar30ByteOrder,
     ) -> Result<(), PicScaleError> {
         match order {
-            Ar30ByteOrder::Host => resize_ar30_impl::<
-                { Rgb30::Ar30 as usize },
-                { Ar30ByteOrder::Host as usize },
-            >(src, src_size, dst, new_size, self),
-            Ar30ByteOrder::Network => resize_ar30_impl::<
-                { Rgb30::Ar30 as usize },
-                { Ar30ByteOrder::Network as usize },
-            >(src, src_size, dst, new_size, self),
+            Ar30ByteOrder::Host => {
+                resize_ar30_impl::<{ Rgb30::Ar30 as usize }, { Ar30ByteOrder::Host as usize }>(
+                    src, src_stride, src_size, dst, dst_stride, new_size, self,
+                )
+            }
+            Ar30ByteOrder::Network => {
+                resize_ar30_impl::<{ Rgb30::Ar30 as usize }, { Ar30ByteOrder::Network as usize }>(
+                    src, src_stride, src_size, dst, dst_stride, new_size, self,
+                )
+            }
         }
     }
 
     /// Resizes RGBA1010102 image
+    ///
+    /// This method ignores alpha scaling.
     ///
     /// # Arguments
     /// `src` - source slice
@@ -1133,21 +1164,25 @@ impl Scaler {
     ///
     pub fn resize_ra30(
         &self,
-        src: &[u32],
+        src: &[u8],
+        src_stride: usize,
         src_size: ImageSize,
-        dst: &mut [u32],
+        dst: &mut [u8],
+        dst_stride: usize,
         new_size: ImageSize,
         order: Ar30ByteOrder,
     ) -> Result<(), PicScaleError> {
         match order {
-            Ar30ByteOrder::Host => resize_ar30_impl::<
-                { Rgb30::Ra30 as usize },
-                { Ar30ByteOrder::Host as usize },
-            >(src, src_size, dst, new_size, self),
-            Ar30ByteOrder::Network => resize_ar30_impl::<
-                { Rgb30::Ra30 as usize },
-                { Ar30ByteOrder::Network as usize },
-            >(src, src_size, dst, new_size, self),
+            Ar30ByteOrder::Host => {
+                resize_ar30_impl::<{ Rgb30::Ra30 as usize }, { Ar30ByteOrder::Host as usize }>(
+                    src, src_stride, src_size, dst, dst_stride, new_size, self,
+                )
+            }
+            Ar30ByteOrder::Network => {
+                resize_ar30_impl::<{ Rgb30::Ra30 as usize }, { Ar30ByteOrder::Network as usize }>(
+                    src, src_stride, src_size, dst, dst_stride, new_size, self,
+                )
+            }
         }
     }
 }
@@ -1162,7 +1197,7 @@ pub struct ScalingOptions {
 
 pub trait ImageStoreScaling<'b, T, const N: usize>
 where
-    T: FromPrimitive + Clone + Copy + Debug,
+    T: Clone + Copy + Debug,
 {
     fn scale(
         &self,

@@ -39,9 +39,9 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 pub(crate) fn sse_premultiply_alpha_rgba_f16(
-    dst: &mut [half::f16],
+    dst: &mut [f16],
     dst_stride: usize,
-    src: &[half::f16],
+    src: &[f16],
     src_stride: usize,
     width: usize,
     height: usize,
@@ -60,9 +60,9 @@ pub(crate) fn sse_premultiply_alpha_rgba_f16(
 
 #[target_feature(enable = "sse4.1")]
 unsafe fn sse_premultiply_alpha_rgba_f16_regular(
-    dst: &mut [half::f16],
+    dst: &mut [f16],
     dst_stride: usize,
-    src: &[half::f16],
+    src: &[f16],
     src_stride: usize,
     width: usize,
     height: usize,
@@ -75,9 +75,9 @@ unsafe fn sse_premultiply_alpha_rgba_f16_regular(
 
 #[target_feature(enable = "sse4.1", enable = "f16c")]
 unsafe fn sse_premultiply_alpha_rgba_f16c(
-    dst: &mut [half::f16],
+    dst: &mut [f16],
     dst_stride: usize,
-    src: &[half::f16],
+    src: &[f16],
     src_stride: usize,
     width: usize,
     height: usize,
@@ -89,10 +89,7 @@ unsafe fn sse_premultiply_alpha_rgba_f16c(
 }
 
 #[inline(always)]
-unsafe fn sse_premultiply_alpha_rgba_row_f16_impl<const F16C: bool>(
-    dst: &mut [half::f16],
-    src: &[half::f16],
-) {
+unsafe fn sse_premultiply_alpha_rgba_row_f16_impl<const F16C: bool>(dst: &mut [f16], src: &[f16]) {
     let mut rem = dst;
     let mut src_rem = src;
 
@@ -145,9 +142,9 @@ unsafe fn sse_premultiply_alpha_rgba_row_f16_impl<const F16C: bool>(
 
 #[inline(always)]
 unsafe fn sse_premultiply_alpha_rgba_f16_impl<const F16C: bool>(
-    dst: &mut [half::f16],
+    dst: &mut [f16],
     dst_stride: usize,
-    src: &[half::f16],
+    src: &[f16],
     src_stride: usize,
     width: usize,
     _: usize,
@@ -177,7 +174,7 @@ unsafe fn sse_premultiply_alpha_rgba_f16_impl<const F16C: bool>(
 }
 
 pub(crate) fn sse_unpremultiply_alpha_rgba_f16(
-    in_place: &mut [half::f16],
+    in_place: &mut [f16],
     stride: usize,
     width: usize,
     height: usize,
@@ -194,7 +191,7 @@ pub(crate) fn sse_unpremultiply_alpha_rgba_f16(
 
 #[target_feature(enable = "sse4.1")]
 unsafe fn sse_unpremultiply_alpha_rgba_f16_regular(
-    in_place: &mut [half::f16],
+    in_place: &mut [f16],
     stride: usize,
     width: usize,
     height: usize,
@@ -205,7 +202,7 @@ unsafe fn sse_unpremultiply_alpha_rgba_f16_regular(
 
 #[target_feature(enable = "sse4.1", enable = "f16c")]
 unsafe fn sse_unpremultiply_alpha_rgba_f16c(
-    in_place: &mut [half::f16],
+    in_place: &mut [f16],
     stride: usize,
     width: usize,
     height: usize,
@@ -215,7 +212,7 @@ unsafe fn sse_unpremultiply_alpha_rgba_f16c(
 }
 
 #[inline(always)]
-unsafe fn sse_unpremultiply_alpha_rgba_f16_row_impl<const F16C: bool>(in_place: &mut [half::f16]) {
+unsafe fn sse_unpremultiply_alpha_rgba_f16_row_impl<const F16C: bool>(in_place: &mut [f16]) {
     let mut rem = in_place;
 
     for dst in rem.chunks_exact_mut(8 * 4) {
@@ -293,7 +290,7 @@ unsafe fn sse_unpremultiply_alpha_rgba_f16_row_impl<const F16C: bool>(in_place: 
 
 #[inline(always)]
 unsafe fn sse_unpremultiply_alpha_rgba_f16_impl<const F16C: bool>(
-    in_place: &mut [half::f16],
+    in_place: &mut [f16],
     stride: usize,
     width: usize,
     _: usize,

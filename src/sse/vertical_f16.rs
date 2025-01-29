@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use core::f16;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -39,9 +40,9 @@ use crate::sse::f16_utils::{_mm_cvtph_psx, _mm_cvtps_phx};
 pub(crate) unsafe fn convolve_vertical_part_sse_f16<const F16C: bool, const FMA: bool>(
     start_y: usize,
     start_x: usize,
-    src: &[half::f16],
+    src: &[f16],
     src_stride: usize,
-    dst: &mut [half::f16],
+    dst: &mut [f16],
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
@@ -71,9 +72,9 @@ pub(crate) unsafe fn convolve_vertical_part_sse_f16<const F16C: bool, const FMA:
 pub(crate) unsafe fn convolve_vertical_part_sse_4_f16<const F16C: bool, const FMA: bool>(
     start_y: usize,
     start_x: usize,
-    src: &[half::f16],
+    src: &[f16],
     src_stride: usize,
-    dst: &mut [half::f16],
+    dst: &mut [f16],
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
@@ -102,9 +103,9 @@ pub(crate) unsafe fn convolve_vertical_part_sse_4_f16<const F16C: bool, const FM
 pub(crate) unsafe fn convolve_vertical_part_sse_16_16<const F16C: bool, const FMA: bool>(
     start_y: usize,
     start_x: usize,
-    src: &[half::f16],
+    src: &[f16],
     src_stride: usize,
-    dst: &mut [half::f16],
+    dst: &mut [f16],
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
@@ -155,9 +156,9 @@ pub(crate) unsafe fn convolve_vertical_part_sse_16_16<const F16C: bool, const FM
 pub(crate) unsafe fn convolve_vertical_part_sse_8_f16<const F16C: bool, const FMA: bool>(
     start_y: usize,
     start_x: usize,
-    src: &[half::f16],
+    src: &[f16],
     src_stride: usize,
-    dst: &mut [half::f16],
+    dst: &mut [f16],
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
@@ -192,8 +193,8 @@ pub(crate) unsafe fn convolve_vertical_part_sse_8_f16<const F16C: bool, const FM
 pub(crate) fn convolve_vertical_sse_row_f16<const F16C: bool, const FMA: bool>(
     width: usize,
     bounds: &FilterBounds,
-    src: &[half::f16],
-    dst: &mut [half::f16],
+    src: &[f16],
+    dst: &mut [f16],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
@@ -217,8 +218,8 @@ pub(crate) fn convolve_vertical_sse_row_f16<const F16C: bool, const FMA: bool>(
 unsafe fn convolve_vertical_sse_row_f16_regular(
     width: usize,
     bounds: &FilterBounds,
-    src: &[half::f16],
-    dst: &mut [half::f16],
+    src: &[f16],
+    dst: &mut [f16],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
@@ -234,8 +235,8 @@ unsafe fn convolve_vertical_sse_row_f16_regular(
 unsafe fn convolve_vertical_sse_row_f16c_fma(
     width: usize,
     bounds: &FilterBounds,
-    src: &[half::f16],
-    dst: &mut [half::f16],
+    src: &[f16],
+    dst: &mut [f16],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
@@ -251,8 +252,8 @@ unsafe fn convolve_vertical_sse_row_f16c_fma(
 unsafe fn convolve_vertical_sse_row_f16c(
     width: usize,
     bounds: &FilterBounds,
-    src: &[half::f16],
-    dst: &mut [half::f16],
+    src: &[f16],
+    dst: &mut [f16],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
@@ -265,8 +266,8 @@ unsafe fn convolve_vertical_sse_row_f16c(
 unsafe fn convolve_vertical_sse_row_f16_impl<const FMA: bool, const F16C: bool>(
     _: usize,
     bounds: &FilterBounds,
-    src: &[half::f16],
-    dst: &mut [half::f16],
+    src: &[f16],
+    dst: &mut [f16],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {

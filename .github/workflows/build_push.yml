@@ -23,14 +23,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
       - run: rustup target add aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu i686-unknown-linux-gnu powerpc-unknown-linux-gnu riscv64gc-unknown-linux-gnu
-      - run: RUSTFLAGS="-C target-feature=+neon,-fp16" cargo build --target aarch64-unknown-linux-gnu --features half
-      - run: RUSTFLAGS="-C target-feature=+neon,+fp16" cargo build --target aarch64-unknown-linux-gnu --features half
+      - run: RUSTFLAGS="-C target-feature=+neon,-fp16" cargo build --target aarch64-unknown-linux-gnu
+      - run: RUSTFLAGS="-C target-feature=+neon,+fp16" cargo +nightly build --target aarch64-unknown-linux-gnu --features nightly_f16
       - run: RUSTFLAGS="-C target-feature=+sse4.1" cargo build --target i686-unknown-linux-gnu
       - run: cargo build --target powerpc-unknown-linux-gnu
       - run: cargo build --target riscv64gc-unknown-linux-gnu
       - run: RUSTFLAGS="-C target-feature=+sse4.1" cargo build --target x86_64-unknown-linux-gnu
-      - run: RUSTFLAGS="-C target-feature=+sse4.1,+f16c" cargo build --features half --target x86_64-unknown-linux-gnu
-      - run: RUSTFLAGS="-C target-feature=+avx2,+f16c" cargo build --features half --target x86_64-unknown-linux-gnu
+      - run: RUSTFLAGS="-C target-feature=+sse4.1,+f16c" cargo +nightly build --features nightly_f16 --target x86_64-unknown-linux-gnu
+      - run: RUSTFLAGS="-C target-feature=+avx2,+f16c" cargo +nightly build --features nightly_f16 --target x86_64-unknown-linux-gnu
       - run: RUSTFLAGS="-C target-feature=+avx2" cargo build --target x86_64-unknown-linux-gnu
 
   clippy:
@@ -42,7 +42,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo clippy
+      - run: cargo clippy -- -D warnings
+
+  clippy_nightly:
+    name: Clippy Nightly
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo clippy --all-features -- -D warnings
 
   tests:
     name: Testing
@@ -71,6 +82,18 @@ jobs:
       - run: cargo fuzz run resize_plane -- -max_total_time=30
       - run: cargo fuzz run colorspaces -- -max_total_time=10
 
+  fuzz_rgba_8bit_no_rdm:
+    name: Fuzzing 8bit wo RDM
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz run resize_rgba --no-default-features -- -max_total_time=30
+      - run: cargo fuzz run resize_rgb --no-default-features -- -max_total_time=30
+      - run: cargo fuzz run resize_cbcr8 --no-default-features -- -max_total_time=30
+      - run: cargo fuzz run resize_plane --no-default-features -- -max_total_time=30
+
   fuzz_rgba_high_bit:
     name: Fuzzing High bit-depth
     strategy:
@@ -82,6 +105,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run resize_rgba_u16 -- -max_total_time=30
+      - run: cargo fuzz run resize_rgba_f16 -- -max_total_time=30
       - run: cargo fuzz run resize_rgb_u16 -- -max_total_time=30
       - run: cargo fuzz run resize_cbcr16 -- -max_total_time=30
       - run: cargo fuzz run resize_plane_u16 -- -max_total_time=30

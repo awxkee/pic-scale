@@ -27,33 +27,48 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use num_traits::FromPrimitive;
 use rayon::ThreadPool;
 use std::fmt::Debug;
 
 use crate::filter_weights::FilterWeights;
 use crate::image_store::ImageStoreMut;
+use crate::scaler::WorkloadStrategy;
+
+#[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq)]
+pub(crate) struct ConvolutionOptions {
+    pub(crate) workload_strategy: WorkloadStrategy,
+}
+
+impl ConvolutionOptions {
+    pub(crate) fn new(strategy: WorkloadStrategy) -> Self {
+        Self {
+            workload_strategy: strategy,
+        }
+    }
+}
 
 pub(crate) trait HorizontalConvolutionPass<T, const N: usize>
 where
-    T: FromPrimitive + Clone + Copy + Debug,
+    T: Clone + Copy + Debug,
 {
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<T, N>,
         pool: &Option<ThreadPool>,
+        options: ConvolutionOptions,
     );
 }
 
 pub(crate) trait VerticalConvolutionPass<T, const N: usize>
 where
-    T: FromPrimitive + Clone + Copy + Debug,
+    T: Clone + Copy + Debug,
 {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<T, N>,
         pool: &Option<ThreadPool>,
+        options: ConvolutionOptions,
     );
 }

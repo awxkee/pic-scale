@@ -27,23 +27,23 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 mod alpha_f16;
 mod alpha_f32;
 mod alpha_u16;
 mod alpha_u8;
 mod cbcr8_hrs;
 mod check_alpha;
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 mod f16_utils;
 mod plane_f32;
 mod plane_u8;
 mod plane_u8_hrs;
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 mod rgb_f16;
 mod rgb_f32;
 mod rgb_u8;
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 mod rgba_f16;
 mod rgba_f32;
 mod rgba_u16;
@@ -53,7 +53,7 @@ mod rgba_u8_lb;
 mod routines;
 mod u8_utils;
 mod utils;
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 mod vertical_f16;
 mod vertical_f32;
 mod vertical_u16;
@@ -61,7 +61,7 @@ mod vertical_u16_lb;
 mod vertical_u8;
 mod vertical_u8_lp;
 
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 pub(crate) use alpha_f16::{sse_premultiply_alpha_rgba_f16, sse_unpremultiply_alpha_rgba_f16};
 pub(crate) use alpha_f32::sse_premultiply_alpha_rgba_f32;
 pub(crate) use alpha_f32::sse_unpremultiply_alpha_rgba_f32;
@@ -81,7 +81,7 @@ pub(crate) use plane_u8::{
 pub(crate) use plane_u8_hrs::{
     convolve_horizontal_plane_sse_row_hrs, convolve_horizontal_plane_sse_rows_hrs_4_u8,
 };
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 pub(crate) use rgb_f16::{
     convolve_horizontal_rgb_sse_row_one_f16, convolve_horizontal_rgb_sse_rows_4_f16,
 };
@@ -89,7 +89,7 @@ pub(crate) use rgb_f32::{
     convolve_horizontal_rgb_sse_row_one_f32, convolve_horizontal_rgb_sse_rows_4_f32,
 };
 pub(crate) use rgb_u8::*;
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 pub(crate) use rgba_f16::{
     convolve_horizontal_rgba_sse_row_one_f16, convolve_horizontal_rgba_sse_rows_4_f16,
 };
@@ -111,7 +111,7 @@ pub(crate) use rgba_u8_lb::{
 pub(crate) use routines::{load_4_weights, load_4_weights_group_2_avx, load_8_weights_group_4_avx};
 pub(crate) use u8_utils::*;
 pub(crate) use utils::*;
-#[cfg(feature = "half")]
+#[cfg(feature = "nightly_f16")]
 pub(crate) use vertical_f16::convolve_vertical_sse_row_f16;
 pub(crate) use vertical_f32::convolve_vertical_rgb_sse_row_f32;
 pub(crate) use vertical_u16::convolve_column_sse_u16;

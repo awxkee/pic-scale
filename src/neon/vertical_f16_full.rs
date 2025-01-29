@@ -30,14 +30,15 @@ use std::arch::aarch64::*;
 
 use crate::filter_weights::FilterBounds;
 use crate::neon::*;
+use core::f16;
 
 #[inline(always)]
 pub(crate) unsafe fn xconvolve_vertical_part_neon_8_f16<const USE_BLENDING: bool>(
     start_y: usize,
     start_x: usize,
-    src: &[half::f16],
+    src: &[f16],
     src_stride: usize,
-    dst: &mut [half::f16],
+    dst: &mut [f16],
     filter: &[f32],
     bounds: &FilterBounds,
     blend_length: usize,
@@ -55,7 +56,7 @@ pub(crate) unsafe fn xconvolve_vertical_part_neon_8_f16<const USE_BLENDING: bool
 
         let s_ptr = src_ptr.add(px);
         let item_row = if USE_BLENDING {
-            let mut transient: [half::f16; 8] = [half::f16::from_f32(0.); 8];
+            let mut transient: [f16; 8] = [0.; 8];
             std::ptr::copy_nonoverlapping(s_ptr, transient.as_mut_ptr(), blend_length);
             xvldq_f16(transient.as_ptr())
         } else {
@@ -67,7 +68,7 @@ pub(crate) unsafe fn xconvolve_vertical_part_neon_8_f16<const USE_BLENDING: bool
 
     let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
     if USE_BLENDING {
-        let mut transient: [half::f16; 8] = [half::f16::from_bits(0); 8];
+        let mut transient: [f16; 8] = [0.; 8];
         xvstq_f16(transient.as_mut_ptr(), store_0);
         std::ptr::copy_nonoverlapping(transient.as_ptr(), dst_ptr, blend_length);
     } else {
@@ -181,8 +182,8 @@ macro_rules! conv_vertical_part_neon_48_f16 {
 pub(crate) fn xconvolve_vertical_rgb_neon_row_f16(
     width: usize,
     bounds: &FilterBounds,
-    src: &[half::f16],
-    dst: &mut [half::f16],
+    src: &[f16],
+    dst: &mut [f16],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
@@ -195,8 +196,8 @@ pub(crate) fn xconvolve_vertical_rgb_neon_row_f16(
 pub unsafe fn xconvolve_vertical_rgb_neon_row_f16_impl(
     _: usize,
     bounds: &FilterBounds,
-    src: &[half::f16],
-    dst: &mut [half::f16],
+    src: &[f16],
+    dst: &mut [f16],
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
