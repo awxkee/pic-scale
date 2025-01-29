@@ -17,7 +17,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let dimensions = img.dimensions();
     let src_bytes = img.as_bytes();
 
-    /*c.bench_function("Pic scale RGBA with alpha: Lanczos 3", |b| {
+    c.bench_function("Pic scale RGBA with alpha: Lanczos 3", |b| {
         let copied: Vec<u8> = Vec::from(src_bytes);
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
@@ -410,7 +410,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 panic!("Can't resize by accelerate");
             }
         })
-    });*/
+    });
 
     c.bench_function("Pic scale RGBA1010102(N0: Lanczos 3/Speed", |b| {
         let copied: Vec<u8> = Vec::from(src_bytes);

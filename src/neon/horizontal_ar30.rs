@@ -114,7 +114,7 @@ unsafe fn neon_convolve_horizontal_rgba_rows_4_impl<const AR_TYPE: usize, const 
 ) {
     unsafe {
         const PRECISION: i32 = 16;
-        const ROUNDING: i32 = 1 << (PRECISION - 1) - 1;
+        const ROUNDING: i32 = (1 << (PRECISION - 1)) - 1;
 
         let init = vdupq_n_s32(ROUNDING);
 
@@ -301,7 +301,7 @@ unsafe fn neon_convolve_horizontal_rgba_row_impl<const AR_TYPE: usize, const AR_
 ) {
     unsafe {
         const PRECISION: i32 = 16;
-        const ROUNDING: i32 = 1 << (PRECISION - 1) - 1;
+        const ROUNDING: i32 = (1 << (PRECISION - 1)) - 1;
 
         let init = vdupq_n_s32(ROUNDING);
 
