@@ -280,26 +280,6 @@ pub(crate) unsafe fn _mm_store3_u16(ptr: *mut u16, a: __m128i) {
         .write_unaligned(_mm_extract_epi16::<2>(a) as i16);
 }
 
-#[inline(always)]
-pub(crate) unsafe fn _mm_dot16_avx_epi32<const HAS_DOT: bool>(
-    a: __m128i,
-    b: __m128i,
-    c: __m128i,
-) -> __m128i {
-    #[cfg(feature = "nightly_avx512")]
-    {
-        if HAS_DOT {
-            _mm_dpwssd_avx_epi32(a, b, c)
-        } else {
-            _mm_add_epi32(a, _mm_madd_epi16(b, c))
-        }
-    }
-    #[cfg(not(feature = "nightly_avx512"))]
-    {
-        _mm_add_epi32(a, _mm_madd_epi16(b, c))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

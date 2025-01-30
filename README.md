@@ -52,7 +52,7 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 | RGBA (8 bit)   | x    | x   | x    | x(avxvnni) | ~    | 
 | RGB (8 bit)    | x    | x   | x    | x(avxvnni) | ~    | 
 | Plane (8 bit)  | x    | x   | ~    | ~          | ~    | 
-| RGBA (8+ bit)  | x    | x   | ~    | x(avxvnni) | -    | 
+| RGBA (8+ bit)  | x    | x   | x    | x(avxvnni) | -    | 
 | RGB (8+ bit)   | x    | x   | ~    | ~          | -    | 
 | Plane (8+ bit) | ~    | ~   | ~    | ~          | -    | 
 | RGBA (f32)     | x    | x   | x    | -          | -    | 
@@ -82,7 +82,7 @@ For x86 and aarch64 NEON runtime dispatch is used.
 `avxvnni` requires feature `nightly_avx512` and requires `nightly` compiler channel, runtime detection if it is available then will be used.
 AVX-VNNI is helpful extension on modern Intel and AMD CPU's, consider turn it on to ger maximum performance.
 
-`fullfp16` NEON target detection performed in runtime, when available best the best paths for *f16* images are available on ARM.
+`fullfp16`, `fhm` NEON target detection performed in runtime, when available best the best paths for *f16* images are available on ARM.
 
 WASM `simd128` target feature activating is mandatory in build flags.
 

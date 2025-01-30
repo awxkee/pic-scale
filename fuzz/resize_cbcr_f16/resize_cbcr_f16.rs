@@ -29,11 +29,9 @@
 #![feature(f16)]
 #![no_main]
 
-use libfuzzer_sys::fuzz_target;
-use pic_scale::{
-    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, WorkloadStrategy,
-};
 use core::f16;
+use libfuzzer_sys::fuzz_target;
+use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, WorkloadStrategy};
 
 fuzz_target!(|data: (u16, u16, u16, u16, bool)| {
     let strategy = if data.4 {

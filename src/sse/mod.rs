@@ -60,6 +60,7 @@ mod vertical_u16;
 mod vertical_u16_lb;
 mod vertical_u8;
 mod vertical_u8_lp;
+mod vertical_ar30;
 
 #[cfg(feature = "nightly_f16")]
 pub(crate) use alpha_f16::{sse_premultiply_alpha_rgba_f16, sse_unpremultiply_alpha_rgba_f16};
@@ -118,6 +119,7 @@ pub(crate) use vertical_u16::convolve_column_sse_u16;
 pub(crate) use vertical_u16_lb::convolve_column_lb_sse_u16;
 pub(crate) use vertical_u8::convolve_vertical_sse_row;
 pub(crate) use vertical_u8_lp::convolve_vertical_sse_row_lp;
+pub(crate) use vertical_ar30::sse_column_handler_fixed_point_ar30;
 
 pub(crate) const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
     ((z << 6) | (y << 4) | (x << 2) | w) as i32
