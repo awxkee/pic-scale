@@ -27,12 +27,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+use crate::ar30::Rgb30;
+use crate::support::PRECISION;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
-
-use crate::support::PRECISION;
 
 #[inline(always)]
 pub(crate) fn compress_i32(x: __m128i) -> __m128i {
@@ -58,4 +58,116 @@ pub(crate) unsafe fn convolve_horizontal_parts_one_sse_rgb(
         store_0,
         _mm_madd_epi16(_mm_unpacklo_epi16(lo, _mm_setzero_si128()), weight0),
     )
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_rev128_epi32(v: __m128i) -> __m128i {
+    let sh = _mm_setr_epi8(3, 2, 1, 0, 7, 6, 5, 4, 11, 10, 9, 8, 15, 14, 13, 12);
+    _mm_shuffle_epi8(v, sh)
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_unzip_3_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
+    v: (__m128i, __m128i),
+) -> (__m128i, __m128i, __m128i) {
+    let mask = _mm_set1_epi32(0x3ff);
+    let ar_type: Rgb30 = AR30_TYPE.into();
+
+    let v = if AR30_ORDER == 0 {
+        v
+    } else {
+        (_mm_rev128_epi32(v.0), _mm_rev128_epi32(v.1))
+    };
+
+    match ar_type {
+        Rgb30::Ar30 => {
+            let r0 = _mm_and_si128(v.0, mask);
+            let r1 = _mm_and_si128(v.1, mask);
+            let g0 = _mm_srli_epi32::<10>(v.0);
+            let g1 = _mm_srli_epi32::<10>(v.1);
+            let b0 = _mm_srli_epi32::<20>(v.0);
+            let b1 = _mm_srli_epi32::<20>(v.1);
+            let r = _mm_packus_epi32(r0, r1);
+            let g = _mm_packus_epi32(_mm_and_si128(g0, mask), _mm_and_si128(g1, mask));
+            let b = _mm_packus_epi32(_mm_and_si128(b0, mask), _mm_and_si128(b1, mask));
+            (r, g, b)
+        }
+        Rgb30::Ra30 => {
+            let r0 = _mm_srli_epi32::<22>(v.0);
+            let r1 = _mm_srli_epi32::<22>(v.1);
+            let g0 = _mm_srli_epi32::<12>(v.0);
+            let g1 = _mm_srli_epi32::<12>(v.1);
+            let b0 = _mm_srli_epi32::<2>(v.0);
+            let b1 = _mm_srli_epi32::<2>(v.1);
+            let r = _mm_packus_epi32(_mm_and_si128(r0, mask), _mm_and_si128(r1, mask));
+            let g = _mm_packus_epi32(_mm_and_si128(g0, mask), _mm_and_si128(g1, mask));
+            let b = _mm_packus_epi32(_mm_and_si128(b0, mask), _mm_and_si128(b1, mask));
+            (r, g, b)
+        }
+    }
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_zip_4_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
+    v: (__m128i, __m128i, __m128i, __m128i),
+) -> (__m128i, __m128i) {
+    let ar_type: Rgb30 = AR30_TYPE.into();
+    match ar_type {
+        Rgb30::Ar30 => {
+            let mut a0 = _mm_set1_epi32(3 << 30);
+            let mut a1 = _mm_set1_epi32(3 << 30);
+
+            let r0 = _mm_slli_epi32::<20>(_mm_unpacklo_epi16(v.2, _mm_setzero_si128()));
+            let r1 = _mm_slli_epi32::<20>(_mm_unpackhi_epi16(v.2, _mm_setzero_si128()));
+
+            a0 = _mm_or_si128(a0, r0);
+            a1 = _mm_or_si128(a1, r1);
+
+            let g0 = _mm_slli_epi32::<10>(_mm_unpacklo_epi16(v.1, _mm_setzero_si128()));
+            let g1 = _mm_slli_epi32::<10>(_mm_unpackhi_epi16(v.1, _mm_setzero_si128()));
+
+            a0 = _mm_or_si128(a0, g0);
+            a1 = _mm_or_si128(a1, g1);
+
+            a0 = _mm_or_si128(a0, _mm_unpacklo_epi16(v.0, _mm_setzero_si128()));
+            a1 = _mm_or_si128(a1, _mm_unpackhi_epi16(v.0, _mm_setzero_si128()));
+
+            if AR30_ORDER == 0 {
+                (a0, a1)
+            } else {
+                (_mm_rev128_epi32(a0), _mm_rev128_epi32(a1))
+            }
+        }
+        Rgb30::Ra30 => {
+            let mut a0 = _mm_set1_epi32(3);
+            let mut a1 = _mm_set1_epi32(3);
+
+            let r0 = _mm_slli_epi32::<22>(_mm_unpacklo_epi16(v.0, _mm_setzero_si128()));
+            let r1 = _mm_slli_epi32::<22>(_mm_unpackhi_epi16(v.0, _mm_setzero_si128()));
+
+            a0 = _mm_or_si128(a0, r0);
+            a1 = _mm_or_si128(a1, r1);
+
+            let g0 = _mm_slli_epi32::<12>(_mm_unpacklo_epi16(v.1, _mm_setzero_si128()));
+            let g1 = _mm_slli_epi32::<12>(_mm_unpackhi_epi16(v.1, _mm_setzero_si128()));
+
+            a0 = _mm_or_si128(a0, g0);
+            a1 = _mm_or_si128(a1, g1);
+
+            a0 = _mm_or_si128(
+                a0,
+                _mm_slli_epi32::<2>(_mm_unpacklo_epi16(v.2, _mm_setzero_si128())),
+            );
+            a1 = _mm_or_si128(
+                a1,
+                _mm_slli_epi32::<2>(_mm_unpackhi_epi16(v.2, _mm_setzero_si128())),
+            );
+
+            if AR30_ORDER == 0 {
+                (a0, a1)
+            } else {
+                (_mm_rev128_epi32(a0), _mm_rev128_epi32(a1))
+            }
+        }
+    }
 }
