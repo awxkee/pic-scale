@@ -87,6 +87,14 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
                             }
                         }
                     }
+                    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+                    {
+                        if std::arch::is_x86_feature_detected!("sse4.1") {
+                            use crate::sse::sse_convolve_horizontal_rgba_rows_4_ar30;
+                            _dispatch =
+                                sse_convolve_horizontal_rgba_rows_4_ar30::<AR30_TYPE, AR30_ORDER>;
+                        }
+                    }
                     _dispatch(src, src_stride, dst, dst_stride, &approx);
                 });
 
@@ -104,6 +112,14 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
                         use crate::neon::neon_convolve_horizontal_rgba_rows_ar30;
                         _dispatch =
                             neon_convolve_horizontal_rgba_rows_ar30::<AR30_TYPE, AR30_ORDER>;
+                    }
+                    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+                    {
+                        if std::arch::is_x86_feature_detected!("sse4.1") {
+                            use crate::sse::sse_convolve_horizontal_rgba_rows_ar30;
+                            _dispatch =
+                                sse_convolve_horizontal_rgba_rows_ar30::<AR30_TYPE, AR30_ORDER>;
+                        }
                     }
                     _dispatch(src, dst, &approx);
                 });
@@ -142,6 +158,14 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
                         }
                     }
                 }
+                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+                {
+                    if std::arch::is_x86_feature_detected!("sse4.1") {
+                        use crate::sse::sse_convolve_horizontal_rgba_rows_4_ar30;
+                        _dispatch =
+                            sse_convolve_horizontal_rgba_rows_4_ar30::<AR30_TYPE, AR30_ORDER>;
+                    }
+                }
                 _dispatch(src, src_stride, dst, dst_stride, &approx);
             });
 
@@ -158,6 +182,13 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
                 {
                     use crate::neon::neon_convolve_horizontal_rgba_rows_ar30;
                     _dispatch = neon_convolve_horizontal_rgba_rows_ar30::<AR30_TYPE, AR30_ORDER>;
+                }
+                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+                {
+                    if std::arch::is_x86_feature_detected!("sse4.1") {
+                        use crate::sse::sse_convolve_horizontal_rgba_rows_ar30;
+                        _dispatch = sse_convolve_horizontal_rgba_rows_ar30::<AR30_TYPE, AR30_ORDER>;
+                    }
                 }
                 _dispatch(src, dst, &approx);
             });
@@ -231,7 +262,6 @@ pub(crate) fn convolve_vertical_dispatch_ar30<const AR30_TYPE: usize, const AR30
                     }
 
                     let row = &mut row[0..4 * width];
-
                     _dispatch(&bounds, src, row, src_stride, weights);
                 });
         });
@@ -285,7 +315,6 @@ pub(crate) fn convolve_vertical_dispatch_ar30<const AR30_TYPE: usize, const AR30
                 }
 
                 let row = &mut row[0..4 * width];
-
                 _dispatch(&bounds, src, row, src_stride, weights);
             });
     }

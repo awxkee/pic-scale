@@ -35,7 +35,7 @@ pub(crate) unsafe fn vrev128_u32(v: uint32x4_t) -> uint32x4_t {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vunzips_4_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
+pub(crate) unsafe fn vunzips_3_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: uint32x4_t,
 ) -> int16x4x4_t {
     let mask = vdupq_n_u32(0x3ff);
@@ -45,54 +45,95 @@ pub(crate) unsafe fn vunzips_4_ar30<const AR30_TYPE: usize, const AR30_ORDER: us
 
     match ar_type {
         Rgb30::Ar30 => {
-            let r = vmovn_u32(vandq_u32(v, mask));
-            let g = vmovn_u32(vandq_u32(vshrq_n_u32::<10>(v), mask));
-            let b = vmovn_u32(vandq_u32(vshrq_n_u32::<20>(v), mask));
-            let va = vmovn_u32(vshrq_n_u32::<30>(v));
-            let a = vorr_u16(
-                vorr_u16(
-                    vorr_u16(
-                        vorr_u16(vshl_n_u16::<8>(va), vshl_n_u16::<6>(va)),
-                        vshl_n_u16::<4>(va),
-                    ),
-                    vshl_n_u16::<2>(va),
-                ),
-                va,
-            );
+            let j0 = vandq_u32(v, mask);
+            let j1 = vshrq_n_u32::<10>(v);
+            let j2 = vshrq_n_u32::<20>(v);
+            let r = j0;
+            let g = vandq_u32(j1, mask);
+            let b = vandq_u32(j2, mask);
             int16x4x4_t(
-                vreinterpret_s16_u16(r),
-                vreinterpret_s16_u16(g),
-                vreinterpret_s16_u16(b),
-                vreinterpret_s16_u16(a),
+                vreinterpret_s16_u16(vmovn_u32(r)),
+                vreinterpret_s16_u16(vmovn_u32(g)),
+                vreinterpret_s16_u16(vmovn_u32(b)),
+                vdup_n_s16(3),
             )
         }
         Rgb30::Ra30 => {
-            let a_mask = vdupq_n_u32(0x3);
-            let va = vmovn_u32(vandq_u32(v, a_mask));
-
-            let a = vorr_u16(
-                vorr_u16(
-                    vorr_u16(
-                        vorr_u16(vshl_n_u16::<8>(va), vshl_n_u16::<6>(va)),
-                        vshl_n_u16::<4>(va),
-                    ),
-                    vshl_n_u16::<2>(va),
-                ),
-                va,
-            );
-
-            let r = vmovn_u32(vandq_u32(vshrq_n_u32::<22>(v), mask));
-            let g = vmovn_u32(vandq_u32(vshrq_n_u32::<12>(v), mask));
-            let b = vmovn_u32(vandq_u32(vshrq_n_u32::<2>(v), mask));
+            let j0 = vshrq_n_u32::<22>(v);
+            let j1 = vshrq_n_u32::<12>(v);
+            let j2 = vshrq_n_u32::<2>(v);
+            let r = vandq_u32(j0, mask);
+            let g = vandq_u32(j1, mask);
+            let b = vandq_u32(j2, mask);
             int16x4x4_t(
-                vreinterpret_s16_u16(r),
-                vreinterpret_s16_u16(g),
-                vreinterpret_s16_u16(b),
-                vreinterpret_s16_u16(a),
+                vreinterpret_s16_u16(vmovn_u32(r)),
+                vreinterpret_s16_u16(vmovn_u32(g)),
+                vreinterpret_s16_u16(vmovn_u32(b)),
+                vdup_n_s16(3),
             )
         }
     }
 }
+
+// #[inline(always)]
+// pub(crate) unsafe fn vunzips_4_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
+//     v: uint32x4_t,
+// ) -> int16x4x4_t {
+//     let mask = vdupq_n_u32(0x3ff);
+//     let ar_type: Rgb30 = AR30_TYPE.into();
+//
+//     let v = if AR30_ORDER == 0 { v } else { vrev128_u32(v) };
+//
+//     match ar_type {
+//         Rgb30::Ar30 => {
+//             let r = vmovn_u32(vandq_u32(v, mask));
+//             let g = vmovn_u32(vandq_u32(vshrq_n_u32::<10>(v), mask));
+//             let b = vmovn_u32(vandq_u32(vshrq_n_u32::<20>(v), mask));
+//             let va = vmovn_u32(vshrq_n_u32::<30>(v));
+//             let a = vorr_u16(
+//                 vorr_u16(
+//                     vorr_u16(
+//                         vorr_u16(vshl_n_u16::<8>(va), vshl_n_u16::<6>(va)),
+//                         vshl_n_u16::<4>(va),
+//                     ),
+//                     vshl_n_u16::<2>(va),
+//                 ),
+//                 va,
+//             );
+//             int16x4x4_t(
+//                 vreinterpret_s16_u16(r),
+//                 vreinterpret_s16_u16(g),
+//                 vreinterpret_s16_u16(b),
+//                 vreinterpret_s16_u16(a),
+//             )
+//         }
+//         Rgb30::Ra30 => {
+//             let a_mask = vdupq_n_u32(0x3);
+//             let va = vmovn_u32(vandq_u32(v, a_mask));
+//
+//             let a = vorr_u16(
+//                 vorr_u16(
+//                     vorr_u16(
+//                         vorr_u16(vshl_n_u16::<8>(va), vshl_n_u16::<6>(va)),
+//                         vshl_n_u16::<4>(va),
+//                     ),
+//                     vshl_n_u16::<2>(va),
+//                 ),
+//                 va,
+//             );
+//
+//             let r = vmovn_u32(vandq_u32(vshrq_n_u32::<22>(v), mask));
+//             let g = vmovn_u32(vandq_u32(vshrq_n_u32::<12>(v), mask));
+//             let b = vmovn_u32(vandq_u32(vshrq_n_u32::<2>(v), mask));
+//             int16x4x4_t(
+//                 vreinterpret_s16_u16(r),
+//                 vreinterpret_s16_u16(g),
+//                 vreinterpret_s16_u16(b),
+//                 vreinterpret_s16_u16(a),
+//             )
+//         }
+//     }
+// }
 
 #[inline(always)]
 pub(crate) unsafe fn vunzip_3_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
@@ -257,7 +298,7 @@ pub(crate) unsafe fn vunzip_3_ar30_separate<const AR30_TYPE: usize, const AR30_O
 pub(crate) unsafe fn vunzips_4_ar30_separate<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: uint32x4_t,
 ) -> int16x8x2_t {
-    let values = vunzips_4_ar30::<AR30_TYPE, AR30_ORDER>(v);
+    let values = vunzips_3_ar30::<AR30_TYPE, AR30_ORDER>(v);
     let a0 = vtrn_s16(values.0, values.1);
     let a1 = vtrn_s16(values.2, values.3);
     let v1 = vtrn_s32(vreinterpret_s32_s16(a0.0), vreinterpret_s32_s16(a1.0));
@@ -349,20 +390,21 @@ pub(crate) unsafe fn vld1_ar30_s16<const AR30_TYPE: usize, const AR30_ORDER: usi
     ]);
     let ar_type: Rgb30 = AR30_TYPE.into();
     let vl = ar_type.unpack::<AR30_ORDER>(item);
-    let a_rep = (vl.3 as i16) << 8;
-    let temp = [vl.0 as i16, vl.1 as i16, vl.2 as i16, a_rep];
+    let temp = [vl.0 as i16, vl.1 as i16, vl.2 as i16, 1023];
     vld1_s16(temp.as_ptr())
 }
 
 #[inline(always)]
 pub(crate) unsafe fn vextract_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: uint16x4_t,
-) -> u32 {
+) -> uint32x2_t {
     let v0 = vreinterpret_u64_u16(v);
     let v_mask = vdup_n_u64(0x3ff);
+    let j0 = vshr_n_u64::<16>(v0);
+    let j1 = vshr_n_u64::<32>(v0);
     let r = vand_u64(v0, v_mask);
-    let g = vand_u64(vshr_n_u64::<16>(v0), v_mask);
-    let b = vand_u64(vshr_n_u64::<32>(v0), v_mask);
+    let g = vand_u64(j0, v_mask);
+    let b = vand_u64(j1, v_mask);
 
     let ar_type: Rgb30 = AR30_TYPE.into();
 
@@ -386,6 +428,5 @@ pub(crate) unsafe fn vextract_ar30<const AR30_TYPE: usize, const AR30_ORDER: usi
     if AR30_ORDER == 1 {
         a = vreinterpret_u64_u8(vrev32_u8(vreinterpret_u8_u64(a)));
     }
-    let pairs = vreinterpret_u32_u64(a);
-    vget_lane_u32::<0>(pairs)
+    vreinterpret_u32_u64(a)
 }

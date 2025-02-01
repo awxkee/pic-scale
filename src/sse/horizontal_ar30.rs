@@ -27,64 +27,83 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter_weights::FilterWeights;
-use crate::neon::ar30::{
-    vextract_ar30, vld1_ar30_s16, vunzip_3_ar30_separate, vunzips_4_ar30_separate,
+use crate::sse::{
+    _mm_extract_ar30, _mm_ld1_ar30_s16, _mm_unzip_4_ar30_separate, _mm_unzips_4_ar30_separate,
 };
-use std::arch::aarch64::*;
+#[cfg(target_arch = "x86")]
+use std::arch::x86::*;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
 
 #[inline]
 unsafe fn conv_horiz_rgba_1_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
     start_x: usize,
     src: &[u8],
-    w0: int16x4_t,
-    store: int32x4_t,
-) -> int32x4_t {
+    w0: __m128i,
+    store: __m128i,
+) -> __m128i {
     let src_ptr = src.get_unchecked(start_x * 4..);
-    let ld = vld1_ar30_s16::<AR_TYPE, AR_ORDER>(src_ptr);
-    vqdmlal_lane_s16::<0>(store, ld, w0)
+    let ld = _mm_ld1_ar30_s16::<AR_TYPE, AR_ORDER>(src_ptr);
+    _mm_add_epi32(
+        store,
+        _mm_madd_epi16(_mm_unpacklo_epi16(ld, _mm_setzero_si128()), w0),
+    )
 }
 
 #[inline(always)]
 unsafe fn conv_horiz_rgba_8_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
     start_x: usize,
     src: &[u8],
-    w: int16x8_t,
-    store: int32x4_t,
-) -> int32x4_t {
+    w0: __m128i,
+    w1: __m128i,
+    w2: __m128i,
+    w3: __m128i,
+    store: __m128i,
+) -> __m128i {
     let src_ptr = src.get_unchecked(start_x * 4..);
 
-    let rgba_pixel =
-        vunzip_3_ar30_separate::<AR_TYPE, AR_ORDER>(vld1q_u32_x2(src_ptr.as_ptr() as *const _));
+    let l0 = _mm_loadu_si128(src_ptr.as_ptr() as *const _);
+    let l1 = _mm_loadu_si128(src_ptr.as_ptr().add(4 * 4) as *const _);
 
-    let mut v = vqdmlal_laneq_s16::<0>(store, vget_low_s16(rgba_pixel.0), w);
-    v = vqdmlal_high_laneq_s16::<1>(v, rgba_pixel.1, w);
-    v = vqdmlal_laneq_s16::<2>(v, vget_low_s16(rgba_pixel.1), w);
-    v = vqdmlal_high_laneq_s16::<3>(v, rgba_pixel.1, w);
-    v = vqdmlal_laneq_s16::<4>(v, vget_low_s16(rgba_pixel.2), w);
-    v = vqdmlal_high_laneq_s16::<5>(v, rgba_pixel.2, w);
-    v = vqdmlal_laneq_s16::<6>(v, vget_low_s16(rgba_pixel.3), w);
-    vqdmlal_high_laneq_s16::<7>(v, rgba_pixel.3, w)
+    let rgba_pixel = _mm_unzip_4_ar30_separate::<AR_TYPE, AR_ORDER>((l0, l1));
+
+    let sh1 = _mm_setr_epi8(0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15);
+
+    let v0 = _mm_shuffle_epi8(rgba_pixel.0, sh1);
+    let v1 = _mm_shuffle_epi8(rgba_pixel.1, sh1);
+    let v2 = _mm_shuffle_epi8(rgba_pixel.2, sh1);
+    let v3 = _mm_shuffle_epi8(rgba_pixel.3, sh1);
+
+    let mut v = _mm_add_epi32(store, _mm_madd_epi16(v0, w0));
+    v = _mm_add_epi32(v, _mm_madd_epi16(v1, w1));
+    v = _mm_add_epi32(v, _mm_madd_epi16(v2, w2));
+    _mm_add_epi32(v, _mm_madd_epi16(v3, w3))
 }
 
 #[inline]
 unsafe fn conv_horiz_rgba_4_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
     start_x: usize,
     src: &[u8],
-    w: int16x4_t,
-    store: int32x4_t,
-) -> int32x4_t {
+    w0: __m128i,
+    w1: __m128i,
+    store: __m128i,
+) -> __m128i {
     let src_ptr = src.get_unchecked(start_x * 4..);
 
-    let rgba_pixel =
-        vunzips_4_ar30_separate::<AR_TYPE, AR_ORDER>(vld1q_u32(src_ptr.as_ptr() as *const _));
+    let rgba_pixel = _mm_unzips_4_ar30_separate::<AR_TYPE, AR_ORDER>(_mm_loadu_si128(
+        src_ptr.as_ptr() as *const _,
+    ));
 
-    let mut v = vqdmlal_lane_s16::<0>(store, vget_low_s16(rgba_pixel.0), w);
-    v = vqdmlal_high_lane_s16::<1>(v, rgba_pixel.1, w);
-    v = vqdmlal_lane_s16::<2>(v, vget_low_s16(rgba_pixel.1), w);
-    vqdmlal_high_lane_s16::<3>(v, rgba_pixel.1, w)
+    let sh1 = _mm_setr_epi8(0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15);
+
+    let v0 = _mm_shuffle_epi8(rgba_pixel.0, sh1);
+    let v1 = _mm_shuffle_epi8(rgba_pixel.1, sh1);
+
+    let v = _mm_add_epi32(store, _mm_madd_epi16(v0, w0));
+    _mm_add_epi32(v, _mm_madd_epi16(v1, w1))
 }
 
-pub(crate) fn neon_convolve_horizontal_rgba_rows_4_ar30<
+pub(crate) fn sse_convolve_horizontal_rgba_rows_4_ar30<
     const AR_TYPE: usize,
     const AR_ORDER: usize,
 >(
@@ -95,7 +114,7 @@ pub(crate) fn neon_convolve_horizontal_rgba_rows_4_ar30<
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        neon_convolve_horizontal_rgba_rows_4_impl::<AR_TYPE, AR_ORDER>(
+        sse_convolve_horizontal_rgba_rows_4_impl::<AR_TYPE, AR_ORDER>(
             src,
             src_stride,
             dst,
@@ -105,7 +124,8 @@ pub(crate) fn neon_convolve_horizontal_rgba_rows_4_ar30<
     }
 }
 
-unsafe fn neon_convolve_horizontal_rgba_rows_4_impl<const AR_TYPE: usize, const AR_ORDER: usize>(
+#[target_feature(enable = "sse4.1")]
+unsafe fn sse_convolve_horizontal_rgba_rows_4_impl<const AR_TYPE: usize, const AR_ORDER: usize>(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -113,12 +133,12 @@ unsafe fn neon_convolve_horizontal_rgba_rows_4_impl<const AR_TYPE: usize, const 
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        const PRECISION: i32 = 16;
+        const PRECISION: i32 = 15;
         const ROUNDING: i32 = (1 << (PRECISION - 1)) - 1;
 
-        let init = vdupq_n_s32(ROUNDING);
+        let init = _mm_set1_epi32(ROUNDING);
 
-        let v_cut_off = vdup_n_u16(1023);
+        let v_cut_off = _mm_set1_epi16(1023);
 
         let (row0_ref, rest) = dst.split_at_mut(dst_stride);
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
@@ -157,29 +177,44 @@ unsafe fn neon_convolve_horizontal_rgba_rows_4_impl<const AR_TYPE: usize, const 
             while jx + 8 < bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..(jx + 8));
-                let weights_set = vld1q_s16(w_ptr.as_ptr());
+                let w0 = _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
+                let w1 = _mm_set1_epi32((w_ptr.as_ptr().add(2) as *const i32).read_unaligned());
+                let w2 = _mm_set1_epi32((w_ptr.as_ptr().add(4) as *const i32).read_unaligned());
+                let w3 = _mm_set1_epi32((w_ptr.as_ptr().add(6) as *const i32).read_unaligned());
                 store_0 = conv_horiz_rgba_8_u8_i16::<AR_TYPE, AR_ORDER>(
                     bounds_start,
                     src0,
-                    weights_set,
+                    w0,
+                    w1,
+                    w2,
+                    w3,
                     store_0,
                 );
                 store_1 = conv_horiz_rgba_8_u8_i16::<AR_TYPE, AR_ORDER>(
                     bounds_start,
                     src1,
-                    weights_set,
+                    w0,
+                    w1,
+                    w2,
+                    w3,
                     store_1,
                 );
                 store_2 = conv_horiz_rgba_8_u8_i16::<AR_TYPE, AR_ORDER>(
                     bounds_start,
                     src2,
-                    weights_set,
+                    w0,
+                    w1,
+                    w2,
+                    w3,
                     store_2,
                 );
                 store_3 = conv_horiz_rgba_8_u8_i16::<AR_TYPE, AR_ORDER>(
                     bounds_start,
                     src3,
-                    weights_set,
+                    w0,
+                    w1,
+                    w2,
+                    w3,
                     store_3,
                 );
                 jx += 8;
@@ -188,29 +223,34 @@ unsafe fn neon_convolve_horizontal_rgba_rows_4_impl<const AR_TYPE: usize, const 
             while jx + 4 < bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..(jx + 4));
-                let weights = vld1_s16(w_ptr.as_ptr());
+                let w0 = _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
+                let w1 = _mm_set1_epi32((w_ptr.as_ptr().add(2) as *const i32).read_unaligned());
                 store_0 = conv_horiz_rgba_4_u8_i16::<AR_TYPE, AR_ORDER>(
                     bounds_start,
                     src0,
-                    weights,
+                    w0,
+                    w1,
                     store_0,
                 );
                 store_1 = conv_horiz_rgba_4_u8_i16::<AR_TYPE, AR_ORDER>(
                     bounds_start,
                     src1,
-                    weights,
+                    w0,
+                    w1,
                     store_1,
                 );
                 store_2 = conv_horiz_rgba_4_u8_i16::<AR_TYPE, AR_ORDER>(
                     bounds_start,
                     src2,
-                    weights,
+                    w0,
+                    w1,
                     store_2,
                 );
                 store_3 = conv_horiz_rgba_4_u8_i16::<AR_TYPE, AR_ORDER>(
                     bounds_start,
                     src3,
-                    weights,
+                    w0,
+                    w1,
                     store_3,
                 );
                 jx += 4;
@@ -219,7 +259,7 @@ unsafe fn neon_convolve_horizontal_rgba_rows_4_impl<const AR_TYPE: usize, const 
             while jx < bounds_size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 1));
                 let bounds_start = bounds.start + jx;
-                let weight0 = vld1_dup_s16(w_ptr.as_ptr());
+                let weight0 = _mm_set1_epi16(w_ptr[0]);
                 store_0 = conv_horiz_rgba_1_u8_i16::<AR_TYPE, AR_ORDER>(
                     bounds_start,
                     src0,
@@ -247,29 +287,34 @@ unsafe fn neon_convolve_horizontal_rgba_rows_4_impl<const AR_TYPE: usize, const 
                 jx += 1;
             }
 
-            let store_0 = vqshrun_n_s32::<PRECISION>(store_0);
-            let store_1 = vqshrun_n_s32::<PRECISION>(store_1);
-            let store_2 = vqshrun_n_s32::<PRECISION>(store_2);
-            let store_3 = vqshrun_n_s32::<PRECISION>(store_3);
+            let store_0 = _mm_srai_epi32::<PRECISION>(store_0);
+            let store_1 = _mm_srai_epi32::<PRECISION>(store_1);
+            let store_2 = _mm_srai_epi32::<PRECISION>(store_2);
+            let store_3 = _mm_srai_epi32::<PRECISION>(store_3);
 
-            let store_16_0 = vmin_u16(store_0, v_cut_off);
-            let store_16_1 = vmin_u16(store_1, v_cut_off);
-            let store_16_2 = vmin_u16(store_2, v_cut_off);
-            let store_16_3 = vmin_u16(store_3, v_cut_off);
+            let store_0 = _mm_packus_epi32(store_0, store_0);
+            let store_1 = _mm_packus_epi32(store_1, store_1);
+            let store_2 = _mm_packus_epi32(store_2, store_2);
+            let store_3 = _mm_packus_epi32(store_3, store_3);
 
-            let packed0 = vextract_ar30::<AR_TYPE, AR_ORDER>(store_16_0);
-            vst1_lane_u32::<0>(chunk0.as_mut_ptr() as *mut u32, packed0);
-            let packed1 = vextract_ar30::<AR_TYPE, AR_ORDER>(store_16_1);
-            vst1_lane_u32::<0>(chunk1.as_mut_ptr() as *mut u32, packed1);
-            let packed2 = vextract_ar30::<AR_TYPE, AR_ORDER>(store_16_2);
-            vst1_lane_u32::<0>(chunk2.as_mut_ptr() as *mut u32, packed2);
-            let packed3 = vextract_ar30::<AR_TYPE, AR_ORDER>(store_16_3);
-            vst1_lane_u32::<0>(chunk3.as_mut_ptr() as *mut u32, packed3);
+            let store_16_0 = _mm_min_epi16(store_0, v_cut_off);
+            let store_16_1 = _mm_min_epi16(store_1, v_cut_off);
+            let store_16_2 = _mm_min_epi16(store_2, v_cut_off);
+            let store_16_3 = _mm_min_epi16(store_3, v_cut_off);
+
+            let packed0 = _mm_extract_ar30::<AR_TYPE, AR_ORDER>(store_16_0);
+            _mm_storeu_si32(chunk0.as_mut_ptr(), packed0);
+            let packed1 = _mm_extract_ar30::<AR_TYPE, AR_ORDER>(store_16_1);
+            _mm_storeu_si32(chunk1.as_mut_ptr(), packed1);
+            let packed2 = _mm_extract_ar30::<AR_TYPE, AR_ORDER>(store_16_2);
+            _mm_storeu_si32(chunk2.as_mut_ptr(), packed2);
+            let packed3 = _mm_extract_ar30::<AR_TYPE, AR_ORDER>(store_16_3);
+            _mm_storeu_si32(chunk3.as_mut_ptr(), packed3);
         }
     }
 }
 
-pub(crate) fn neon_convolve_horizontal_rgba_rows_ar30<
+pub(crate) fn sse_convolve_horizontal_rgba_rows_ar30<
     const AR_TYPE: usize,
     const AR_ORDER: usize,
 >(
@@ -278,11 +323,12 @@ pub(crate) fn neon_convolve_horizontal_rgba_rows_ar30<
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        neon_convolve_horizontal_rgba_row_impl::<AR_TYPE, AR_ORDER>(src, dst, filter_weights);
+        sse_convolve_horizontal_rgba_row_impl::<AR_TYPE, AR_ORDER>(src, dst, filter_weights);
     }
 }
 
-unsafe fn neon_convolve_horizontal_rgba_row_impl<const AR_TYPE: usize, const AR_ORDER: usize>(
+#[target_feature(enable = "sse4.1")]
+unsafe fn sse_convolve_horizontal_rgba_row_impl<const AR_TYPE: usize, const AR_ORDER: usize>(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
@@ -291,9 +337,9 @@ unsafe fn neon_convolve_horizontal_rgba_row_impl<const AR_TYPE: usize, const AR_
         const PRECISION: i32 = 16;
         const ROUNDING: i32 = (1 << (PRECISION - 1)) - 1;
 
-        let init = vdupq_n_s32(ROUNDING);
+        let init = _mm_set1_epi32(ROUNDING);
 
-        let v_cut_off = vdup_n_u16(1023);
+        let v_cut_off = _mm_set1_epi32(1023);
 
         for ((chunk0, &bounds), weights) in dst
             .chunks_exact_mut(4)
@@ -315,11 +361,17 @@ unsafe fn neon_convolve_horizontal_rgba_row_impl<const AR_TYPE: usize, const AR_
             while jx + 8 < bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..(jx + 8));
-                let weights_set = vld1q_s16(w_ptr.as_ptr());
+                let w0 = _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
+                let w1 = _mm_set1_epi32((w_ptr.as_ptr().add(2) as *const i32).read_unaligned());
+                let w2 = _mm_set1_epi32((w_ptr.as_ptr().add(4) as *const i32).read_unaligned());
+                let w3 = _mm_set1_epi32((w_ptr.as_ptr().add(6) as *const i32).read_unaligned());
                 store_0 = conv_horiz_rgba_8_u8_i16::<AR_TYPE, AR_ORDER>(
                     bounds_start,
                     src0,
-                    weights_set,
+                    w0,
+                    w1,
+                    w2,
+                    w3,
                     store_0,
                 );
                 jx += 8;
@@ -328,11 +380,13 @@ unsafe fn neon_convolve_horizontal_rgba_row_impl<const AR_TYPE: usize, const AR_
             while jx + 4 < bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..(jx + 4));
-                let weights = vld1_s16(w_ptr.as_ptr());
+                let w0 = _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
+                let w1 = _mm_set1_epi32((w_ptr.as_ptr().add(2) as *const i32).read_unaligned());
                 store_0 = conv_horiz_rgba_4_u8_i16::<AR_TYPE, AR_ORDER>(
                     bounds_start,
                     src0,
-                    weights,
+                    w0,
+                    w1,
                     store_0,
                 );
                 jx += 4;
@@ -341,7 +395,7 @@ unsafe fn neon_convolve_horizontal_rgba_row_impl<const AR_TYPE: usize, const AR_
             while jx < bounds_size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 1));
                 let bounds_start = bounds.start + jx;
-                let weight0 = vld1_dup_s16(w_ptr.as_ptr());
+                let weight0 = _mm_set1_epi16(w_ptr[0]);
                 store_0 = conv_horiz_rgba_1_u8_i16::<AR_TYPE, AR_ORDER>(
                     bounds_start,
                     src0,
@@ -351,12 +405,14 @@ unsafe fn neon_convolve_horizontal_rgba_row_impl<const AR_TYPE: usize, const AR_
                 jx += 1;
             }
 
-            let store_0 = vqshrun_n_s32::<PRECISION>(store_0);
+            let store_0 = _mm_srai_epi32::<PRECISION>(store_0);
 
-            let store_16_0 = vmin_u16(store_0, v_cut_off);
+            let store_0 = _mm_packus_epi32(store_0, store_0);
 
-            let packed0 = vextract_ar30::<AR_TYPE, AR_ORDER>(store_16_0);
-            vst1_lane_u32::<0>(chunk0.as_mut_ptr() as *mut u32, packed0);
+            let store_16_0 = _mm_min_epi16(store_0, v_cut_off);
+
+            let packed0 = _mm_extract_ar30::<AR_TYPE, AR_ORDER>(store_16_0);
+            _mm_storeu_si32(chunk0.as_mut_ptr(), packed0);
         }
     }
 }

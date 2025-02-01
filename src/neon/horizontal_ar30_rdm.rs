@@ -335,26 +335,14 @@ unsafe fn neon_convolve_horizontal_rgba_rows_4_impl<const AR_TYPE: usize, const 
                 v_cut_off,
             ));
 
-            let packed0 = vextract_ar30::<AR_TYPE, AR_ORDER>(store_16_0).to_ne_bytes();
-            chunk0[0] = packed0[0];
-            chunk0[1] = packed0[1];
-            chunk0[2] = packed0[2];
-            chunk0[3] = packed0[3];
-            let packed1 = vextract_ar30::<AR_TYPE, AR_ORDER>(store_16_1).to_ne_bytes();
-            chunk1[0] = packed1[0];
-            chunk1[1] = packed1[1];
-            chunk1[2] = packed1[2];
-            chunk1[3] = packed1[3];
-            let packed2 = vextract_ar30::<AR_TYPE, AR_ORDER>(store_16_2).to_ne_bytes();
-            chunk2[0] = packed2[0];
-            chunk2[1] = packed2[1];
-            chunk2[2] = packed2[2];
-            chunk2[3] = packed2[3];
-            let packed3 = vextract_ar30::<AR_TYPE, AR_ORDER>(store_16_3).to_ne_bytes();
-            chunk3[0] = packed3[0];
-            chunk3[1] = packed3[1];
-            chunk3[2] = packed3[2];
-            chunk3[3] = packed3[3];
+            let packed0 = vextract_ar30::<AR_TYPE, AR_ORDER>(store_16_0);
+            vst1_lane_u32::<0>(chunk0.as_mut_ptr() as *mut u32, packed0);
+            let packed1 = vextract_ar30::<AR_TYPE, AR_ORDER>(store_16_1);
+            vst1_lane_u32::<0>(chunk1.as_mut_ptr() as *mut u32, packed1);
+            let packed2 = vextract_ar30::<AR_TYPE, AR_ORDER>(store_16_2);
+            vst1_lane_u32::<0>(chunk2.as_mut_ptr() as *mut u32, packed2);
+            let packed3 = vextract_ar30::<AR_TYPE, AR_ORDER>(store_16_3);
+            vst1_lane_u32::<0>(chunk3.as_mut_ptr() as *mut u32, packed3);
         }
     }
 }

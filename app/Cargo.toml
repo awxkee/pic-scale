@@ -8,6 +8,7 @@ image = { version = "0.25.5", features = ["default"] }
 pic-scale = { path = "..", features = ["nightly_f16"], default-features = false }
 fast_image_resize = { version = "5.0.0", features = [] }
 accelerate = {path = "accelerate/"}
+yuvutils-rs = "0.6.0"
 libc = "0.2.169"
 
 [dev-dependencies]
