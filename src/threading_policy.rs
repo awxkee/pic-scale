@@ -82,13 +82,10 @@ impl ThreadingPolicy {
             return None;
         }
         let thread_count = self.thread_count(for_size);
-        match rayon::ThreadPoolBuilder::new()
+        rayon::ThreadPoolBuilder::new()
             .num_threads(thread_count)
             .build()
-        {
-            Ok(pool) => Some(pool),
-            Err(_) => None,
-        }
+            .ok()
     }
 
     #[cfg(target_arch = "wasm32")]
