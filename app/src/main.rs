@@ -13,9 +13,9 @@ use fast_image_resize::{
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
     Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, ImageStoreScaling, ResamplingFunction,
-    RgbF16ImageStore, RgbF16ImageStoreMut, Rgba16ImageStore, Rgba16ImageStoreMut,
-    RgbaF16ImageStore, RgbaF16ImageStoreMut, Scaler, Scaling, ScalingU16, ThreadingPolicy,
-    WorkloadStrategy,
+    RgbF16ImageStore, RgbF16ImageStoreMut, Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore,
+    Rgba8ImageStoreMut, RgbaF16ImageStore, RgbaF16ImageStoreMut, Scaler, Scaling, ScalingU16,
+    ThreadingPolicy, WorkloadStrategy,
 };
 use yuvutils_rs::{ar30_to_rgb8, rgb8_to_ar30, rgba8_to_ar30, Rgb30ByteOrder};
 
@@ -48,7 +48,7 @@ fn resize_plane(
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/asset_4.png")
+    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -68,67 +68,23 @@ fn main() {
     // //     .collect::<Vec<_>>();
     //
     // //
-    // let mut store =
-    //     Rgba16ImageStore::from_slice(&choke, dimensions.0 as usize, dimensions.1 as usize).unwrap();
-    // store.bit_depth = 10;
+    let mut store =
+        Rgba8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
+    store.bit_depth = 10;
     //
     let mut src_ar = vec![0u8; dimensions.0 as usize * dimensions.1 as usize * 4];
-    rgba8_to_ar30(
-        &mut src_ar,
-        dimensions.0 * 4,
-        Rgb30ByteOrder::Host,
-        &transient,
-        dimensions.0 as u32 * 4,
-        dimensions.0,
-        dimensions.1,
-    )
-    .unwrap();
+
     let dst_size = ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2);
-    let mut resized_ar = vec![0u8; dst_size.width * dst_size.height * 4];
-    scaler
-        .resize_ar30(
-            &src_ar,
-            dimensions.0 as usize * 4,
-            ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-            &mut resized_ar,
-            dst_size.width * 4,
-            dst_size,
-            Ar30ByteOrder::Host,
-        )
-        .unwrap();
 
-    let mut dest_rgb = vec![0u8; dst_size.width * dst_size.height * 3];
-    ar30_to_rgb8(
-        &resized_ar,
-        dst_size.width as u32 * 4,
-        Rgb30ByteOrder::Host,
-        &mut dest_rgb,
-        dst_size.width as u32 * 3,
-        dst_size.width as u32,
-        dst_size.height as u32,
-    )
-    .unwrap();
-
-    image::save_buffer(
-        "converted.png",
-        &dest_rgb,
-        dst_size.width as u32,
-        dst_size.height as u32,
-        image::ColorType::Rgb8,
-    )
-    .unwrap();
-
-    // let mut dst_store = Rgba16ImageStoreMut::alloc_with_depth(
-    //     dimensions.0 as usize / 2,
-    //     dimensions.1 as usize / 2,
-    //     10,
-    // );
+    let mut dst_store = Rgba8ImageStoreMut::alloc_with_depth(
+        dimensions.0 as usize / 2,
+        dimensions.1 as usize / 2,
+        10,
+    );
     // //
     // // // for i in 0..25 {
     // // let start_time = Instant::now();
-    // scaler
-    //     .resize_rgba_u16(&store, &mut dst_store, false)
-    //     .unwrap();
+    scaler.resize_rgba(&store, &mut dst_store, false).unwrap();
     //
     // let elapsed_time = start_time.elapsed();
     // // Print the elapsed time in milliseconds
@@ -176,25 +132,27 @@ fn main() {
     //     .map(|&x| (x >> 2) as u8)
     //     .collect();
 
-    // if dst_store.channels == 4 {
-    //     image::save_buffer(
-    //         "converted.png",
-    //         &dst,
-    //         dst_store.width as u32,
-    //         dst_store.height as u32,
-    //         image::ColorType::Rgba8,
-    //     )
-    //     .unwrap();
-    // } else {
-    //     image::save_buffer(
-    //         "converted.png",
-    //         &dst,
-    //         dst_store.width as u32,
-    //         dst_store.height as u32,
-    //         image::ColorType::Rgb8,
-    //     )
-    //     .unwrap();
-    // }
+    let dst = dst_store.as_bytes();
+
+    if dst_store.channels == 4 {
+        image::save_buffer(
+            "converted.png",
+            &dst,
+            dst_store.width as u32,
+            dst_store.height as u32,
+            image::ColorType::Rgba8,
+        )
+        .unwrap();
+    } else {
+        image::save_buffer(
+            "converted.png",
+            &dst,
+            dst_store.width as u32,
+            dst_store.height as u32,
+            image::ColorType::Rgb8,
+        )
+        .unwrap();
+    }
 }
 
 fn u16_to_u8(u16_buffer: &[u16]) -> &[u8] {
