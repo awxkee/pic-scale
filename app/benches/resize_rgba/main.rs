@@ -412,7 +412,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    c.bench_function("Pic scale RGBA1010102(N0: Lanczos 3/Speed", |b| {
+    c.bench_function("Pic scale RGBA1010102(N): Lanczos 3/Speed", |b| {
         let copied: Vec<u8> = Vec::from(src_bytes);
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);

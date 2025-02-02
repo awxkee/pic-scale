@@ -128,36 +128,31 @@ impl<const BIT_DEPTH: usize> Avx2PremultiplyExecutorDefault<BIT_DEPTH> {
         let low_alpha = _mm256_unpacklo_epi16(pixel.3, zeros);
         let high_alpha = _mm256_unpackhi_epi16(pixel.3, zeros);
 
-        let new_rrr = _mm256_packus_epi32(
-            _mm256_div_by_epi32::<BIT_DEPTH>(_mm256_madd_epi16(
-                _mm256_unpacklo_epi16(pixel.0, zeros),
-                low_alpha,
-            )),
-            _mm256_div_by_epi32::<BIT_DEPTH>(_mm256_madd_epi16(
-                _mm256_unpackhi_epi16(pixel.0, zeros),
-                high_alpha,
-            )),
-        );
-        let new_ggg = _mm256_packus_epi32(
-            _mm256_div_by_epi32::<BIT_DEPTH>(_mm256_madd_epi16(
-                _mm256_unpacklo_epi16(pixel.1, zeros),
-                low_alpha,
-            )),
-            _mm256_div_by_epi32::<BIT_DEPTH>(_mm256_madd_epi16(
-                _mm256_unpackhi_epi16(pixel.1, zeros),
-                high_alpha,
-            )),
-        );
-        let new_bbb = _mm256_packus_epi32(
-            _mm256_div_by_epi32::<BIT_DEPTH>(_mm256_madd_epi16(
-                _mm256_unpacklo_epi16(pixel.2, zeros),
-                low_alpha,
-            )),
-            _mm256_div_by_epi32::<BIT_DEPTH>(_mm256_madd_epi16(
-                _mm256_unpackhi_epi16(pixel.2, zeros),
-                high_alpha,
-            )),
-        );
+        let rl32 = _mm256_unpacklo_epi16(pixel.0, zeros);
+        let rh32 = _mm256_unpackhi_epi16(pixel.0, zeros);
+        let gl32 = _mm256_unpacklo_epi16(pixel.1, zeros);
+        let gh32 = _mm256_unpackhi_epi16(pixel.1, zeros);
+        let bl32 = _mm256_unpacklo_epi16(pixel.2, zeros);
+        let bh32 = _mm256_unpackhi_epi16(pixel.2, zeros);
+
+        let rl32 = _mm256_madd_epi16(rl32, low_alpha);
+        let rh32 = _mm256_madd_epi16(rh32, high_alpha);
+        let gl32 = _mm256_madd_epi16(gl32, low_alpha);
+        let gh32 = _mm256_madd_epi16(gh32, high_alpha);
+        let bl32 = _mm256_madd_epi16(bl32, low_alpha);
+        let bh32 = _mm256_madd_epi16(bh32, high_alpha);
+
+        let lr32 = _mm256_div_by_epi32::<BIT_DEPTH>(rl32);
+        let hr32 = _mm256_div_by_epi32::<BIT_DEPTH>(rh32);
+        let lg32 = _mm256_div_by_epi32::<BIT_DEPTH>(gl32);
+        let hg32 = _mm256_div_by_epi32::<BIT_DEPTH>(gh32);
+        let lb32 = _mm256_div_by_epi32::<BIT_DEPTH>(bl32);
+        let hb32 = _mm256_div_by_epi32::<BIT_DEPTH>(bh32);
+
+        let new_rrr = _mm256_packus_epi32(lr32, hr32);
+
+        let new_ggg = _mm256_packus_epi32(lg32, hg32);
+        let new_bbb = _mm256_packus_epi32(lb32, hb32);
 
         let dst_ptr = dst.as_mut_ptr();
 
