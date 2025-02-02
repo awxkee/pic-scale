@@ -66,12 +66,12 @@ unsafe fn sse_column_handler_fixed_point_ar30_impl<
 
     let total_width = dst.len() / 4;
 
-    const PREC: i32 = 16;
+    const PREC: i32 = 15;
     const RND_CONST: i32 = (1 << (PREC - 1)) - 1;
 
     while cx + 8 < total_width {
         unsafe {
-            let v_max = _mm_set1_epi32(1023);
+            let v_max = _mm_set1_epi16(1023);
             let filter = weight;
             let v_start_px = cx * 4;
 
@@ -134,9 +134,9 @@ unsafe fn sse_column_handler_fixed_point_ar30_impl<
             let vals = _mm_zip_4_ar30::<AR30_TYPE, AR30_ORDER>((r_v, g_v, b_v, _mm_set1_epi16(3)));
             _mm_storeu_si128(v_dst.as_mut_ptr() as *mut _, vals.0);
             _mm_storeu_si128(v_dst.as_mut_ptr().add(4 * 4) as *mut _, vals.1);
-        }
 
-        cx += 8;
+            cx += 8;
+        }
     }
 
     if cx < total_width {

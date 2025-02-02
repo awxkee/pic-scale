@@ -61,12 +61,12 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 | RGBA (f16)     | x    | x   | x    | -          | -    | 
 | RGB (f16)      | x    | ~   | ~    | -          | -    | 
 | Plane (f16)    | ~    | ~   | ~    | -          | -    |
-| AR30/RA30      | x    | -   | -    | -          | -    |
+| AR30/RA30      | x    | x   | -    | -          | -    |
 
 #### Features
 
 Features: 
- -  To enable support of `f16` the feature `half` should be activated.
+ -  To enable support of `f16` the feature `nightly_f16` should be activated and `nightly` compiler are required.
  -  `nightly_avx512` activates AVX-512 feature set and requires `nightly` compiler channel 
 
 #### Target features with runtime dispatch
