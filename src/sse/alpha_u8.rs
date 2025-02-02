@@ -42,20 +42,16 @@ pub(crate) unsafe fn _mm_select_si128(
     true_vals: __m128i,
     false_vals: __m128i,
 ) -> __m128i {
-    _mm_or_si128(
-        _mm_and_si128(mask, true_vals),
-        _mm_andnot_si128(mask, false_vals),
-    )
+    _mm_blendv_epi8(false_vals, true_vals, mask)
 }
 
 /// Exact division by 255 with rounding to nearest
 #[inline(always)]
 pub(crate) unsafe fn _mm_div_by_255_epi16(v: __m128i) -> __m128i {
     let addition = _mm_set1_epi16(127);
-    _mm_srli_epi16::<8>(_mm_add_epi16(
-        _mm_add_epi16(v, addition),
-        _mm_srli_epi16::<8>(v),
-    ))
+    let j0 = _mm_add_epi16(v, addition);
+    let j1 = _mm_srli_epi16::<8>(v);
+    _mm_srli_epi16::<8>(_mm_add_epi16(j0, j1))
 }
 
 #[inline(always)]
