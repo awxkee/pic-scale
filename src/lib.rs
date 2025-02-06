@@ -151,8 +151,6 @@ pub use image_store::{
 pub use math::*;
 pub use pic_scale_error::{PicScaleBufferMismatch, PicScaleError};
 pub use sampler::*;
-pub use scaler::Scaling;
-pub use scaler::ScalingF32;
-pub use scaler::ScalingU16;
 pub use scaler::{ImageStoreScaling, Scaler, ScalingOptions, WorkloadStrategy};
+pub use scaler::{Scaling, ScalingF32, ScalingU16};
 pub use threading_policy::*;

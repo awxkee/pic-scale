@@ -57,10 +57,7 @@ pub(crate) unsafe fn _mm256_select_si256(
     true_vals: __m256i,
     false_vals: __m256i,
 ) -> __m256i {
-    _mm256_or_si256(
-        _mm256_and_si256(mask, true_vals),
-        _mm256_andnot_si256(mask, false_vals),
-    )
+    _mm256_blendv_epi8(false_vals, true_vals, mask)
 }
 
 #[inline(always)]
@@ -76,10 +73,9 @@ pub(crate) unsafe fn _mm256_selecti_ps(
 #[inline(always)]
 pub(crate) unsafe fn avx2_div_by255(v: __m256i) -> __m256i {
     let addition = _mm256_set1_epi16(127);
-    _mm256_srli_epi16::<8>(_mm256_add_epi16(
-        _mm256_add_epi16(v, addition),
-        _mm256_srli_epi16::<8>(v),
-    ))
+    let j0 = _mm256_add_epi16(v, addition);
+    let j1 = _mm256_srli_epi16::<8>(v);
+    _mm256_srli_epi16::<8>(_mm256_add_epi16(j0, j1))
 }
 
 #[inline(always)]

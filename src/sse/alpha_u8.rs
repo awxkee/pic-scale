@@ -42,20 +42,16 @@ pub(crate) unsafe fn _mm_select_si128(
     true_vals: __m128i,
     false_vals: __m128i,
 ) -> __m128i {
-    _mm_or_si128(
-        _mm_and_si128(mask, true_vals),
-        _mm_andnot_si128(mask, false_vals),
-    )
+    _mm_blendv_epi8(false_vals, true_vals, mask)
 }
 
 /// Exact division by 255 with rounding to nearest
 #[inline(always)]
 pub(crate) unsafe fn _mm_div_by_255_epi16(v: __m128i) -> __m128i {
     let addition = _mm_set1_epi16(127);
-    _mm_srli_epi16::<8>(_mm_add_epi16(
-        _mm_add_epi16(v, addition),
-        _mm_srli_epi16::<8>(v),
-    ))
+    let j0 = _mm_add_epi16(v, addition);
+    let j1 = _mm_srli_epi16::<8>(v);
+    _mm_srli_epi16::<8>(_mm_add_epi16(j0, j1))
 }
 
 #[inline(always)]
@@ -68,23 +64,55 @@ pub(crate) unsafe fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
 
     let scale_ps = _mm_set1_ps(255f32);
 
-    let lo_lo = _mm_mul_ps(_mm_cvtepi32_ps(_mm_unpacklo_epi16(lo, zeros)), scale_ps);
-    let lo_hi = _mm_mul_ps(_mm_cvtepi32_ps(_mm_unpackhi_epi16(lo, zeros)), scale_ps);
-    let hi_lo = _mm_mul_ps(_mm_cvtepi32_ps(_mm_unpacklo_epi16(hi, zeros)), scale_ps);
-    let hi_hi = _mm_mul_ps(_mm_cvtepi32_ps(_mm_unpackhi_epi16(hi, zeros)), scale_ps);
+    let llw = _mm_unpacklo_epi16(lo, zeros);
+    let lhw = _mm_unpackhi_epi16(lo, zeros);
+    let hlw = _mm_unpacklo_epi16(hi, zeros);
+    let hhw = _mm_unpackhi_epi16(hi, zeros);
+
+    let llwc = _mm_cvtepi32_ps(llw);
+    let lhwc = _mm_cvtepi32_ps(lhw);
+    let hlwc = _mm_cvtepi32_ps(hlw);
+    let hhwc = _mm_cvtepi32_ps(hhw);
+
+    let lo_lo = _mm_mul_ps(llwc, scale_ps);
+    let lo_hi = _mm_mul_ps(lhwc, scale_ps);
+    let hi_lo = _mm_mul_ps(hlwc, scale_ps);
+    let hi_hi = _mm_mul_ps(hhwc, scale_ps);
+
     let a_lo = _mm_unpacklo_epi8(a, zeros);
     let a_hi = _mm_unpackhi_epi8(a, zeros);
-    let a_lo_lo = _mm_rcp_ps(_mm_cvtepi32_ps(_mm_unpacklo_epi16(a_lo, zeros)));
-    let a_lo_hi = _mm_rcp_ps(_mm_cvtepi32_ps(_mm_unpackhi_epi16(a_lo, zeros)));
-    let a_hi_lo = _mm_rcp_ps(_mm_cvtepi32_ps(_mm_unpacklo_epi16(a_hi, zeros)));
-    let a_hi_hi = _mm_rcp_ps(_mm_cvtepi32_ps(_mm_unpackhi_epi16(a_hi, zeros)));
+
+    let allw = _mm_unpacklo_epi16(a_lo, zeros);
+    let alhw = _mm_unpackhi_epi16(a_lo, zeros);
+    let ahlw = _mm_unpacklo_epi16(a_hi, zeros);
+    let ahhw = _mm_unpackhi_epi16(a_hi, zeros);
+
+    let allf = _mm_cvtepi32_ps(allw);
+    let alhf = _mm_cvtepi32_ps(alhw);
+    let ahlf = _mm_cvtepi32_ps(ahlw);
+    let ahhf = _mm_cvtepi32_ps(ahhw);
+
+    let a_lo_lo = _mm_rcp_ps(allf);
+    let a_lo_hi = _mm_rcp_ps(alhf);
+    let a_hi_lo = _mm_rcp_ps(ahlf);
+    let a_hi_hi = _mm_rcp_ps(ahhf);
 
     const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
 
-    let lo_lo = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(lo_lo, a_lo_lo)));
-    let lo_hi = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(lo_hi, a_lo_hi)));
-    let hi_lo = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(hi_lo, a_hi_lo)));
-    let hi_hi = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(hi_hi, a_hi_hi)));
+    let mut fllw = _mm_mul_ps(lo_lo, a_lo_lo);
+    let mut flhw = _mm_mul_ps(lo_hi, a_lo_hi);
+    let mut fhlw = _mm_mul_ps(hi_lo, a_hi_lo);
+    let mut fhhw = _mm_mul_ps(hi_hi, a_hi_hi);
+
+    fllw = _mm_round_ps::<ROUNDING_FLAGS>(fllw);
+    flhw = _mm_round_ps::<ROUNDING_FLAGS>(flhw);
+    fhlw = _mm_round_ps::<ROUNDING_FLAGS>(fhlw);
+    fhhw = _mm_round_ps::<ROUNDING_FLAGS>(fhhw);
+
+    let lo_lo = _mm_cvtps_epi32(fllw);
+    let lo_hi = _mm_cvtps_epi32(flhw);
+    let hi_lo = _mm_cvtps_epi32(fhlw);
+    let hi_hi = _mm_cvtps_epi32(fhhw);
 
     let lo = _mm_packs_epi32(lo_lo, lo_hi);
     let hi = _mm_packs_epi32(hi_lo, hi_hi);
@@ -135,12 +163,19 @@ impl Sse41PremultiplyExecutor8Default {
         let aaa_low = _mm_unpacklo_epi8(aaa, zeros);
         let aaa_high = _mm_unpackhi_epi8(aaa, zeros);
 
-        rrr_low = _mm_div_by_255_epi16(_mm_mullo_epi16(rrr_low, aaa_low));
-        rrr_high = _mm_div_by_255_epi16(_mm_mullo_epi16(rrr_high, aaa_high));
-        ggg_low = _mm_div_by_255_epi16(_mm_mullo_epi16(ggg_low, aaa_low));
-        ggg_high = _mm_div_by_255_epi16(_mm_mullo_epi16(ggg_high, aaa_high));
-        bbb_low = _mm_div_by_255_epi16(_mm_mullo_epi16(bbb_low, aaa_low));
-        bbb_high = _mm_div_by_255_epi16(_mm_mullo_epi16(bbb_high, aaa_high));
+        rrr_low = _mm_mullo_epi16(rrr_low, aaa_low);
+        rrr_high = _mm_mullo_epi16(rrr_high, aaa_high);
+        ggg_low = _mm_mullo_epi16(ggg_low, aaa_low);
+        ggg_high = _mm_mullo_epi16(ggg_high, aaa_high);
+        bbb_low = _mm_mullo_epi16(bbb_low, aaa_low);
+        bbb_high = _mm_mullo_epi16(bbb_high, aaa_high);
+
+        rrr_low = _mm_div_by_255_epi16(rrr_low);
+        rrr_high = _mm_div_by_255_epi16(rrr_high);
+        ggg_low = _mm_div_by_255_epi16(ggg_low);
+        ggg_high = _mm_div_by_255_epi16(ggg_high);
+        bbb_low = _mm_div_by_255_epi16(bbb_low);
+        bbb_high = _mm_div_by_255_epi16(bbb_high);
 
         let rrr = _mm_packus_epi16(rrr_low, rrr_high);
         let ggg = _mm_packus_epi16(ggg_low, ggg_high);

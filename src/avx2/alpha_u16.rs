@@ -42,11 +42,20 @@ use std::arch::x86_64::*;
 #[inline(always)]
 unsafe fn _mm256_scale_by_alpha(px: __m256i, low_low_a: __m256, low_high_a: __m256) -> __m256i {
     let zeros = _mm256_setzero_si256();
-    let low_px = _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(px, zeros));
-    let high_px = _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(px, zeros));
+    let ls = _mm256_unpacklo_epi16(px, zeros);
+    let hs = _mm256_unpackhi_epi16(px, zeros);
 
-    let new_ll = _mm256_cvtps_epi32(_mm256_round_ps::<0x00>(_mm256_mul_ps(low_px, low_low_a)));
-    let new_lh = _mm256_cvtps_epi32(_mm256_round_ps::<0x00>(_mm256_mul_ps(high_px, low_high_a)));
+    let low_px = _mm256_cvtepi32_ps(ls);
+    let high_px = _mm256_cvtepi32_ps(hs);
+
+    let lps = _mm256_mul_ps(low_px, low_low_a);
+    let hps = _mm256_mul_ps(high_px, low_high_a);
+
+    let lvs = _mm256_round_ps::<0x00>(lps);
+    let hvs = _mm256_round_ps::<0x00>(hps);
+
+    let new_ll = _mm256_cvtps_epi32(lvs);
+    let new_lh = _mm256_cvtps_epi32(hvs);
 
     _mm256_packus_epi32(new_ll, new_lh)
 }
@@ -128,36 +137,31 @@ impl<const BIT_DEPTH: usize> Avx2PremultiplyExecutorDefault<BIT_DEPTH> {
         let low_alpha = _mm256_unpacklo_epi16(pixel.3, zeros);
         let high_alpha = _mm256_unpackhi_epi16(pixel.3, zeros);
 
-        let new_rrr = _mm256_packus_epi32(
-            _mm256_div_by_epi32::<BIT_DEPTH>(_mm256_madd_epi16(
-                _mm256_unpacklo_epi16(pixel.0, zeros),
-                low_alpha,
-            )),
-            _mm256_div_by_epi32::<BIT_DEPTH>(_mm256_madd_epi16(
-                _mm256_unpackhi_epi16(pixel.0, zeros),
-                high_alpha,
-            )),
-        );
-        let new_ggg = _mm256_packus_epi32(
-            _mm256_div_by_epi32::<BIT_DEPTH>(_mm256_madd_epi16(
-                _mm256_unpacklo_epi16(pixel.1, zeros),
-                low_alpha,
-            )),
-            _mm256_div_by_epi32::<BIT_DEPTH>(_mm256_madd_epi16(
-                _mm256_unpackhi_epi16(pixel.1, zeros),
-                high_alpha,
-            )),
-        );
-        let new_bbb = _mm256_packus_epi32(
-            _mm256_div_by_epi32::<BIT_DEPTH>(_mm256_madd_epi16(
-                _mm256_unpacklo_epi16(pixel.2, zeros),
-                low_alpha,
-            )),
-            _mm256_div_by_epi32::<BIT_DEPTH>(_mm256_madd_epi16(
-                _mm256_unpackhi_epi16(pixel.2, zeros),
-                high_alpha,
-            )),
-        );
+        let rl32 = _mm256_unpacklo_epi16(pixel.0, zeros);
+        let rh32 = _mm256_unpackhi_epi16(pixel.0, zeros);
+        let gl32 = _mm256_unpacklo_epi16(pixel.1, zeros);
+        let gh32 = _mm256_unpackhi_epi16(pixel.1, zeros);
+        let bl32 = _mm256_unpacklo_epi16(pixel.2, zeros);
+        let bh32 = _mm256_unpackhi_epi16(pixel.2, zeros);
+
+        let rl32 = _mm256_madd_epi16(rl32, low_alpha);
+        let rh32 = _mm256_madd_epi16(rh32, high_alpha);
+        let gl32 = _mm256_madd_epi16(gl32, low_alpha);
+        let gh32 = _mm256_madd_epi16(gh32, high_alpha);
+        let bl32 = _mm256_madd_epi16(bl32, low_alpha);
+        let bh32 = _mm256_madd_epi16(bh32, high_alpha);
+
+        let lr32 = _mm256_div_by_epi32::<BIT_DEPTH>(rl32);
+        let hr32 = _mm256_div_by_epi32::<BIT_DEPTH>(rh32);
+        let lg32 = _mm256_div_by_epi32::<BIT_DEPTH>(gl32);
+        let hg32 = _mm256_div_by_epi32::<BIT_DEPTH>(gh32);
+        let lb32 = _mm256_div_by_epi32::<BIT_DEPTH>(bl32);
+        let hb32 = _mm256_div_by_epi32::<BIT_DEPTH>(bh32);
+
+        let new_rrr = _mm256_packus_epi32(lr32, hr32);
+
+        let new_ggg = _mm256_packus_epi32(lg32, hg32);
+        let new_bbb = _mm256_packus_epi32(lb32, hb32);
 
         let dst_ptr = dst.as_mut_ptr();
 
@@ -218,14 +222,14 @@ impl Avx2PremultiplyExecutorAnyBit {
 
         let zeros = _mm256_setzero_si256();
 
-        let low_alpha = _mm256_mul_ps(
-            _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(pixel.3, zeros)),
-            scale,
-        );
-        let high_alpha = _mm256_mul_ps(
-            _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(pixel.3, zeros)),
-            scale,
-        );
+        let la = _mm256_unpacklo_epi16(pixel.3, zeros);
+        let ha = _mm256_unpackhi_epi16(pixel.3, zeros);
+
+        let lla = _mm256_cvtepi32_ps(la);
+        let hla = _mm256_cvtepi32_ps(ha);
+
+        let low_alpha = _mm256_mul_ps(lla, scale);
+        let high_alpha = _mm256_mul_ps(hla, scale);
 
         let new_rrr = _mm256_scale_by_alpha(pixel.0, low_alpha, high_alpha);
         let new_ggg = _mm256_scale_by_alpha(pixel.1, low_alpha, high_alpha);

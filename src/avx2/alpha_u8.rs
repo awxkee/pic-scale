@@ -78,8 +78,11 @@ impl AssociateAlphaDefault {
         let a_lo = _mm256_unpacklo_epi8(multiplicand, zeros);
         let a_hi = _mm256_unpackhi_epi8(multiplicand, zeros);
 
-        v_ll = avx2_div_by255(_mm256_mullo_epi16(v_ll, a_lo));
-        v_hi = avx2_div_by255(_mm256_mullo_epi16(v_hi, a_hi));
+        let la_lo = _mm256_mullo_epi16(v_ll, a_lo);
+        let la_hi = _mm256_mullo_epi16(v_hi, a_hi);
+
+        v_ll = avx2_div_by255(la_lo);
+        v_hi = avx2_div_by255(la_hi);
 
         let values = _mm256_packus_epi16(v_ll, v_hi);
 
@@ -192,42 +195,58 @@ impl Avx2DisassociateAlpha {
 
         let scale_ps = _mm256_set1_ps(255f32);
 
-        let lo_lo = _mm256_mul_ps(
-            _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(lo, zeros)),
-            scale_ps,
-        );
-        let lo_hi = _mm256_mul_ps(
-            _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(lo, zeros)),
-            scale_ps,
-        );
-        let hi_lo = _mm256_mul_ps(
-            _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(hi, zeros)),
-            scale_ps,
-        );
-        let hi_hi = _mm256_mul_ps(
-            _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(hi, zeros)),
-            scale_ps,
-        );
+        let llw = _mm256_unpacklo_epi16(lo, zeros);
+        let lhw = _mm256_unpackhi_epi16(lo, zeros);
+        let hlw = _mm256_unpacklo_epi16(hi, zeros);
+        let hhw = _mm256_unpackhi_epi16(hi, zeros);
+
+        let llwc = _mm256_cvtepi32_ps(llw);
+        let lhwc = _mm256_cvtepi32_ps(lhw);
+        let hlwc = _mm256_cvtepi32_ps(hlw);
+        let hhwc = _mm256_cvtepi32_ps(hhw);
+
+        let lo_lo = _mm256_mul_ps(llwc, scale_ps);
+        let lo_hi = _mm256_mul_ps(lhwc, scale_ps);
+        let hi_lo = _mm256_mul_ps(hlwc, scale_ps);
+        let hi_hi = _mm256_mul_ps(hhwc, scale_ps);
+
         let a_lo = _mm256_unpacklo_epi8(a, zeros);
         let a_hi = _mm256_unpackhi_epi8(a, zeros);
-        let a_lo_lo = _mm256_rcp_ps(_mm256_cvtepi32_ps(_mm256_unpacklo_epi16(a_lo, zeros)));
-        let a_lo_hi = _mm256_rcp_ps(_mm256_cvtepi32_ps(_mm256_unpackhi_epi16(a_lo, zeros)));
-        let a_hi_lo = _mm256_rcp_ps(_mm256_cvtepi32_ps(_mm256_unpacklo_epi16(a_hi, zeros)));
-        let a_hi_hi = _mm256_rcp_ps(_mm256_cvtepi32_ps(_mm256_unpackhi_epi16(a_hi, zeros)));
 
-        let lo_lo = _mm256_cvtps_epi32(_mm256_round_ps::<0x00>(_mm256_mul_ps(lo_lo, a_lo_lo)));
-        let lo_hi = _mm256_cvtps_epi32(_mm256_round_ps::<0x00>(_mm256_mul_ps(lo_hi, a_lo_hi)));
-        let hi_lo = _mm256_cvtps_epi32(_mm256_round_ps::<0x00>(_mm256_mul_ps(hi_lo, a_hi_lo)));
-        let hi_hi = _mm256_cvtps_epi32(_mm256_round_ps::<0x00>(_mm256_mul_ps(hi_hi, a_hi_hi)));
+        let allw = _mm256_unpacklo_epi16(a_lo, zeros);
+        let alhw = _mm256_unpackhi_epi16(a_lo, zeros);
+        let ahlw = _mm256_unpacklo_epi16(a_hi, zeros);
+        let ahhw = _mm256_unpackhi_epi16(a_hi, zeros);
 
-        _mm256_select_si256(
-            is_zero_mask,
-            zeros,
-            _mm256_packus_epi16(
-                _mm256_packus_epi32(lo_lo, lo_hi),
-                _mm256_packus_epi32(hi_lo, hi_hi),
-            ),
-        )
+        let allf = _mm256_cvtepi32_ps(allw);
+        let alhf = _mm256_cvtepi32_ps(alhw);
+        let ahlf = _mm256_cvtepi32_ps(ahlw);
+        let ahhf = _mm256_cvtepi32_ps(ahhw);
+
+        let a_lo_lo = _mm256_rcp_ps(allf);
+        let a_lo_hi = _mm256_rcp_ps(alhf);
+        let a_hi_lo = _mm256_rcp_ps(ahlf);
+        let a_hi_hi = _mm256_rcp_ps(ahhf);
+
+        let mut fllw = _mm256_mul_ps(lo_lo, a_lo_lo);
+        let mut flhw = _mm256_mul_ps(lo_hi, a_lo_hi);
+        let mut fhlw = _mm256_mul_ps(hi_lo, a_hi_lo);
+        let mut fhhw = _mm256_mul_ps(hi_hi, a_hi_hi);
+
+        fllw = _mm256_round_ps::<0x00>(fllw);
+        flhw = _mm256_round_ps::<0x00>(flhw);
+        fhlw = _mm256_round_ps::<0x00>(fhlw);
+        fhhw = _mm256_round_ps::<0x00>(fhhw);
+
+        let lo_lo = _mm256_cvtps_epi32(fllw);
+        let lo_hi = _mm256_cvtps_epi32(flhw);
+        let hi_lo = _mm256_cvtps_epi32(fhlw);
+        let hi_hi = _mm256_cvtps_epi32(fhhw);
+
+        let packed0 = _mm256_packus_epi32(lo_lo, lo_hi);
+        let packed1 = _mm256_packus_epi32(hi_lo, hi_hi);
+
+        _mm256_select_si256(is_zero_mask, zeros, _mm256_packus_epi16(packed0, packed1))
     }
 
     #[inline(always)]
