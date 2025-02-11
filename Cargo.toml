@@ -2,7 +2,7 @@ workspace = { members = ["app", "wasm", "fuzz", "app/accelerate"], exclude = ["p
 
 [package]
 name = "pic-scale"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
 description = "High performance image scaling"
 readme = "README.md"
@@ -31,3 +31,9 @@ nightly_avx512 = []
 nightly_avx512fp16 = ["nightly_avx512"]
 nightly_f16 = []
 rdm = []
+
+[package.metadata.docs.rs]
+# To build locally:
+# RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps --open
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

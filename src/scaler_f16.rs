@@ -37,6 +37,7 @@ use crate::{
 use core::f16;
 
 /// Implements `f16` type support
+#[cfg_attr(docsrs, doc(cfg(feature = "nightly_f16")))]
 impl Scaler {
     /// Performs rescaling for RGBA f16
     ///
@@ -151,6 +152,7 @@ impl Scaler {
     }
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "nightly_f16")))]
 impl<'b> ImageStoreScaling<'b, f16, 1> for PlanarF16ImageStore<'b> {
     fn scale(
         &self,
@@ -167,6 +169,7 @@ impl<'b> ImageStoreScaling<'b, f16, 1> for PlanarF16ImageStore<'b> {
     }
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "nightly_f16")))]
 impl<'b> ImageStoreScaling<'b, f16, 2> for CbCrF16ImageStore<'b> {
     fn scale(
         &self,
@@ -183,6 +186,7 @@ impl<'b> ImageStoreScaling<'b, f16, 2> for CbCrF16ImageStore<'b> {
     }
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "nightly_f16")))]
 impl<'b> ImageStoreScaling<'b, f16, 3> for RgbF16ImageStore<'b> {
     fn scale(
         &self,
@@ -199,6 +203,7 @@ impl<'b> ImageStoreScaling<'b, f16, 3> for RgbF16ImageStore<'b> {
     }
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "nightly_f16")))]
 impl<'b> ImageStoreScaling<'b, f16, 4> for RgbaF16ImageStore<'b> {
     fn scale(
         &self,

@@ -48,7 +48,7 @@ fn resize_plane(
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
+    let img = ImageReader::open("./assets/test_1.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -60,7 +60,7 @@ fn main() {
     scaler.set_threading_policy(ThreadingPolicy::Single);
     scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
 
-    // let mut choke: Vec<u16> = bytes.iter().map(|&x| (x as u16) << 2).collect();
+    let mut choke: Vec<u16> = bytes.iter().map(|&x| ((x as u16) << 4) | ((x as u16) >> 4)).collect();
     //
     // // let rgb_feature16 = transient
     // //     .iter()
@@ -69,22 +69,22 @@ fn main() {
     //
     // //
     let mut store =
-        Rgba8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
-    store.bit_depth = 10;
+        Rgba16ImageStore::from_slice(&choke, dimensions.0 as usize, dimensions.1 as usize).unwrap();
+    store.bit_depth = 12;
     //
     let mut src_ar = vec![0u8; dimensions.0 as usize * dimensions.1 as usize * 4];
 
     let dst_size = ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2);
 
-    let mut dst_store = Rgba8ImageStoreMut::alloc_with_depth(
-        dimensions.0 as usize / 2,
+    let mut dst_store = Rgba16ImageStoreMut::alloc_with_depth(
+        dimensions.0 as usize,
         dimensions.1 as usize / 2,
-        10,
+        12,
     );
     // //
     // // // for i in 0..25 {
     // // let start_time = Instant::now();
-    scaler.resize_rgba(&store, &mut dst_store, false).unwrap();
+    scaler.resize_rgba_u16(&store, &mut dst_store, false).unwrap();
     //
     // let elapsed_time = start_time.elapsed();
     // // Print the elapsed time in milliseconds
@@ -126,13 +126,13 @@ fn main() {
     // //     .map(|&x| (x * 255f32) as u8)
     // //     .collect();
     //
-    // let dst: Vec<u8> = dst_store
-    //     .as_bytes()
-    //     .iter()
-    //     .map(|&x| (x >> 2) as u8)
-    //     .collect();
+    let dst: Vec<u8> = dst_store
+        .as_bytes()
+        .iter()
+        .map(|&x| (x >> 4) as u8)
+        .collect();
 
-    let dst = dst_store.as_bytes();
+    // let dst = dst_store.as_bytes();
 
     if dst_store.channels == 4 {
         image::save_buffer(
