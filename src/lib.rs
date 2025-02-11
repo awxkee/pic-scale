@@ -58,6 +58,7 @@
     feature(stdarch_x86_avx512_f16)
 )]
 #![cfg_attr(feature = "nightly_f16", feature(f16))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod alpha_check;
 #[cfg(feature = "nightly_f16")]
@@ -121,6 +122,7 @@ mod sampler;
 mod saturate_narrow;
 mod scaler;
 #[cfg(feature = "nightly_f16")]
+#[cfg_attr(docsrs, doc(cfg(feature = "nightly_f16")))]
 mod scaler_f16;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod sse;
@@ -144,6 +146,7 @@ pub use image_store::{
     Rgba8ImageStoreMut, RgbaF32ImageStore, RgbaF32ImageStoreMut,
 };
 #[cfg(feature = "nightly_f16")]
+#[cfg_attr(docsrs, doc(cfg(feature = "nightly_f16")))]
 pub use image_store::{
     CbCrF16ImageStore, CbCrF16ImageStoreMut, PlanarF16ImageStore, PlanarF16ImageStoreMut,
     RgbF16ImageStore, RgbF16ImageStoreMut, RgbaF16ImageStore, RgbaF16ImageStoreMut,

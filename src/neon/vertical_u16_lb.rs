@@ -174,10 +174,10 @@ pub(crate) fn convolve_column_lb_u16(
                     let item_row0 = vreinterpretq_s16_u16(vld1q_u16(src_ptr.as_ptr()));
                     let item_row1 = vreinterpretq_s16_u16(vld1q_u16(src_ptr.as_ptr().add(8)));
 
-                    store0 = vmlal_s16(store0, vget_low_s16(item_row0), vget_low_s16(v_weight));
-                    store1 = vmlal_high_s16(store1, item_row0, v_weight);
-                    store2 = vmlal_s16(store2, vget_low_s16(item_row1), vget_low_s16(v_weight));
-                    store3 = vmlal_high_s16(store3, item_row1, v_weight);
+                    store0 = vqdmlal_s16(store0, vget_low_s16(item_row0), vget_low_s16(v_weight));
+                    store1 = vqdmlal_high_s16(store1, item_row0, v_weight);
+                    store2 = vqdmlal_s16(store2, vget_low_s16(item_row1), vget_low_s16(v_weight));
+                    store3 = vqdmlal_high_s16(store3, item_row1, v_weight);
                 }
             }
 
@@ -287,8 +287,8 @@ pub(crate) fn convolve_column_lb_u16(
 
                     let item_row = vreinterpretq_s16_u16(vld1q_u16(src_ptr.as_ptr()));
 
-                    store0 = vmlal_s16(store0, vget_low_s16(item_row), vget_low_s16(v_weight));
-                    store1 = vmlal_high_s16(store1, item_row, v_weight);
+                    store0 = vqdmlal_s16(store0, vget_low_s16(item_row), vget_low_s16(v_weight));
+                    store1 = vqdmlal_high_s16(store1, item_row, v_weight);
                 }
             }
 
@@ -377,7 +377,7 @@ pub(crate) fn convolve_column_lb_u16(
 
                     let item_row = vreinterpret_s16_u16(vld1_u16(src_ptr.as_ptr()));
 
-                    store0 = vmlal_s16(store0, item_row, v_weight);
+                    store0 = vqdmlal_s16(store0, item_row, v_weight);
                 }
             }
 

@@ -60,7 +60,7 @@ unsafe fn conv_horiz_rgba_2_u16(
     let rgb_pixel = vld1q_u16(src_ptr.as_ptr());
     let wide = vreinterpretq_s16_u16(rgb_pixel);
 
-    let acc = vmlal_high_s16(store, wide, w1);
+    let acc = vqdmlal_high_s16(store, wide, w1);
     vqdmlal_s16(acc, vget_low_s16(wide), w0)
 }
 
