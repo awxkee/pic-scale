@@ -96,18 +96,16 @@ pub(crate) unsafe fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
     let a_lo_hi = _mm_rcp_ps(alhf);
     let a_hi_lo = _mm_rcp_ps(ahlf);
     let a_hi_hi = _mm_rcp_ps(ahhf);
-
-    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-
+    
     let mut fllw = _mm_mul_ps(lo_lo, a_lo_lo);
     let mut flhw = _mm_mul_ps(lo_hi, a_lo_hi);
     let mut fhlw = _mm_mul_ps(hi_lo, a_hi_lo);
     let mut fhhw = _mm_mul_ps(hi_hi, a_hi_hi);
 
-    fllw = _mm_round_ps::<ROUNDING_FLAGS>(fllw);
-    flhw = _mm_round_ps::<ROUNDING_FLAGS>(flhw);
-    fhlw = _mm_round_ps::<ROUNDING_FLAGS>(fhlw);
-    fhhw = _mm_round_ps::<ROUNDING_FLAGS>(fhhw);
+    fllw = _mm_add_ps(_mm_set1_ps(0.5f32), fllw);
+    flhw = _mm_add_ps(_mm_set1_ps(0.5f32), flhw);
+    fhlw = _mm_add_ps(_mm_set1_ps(0.5f32), fhlw);
+    fhhw = _mm_add_ps(_mm_set1_ps(0.5f32), fhhw);
 
     let lo_lo = _mm_cvtps_epi32(fllw);
     let lo_hi = _mm_cvtps_epi32(flhw);
