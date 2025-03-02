@@ -476,10 +476,10 @@ unsafe fn avx_unpremultiply_alpha_rgba_u16_row_impl<const FMA: bool>(
         let mut dst_buffer: [u16; 16 * 4] = [0u16; 16 * 4];
         std::ptr::copy_nonoverlapping(rem.as_ptr(), dst_buffer.as_mut_ptr(), rem.len());
 
-        let lane0 = _mm256_loadu_si256(rem.as_ptr() as *const __m256i);
-        let lane1 = _mm256_loadu_si256(rem.as_ptr().add(16) as *const __m256i);
-        let lane2 = _mm256_loadu_si256(rem.as_ptr().add(32) as *const __m256i);
-        let lane3 = _mm256_loadu_si256(rem.as_ptr().add(48) as *const __m256i);
+        let lane0 = _mm256_loadu_si256(dst_buffer.as_ptr() as *const __m256i);
+        let lane1 = _mm256_loadu_si256(dst_buffer.as_ptr().add(16) as *const __m256i);
+        let lane2 = _mm256_loadu_si256(dst_buffer.as_ptr().add(32) as *const __m256i);
+        let lane3 = _mm256_loadu_si256(dst_buffer.as_ptr().add(48) as *const __m256i);
 
         let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
 
