@@ -151,6 +151,31 @@ where
         })
     }
 
+    pub fn borrow(
+        slice_ref: &'a [T],
+        width: usize,
+        height: usize,
+    ) -> Result<ImageStore<'a, T, N>, PicScaleError> {
+        let expected_size = width * height * N;
+        if slice_ref.len() != width * height * N {
+            return Err(PicScaleError::BufferMismatch(PicScaleBufferMismatch {
+                expected: expected_size,
+                width,
+                height,
+                channels: N,
+                slice_len: slice_ref.len(),
+            }));
+        }
+        Ok(ImageStore::<T, N> {
+            buffer: Cow::Borrowed(slice_ref),
+            channels: N,
+            width,
+            height,
+            stride: width * N,
+            bit_depth: 0,
+        })
+    }
+
     pub fn alloc(width: usize, height: usize) -> ImageStore<'a, T, N> {
         let vc = vec![T::default(); width * N * height];
         ImageStore::<T, N> {
@@ -237,7 +262,7 @@ impl<'a, T, const N: usize> ImageStoreMut<'a, T, N>
 where
     T: Clone + Copy + Debug + Default,
 {
-    /// Creates new mutable storage from vectors
+    /// Creates new mutable storage from vector
     ///
     /// Always sets bit-depth to `0`
     pub fn new(
@@ -257,6 +282,34 @@ where
         }
         Ok(ImageStoreMut::<T, N> {
             buffer: BufferStore::Owned(slice_ref),
+            channels: N,
+            width,
+            height,
+            stride: width * N,
+            bit_depth: 0,
+        })
+    }
+
+    /// Creates new mutable storage from slice
+    ///
+    /// Always sets bit-depth to `0`
+    pub fn borrow(
+        slice_ref: &'a mut [T],
+        width: usize,
+        height: usize,
+    ) -> Result<ImageStoreMut<'a, T, N>, PicScaleError> {
+        let expected_size = width * height * N;
+        if slice_ref.len() != width * height * N {
+            return Err(PicScaleError::BufferMismatch(PicScaleBufferMismatch {
+                expected: expected_size,
+                width,
+                height,
+                channels: N,
+                slice_len: slice_ref.len(),
+            }));
+        }
+        Ok(ImageStoreMut::<T, N> {
+            buffer: BufferStore::Borrowed(slice_ref),
             channels: N,
             width,
             height,
