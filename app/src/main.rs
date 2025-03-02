@@ -60,7 +60,10 @@ fn main() {
     scaler.set_threading_policy(ThreadingPolicy::Single);
     scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
 
-    let mut choke: Vec<u16> = bytes.iter().map(|&x| ((x as u16) << 4) | ((x as u16) >> 4)).collect();
+    let mut choke: Vec<u16> = bytes
+        .iter()
+        .map(|&x| ((x as u16) << 4) | ((x as u16) >> 4))
+        .collect();
     //
     // // let rgb_feature16 = transient
     // //     .iter()
@@ -68,23 +71,19 @@ fn main() {
     // //     .collect::<Vec<_>>();
     //
     // //
-    let mut store =
-        Rgba16ImageStore::from_slice(&choke, dimensions.0 as usize, dimensions.1 as usize).unwrap();
-    store.bit_depth = 12;
+    // store.bit_depth = 12;
     //
     let mut src_ar = vec![0u8; dimensions.0 as usize * dimensions.1 as usize * 4];
 
     let dst_size = ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2);
 
-    let mut dst_store = Rgba16ImageStoreMut::alloc_with_depth(
-        dimensions.0 as usize,
-        dimensions.1 as usize / 2,
-        12,
-    );
-    // //
-    // // // for i in 0..25 {
-    // // let start_time = Instant::now();
-    scaler.resize_rgba_u16(&store, &mut dst_store, false).unwrap();
+    let mut store =
+        Rgba16ImageStore::from_slice(&choke, dimensions.0 as usize, dimensions.1 as usize).unwrap();
+    let mut dst_store =
+        Rgba16ImageStoreMut::alloc_with_depth(dimensions.0 as usize, dimensions.1 as usize / 2, 12);
+    scaler
+        .resize_rgba_u16(&store, &mut dst_store, false)
+        .unwrap();
     //
     // let elapsed_time = start_time.elapsed();
     // // Print the elapsed time in milliseconds

@@ -47,7 +47,7 @@ unsafe fn sse_unpremultiply_row_u16(
     let zeros = _mm_setzero_si128();
     let lo = _mm_unpacklo_epi16(x, zeros);
     let hi = _mm_unpackhi_epi16(x, zeros);
-    
+
     let new_lo = _mm_cvtps_epi32(_mm_add_ps(
         _mm_set1_ps(0.5f32),
         _mm_mul_ps(_mm_cvtepi32_ps(lo), a_lo_f),

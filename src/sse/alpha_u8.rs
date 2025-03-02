@@ -96,7 +96,7 @@ pub(crate) unsafe fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
     let a_lo_hi = _mm_rcp_ps(alhf);
     let a_hi_lo = _mm_rcp_ps(ahlf);
     let a_hi_hi = _mm_rcp_ps(ahhf);
-    
+
     let mut fllw = _mm_mul_ps(lo_lo, a_lo_lo);
     let mut flhw = _mm_mul_ps(lo_hi, a_lo_hi);
     let mut fhlw = _mm_mul_ps(hi_lo, a_hi_lo);
