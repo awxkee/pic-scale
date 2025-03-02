@@ -507,10 +507,10 @@ unsafe fn avx_unpremultiply_alpha_rgba_u16_row_impl<const FMA: bool>(
         let (d_lane0, d_lane1, d_lane2, d_lane3) =
             avx_interleave_rgba_epi16(new_rrr, new_ggg, new_bbb, pixel.3);
 
-        _mm256_storeu_si256(rem.as_mut_ptr() as *mut __m256i, d_lane0);
-        _mm256_storeu_si256(rem.as_mut_ptr().add(16) as *mut __m256i, d_lane1);
-        _mm256_storeu_si256(rem.as_mut_ptr().add(32) as *mut __m256i, d_lane2);
-        _mm256_storeu_si256(rem.as_mut_ptr().add(48) as *mut __m256i, d_lane3);
+        _mm256_storeu_si256(dst_buffer.as_mut_ptr() as *mut __m256i, d_lane0);
+        _mm256_storeu_si256(dst_buffer.as_mut_ptr().add(16) as *mut __m256i, d_lane1);
+        _mm256_storeu_si256(dst_buffer.as_mut_ptr().add(32) as *mut __m256i, d_lane2);
+        _mm256_storeu_si256(dst_buffer.as_mut_ptr().add(48) as *mut __m256i, d_lane3);
 
         std::ptr::copy_nonoverlapping(dst_buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
     }
