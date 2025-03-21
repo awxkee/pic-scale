@@ -48,7 +48,7 @@ fn resize_plane(
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/test_1.jpg")
+    let img = ImageReader::open("./assets/result.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -56,14 +56,10 @@ fn main() {
     let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
-    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
     scaler.set_threading_policy(ThreadingPolicy::Single);
-    scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
-
-    let mut choke: Vec<u16> = bytes
-        .iter()
-        .map(|&x| ((x as u16) << 4) | ((x as u16) >> 4))
-        .collect();
+    scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
+    
     //
     // // let rgb_feature16 = transient
     // //     .iter()
@@ -78,11 +74,11 @@ fn main() {
     let dst_size = ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2);
 
     let mut store =
-        Rgba16ImageStore::from_slice(&choke, dimensions.0 as usize, dimensions.1 as usize).unwrap();
+        Rgba8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     let mut dst_store =
-        Rgba16ImageStoreMut::alloc_with_depth(dimensions.0 as usize, dimensions.1 as usize / 2, 12);
+        Rgba8ImageStoreMut::alloc_with_depth(dimensions.0 as usize / 5, dimensions.1 as usize / 5, 8);
     scaler
-        .resize_rgba_u16(&store, &mut dst_store, false)
+        .resize_rgba(&store, &mut dst_store, true)
         .unwrap();
     //
     // let elapsed_time = start_time.elapsed();
@@ -125,13 +121,13 @@ fn main() {
     // //     .map(|&x| (x * 255f32) as u8)
     // //     .collect();
     //
-    let dst: Vec<u8> = dst_store
-        .as_bytes()
-        .iter()
-        .map(|&x| (x >> 4) as u8)
-        .collect();
+    // let dst: Vec<u8> = dst_store
+    //     .as_bytes()
+    //     .iter()
+    //     .map(|&x| (x >> 4) as u8)
+    //     .collect();
 
-    // let dst = dst_store.as_bytes();
+    let dst = dst_store.as_bytes();
 
     if dst_store.channels == 4 {
         image::save_buffer(
