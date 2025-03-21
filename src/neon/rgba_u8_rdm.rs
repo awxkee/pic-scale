@@ -150,14 +150,15 @@ unsafe fn convolve_horizontal_rgba_neon_rows_4_u8_i16_impl(
     const SCALE: i32 = 6;
     const ROUNDING: i16 = 1 << (SCALE - 1);
 
-    let weights_distribute: [u8; 16] = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3];
+    let weights_distribute: [u8; 16] = [0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3];
     let v_w_distribute0 = vld1q_u8(weights_distribute.as_ptr());
-    let weights_distribute1: [u8; 16] = [4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7];
+    let weights_distribute1: [u8; 16] = [4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6, 7, 6, 7];
     let v_w_distribute1 = vld1q_u8(weights_distribute1.as_ptr());
-    let weights_distribute2: [u8; 16] = [8, 9, 10, 11, 8, 9, 10, 11, 8, 9, 10, 11, 8, 9, 10, 11];
+    let weights_distribute2: [u8; 16] = [8, 9, 8, 9, 8, 9, 8, 9, 10, 11, 10, 11, 10, 11, 10, 11];
     let v_w_distribute2 = vld1q_u8(weights_distribute2.as_ptr());
-    let weights_distribute3: [u8; 16] =
-        [12, 13, 14, 15, 2, 13, 14, 15, 2, 13, 14, 15, 2, 13, 14, 15];
+    let weights_distribute3: [u8; 16] = [
+        12, 13, 12, 13, 12, 13, 12, 13, 14, 15, 14, 15, 14, 15, 14, 15,
+    ];
     let v_w_distribute3 = vld1q_u8(weights_distribute3.as_ptr());
 
     let (row0_ref, rest) = dst.split_at_mut(dst_stride);
@@ -337,14 +338,15 @@ unsafe fn convolve_horizontal_rgba_neon_row_i16_impl(
     const ROUNDING: i16 = 1 << (SCALE - 1);
     const CHANNELS: usize = 4;
 
-    let weights_distribute: [u8; 16] = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3];
+    let weights_distribute: [u8; 16] = [0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3];
     let v_w_distribute0 = vld1q_u8(weights_distribute.as_ptr());
-    let weights_distribute1: [u8; 16] = [4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7];
+    let weights_distribute1: [u8; 16] = [4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6, 7, 6, 7];
     let v_w_distribute1 = vld1q_u8(weights_distribute1.as_ptr());
-    let weights_distribute2: [u8; 16] = [8, 9, 10, 11, 8, 9, 10, 11, 8, 9, 10, 11, 8, 9, 10, 11];
+    let weights_distribute2: [u8; 16] = [8, 9, 8, 9, 8, 9, 8, 9, 10, 11, 10, 11, 10, 11, 10, 11];
     let v_w_distribute2 = vld1q_u8(weights_distribute2.as_ptr());
-    let weights_distribute3: [u8; 16] =
-        [12, 13, 14, 15, 2, 13, 14, 15, 2, 13, 14, 15, 2, 13, 14, 15];
+    let weights_distribute3: [u8; 16] = [
+        12, 13, 12, 13, 12, 13, 12, 13, 14, 15, 14, 15, 14, 15, 14, 15,
+    ];
     let v_w_distribute3 = vld1q_u8(weights_distribute3.as_ptr());
 
     let initial_val = vcombine_s16(vdup_n_s16(ROUNDING), vdup_n_s16(0));

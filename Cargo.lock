@@ -422,15 +422,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fast_transpose"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c2d2b59e139013dffe85ab5023a5768d706e5adced64affd9f2c1260228e03b"
-dependencies = [
- "bytemuck",
-]
-
-[[package]]
 name = "fdeflate"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1487,11 +1478,10 @@ dependencies = [
 
 [[package]]
 name = "yuvutils-rs"
-version = "0.6.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af24f60e29423d43cf2ec1385969b045f996b27816e0118c711e4fc4d48c3589"
+checksum = "45d853a7816ee95dd912b6345d93dd5f8e6165858d97484389955f6ce1cb1f37"
 dependencies = [
- "fast_transpose",
  "num-traits",
 ]
 
