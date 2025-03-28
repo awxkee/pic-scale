@@ -10,3 +10,5 @@ converted_risc.png
 pkg/
 wasm/target/
 wasm/pkg/
+Cargo.lock
+app/Cargo.lock

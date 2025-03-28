@@ -59,7 +59,7 @@ fn main() {
     let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
     scaler.set_threading_policy(ThreadingPolicy::Single);
     scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
-    
+
     //
     // // let rgb_feature16 = transient
     // //     .iter()
@@ -75,11 +75,12 @@ fn main() {
 
     let mut store =
         Rgba8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
-    let mut dst_store =
-        Rgba8ImageStoreMut::alloc_with_depth(dimensions.0 as usize / 5, dimensions.1 as usize / 5, 8);
-    scaler
-        .resize_rgba(&store, &mut dst_store, true)
-        .unwrap();
+    let mut dst_store = Rgba8ImageStoreMut::alloc_with_depth(
+        dimensions.0 as usize / 5,
+        dimensions.1 as usize / 5,
+        8,
+    );
+    scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
     //
     // let elapsed_time = start_time.elapsed();
     // // Print the elapsed time in milliseconds
