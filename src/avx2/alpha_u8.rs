@@ -186,7 +186,7 @@ struct Avx2DisassociateAlpha {}
 
 impl Avx2DisassociateAlpha {
     #[inline(always)]
-    unsafe fn avx2_unpremultiply_row<const FMA: bool>(&self, x: __m256i, a: __m256i) -> __m256i {
+    unsafe fn avx2_unpremultiply_row(&self, x: __m256i, a: __m256i) -> __m256i {
         let zeros = _mm256_setzero_si256();
         let lo = _mm256_unpacklo_epi8(x, zeros);
         let hi = _mm256_unpackhi_epi8(x, zeros);
@@ -228,27 +228,10 @@ impl Avx2DisassociateAlpha {
         let a_hi_lo = _mm256_rcp_ps(ahlf);
         let a_hi_hi = _mm256_rcp_ps(ahhf);
 
-        let mut fllw;
-        let mut flhw;
-        let mut fhlw;
-        let mut fhhw;
-
-        if FMA {
-            fllw = _mm256_fmadd_ps(lo_lo, a_lo_lo, _mm256_set1_ps(0.5f32));
-            flhw = _mm256_fmadd_ps(lo_hi, a_lo_hi, _mm256_set1_ps(0.5f32));
-            fhlw = _mm256_fmadd_ps(hi_lo, a_hi_lo, _mm256_set1_ps(0.5f32));
-            fhhw = _mm256_fmadd_ps(hi_hi, a_hi_hi, _mm256_set1_ps(0.5f32));
-        } else {
-            fllw = _mm256_mul_ps(lo_lo, a_lo_lo);
-            flhw = _mm256_mul_ps(lo_hi, a_lo_hi);
-            fhlw = _mm256_mul_ps(hi_lo, a_hi_lo);
-            fhhw = _mm256_mul_ps(hi_hi, a_hi_hi);
-
-            fllw = _mm256_add_ps(_mm256_set1_ps(0.5f32), fllw);
-            flhw = _mm256_add_ps(_mm256_set1_ps(0.5f32), flhw);
-            fhlw = _mm256_add_ps(_mm256_set1_ps(0.5f32), fhlw);
-            fhhw = _mm256_add_ps(_mm256_set1_ps(0.5f32), fhhw);
-        }
+        let fllw = _mm256_mul_ps(lo_lo, a_lo_lo);
+        let flhw = _mm256_mul_ps(lo_hi, a_lo_hi);
+        let fhlw = _mm256_mul_ps(hi_lo, a_hi_lo);
+        let fhhw = _mm256_mul_ps(hi_hi, a_hi_hi);
 
         let lo_lo = _mm256_cvtps_epi32(fllw);
         let lo_hi = _mm256_cvtps_epi32(flhw);
@@ -270,9 +253,9 @@ impl Avx2DisassociateAlpha {
         let rgba3 = _mm256_loadu_si256(src_ptr.add(96) as *const __m256i);
         let (rrr, ggg, bbb, aaa) = avx2_deinterleave_rgba(rgba0, rgba1, rgba2, rgba3);
 
-        let rrr = self.avx2_unpremultiply_row::<FMA>(rrr, aaa);
-        let ggg = self.avx2_unpremultiply_row::<FMA>(ggg, aaa);
-        let bbb = self.avx2_unpremultiply_row::<FMA>(bbb, aaa);
+        let rrr = self.avx2_unpremultiply_row(rrr, aaa);
+        let ggg = self.avx2_unpremultiply_row(ggg, aaa);
+        let bbb = self.avx2_unpremultiply_row(bbb, aaa);
 
         let (rgba0, rgba1, rgba2, rgba3) = avx2_interleave_rgba(rrr, ggg, bbb, aaa);
 

@@ -35,8 +35,6 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-const ROUNDING: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-
 pub(crate) fn convolve_column_sse_u16(
     _: usize,
     bounds: &FilterBounds,
@@ -143,22 +141,10 @@ unsafe fn convolve_column_lb_u16_impl<const FMA: bool>(
             );
         }
 
-        let v_st0 = _mm_min_epi32(
-            _mm_cvtps_epi32(_mm_round_ps::<ROUNDING>(store0)),
-            v_max_colors,
-        );
-        let v_st1 = _mm_min_epi32(
-            _mm_cvtps_epi32(_mm_round_ps::<ROUNDING>(store1)),
-            v_max_colors,
-        );
-        let v_st2 = _mm_min_epi32(
-            _mm_cvtps_epi32(_mm_round_ps::<ROUNDING>(store2)),
-            v_max_colors,
-        );
-        let v_st3 = _mm_min_epi32(
-            _mm_cvtps_epi32(_mm_round_ps::<ROUNDING>(store3)),
-            v_max_colors,
-        );
+        let v_st0 = _mm_min_epi32(_mm_cvtps_epi32(store0), v_max_colors);
+        let v_st1 = _mm_min_epi32(_mm_cvtps_epi32(store1), v_max_colors);
+        let v_st2 = _mm_min_epi32(_mm_cvtps_epi32(store2), v_max_colors);
+        let v_st3 = _mm_min_epi32(_mm_cvtps_epi32(store3), v_max_colors);
 
         let item0 = _mm_packus_epi32(v_st0, v_st1);
         let item1 = _mm_packus_epi32(v_st2, v_st3);
@@ -200,14 +186,8 @@ unsafe fn convolve_column_lb_u16_impl<const FMA: bool>(
             );
         }
 
-        let v_st0 = _mm_min_epi32(
-            _mm_cvtps_epi32(_mm_round_ps::<ROUNDING>(store0)),
-            v_max_colors,
-        );
-        let v_st1 = _mm_min_epi32(
-            _mm_cvtps_epi32(_mm_round_ps::<ROUNDING>(store1)),
-            v_max_colors,
-        );
+        let v_st0 = _mm_min_epi32(_mm_cvtps_epi32(store0), v_max_colors);
+        let v_st1 = _mm_min_epi32(_mm_cvtps_epi32(store1), v_max_colors);
 
         let item = _mm_packus_epi32(v_st0, v_st1);
         _mm_storeu_si128(dst.as_mut_ptr() as *mut __m128i, item);
@@ -350,10 +330,7 @@ unsafe fn convolve_column_lb_u16_impl<const FMA: bool>(
             }
         }
 
-        let v_st = _mm_min_epi32(
-            _mm_cvtps_epi32(_mm_round_ps::<ROUNDING>(store0)),
-            v_max_colors,
-        );
+        let v_st = _mm_min_epi32(_mm_cvtps_epi32(store0), v_max_colors);
 
         let u_store0 = _mm_packus_epi32(v_st, v_st);
         _mm_storeu_si64(dst.as_mut_ptr() as *mut u8, u_store0);
