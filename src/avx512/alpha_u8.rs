@@ -177,7 +177,6 @@ impl<const HAS_VBMI: bool> Avx512DisassociateAlpha<HAS_VBMI> {
         let a_hi_lo = _mm512_rcp14_ps(_mm512_cvtepi32_ps(_mm512_unpacklo_epi16(a_hi, zeros)));
         let a_hi_hi = _mm512_rcp14_ps(_mm512_cvtepi32_ps(_mm512_unpackhi_epi16(a_hi, zeros)));
 
-        const FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
         let lo_lo = _mm512_cvtps_epi32(_mm512_mul_ps(lo_lo, a_lo_lo));
         let lo_hi = _mm512_cvtps_epi32(_mm512_mul_ps(lo_hi, a_lo_hi));
         let hi_lo = _mm512_cvtps_epi32(_mm512_mul_ps(hi_lo, a_hi_lo));
