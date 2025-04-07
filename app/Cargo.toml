@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 image = { version = "0.25.5", features = ["default"] }
-pic-scale = { path = "..", features = ["nightly_f16"], default-features = true }
+pic-scale = { path = "..", features = ["nightly_f16", "nightly_avx512", "sse"], default-features = false }
 fast_image_resize = { version = "5.0.0", features = [] }
 accelerate = {path = "accelerate/"}
 yuvutils-rs = "0.8.1"
@@ -15,7 +15,6 @@ libc = "0.2.169"
 criterion = "0.5.1"
 #image = { version = "0.25.2", features = ["default"] }
 fast_image_resize = { version = "5.0.0", features = [] }
-pic-scale = { path = "..", features = ["nightly_f16", "rdm"], default-features = false }
 
 [[bench]]
 name = "resize_rgb"

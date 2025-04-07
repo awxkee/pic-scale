@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::convolve_vertical_avx_row_f32;
 use crate::convolution::{ConvolutionOptions, HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_naive_f32::{
@@ -38,7 +38,7 @@ use crate::image_store::{ImageStore, ImageStoreMut};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::*;
 use crate::rgb_f32::convolve_vertical_rgb_native_row_f32;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::*;
 use rayon::ThreadPool;
 
@@ -82,17 +82,16 @@ impl VerticalConvolutionPass<f32, 2> for ImageStore<'_, f32, 2> {
         {
             _dispatcher = convolve_vertical_rgb_neon_row_f32::<2>;
         }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
-            let has_fma = is_x86_feature_detected!("fma");
-            if is_x86_feature_detected!("sse4.1") {
-                if has_fma {
-                    _dispatcher = convolve_vertical_rgb_sse_row_f32::<true>;
-                } else {
-                    _dispatcher = convolve_vertical_rgb_sse_row_f32::<false>;
-                }
+            if std::arch::is_x86_feature_detected!("sse4.1") {
+                _dispatcher = convolve_vertical_rgb_sse_row_f32::<false>;
             }
-            if is_x86_feature_detected!("avx2") {
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            let has_fma = std::arch::is_x86_feature_detected!("fma");
+            if std::arch::is_x86_feature_detected!("avx2") {
                 _dispatcher = convolve_vertical_avx_row_f32::<false>;
                 if has_fma {
                     _dispatcher = convolve_vertical_avx_row_f32::<true>;

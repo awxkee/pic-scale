@@ -69,19 +69,35 @@ jobs:
 
   fuzz_rgba_8bit:
     name: Fuzzing 8bit
+    runs-on: macos-latest
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
-    runs-on: ${{ matrix.os }}
+        feature: [ rdm ]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
-      - run: cargo fuzz run resize_rgba -- -max_total_time=15
-      - run: cargo fuzz run resize_rgb -- -max_total_time=15
-      - run: cargo fuzz run resize_cbcr8 -- -max_total_time=15
-      - run: cargo fuzz run resize_plane -- -max_total_time=15
-      - run: cargo fuzz run colorspaces -- -max_total_time=10
+      - run: cargo fuzz run resize_rgba --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_rgb --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_cbcr8 --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_plane --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run colorspaces --features ${{ matrix.feature }},colorspaces -- -max_total_time=10
+
+  fuzz_rgba_8bit_x86_64:
+    name: Fuzzing 8bit x86_64
+    strategy:
+      matrix:
+        feature: [ sse, avx ]
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz run resize_rgba --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_rgb --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_cbcr8 --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_plane --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run colorspaces --features ${{ matrix.feature }},colorspaces -- -max_total_time=10
 
   fuzz_rgba_8bit_no_rdm:
     name: Fuzzing 8bit wo RDM
@@ -96,12 +112,9 @@ jobs:
       - run: cargo fuzz run resize_plane --no-default-features -- -max_total_time=15
       - run: cargo fuzz run resize_rgba_u16 -- -max_total_time=15
 
-  fuzz_rgba_high_bit:
-    name: Fuzzing High bit-depth
-    strategy:
-      matrix:
-        os: [ ubuntu-latest, macos-latest ]
-    runs-on: ${{ matrix.os }}
+  fuzz_rgba_high_bit_arm:
+    name: Fuzzing High bit-depth ARM
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
@@ -114,12 +127,27 @@ jobs:
       - run: cargo fuzz run resize_cbcr_f16 -- -max_total_time=15
       - run: cargo fuzz run resize_plane_u16 -- -max_total_time=15
 
-  fuzz_rgba_f32:
-    name: Fuzzing floating point
+  fuzz_rgba_high_bit:
+    name: Fuzzing High bit-depth
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
-    runs-on: ${{ matrix.os }}
+        feature: [ sse, avx ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz run resize_rgba_u16 --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_rgba_f16 --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_rgb_u16 --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_rgb_f16 --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_cbcr16 --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_cbcr_f16 --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_plane_u16 --features ${{ matrix.feature }} -- -max_total_time=15
+
+  fuzz_rgba_f32_arm:
+    name: Fuzzing floating point ARM
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
@@ -128,3 +156,18 @@ jobs:
       - run: cargo fuzz run resize_rgb_f32 -- -max_total_time=15
       - run: cargo fuzz run resize_cbcr_f32 -- -max_total_time=15
       - run: cargo fuzz run resize_plane_f32 -- -max_total_time=15
+
+  fuzz_rgba_f32:
+    name: Fuzzing floating point
+    strategy:
+      matrix:
+        feature: [ sse, avx ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz run resize_rgba_f32 --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_rgb_f32 --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_cbcr_f32 --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_plane_f32 --features ${{ matrix.feature }} -- -max_total_time=15

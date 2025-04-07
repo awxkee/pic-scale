@@ -28,7 +28,7 @@
  */
 #![forbid(unsafe_code)]
 
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::{
     convolve_horizontal_rgba_avx_rows_4_lb, convolve_horizontal_rgba_avx_rows_one_lb,
     convolve_vertical_avx_row, convolve_vertical_avx_row_lp,
@@ -42,7 +42,7 @@ use crate::handler_provider::{
 use crate::image_store::ImageStoreMut;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
 use crate::neon::*;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::{
     convolve_horizontal_rgba_sse_rows_4, convolve_horizontal_rgba_sse_rows_4_lb,
     convolve_horizontal_rgba_sse_rows_one, convolve_horizontal_rgba_sse_rows_one_lb,
@@ -96,7 +96,7 @@ impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
                 }
             }
         }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             if std::arch::is_x86_feature_detected!("sse4.1") {
                 if _scale_factor < 8.
@@ -109,21 +109,24 @@ impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
                     _dispatcher_1_row = convolve_horizontal_rgba_sse_rows_one;
                 }
             }
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
             if (std::arch::is_x86_feature_detected!("avx2") || _scale_factor < 8.)
                 && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
             {
                 _dispatcher_4_rows = Some(convolve_horizontal_rgba_avx_rows_4_lb);
                 _dispatcher_1_row = convolve_horizontal_rgba_avx_rows_one_lb;
             }
-            #[cfg(feature = "nightly_avx512")]
-            {
-                if std::arch::is_x86_feature_detected!("avxvnni") {
-                    use crate::avx512::{
-                        convolve_horizontal_rgba_vnni_row_1, convolve_horizontal_rgba_vnni_row_4,
-                    };
-                    _dispatcher_4_rows = Some(convolve_horizontal_rgba_vnni_row_4);
-                    _dispatcher_1_row = convolve_horizontal_rgba_vnni_row_1;
-                }
+        }
+        #[cfg(all(feature = "nightly_avx512", target_arch = "x86_64"))]
+        {
+            if std::arch::is_x86_feature_detected!("avxvnni") {
+                use crate::avx512::{
+                    convolve_horizontal_rgba_vnni_row_1, convolve_horizontal_rgba_vnni_row_4,
+                };
+                _dispatcher_4_rows = Some(convolve_horizontal_rgba_vnni_row_4);
+                _dispatcher_1_row = convolve_horizontal_rgba_vnni_row_1;
             }
         }
         convolve_horizontal_dispatch_u8(
@@ -175,7 +178,7 @@ impl VerticalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
                 }
             }
         }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             if std::arch::is_x86_feature_detected!("sse4.1") {
                 if _scale_factor < 8.
@@ -186,6 +189,9 @@ impl VerticalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
                     _dispatcher = convolve_vertical_sse_row;
                 }
             }
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
             if std::arch::is_x86_feature_detected!("avx2") {
                 if _scale_factor < 8.
                     && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
@@ -195,14 +201,14 @@ impl VerticalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
                     _dispatcher = convolve_vertical_avx_row;
                 }
             }
-            #[cfg(feature = "nightly_avx512")]
-            if std::arch::is_x86_feature_detected!("avx512bw")
-                && _scale_factor < 8.
-                && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
-            {
-                use crate::avx512::convolve_vertical_avx512_row_lp;
-                _dispatcher = convolve_vertical_avx512_row_lp;
-            }
+        }
+        #[cfg(all(feature = "nightly_avx512", target_arch = "x86_64"))]
+        if std::arch::is_x86_feature_detected!("avx512bw")
+            && _scale_factor < 8.
+            && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
+        {
+            use crate::avx512::convolve_vertical_avx512_row_lp;
+            _dispatcher = convolve_vertical_avx512_row_lp;
         }
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
         {

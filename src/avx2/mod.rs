@@ -39,6 +39,7 @@ mod rgba_f16;
 mod rgba_f32;
 mod rgba_u16_lb;
 mod rgba_u8_lb;
+mod routines;
 pub(crate) mod utils;
 #[cfg(feature = "nightly_f16")]
 mod vertical_f16;

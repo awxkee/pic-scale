@@ -203,16 +203,16 @@ pub(crate) unsafe fn convolve_vertical_part_sse_f32<const FMA: bool>(
     for j in 0..bounds.size {
         let py = start_y + j;
         let weight = filter.get_unchecked(j..);
-        let v_weight = _mm_load1_ps(weight.as_ptr());
+        let v_weight = _mm_load_ss(weight.as_ptr());
         let src_ptr = src.get_unchecked(src_stride * py + px..);
 
-        let item_row_0 = _mm_set1_ps(src_ptr.as_ptr().read_unaligned());
+        let item_row_0 = _mm_load_ss(src_ptr.as_ptr());
 
         store_0 = _mm_prefer_fma_ps::<FMA>(store_0, item_row_0, v_weight);
     }
 
     let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-    (dst_ptr as *mut i32).write_unaligned(_mm_extract_ps::<0>(store_0));
+    _mm_storeu_si32(dst_ptr as *mut u8, _mm_castps_si128(store_0));
 }
 
 pub(crate) fn convolve_vertical_rgb_sse_row_f32<const FMA: bool>(

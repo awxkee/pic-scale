@@ -27,7 +27,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::sse::_mm_hsum_epi32;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -113,6 +112,7 @@ unsafe fn avx_has_non_constant_cap_alpha_rgba8_impl(
 
         let row = row.chunks_exact(16).remainder();
 
+        use crate::avx2::routines::_mm_hsum_epi32;
         let mut h_sum = _mm_hsum_epi32(sums);
 
         for chunk in row.chunks_exact(4) {
@@ -188,6 +188,7 @@ unsafe fn avx_has_non_constant_cap_alpha_rgba16_impl(
 
         let row = row.chunks_exact(16).remainder();
 
+        use crate::avx2::routines::_mm_hsum_epi32;
         let mut h_sum = _mm_hsum_epi32(_mm_add_epi32(
             _mm256_castsi256_si128(sums),
             _mm256_extracti128_si256::<1>(sums),

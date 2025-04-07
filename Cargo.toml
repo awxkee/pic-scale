@@ -25,12 +25,14 @@ rayon = "1.10.0"
 libc = "0.2.158"
 
 [features]
-default = ["colorspaces", "rdm"]
+default = ["colorspaces", "rdm", "sse", "avx"]
 colorspaces = ["dep:colorutils-rs"]
 nightly_avx512 = []
 nightly_avx512fp16 = ["nightly_avx512"]
 nightly_f16 = []
 rdm = []
+avx = []
+sse = []
 
 [package.metadata.docs.rs]
 # To build locally:

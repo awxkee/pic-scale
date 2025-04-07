@@ -27,16 +27,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
-#[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
 use core::f16;
 
+use crate::avx2::routines::*;
 use crate::avx2::utils::{_mm256_fma_ps, avx_combine_ps};
 use crate::filter_weights::FilterWeights;
-use crate::sse::{load_4_weights_group_2_avx, load_8_weights_group_4_avx, shuffle};
 
 #[inline(always)]
 unsafe fn convolve_horizontal_parts_one_rgba_f16<const FMA: bool>(

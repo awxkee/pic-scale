@@ -9,11 +9,14 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-pic-scale = { path = "../", features = ["nightly_f16"], default-features = true }
+pic-scale = { path = "../", features = ["nightly_f16"], default-features = false }
 
 [features]
 nightly_avx512 = ["pic-scale/nightly_avx512"]
 rdm = []
+sse = ["pic-scale/sse"]
+avx = ["pic-scale/avx"]
+colorspaces = ["pic-scale/colorspaces"]
 
 [[bin]]
 name = "resize_rgba"

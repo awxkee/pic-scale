@@ -406,7 +406,7 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_f32_impl<const FMA: bool>(
                 weight1,
                 store_3,
             );
-            jx += 2
+            jx += 2;
         }
 
         while jx < bounds.size {

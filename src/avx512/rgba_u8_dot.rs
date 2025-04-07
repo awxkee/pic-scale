@@ -27,8 +27,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+use crate::avx512::utils::compress_i32;
 use crate::filter_weights::FilterWeights;
-use crate::sse::compress_i32;
 use crate::support::{PRECISION, ROUNDING_CONST};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
