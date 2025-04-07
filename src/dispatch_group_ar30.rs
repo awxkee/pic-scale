@@ -87,7 +87,7 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
                             }
                         }
                     }
-                    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+                    #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
                     {
                         if std::arch::is_x86_feature_detected!("sse4.1") {
                             use crate::sse::sse_convolve_horizontal_rgba_rows_4_ar30;
@@ -113,7 +113,7 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
                         _dispatch =
                             neon_convolve_horizontal_rgba_rows_ar30::<AR30_TYPE, AR30_ORDER>;
                     }
-                    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+                    #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
                     {
                         if std::arch::is_x86_feature_detected!("sse4.1") {
                             use crate::sse::sse_convolve_horizontal_rgba_rows_ar30;
@@ -158,7 +158,7 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
                         }
                     }
                 }
-                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+                #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
                 {
                     if std::arch::is_x86_feature_detected!("sse4.1") {
                         use crate::sse::sse_convolve_horizontal_rgba_rows_4_ar30;
@@ -183,7 +183,7 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
                     use crate::neon::neon_convolve_horizontal_rgba_rows_ar30;
                     _dispatch = neon_convolve_horizontal_rgba_rows_ar30::<AR30_TYPE, AR30_ORDER>;
                 }
-                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+                #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
                 {
                     if std::arch::is_x86_feature_detected!("sse4.1") {
                         use crate::sse::sse_convolve_horizontal_rgba_rows_ar30;
@@ -252,7 +252,7 @@ pub(crate) fn convolve_vertical_dispatch_ar30<const AR30_TYPE: usize, const AR30
                             }
                         }
                     }
-                    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+                    #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
                     {
                         if std::arch::is_x86_feature_detected!("sse4.1") {
                             use crate::sse::sse_column_handler_fixed_point_ar30;
@@ -306,7 +306,7 @@ pub(crate) fn convolve_vertical_dispatch_ar30<const AR30_TYPE: usize, const AR30
                         }
                     }
                 }
-                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+                #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
                 {
                     if std::arch::is_x86_feature_detected!("sse4.1") {
                         use crate::sse::sse_column_handler_fixed_point_ar30;

@@ -29,7 +29,6 @@
 
 use crate::avx2::utils::{_mm256_dot16_avx_epi32, _mm_dot16_avx_epi32};
 use crate::filter_weights::FilterWeights;
-use crate::sse::compress_i32;
 use crate::support::ROUNDING_CONST;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
@@ -387,6 +386,7 @@ unsafe fn convolve_horizontal_rgb_avx_rows_4_impl<const HAS_DOT: bool>(
             jx += 1;
         }
 
+        use crate::avx2::routines::compress_i32;
         let store_0_8 = compress_i32(store_0);
         let store_1_8 = compress_i32(store_1);
         let store_2_8 = compress_i32(store_2);
@@ -599,6 +599,7 @@ unsafe fn convolve_horizontal_rgb_avx_row_one_impl<const HAS_DOT: bool>(
             jx += 1;
         }
 
+        use crate::avx2::routines::compress_i32;
         let store_16_8 = compress_i32(store);
         let store_16_8 = _mm_packus_epi16(store_16_8, store_16_8);
 

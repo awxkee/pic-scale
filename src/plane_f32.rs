@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::convolve_vertical_avx_row_f32;
 use crate::convolution::{ConvolutionOptions, HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::convolve_naive_f32::{
@@ -41,7 +41,7 @@ use crate::neon::{
     convolve_vertical_rgb_neon_row_f32,
 };
 use crate::rgb_f32::convolve_vertical_rgb_native_row_f32;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::{
     convolve_horizontal_plane_sse_row_one, convolve_horizontal_plane_sse_rows_4,
     convolve_vertical_rgb_sse_row_f32,
@@ -69,7 +69,7 @@ impl HorizontalConvolutionPass<f32, 1> for ImageStore<'_, f32, 1> {
             _dispatcher_4_rows = Some(convolve_horizontal_plane_neon_rows_4);
             _dispatcher_row = convolve_horizontal_plane_neon_row_one;
         }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             if is_x86_feature_detected!("sse4.1") {
                 _dispatcher_4_rows = Some(convolve_horizontal_plane_sse_rows_4::<false>);
@@ -106,17 +106,16 @@ impl VerticalConvolutionPass<f32, 1> for ImageStore<'_, f32, 1> {
         {
             _dispatcher = convolve_vertical_rgb_neon_row_f32::<1>;
         }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
-            let has_fma = is_x86_feature_detected!("fma");
-            if is_x86_feature_detected!("sse4.1") {
-                if has_fma {
-                    _dispatcher = convolve_vertical_rgb_sse_row_f32::<true>;
-                } else {
-                    _dispatcher = convolve_vertical_rgb_sse_row_f32::<false>;
-                }
+            if std::arch::is_x86_feature_detected!("sse4.1") {
+                _dispatcher = convolve_vertical_rgb_sse_row_f32::<false>;
             }
-            if is_x86_feature_detected!("avx2") {
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            let has_fma = std::arch::is_x86_feature_detected!("fma");
+            if std::arch::is_x86_feature_detected!("avx2") {
                 _dispatcher = convolve_vertical_avx_row_f32::<false>;
                 if has_fma {
                     _dispatcher = convolve_vertical_avx_row_f32::<true>;

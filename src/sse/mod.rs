@@ -113,7 +113,7 @@ pub(crate) use rgba_u8::{
 pub(crate) use rgba_u8_lb::{
     convolve_horizontal_rgba_sse_rows_4_lb, convolve_horizontal_rgba_sse_rows_one_lb,
 };
-pub(crate) use routines::{load_4_weights, load_4_weights_group_2_avx, load_8_weights_group_4_avx};
+pub(crate) use routines::load_4_weights;
 pub(crate) use u8_utils::*;
 pub(crate) use utils::*;
 pub(crate) use vertical_ar30::sse_column_handler_fixed_point_ar30;

@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::avx512::avx512_setr::{_v512_set_epu32, _v512_set_epu8};
+use crate::support::PRECISION;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -150,5 +151,13 @@ pub(crate) unsafe fn _mm512_dot16_epi32<const HAS_DOT: bool>(
         _mm512_dpwssd_epi32(a, b, c)
     } else {
         _mm512_add_epi32(a, _mm512_madd_epi16(b, c))
+    }
+}
+
+#[inline(always)]
+pub(crate) fn compress_i32(x: __m128i) -> __m128i {
+    unsafe {
+        let store_32 = _mm_srai_epi32::<PRECISION>(x);
+        _mm_packus_epi32(store_32, store_32)
     }
 }

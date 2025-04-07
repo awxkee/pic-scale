@@ -30,31 +30,19 @@
 // #![deny(unreachable_code, unused)]
 #![allow(clippy::too_many_arguments)]
 #![cfg_attr(
-    all(
-        feature = "nightly_avx512",
-        any(target_arch = "x86", target_arch = "x86_64")
-    ),
+    all(feature = "nightly_avx512", target_arch = "x86_64"),
     feature(cfg_version)
 )]
 #![cfg_attr(
-    all(
-        feature = "nightly_avx512",
-        any(target_arch = "x86", target_arch = "x86_64")
-    ),
+    all(feature = "nightly_avx512", target_arch = "x86_64"),
     feature(avx512_target_feature)
 )]
 #![cfg_attr(
-    all(
-        feature = "nightly_avx512",
-        any(target_arch = "x86", target_arch = "x86_64")
-    ),
+    all(feature = "nightly_avx512", target_arch = "x86_64"),
     feature(stdarch_x86_avx512)
 )]
 #![cfg_attr(
-    all(
-        feature = "nightly_avx512fp16",
-        any(target_arch = "x86", target_arch = "x86_64")
-    ),
+    all(feature = "nightly_avx512fp16", target_arch = "x86_64"),
     feature(stdarch_x86_avx512_f16)
 )]
 #![cfg_attr(feature = "nightly_f16", feature(f16))]
@@ -67,12 +55,9 @@ mod alpha_handle_f32;
 mod alpha_handle_u16;
 mod alpha_handle_u8;
 mod ar30;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(target_arch = "x86_64", feature = "avx"))]
 mod avx2;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    feature = "nightly_avx512"
-))]
+#[cfg(all(target_arch = "x86_64", feature = "nightly_avx512"))]
 mod avx512;
 mod cbcr16;
 mod cbcr8;
@@ -124,7 +109,7 @@ mod scaler;
 #[cfg(feature = "nightly_f16")]
 #[cfg_attr(docsrs, doc(cfg(feature = "nightly_f16")))]
 mod scaler_f16;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 mod sse;
 mod support;
 mod threading_policy;

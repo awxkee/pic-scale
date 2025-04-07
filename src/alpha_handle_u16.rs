@@ -27,11 +27,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::{avx_premultiply_alpha_rgba_u16, avx_unpremultiply_alpha_rgba_u16};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
 use crate::neon::{neon_premultiply_alpha_rgba_u16, neon_unpremultiply_alpha_rgba_u16};
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::{premultiply_alpha_sse_rgba_u16, unpremultiply_alpha_sse_rgba_u16};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::ParallelSlice;
@@ -192,15 +192,15 @@ pub(crate) fn premultiply_alpha_rgba_u16(
         usize,
         &Option<ThreadPool>,
     ) = premultiply_alpha_rgba_impl;
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
     {
-        if std::is_x86_feature_detected!("sse4.1") {
+        if std::arch::is_x86_feature_detected!("sse4.1") {
             _dispatcher = premultiply_alpha_sse_rgba_u16;
         }
     }
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    #[cfg(all(target_arch = "x86_64", feature = "avx"))]
     {
-        if std::is_x86_feature_detected!("avx2") {
+        if std::arch::is_x86_feature_detected!("avx2") {
             _dispatcher = avx_premultiply_alpha_rgba_u16;
         }
     }
@@ -224,15 +224,15 @@ pub(crate) fn unpremultiply_alpha_rgba_u16(
     #[allow(clippy::type_complexity)]
     let mut _dispatcher: fn(&mut [u16], usize, usize, usize, usize, &Option<ThreadPool>) =
         unpremultiply_alpha_rgba_impl;
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
     {
-        if std::is_x86_feature_detected!("sse4.1") {
+        if std::arch::is_x86_feature_detected!("sse4.1") {
             _dispatcher = unpremultiply_alpha_sse_rgba_u16;
         }
     }
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    #[cfg(all(target_arch = "x86_64", feature = "avx"))]
     {
-        if std::is_x86_feature_detected!("avx2") {
+        if std::arch::is_x86_feature_detected!("avx2") {
             _dispatcher = avx_unpremultiply_alpha_rgba_u16;
         }
     }

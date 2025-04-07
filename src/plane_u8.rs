@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::{convolve_vertical_avx_row, convolve_vertical_avx_row_lp};
 use crate::convolution::{ConvolutionOptions, HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertical_dispatch_u8};
@@ -37,7 +37,7 @@ use crate::handler_provider::{
 use crate::image_store::ImageStoreMut;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
 use crate::neon::{convolve_horizontal_plane_neon_row, convolve_horizontal_plane_neon_rows_4_u8};
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::{
     convolve_horizontal_plane_sse_row, convolve_horizontal_plane_sse_rows_4_u8,
     convolve_vertical_sse_row, convolve_vertical_sse_row_lp,
@@ -91,9 +91,9 @@ impl HorizontalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
                 }
             }
         }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
-            if is_x86_feature_detected!("sse4.1") {
+            if std::arch::is_x86_feature_detected!("sse4.1") {
                 _dispatcher_4_rows = Some(convolve_horizontal_plane_sse_rows_4_u8);
                 _dispatcher_1_row = convolve_horizontal_plane_sse_row;
                 if _scale_factor < 8.
@@ -157,9 +157,9 @@ impl VerticalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
                 }
             }
         }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
-            if is_x86_feature_detected!("sse4.1") {
+            if std::arch::is_x86_feature_detected!("sse4.1") {
                 if _scale_factor < 8.
                     && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
                 {
@@ -168,7 +168,10 @@ impl VerticalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
                     _dispatcher = convolve_vertical_sse_row;
                 }
             }
-            if is_x86_feature_detected!("avx2") {
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            if std::arch::is_x86_feature_detected!("avx2") {
                 if _scale_factor < 8.
                     && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
                 {
@@ -177,14 +180,14 @@ impl VerticalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
                     _dispatcher = convolve_vertical_avx_row;
                 }
             }
-            #[cfg(feature = "nightly_avx512")]
-            if std::arch::is_x86_feature_detected!("avx512bw")
-                && _scale_factor < 8.
-                && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
-            {
-                use crate::avx512::convolve_vertical_avx512_row_lp;
-                _dispatcher = convolve_vertical_avx512_row_lp;
-            }
+        }
+        #[cfg(all(feature = "nightly_avx512", target_arch = "x86_64"))]
+        if std::arch::is_x86_feature_detected!("avx512bw")
+            && _scale_factor < 8.
+            && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
+        {
+            use crate::avx512::convolve_vertical_avx512_row_lp;
+            _dispatcher = convolve_vertical_avx512_row_lp;
         }
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
         {

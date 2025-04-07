@@ -31,6 +31,8 @@ nightly_avx512 = []
 nightly_avx512fp16 = ["nightly_avx512"]
 nightly_f16 = []
 rdm = []
+avx = []
+sse = []
 
 [package.metadata.docs.rs]
 # To build locally:

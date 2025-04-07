@@ -29,7 +29,7 @@
 
 // RGBA
 
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::{
     convolve_horizontal_rgba_avx_row_one_f16, convolve_horizontal_rgba_avx_rows_4_f16,
     convolve_vertical_avx_row_f16,
@@ -56,7 +56,7 @@ use crate::neon::{
     xconvolve_horizontal_rgba_neon_row_one_f16, xconvolve_horizontal_rgba_neon_rows_4_f16,
     xconvolve_vertical_rgb_neon_row_f16,
 };
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::{
     convolve_horizontal_rgb_sse_row_one_f16, convolve_horizontal_rgb_sse_rows_4_f16,
     convolve_horizontal_rgba_sse_row_one_f16, convolve_horizontal_rgba_sse_rows_4_f16,
@@ -158,10 +158,9 @@ impl HorizontalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
                 }
             }
         }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
-            let is_f16c_available = is_x86_feature_detected!("f16c");
-            let fma_available = is_x86_feature_detected!("fma");
+            let is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
             if is_x86_feature_detected!("sse4.1") {
                 _dispatcher_4_rows = Some(convolve_horizontal_rgba_sse_rows_4_f16::<false, false>);
                 _dispatcher_row = convolve_horizontal_rgba_sse_row_one_f16::<false, false>;
@@ -169,14 +168,14 @@ impl HorizontalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
                     _dispatcher_4_rows =
                         Some(convolve_horizontal_rgba_sse_rows_4_f16::<true, false>);
                     _dispatcher_row = convolve_horizontal_rgba_sse_row_one_f16::<true, false>;
-                    if fma_available {
-                        _dispatcher_4_rows =
-                            Some(convolve_horizontal_rgba_sse_rows_4_f16::<true, true>);
-                        _dispatcher_row = convolve_horizontal_rgba_sse_row_one_f16::<true, true>;
-                    }
                 }
             }
-            if is_x86_feature_detected!("avx2") && is_f16c_available {
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            let is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
+            let fma_available = std::arch::is_x86_feature_detected!("fma");
+            if std::arch::is_x86_feature_detected!("avx2") && is_f16c_available {
                 _dispatcher_4_rows = Some(convolve_horizontal_rgba_avx_rows_4_f16::<false>);
                 _dispatcher_row = convolve_horizontal_rgba_avx_row_one_f16::<false>;
                 if fma_available {
@@ -258,22 +257,21 @@ impl VerticalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
                 }
             }
         }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
-            let is_f16c_available = is_x86_feature_detected!("f16c");
-            let is_fma_available = is_x86_feature_detected!("fma");
-            if is_x86_feature_detected!("sse4.1") {
+            let is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
+            if std::arch::is_x86_feature_detected!("sse4.1") {
                 _dispatcher = convolve_vertical_sse_row_f16::<false, false>;
                 if is_f16c_available {
-                    if is_fma_available {
-                        _dispatcher = convolve_vertical_sse_row_f16::<true, true>;
-                    } else {
-                        _dispatcher = convolve_vertical_sse_row_f16::<true, false>;
-                    }
+                    _dispatcher = convolve_vertical_sse_row_f16::<true, false>;
                 }
             }
-
-            if is_x86_feature_detected!("avx2") && is_f16c_available {
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            let is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
+            let is_fma_available = std::arch::is_x86_feature_detected!("fma");
+            if std::arch::is_x86_feature_detected!("avx2") && is_f16c_available {
                 _dispatcher = convolve_vertical_avx_row_f16::<false>;
                 if is_fma_available {
                     _dispatcher = convolve_vertical_avx_row_f16::<true>;
@@ -341,7 +339,7 @@ impl HorizontalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
                 }
             }
         }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             if is_x86_feature_detected!("sse4.1") {
                 _dispatcher_4_rows = Some(convolve_horizontal_rgb_sse_rows_4_f16::<false, false>);
@@ -409,22 +407,21 @@ impl VerticalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
                 }
             }
         }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
-            let is_f16c_available = is_x86_feature_detected!("f16c");
-            let is_fma_available = is_x86_feature_detected!("fma");
-            if is_x86_feature_detected!("sse4.1") {
+            let is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
+            if std::arch::is_x86_feature_detected!("sse4.1") {
                 _dispatcher = convolve_vertical_sse_row_f16::<false, false>;
                 if is_f16c_available {
-                    if is_fma_available {
-                        _dispatcher = convolve_vertical_sse_row_f16::<true, true>;
-                    } else {
-                        _dispatcher = convolve_vertical_sse_row_f16::<true, false>;
-                    }
+                    _dispatcher = convolve_vertical_sse_row_f16::<true, false>;
                 }
             }
-
-            if is_x86_feature_detected!("avx2") && is_f16c_available {
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            let is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
+            let is_fma_available = std::arch::is_x86_feature_detected!("fma");
+            if std::arch::is_x86_feature_detected!("avx2") && is_f16c_available {
                 _dispatcher = convolve_vertical_avx_row_f16::<false>;
                 if is_fma_available {
                     _dispatcher = convolve_vertical_avx_row_f16::<true>;
@@ -506,21 +503,21 @@ impl VerticalConvolutionPass<f16, 1> for ImageStore<'_, f16, 1> {
                 }
             }
         }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
-            let is_f16c_available = is_x86_feature_detected!("f16c");
-            let is_fma_available = is_x86_feature_detected!("fma");
-            if is_x86_feature_detected!("sse4.1") {
+            let is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
+            if std::arch::is_x86_feature_detected!("sse4.1") {
                 _dispatcher = convolve_vertical_sse_row_f16::<false, false>;
                 if is_f16c_available {
-                    if is_fma_available {
-                        _dispatcher = convolve_vertical_sse_row_f16::<true, true>;
-                    } else {
-                        _dispatcher = convolve_vertical_sse_row_f16::<true, false>;
-                    }
+                    _dispatcher = convolve_vertical_sse_row_f16::<true, false>;
                 }
             }
-            if is_x86_feature_detected!("avx2") && is_f16c_available {
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            let is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
+            let is_fma_available = std::arch::is_x86_feature_detected!("fma");
+            if std::arch::is_x86_feature_detected!("avx2") && is_f16c_available {
                 _dispatcher = convolve_vertical_avx_row_f16::<false>;
                 if is_fma_available {
                     _dispatcher = convolve_vertical_avx_row_f16::<true>;
@@ -602,21 +599,21 @@ impl VerticalConvolutionPass<f16, 2> for ImageStore<'_, f16, 2> {
                 }
             }
         }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
-            let is_f16c_available = is_x86_feature_detected!("f16c");
-            let is_fma_available = is_x86_feature_detected!("fma");
-            if is_x86_feature_detected!("sse4.1") {
+            let is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
+            if std::arch::is_x86_feature_detected!("sse4.1") {
                 _dispatcher = convolve_vertical_sse_row_f16::<false, false>;
                 if is_f16c_available {
-                    if is_fma_available {
-                        _dispatcher = convolve_vertical_sse_row_f16::<true, true>;
-                    } else {
-                        _dispatcher = convolve_vertical_sse_row_f16::<true, false>;
-                    }
+                    _dispatcher = convolve_vertical_sse_row_f16::<true, false>;
                 }
             }
-            if is_x86_feature_detected!("avx2") && is_f16c_available {
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            let is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
+            let is_fma_available = std::arch::is_x86_feature_detected!("fma");
+            if std::arch::is_x86_feature_detected!("avx2") && is_f16c_available {
                 _dispatcher = convolve_vertical_avx_row_f16::<false>;
                 if is_fma_available {
                     _dispatcher = convolve_vertical_avx_row_f16::<true>;
