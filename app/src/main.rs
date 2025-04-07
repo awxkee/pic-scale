@@ -14,8 +14,9 @@ use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
     Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, ImageStoreScaling, ResamplingFunction,
     RgbF16ImageStore, RgbF16ImageStoreMut, Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore,
-    Rgba8ImageStoreMut, RgbaF16ImageStore, RgbaF16ImageStoreMut, Scaler, Scaling, ScalingU16,
-    ThreadingPolicy, WorkloadStrategy,
+    Rgba8ImageStoreMut, RgbaF16ImageStore, RgbaF16ImageStoreMut, RgbaF32ImageStore,
+    RgbaF32ImageStoreMut, Scaler, Scaling, ScalingF32, ScalingU16, ThreadingPolicy,
+    WorkloadStrategy,
 };
 use yuvutils_rs::{ar30_to_rgb8, rgb8_to_ar30, rgba8_to_ar30, Rgb30ByteOrder};
 
@@ -48,7 +49,7 @@ fn resize_plane(
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
+    let img = ImageReader::open("./assets/nasa-4928x3279-rgba_.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -73,14 +74,15 @@ fn main() {
 
     let dst_size = ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2);
 
+    let bytes32 = bytes.iter().map(|&x| x as f32).collect::<Vec<_>>();
+
     let mut store =
-        Rgba8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
-    let mut dst_store = Rgba8ImageStoreMut::alloc_with_depth(
-        dimensions.0 as usize / 5,
-        dimensions.1 as usize / 5,
-        8,
-    );
-    scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
+        RgbaF32ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize)
+            .unwrap();
+    let mut dst_store = RgbaF32ImageStoreMut::alloc_with_depth(257, 257, 8);
+    scaler
+        .resize_rgba_f32(&store, &mut dst_store, true)
+        .unwrap();
     //
     // let elapsed_time = start_time.elapsed();
     // // Print the elapsed time in milliseconds
@@ -128,7 +130,11 @@ fn main() {
     //     .map(|&x| (x >> 4) as u8)
     //     .collect();
 
-    let dst = dst_store.as_bytes();
+    let dst = dst_store
+        .as_bytes()
+        .iter()
+        .map(|&x| x as u8)
+        .collect::<Vec<_>>();
 
     if dst_store.channels == 4 {
         image::save_buffer(

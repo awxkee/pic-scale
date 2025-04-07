@@ -58,7 +58,7 @@ pub(crate) fn sse_unpremultiply_alpha_rgba_f32(
 
 #[target_feature(enable = "sse4.1")]
 unsafe fn sse_unpremultiply_alpha_rgba_f32_row_impl(in_place: &mut [f32]) {
-    for dst in in_place.chunks_exact_mut(4) {
+    for dst in in_place.chunks_exact_mut(4 * 4) {
         let src_ptr = dst.as_ptr();
         let rgba0 = _mm_loadu_ps(src_ptr);
         let rgba1 = _mm_loadu_ps(src_ptr.add(4));
@@ -80,7 +80,7 @@ unsafe fn sse_unpremultiply_alpha_rgba_f32_row_impl(in_place: &mut [f32]) {
         _mm_storeu_ps(dst_ptr.add(12), rgba3);
     }
 
-    let rem = in_place.chunks_exact_mut(4).into_remainder();
+    let rem = in_place.chunks_exact_mut(4 * 4).into_remainder();
 
     unpremultiply_pixel_f32_row(rem);
 }

@@ -32,13 +32,14 @@
 use libfuzzer_sys::fuzz_target;
 use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingF32};
 
-fuzz_target!(|data: (u16, u16, u16, u16)| {
+fuzz_target!(|data: (u16, u16, u16, u16, bool)| {
     resize_rgba(
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
         data.3 as usize,
         ResamplingFunction::Bilinear,
+        data.4,
     )
 });
 
@@ -48,6 +49,7 @@ fn resize_rgba(
     dst_width: usize,
     dst_height: usize,
     sampler: ResamplingFunction,
+    premultiply_alpha: bool,
 ) {
     if src_width == 0
         || src_width > 2000
@@ -65,7 +67,7 @@ fn resize_rgba(
     let mut target = ImageStoreMut::alloc(dst_width, dst_height);
 
     let scaler = Scaler::new(sampler);
-    scaler.resize_rgba_f32(&store, &mut target, false).unwrap();
-    let store = ImageStore::<f32, 4>::alloc(src_width, src_height);
-    scaler.resize_rgba_f32(&store, &mut target, true).unwrap();
+    scaler
+        .resize_rgba_f32(&store, &mut target, premultiply_alpha)
+        .unwrap();
 }
