@@ -82,17 +82,42 @@ fn premultiply_alpha_rgba_impl(
     }
 }
 
+const fn make_unpremultiplication_table() -> [u8; 65536] {
+    let mut alpha = 0usize;
+    let mut buf = [0u8; 65536];
+    while alpha < 256 {
+        let mut pixel = 0usize;
+        while pixel < 256 {
+            if alpha == 0 {
+                buf[alpha * 255 + pixel] = 0;
+            } else {
+                let value = (pixel * 255 + alpha / 2) / alpha;
+                buf[alpha * 255 + pixel] = value as u8;
+            }
+            pixel += 1;
+        }
+        alpha += 1;
+    }
+    buf
+}
+
+const UNPREMULTIPLICATION_TABLE: [u8; 65536] = make_unpremultiplication_table();
+
 #[inline]
 pub(crate) fn unpremultiply_alpha_rgba_row_impl(in_place: &mut [u8]) {
     for dst in in_place.chunks_exact_mut(4) {
         let a = dst[3];
-        if a != 0 {
-            let a_recip = 1. / a as f32;
-            dst[0] = ((dst[0] as f32 * 255.) * a_recip) as u8;
-            dst[1] = ((dst[1] as f32 * 255.) * a_recip) as u8;
-            dst[2] = ((dst[2] as f32 * 255.) * a_recip) as u8;
-            dst[3] = ((a as f32 * 255.) * a_recip) as u8;
-        }
+        dst[0] = UNPREMULTIPLICATION_TABLE[(a as u16 * 255 + dst[0] as u16) as usize];
+        dst[1] = UNPREMULTIPLICATION_TABLE[(a as u16 * 255 + dst[1] as u16) as usize];
+        dst[2] = UNPREMULTIPLICATION_TABLE[(a as u16 * 255 + dst[2] as u16) as usize];
+
+        // if a != 0 {
+        //     let a_recip = 1. / a as f32;
+        //     dst[0] = ((dst[0] as f32 * 255.) * a_recip) as u8;
+        //     dst[1] = ((dst[1] as f32 * 255.) * a_recip) as u8;
+        //     dst[2] = ((dst[2] as f32 * 255.) * a_recip) as u8;
+        //     dst[3] = ((a as f32 * 255.) * a_recip) as u8;
+        // }
     }
 }
 
@@ -167,32 +192,32 @@ pub(crate) fn unpremultiply_alpha_rgba(
 ) {
     let mut _dispatcher: fn(&mut [u8], usize, usize, usize, &Option<ThreadPool>) =
         unpremultiply_alpha_rgba_impl;
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-    {
-        _dispatcher = neon_unpremultiply_alpha_rgba;
-    }
-    #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
-    {
-        if std::arch::is_x86_feature_detected!("sse4.1") {
-            _dispatcher = sse_unpremultiply_alpha_rgba;
-        }
-    }
-    #[cfg(all(target_arch = "x86_64", feature = "avx"))]
-    {
-        if std::arch::is_x86_feature_detected!("avx2") {
-            _dispatcher = avx_unpremultiply_alpha_rgba;
-        }
-    }
-    #[cfg(all(feature = "nightly_avx512", target_arch = "x86_64"))]
-    if std::arch::is_x86_feature_detected!("avx512f")
-        && std::arch::is_x86_feature_detected!("avx512bw")
-    {
-        use crate::avx512::avx512_unpremultiply_alpha_rgba;
-        _dispatcher = avx512_unpremultiply_alpha_rgba;
-    }
-    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-    {
-        _dispatcher = wasm_unpremultiply_alpha_rgba;
-    }
+    // #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    // {
+    //     _dispatcher = neon_unpremultiply_alpha_rgba;
+    // }
+    // #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+    // {
+    //     if std::arch::is_x86_feature_detected!("sse4.1") {
+    //         _dispatcher = sse_unpremultiply_alpha_rgba;
+    //     }
+    // }
+    // #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+    // {
+    //     if std::arch::is_x86_feature_detected!("avx2") {
+    //         _dispatcher = avx_unpremultiply_alpha_rgba;
+    //     }
+    // }
+    // #[cfg(all(feature = "nightly_avx512", target_arch = "x86_64"))]
+    // if std::arch::is_x86_feature_detected!("avx512f")
+    //     && std::arch::is_x86_feature_detected!("avx512bw")
+    // {
+    //     use crate::avx512::avx512_unpremultiply_alpha_rgba;
+    //     _dispatcher = avx512_unpremultiply_alpha_rgba;
+    // }
+    // #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    // {
+    //     _dispatcher = wasm_unpremultiply_alpha_rgba;
+    // }
     _dispatcher(in_place, width, height, stride, pool);
 }
