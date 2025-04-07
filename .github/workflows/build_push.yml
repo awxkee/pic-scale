@@ -81,7 +81,7 @@ jobs:
       - run: cargo fuzz run resize_rgb --features ${{ matrix.feature }} -- -max_total_time=15
       - run: cargo fuzz run resize_cbcr8 --features ${{ matrix.feature }} -- -max_total_time=15
       - run: cargo fuzz run resize_plane --features ${{ matrix.feature }} -- -max_total_time=15
-      - run: cargo fuzz run colorspaces --features ${{ matrix.feature }} -- -max_total_time=10
+      - run: cargo fuzz run colorspaces --features ${{ matrix.feature }},colorspaces -- -max_total_time=10
 
   fuzz_rgba_8bit_x86_64:
     name: Fuzzing 8bit x86_64
@@ -97,7 +97,7 @@ jobs:
       - run: cargo fuzz run resize_rgb --features ${{ matrix.feature }} -- -max_total_time=15
       - run: cargo fuzz run resize_cbcr8 --features ${{ matrix.feature }} -- -max_total_time=15
       - run: cargo fuzz run resize_plane --features ${{ matrix.feature }} -- -max_total_time=15
-      - run: cargo fuzz run colorspaces --features ${{ matrix.feature }} -- -max_total_time=10
+      - run: cargo fuzz run colorspaces --features ${{ matrix.feature }},colorspaces -- -max_total_time=10
 
   fuzz_rgba_8bit_no_rdm:
     name: Fuzzing 8bit wo RDM
