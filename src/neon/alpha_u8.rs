@@ -28,9 +28,6 @@
  */
 
 use crate::alpha_handle_u8::premultiply_alpha_rgba_row_impl;
-use crate::cpu_features::is_aarch_f16_supported;
-use crate::neon::f16_utils::{xvcvtaq_u16_f16, xvcvtq_f16_u16, xvmulq_f16, xvrecpeq_f16};
-use crate::neon::xreinterpretq_f16_u16;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
@@ -231,101 +228,13 @@ impl DisassociateAlpha for NeonDisassociateAlpha {
     }
 }
 
-#[derive(Default)]
-struct NeonDisassociateAlphaFloat16 {}
-
-impl NeonDisassociateAlphaFloat16 {
-    #[inline]
-    #[target_feature(enable = "fp16")]
-    /// Float16 feature un pre-multiplication, it's faster with a little slower precision
-    unsafe fn unpremultiply_vec_f16(v: uint8x16_t, a_values: uint8x16_t) -> uint8x16_t {
-        // 23544 = 255f16
-        let v_scale = xreinterpretq_f16_u16(vdupq_n_u16(23544));
-
-        let lo = xvmulq_f16(xvcvtq_f16_u16(vmovl_u8(vget_low_u8(v))), v_scale);
-        let hi = xvmulq_f16(xvcvtq_f16_u16(vmovl_high_u8(v)), v_scale);
-
-        let lo_a = xvrecpeq_f16(xvcvtq_f16_u16(vmovl_u8(vget_low_u8(a_values))));
-        let hi_a = xvrecpeq_f16(xvcvtq_f16_u16(vmovl_high_u8(a_values)));
-
-        let zero_mask = vceqzq_u8(a_values);
-
-        let lo = xvcvtaq_u16_f16(xvmulq_f16(lo, lo_a));
-        let hi = xvcvtaq_u16_f16(xvmulq_f16(hi, hi_a));
-        vbslq_u8(
-            zero_mask,
-            vdupq_n_u8(0),
-            vcombine_u8(vqmovn_u16(lo), vqmovn_u16(hi)),
-        )
-    }
-
-    #[inline]
-    #[target_feature(enable = "fp16")]
-    /// Float16 feature un pre-multiplication, it's faster with a little slower precision
-    unsafe fn unpremultiply_vec_f16h(v: uint8x8_t, a_values: uint8x8_t) -> uint8x8_t {
-        // 23544 = 255f16
-        let v_scale = xreinterpretq_f16_u16(vdupq_n_u16(23544));
-        let lo = xvmulq_f16(xvcvtq_f16_u16(vmovl_u8(v)), v_scale);
-        let lo_a = xvrecpeq_f16(xvcvtq_f16_u16(vmovl_u8(a_values)));
-        let lo = xvcvtaq_u16_f16(xvmulq_f16(lo, lo_a));
-        vbsl_u8(vceqz_u8(a_values), vdup_n_u8(0), vqmovn_u16(lo))
-    }
-}
-
-impl DisassociateAlpha for NeonDisassociateAlphaFloat16 {
-    #[target_feature(enable = "fp16")]
-    unsafe fn disassociate(&self, in_place: &mut [u8]) {
-        let mut rem = in_place;
-
-        for dst in rem.chunks_exact_mut(16 * 4) {
-            let mut pixel = vld4q_u8(dst.as_ptr());
-            pixel.0 = Self::unpremultiply_vec_f16(pixel.0, pixel.3);
-            pixel.1 = Self::unpremultiply_vec_f16(pixel.1, pixel.3);
-            pixel.2 = Self::unpremultiply_vec_f16(pixel.2, pixel.3);
-            let dst_ptr = dst.as_mut_ptr();
-            vst4q_u8(dst_ptr, pixel);
-        }
-
-        rem = rem.chunks_exact_mut(16 * 4).into_remainder();
-
-        for dst in rem.chunks_exact_mut(8 * 4) {
-            let mut pixel = vld4_u8(dst.as_ptr());
-            pixel.0 = Self::unpremultiply_vec_f16h(pixel.0, pixel.3);
-            pixel.1 = Self::unpremultiply_vec_f16h(pixel.1, pixel.3);
-            pixel.2 = Self::unpremultiply_vec_f16h(pixel.2, pixel.3);
-            let dst_ptr = dst.as_mut_ptr();
-            vst4_u8(dst_ptr, pixel);
-        }
-
-        rem = rem.chunks_exact_mut(8 * 4).into_remainder();
-
-        if !rem.is_empty() {
-            assert!(rem.len() < 8 * 4);
-            let mut buffer: [u8; 8 * 4] = [0u8; 8 * 4];
-            std::ptr::copy_nonoverlapping(rem.as_ptr(), buffer.as_mut_ptr(), rem.len());
-
-            let mut pixel = vld4_u8(buffer.as_ptr());
-            pixel.0 = Self::unpremultiply_vec_f16h(pixel.0, pixel.3);
-            pixel.1 = Self::unpremultiply_vec_f16h(pixel.1, pixel.3);
-            pixel.2 = Self::unpremultiply_vec_f16h(pixel.2, pixel.3);
-            vst4_u8(buffer.as_mut_ptr(), pixel);
-
-            std::ptr::copy_nonoverlapping(buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
-        }
-    }
-}
-
 #[inline]
 unsafe fn neon_dis_dispatch(in_place: &mut [u8], handler: impl DisassociateAlpha) {
     handler.disassociate(in_place);
 }
 
 unsafe fn neon_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8]) {
-    if is_aarch_f16_supported() {
-        neon_dis_dispatch(in_place, NeonDisassociateAlphaFloat16::default());
-    } else {
-        neon_dis_dispatch(in_place, NeonDisassociateAlpha::default());
-    }
+    neon_dis_dispatch(in_place, NeonDisassociateAlpha::default());
 }
 
 pub(crate) fn neon_unpremultiply_alpha_rgba(
