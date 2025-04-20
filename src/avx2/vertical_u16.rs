@@ -205,12 +205,13 @@ unsafe fn convolve_column_lb_u16_impl<const FMA: bool>(
 
         let v_dx = v_px + x * 8;
 
+        const S: i32 = shuffle(3, 1, 2, 0);
+
         for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
             let py = bounds.start + j;
             let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
 
             let v_weight = _mm256_set1_ps(k_weight);
-            const S: i32 = shuffle(3, 1, 2, 0);
 
             let item_row = _mm256_permute4x64_epi64::<S>(_mm256_castsi128_si256(_mm_loadu_si128(
                 src_ptr.as_ptr() as *const __m128i,
@@ -225,7 +226,8 @@ unsafe fn convolve_column_lb_u16_impl<const FMA: bool>(
 
         let v_st0 = _mm256_min_epi32(_mm256_cvtps_epi32(store0), v_max_colors);
 
-        let item = _mm256_packus_epi32(v_st0, _mm256_setzero_si256());
+        let item =
+            _mm256_permute4x64_epi64::<S>(_mm256_packus_epi32(v_st0, _mm256_setzero_si256()));
         _mm_storeu_si128(
             dst.as_mut_ptr() as *mut __m128i,
             _mm256_castsi256_si128(item),
