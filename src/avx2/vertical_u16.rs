@@ -27,10 +27,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::avx2::utils::{_mm256_prefer_fma_ps, shuffle};
+use crate::avx2::utils::{_mm256_prefer_fma_ps, _mm_prefer_fma_ps, shuffle};
 use crate::filter_weights::FilterBounds;
 use crate::mlaf::mlaf;
-use crate::sse::_mm_prefer_fma_ps;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
