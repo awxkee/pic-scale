@@ -60,7 +60,7 @@ pub(crate) fn convolve_horizontal_dispatch_u16<const CHANNELS: usize>(
             if bit_depth > 12 {
                 #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
                 {
-                    if std::arch::is_aarch64_feature_detected!("rdm") {
+                    if std::arch::is_aarch64_feature_detected!("rdm") && CHANNELS == 4 {
                         use crate::neon::{
                             convolve_horizontal_rgba_neon_rows_4_hb_u16,
                             convolve_horizontal_rgba_neon_u16_hb_row,
@@ -147,7 +147,7 @@ pub(crate) fn convolve_horizontal_dispatch_u16<const CHANNELS: usize>(
     } else if bit_depth > 12 {
         #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
         {
-            if std::arch::is_aarch64_feature_detected!("rdm") {
+            if std::arch::is_aarch64_feature_detected!("rdm") && CHANNELS == 4 {
                 use crate::neon::{
                     convolve_horizontal_rgba_neon_rows_4_hb_u16,
                     convolve_horizontal_rgba_neon_u16_hb_row,
