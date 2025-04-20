@@ -98,6 +98,7 @@ macro_rules! make_handler {
 }
 
 make_handler!(HorizontalDefaultHandler);
+#[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
 make_handler!(HorizontalDefaultHandlerQ0_31);
 make_handler!(HorizontalDefaultHandlerQ0_15);
 
