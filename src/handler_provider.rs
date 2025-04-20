@@ -140,6 +140,15 @@ impl ColumnHandlerFloatingPoint<u16, f32, f32> for u16 {
         weight: &[f32],
         bit_depth: u32,
     ) {
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            if std::arch::is_x86_feature_detected!("avx2") {
+                use crate::avx2::convolve_column_avx_u16;
+                return convolve_column_avx_u16(
+                    _dst_width, bounds, src, dst, src_stride, weight, bit_depth,
+                );
+            }
+        }
         #[cfg(feature = "sse")]
         if std::arch::is_x86_feature_detected!("sse4.1") {
             return convolve_column_sse_u16(

@@ -48,6 +48,7 @@ mod vertical_f32;
 mod vertical_u16_lb;
 mod vertical_u8;
 mod vertical_u8_lp;
+mod vertical_u16;
 
 #[cfg(feature = "nightly_f16")]
 pub(crate) use alpha_f16::{avx_premultiply_alpha_rgba_f16, avx_unpremultiply_alpha_rgba_f16};
@@ -82,3 +83,4 @@ pub(crate) use vertical_f32::convolve_vertical_avx_row_f32;
 pub(crate) use vertical_u16_lb::convolve_column_lb_avx2_u16;
 pub(crate) use vertical_u8::convolve_vertical_avx_row;
 pub(crate) use vertical_u8_lp::convolve_vertical_avx_row_lp;
+pub(crate) use vertical_u16::convolve_column_avx_u16;
