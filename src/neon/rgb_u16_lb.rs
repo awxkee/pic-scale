@@ -96,6 +96,12 @@ unsafe fn conv_horiz_rgba_4_u16(
     vqdmlal_lane_s16::<0>(acc, vreinterpret_s16_u16(vget_low_u16(part0)), weights)
 }
 
+#[inline(always)]
+unsafe fn set_pixel(ptr: &mut [u16], pixel: uint16x4_t) {
+    vst1_lane_u32::<0>(ptr.as_mut_ptr() as *mut _, vreinterpret_u32_u16(pixel));
+    vst1_lane_u16::<2>(ptr.get_unchecked_mut(2..).as_mut_ptr(), pixel);
+}
+
 pub(crate) fn convolve_horizontal_rgb_neon_rows_4_lb_u16(
     src: &[u16],
     src_stride: usize,
@@ -189,10 +195,10 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4_lb_u16(
             let store_16_2 = vmin_u16(j2, v_max_colors);
             let store_16_3 = vmin_u16(j3, v_max_colors);
 
-            vst1_u16(chunk0.as_mut_ptr(), store_16_0);
-            vst1_u16(chunk1.as_mut_ptr(), store_16_1);
-            vst1_u16(chunk2.as_mut_ptr(), store_16_2);
-            vst1_u16(chunk3.as_mut_ptr(), store_16_3);
+            set_pixel(chunk0, store_16_0);
+            set_pixel(chunk1, store_16_1);
+            set_pixel(chunk2, store_16_2);
+            set_pixel(chunk3, store_16_3);
         }
     }
 }
@@ -251,7 +257,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_u16_lb_row(
 
             let store_16_0 = vmin_u16(vqshrun_n_s32::<PRECISION>(store), v_max_colors);
 
-            vst1_u16(dst.as_mut_ptr(), store_16_0);
+            set_pixel(dst, store_16_0);
         }
     }
 }
