@@ -704,7 +704,8 @@ unsafe fn convolve_column_hb_impl(
                 }
             }
 
-            *dst = (store0 >> 31).max(0).min(max_colors as i64) as u16;
+            const R: i64 = 1 << 30;
+            *dst = ((store0 + R) >> 31).max(0).min(max_colors as i64) as u16;
         }
     }
 }
