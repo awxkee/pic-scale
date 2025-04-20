@@ -79,21 +79,21 @@ impl FilterWeights<f32> {
     }
 
     pub(crate) fn numerical_approximation<
-        J: Clone + Default + Copy + 'static + Bounded + AsPrimitive<f32>,
+        J: Clone + Default + Copy + 'static + Bounded + AsPrimitive<f64>,
         const PRECISION: i32,
     >(
         &self,
         alignment: usize,
     ) -> FilterWeights<J>
     where
-        f32: AsPrimitive<J>,
+        f64: AsPrimitive<J>,
     {
         let align = if alignment != 0 {
             (self.kernel_size.div_ceil(alignment)) * alignment
         } else {
             self.kernel_size
         };
-        let precision_scale: f32 = ((1i64 << PRECISION) - 1) as f32;
+        let precision_scale: f64 = ((1i64 << PRECISION) - 1) as f64;
 
         let mut output_kernel = vec![J::default(); self.distinct_elements * align];
 
@@ -106,7 +106,7 @@ impl FilterWeights<f32> {
             .zip(output_kernel.chunks_exact_mut(align))
         {
             for (&weight, kernel) in chunk.iter().zip(kernel_chunk) {
-                *kernel = (weight * precision_scale)
+                *kernel = (weight as f64 * precision_scale)
                     .round()
                     .min(upper_bound)
                     .max(lower_bound)
@@ -138,10 +138,10 @@ pub(crate) trait WeightsConverter<V> {
 #[derive(Default)]
 pub(crate) struct DefaultWeightsConverter {}
 
-impl<V: Default + Copy + 'static + Clone + Bounded + AsPrimitive<f32>> WeightsConverter<V>
+impl<V: Default + Copy + 'static + Clone + Bounded + AsPrimitive<f64>> WeightsConverter<V>
     for DefaultWeightsConverter
 where
-    f32: AsPrimitive<V>,
+    f64: AsPrimitive<V>,
 {
     fn prepare_weights(&self, weights: &FilterWeights<f32>) -> FilterWeights<V> {
         use crate::support::PRECISION;
