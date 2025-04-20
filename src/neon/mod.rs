@@ -80,8 +80,9 @@ mod vertical_f16_fhm;
 mod vertical_f16_full;
 mod vertical_f32;
 mod vertical_u16;
+#[cfg(feature = "rdm")]
+mod vertical_u16_hb;
 mod vertical_u16_lb;
-mod vertical_u16_lb_f16;
 mod vertical_u8;
 #[cfg(feature = "rdm")]
 mod vertical_u8_rdm;
@@ -181,13 +182,13 @@ pub(crate) use vertical_f16_fhm::convolve_vertical_rgb_neon_row_f16_fhm;
 pub(crate) use vertical_f16_full::xconvolve_vertical_rgb_neon_row_f16;
 pub(crate) use vertical_f32::convolve_vertical_rgb_neon_row_f32;
 pub(crate) use vertical_u16::convolve_column_u16;
+#[cfg(feature = "rdm")]
+pub(crate) use vertical_u16_hb::convolve_column_hb_u16;
 pub(crate) use vertical_u16_lb::convolve_column_lb_u16;
-pub(crate) use vertical_u16_lb_f16::convolve_column_lb_u16_f16;
 pub(crate) use vertical_u8::{
     convolve_vertical_neon_i32_precision, convolve_vertical_neon_i32_precision_d,
 };
 #[cfg(feature = "rdm")]
 pub(crate) use vertical_u8_rdm::convolve_vertical_neon_i16_precision;
-pub(crate) use weights::convert_weights_to_f16;
 #[cfg(feature = "nightly_f16")]
 pub(crate) use weights::convert_weights_to_f16_fhm;

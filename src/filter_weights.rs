@@ -93,7 +93,7 @@ impl FilterWeights<f32> {
         } else {
             self.kernel_size
         };
-        let precision_scale: f32 = (1 << PRECISION) as f32;
+        let precision_scale: f32 = ((1i64 << PRECISION) - 1) as f32;
 
         let mut output_kernel = vec![J::default(); self.distinct_elements * align];
 
@@ -157,29 +157,6 @@ pub(crate) struct PasshroughWeightsConverter {}
 impl WeightsConverter<f32> for PasshroughWeightsConverter {
     fn prepare_weights(&self, weights: &FilterWeights<f32>) -> FilterWeights<f32> {
         weights.clone()
-    }
-}
-
-#[derive(Default)]
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-pub(crate) struct WeightFloat16ConverterCast {}
-
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-impl WeightsConverter<i16> for WeightFloat16ConverterCast {
-    fn prepare_weights(&self, weights: &FilterWeights<f32>) -> FilterWeights<i16> {
-        use crate::neon::convert_weights_to_f16;
-        let converted_weights = convert_weights_to_f16(&weights.weights);
-
-        let new_bounds = weights.bounds.to_vec();
-
-        FilterWeights::new(
-            converted_weights,
-            weights.kernel_size,
-            weights.kernel_size,
-            weights.distinct_elements,
-            weights.coeffs_size,
-            new_bounds,
-        )
     }
 }
 

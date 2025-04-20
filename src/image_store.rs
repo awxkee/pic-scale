@@ -37,7 +37,6 @@ use crate::ImageSize;
 #[cfg(feature = "nightly_f16")]
 use core::f16;
 use rayon::ThreadPool;
-use std::borrow::Cow;
 use std::fmt::Debug;
 
 /// Holds an image
@@ -167,7 +166,7 @@ where
             }));
         }
         Ok(ImageStore::<T, N> {
-            buffer: Cow::Borrowed(slice_ref),
+            buffer: std::borrow::Cow::Borrowed(slice_ref),
             channels: N,
             width,
             height,
@@ -394,8 +393,8 @@ where
 
     pub fn as_bytes(&self) -> &[T] {
         match &self.buffer {
-            Cow::Borrowed(br) => br,
-            Cow::Owned(v) => v.as_ref(),
+            std::borrow::Cow::Borrowed(br) => br,
+            std::borrow::Cow::Owned(v) => v.as_ref(),
         }
     }
 
