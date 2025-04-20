@@ -35,7 +35,7 @@ impl MixedStorage<u8> for f32 {
     #[inline(always)]
     #[allow(clippy::manual_clamp)]
     fn to_mixed(self, _: u32) -> u8 {
-        self.ceil().max(0.).min(255.) as u8
+        self.round().max(0.).min(255.) as u8
     }
 }
 
@@ -43,7 +43,7 @@ impl MixedStorage<u8> for f64 {
     #[inline(always)]
     #[allow(clippy::manual_clamp)]
     fn to_mixed(self, _: u32) -> u8 {
-        self.ceil().max(0.).min(255.) as u8
+        self.round().max(0.).min(255.) as u8
     }
 }
 
@@ -51,7 +51,7 @@ impl MixedStorage<u16> for f32 {
     #[inline(always)]
     #[allow(clippy::manual_clamp)]
     fn to_mixed(self, bit_depth: u32) -> u16 {
-        self.ceil().max(0.).min(((1 << bit_depth) - 1) as f32) as u16
+        self.round().max(0.).min(((1 << bit_depth) - 1) as f32) as u16
     }
 }
 
@@ -71,7 +71,7 @@ impl MixedStorage<u16> for f64 {
     #[inline(always)]
     #[allow(clippy::manual_clamp)]
     fn to_mixed(self, bit_depth: u32) -> u16 {
-        self.ceil().max(0.).min(((1 << bit_depth) - 1) as f64) as u16
+        self.round().max(0.).min(((1 << bit_depth) - 1) as f64) as u16
     }
 }
 

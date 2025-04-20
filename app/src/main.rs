@@ -18,7 +18,7 @@ use pic_scale::{
     RgbaF32ImageStoreMut, Scaler, Scaling, ScalingF32, ScalingU16, ThreadingPolicy,
     WorkloadStrategy,
 };
-use yuvutils_rs::{ar30_to_rgb8, rgb8_to_ar30, rgba8_to_ar30, Rgb30ByteOrder};
+use yuv::{ar30_to_rgb8, rgb8_to_ar30, rgba8_to_ar30, Rgb30ByteOrder};
 
 fn resize_plane(
     src_width: usize,
@@ -49,7 +49,7 @@ fn resize_plane(
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/nasa-4928x3279-rgba_.png")
+    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -74,14 +74,22 @@ fn main() {
 
     let dst_size = ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2);
 
-    let bytes32 = bytes.iter().map(|&x| x as f32).collect::<Vec<_>>();
+    let bytes32 = bytes
+        .iter()
+        .map(|&x| u16::from_ne_bytes([x, x]))
+        .collect::<Vec<_>>();
 
     let mut store =
-        RgbaF32ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize)
+        Rgba16ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
-    let mut dst_store = RgbaF32ImageStoreMut::alloc_with_depth(257, 257, 8);
+    store.bit_depth = 16;
+    let mut dst_store = Rgba16ImageStoreMut::alloc_with_depth(
+        dimensions.0 as usize / 2,
+        dimensions.1 as usize / 2,
+        16,
+    );
     scaler
-        .resize_rgba_f32(&store, &mut dst_store, true)
+        .resize_rgba_u16(&store, &mut dst_store, true)
         .unwrap();
     //
     // let elapsed_time = start_time.elapsed();
@@ -133,7 +141,7 @@ fn main() {
     let dst = dst_store
         .as_bytes()
         .iter()
-        .map(|&x| x as u8)
+        .map(|&x| (x >> 8) as u8)
         .collect::<Vec<_>>();
 
     if dst_store.channels == 4 {

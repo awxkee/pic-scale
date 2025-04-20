@@ -126,6 +126,17 @@ jobs:
       - run: cargo fuzz run resize_cbcr16 -- -max_total_time=15
       - run: cargo fuzz run resize_cbcr_f16 -- -max_total_time=15
       - run: cargo fuzz run resize_plane_u16 -- -max_total_time=15
+  
+  fuzz_rgba_high_bit_arm_rdm:
+    name: Fuzzing High bit-depth RDM
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz run resize_rgba_u16 --features rdm -- -max_total_time=15
+      - run: cargo fuzz run resize_rgb_u16 --features rdm -- -max_total_time=15
+      - run: cargo fuzz run resize_plane_u16 --features rdm -- -max_total_time=15
 
   fuzz_rgba_high_bit:
     name: Fuzzing High bit-depth

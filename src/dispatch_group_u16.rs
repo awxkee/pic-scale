@@ -26,10 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 use crate::convolution::ConvolutionOptions;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::cpu_features::is_aarch_f16_supported;
 use crate::filter_weights::{
     DefaultWeightsConverter, FilterBounds, FilterWeights, WeightsConverter,
 };
@@ -61,6 +58,44 @@ pub(crate) fn convolve_horizontal_dispatch_u16<const CHANNELS: usize>(
     if let Some(pool) = pool {
         pool.install(|| {
             if bit_depth > 12 {
+                #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
+                {
+                    if std::arch::is_aarch64_feature_detected!("rdm") {
+                        use crate::neon::{
+                            convolve_horizontal_rgba_neon_rows_4_hb_u16,
+                            convolve_horizontal_rgba_neon_u16_hb_row,
+                        };
+                        let approx_num = filter_weights.numerical_approximation::<i32, 31>(0);
+                        dst.par_chunks_exact_mut(dst_stride * 4)
+                            .zip(src.par_chunks_exact(src_stride * 4))
+                            .for_each(|(dst, src)| {
+                                convolve_horizontal_rgba_neon_rows_4_hb_u16(
+                                    src,
+                                    src_stride,
+                                    dst,
+                                    dst_stride,
+                                    &approx_num,
+                                    bit_depth as u32,
+                                );
+                            });
+
+                        let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
+                        let src_remainder = src.chunks_exact(src_stride * 4).remainder();
+
+                        remainder
+                            .par_chunks_exact_mut(dst_stride)
+                            .zip(src_remainder.par_chunks_exact(src_stride))
+                            .for_each(|(dst, src)| {
+                                convolve_horizontal_rgba_neon_u16_hb_row(
+                                    src,
+                                    dst,
+                                    &approx_num,
+                                    bit_depth as u32,
+                                );
+                            });
+                        return;
+                    }
+                }
                 dst.par_chunks_exact_mut(dst_stride * 4)
                     .zip(src.par_chunks_exact(src_stride * 4))
                     .for_each(|(dst, src)| {
@@ -110,6 +145,45 @@ pub(crate) fn convolve_horizontal_dispatch_u16<const CHANNELS: usize>(
             }
         });
     } else if bit_depth > 12 {
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
+        {
+            if std::arch::is_aarch64_feature_detected!("rdm") {
+                use crate::neon::{
+                    convolve_horizontal_rgba_neon_rows_4_hb_u16,
+                    convolve_horizontal_rgba_neon_u16_hb_row,
+                };
+                let approx_num = filter_weights.numerical_approximation::<i32, 31>(0);
+                dst.chunks_exact_mut(dst_stride * 4)
+                    .zip(src.chunks_exact(src_stride * 4))
+                    .for_each(|(dst, src)| {
+                        convolve_horizontal_rgba_neon_rows_4_hb_u16(
+                            src,
+                            src_stride,
+                            dst,
+                            dst_stride,
+                            &approx_num,
+                            bit_depth as u32,
+                        );
+                    });
+
+                let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
+                let src_remainder = src.chunks_exact(src_stride * 4).remainder();
+
+                remainder
+                    .chunks_exact_mut(dst_stride)
+                    .zip(src_remainder.chunks_exact(src_stride))
+                    .for_each(|(dst, src)| {
+                        convolve_horizontal_rgba_neon_u16_hb_row(
+                            src,
+                            dst,
+                            &approx_num,
+                            bit_depth as u32,
+                        );
+                    });
+                return;
+            }
+        }
+
         dst.chunks_exact_mut(dst_stride * 4)
             .zip(src.chunks_exact(src_stride * 4))
             .for_each(|(dst, src)| {
@@ -195,40 +269,6 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
                         );
                     });
             } else {
-                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-                {
-                    if is_aarch_f16_supported()
-                        && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
-                    {
-                        use crate::filter_weights::WeightFloat16ConverterCast;
-                        execute_low_precision_row(
-                            true,
-                            image_store,
-                            &filter_weights,
-                            src_stride,
-                            dst_stride,
-                            bit_depth,
-                            dst_width,
-                            destination_image,
-                            HighBitDepthFloat16LowerHandler::default(),
-                            WeightFloat16ConverterCast::default(),
-                        );
-                    } else {
-                        execute_low_precision_row(
-                            true,
-                            image_store,
-                            &filter_weights,
-                            src_stride,
-                            dst_stride,
-                            bit_depth,
-                            dst_width,
-                            destination_image,
-                            DefaultHighBitDepthLowerHandler::default(),
-                            DefaultWeightsConverter::default(),
-                        );
-                    }
-                }
-                #[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
                 execute_low_precision_row(
                     true,
                     image_store,
@@ -244,6 +284,23 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
             }
         });
     } else if bit_depth > 12 {
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
+        {
+            if DefaultHighBitDepthHighHandlerNeon::is_available() {
+                return execute_low_precision_row(
+                    false,
+                    image_store,
+                    &filter_weights,
+                    src_stride,
+                    dst_stride,
+                    bit_depth,
+                    dst_width,
+                    destination.buffer.borrow_mut(),
+                    DefaultHighBitDepthHighHandlerNeon::default(),
+                    WeightsConverterQ0_31::default(),
+                );
+            }
+        }
         let destination_image = destination.buffer.borrow_mut();
         destination_image
             .chunks_exact_mut(dst_stride)
@@ -264,40 +321,6 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
                 );
             });
     } else {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            if is_aarch_f16_supported()
-                && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
-            {
-                use crate::filter_weights::WeightFloat16ConverterCast;
-                execute_low_precision_row(
-                    false,
-                    image_store,
-                    &filter_weights,
-                    src_stride,
-                    dst_stride,
-                    bit_depth,
-                    dst_width,
-                    destination.buffer.borrow_mut(),
-                    HighBitDepthFloat16LowerHandler::default(),
-                    WeightFloat16ConverterCast::default(),
-                );
-            } else {
-                execute_low_precision_row(
-                    false,
-                    image_store,
-                    &filter_weights,
-                    src_stride,
-                    dst_stride,
-                    bit_depth,
-                    dst_width,
-                    destination.buffer.borrow_mut(),
-                    DefaultHighBitDepthLowerHandler::default(),
-                    DefaultWeightsConverter::default(),
-                );
-            }
-        }
-        #[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
         execute_low_precision_row(
             false,
             image_store,
@@ -313,7 +336,7 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
     }
 }
 
-trait HandleHighBitDepthLower<const COMPONENTS: usize> {
+trait HandleHighBitDepthLower<W, const COMPONENTS: usize> {
     fn handle_fixed_column(
         &self,
         dst_width: usize,
@@ -321,7 +344,7 @@ trait HandleHighBitDepthLower<const COMPONENTS: usize> {
         src: &[u16],
         dst: &mut [u16],
         src_stride: usize,
-        weight: &[i16],
+        weight: &[W],
         bit_depth: u32,
     );
 }
@@ -329,7 +352,7 @@ trait HandleHighBitDepthLower<const COMPONENTS: usize> {
 #[derive(Default)]
 struct DefaultHighBitDepthLowerHandler {}
 
-impl<const COMPONENTS: usize> HandleHighBitDepthLower<COMPONENTS>
+impl<const COMPONENTS: usize> HandleHighBitDepthLower<i16, COMPONENTS>
     for DefaultHighBitDepthLowerHandler
 {
     fn handle_fixed_column(
@@ -348,13 +371,31 @@ impl<const COMPONENTS: usize> HandleHighBitDepthLower<COMPONENTS>
     }
 }
 
+#[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
 #[derive(Default)]
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-struct HighBitDepthFloat16LowerHandler {}
+pub(crate) struct WeightsConverterQ0_31 {}
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-impl<const COMPONENTS: usize> HandleHighBitDepthLower<COMPONENTS>
-    for HighBitDepthFloat16LowerHandler
+#[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
+impl WeightsConverter<i32> for WeightsConverterQ0_31 {
+    fn prepare_weights(&self, weights: &FilterWeights<f32>) -> FilterWeights<i32> {
+        weights.numerical_approximation::<i32, 31>(0)
+    }
+}
+
+#[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
+#[derive(Default)]
+struct DefaultHighBitDepthHighHandlerNeon {}
+
+#[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
+impl DefaultHighBitDepthHighHandlerNeon {
+    fn is_available() -> bool {
+        std::arch::is_aarch64_feature_detected!("rdm")
+    }
+}
+
+#[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
+impl<const COMPONENTS: usize> HandleHighBitDepthLower<i32, COMPONENTS>
+    for DefaultHighBitDepthHighHandlerNeon
 {
     fn handle_fixed_column(
         &self,
@@ -363,16 +404,16 @@ impl<const COMPONENTS: usize> HandleHighBitDepthLower<COMPONENTS>
         src: &[u16],
         dst: &mut [u16],
         src_stride: usize,
-        weight: &[i16],
+        weight: &[i32],
         bit_depth: u32,
     ) {
-        use crate::neon::convolve_column_lb_u16_f16;
-        convolve_column_lb_u16_f16(dst_width, bounds, src, dst, src_stride, weight, bit_depth);
+        use crate::neon::convolve_column_hb_u16;
+        convolve_column_hb_u16(dst_width, bounds, src, dst, src_stride, weight, bit_depth);
     }
 }
 
 #[inline]
-fn execute_low_precision_row<const COMPONENTS: usize>(
+fn execute_low_precision_row<W: Send + Sync, const COMPONENTS: usize>(
     is_parallel: bool,
     image_store: &ImageStore<u16, COMPONENTS>,
     filter_weights: &FilterWeights<f32>,
@@ -381,8 +422,8 @@ fn execute_low_precision_row<const COMPONENTS: usize>(
     bit_depth: usize,
     dst_width: usize,
     destination_image: &mut [u16],
-    handler: impl HandleHighBitDepthLower<COMPONENTS> + Sync,
-    weights: impl WeightsConverter<i16>,
+    handler: impl HandleHighBitDepthLower<W, COMPONENTS> + Sync,
+    weights: impl WeightsConverter<W>,
 ) {
     let approx = weights.prepare_weights(filter_weights);
     if is_parallel {

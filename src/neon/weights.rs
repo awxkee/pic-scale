@@ -26,15 +26,16 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#[cfg(feature = "nightly_f16")]
 use crate::neon::f16_utils::{xvcombine_f16, xvcvt_f16_f32};
+#[cfg(feature = "nightly_f16")]
 use crate::neon::utils::xvld1q_f32_x2;
+#[cfg(feature = "nightly_f16")]
 use crate::neon::{xreinterpret_u16_f16, xreinterpretq_u16_f16};
+#[cfg(feature = "nightly_f16")]
 use std::arch::aarch64::*;
 
-pub(crate) fn convert_weights_to_f16(weights: &[f32]) -> Vec<i16> {
-    unsafe { convert_weights_to_f16_impl::<i16>(weights) }
-}
-
+#[cfg(feature = "nightly_f16")]
 #[target_feature(enable = "fp16")]
 unsafe fn convert_weights_to_f16_impl<J: Default + Clone>(weights: &[f32]) -> Vec<J> {
     let mut new_weights = vec![J::default(); weights.len()];
