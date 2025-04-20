@@ -1,7 +1,9 @@
 extern crate wee_alloc;
 use image::{DynamicImage, EncodableLayout, GenericImageView, ImageBuffer, ImageReader};
 use js_sys::Uint8Array;
-use pic_scale::{ImageSize, ImageStore, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
+use pic_scale::{
+    ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ThreadingPolicy,
+};
 use std::io::Cursor;
 use std::panic;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -40,16 +42,14 @@ pub fn process(image: Uint8Array) -> Uint8Array {
         ImageStore::<u8, 3>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
 
-    let resized = scaler
-        .resize_rgb(
-            ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2),
-            store,
-        )
-        .unwrap();
+    let mut target_store =
+        ImageStoreMut::<u8, 3>::alloc(dimensions.0 as usize / 2, dimensions.1 as usize / 2);
 
-    let dst: Vec<u8> = Vec::from(resized.as_bytes());
+    scaler.resize_rgb(&store, &mut target_store).unwrap();
 
-    let img = ImageBuffer::from_raw(resized.width as u32, resized.height as u32, dst)
+    let dst: Vec<u8> = target_store.buffer.borrow().to_vec();
+
+    let img = ImageBuffer::from_raw(target_store.width as u32, target_store.height as u32, dst)
         .map(DynamicImage::ImageRgb8)
         .expect("Failed to create image from raw data");
 
