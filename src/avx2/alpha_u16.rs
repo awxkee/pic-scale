@@ -338,13 +338,6 @@ unsafe fn avx_premultiply_alpha_rgba_u16_row(dst: &mut [u16], src: &[u16], bit_d
             bit_depth,
             Avx2PremultiplyExecutorDefault::<12>::default(),
         );
-    } else if bit_depth == 16 {
-        avx_pa_dispatch(
-            dst,
-            src,
-            bit_depth,
-            Avx2PremultiplyExecutorDefault::<16>::default(),
-        );
     } else {
         avx_pa_dispatch(
             dst,

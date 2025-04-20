@@ -37,6 +37,7 @@ mod rgb_u8;
 #[cfg(feature = "nightly_f16")]
 mod rgba_f16;
 mod rgba_f32;
+mod rgba_u16;
 mod rgba_u16_lb;
 mod rgba_u8_lb;
 mod routines;
@@ -65,6 +66,9 @@ pub(crate) use rgba_f16::{
 };
 pub(crate) use rgba_f32::{
     convolve_horizontal_rgba_avx_row_one_f32, convolve_horizontal_rgba_avx_rows_4_f32,
+};
+pub(crate) use rgba_u16::{
+    convolve_horizontal_rgba_avx_rows_4_u16_f, convolve_horizontal_rgba_avx_u16_row_f,
 };
 pub(crate) use rgba_u16_lb::{
     convolve_horizontal_rgba_avx_rows_4_u16, convolve_horizontal_rgba_avx_u16lp_row,

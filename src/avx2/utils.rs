@@ -439,3 +439,25 @@ pub(crate) unsafe fn _mm256_reduce_dot_epi16<const DOT: bool>(a: __m256i) -> __m
     #[cfg(not(feature = "nightly_avx512"))]
     _mm_adds_epi16(_mm256_castsi256_si128(a), _mm256_extracti128_si256::<1>(a))
 }
+
+#[inline]
+pub(crate) unsafe fn _mm256_prefer_fma_ps<const FMA: bool>(
+    a: __m256,
+    b: __m256,
+    c: __m256,
+) -> __m256 {
+    if FMA {
+        _mm256_fmadd_ps(b, c, a)
+    } else {
+        _mm256_add_ps(_mm256_mul_ps(b, c), a)
+    }
+}
+
+#[inline]
+pub(crate) unsafe fn _mm_prefer_fma_ps<const FMA: bool>(a: __m128, b: __m128, c: __m128) -> __m128 {
+    if FMA {
+        _mm_fmadd_ps(b, c, a)
+    } else {
+        _mm_add_ps(_mm_mul_ps(b, c), a)
+    }
+}
