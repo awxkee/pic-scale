@@ -458,13 +458,6 @@ unsafe fn premultiply_alpha_sse_rgba_u16_row_impl(dst: &mut [u16], src: &[u16], 
             bit_depth,
             Sse41PremultiplyExecutorDefault::<12>::default(),
         )
-    } else if bit_depth == 16 {
-        pma_sse41_rgba16_dispatch(
-            dst,
-            src,
-            bit_depth,
-            Sse41PremultiplyExecutorDefault::<16>::default(),
-        )
     } else {
         pma_sse41_rgba16_dispatch(dst, src, bit_depth, Sse41PremultiplyExecutorAny::default())
     }

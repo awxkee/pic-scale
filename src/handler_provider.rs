@@ -203,6 +203,13 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
         filter_weights: &FilterWeights<f32>,
         bit_depth: u32,
     ) {
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("avx2") {
+                use crate::avx2::convolve_horizontal_rgba_avx_u16_row_f;
+                return convolve_horizontal_rgba_avx_u16_row_f(src, dst, filter_weights, bit_depth);
+            }
+        }
         #[cfg(feature = "sse")]
         if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("sse4.1") {
             return convolve_horizontal_rgba_sse_u16_row(src, dst, filter_weights, bit_depth);
@@ -243,9 +250,23 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
         filter_weights: &FilterWeights<f32>,
         bit_depth: u32,
     ) {
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("avx2") {
+                use crate::avx2::convolve_horizontal_rgba_avx_rows_4_u16_f;
+                return convolve_horizontal_rgba_avx_rows_4_u16_f(
+                    src,
+                    src_stride,
+                    dst,
+                    dst_stride,
+                    filter_weights,
+                    bit_depth,
+                );
+            }
+        }
         #[cfg(feature = "sse")]
         if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("sse4.1") {
-            convolve_horizontal_rgba_sse_rows_4_u16(
+            return convolve_horizontal_rgba_sse_rows_4_u16(
                 src,
                 src_stride,
                 dst,
