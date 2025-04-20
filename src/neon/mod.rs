@@ -54,6 +54,9 @@ mod rgb_f16_fhm;
 #[cfg(feature = "nightly_f16")]
 mod rgb_f16_full;
 mod rgb_f32;
+#[cfg(feature = "rdm")]
+mod rgb_u16_hb;
+mod rgb_u16_lb;
 mod rgb_u8;
 #[cfg(feature = "rdm")]
 mod rgb_u8_sqrdml;
@@ -138,6 +141,13 @@ pub(crate) use rgb_f16_full::{
 };
 pub(crate) use rgb_f32::{
     convolve_horizontal_rgb_neon_row_one_f32, convolve_horizontal_rgb_neon_rows_4_f32,
+};
+#[cfg(feature = "rdm")]
+pub(crate) use rgb_u16_hb::{
+    convolve_horizontal_rgb_neon_rows_4_hb_u16, convolve_horizontal_rgb_neon_u16_hb_row,
+};
+pub(crate) use rgb_u16_lb::{
+    convolve_horizontal_rgb_neon_rows_4_lb_u16, convolve_horizontal_rgb_neon_u16_lb_row,
 };
 pub(crate) use rgb_u8::{
     convolve_horizontal_rgb_neon_row_one, convolve_horizontal_rgb_neon_row_one_q,
