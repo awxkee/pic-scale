@@ -58,6 +58,44 @@ pub(crate) fn convolve_horizontal_dispatch_u16<const CHANNELS: usize>(
     if let Some(pool) = pool {
         pool.install(|| {
             if bit_depth > 12 {
+                #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
+                {
+                    if std::arch::is_aarch64_feature_detected!("rdm") {
+                        use crate::neon::{
+                            convolve_horizontal_rgba_neon_rows_4_hb_u16,
+                            convolve_horizontal_rgba_neon_u16_hb_row,
+                        };
+                        let approx_num = filter_weights.numerical_approximation::<i32, 31>(0);
+                        dst.par_chunks_exact_mut(dst_stride * 4)
+                            .zip(src.par_chunks_exact(src_stride * 4))
+                            .for_each(|(dst, src)| {
+                                convolve_horizontal_rgba_neon_rows_4_hb_u16(
+                                    src,
+                                    src_stride,
+                                    dst,
+                                    dst_stride,
+                                    &approx_num,
+                                    bit_depth as u32,
+                                );
+                            });
+
+                        let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
+                        let src_remainder = src.chunks_exact(src_stride * 4).remainder();
+
+                        remainder
+                            .par_chunks_exact_mut(dst_stride)
+                            .zip(src_remainder.par_chunks_exact(src_stride))
+                            .for_each(|(dst, src)| {
+                                convolve_horizontal_rgba_neon_u16_hb_row(
+                                    src,
+                                    dst,
+                                    &approx_num,
+                                    bit_depth as u32,
+                                );
+                            });
+                        return;
+                    }
+                }
                 dst.par_chunks_exact_mut(dst_stride * 4)
                     .zip(src.par_chunks_exact(src_stride * 4))
                     .for_each(|(dst, src)| {
@@ -107,6 +145,45 @@ pub(crate) fn convolve_horizontal_dispatch_u16<const CHANNELS: usize>(
             }
         });
     } else if bit_depth > 12 {
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
+        {
+            if std::arch::is_aarch64_feature_detected!("rdm") {
+                use crate::neon::{
+                    convolve_horizontal_rgba_neon_rows_4_hb_u16,
+                    convolve_horizontal_rgba_neon_u16_hb_row,
+                };
+                let approx_num = filter_weights.numerical_approximation::<i32, 31>(0);
+                dst.chunks_exact_mut(dst_stride * 4)
+                    .zip(src.chunks_exact(src_stride * 4))
+                    .for_each(|(dst, src)| {
+                        convolve_horizontal_rgba_neon_rows_4_hb_u16(
+                            src,
+                            src_stride,
+                            dst,
+                            dst_stride,
+                            &approx_num,
+                            bit_depth as u32,
+                        );
+                    });
+
+                let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
+                let src_remainder = src.chunks_exact(src_stride * 4).remainder();
+
+                remainder
+                    .chunks_exact_mut(dst_stride)
+                    .zip(src_remainder.chunks_exact(src_stride))
+                    .for_each(|(dst, src)| {
+                        convolve_horizontal_rgba_neon_u16_hb_row(
+                            src,
+                            dst,
+                            &approx_num,
+                            bit_depth as u32,
+                        );
+                    });
+                return;
+            }
+        }
+
         dst.chunks_exact_mut(dst_stride * 4)
             .zip(src.chunks_exact(src_stride * 4))
             .for_each(|(dst, src)| {

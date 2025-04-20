@@ -64,6 +64,8 @@ mod rgba_f16_fhm;
 #[cfg(feature = "nightly_f16")]
 mod rgba_f16_full;
 mod rgba_f32;
+#[cfg(feature = "rdm")]
+mod rgba_u16_hb;
 mod rgba_u16_lb;
 mod rgba_u8;
 #[cfg(feature = "rdm")]
@@ -159,6 +161,10 @@ pub(crate) use rgba_f16_full::{
 };
 pub(crate) use rgba_f32::{
     convolve_horizontal_rgba_neon_row_one, convolve_horizontal_rgba_neon_rows_4,
+};
+#[cfg(feature = "rdm")]
+pub(crate) use rgba_u16_hb::{
+    convolve_horizontal_rgba_neon_rows_4_hb_u16, convolve_horizontal_rgba_neon_u16_hb_row,
 };
 pub(crate) use rgba_u16_lb::{
     convolve_horizontal_rgba_neon_rows_4_lb_u16, convolve_horizontal_rgba_neon_u16_lb_row,
