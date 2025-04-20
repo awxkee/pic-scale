@@ -408,6 +408,6 @@ unsafe fn convolve_column_lb_u16_impl<const FMA: bool>(
             }
         }
 
-        *dst = store0.ceil().max(0.).min(max_colors as f32) as u16;
+        *dst = store0.round().max(0.).min(max_colors as f32) as u16;
     }
 }
