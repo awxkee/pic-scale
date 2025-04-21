@@ -21,9 +21,6 @@ colorutils-rs = {version = "0.7.4", optional = true}
 num-traits = { version = "0.2.19", features = ["std"] }
 rayon = "1.10.0"
 
-[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
-libc = "0.2.158"
-
 [features]
 default = ["colorspaces", "rdm", "sse", "avx"]
 colorspaces = ["dep:colorutils-rs"]

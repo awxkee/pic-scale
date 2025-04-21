@@ -77,7 +77,7 @@ impl HorizontalConvolutionPass<u8, 3> for ImageStore<'_, u8, 3> {
                     _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rows_4);
                     _dispatcher_1_row = convolve_horizontal_rgb_neon_row_one;
                     #[cfg(feature = "rdm")]
-                    if _scale_factor < 8.0 && crate::cpu_features::is_aarch_rdm_supported() {
+                    if _scale_factor < 8.0 && std::arch::is_aarch64_feature_detected!("rdm") {
                         use crate::neon::{
                             convolve_horizontal_rgb_neon_rdm_row_one,
                             convolve_horizontal_rgb_neon_rdm_rows_4,
@@ -139,7 +139,7 @@ impl VerticalConvolutionPass<u8, 3> for ImageStore<'_, u8, 3> {
                 crate::WorkloadStrategy::PreferSpeed => {
                     // For more downscaling better to use more precise version
                     #[cfg(feature = "rdm")]
-                    if _scale_factor < 8. && crate::cpu_features::is_aarch_rdm_supported() {
+                    if _scale_factor < 8. && std::arch::is_aarch64_feature_detected!("rdm") {
                         use crate::neon::convolve_vertical_neon_i16_precision;
                         _dispatcher = convolve_vertical_neon_i16_precision;
                     } else {
