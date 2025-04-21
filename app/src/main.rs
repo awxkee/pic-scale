@@ -57,7 +57,9 @@ fn main() {
     let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
-    let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+    // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
+
+    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
     scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
@@ -84,8 +86,8 @@ fn main() {
             .unwrap();
     store.bit_depth = 16;
     let mut dst_store = Rgba16ImageStoreMut::alloc_with_depth(
-        dimensions.0 as usize / 2,
-        dimensions.1 as usize / 2,
+        dimensions.0 as usize / 4,
+        dimensions.1 as usize / 4,
         16,
     );
     scaler

@@ -26,8 +26,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::neon::f16_utils::{xvcvtaq_u16_f16, xvcvtq_f16_u16, xvmulq_f16, xvrecpeq_f16};
-use crate::neon::x_float16x8_t;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
@@ -137,69 +135,6 @@ impl<const BIT_DEPTH: usize> NeonPremultiplyExecutor for NeonPremultiplyExecutor
 }
 
 #[derive(Default)]
-struct NeonPremultiplyExecutorFloat16<const BIT_DEPTH: usize> {}
-
-impl<const BIT_DEPTH: usize> NeonPremultiplyExecutorFloat16<BIT_DEPTH> {
-    #[inline]
-    #[target_feature(enable = "fp16")]
-    unsafe fn premultiply_chunk(
-        &self,
-        dst: &mut [u16],
-        src: &[u16],
-        recip_bit_depth: x_float16x8_t,
-    ) {
-        let pixel = vld4q_u16(src.as_ptr());
-
-        let a_values = xvmulq_f16(xvcvtq_f16_u16(pixel.3), recip_bit_depth);
-
-        let new_r = xvcvtaq_u16_f16(xvmulq_f16(xvcvtq_f16_u16(pixel.0), a_values));
-        let new_g = xvcvtaq_u16_f16(xvmulq_f16(xvcvtq_f16_u16(pixel.1), a_values));
-        let new_b = xvcvtaq_u16_f16(xvmulq_f16(xvcvtq_f16_u16(pixel.2), a_values));
-
-        let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
-
-        vst4q_u16(dst.as_mut_ptr(), new_px);
-    }
-}
-
-impl<const BIT_DEPTH: usize> NeonPremultiplyExecutor for NeonPremultiplyExecutorFloat16<BIT_DEPTH> {
-    #[target_feature(enable = "fp16")]
-    unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
-        assert_ne!(bit_depth, 0, "Something goes wrong!");
-        assert!((1..=16).contains(&bit_depth));
-
-        let recip_bit_depth = xvrecpeq_f16(xvcvtq_f16_u16(vdupq_n_u16((1 << bit_depth) - 1)));
-
-        let mut rem = dst;
-        let mut src_rem = src;
-        for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
-            self.premultiply_chunk(dst, src, recip_bit_depth);
-        }
-
-        rem = rem.chunks_exact_mut(8 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(8 * 4).remainder();
-
-        if !rem.is_empty() {
-            assert!(src_rem.len() < 8 * 4);
-            assert!(rem.len() < 8 * 4);
-            assert_eq!(src_rem.len(), rem.len());
-
-            let mut buffer: [u16; 8 * 4] = [0u16; 8 * 4];
-            let mut dst_buffer: [u16; 8 * 4] = [0u16; 8 * 4];
-            std::ptr::copy_nonoverlapping(src_rem.as_ptr(), buffer.as_mut_ptr(), src_rem.len());
-
-            self.premultiply_chunk(
-                dst_buffer.as_mut_slice(),
-                buffer.as_slice(),
-                recip_bit_depth,
-            );
-
-            std::ptr::copy_nonoverlapping(dst_buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
-        }
-    }
-}
-
-#[derive(Default)]
 struct NeonPremultiplyExecutorAnyBitDepth {}
 
 impl NeonPremultiplyExecutor for NeonPremultiplyExecutorAnyBitDepth {
@@ -267,26 +202,6 @@ impl NeonPremultiplyExecutor for NeonPremultiplyExecutorAnyBitDepth {
 
 fn neon_premultiply_alpha_rgba_row_u16(dst: &mut [u16], src: &[u16], bit_depth: usize) {
     assert_ne!(bit_depth, 0, "Something goes wrong!");
-
-    if std::arch::is_aarch64_feature_detected!("fp16") {
-        if bit_depth == 10 {
-            neon_pa_dispatch(
-                dst,
-                src,
-                bit_depth,
-                NeonPremultiplyExecutorFloat16::<10>::default(),
-            );
-            return;
-        } else if bit_depth == 12 {
-            neon_pa_dispatch(
-                dst,
-                src,
-                bit_depth,
-                NeonPremultiplyExecutorFloat16::<12>::default(),
-            );
-            return;
-        }
-    }
 
     if bit_depth == 10 {
         neon_pa_dispatch(
@@ -379,7 +294,7 @@ unsafe fn v_scale_by_alpha(
     let new_ll = vcvtaq_u32_f32(vmulq_f32(low_px, low_low_a));
     let new_lh = vcvtaq_u32_f32(vmulq_f32(high_px, low_high_a));
 
-    vcombine_u16(vmovn_u32(new_ll), vmovn_u32(new_lh))
+    vcombine_u16(vqmovn_u32(new_ll), vqmovn_u32(new_lh))
 }
 
 trait DisassociateAlpha {
@@ -391,7 +306,7 @@ struct NeonDisassociateAlpha {}
 
 impl DisassociateAlpha for NeonDisassociateAlpha {
     unsafe fn disassociate(&self, in_place: &mut [u16], bit_depth: usize) {
-        let max_colors = (1 << bit_depth) - 1;
+        let max_colors = (1i32 << bit_depth) - 1;
 
         let mut rem = in_place;
 

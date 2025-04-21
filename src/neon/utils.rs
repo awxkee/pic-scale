@@ -276,3 +276,9 @@ pub(crate) unsafe fn xvld1q_u32_x2(a: *const u32) -> uint32x4x2_t {
     let v1 = vld1q_u32(a.add(4));
     uint32x4x2_t(v0, v1)
 }
+
+#[inline(always)]
+pub(crate) unsafe fn xvst1q_u32_x2(a: *mut u32, b: uint32x4x2_t) {
+    vst1q_u32(a, b.0);
+    vst1q_u32(a.add(4), b.1);
+}

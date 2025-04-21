@@ -28,7 +28,9 @@
  */
 use crate::filter_weights::FilterBounds;
 use crate::neon::ar30::{vunzip_3_ar30, vzip_4_ar30};
+use crate::neon::utils::{xvld1q_u32_x2, xvst1q_u32_x2};
 use std::arch::aarch64::*;
+
 #[inline(always)]
 pub(crate) fn neon_column_handler_fixed_point_ar30<
     const AR30_TYPE: usize,
@@ -83,7 +85,7 @@ unsafe fn neon_column_handler_fixed_point_ar30_impl<
                 let offset = src_stride * py + v_start_px;
                 let src_ptr = src.get_unchecked(offset..(offset + 8 * 4));
 
-                let ps = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(vld1q_u32_x2(
+                let ps = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(xvld1q_u32_x2(
                     src_ptr.as_ptr() as *const _
                 ));
                 v0 = vqdmlal_s16(v0, vget_low_s16(ps.0), vget_low_s16(weight));
@@ -113,7 +115,7 @@ unsafe fn neon_column_handler_fixed_point_ar30_impl<
                 vreinterpretq_s16_u16(b_v),
                 vdupq_n_s16(3),
             ));
-            vst1q_u32_x2(v_dst.as_mut_ptr() as *mut _, vals);
+            xvst1q_u32_x2(v_dst.as_mut_ptr() as *mut _, vals);
         }
 
         cx += 8;
@@ -144,7 +146,7 @@ unsafe fn neon_column_handler_fixed_point_ar30_impl<
 
             std::ptr::copy_nonoverlapping(src_ptr.as_ptr(), src_transient.as_mut_ptr(), diff * 4);
 
-            let ps = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(vld1q_u32_x2(
+            let ps = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(xvld1q_u32_x2(
                 src_transient.as_ptr() as *const _
             ));
             v0 = vqdmlal_s16(v0, vget_low_s16(ps.0), vget_low_s16(weight));
@@ -172,7 +174,7 @@ unsafe fn neon_column_handler_fixed_point_ar30_impl<
             vreinterpretq_s16_u16(b_v),
             vdupq_n_s16(3),
         ));
-        vst1q_u32_x2(dst_transient.as_mut_ptr() as *mut _, vals);
+        xvst1q_u32_x2(dst_transient.as_mut_ptr() as *mut _, vals);
 
         let v_dst = dst.get_unchecked_mut(v_start_px..(v_start_px + diff * 4));
         std::ptr::copy_nonoverlapping(dst_transient.as_ptr(), v_dst.as_mut_ptr(), diff * 4);

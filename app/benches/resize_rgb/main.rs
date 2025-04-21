@@ -96,7 +96,32 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    c.bench_function("Pic scale RGB10 without alpha: Lanczos 3", |b| {
+    c.bench_function("Pic scale RGB16: Lanczos 3", |b| {
+        let mut copied: Vec<u16> = Vec::from(
+            src_bytes
+                .iter()
+                .map(|&x| u16::from_ne_bytes([x, x]))
+                .collect::<Vec<_>>(),
+        );
+        b.iter(|| {
+            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+            scaler.set_threading_policy(ThreadingPolicy::Single);
+            let store = ImageStore::<u16, 3>::from_slice(
+                &mut copied,
+                dimensions.0 as usize,
+                dimensions.1 as usize,
+            )
+            .unwrap();
+            let mut target = ImageStoreMut::alloc_with_depth(
+                dimensions.0 as usize / 4,
+                dimensions.1 as usize / 4,
+                16,
+            );
+            _ = scaler.resize_rgb_u16(&store, &mut target);
+        })
+    });
+
+    c.bench_function("Pic scale RGB10: Lanczos 3", |b| {
         let mut copied: Vec<u16> = Vec::from(
             src_bytes
                 .iter()

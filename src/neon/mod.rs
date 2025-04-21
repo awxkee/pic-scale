@@ -111,7 +111,6 @@ pub(crate) use cbcr8_rdm::{
 pub(crate) use check_alpha::{
     neon_has_non_constant_cap_alpha_rgba16, neon_has_non_constant_cap_alpha_rgba8,
 };
-pub(crate) use f16_utils::*;
 pub(crate) use horizontal_ar30::{
     neon_convolve_horizontal_rgba_rows_4_ar30, neon_convolve_horizontal_rgba_rows_ar30,
 };
