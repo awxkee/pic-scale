@@ -42,7 +42,7 @@ use rayon::ThreadPool;
 #[inline]
 /// Divides value by 255 with rounding to nearest
 pub(crate) fn div_by_255(v: u16) -> u8 {
-    ((((v + 0x80) >> 8) + v + 0x80) >> 8).min(255) as u8
+    ((((v + 0x80) >> 8) + v + 0x80) >> 8) as u8
 }
 
 #[inline]
