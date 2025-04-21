@@ -35,8 +35,6 @@ use crate::avx2::{
     convolve_vertical_avx_row_f16,
 };
 use crate::convolution::{ConvolutionOptions, HorizontalConvolutionPass, VerticalConvolutionPass};
-#[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
-use crate::cpu_features::{is_aarch_f16_supported, is_aarch_f16c_supported};
 use crate::dispatch_group_f16::{convolve_horizontal_dispatch_f16, convolve_vertical_dispatch_f16};
 use crate::filter_weights::{FilterBounds, FilterWeights, PasshroughWeightsConverter};
 use crate::floating_point_horizontal::{
@@ -127,33 +125,31 @@ impl HorizontalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
             convolve_horizontal_rgb_native_row_f16::<4>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            if is_aarch_f16c_supported() {
-                _dispatcher_4_rows = Some(convolve_horizontal_rgba_neon_rows_4_f16);
-                _dispatcher_row = convolve_horizontal_rgba_neon_row_one_f16;
-                match _options.workload_strategy {
-                    crate::WorkloadStrategy::PreferSpeed => {
-                        if is_aarch_f16_supported() {
-                            _dispatcher_4_rows = Some(xconvolve_horizontal_rgba_neon_rows_4_f16);
-                            _dispatcher_row = xconvolve_horizontal_rgba_neon_row_one_f16;
-                        }
+            _dispatcher_4_rows = Some(convolve_horizontal_rgba_neon_rows_4_f16);
+            _dispatcher_row = convolve_horizontal_rgba_neon_row_one_f16;
+            match _options.workload_strategy {
+                crate::WorkloadStrategy::PreferSpeed => {
+                    if std::arch::is_aarch64_feature_detected!("fp16") {
+                        _dispatcher_4_rows = Some(xconvolve_horizontal_rgba_neon_rows_4_f16);
+                        _dispatcher_row = xconvolve_horizontal_rgba_neon_row_one_f16;
                     }
-                    crate::WorkloadStrategy::PreferQuality => {
-                        if std::arch::is_aarch64_feature_detected!("fhm") {
-                            use crate::filter_weights::WeightFloat16Converter;
-                            use crate::neon::{
-                                convolve_horizontal_rgba_neon_row_one_f16_fhm,
-                                convolve_horizontal_rgba_neon_rows_4_f16_fhm,
-                            };
-                            return convolve_horizontal_dispatch_f16(
-                                self,
-                                filter_weights,
-                                destination,
-                                pool,
-                                Some(convolve_horizontal_rgba_neon_rows_4_f16_fhm),
-                                convolve_horizontal_rgba_neon_row_one_f16_fhm,
-                                WeightFloat16Converter::default(),
-                            );
-                        }
+                }
+                crate::WorkloadStrategy::PreferQuality => {
+                    if std::arch::is_aarch64_feature_detected!("fhm") {
+                        use crate::filter_weights::WeightFloat16Converter;
+                        use crate::neon::{
+                            convolve_horizontal_rgba_neon_row_one_f16_fhm,
+                            convolve_horizontal_rgba_neon_rows_4_f16_fhm,
+                        };
+                        return convolve_horizontal_dispatch_f16(
+                            self,
+                            filter_weights,
+                            destination,
+                            pool,
+                            Some(convolve_horizontal_rgba_neon_rows_4_f16_fhm),
+                            convolve_horizontal_rgba_neon_row_one_f16_fhm,
+                            WeightFloat16Converter::default(),
+                        );
                     }
                 }
             }
@@ -232,27 +228,25 @@ impl VerticalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
             convolve_vertical_rgb_native_row_f16;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            if is_aarch_f16c_supported() {
-                _dispatcher = convolve_vertical_rgb_neon_row_f16;
-                match _options.workload_strategy {
-                    crate::WorkloadStrategy::PreferQuality => {
-                        use crate::filter_weights::WeightFloat16Converter;
-                        use crate::neon::convolve_vertical_rgb_neon_row_f16_fhm;
-                        if std::arch::is_aarch64_feature_detected!("fhm") {
-                            return convolve_vertical_dispatch_f16(
-                                self,
-                                filter_weights,
-                                destination,
-                                pool,
-                                convolve_vertical_rgb_neon_row_f16_fhm,
-                                WeightFloat16Converter {},
-                            );
-                        }
+            _dispatcher = convolve_vertical_rgb_neon_row_f16;
+            match _options.workload_strategy {
+                crate::WorkloadStrategy::PreferQuality => {
+                    use crate::filter_weights::WeightFloat16Converter;
+                    use crate::neon::convolve_vertical_rgb_neon_row_f16_fhm;
+                    if std::arch::is_aarch64_feature_detected!("fhm") {
+                        return convolve_vertical_dispatch_f16(
+                            self,
+                            filter_weights,
+                            destination,
+                            pool,
+                            convolve_vertical_rgb_neon_row_f16_fhm,
+                            WeightFloat16Converter {},
+                        );
                     }
-                    crate::WorkloadStrategy::PreferSpeed => {
-                        if is_aarch_f16_supported() {
-                            _dispatcher = xconvolve_vertical_rgb_neon_row_f16;
-                        }
+                }
+                crate::WorkloadStrategy::PreferSpeed => {
+                    if std::arch::is_aarch64_feature_detected!("fp16") {
+                        _dispatcher = xconvolve_vertical_rgb_neon_row_f16;
                     }
                 }
             }
@@ -306,10 +300,8 @@ impl HorizontalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
             convolve_horizontal_rgb_native_row_f16::<3>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            if is_aarch_f16c_supported() {
-                _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rows_4_f16);
-                _dispatcher_row = convolve_horizontal_rgb_neon_row_one_f16;
-            }
+            _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rows_4_f16);
+            _dispatcher_row = convolve_horizontal_rgb_neon_row_one_f16;
             match _options.workload_strategy {
                 crate::WorkloadStrategy::PreferQuality => {
                     if std::arch::is_aarch64_feature_detected!("fhm") {
@@ -330,7 +322,7 @@ impl HorizontalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
                     }
                 }
                 crate::WorkloadStrategy::PreferSpeed => {
-                    if is_aarch_f16_supported()
+                    if std::arch::is_aarch64_feature_detected!("fp16")
                         && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
                     {
                         _dispatcher_4_rows = Some(xconvolve_horizontal_rgb_neon_rows_4_f16);
@@ -382,27 +374,25 @@ impl VerticalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
             convolve_vertical_rgb_native_row_f16;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            if is_aarch_f16c_supported() {
-                _dispatcher = convolve_vertical_rgb_neon_row_f16;
-                match _options.workload_strategy {
-                    crate::WorkloadStrategy::PreferQuality => {
-                        use crate::filter_weights::WeightFloat16Converter;
-                        use crate::neon::convolve_vertical_rgb_neon_row_f16_fhm;
-                        if std::arch::is_aarch64_feature_detected!("fhm") {
-                            return convolve_vertical_dispatch_f16(
-                                self,
-                                filter_weights,
-                                destination,
-                                pool,
-                                convolve_vertical_rgb_neon_row_f16_fhm,
-                                WeightFloat16Converter {},
-                            );
-                        }
+            _dispatcher = convolve_vertical_rgb_neon_row_f16;
+            match _options.workload_strategy {
+                crate::WorkloadStrategy::PreferQuality => {
+                    use crate::filter_weights::WeightFloat16Converter;
+                    use crate::neon::convolve_vertical_rgb_neon_row_f16_fhm;
+                    if std::arch::is_aarch64_feature_detected!("fhm") {
+                        return convolve_vertical_dispatch_f16(
+                            self,
+                            filter_weights,
+                            destination,
+                            pool,
+                            convolve_vertical_rgb_neon_row_f16_fhm,
+                            WeightFloat16Converter {},
+                        );
                     }
-                    crate::WorkloadStrategy::PreferSpeed => {
-                        if is_aarch_f16_supported() {
-                            _dispatcher = xconvolve_vertical_rgb_neon_row_f16;
-                        }
+                }
+                crate::WorkloadStrategy::PreferSpeed => {
+                    if std::arch::is_aarch64_feature_detected!("fp16") {
+                        _dispatcher = xconvolve_vertical_rgb_neon_row_f16;
                     }
                 }
             }
@@ -478,27 +468,25 @@ impl VerticalConvolutionPass<f16, 1> for ImageStore<'_, f16, 1> {
             convolve_vertical_rgb_native_row_f16;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            if is_aarch_f16c_supported() {
-                _dispatcher = convolve_vertical_rgb_neon_row_f16;
-                match _options.workload_strategy {
-                    crate::WorkloadStrategy::PreferQuality => {
-                        use crate::filter_weights::WeightFloat16Converter;
-                        use crate::neon::convolve_vertical_rgb_neon_row_f16_fhm;
-                        if std::arch::is_aarch64_feature_detected!("fhm") {
-                            return convolve_vertical_dispatch_f16(
-                                self,
-                                filter_weights,
-                                destination,
-                                pool,
-                                convolve_vertical_rgb_neon_row_f16_fhm,
-                                WeightFloat16Converter {},
-                            );
-                        }
+            _dispatcher = convolve_vertical_rgb_neon_row_f16;
+            match _options.workload_strategy {
+                crate::WorkloadStrategy::PreferQuality => {
+                    use crate::filter_weights::WeightFloat16Converter;
+                    use crate::neon::convolve_vertical_rgb_neon_row_f16_fhm;
+                    if std::arch::is_aarch64_feature_detected!("fhm") {
+                        return convolve_vertical_dispatch_f16(
+                            self,
+                            filter_weights,
+                            destination,
+                            pool,
+                            convolve_vertical_rgb_neon_row_f16_fhm,
+                            WeightFloat16Converter {},
+                        );
                     }
-                    crate::WorkloadStrategy::PreferSpeed => {
-                        if is_aarch_f16_supported() {
-                            _dispatcher = xconvolve_vertical_rgb_neon_row_f16;
-                        }
+                }
+                crate::WorkloadStrategy::PreferSpeed => {
+                    if std::arch::is_aarch64_feature_detected!("fp16") {
+                        _dispatcher = xconvolve_vertical_rgb_neon_row_f16;
                     }
                 }
             }
@@ -574,27 +562,25 @@ impl VerticalConvolutionPass<f16, 2> for ImageStore<'_, f16, 2> {
             convolve_vertical_rgb_native_row_f16;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            if is_aarch_f16c_supported() {
-                _dispatcher = convolve_vertical_rgb_neon_row_f16;
-                match _options.workload_strategy {
-                    crate::WorkloadStrategy::PreferQuality => {
-                        use crate::filter_weights::WeightFloat16Converter;
-                        use crate::neon::convolve_vertical_rgb_neon_row_f16_fhm;
-                        if std::arch::is_aarch64_feature_detected!("fhm") {
-                            return convolve_vertical_dispatch_f16(
-                                self,
-                                filter_weights,
-                                destination,
-                                pool,
-                                convolve_vertical_rgb_neon_row_f16_fhm,
-                                WeightFloat16Converter {},
-                            );
-                        }
+            _dispatcher = convolve_vertical_rgb_neon_row_f16;
+            match _options.workload_strategy {
+                crate::WorkloadStrategy::PreferQuality => {
+                    use crate::filter_weights::WeightFloat16Converter;
+                    use crate::neon::convolve_vertical_rgb_neon_row_f16_fhm;
+                    if std::arch::is_aarch64_feature_detected!("fhm") {
+                        return convolve_vertical_dispatch_f16(
+                            self,
+                            filter_weights,
+                            destination,
+                            pool,
+                            convolve_vertical_rgb_neon_row_f16_fhm,
+                            WeightFloat16Converter {},
+                        );
                     }
-                    crate::WorkloadStrategy::PreferSpeed => {
-                        if is_aarch_f16_supported() {
-                            _dispatcher = xconvolve_vertical_rgb_neon_row_f16;
-                        }
+                }
+                crate::WorkloadStrategy::PreferSpeed => {
+                    if std::arch::is_aarch64_feature_detected!("fp16") {
+                        _dispatcher = xconvolve_vertical_rgb_neon_row_f16;
                     }
                 }
             }

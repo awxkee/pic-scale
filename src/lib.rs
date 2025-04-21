@@ -71,7 +71,6 @@ mod color_group;
 mod colors;
 mod convolution;
 mod convolve_naive_f32;
-mod cpu_features;
 mod dispatch_group_ar30;
 #[cfg(feature = "nightly_f16")]
 mod dispatch_group_f16;
