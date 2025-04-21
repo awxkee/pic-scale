@@ -36,7 +36,7 @@ use crate::avx2::{
 };
 use crate::convolution::{ConvolutionOptions, HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::dispatch_group_f16::{convolve_horizontal_dispatch_f16, convolve_vertical_dispatch_f16};
-use crate::filter_weights::{FilterBounds, FilterWeights, PasshroughWeightsConverter};
+use crate::filter_weights::{FilterBounds, FilterWeights, PassthroughWeightsConverter};
 use crate::floating_point_horizontal::{
     convolve_row_handler_floating_point, convolve_row_handler_floating_point_4,
 };
@@ -187,7 +187,7 @@ impl HorizontalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
             pool,
             _dispatcher_4_rows,
             _dispatcher_row,
-            PasshroughWeightsConverter::default(),
+            PassthroughWeightsConverter::default(),
         );
     }
 }
@@ -278,7 +278,7 @@ impl VerticalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
             destination,
             pool,
             _dispatcher,
-            PasshroughWeightsConverter {},
+            PassthroughWeightsConverter {},
         );
     }
 }
@@ -356,7 +356,7 @@ impl HorizontalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
             pool,
             _dispatcher_4_rows,
             _dispatcher_row,
-            PasshroughWeightsConverter::default(),
+            PassthroughWeightsConverter::default(),
         );
     }
 }
@@ -424,7 +424,7 @@ impl VerticalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
             destination,
             pool,
             _dispatcher,
-            PasshroughWeightsConverter::default(),
+            PassthroughWeightsConverter::default(),
         );
     }
 }
@@ -450,7 +450,7 @@ impl HorizontalConvolutionPass<f16, 1> for ImageStore<'_, f16, 1> {
             pool,
             _dispatcher_4_rows,
             _dispatcher_row,
-            PasshroughWeightsConverter::default(),
+            PassthroughWeightsConverter::default(),
         );
     }
 }
@@ -518,7 +518,7 @@ impl VerticalConvolutionPass<f16, 1> for ImageStore<'_, f16, 1> {
             destination,
             pool,
             _dispatcher,
-            PasshroughWeightsConverter::default(),
+            PassthroughWeightsConverter::default(),
         );
     }
 }
@@ -544,7 +544,7 @@ impl HorizontalConvolutionPass<f16, 2> for ImageStore<'_, f16, 2> {
             pool,
             _dispatcher_4_rows,
             _dispatcher_row,
-            PasshroughWeightsConverter::default(),
+            PassthroughWeightsConverter::default(),
         );
     }
 }
@@ -612,7 +612,7 @@ impl VerticalConvolutionPass<f16, 2> for ImageStore<'_, f16, 2> {
             destination,
             pool,
             _dispatcher,
-            PasshroughWeightsConverter::default(),
+            PassthroughWeightsConverter::default(),
         );
     }
 }

@@ -151,10 +151,10 @@ where
 
 #[derive(Default)]
 #[cfg(feature = "nightly_f16")]
-pub(crate) struct PasshroughWeightsConverter {}
+pub(crate) struct PassthroughWeightsConverter {}
 
 #[cfg(feature = "nightly_f16")]
-impl WeightsConverter<f32> for PasshroughWeightsConverter {
+impl WeightsConverter<f32> for PassthroughWeightsConverter {
     fn prepare_weights(&self, weights: &FilterWeights<f32>) -> FilterWeights<f32> {
         weights.clone()
     }
