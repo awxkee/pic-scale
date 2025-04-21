@@ -32,7 +32,7 @@ use std::arch::aarch64::*;
 use core::f16;
 
 use crate::filter_weights::FilterWeights;
-use crate::neon::*;
+use crate::neon::f16_utils::*;
 
 macro_rules! write_rgb_f16 {
     ($store: expr, $dest_ptr: expr) => {{

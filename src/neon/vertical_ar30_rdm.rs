@@ -29,9 +29,10 @@
 use crate::filter_weights::FilterBounds;
 use crate::fixed_point_vertical_ar30::convolve_column_handler_fip_db_ar30;
 use crate::neon::ar30::{vunzip_3_ar30, vzip_4_ar30};
+use crate::neon::utils::{xvld1q_u32_x2, xvst1q_u32_x2};
 use std::arch::aarch64::{
-    int16x8x4_t, vdupq_n_s16, vld1q_u32_x2, vmaxq_s16, vminq_s16, vqrdmlahq_s16, vqrdmulhq_s16,
-    vrshrq_n_s16, vshlq_n_s16, vst1q_u32_x2,
+    int16x8x4_t, vdupq_n_s16, vmaxq_s16, vminq_s16, vqrdmlahq_s16, vqrdmulhq_s16, vrshrq_n_s16,
+    vshlq_n_s16,
 };
 
 #[inline(always)]
@@ -85,7 +86,7 @@ unsafe fn neon_column_handler_fixed_point_ar30_impl<
             let src_ptr = src.get_unchecked(offset..(offset + 8));
 
             let ps =
-                vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(vld1q_u32_x2(src_ptr.as_ptr() as *const _));
+                vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(xvld1q_u32_x2(src_ptr.as_ptr() as *const _));
             let mut v0 = vqrdmulhq_s16(vshlq_n_s16::<PREC>(ps.0), weight);
             let mut v1 = vqrdmulhq_s16(vshlq_n_s16::<PREC>(ps.1), weight);
             let mut v2 = vqrdmulhq_s16(vshlq_n_s16::<PREC>(ps.2), weight);
@@ -97,7 +98,7 @@ unsafe fn neon_column_handler_fixed_point_ar30_impl<
 
                 let v_weight1 = vdupq_n_s16(weights[1]);
 
-                let ps1 = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(vld1q_u32_x2(
+                let ps1 = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(xvld1q_u32_x2(
                     src_ptr1.as_ptr() as *const _
                 ));
                 v0 = vqrdmlahq_s16(v0, vshlq_n_s16::<PREC>(ps1.0), v_weight1);
@@ -112,13 +113,13 @@ unsafe fn neon_column_handler_fixed_point_ar30_impl<
                 let v_weight1 = vdupq_n_s16(weights[1]);
                 let v_weight2 = vdupq_n_s16(weights[2]);
 
-                let ps1 = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(vld1q_u32_x2(
+                let ps1 = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(xvld1q_u32_x2(
                     src_ptr1.as_ptr() as *const _
                 ));
                 v0 = vqrdmlahq_s16(v0, vshlq_n_s16::<PREC>(ps1.0), v_weight1);
                 v1 = vqrdmlahq_s16(v1, vshlq_n_s16::<PREC>(ps1.1), v_weight1);
                 v2 = vqrdmlahq_s16(v2, vshlq_n_s16::<PREC>(ps1.2), v_weight1);
-                let ps2 = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(vld1q_u32_x2(
+                let ps2 = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(xvld1q_u32_x2(
                     src_ptr2.as_ptr() as *const _
                 ));
                 v0 = vqrdmlahq_s16(v0, vshlq_n_s16::<PREC>(ps2.0), v_weight2);
@@ -135,19 +136,19 @@ unsafe fn neon_column_handler_fixed_point_ar30_impl<
                 let v_weight2 = vdupq_n_s16(weights[2]);
                 let v_weight3 = vdupq_n_s16(weights[3]);
 
-                let ps1 = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(vld1q_u32_x2(
+                let ps1 = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(xvld1q_u32_x2(
                     src_ptr1.as_ptr() as *const _
                 ));
                 v0 = vqrdmlahq_s16(v0, vshlq_n_s16::<PREC>(ps1.0), v_weight1);
                 v1 = vqrdmlahq_s16(v1, vshlq_n_s16::<PREC>(ps1.1), v_weight1);
                 v2 = vqrdmlahq_s16(v2, vshlq_n_s16::<PREC>(ps1.2), v_weight1);
-                let ps2 = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(vld1q_u32_x2(
+                let ps2 = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(xvld1q_u32_x2(
                     src_ptr2.as_ptr() as *const _
                 ));
                 v0 = vqrdmlahq_s16(v0, vshlq_n_s16::<PREC>(ps2.0), v_weight2);
                 v1 = vqrdmlahq_s16(v1, vshlq_n_s16::<PREC>(ps2.1), v_weight2);
                 v2 = vqrdmlahq_s16(v2, vshlq_n_s16::<PREC>(ps2.2), v_weight2);
-                let ps3 = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(vld1q_u32_x2(
+                let ps3 = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(xvld1q_u32_x2(
                     src_ptr3.as_ptr() as *const _
                 ));
                 v0 = vqrdmlahq_s16(v0, vshlq_n_s16::<PREC>(ps3.0), v_weight3);
@@ -161,8 +162,8 @@ unsafe fn neon_column_handler_fixed_point_ar30_impl<
                     let offset = src_stride * py + v_start_px;
                     let src_ptr = src.get_unchecked(offset..(offset + 8 * 4));
 
-                    let ps = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(vld1q_u32_x2(
-                        src_ptr.as_ptr() as *const _
+                    let ps = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(xvld1q_u32_x2(
+                        src_ptr.as_ptr() as *const _,
                     ));
                     v0 = vqrdmlahq_s16(v0, vshlq_n_s16::<PREC>(ps.0), weight);
                     v1 = vqrdmlahq_s16(v1, vshlq_n_s16::<PREC>(ps.1), weight);
@@ -182,7 +183,7 @@ unsafe fn neon_column_handler_fixed_point_ar30_impl<
 
             let vals =
                 vzip_4_ar30::<AR30_TYPE, AR30_ORDER>(int16x8x4_t(v0, v1, v2, vdupq_n_s16(3)));
-            vst1q_u32_x2(v_dst.as_mut_ptr() as *mut _, vals);
+            xvst1q_u32_x2(v_dst.as_mut_ptr() as *mut _, vals);
         }
 
         cx += 8;

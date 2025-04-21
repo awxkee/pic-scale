@@ -111,7 +111,6 @@ pub(crate) use cbcr8_rdm::{
 pub(crate) use check_alpha::{
     neon_has_non_constant_cap_alpha_rgba16, neon_has_non_constant_cap_alpha_rgba8,
 };
-pub(crate) use f16_utils::*;
 pub(crate) use horizontal_ar30::{
     neon_convolve_horizontal_rgba_rows_4_ar30, neon_convolve_horizontal_rgba_rows_ar30,
 };
@@ -119,7 +118,7 @@ pub(crate) use horizontal_ar30::{
 pub(crate) use horizontal_ar30_rdm::neon_convolve_horizontal_rgba_rows_4_ar30_rdm;
 pub(crate) use plane_f32::convolve_horizontal_plane_neon_row_one;
 pub(crate) use plane_f32::convolve_horizontal_plane_neon_rows_4;
-pub use plane_u8::{
+pub(crate) use plane_u8::{
     convolve_horizontal_plane_neon_row, convolve_horizontal_plane_neon_row_q,
     convolve_horizontal_plane_neon_rows_4_u8, convolve_horizontal_plane_neon_rows_4_u8_q,
 };

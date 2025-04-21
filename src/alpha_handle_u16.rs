@@ -109,10 +109,18 @@ pub(crate) fn unpremultiply_alpha_rgba_row(in_place: &mut [u16], max_colors: u32
         let a = dst[3] as u32;
         if a != 0 {
             let a_recip = 1. / a as f32;
-            dst[0] = ((dst[0] as u32 * max_colors) as f32 * a_recip) as u16;
-            dst[1] = ((dst[1] as u32 * max_colors) as f32 * a_recip) as u16;
-            dst[2] = ((dst[2] as u32 * max_colors) as f32 * a_recip) as u16;
-            dst[3] = ((a * max_colors) as f32 * a_recip) as u16;
+            dst[0] = ((dst[0] as u32 * max_colors) as f32 * a_recip)
+                .round()
+                .min(max_colors as f32) as u16;
+            dst[1] = ((dst[1] as u32 * max_colors) as f32 * a_recip)
+                .round()
+                .min(max_colors as f32) as u16;
+            dst[2] = ((dst[2] as u32 * max_colors) as f32 * a_recip)
+                .round()
+                .min(max_colors as f32) as u16;
+            dst[3] = ((a * max_colors) as f32 * a_recip)
+                .round()
+                .min(max_colors as f32) as u16;
         }
     }
 }
