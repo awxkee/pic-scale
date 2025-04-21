@@ -28,13 +28,12 @@
  */
 
 use crate::filter_weights::FilterWeights;
-use crate::neon::f16_utils::xvcvt_f16_f32;
+use crate::neon::f16_utils::{
+    xvcvt_f16_f32, xvcvt_f32_f16, xvget_high_f16, xvget_low_f16, xvld_f16, xvldq_f16, xvldq_f16_x2,
+    xvldq_f16_x4, xvst_f16,
+};
 use crate::neon::utils::{
     prefer_vfmaq_f32, prefer_vfmaq_lane_f32, prefer_vfmaq_laneq_f32, xvld1q_f32_x2,
-};
-use crate::neon::{
-    xvcvt_f32_f16, xvget_high_f16, xvget_low_f16, xvld_f16, xvldq_f16, xvldq_f16_x2, xvldq_f16_x4,
-    xvst_f16,
 };
 use core::f16;
 use std::arch::aarch64::*;

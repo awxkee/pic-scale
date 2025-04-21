@@ -90,7 +90,7 @@ unsafe fn accumulate_1_horiz<const D: bool>(
     vxmlal_s16::<D>(store, px_16, weight)
 }
 
-pub fn convolve_horizontal_plane_neon_rows_4_u8(
+pub(crate) fn convolve_horizontal_plane_neon_rows_4_u8(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -106,7 +106,7 @@ pub fn convolve_horizontal_plane_neon_rows_4_u8(
     );
 }
 
-pub fn convolve_horizontal_plane_neon_rows_4_u8_q(
+pub(crate) fn convolve_horizontal_plane_neon_rows_4_u8_q(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -271,7 +271,7 @@ fn convolve_horizontal_plane_neon_rows_4_u8_impl<const D: bool, const PRECISION:
     }
 }
 
-pub fn convolve_horizontal_plane_neon_row(
+pub(crate) fn convolve_horizontal_plane_neon_row(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
@@ -279,7 +279,7 @@ pub fn convolve_horizontal_plane_neon_row(
     convolve_horizontal_plane_neon_row_impl::<false, PRECISION>(src, dst, filter_weights);
 }
 
-pub fn convolve_horizontal_plane_neon_row_q(
+pub(crate) fn convolve_horizontal_plane_neon_row_q(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,

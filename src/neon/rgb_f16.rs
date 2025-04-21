@@ -28,8 +28,8 @@
  */
 
 use crate::filter_weights::FilterWeights;
+use crate::neon::f16_utils::*;
 use crate::neon::utils::{prefer_vfmaq_f32, prefer_vfmaq_lane_f32, prefer_vfmaq_laneq_f32};
-use crate::neon::*;
 use core::f16;
 use std::arch::aarch64::*;
 

@@ -29,8 +29,8 @@
 use std::arch::aarch64::{vdupq_n_f32, vld1q_dup_f32};
 
 use crate::filter_weights::FilterBounds;
+use crate::neon::f16_utils::*;
 use crate::neon::utils::prefer_vfmaq_f32;
-use crate::neon::*;
 use core::f16;
 
 #[inline(always)]

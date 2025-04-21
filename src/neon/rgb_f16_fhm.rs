@@ -28,7 +28,7 @@
  */
 
 use crate::filter_weights::FilterWeights;
-use crate::neon::*;
+use crate::neon::f16_utils::*;
 use core::f16;
 use std::arch::aarch64::*;
 

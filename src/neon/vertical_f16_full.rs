@@ -29,7 +29,7 @@
 use std::arch::aarch64::*;
 
 use crate::filter_weights::FilterBounds;
-use crate::neon::*;
+use crate::neon::f16_utils::*;
 use core::f16;
 
 #[inline(always)]
