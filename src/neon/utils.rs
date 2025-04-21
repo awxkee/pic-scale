@@ -258,7 +258,7 @@ pub(crate) unsafe fn vxmlal_high_laneq_s16<const D: bool, const LANE: i32>(
 }
 
 #[inline(always)]
-pub unsafe fn vxmlal_laneq_s16<const D: bool, const LANE: i32>(
+pub(crate) unsafe fn vxmlal_laneq_s16<const D: bool, const LANE: i32>(
     a: int32x4_t,
     b: int16x4_t,
     c: int16x8_t,
@@ -268,4 +268,11 @@ pub unsafe fn vxmlal_laneq_s16<const D: bool, const LANE: i32>(
     } else {
         vmlal_laneq_s16::<LANE>(a, b, c)
     }
+}
+
+#[inline(always)]
+pub(crate) unsafe fn xvld1q_u32_x2(a: *const u32) -> uint32x4x2_t {
+    let v0 = vld1q_u32(a);
+    let v1 = vld1q_u32(a.add(4));
+    uint32x4x2_t(v0, v1)
 }

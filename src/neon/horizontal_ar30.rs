@@ -30,6 +30,7 @@ use crate::filter_weights::FilterWeights;
 use crate::neon::ar30::{
     vextract_ar30, vld1_ar30_s16, vunzip_3_ar30_separate, vunzips_4_ar30_separate,
 };
+use crate::neon::utils::xvld1q_u32_x2;
 use std::arch::aarch64::*;
 
 #[inline]
@@ -54,7 +55,7 @@ unsafe fn conv_horiz_rgba_8_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
     let src_ptr = src.get_unchecked(start_x * 4..);
 
     let rgba_pixel =
-        vunzip_3_ar30_separate::<AR_TYPE, AR_ORDER>(vld1q_u32_x2(src_ptr.as_ptr() as *const _));
+        vunzip_3_ar30_separate::<AR_TYPE, AR_ORDER>(xvld1q_u32_x2(src_ptr.as_ptr() as *const _));
 
     let mut v = vqdmlal_laneq_s16::<0>(store, vget_low_s16(rgba_pixel.0), w);
     v = vqdmlal_high_laneq_s16::<1>(v, rgba_pixel.1, w);
