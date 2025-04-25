@@ -212,7 +212,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_f32<const FMA: bool>(
     }
 
     let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-    _mm_storeu_si32(dst_ptr as *mut u8, _mm_castps_si128(store_0));
+    _mm_store_ss(dst_ptr, store_0);
 }
 
 pub(crate) fn convolve_vertical_rgb_sse_row_f32<const FMA: bool>(
