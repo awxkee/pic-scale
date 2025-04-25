@@ -410,36 +410,6 @@ pub(crate) unsafe fn _mm_udot8_epi16<const DOT: bool>(
     }
 }
 
-#[allow(dead_code)]
-#[inline(always)]
-pub(crate) unsafe fn _mm256_udot8_epi16<const DOT: bool>(
-    a: __m256i,
-    b: __m256i,
-    c: __m256i,
-) -> __m256i {
-    #[cfg(feature = "nightly_avx512")]
-    if DOT {
-        _mm256_dpbusd_avx_epi32(a, b, c)
-    } else {
-        _mm256_adds_epi16(a, _mm256_maddubs_epi16(b, c))
-    }
-    #[cfg(not(feature = "nightly_avx512"))]
-    _mm256_adds_epi16(a, _mm256_maddubs_epi16(b, c))
-}
-
-#[allow(dead_code)]
-#[inline(always)]
-pub(crate) unsafe fn _mm256_reduce_dot_epi16<const DOT: bool>(a: __m256i) -> __m128i {
-    #[cfg(feature = "nightly_avx512")]
-    if DOT {
-        _mm_add_epi32(_mm256_castsi256_si128(a), _mm256_extracti128_si256::<1>(a))
-    } else {
-        _mm_adds_epi16(_mm256_castsi256_si128(a), _mm256_extracti128_si256::<1>(a))
-    }
-    #[cfg(not(feature = "nightly_avx512"))]
-    _mm_adds_epi16(_mm256_castsi256_si128(a), _mm256_extracti128_si256::<1>(a))
-}
-
 #[inline]
 pub(crate) unsafe fn _mm256_prefer_fma_ps<const FMA: bool>(
     a: __m256,
