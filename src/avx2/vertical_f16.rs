@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::avx2::utils::{_mm256_fma_ps, avx_combine_epi};
+use crate::avx2::utils::{_mm256_fma_ps, _mm_prefer_fma_ps, avx_combine_epi};
 use crate::filter_weights::FilterBounds;
 use core::f16;
 #[cfg(target_arch = "x86")]
@@ -44,33 +44,28 @@ unsafe fn convolve_vertical_part_avx_f16<const FMA: bool>(
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
-    let mut store_0 = _mm256_setzero_ps();
+    let mut store_0 = _mm_setzero_ps();
 
     let px = start_x;
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = *filter.get_unchecked(j);
-        let v_weight = _mm256_set1_ps(weight);
+        let weight = filter.get_unchecked(j..);
+        let v_weight = _mm_load_ss(weight.as_ptr());
         let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
 
         let s_ptr = src_ptr.add(px);
-        let item_row_0 = _mm256_set1_epi16(s_ptr.read_unaligned().to_bits() as i16);
+        let item_row_0 = _mm_set1_epi16(s_ptr.read_unaligned().to_bits() as i16);
 
-        store_0 = _mm256_fma_ps::<FMA>(
-            store_0,
-            _mm256_cvtph_ps(_mm256_castsi256_si128(item_row_0)),
-            v_weight,
-        );
+        store_0 = _mm_prefer_fma_ps::<FMA>(store_0, _mm_cvtph_ps(item_row_0), v_weight);
     }
 
     let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
 
     const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT;
 
-    let converted = _mm256_cvtps_ph::<ROUNDING_FLAGS>(store_0);
-    let first_item = _mm_extract_epi16::<0>(converted) as u16;
-    (dst_ptr as *mut u16).write_unaligned(first_item);
+    let converted = _mm_cvtps_ph::<ROUNDING_FLAGS>(store_0);
+    _mm_storeu_si16(dst_ptr as *mut _, converted);
 }
 
 #[inline(always)]
