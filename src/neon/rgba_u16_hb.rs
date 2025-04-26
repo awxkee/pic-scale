@@ -41,7 +41,7 @@ unsafe fn conv_horiz_rgba_1_u16(
     const COMPONENTS: usize = 4;
     let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
     let rgba_pixel = vld1_u16(src_ptr.as_ptr());
-    let lo = vreinterpretq_s32_u32(vmovl_u16(rgba_pixel));
+    let lo = vreinterpretq_s32_u32(vshll_n_u16::<6>(rgba_pixel));
     vqrdmlahq_s32(store, lo, w0)
 }
 
@@ -59,10 +59,14 @@ unsafe fn conv_horiz_rgba_2_u16(
 
     let rgb_pixel = vld1q_u16(src_ptr.as_ptr());
 
-    let acc = vqrdmlahq_s32(store, vreinterpretq_s32_u32(vmovl_high_u16(rgb_pixel)), w1);
+    let acc = vqrdmlahq_s32(
+        store,
+        vreinterpretq_s32_u32(vshll_high_n_u16::<6>(rgb_pixel)),
+        w1,
+    );
     vqrdmlahq_s32(
         acc,
-        vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(rgb_pixel))),
+        vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(rgb_pixel))),
         w0,
     )
 }
@@ -83,16 +87,24 @@ unsafe fn conv_horiz_rgba_4_u16(
     let hi = rgba_pixel.1;
     let lo = rgba_pixel.0;
 
-    let acc = vqrdmlahq_laneq_s32::<3>(store, vreinterpretq_s32_u32(vmovl_high_u16(hi)), weights);
-    let acc = vqrdmlahq_laneq_s32::<2>(
-        acc,
-        vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(hi))),
+    let acc = vqrdmlahq_laneq_s32::<3>(
+        store,
+        vreinterpretq_s32_u32(vshll_high_n_u16::<6>(hi)),
         weights,
     );
-    let acc = vqrdmlahq_laneq_s32::<1>(acc, vreinterpretq_s32_u32(vmovl_high_u16(lo)), weights);
+    let acc = vqrdmlahq_laneq_s32::<2>(
+        acc,
+        vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(hi))),
+        weights,
+    );
+    let acc = vqrdmlahq_laneq_s32::<1>(
+        acc,
+        vreinterpretq_s32_u32(vshll_high_n_u16::<6>(lo)),
+        weights,
+    );
     vqrdmlahq_laneq_s32::<0>(
         acc,
-        vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(lo))),
+        vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(lo))),
         weights,
     )
 }
@@ -115,30 +127,45 @@ unsafe fn conv_horiz_rgba_8_u16(
     let hi1 = rgba_pixel.3;
     let lo1 = rgba_pixel.2;
 
-    let mut acc =
-        vqrdmlahq_laneq_s32::<3>(store, vreinterpretq_s32_u32(vmovl_high_u16(hi0)), weights.0);
-    acc = vqrdmlahq_laneq_s32::<2>(
-        acc,
-        vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(hi0))),
+    let mut acc = vqrdmlahq_laneq_s32::<3>(
+        store,
+        vreinterpretq_s32_u32(vshll_high_n_u16::<6>(hi0)),
         weights.0,
     );
-    acc = vqrdmlahq_laneq_s32::<1>(acc, vreinterpretq_s32_u32(vmovl_high_u16(lo0)), weights.0);
+    acc = vqrdmlahq_laneq_s32::<2>(
+        acc,
+        vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(hi0))),
+        weights.0,
+    );
+    acc = vqrdmlahq_laneq_s32::<1>(
+        acc,
+        vreinterpretq_s32_u32(vshll_high_n_u16::<6>(lo0)),
+        weights.0,
+    );
     acc = vqrdmlahq_laneq_s32::<0>(
         acc,
-        vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(lo0))),
+        vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(lo0))),
         weights.0,
     );
 
-    acc = vqrdmlahq_laneq_s32::<3>(acc, vreinterpretq_s32_u32(vmovl_high_u16(hi1)), weights.1);
-    acc = vqrdmlahq_laneq_s32::<2>(
+    acc = vqrdmlahq_laneq_s32::<3>(
         acc,
-        vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(hi1))),
+        vreinterpretq_s32_u32(vshll_high_n_u16::<6>(hi1)),
         weights.1,
     );
-    acc = vqrdmlahq_laneq_s32::<1>(acc, vreinterpretq_s32_u32(vmovl_high_u16(lo1)), weights.1);
+    acc = vqrdmlahq_laneq_s32::<2>(
+        acc,
+        vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(hi1))),
+        weights.1,
+    );
+    acc = vqrdmlahq_laneq_s32::<1>(
+        acc,
+        vreinterpretq_s32_u32(vshll_high_n_u16::<6>(lo1)),
+        weights.1,
+    );
     acc = vqrdmlahq_laneq_s32::<0>(
         acc,
-        vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(lo1))),
+        vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(lo1))),
         weights.1,
     );
     acc
@@ -175,7 +202,7 @@ unsafe fn convolve_horizontal_rgba_neon_rows_4_hb_impl(
 ) {
     unsafe {
         const CHANNELS: usize = 4;
-        let init = vdupq_n_s32(0);
+        let init = vdupq_n_s32((1 << 5) - 1);
 
         let v_max_colors = vdup_n_u16(((1u32 << bit_depth) - 1) as u16);
 
@@ -260,10 +287,10 @@ unsafe fn convolve_horizontal_rgba_neon_rows_4_hb_impl(
                 jx += 1;
             }
 
-            let j0 = vqmovun_s32(store_0);
-            let j1 = vqmovun_s32(store_1);
-            let j2 = vqmovun_s32(store_2);
-            let j3 = vqmovun_s32(store_3);
+            let j0 = vqshrun_n_s32::<6>(store_0);
+            let j1 = vqshrun_n_s32::<6>(store_1);
+            let j2 = vqshrun_n_s32::<6>(store_2);
+            let j3 = vqshrun_n_s32::<6>(store_3);
 
             let store_16_0 = vmin_u16(j0, v_max_colors);
             let store_16_1 = vmin_u16(j1, v_max_colors);
@@ -312,7 +339,7 @@ unsafe fn convolve_horizontal_rgba_neon_u16_hb_impl(
         {
             let bounds_size = bounds.size;
             let mut jx = 0usize;
-            let mut store = vdupq_n_s32(0);
+            let mut store = vdupq_n_s32((1 << 5) - 1);
 
             while jx + 8 < bounds_size {
                 let bounds_start = bounds.start + jx;
@@ -350,7 +377,7 @@ unsafe fn convolve_horizontal_rgba_neon_u16_hb_impl(
                 jx += 1;
             }
 
-            let store_16_0 = vmin_u16(vqmovun_s32(store), v_max_colors);
+            let store_16_0 = vmin_u16(vqshrun_n_s32::<6>(store), v_max_colors);
 
             vst1_u16(dst.as_mut_ptr(), store_16_0);
         }
