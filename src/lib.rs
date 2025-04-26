@@ -50,6 +50,10 @@
     feature(x86_amx_intrinsics)
 )]
 #![cfg_attr(feature = "nightly_f16", feature(f16))]
+#![cfg_attr(
+    all(feature = "nightly_f16", target_arch = "aarch64"),
+    feature(stdarch_neon_f16)
+)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod alpha_check;
