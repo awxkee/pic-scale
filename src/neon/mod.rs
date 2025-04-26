@@ -39,7 +39,6 @@ mod cbcr8_rdm;
 mod check_alpha;
 #[cfg(feature = "nightly_f16")]
 mod convolve_f16;
-mod f16_utils;
 mod horizontal_ar30;
 #[cfg(feature = "rdm")]
 mod horizontal_ar30_rdm;

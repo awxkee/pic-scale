@@ -32,11 +32,10 @@ use std::arch::aarch64::*;
 use core::f16;
 
 use crate::filter_weights::FilterWeights;
-use crate::neon::f16_utils::*;
 
 macro_rules! write_rgb_f16 {
     ($store: expr, $dest_ptr: expr) => {{
-        let cvt = xreinterpret_u16_f16($store);
+        let cvt = vreinterpret_u16_f16($store);
         let l1 = vget_lane_u32::<0>(vreinterpret_u32_u16(cvt));
         let l3 = vget_lane_u16::<2>(cvt);
         ($dest_ptr as *mut u32).write_unaligned(l1);
@@ -49,40 +48,31 @@ macro_rules! write_rgb_f16 {
 unsafe fn conv_horiz_4_rgb_f16(
     start_x: usize,
     src: &[f16],
-    set: x_float16x4_t,
-    store: x_float16x4_t,
-) -> x_float16x4_t {
+    set: float16x4_t,
+    store: float16x4_t,
+) -> float16x4_t {
     const COMPONENTS: usize = 3;
     let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
 
-    let v0 = xvldq_f16(src_ptr);
-    let v1 = xvcombine_f16(xvld_f16(src_ptr), xvzeros_f16());
+    let v0 = vld1q_u16(src_ptr as *const _);
+    let v1 = vcombine_u16(vld1_u16(src_ptr as *const _), vdup_n_u16(0));
 
-    let rgb_pixel_s = x_float16x8x2_t(v0, v1);
-    let rgb_first_u = vget_low_u16(xreinterpretq_u16_f16(rgb_pixel_s.0));
-    let rgb_first = xreinterpret_f16_u16(rgb_first_u);
-    let rgb_second_u = vext_u16::<3>(
-        vget_low_u16(xreinterpretq_u16_f16(rgb_pixel_s.0)),
-        vget_high_u16(xreinterpretq_u16_f16(rgb_pixel_s.0)),
-    );
-    let rgb_second = xreinterpret_f16_u16(rgb_second_u);
+    let rgb_pixel_s = uint16x8x2_t(v0, v1);
+    let rgb_first_u = vget_low_u16(rgb_pixel_s.0);
+    let rgb_first = rgb_first_u;
+    let rgb_second_u = vext_u16::<3>(vget_low_u16(rgb_pixel_s.0), vget_high_u16(rgb_pixel_s.0));
+    let rgb_second = rgb_second_u;
 
-    let rgb_third_u = vext_u16::<2>(
-        vget_high_u16(xreinterpretq_u16_f16(rgb_pixel_s.0)),
-        vget_low_u16(xreinterpretq_u16_f16(rgb_pixel_s.1)),
-    );
-    let rgb_third = xreinterpret_f16_u16(rgb_third_u);
+    let rgb_third_u = vext_u16::<2>(vget_high_u16(rgb_pixel_s.0), vget_low_u16(rgb_pixel_s.1));
+    let rgb_third = rgb_third_u;
 
-    let rgb_fourth_u = vext_u16::<1>(
-        vget_low_u16(xreinterpretq_u16_f16(rgb_pixel_s.1)),
-        vget_high_u16(xreinterpretq_u16_f16(rgb_pixel_s.1)),
-    );
-    let rgb_fourth = xreinterpret_f16_u16(rgb_fourth_u);
+    let rgb_fourth_u = vext_u16::<1>(vget_low_u16(rgb_pixel_s.1), vget_high_u16(rgb_pixel_s.1));
+    let rgb_fourth = vreinterpret_f16_u16(rgb_fourth_u);
 
-    let acc = xvfmla_lane_f16::<0>(store, rgb_first, set);
-    let acc = xvfmla_lane_f16::<1>(acc, rgb_second, set);
-    let acc = xvfmla_lane_f16::<2>(acc, rgb_third, set);
-    xvfmla_lane_f16::<3>(acc, rgb_fourth, set)
+    let acc = vfma_lane_f16::<0>(store, vreinterpret_f16_u16(rgb_first), set);
+    let acc = vfma_lane_f16::<1>(acc, vreinterpret_f16_u16(rgb_second), set);
+    let acc = vfma_lane_f16::<2>(acc, vreinterpret_f16_u16(rgb_third), set);
+    vfma_lane_f16::<3>(acc, rgb_fourth, set)
 }
 
 #[must_use]
@@ -90,30 +80,27 @@ unsafe fn conv_horiz_4_rgb_f16(
 unsafe fn conv_horiz_2_rgb_f16(
     start_x: usize,
     src: &[f16],
-    set: x_float16x4_t,
-    store: x_float16x4_t,
-) -> x_float16x4_t {
+    set: float16x4_t,
+    store: float16x4_t,
+) -> float16x4_t {
     const COMPONENTS: usize = 3;
     let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
 
-    let rgb_pixel = xvld_f16(src_ptr);
-    let second_px = xreinterpret_f16_u16(vreinterpret_u16_u32(vld1_lane_u32::<0>(
+    let rgb_pixel = vld1_u16(src_ptr as *const _);
+    let second_px = vreinterpret_u16_u32(vld1_lane_u32::<0>(
         src_ptr.add(4) as *const _,
         vdup_n_u32(0),
-    )));
+    ));
 
-    let mut rgb_first_u = xreinterpret_u16_f16(rgb_pixel);
+    let mut rgb_first_u = rgb_pixel;
     rgb_first_u = vset_lane_u16::<3>(0, rgb_first_u);
-    let rgb_first = xreinterpret_f16_u16(rgb_first_u);
-    let mut rgb_second_u = vext_u16::<3>(
-        xreinterpret_u16_f16(rgb_pixel),
-        xreinterpret_u16_f16(second_px),
-    );
+    let rgb_first = rgb_first_u;
+    let mut rgb_second_u = vext_u16::<3>(rgb_pixel, second_px);
     rgb_second_u = vset_lane_u16::<3>(0, rgb_second_u);
-    let rgb_second = xreinterpret_f16_u16(rgb_second_u);
+    let rgb_second = vreinterpret_f16_u16(rgb_second_u);
 
-    let acc = xvfmla_lane_f16::<0>(store, rgb_first, set);
-    xvfmla_lane_f16::<1>(acc, rgb_second, set)
+    let acc = vfma_lane_f16::<0>(store, vreinterpret_f16_u16(rgb_first), set);
+    vfma_lane_f16::<1>(acc, rgb_second, set)
 }
 
 #[must_use]
@@ -121,9 +108,9 @@ unsafe fn conv_horiz_2_rgb_f16(
 unsafe fn conv_horiz_1_rgb_f16(
     start_x: usize,
     src: &[f16],
-    set: x_float16x4_t,
-    store: x_float16x4_t,
-) -> x_float16x4_t {
+    set: float16x4_t,
+    store: float16x4_t,
+) -> float16x4_t {
     const COMPONENTS: usize = 3;
     let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
 
@@ -131,8 +118,8 @@ unsafe fn conv_horiz_1_rgb_f16(
         vreinterpret_u16_u32(vld1_lane_u32::<0>(src_ptr as *const _, vdup_n_u32(0)));
     rgb_pixel_u = vld1_lane_u16::<2>(src_ptr as *const _, rgb_pixel_u);
 
-    let rgb_pixel = xreinterpret_f16_u16(rgb_pixel_u);
-    xvfmla_f16(store, rgb_pixel, set)
+    let rgb_pixel = vreinterpret_f16_u16(rgb_pixel_u);
+    vfma_f16(store, rgb_pixel, set)
 }
 
 pub(crate) fn xconvolve_horizontal_rgb_neon_rows_4_f16(
@@ -175,15 +162,15 @@ unsafe fn xconvolve_horizontal_rgb_neon_rows_4_f16_impl(
     for x in 0..dst_width {
         let bounds = filter_weights.bounds.get_unchecked(x);
         let mut jx = 0usize;
-        let mut store_0 = xvzeros_f16();
-        let mut store_1 = xvzeros_f16();
-        let mut store_2 = xvzeros_f16();
-        let mut store_3 = xvzeros_f16();
+        let mut store_0 = vdup_n_f16(0.);
+        let mut store_1 = vdup_n_f16(0.);
+        let mut store_2 = vdup_n_f16(0.);
+        let mut store_3 = vdup_n_f16(0.);
 
         while jx + 4 < bounds.size {
             let bounds_start = bounds.start + jx;
             let ptr = weights_ptr.add(jx + filter_offset);
-            let read_weights = xvcvt_f16_f32(vld1q_f32(ptr));
+            let read_weights = vcvt_f16_f32(vld1q_f32(ptr));
             store_0 = conv_horiz_4_rgb_f16(bounds_start, src, read_weights, store_0);
             let s_ptr1 = src.get_unchecked(src_stride..);
             store_1 = conv_horiz_4_rgb_f16(bounds_start, s_ptr1, read_weights, store_1);
@@ -198,7 +185,7 @@ unsafe fn xconvolve_horizontal_rgb_neon_rows_4_f16_impl(
             let bounds_start = bounds.start + jx;
             let ptr = weights_ptr.add(jx + filter_offset);
             let read_weights_h = vld1_f32(ptr);
-            let read_weights = xvcvt_f16_f32(vcombine_f32(read_weights_h, read_weights_h));
+            let read_weights = vcvt_f16_f32(vcombine_f32(read_weights_h, read_weights_h));
             store_0 = conv_horiz_2_rgb_f16(bounds_start, src, read_weights, store_0);
             let s_ptr_1 = src.get_unchecked(src_stride..);
             store_1 = conv_horiz_2_rgb_f16(bounds_start, s_ptr_1, read_weights, store_1);
@@ -212,7 +199,7 @@ unsafe fn xconvolve_horizontal_rgb_neon_rows_4_f16_impl(
         while jx < bounds.size {
             let ptr = weights_ptr.add(jx + filter_offset);
             let bounds_start = bounds.start + jx;
-            let weight0 = xvcvt_f16_f32(vld1q_dup_f32(ptr));
+            let weight0 = vcvt_f16_f32(vld1q_dup_f32(ptr));
             store_0 = conv_horiz_1_rgb_f16(bounds_start, src, weight0, store_0);
             let s_ptr_1 = src.get_unchecked(src_stride..);
             store_1 = conv_horiz_1_rgb_f16(bounds_start, s_ptr_1, weight0, store_1);
@@ -273,12 +260,12 @@ unsafe fn xconvolve_horizontal_rgb_neon_row_one_f16_impl(
     for x in 0..dst_width {
         let bounds = filter_weights.bounds.get_unchecked(x);
         let mut jx = 0usize;
-        let mut store = xvzeros_f16();
+        let mut store = vdup_n_f16(0.);
 
         while jx + 4 < bounds.size {
             let bounds_start = bounds.start + jx;
             let ptr = weights_ptr.add(jx + filter_offset);
-            let read_weights = xvcvt_f16_f32(vld1q_f32(ptr));
+            let read_weights = vcvt_f16_f32(vld1q_f32(ptr));
             store = conv_horiz_4_rgb_f16(bounds_start, src, read_weights, store);
             jx += 4;
         }
@@ -287,14 +274,14 @@ unsafe fn xconvolve_horizontal_rgb_neon_row_one_f16_impl(
             let bounds_start = bounds.start + jx;
             let ptr = weights_ptr.add(jx + filter_offset);
             let read_weights_h = vld1_f32(ptr);
-            let read_weights = xvcvt_f16_f32(vcombine_f32(read_weights_h, read_weights_h));
+            let read_weights = vcvt_f16_f32(vcombine_f32(read_weights_h, read_weights_h));
             store = conv_horiz_2_rgb_f16(bounds_start, src, read_weights, store);
             jx += 2;
         }
 
         while jx < bounds.size {
             let ptr = weights_ptr.add(jx + filter_offset);
-            let weight0 = xvcvt_f16_f32(vld1q_dup_f32(ptr));
+            let weight0 = vcvt_f16_f32(vld1q_dup_f32(ptr));
             let bounds_start = bounds.start + jx;
             store = conv_horiz_1_rgb_f16(bounds_start, src, weight0, store);
             jx += 1;

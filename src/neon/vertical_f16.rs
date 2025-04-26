@@ -26,12 +26,29 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use std::arch::aarch64::*;
-
 use crate::filter_weights::FilterBounds;
 use crate::neon::convolve_f16::convolve_vertical_part_neon_8_f16;
-use crate::neon::utils::prefer_vfmaq_f32;
+use crate::neon::utils::{prefer_vfmaq_f32, xvld1q_u16_x2, xvld1q_u16_x4};
 use core::f16;
+use std::arch::aarch64::*;
+
+#[inline(always)]
+#[cfg(feature = "nightly_f16")]
+pub(crate) unsafe fn xvst1q_u16_x2(ptr: *mut u16, x: uint16x8x2_t) {
+    let ptr_u16 = ptr;
+    vst1q_u16(ptr_u16, x.0);
+    vst1q_u16(ptr_u16.add(8), x.1);
+}
+
+#[inline(always)]
+#[cfg(feature = "nightly_f16")]
+pub(crate) unsafe fn xvst1q_u16_x4(ptr: *const f16, x: uint16x8x4_t) {
+    let ptr_u16 = ptr as *mut u16;
+    vst1q_u16(ptr_u16, x.0);
+    vst1q_u16(ptr_u16.add(8), x.1);
+    vst1q_u16(ptr_u16.add(16), x.2);
+    vst1q_u16(ptr_u16.add(24), x.3);
+}
 
 macro_rules! conv_vertical_part_neon_16_f16 {
     ($start_y: expr, $start_x: expr, $src: expr, $src_stride: expr, $dst: expr, $filter: expr, $bounds: expr) => {{
@@ -49,24 +66,42 @@ macro_rules! conv_vertical_part_neon_16_f16 {
                 let src_ptr = $src.get_unchecked($src_stride * py..).as_ptr();
 
                 let s_ptr = src_ptr.add(px);
-                let item_row = xvldq_f16_x2(s_ptr);
+                let item_row = xvld1q_u16_x2(s_ptr as *const _);
 
-                store_0 =
-                    prefer_vfmaq_f32(store_0, xvcvt_f32_f16(xvget_low_f16(item_row.0)), v_weight);
-                store_1 =
-                    prefer_vfmaq_f32(store_1, xvcvt_f32_f16(xvget_high_f16(item_row.0)), v_weight);
-                store_2 =
-                    prefer_vfmaq_f32(store_2, xvcvt_f32_f16(xvget_low_f16(item_row.1)), v_weight);
-                store_3 =
-                    prefer_vfmaq_f32(store_3, xvcvt_f32_f16(xvget_high_f16(item_row.1)), v_weight);
+                store_0 = prefer_vfmaq_f32(
+                    store_0,
+                    vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(item_row.0))),
+                    v_weight,
+                );
+                store_1 = prefer_vfmaq_f32(
+                    store_1,
+                    vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(item_row.0))),
+                    v_weight,
+                );
+                store_2 = prefer_vfmaq_f32(
+                    store_2,
+                    vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(item_row.1))),
+                    v_weight,
+                );
+                store_3 = prefer_vfmaq_f32(
+                    store_3,
+                    vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(item_row.1))),
+                    v_weight,
+                );
             }
 
             let dst_ptr = $dst.get_unchecked_mut(px..).as_mut_ptr();
-            let f_set = x_float16x8x2_t(
-                xcombine_f16(xvcvt_f16_f32(store_0), xvcvt_f16_f32(store_1)),
-                xcombine_f16(xvcvt_f16_f32(store_2), xvcvt_f16_f32(store_3)),
+            let f_set = uint16x8x2_t(
+                vcombine_u16(
+                    vreinterpret_u16_f16(vcvt_f16_f32(store_0)),
+                    vreinterpret_u16_f16(vcvt_f16_f32(store_1)),
+                ),
+                vcombine_u16(
+                    vreinterpret_u16_f16(vcvt_f16_f32(store_2)),
+                    vreinterpret_u16_f16(vcvt_f16_f32(store_3)),
+                ),
             );
-            xvstq_f16_x2(dst_ptr, f_set);
+            xvst1q_u16_x2(dst_ptr as *mut _, f_set);
         }
     }};
 }
@@ -91,147 +126,71 @@ macro_rules! conv_vertical_part_neon_32_f16 {
                 let src_ptr = $src.get_unchecked($src_stride * py..).as_ptr();
 
                 let s_ptr = src_ptr.add(px);
-                let item_row = xvldq_f16_x4(s_ptr);
-
-                store_0 =
-                    prefer_vfmaq_f32(store_0, xvcvt_f32_f16(xvget_low_f16(item_row.0)), v_weight);
-                store_1 =
-                    prefer_vfmaq_f32(store_1, xvcvt_f32_f16(xvget_high_f16(item_row.0)), v_weight);
-                store_2 =
-                    prefer_vfmaq_f32(store_2, xvcvt_f32_f16(xvget_low_f16(item_row.1)), v_weight);
-                store_3 =
-                    prefer_vfmaq_f32(store_3, xvcvt_f32_f16(xvget_high_f16(item_row.1)), v_weight);
-
-                store_4 =
-                    prefer_vfmaq_f32(store_4, xvcvt_f32_f16(xvget_low_f16(item_row.2)), v_weight);
-                store_5 =
-                    prefer_vfmaq_f32(store_5, xvcvt_f32_f16(xvget_high_f16(item_row.2)), v_weight);
-                store_6 =
-                    prefer_vfmaq_f32(store_6, xvcvt_f32_f16(xvget_low_f16(item_row.3)), v_weight);
-                store_7 =
-                    prefer_vfmaq_f32(store_7, xvcvt_f32_f16(xvget_high_f16(item_row.3)), v_weight);
-            }
-
-            let dst_ptr = $dst.get_unchecked_mut(px..).as_mut_ptr();
-            let f_set = x_float16x8x4_t(
-                xcombine_f16(xvcvt_f16_f32(store_0), xvcvt_f16_f32(store_1)),
-                xcombine_f16(xvcvt_f16_f32(store_2), xvcvt_f16_f32(store_3)),
-                xcombine_f16(xvcvt_f16_f32(store_4), xvcvt_f16_f32(store_5)),
-                xcombine_f16(xvcvt_f16_f32(store_6), xvcvt_f16_f32(store_7)),
-            );
-            xvstq_f16_x4(dst_ptr, f_set);
-        }
-    }};
-}
-
-macro_rules! conv_vertical_part_neon_48_f16 {
-    ($start_y: expr, $start_x: expr, $src: expr, $src_stride: expr, $dst: expr, $filter: expr, $bounds: expr) => {{
-        unsafe {
-            let mut store_0 = vdupq_n_f32(0.);
-            let mut store_1 = vdupq_n_f32(0.);
-            let mut store_2 = vdupq_n_f32(0.);
-            let mut store_3 = vdupq_n_f32(0.);
-
-            let mut store_4 = vdupq_n_f32(0.);
-            let mut store_5 = vdupq_n_f32(0.);
-            let mut store_6 = vdupq_n_f32(0.);
-            let mut store_7 = vdupq_n_f32(0.);
-
-            let mut store_8 = vdupq_n_f32(0.);
-            let mut store_9 = vdupq_n_f32(0.);
-            let mut store_10 = vdupq_n_f32(0.);
-            let mut store_11 = vdupq_n_f32(0.);
-
-            let px = $start_x;
-
-            for j in 0..$bounds.size {
-                let py = $start_y + j;
-                let v_weight = vld1q_dup_f32($filter.get_unchecked(j..).as_ptr());
-                let src_ptr = $src.get_unchecked($src_stride * py..).as_ptr();
-
-                let s_ptr = src_ptr.add(px);
-                let item_row_0 = xvldq_f16_x4(s_ptr);
-                let item_row_1 = xvldq_f16_x2(s_ptr.add(32));
+                let item_row = xvld1q_u16_x4(s_ptr as *const _);
 
                 store_0 = prefer_vfmaq_f32(
                     store_0,
-                    xvcvt_f32_f16(xvget_low_f16(item_row_0.0)),
+                    vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(item_row.0))),
                     v_weight,
                 );
                 store_1 = prefer_vfmaq_f32(
                     store_1,
-                    xvcvt_f32_f16(xvget_high_f16(item_row_0.0)),
+                    vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(item_row.0))),
                     v_weight,
                 );
                 store_2 = prefer_vfmaq_f32(
                     store_2,
-                    xvcvt_f32_f16(xvget_low_f16(item_row_0.1)),
+                    vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(item_row.1))),
                     v_weight,
                 );
                 store_3 = prefer_vfmaq_f32(
                     store_3,
-                    xvcvt_f32_f16(xvget_high_f16(item_row_0.1)),
+                    vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(item_row.1))),
                     v_weight,
                 );
 
                 store_4 = prefer_vfmaq_f32(
                     store_4,
-                    xvcvt_f32_f16(xvget_low_f16(item_row_0.2)),
+                    vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(item_row.2))),
                     v_weight,
                 );
                 store_5 = prefer_vfmaq_f32(
                     store_5,
-                    xvcvt_f32_f16(xvget_high_f16(item_row_0.2)),
+                    vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(item_row.2))),
                     v_weight,
                 );
                 store_6 = prefer_vfmaq_f32(
                     store_6,
-                    xvcvt_f32_f16(xvget_low_f16(item_row_0.3)),
+                    vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(item_row.3))),
                     v_weight,
                 );
                 store_7 = prefer_vfmaq_f32(
                     store_7,
-                    xvcvt_f32_f16(xvget_high_f16(item_row_0.3)),
-                    v_weight,
-                );
-
-                store_8 = prefer_vfmaq_f32(
-                    store_8,
-                    xvcvt_f32_f16(xvget_low_f16(item_row_1.0)),
-                    v_weight,
-                );
-                store_9 = prefer_vfmaq_f32(
-                    store_9,
-                    xvcvt_f32_f16(xvget_high_f16(item_row_1.0)),
-                    v_weight,
-                );
-                store_10 = prefer_vfmaq_f32(
-                    store_10,
-                    xvcvt_f32_f16(xvget_low_f16(item_row_1.1)),
-                    v_weight,
-                );
-                store_11 = prefer_vfmaq_f32(
-                    store_11,
-                    xvcvt_f32_f16(xvget_high_f16(item_row_1.1)),
+                    vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(item_row.3))),
                     v_weight,
                 );
             }
 
             let dst_ptr = $dst.get_unchecked_mut(px..).as_mut_ptr();
-            let f_set = x_float16x8x4_t(
-                xcombine_f16(xvcvt_f16_f32(store_0), xvcvt_f16_f32(store_1)),
-                xcombine_f16(xvcvt_f16_f32(store_2), xvcvt_f16_f32(store_3)),
-                xcombine_f16(xvcvt_f16_f32(store_4), xvcvt_f16_f32(store_5)),
-                xcombine_f16(xvcvt_f16_f32(store_6), xvcvt_f16_f32(store_7)),
+            let f_set = uint16x8x4_t(
+                vcombine_u16(
+                    vreinterpret_u16_f16(vcvt_f16_f32(store_0)),
+                    vreinterpret_u16_f16(vcvt_f16_f32(store_1)),
+                ),
+                vcombine_u16(
+                    vreinterpret_u16_f16(vcvt_f16_f32(store_2)),
+                    vreinterpret_u16_f16(vcvt_f16_f32(store_3)),
+                ),
+                vcombine_u16(
+                    vreinterpret_u16_f16(vcvt_f16_f32(store_4)),
+                    vreinterpret_u16_f16(vcvt_f16_f32(store_5)),
+                ),
+                vcombine_u16(
+                    vreinterpret_u16_f16(vcvt_f16_f32(store_6)),
+                    vreinterpret_u16_f16(vcvt_f16_f32(store_7)),
+                ),
             );
-            xvstq_f16_x4(dst_ptr, f_set);
-            let dst_ptr2 = dst_ptr.add(32);
-
-            let f_set1 = x_float16x8x2_t(
-                xcombine_f16(xvcvt_f16_f32(store_8), xvcvt_f16_f32(store_9)),
-                xcombine_f16(xvcvt_f16_f32(store_10), xvcvt_f16_f32(store_11)),
-            );
-            xvstq_f16_x2(dst_ptr2, f_set1);
+            xvst1q_u16_x4(dst_ptr as *mut _, f_set);
         }
     }};
 }
@@ -246,14 +205,6 @@ pub(crate) fn convolve_vertical_rgb_neon_row_f16(
 ) {
     let mut cx = 0usize;
     let dst_width = dst.len();
-
-    use crate::neon::f16_utils::*;
-
-    while cx + 48 < dst_width {
-        conv_vertical_part_neon_48_f16!(bounds.start, cx, src, src_stride, dst, weight_ptr, bounds);
-
-        cx += 48;
-    }
 
     while cx + 32 < dst_width {
         conv_vertical_part_neon_32_f16!(bounds.start, cx, src, src_stride, dst, weight_ptr, bounds);
