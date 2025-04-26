@@ -75,24 +75,24 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_impl(
     const CHANNELS: usize = 4;
 
     #[rustfmt::skip]
-        let shuffle_lo = _mm_setr_epi8(0, -1,
-                                               4, -1,
-                                               1, -1,
-                                               5, -1,
-                                               2, -1 ,
-                                               6,-1,
-                                               3, -1,
-                                               7, -1);
+    let shuffle_lo = _mm_setr_epi8(0, -1,
+                                   4, -1,
+                                   1, -1,
+                                   5, -1,
+                                   2, -1 ,
+                                   6,-1,
+                                   3, -1,
+                                   7, -1);
 
     #[rustfmt::skip]
-        let shuffle_hi = _mm_setr_epi8(8, -1,
-                                               12, -1,
-                                               9, -1,
-                                               13, -1 ,
-                                               10,-1,
-                                               14, -1,
-                                               11, -1,
-                                               15, -1);
+    let shuffle_hi = _mm_setr_epi8(8, -1,
+                                   12, -1,
+                                   9, -1,
+                                   13, -1 ,
+                                   10,-1,
+                                   14, -1,
+                                   11, -1,
+                                   15, -1);
 
     let vld = _mm_set1_epi32(ROUNDING_CONST);
 
@@ -259,23 +259,23 @@ unsafe fn convolve_horizontal_rgba_sse_rows_one_impl(
 
     #[rustfmt::skip]
     let shuffle_lo = _mm_setr_epi8(0, -1,
-                                           4, -1,
-                                           1, -1,
-                                           5, -1,
-                                           2, -1 ,
-                                           6,-1,
-                                           3, -1,
-                                           7, -1);
+                                   4, -1,
+                                   1, -1,
+                                   5, -1,
+                                   2, -1 ,
+                                   6,-1,
+                                   3, -1,
+                                   7, -1);
 
     #[rustfmt::skip]
     let shuffle_hi = _mm_setr_epi8(8, -1,
-                                           12, -1,
-                                           9, -1,
-                                           13, -1 ,
-                                           10,-1,
-                                           14, -1,
-                                           11, -1,
-                                           15, -1);
+                                   12, -1,
+                                   9, -1,
+                                   13, -1 ,
+                                   10,-1,
+                                   14, -1,
+                                   11, -1,
+                                   15, -1);
 
     let vld = _mm_set1_epi32(ROUNDING_CONST);
 

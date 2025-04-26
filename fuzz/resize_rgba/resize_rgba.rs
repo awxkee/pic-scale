@@ -30,15 +30,21 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling};
+use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, WorkloadStrategy};
 
-fuzz_target!(|data: (u16, u16, u16, u16)| {
+fuzz_target!(|data: (u16, u16, u16, u16, bool)| {
+    let quality = if data.4 {
+        WorkloadStrategy::PreferQuality
+    } else {
+        WorkloadStrategy::PreferSpeed
+    };
     resize_rgba(
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
         data.3 as usize,
         ResamplingFunction::Bilinear,
+        quality,
     )
 });
 
@@ -48,6 +54,7 @@ fn resize_rgba(
     dst_width: usize,
     dst_height: usize,
     sampler: ResamplingFunction,
+    workload_strategy: WorkloadStrategy,
 ) {
     if src_width == 0
         || src_width > 2000
@@ -63,7 +70,8 @@ fn resize_rgba(
 
     let store = ImageStore::<u8, 4>::alloc(src_width, src_height);
     let mut target = ImageStoreMut::alloc(dst_width, dst_height);
-    let scaler = Scaler::new(sampler);
+    let mut scaler = Scaler::new(sampler);
+    scaler.set_workload_strategy(workload_strategy);
     scaler.resize_rgba(&store, &mut target, false).unwrap();
     let store = ImageStore::<u8, 4>::alloc(src_width, src_height);
     scaler.resize_rgba(&store, &mut target, true).unwrap();
