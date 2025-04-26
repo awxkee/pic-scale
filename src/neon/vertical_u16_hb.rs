@@ -58,7 +58,7 @@ unsafe fn convolve_column_hb_impl(
 
         let bounds_size = bounds.size;
 
-        let initial_store = vdupq_n_s32(0);
+        let initial_store = vdupq_n_s32((1 << 5) - 1);
 
         let v_max_colors = vdupq_n_u16(max_colors as u16);
 
@@ -88,22 +88,22 @@ unsafe fn convolve_column_hb_impl(
 
                 store0 = vqrdmlahq_lane_s32::<0>(
                     store0,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row0))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row0))),
                     v_weight,
                 );
                 store1 = vqrdmlahq_lane_s32::<0>(
                     store1,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row0)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row0)),
                     v_weight,
                 );
                 store2 = vqrdmlahq_lane_s32::<0>(
                     store2,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row1))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row1))),
                     v_weight,
                 );
                 store3 = vqrdmlahq_lane_s32::<0>(
                     store3,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row1)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row1)),
                     v_weight,
                 );
 
@@ -112,22 +112,22 @@ unsafe fn convolve_column_hb_impl(
 
                 store0 = vqrdmlahq_lane_s32::<1>(
                     store0,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row10))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row10))),
                     v_weight,
                 );
                 store1 = vqrdmlahq_lane_s32::<1>(
                     store1,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row10)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row10)),
                     v_weight,
                 );
                 store2 = vqrdmlahq_lane_s32::<1>(
                     store2,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row11))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row11))),
                     v_weight,
                 );
                 store3 = vqrdmlahq_lane_s32::<1>(
                     store3,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row11)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row11)),
                     v_weight,
                 );
             } else if bounds_size == 3 {
@@ -146,22 +146,22 @@ unsafe fn convolve_column_hb_impl(
 
                 store0 = vqrdmlahq_laneq_s32::<0>(
                     store0,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row0))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row0))),
                     v_weight,
                 );
                 store1 = vqrdmlahq_laneq_s32::<0>(
                     store1,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row0)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row0)),
                     v_weight,
                 );
                 store2 = vqrdmlahq_laneq_s32::<0>(
                     store2,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row1))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row1))),
                     v_weight,
                 );
                 store3 = vqrdmlahq_laneq_s32::<0>(
                     store3,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row1)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row1)),
                     v_weight,
                 );
 
@@ -170,22 +170,22 @@ unsafe fn convolve_column_hb_impl(
 
                 store0 = vqrdmlahq_laneq_s32::<1>(
                     store0,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row10))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row10))),
                     v_weight,
                 );
                 store1 = vqrdmlahq_laneq_s32::<1>(
                     store1,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row10)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row10)),
                     v_weight,
                 );
                 store2 = vqrdmlahq_laneq_s32::<1>(
                     store2,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row11))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row11))),
                     v_weight,
                 );
                 store3 = vqrdmlahq_laneq_s32::<1>(
                     store3,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row11)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row11)),
                     v_weight,
                 );
 
@@ -194,22 +194,22 @@ unsafe fn convolve_column_hb_impl(
 
                 store0 = vqrdmlahq_laneq_s32::<2>(
                     store0,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row20))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row20))),
                     v_weight,
                 );
                 store1 = vqrdmlahq_laneq_s32::<2>(
                     store1,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row20)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row20)),
                     v_weight,
                 );
                 store2 = vqrdmlahq_laneq_s32::<2>(
                     store2,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row21))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row21))),
                     v_weight,
                 );
                 store3 = vqrdmlahq_laneq_s32::<2>(
                     store3,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row21)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row21)),
                     v_weight,
                 );
             } else if bounds_size == 4 {
@@ -228,22 +228,22 @@ unsafe fn convolve_column_hb_impl(
 
                 store0 = vqrdmlahq_laneq_s32::<0>(
                     store0,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row0))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row0))),
                     v_weight,
                 );
                 store1 = vqrdmlahq_laneq_s32::<0>(
                     store1,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row0)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row0)),
                     v_weight,
                 );
                 store2 = vqrdmlahq_laneq_s32::<0>(
                     store2,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row1))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row1))),
                     v_weight,
                 );
                 store3 = vqrdmlahq_laneq_s32::<0>(
                     store3,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row1)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row1)),
                     v_weight,
                 );
 
@@ -252,22 +252,22 @@ unsafe fn convolve_column_hb_impl(
 
                 store0 = vqrdmlahq_laneq_s32::<1>(
                     store0,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row10))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row10))),
                     v_weight,
                 );
                 store1 = vqrdmlahq_laneq_s32::<1>(
                     store1,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row10)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row10)),
                     v_weight,
                 );
                 store2 = vqrdmlahq_laneq_s32::<1>(
                     store2,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row11))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row11))),
                     v_weight,
                 );
                 store3 = vqrdmlahq_laneq_s32::<1>(
                     store3,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row11)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row11)),
                     v_weight,
                 );
 
@@ -276,22 +276,22 @@ unsafe fn convolve_column_hb_impl(
 
                 store0 = vqrdmlahq_laneq_s32::<2>(
                     store0,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row20))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row20))),
                     v_weight,
                 );
                 store1 = vqrdmlahq_laneq_s32::<2>(
                     store1,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row20)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row20)),
                     v_weight,
                 );
                 store2 = vqrdmlahq_laneq_s32::<2>(
                     store2,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row21))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row21))),
                     v_weight,
                 );
                 store3 = vqrdmlahq_laneq_s32::<2>(
                     store3,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row21)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row21)),
                     v_weight,
                 );
 
@@ -300,22 +300,22 @@ unsafe fn convolve_column_hb_impl(
 
                 store0 = vqrdmlahq_laneq_s32::<3>(
                     store0,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row30))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row30))),
                     v_weight,
                 );
                 store1 = vqrdmlahq_laneq_s32::<3>(
                     store1,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row30)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row30)),
                     v_weight,
                 );
                 store2 = vqrdmlahq_laneq_s32::<3>(
                     store2,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row31))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row31))),
                     v_weight,
                 );
                 store3 = vqrdmlahq_laneq_s32::<3>(
                     store3,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row31)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row31)),
                     v_weight,
                 );
             } else {
@@ -330,31 +330,31 @@ unsafe fn convolve_column_hb_impl(
 
                     store0 = vqrdmlahq_s32(
                         store0,
-                        vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row0))),
+                        vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row0))),
                         v_weight,
                     );
                     store1 = vqrdmlahq_s32(
                         store1,
-                        vreinterpretq_s32_u32(vmovl_high_u16(item_row0)),
+                        vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row0)),
                         v_weight,
                     );
                     store2 = vqrdmlahq_s32(
                         store2,
-                        vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row1))),
+                        vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row1))),
                         v_weight,
                     );
                     store3 = vqrdmlahq_s32(
                         store3,
-                        vreinterpretq_s32_u32(vmovl_high_u16(item_row1)),
+                        vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row1)),
                         v_weight,
                     );
                 }
             }
 
-            let store0 = vqmovun_s32(store0);
-            let store1 = vqmovun_s32(store1);
-            let store2 = vqmovun_s32(store2);
-            let store3 = vqmovun_s32(store3);
+            let store0 = vqshrun_n_s32::<6>(store0);
+            let store1 = vqshrun_n_s32::<6>(store1);
+            let store2 = vqshrun_n_s32::<6>(store2);
+            let store3 = vqshrun_n_s32::<6>(store3);
 
             let item0 = vminq_u16(vcombine_u16(store0, store1), v_max_colors);
             let item1 = vminq_u16(vcombine_u16(store2, store3), v_max_colors);
@@ -389,12 +389,12 @@ unsafe fn convolve_column_hb_impl(
 
                 store0 = vqrdmlahq_lane_s32::<0>(
                     store0,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row0))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row0))),
                     v_weight,
                 );
                 store1 = vqrdmlahq_lane_s32::<0>(
                     store1,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row0)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row0)),
                     v_weight,
                 );
 
@@ -402,12 +402,12 @@ unsafe fn convolve_column_hb_impl(
 
                 store0 = vqrdmlahq_lane_s32::<1>(
                     store0,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row1))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row1))),
                     v_weight,
                 );
                 store1 = vqrdmlahq_lane_s32::<1>(
                     store1,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row1)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row1)),
                     v_weight,
                 );
             } else if bounds_size == 3 {
@@ -425,12 +425,12 @@ unsafe fn convolve_column_hb_impl(
 
                 store0 = vqrdmlahq_laneq_s32::<0>(
                     store0,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row0))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row0))),
                     v_weight,
                 );
                 store1 = vqrdmlahq_laneq_s32::<0>(
                     store1,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row0)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row0)),
                     v_weight,
                 );
 
@@ -438,12 +438,12 @@ unsafe fn convolve_column_hb_impl(
 
                 store0 = vqrdmlahq_laneq_s32::<1>(
                     store0,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row1))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row1))),
                     v_weight,
                 );
                 store1 = vqrdmlahq_laneq_s32::<1>(
                     store1,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row1)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row1)),
                     v_weight,
                 );
 
@@ -451,12 +451,12 @@ unsafe fn convolve_column_hb_impl(
 
                 store0 = vqrdmlahq_laneq_s32::<2>(
                     store0,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row2))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row2))),
                     v_weight,
                 );
                 store1 = vqrdmlahq_laneq_s32::<2>(
                     store1,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row2)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row2)),
                     v_weight,
                 );
             } else if bounds_size == 4 {
@@ -473,12 +473,12 @@ unsafe fn convolve_column_hb_impl(
 
                 store0 = vqrdmlahq_laneq_s32::<0>(
                     store0,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row0))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row0))),
                     v_weight,
                 );
                 store1 = vqrdmlahq_laneq_s32::<0>(
                     store1,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row0)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row0)),
                     v_weight,
                 );
 
@@ -486,12 +486,12 @@ unsafe fn convolve_column_hb_impl(
 
                 store0 = vqrdmlahq_laneq_s32::<1>(
                     store0,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row1))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row1))),
                     v_weight,
                 );
                 store1 = vqrdmlahq_laneq_s32::<1>(
                     store1,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row1)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row1)),
                     v_weight,
                 );
 
@@ -499,12 +499,12 @@ unsafe fn convolve_column_hb_impl(
 
                 store0 = vqrdmlahq_laneq_s32::<2>(
                     store0,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row2))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row2))),
                     v_weight,
                 );
                 store1 = vqrdmlahq_laneq_s32::<2>(
                     store1,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row2)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row2)),
                     v_weight,
                 );
 
@@ -512,12 +512,12 @@ unsafe fn convolve_column_hb_impl(
 
                 store0 = vqrdmlahq_laneq_s32::<3>(
                     store0,
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row3))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row3))),
                     v_weight,
                 );
                 store1 = vqrdmlahq_laneq_s32::<3>(
                     store1,
-                    vreinterpretq_s32_u32(vmovl_high_u16(item_row3)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row3)),
                     v_weight,
                 );
             } else {
@@ -531,19 +531,19 @@ unsafe fn convolve_column_hb_impl(
 
                     store0 = vqrdmlahq_s32(
                         store0,
-                        vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(item_row))),
+                        vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row))),
                         v_weight,
                     );
                     store1 = vqrdmlahq_s32(
                         store1,
-                        vreinterpretq_s32_u32(vmovl_high_u16(item_row)),
+                        vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row)),
                         v_weight,
                     );
                 }
             }
 
             let item = vminq_u16(
-                vcombine_u16(vqmovun_s32(store0), vqmovun_s32(store1)),
+                vcombine_u16(vqshrun_n_s32::<6>(store0), vqshrun_n_s32::<6>(store1)),
                 v_max_colors,
             );
             vst1q_u16(dst.as_mut_ptr(), item);
@@ -570,11 +570,19 @@ unsafe fn convolve_column_hb_impl(
                 let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
 
-                let item_row0 = vreinterpret_s16_u16(vld1_u16(src_ptr0.as_ptr()));
-                store0 = vqrdmlahq_lane_s32::<0>(store0, vmovl_s16(item_row0), v_weight);
+                let item_row0 = vld1_u16(src_ptr0.as_ptr());
+                store0 = vqrdmlahq_lane_s32::<0>(
+                    store0,
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(item_row0)),
+                    v_weight,
+                );
 
-                let item_row1 = vreinterpret_s16_u16(vld1_u16(src_ptr1.as_ptr()));
-                store0 = vqrdmlahq_lane_s32::<1>(store0, vmovl_s16(item_row1), v_weight);
+                let item_row1 = vld1_u16(src_ptr1.as_ptr());
+                store0 = vqrdmlahq_lane_s32::<1>(
+                    store0,
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(item_row1)),
+                    v_weight,
+                );
             } else if bounds_size == 3 {
                 let weights = weight.get_unchecked(0..3);
                 let mut v_weight = vld1q_dup_s32(weights.as_ptr());
@@ -586,14 +594,26 @@ unsafe fn convolve_column_hb_impl(
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
 
-                let item_row0 = vreinterpret_s16_u16(vld1_u16(src_ptr0.as_ptr()));
-                store0 = vqrdmlahq_laneq_s32::<0>(store0, vmovl_s16(item_row0), v_weight);
+                let item_row0 = vld1_u16(src_ptr0.as_ptr());
+                store0 = vqrdmlahq_laneq_s32::<0>(
+                    store0,
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(item_row0)),
+                    v_weight,
+                );
 
-                let item_row1 = vreinterpret_s16_u16(vld1_u16(src_ptr1.as_ptr()));
-                store0 = vqrdmlahq_laneq_s32::<1>(store0, vmovl_s16(item_row1), v_weight);
+                let item_row1 = vld1_u16(src_ptr1.as_ptr());
+                store0 = vqrdmlahq_laneq_s32::<1>(
+                    store0,
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(item_row1)),
+                    v_weight,
+                );
 
-                let item_row2 = vreinterpret_s16_u16(vld1_u16(src_ptr2.as_ptr()));
-                store0 = vqrdmlahq_laneq_s32::<2>(store0, vmovl_s16(item_row2), v_weight);
+                let item_row2 = vld1_u16(src_ptr2.as_ptr());
+                store0 = vqrdmlahq_laneq_s32::<2>(
+                    store0,
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(item_row2)),
+                    v_weight,
+                );
             } else if bounds_size == 4 {
                 let weights = weight.get_unchecked(0..4);
                 let v_weight = vld1q_s32(weights.as_ptr());
@@ -604,17 +624,33 @@ unsafe fn convolve_column_hb_impl(
                 let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
                 let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + v_dx)..);
 
-                let item_row0 = vreinterpret_s16_u16(vld1_u16(src_ptr0.as_ptr()));
-                store0 = vqrdmlahq_laneq_s32::<0>(store0, vmovl_s16(item_row0), v_weight);
+                let item_row0 = vld1_u16(src_ptr0.as_ptr());
+                store0 = vqrdmlahq_laneq_s32::<0>(
+                    store0,
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(item_row0)),
+                    v_weight,
+                );
 
-                let item_row1 = vreinterpret_s16_u16(vld1_u16(src_ptr1.as_ptr()));
-                store0 = vqrdmlahq_laneq_s32::<1>(store0, vmovl_s16(item_row1), v_weight);
+                let item_row1 = vld1_u16(src_ptr1.as_ptr());
+                store0 = vqrdmlahq_laneq_s32::<1>(
+                    store0,
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(item_row1)),
+                    v_weight,
+                );
 
-                let item_row2 = vreinterpret_s16_u16(vld1_u16(src_ptr2.as_ptr()));
-                store0 = vqrdmlahq_laneq_s32::<2>(store0, vmovl_s16(item_row2), v_weight);
+                let item_row2 = vld1_u16(src_ptr2.as_ptr());
+                store0 = vqrdmlahq_laneq_s32::<2>(
+                    store0,
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(item_row2)),
+                    v_weight,
+                );
 
-                let item_row3 = vreinterpret_s16_u16(vld1_u16(src_ptr3.as_ptr()));
-                store0 = vqrdmlahq_laneq_s32::<3>(store0, vmovl_s16(item_row3), v_weight);
+                let item_row3 = vld1_u16(src_ptr3.as_ptr());
+                store0 = vqrdmlahq_laneq_s32::<3>(
+                    store0,
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(item_row3)),
+                    v_weight,
+                );
             } else {
                 for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
                     let py = bounds.start + j;
@@ -622,13 +658,17 @@ unsafe fn convolve_column_hb_impl(
 
                     let v_weight = vdupq_n_s32(k_weight);
 
-                    let item_row = vreinterpret_s16_u16(vld1_u16(src_ptr.as_ptr()));
+                    let item_row = vld1_u16(src_ptr.as_ptr());
 
-                    store0 = vqrdmlahq_s32(store0, vmovl_s16(item_row), v_weight);
+                    store0 = vqrdmlahq_s32(
+                        store0,
+                        vreinterpretq_s32_u32(vshll_n_u16::<6>(item_row)),
+                        v_weight,
+                    );
                 }
             }
 
-            let u_store0 = vmin_u16(vqmovun_s32(store0), vget_low_u16(v_max_colors));
+            let u_store0 = vmin_u16(vqshrun_n_s32::<6>(store0), vget_low_u16(v_max_colors));
             vst1_u16(dst.as_mut_ptr(), u_store0);
 
             cx = v_dx;
@@ -704,7 +744,7 @@ unsafe fn convolve_column_hb_impl(
                 }
             }
 
-            const R: i64 = 1 << 30;
+            const R: i64 = (1 << 30) - 1;
             *dst = ((store0 + R) >> 31).max(0).min(max_colors as i64) as u16;
         }
     }
