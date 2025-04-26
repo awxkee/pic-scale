@@ -26,15 +26,47 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::avx2::utils::{_mm256_prefer_fma_ps, _mm_prefer_fma_ps};
 use crate::filter_weights::FilterWeights;
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
-#[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
+use std::marker::PhantomData;
+
+pub(crate) trait FusedAccumulate {
+    fn fma(a: __m256, b: __m256, c: __m256) -> __m256;
+    fn fma128(a: __m128, b: __m128, c: __m128) -> __m128;
+}
+
+#[derive(Default)]
+pub(crate) struct FusedAccumulateFma {}
+
+#[derive(Default)]
+pub(crate) struct FusedAccumulateSum {}
+
+impl FusedAccumulate for FusedAccumulateFma {
+    #[inline(always)]
+    fn fma(a: __m256, b: __m256, c: __m256) -> __m256 {
+        unsafe { _mm256_fmadd_ps(b, c, a) }
+    }
+
+    #[inline(always)]
+    fn fma128(a: __m128, b: __m128, c: __m128) -> __m128 {
+        unsafe { _mm_fmadd_ps(b, c, a) }
+    }
+}
+
+impl FusedAccumulate for FusedAccumulateSum {
+    #[inline(always)]
+    fn fma(a: __m256, b: __m256, c: __m256) -> __m256 {
+        unsafe { _mm256_add_ps(_mm256_mul_ps(b, c), a) }
+    }
+
+    #[inline(always)]
+    fn fma128(a: __m128, b: __m128, c: __m128) -> __m128 {
+        unsafe { _mm_add_ps(_mm_mul_ps(b, c), a) }
+    }
+}
 
 #[inline(always)]
-unsafe fn conv_horiz_rgba_1_u16<const FMA: bool>(
+unsafe fn conv_horiz_rgba_1_u16<F: FusedAccumulate>(
     start_x: usize,
     src: &[u16],
     w0: __m128,
@@ -43,7 +75,7 @@ unsafe fn conv_horiz_rgba_1_u16<const FMA: bool>(
     const COMPONENTS: usize = 4;
     let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
     let rgba_pixel = _mm_loadu_si64(src_ptr.as_ptr() as *const u8);
-    _mm_prefer_fma_ps::<FMA>(
+    F::fma128(
         store,
         _mm_cvtepi32_ps(_mm_unpacklo_epi16(rgba_pixel, _mm_setzero_si128())),
         w0,
@@ -51,7 +83,7 @@ unsafe fn conv_horiz_rgba_1_u16<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn conv_horiz_rgba_2_u16<const FMA: bool>(
+unsafe fn conv_horiz_rgba_2_u16<F: FusedAccumulate>(
     start_x: usize,
     src: &[u16],
     w0: __m128,
@@ -63,12 +95,12 @@ unsafe fn conv_horiz_rgba_2_u16<const FMA: bool>(
 
     let rgba_pixel = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
 
-    let acc = _mm_prefer_fma_ps::<FMA>(
+    let acc = F::fma128(
         store,
         _mm_cvtepi32_ps(_mm_unpacklo_epi16(rgba_pixel, _mm_setzero_si128())),
         w0,
     );
-    _mm_prefer_fma_ps::<FMA>(
+    F::fma128(
         acc,
         _mm_cvtepi32_ps(_mm_unpacklo_epi16(rgba_pixel, _mm_setzero_si128())),
         w1,
@@ -76,7 +108,7 @@ unsafe fn conv_horiz_rgba_2_u16<const FMA: bool>(
 }
 
 #[inline]
-unsafe fn conv_horiz_rgba_4_u16<const FMA: bool>(
+unsafe fn conv_horiz_rgba_4_u16<F: FusedAccumulate>(
     start_x: usize,
     src: &[u16],
     w0: __m256,
@@ -88,12 +120,12 @@ unsafe fn conv_horiz_rgba_4_u16<const FMA: bool>(
 
     let rgba_pixel = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
 
-    let acc = _mm256_prefer_fma_ps::<FMA>(
+    let acc = F::fma(
         store,
         _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(rgba_pixel, _mm256_setzero_si256())),
         w0,
     );
-    _mm256_prefer_fma_ps::<FMA>(
+    F::fma(
         acc,
         _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(rgba_pixel, _mm256_setzero_si256())),
         w1,
@@ -101,7 +133,7 @@ unsafe fn conv_horiz_rgba_4_u16<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn conv_horiz_rgba_8_u16<const FMA: bool>(
+unsafe fn conv_horiz_rgba_8_u16<F: FusedAccumulate>(
     start_x: usize,
     src: &[u16],
     w01: __m256,
@@ -118,22 +150,22 @@ unsafe fn conv_horiz_rgba_8_u16<const FMA: bool>(
     let rgba_pixel0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const _);
     let rgba_pixel1 = _mm256_loadu_si256(src_ptr.get_unchecked(16..).as_ptr() as *const _);
 
-    let mut acc = _mm256_prefer_fma_ps::<FMA>(
+    let mut acc = F::fma(
         store,
         _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(rgba_pixel1, z)),
         w67,
     );
-    acc = _mm256_prefer_fma_ps::<FMA>(
+    acc = F::fma(
         acc,
         _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(rgba_pixel1, z)),
         w45,
     );
-    acc = _mm256_prefer_fma_ps::<FMA>(
+    acc = F::fma(
         acc,
         _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(rgba_pixel0, z)),
         w23,
     );
-    _mm256_prefer_fma_ps::<FMA>(
+    F::fma(
         acc,
         _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(rgba_pixel0, z)),
         w01,
@@ -181,7 +213,9 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_u16_def(
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
-    let unit = Row4ExecutionHandler::<false>::default();
+    let unit = Row4ExecutionHandler::<FusedAccumulateSum> {
+        _phantom: PhantomData,
+    };
     unit.pass(src, src_stride, dst, dst_stride, filter_weights, bit_depth);
 }
 
@@ -195,14 +229,18 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_u16_fma(
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
-    let unit = Row4ExecutionHandler::<true>::default();
+    let unit = Row4ExecutionHandler::<FusedAccumulateFma> {
+        _phantom: PhantomData,
+    };
     unit.pass(src, src_stride, dst, dst_stride, filter_weights, bit_depth);
 }
 
 #[derive(Copy, Clone, Default)]
-struct Row4ExecutionHandler<const FMA: bool> {}
+struct Row4ExecutionHandler<F: FusedAccumulate> {
+    _phantom: PhantomData<F>,
+}
 
-impl<const FMA: bool> Row4ExecutionHandler<FMA> {
+impl<F: FusedAccumulate> Row4ExecutionHandler<F> {
     #[inline(always)]
     unsafe fn pass(
         &self,
@@ -275,7 +313,7 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                     let w45 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w4), w5);
                     let w67 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w6), w7);
 
-                    astore_0 = conv_horiz_rgba_8_u16::<FMA>(
+                    astore_0 = conv_horiz_rgba_8_u16::<F>(
                         bounds_start,
                         src0,
                         w01,
@@ -284,7 +322,7 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                         w67,
                         astore_0,
                     );
-                    astore_1 = conv_horiz_rgba_8_u16::<FMA>(
+                    astore_1 = conv_horiz_rgba_8_u16::<F>(
                         bounds_start,
                         src1,
                         w01,
@@ -293,7 +331,7 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                         w67,
                         astore_1,
                     );
-                    astore_2 = conv_horiz_rgba_8_u16::<FMA>(
+                    astore_2 = conv_horiz_rgba_8_u16::<F>(
                         bounds_start,
                         src2,
                         w01,
@@ -302,7 +340,7 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                         w67,
                         astore_2,
                     );
-                    astore_3 = conv_horiz_rgba_8_u16::<FMA>(
+                    astore_3 = conv_horiz_rgba_8_u16::<F>(
                         bounds_start,
                         src3,
                         w01,
@@ -325,10 +363,10 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                     let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
                     let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
 
-                    astore_0 = conv_horiz_rgba_4_u16::<FMA>(bounds_start, src0, w01, w23, astore_0);
-                    astore_1 = conv_horiz_rgba_4_u16::<FMA>(bounds_start, src1, w01, w23, astore_1);
-                    astore_2 = conv_horiz_rgba_4_u16::<FMA>(bounds_start, src2, w01, w23, astore_2);
-                    astore_3 = conv_horiz_rgba_4_u16::<FMA>(bounds_start, src3, w01, w23, astore_3);
+                    astore_0 = conv_horiz_rgba_4_u16::<F>(bounds_start, src0, w01, w23, astore_0);
+                    astore_1 = conv_horiz_rgba_4_u16::<F>(bounds_start, src1, w01, w23, astore_1);
+                    astore_2 = conv_horiz_rgba_4_u16::<F>(bounds_start, src2, w01, w23, astore_2);
+                    astore_3 = conv_horiz_rgba_4_u16::<F>(bounds_start, src3, w01, w23, astore_3);
                     jx += 4;
                 }
 
@@ -355,10 +393,10 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                 let bounds_start = bounds.start + jx;
                 let w0 = _mm_load1_ps(w_ptr.as_ptr());
                 let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
-                store_0 = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src0, w0, w1, store_0);
-                store_1 = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src1, w0, w1, store_1);
-                store_2 = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src2, w0, w1, store_2);
-                store_3 = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src3, w0, w1, store_3);
+                store_0 = conv_horiz_rgba_2_u16::<F>(bounds_start, src0, w0, w1, store_0);
+                store_1 = conv_horiz_rgba_2_u16::<F>(bounds_start, src1, w0, w1, store_1);
+                store_2 = conv_horiz_rgba_2_u16::<F>(bounds_start, src2, w0, w1, store_2);
+                store_3 = conv_horiz_rgba_2_u16::<F>(bounds_start, src3, w0, w1, store_3);
                 jx += 2;
             }
 
@@ -366,10 +404,10 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                 let w_ptr = weights.get_unchecked(jx..(jx + 1));
                 let bounds_start = bounds.start + jx;
                 let w0 = _mm_load1_ps(w_ptr.as_ptr());
-                store_0 = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src0, w0, store_0);
-                store_1 = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src1, w0, store_1);
-                store_2 = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src2, w0, store_2);
-                store_3 = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src3, w0, store_3);
+                store_0 = conv_horiz_rgba_1_u16::<F>(bounds_start, src0, w0, store_0);
+                store_1 = conv_horiz_rgba_1_u16::<F>(bounds_start, src1, w0, store_1);
+                store_2 = conv_horiz_rgba_1_u16::<F>(bounds_start, src2, w0, store_2);
+                store_3 = conv_horiz_rgba_1_u16::<F>(bounds_start, src3, w0, store_3);
                 jx += 1;
             }
 
@@ -426,7 +464,7 @@ unsafe fn convolve_horizontal_rgba_avx_u16_row_def(
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
-    let unit = OneRowExecutionHandler::<false>::default();
+    let unit = OneRowExecutionHandler::<FusedAccumulateSum>::default();
     unit.pass(src, dst, filter_weights, bit_depth);
 }
 
@@ -438,14 +476,16 @@ unsafe fn convolve_horizontal_rgba_avx_u16_row_fma(
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
-    let unit = OneRowExecutionHandler::<true>::default();
+    let unit = OneRowExecutionHandler::<FusedAccumulateFma>::default();
     unit.pass(src, dst, filter_weights, bit_depth);
 }
 
 #[derive(Copy, Clone, Default)]
-struct OneRowExecutionHandler<const FMA: bool> {}
+struct OneRowExecutionHandler<F: FusedAccumulate> {
+    _phantom: PhantomData<F>,
+}
 
-impl<const FMA: bool> OneRowExecutionHandler<FMA> {
+impl<F: FusedAccumulate> OneRowExecutionHandler<F> {
     #[inline(always)]
     unsafe fn pass(
         &self,
@@ -490,7 +530,7 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
                     let w45 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w4), w5);
                     let w67 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w6), w7);
                     astore =
-                        conv_horiz_rgba_8_u16::<FMA>(bounds_start, src, w01, w23, w45, w67, astore);
+                        conv_horiz_rgba_8_u16::<F>(bounds_start, src, w01, w23, w45, w67, astore);
                     jx += 8;
                 }
 
@@ -505,7 +545,7 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
                     let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
                     let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
 
-                    astore = conv_horiz_rgba_4_u16::<FMA>(bounds_start, src, w01, w23, astore);
+                    astore = conv_horiz_rgba_4_u16::<F>(bounds_start, src, w01, w23, astore);
                     jx += 4;
                 }
 
@@ -520,7 +560,7 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
                 let bounds_start = bounds.start + jx;
                 let w0 = _mm_load1_ps(w_ptr.as_ptr());
                 let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
-                store = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src, w0, w1, store);
+                store = conv_horiz_rgba_2_u16::<F>(bounds_start, src, w0, w1, store);
                 jx += 2;
             }
 
@@ -528,7 +568,7 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
                 let w_ptr = weights.get_unchecked(jx..(jx + 1));
                 let w0 = _mm_load1_ps(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
-                store = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src, w0, store);
+                store = conv_horiz_rgba_1_u16::<F>(bounds_start, src, w0, store);
                 jx += 1;
             }
 
