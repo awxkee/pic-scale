@@ -181,14 +181,8 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_u16_def(
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
-    convolve_horizontal_rgba_avx_rows_4_u16_impl::<false>(
-        src,
-        src_stride,
-        dst,
-        dst_stride,
-        filter_weights,
-        bit_depth,
-    );
+    let unit = Row4ExecutionHandler::<false>::default();
+    unit.pass(src, src_stride, dst, dst_stride, filter_weights, bit_depth);
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
@@ -201,181 +195,211 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_u16_fma(
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
-    convolve_horizontal_rgba_avx_rows_4_u16_impl::<true>(
-        src,
-        src_stride,
-        dst,
-        dst_stride,
-        filter_weights,
-        bit_depth,
-    );
+    let unit = Row4ExecutionHandler::<true>::default();
+    unit.pass(src, src_stride, dst, dst_stride, filter_weights, bit_depth);
 }
 
-#[inline(always)]
-unsafe fn convolve_horizontal_rgba_avx_rows_4_u16_impl<const FMA: bool>(
-    src: &[u16],
-    src_stride: usize,
-    dst: &mut [u16],
-    dst_stride: usize,
-    filter_weights: &FilterWeights<f32>,
-    bit_depth: u32,
-) {
-    const CHANNELS: usize = 4;
+#[derive(Copy, Clone, Default)]
+struct Row4ExecutionHandler<const FMA: bool> {}
 
-    let v_max_colors = _mm_set1_epi32((1i32 << bit_depth) - 1);
+impl<const FMA: bool> Row4ExecutionHandler<FMA> {
+    #[inline(always)]
+    unsafe fn pass(
+        &self,
+        src: &[u16],
+        src_stride: usize,
+        dst: &mut [u16],
+        dst_stride: usize,
+        filter_weights: &FilterWeights<f32>,
+        bit_depth: u32,
+    ) {
+        const CHANNELS: usize = 4;
 
-    let (row0_ref, rest) = dst.split_at_mut(dst_stride);
-    let (row1_ref, rest) = rest.split_at_mut(dst_stride);
-    let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
+        let v_max_colors = _mm_set1_epi32((1i32 << bit_depth) - 1);
 
-    let iter_row0 = row0_ref.chunks_exact_mut(CHANNELS);
-    let iter_row1 = row1_ref.chunks_exact_mut(CHANNELS);
-    let iter_row2 = row2_ref.chunks_exact_mut(CHANNELS);
-    let iter_row3 = row3_ref.chunks_exact_mut(CHANNELS);
+        let (row0_ref, rest) = dst.split_at_mut(dst_stride);
+        let (row1_ref, rest) = rest.split_at_mut(dst_stride);
+        let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-    for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
-        .zip(iter_row1)
-        .zip(iter_row2)
-        .zip(iter_row3)
-        .zip(filter_weights.bounds.iter())
-        .zip(
-            filter_weights
-                .weights
-                .chunks_exact(filter_weights.aligned_size),
-        )
-    {
-        let mut jx = 0usize;
-        let mut store_0 = _mm_setzero_ps();
-        let mut store_1 = _mm_setzero_ps();
-        let mut store_2 = _mm_setzero_ps();
-        let mut store_3 = _mm_setzero_ps();
+        let iter_row0 = row0_ref.chunks_exact_mut(CHANNELS);
+        let iter_row1 = row1_ref.chunks_exact_mut(CHANNELS);
+        let iter_row2 = row2_ref.chunks_exact_mut(CHANNELS);
+        let iter_row3 = row3_ref.chunks_exact_mut(CHANNELS);
 
-        let bounds_size = bounds.size;
+        for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
+            .zip(iter_row1)
+            .zip(iter_row2)
+            .zip(iter_row3)
+            .zip(filter_weights.bounds.iter())
+            .zip(
+                filter_weights
+                    .weights
+                    .chunks_exact(filter_weights.aligned_size),
+            )
+        {
+            let mut jx = 0usize;
 
-        let src0 = src;
-        let src1 = src0.get_unchecked(src_stride..);
-        let src2 = src1.get_unchecked(src_stride..);
-        let src3 = src2.get_unchecked(src_stride..);
+            let mut store_0 = _mm_setzero_ps();
+            let mut store_1 = _mm_setzero_ps();
+            let mut store_2 = _mm_setzero_ps();
+            let mut store_3 = _mm_setzero_ps();
 
-        if jx >= 4 {
-            let mut astore_0 = _mm256_setzero_ps();
-            let mut astore_1 = _mm256_setzero_ps();
-            let mut astore_2 = _mm256_setzero_ps();
-            let mut astore_3 = _mm256_setzero_ps();
+            let bounds_size = bounds.size;
 
-            while jx + 8 < bounds_size {
-                let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 8));
-                let w0 = _mm_load1_ps(w_ptr.as_ptr());
-                let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
-                let w2 = _mm_load1_ps(w_ptr.as_ptr().add(2));
-                let w3 = _mm_load1_ps(w_ptr.as_ptr().add(3));
-                let w4 = _mm_load1_ps(w_ptr.as_ptr().add(4));
-                let w5 = _mm_load1_ps(w_ptr.as_ptr().add(5));
-                let w6 = _mm_load1_ps(w_ptr.as_ptr().add(6));
-                let w7 = _mm_load1_ps(w_ptr.as_ptr().add(7));
+            let src0 = src;
+            let src1 = src0.get_unchecked(src_stride..);
+            let src2 = src1.get_unchecked(src_stride..);
+            let src3 = src2.get_unchecked(src_stride..);
 
-                let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
-                let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
-                let w45 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w4), w5);
-                let w67 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w6), w7);
+            if jx >= 4 {
+                let mut astore_0 = _mm256_setzero_ps();
+                let mut astore_1 = _mm256_setzero_ps();
+                let mut astore_2 = _mm256_setzero_ps();
+                let mut astore_3 = _mm256_setzero_ps();
 
-                astore_0 =
-                    conv_horiz_rgba_8_u16::<FMA>(bounds_start, src0, w01, w23, w45, w67, astore_0);
-                astore_1 =
-                    conv_horiz_rgba_8_u16::<FMA>(bounds_start, src1, w01, w23, w45, w67, astore_1);
-                astore_2 =
-                    conv_horiz_rgba_8_u16::<FMA>(bounds_start, src2, w01, w23, w45, w67, astore_2);
-                astore_3 =
-                    conv_horiz_rgba_8_u16::<FMA>(bounds_start, src3, w01, w23, w45, w67, astore_3);
-                jx += 8;
+                while jx + 8 < bounds_size {
+                    let bounds_start = bounds.start + jx;
+                    let w_ptr = weights.get_unchecked(jx..(jx + 8));
+
+                    let w0 = _mm_load1_ps(w_ptr.as_ptr());
+                    let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
+                    let w2 = _mm_load1_ps(w_ptr.as_ptr().add(2));
+                    let w3 = _mm_load1_ps(w_ptr.as_ptr().add(3));
+                    let w4 = _mm_load1_ps(w_ptr.as_ptr().add(4));
+                    let w5 = _mm_load1_ps(w_ptr.as_ptr().add(5));
+                    let w6 = _mm_load1_ps(w_ptr.as_ptr().add(6));
+                    let w7 = _mm_load1_ps(w_ptr.as_ptr().add(7));
+
+                    let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
+                    let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
+                    let w45 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w4), w5);
+                    let w67 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w6), w7);
+
+                    astore_0 = conv_horiz_rgba_8_u16::<FMA>(
+                        bounds_start,
+                        src0,
+                        w01,
+                        w23,
+                        w45,
+                        w67,
+                        astore_0,
+                    );
+                    astore_1 = conv_horiz_rgba_8_u16::<FMA>(
+                        bounds_start,
+                        src1,
+                        w01,
+                        w23,
+                        w45,
+                        w67,
+                        astore_1,
+                    );
+                    astore_2 = conv_horiz_rgba_8_u16::<FMA>(
+                        bounds_start,
+                        src2,
+                        w01,
+                        w23,
+                        w45,
+                        w67,
+                        astore_2,
+                    );
+                    astore_3 = conv_horiz_rgba_8_u16::<FMA>(
+                        bounds_start,
+                        src3,
+                        w01,
+                        w23,
+                        w45,
+                        w67,
+                        astore_3,
+                    );
+                    jx += 8;
+                }
+
+                while jx + 4 < bounds_size {
+                    let bounds_start = bounds.start + jx;
+                    let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                    let w0 = _mm_load1_ps(w_ptr.as_ptr());
+                    let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
+                    let w2 = _mm_load1_ps(w_ptr.as_ptr().add(2));
+                    let w3 = _mm_load1_ps(w_ptr.as_ptr().add(3));
+
+                    let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
+                    let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
+
+                    astore_0 = conv_horiz_rgba_4_u16::<FMA>(bounds_start, src0, w01, w23, astore_0);
+                    astore_1 = conv_horiz_rgba_4_u16::<FMA>(bounds_start, src1, w01, w23, astore_1);
+                    astore_2 = conv_horiz_rgba_4_u16::<FMA>(bounds_start, src2, w01, w23, astore_2);
+                    astore_3 = conv_horiz_rgba_4_u16::<FMA>(bounds_start, src3, w01, w23, astore_3);
+                    jx += 4;
+                }
+
+                store_0 = _mm_add_ps(
+                    _mm256_castps256_ps128(astore_0),
+                    _mm256_extractf128_ps::<1>(astore_0),
+                );
+                store_1 = _mm_add_ps(
+                    _mm256_castps256_ps128(astore_1),
+                    _mm256_extractf128_ps::<1>(astore_1),
+                );
+                store_2 = _mm_add_ps(
+                    _mm256_castps256_ps128(astore_2),
+                    _mm256_extractf128_ps::<1>(astore_2),
+                );
+                store_3 = _mm_add_ps(
+                    _mm256_castps256_ps128(astore_3),
+                    _mm256_extractf128_ps::<1>(astore_3),
+                );
             }
 
-            while jx + 4 < bounds_size {
+            while jx + 2 < bounds_size {
+                let w_ptr = weights.get_unchecked(jx..(jx + 2));
                 let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
                 let w0 = _mm_load1_ps(w_ptr.as_ptr());
                 let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
-                let w2 = _mm_load1_ps(w_ptr.as_ptr().add(2));
-                let w3 = _mm_load1_ps(w_ptr.as_ptr().add(3));
-
-                let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
-                let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
-
-                astore_0 = conv_horiz_rgba_4_u16::<FMA>(bounds_start, src0, w01, w23, astore_0);
-                astore_1 = conv_horiz_rgba_4_u16::<FMA>(bounds_start, src1, w01, w23, astore_1);
-                astore_2 = conv_horiz_rgba_4_u16::<FMA>(bounds_start, src2, w01, w23, astore_2);
-                astore_3 = conv_horiz_rgba_4_u16::<FMA>(bounds_start, src3, w01, w23, astore_3);
-                jx += 4;
+                store_0 = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src0, w0, w1, store_0);
+                store_1 = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src1, w0, w1, store_1);
+                store_2 = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src2, w0, w1, store_2);
+                store_3 = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src3, w0, w1, store_3);
+                jx += 2;
             }
 
-            store_0 = _mm_add_ps(
-                _mm256_castps256_ps128(astore_0),
-                _mm256_extractf128_ps::<1>(astore_0),
+            while jx < bounds_size {
+                let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                let bounds_start = bounds.start + jx;
+                let w0 = _mm_load1_ps(w_ptr.as_ptr());
+                store_0 = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src0, w0, store_0);
+                store_1 = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src1, w0, store_1);
+                store_2 = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src2, w0, store_2);
+                store_3 = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src3, w0, store_3);
+                jx += 1;
+            }
+
+            let v_st0 = _mm_min_epi32(
+                _mm_cvtps_epi32(_mm_max_ps(store_0, _mm_setzero_ps())),
+                v_max_colors,
             );
-            store_1 = _mm_add_ps(
-                _mm256_castps256_ps128(astore_1),
-                _mm256_extractf128_ps::<1>(astore_1),
+            let v_st1 = _mm_min_epi32(
+                _mm_cvtps_epi32(_mm_max_ps(store_1, _mm_setzero_ps())),
+                v_max_colors,
             );
-            store_2 = _mm_add_ps(
-                _mm256_castps256_ps128(astore_2),
-                _mm256_extractf128_ps::<1>(astore_2),
+            let v_st2 = _mm_min_epi32(
+                _mm_cvtps_epi32(_mm_max_ps(store_2, _mm_setzero_ps())),
+                v_max_colors,
             );
-            store_3 = _mm_add_ps(
-                _mm256_castps256_ps128(astore_3),
-                _mm256_extractf128_ps::<1>(astore_3),
+            let v_st3 = _mm_min_epi32(
+                _mm_cvtps_epi32(_mm_max_ps(store_3, _mm_setzero_ps())),
+                v_max_colors,
             );
+
+            let store_16_0 = _mm_packus_epi32(v_st0, v_st0);
+            let store_16_1 = _mm_packus_epi32(v_st1, v_st1);
+            let store_16_2 = _mm_packus_epi32(v_st2, v_st2);
+            let store_16_3 = _mm_packus_epi32(v_st3, v_st3);
+
+            _mm_storeu_si64(chunk0.as_mut_ptr() as *mut u8, store_16_0);
+            _mm_storeu_si64(chunk1.as_mut_ptr() as *mut u8, store_16_1);
+            _mm_storeu_si64(chunk2.as_mut_ptr() as *mut u8, store_16_2);
+            _mm_storeu_si64(chunk3.as_mut_ptr() as *mut u8, store_16_3);
         }
-
-        while jx + 2 < bounds_size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 2));
-            let bounds_start = bounds.start + jx;
-            let w0 = _mm_load1_ps(w_ptr.as_ptr());
-            let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
-            store_0 = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src0, w0, w1, store_0);
-            store_1 = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src1, w0, w1, store_1);
-            store_2 = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src2, w0, w1, store_2);
-            store_3 = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src3, w0, w1, store_3);
-            jx += 2;
-        }
-
-        while jx < bounds_size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 1));
-            let bounds_start = bounds.start + jx;
-            let w0 = _mm_load1_ps(w_ptr.as_ptr());
-            store_0 = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src0, w0, store_0);
-            store_1 = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src1, w0, store_1);
-            store_2 = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src2, w0, store_2);
-            store_3 = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src3, w0, store_3);
-            jx += 1;
-        }
-
-        let v_st0 = _mm_min_epi32(
-            _mm_cvtps_epi32(_mm_max_ps(store_0, _mm_setzero_ps())),
-            v_max_colors,
-        );
-        let v_st1 = _mm_min_epi32(
-            _mm_cvtps_epi32(_mm_max_ps(store_1, _mm_setzero_ps())),
-            v_max_colors,
-        );
-        let v_st2 = _mm_min_epi32(
-            _mm_cvtps_epi32(_mm_max_ps(store_2, _mm_setzero_ps())),
-            v_max_colors,
-        );
-        let v_st3 = _mm_min_epi32(
-            _mm_cvtps_epi32(_mm_max_ps(store_3, _mm_setzero_ps())),
-            v_max_colors,
-        );
-
-        let store_16_0 = _mm_packus_epi32(v_st0, v_st0);
-        let store_16_1 = _mm_packus_epi32(v_st1, v_st1);
-        let store_16_2 = _mm_packus_epi32(v_st2, v_st2);
-        let store_16_3 = _mm_packus_epi32(v_st3, v_st3);
-
-        _mm_storeu_si64(chunk0.as_mut_ptr() as *mut u8, store_16_0);
-        _mm_storeu_si64(chunk1.as_mut_ptr() as *mut u8, store_16_1);
-        _mm_storeu_si64(chunk2.as_mut_ptr() as *mut u8, store_16_2);
-        _mm_storeu_si64(chunk3.as_mut_ptr() as *mut u8, store_16_3);
     }
 }
 
@@ -402,7 +426,8 @@ unsafe fn convolve_horizontal_rgba_avx_u16_row_def(
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
-    convolve_horizontal_rgba_avx_u16_row_impl::<false>(src, dst, filter_weights, bit_depth);
+    let unit = OneRowExecutionHandler::<false>::default();
+    unit.pass(src, dst, filter_weights, bit_depth);
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
@@ -413,100 +438,107 @@ unsafe fn convolve_horizontal_rgba_avx_u16_row_fma(
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
-    convolve_horizontal_rgba_avx_u16_row_impl::<true>(src, dst, filter_weights, bit_depth);
+    let unit = OneRowExecutionHandler::<true>::default();
+    unit.pass(src, dst, filter_weights, bit_depth);
 }
 
-#[inline(always)]
-unsafe fn convolve_horizontal_rgba_avx_u16_row_impl<const FMA: bool>(
-    src: &[u16],
-    dst: &mut [u16],
-    filter_weights: &FilterWeights<f32>,
-    bit_depth: u32,
-) {
-    const CHANNELS: usize = 4;
+#[derive(Copy, Clone, Default)]
+struct OneRowExecutionHandler<const FMA: bool> {}
 
-    let v_max_colors = _mm_set1_epi32((1i32 << bit_depth) - 1);
+impl<const FMA: bool> OneRowExecutionHandler<FMA> {
+    #[inline(always)]
+    unsafe fn pass(
+        &self,
+        src: &[u16],
+        dst: &mut [u16],
+        filter_weights: &FilterWeights<f32>,
+        bit_depth: u32,
+    ) {
+        const CHANNELS: usize = 4;
 
-    for ((dst, bounds), weights) in dst
-        .chunks_exact_mut(CHANNELS)
-        .zip(filter_weights.bounds.iter())
-        .zip(
-            filter_weights
-                .weights
-                .chunks_exact(filter_weights.aligned_size),
-        )
-    {
-        let bounds_size = bounds.size;
-        let mut jx = 0usize;
-        let mut store = _mm_setzero_ps();
+        let v_max_colors = _mm_set1_epi32((1i32 << bit_depth) - 1);
 
-        if jx >= 4 {
-            let mut astore = _mm256_setzero_ps();
+        for ((dst, bounds), weights) in dst
+            .chunks_exact_mut(CHANNELS)
+            .zip(filter_weights.bounds.iter())
+            .zip(
+                filter_weights
+                    .weights
+                    .chunks_exact(filter_weights.aligned_size),
+            )
+        {
+            let bounds_size = bounds.size;
+            let mut jx = 0usize;
+            let mut store = _mm_setzero_ps();
 
-            while jx + 8 < bounds_size {
-                let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 8));
-                let w0 = _mm_load1_ps(w_ptr.as_ptr());
-                let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
-                let w2 = _mm_load1_ps(w_ptr.as_ptr().add(2));
-                let w3 = _mm_load1_ps(w_ptr.as_ptr().add(3));
-                let w4 = _mm_load1_ps(w_ptr.as_ptr().add(4));
-                let w5 = _mm_load1_ps(w_ptr.as_ptr().add(5));
-                let w6 = _mm_load1_ps(w_ptr.as_ptr().add(6));
-                let w7 = _mm_load1_ps(w_ptr.as_ptr().add(7));
-                let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
-                let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
-                let w45 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w4), w5);
-                let w67 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w6), w7);
-                astore =
-                    conv_horiz_rgba_8_u16::<FMA>(bounds_start, src, w01, w23, w45, w67, astore);
-                jx += 8;
+            if jx >= 4 {
+                let mut astore = _mm256_setzero_ps();
+
+                while jx + 8 < bounds_size {
+                    let bounds_start = bounds.start + jx;
+                    let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                    let w0 = _mm_load1_ps(w_ptr.as_ptr());
+                    let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
+                    let w2 = _mm_load1_ps(w_ptr.as_ptr().add(2));
+                    let w3 = _mm_load1_ps(w_ptr.as_ptr().add(3));
+                    let w4 = _mm_load1_ps(w_ptr.as_ptr().add(4));
+                    let w5 = _mm_load1_ps(w_ptr.as_ptr().add(5));
+                    let w6 = _mm_load1_ps(w_ptr.as_ptr().add(6));
+                    let w7 = _mm_load1_ps(w_ptr.as_ptr().add(7));
+                    let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
+                    let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
+                    let w45 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w4), w5);
+                    let w67 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w6), w7);
+                    astore =
+                        conv_horiz_rgba_8_u16::<FMA>(bounds_start, src, w01, w23, w45, w67, astore);
+                    jx += 8;
+                }
+
+                while jx + 4 < bounds_size {
+                    let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                    let w0 = _mm_load1_ps(w_ptr.as_ptr());
+                    let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
+                    let w2 = _mm_load1_ps(w_ptr.as_ptr().add(2));
+                    let w3 = _mm_load1_ps(w_ptr.as_ptr().add(3));
+                    let bounds_start = bounds.start + jx;
+
+                    let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
+                    let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
+
+                    astore = conv_horiz_rgba_4_u16::<FMA>(bounds_start, src, w01, w23, astore);
+                    jx += 4;
+                }
+
+                store = _mm_add_ps(
+                    _mm256_castps256_ps128(astore),
+                    _mm256_extractf128_ps::<1>(astore),
+                );
             }
 
-            while jx + 4 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+            while jx + 2 < bounds_size {
+                let w_ptr = weights.get_unchecked(jx..(jx + 2));
+                let bounds_start = bounds.start + jx;
                 let w0 = _mm_load1_ps(w_ptr.as_ptr());
                 let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
-                let w2 = _mm_load1_ps(w_ptr.as_ptr().add(2));
-                let w3 = _mm_load1_ps(w_ptr.as_ptr().add(3));
-                let bounds_start = bounds.start + jx;
-
-                let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
-                let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
-
-                astore = conv_horiz_rgba_4_u16::<FMA>(bounds_start, src, w01, w23, astore);
-                jx += 4;
+                store = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src, w0, w1, store);
+                jx += 2;
             }
 
-            store = _mm_add_ps(
-                _mm256_castps256_ps128(astore),
-                _mm256_extractf128_ps::<1>(astore),
+            while jx < bounds_size {
+                let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                let w0 = _mm_load1_ps(w_ptr.as_ptr());
+                let bounds_start = bounds.start + jx;
+                store = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src, w0, store);
+                jx += 1;
+            }
+
+            let v_st = _mm_min_epi32(
+                _mm_cvtps_epi32(_mm_max_ps(store, _mm_setzero_ps())),
+                v_max_colors,
             );
+
+            let store_16_0 = _mm_packus_epi32(v_st, v_st);
+            _mm_storeu_si64(dst.as_mut_ptr() as *mut u8, store_16_0);
         }
-
-        while jx + 2 < bounds_size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 2));
-            let bounds_start = bounds.start + jx;
-            let w0 = _mm_load1_ps(w_ptr.as_ptr());
-            let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
-            store = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src, w0, w1, store);
-            jx += 2;
-        }
-
-        while jx < bounds_size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 1));
-            let w0 = _mm_load1_ps(w_ptr.as_ptr());
-            let bounds_start = bounds.start + jx;
-            store = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src, w0, store);
-            jx += 1;
-        }
-
-        let v_st = _mm_min_epi32(
-            _mm_cvtps_epi32(_mm_max_ps(store, _mm_setzero_ps())),
-            v_max_colors,
-        );
-
-        let store_16_0 = _mm_packus_epi32(v_st, v_st);
-        _mm_storeu_si64(dst.as_mut_ptr() as *mut u8, store_16_0);
     }
 }

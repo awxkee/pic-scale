@@ -30,14 +30,14 @@ use std::arch::wasm32::*;
 
 #[inline]
 #[target_feature(enable = "simd128")]
-pub unsafe fn w_zeros() -> v128 {
+pub(crate) unsafe fn w_zeros() -> v128 {
     i32x4_splat(0)
 }
 
 /// Packs two u32x4 into one u16x8 using truncation
 #[inline]
 #[target_feature(enable = "simd128")]
-pub unsafe fn u32x4_pack_trunc_u16x8(a: v128, b: v128) -> v128 {
+pub(crate) unsafe fn u32x4_pack_trunc_u16x8(a: v128, b: v128) -> v128 {
     u8x16_shuffle::<0, 1, 4, 5, 8, 9, 12, 13, 16, 17, 20, 21, 24, 25, 28, 29>(a, b)
 }
 
@@ -45,14 +45,14 @@ pub unsafe fn u32x4_pack_trunc_u16x8(a: v128, b: v128) -> v128 {
 #[inline]
 #[target_feature(enable = "simd128")]
 #[allow(dead_code)]
-pub unsafe fn u16x8_pack_trunc_u8x16(a: v128, b: v128) -> v128 {
+pub(crate) unsafe fn u16x8_pack_trunc_u8x16(a: v128, b: v128) -> v128 {
     u8x16_shuffle::<0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30>(a, b)
 }
 
 /// Packs two u16x8 into one u8x16 using unsigned saturation
 #[inline]
 #[target_feature(enable = "simd128")]
-pub unsafe fn u16x8_pack_sat_u8x16(a: v128, b: v128) -> v128 {
+pub(crate) unsafe fn u16x8_pack_sat_u8x16(a: v128, b: v128) -> v128 {
     let maxval = u16x8_splat(255);
     let a1 = v128_bitselect(maxval, a, u16x8_gt(a, maxval));
     let b1 = v128_bitselect(maxval, b, u16x8_gt(b, maxval));
@@ -61,12 +61,12 @@ pub unsafe fn u16x8_pack_sat_u8x16(a: v128, b: v128) -> v128 {
 
 #[inline]
 #[target_feature(enable = "simd128")]
-pub unsafe fn wasm_unpacklo_i8x16(a: v128, b: v128) -> v128 {
+pub(crate) unsafe fn wasm_unpacklo_i8x16(a: v128, b: v128) -> v128 {
     u8x16_shuffle::<0, 16, 1, 17, 2, 18, 3, 19, 4, 20, 5, 21, 6, 22, 7, 23>(a, b)
 }
 
 #[inline]
 #[target_feature(enable = "simd128")]
-pub unsafe fn wasm_unpackhi_i8x16(a: v128, b: v128) -> v128 {
+pub(crate) unsafe fn wasm_unpackhi_i8x16(a: v128, b: v128) -> v128 {
     u8x16_shuffle::<8, 24, 9, 25, 10, 26, 11, 27, 12, 28, 13, 29, 14, 30, 15, 31>(a, b)
 }

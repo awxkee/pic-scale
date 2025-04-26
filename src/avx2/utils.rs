@@ -86,7 +86,7 @@ pub(crate) unsafe fn avx2_deinterleave_rgba(
     rgba3: __m256i,
 ) -> (__m256i, __m256i, __m256i, __m256i) {
     #[rustfmt::skip]
-        let sh = _mm256_setr_epi8(
+    let sh = _mm256_setr_epi8(
         0, 4, 8, 12, 1, 5,
         9, 13, 2, 6, 10, 14,
         3, 7, 11, 15, 0, 4,
