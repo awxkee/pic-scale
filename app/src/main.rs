@@ -58,7 +58,7 @@ fn main() {
 
     let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
-    scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
+    scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
     //
     // // let rgb_feature16 = transient
