@@ -471,3 +471,12 @@ pub(crate) unsafe fn _mm_reduce_r_epi32<const PRECISION: i32>(x: __m128i) -> __m
     let hi32 = _mm_shufflelo_epi16::<SM>(sum64);
     _mm_srai_epi32::<PRECISION>(_mm_add_epi32(sum64, hi32))
 }
+
+/// Sums all lanes in float32
+#[inline(always)]
+pub(crate) unsafe fn _mm_hsum_ps(v: __m128) -> __m128 {
+    let mut shuf = _mm_movehdup_ps(v);
+    let sums = _mm_add_ps(v, shuf);
+    shuf = _mm_movehl_ps(shuf, sums);
+    _mm_add_ss(sums, shuf)
+}

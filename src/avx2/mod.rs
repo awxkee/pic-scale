@@ -33,6 +33,7 @@ mod alpha_f32;
 mod alpha_u16;
 mod alpha_u8;
 mod check_alpha;
+mod plane_u16;
 mod plane_u16_lb;
 mod rgb_u8;
 #[cfg(feature = "nightly_f16")]
@@ -61,6 +62,9 @@ pub(crate) use alpha_u8::avx_premultiply_alpha_rgba;
 pub(crate) use alpha_u8::avx_unpremultiply_alpha_rgba;
 pub(crate) use check_alpha::{
     avx_has_non_constant_cap_alpha_rgba16, avx_has_non_constant_cap_alpha_rgba8,
+};
+pub(crate) use plane_u16::{
+    convolve_horizontal_plane_avx_rows_4_u16_f, convolve_horizontal_plane_avx_u16_row_f,
 };
 pub(crate) use plane_u16_lb::{
     convolve_horizontal_plane_avx_rows_4_u16, convolve_horizontal_plane_avx_u16lp_row,

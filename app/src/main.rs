@@ -77,17 +77,17 @@ fn main() {
     let bytes32 = bytes
         .iter()
         // .map(|&x| x)
-        .map(|&x| u16::from_ne_bytes([x, x]) >> 6)
+        .map(|&x| u16::from_ne_bytes([x, x]))
         .collect::<Vec<_>>();
 
     let mut store =
         Planar16ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
-    store.bit_depth = 10;
+    store.bit_depth = 16;
     let mut dst_store = Planar16ImageStoreMut::alloc_with_depth(
         dimensions.0 as usize / 4,
         dimensions.1 as usize / 4,
-        10,
+        16,
     );
     scaler.resize_plane_u16(&store, &mut dst_store).unwrap();
     //
@@ -141,7 +141,7 @@ fn main() {
         .as_bytes()
         .iter()
         // .map(|&x| x)
-        .map(|&x| (x >> 2) as u8)
+        .map(|&x| (x >> 8) as u8)
         .collect::<Vec<_>>();
 
     if dst_store.channels == 4 {
