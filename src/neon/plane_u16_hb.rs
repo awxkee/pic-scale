@@ -218,15 +218,10 @@ unsafe fn convolve_horizontal_plane_neon_rows_4_hb_impl(
                 jx += 1;
             }
 
-            let j0 = vmaxq_s32(vshrq_n_s32::<6>(store_0), vdupq_n_s32(0));
-            let j1 = vmaxq_s32(vshrq_n_s32::<6>(store_1), vdupq_n_s32(0));
-            let j2 = vmaxq_s32(vshrq_n_s32::<6>(store_2), vdupq_n_s32(0));
-            let j3 = vmaxq_s32(vshrq_n_s32::<6>(store_3), vdupq_n_s32(0));
-
-            let store_16_0 = (vaddvq_s32(j0) as u32).min(v_max_colors);
-            let store_16_1 = (vaddvq_s32(j1) as u32).min(v_max_colors);
-            let store_16_2 = (vaddvq_s32(j2) as u32).min(v_max_colors);
-            let store_16_3 = (vaddvq_s32(j3) as u32).min(v_max_colors);
+            let store_16_0 = ((vaddvq_s32(store_0).max(0) as u32) >> 6).min(v_max_colors);
+            let store_16_1 = ((vaddvq_s32(store_1).max(0) as u32) >> 6).min(v_max_colors);
+            let store_16_2 = ((vaddvq_s32(store_2).max(0) as u32) >> 6).min(v_max_colors);
+            let store_16_3 = ((vaddvq_s32(store_3).max(0) as u32) >> 6).min(v_max_colors);
 
             *chunk0 = store_16_0 as u16;
             *chunk1 = store_16_1 as u16;
@@ -301,8 +296,7 @@ unsafe fn convolve_horizontal_plane_neon_u16_hb_impl(
                 jx += 1;
             }
 
-            let j0 = vmaxq_s32(vshrq_n_s32::<6>(store), vdupq_n_s32(0));
-            let store_16_0 = (vaddvq_s32(j0) as u32).min(v_max_colors);
+            let store_16_0 = (((vaddvq_s32(store)) >> 6).max(0) as u32).min(v_max_colors);
 
             *dst = store_16_0 as u16;
         }

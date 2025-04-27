@@ -112,7 +112,7 @@ pub(crate) fn convolve_horizontal_plane_neon_rows_4_lb_u16(
         const ROUNDING_CONST: i32 = (1 << (PRECISION - 1)) - 1;
         let init = vdupq_n_s32(ROUNDING_CONST);
 
-        let v_max_colors = (1u16 << bit_depth) - 1;
+        let v_max_colors = (1u32 << bit_depth) - 1;
 
         let (row0_ref, rest) = dst.split_at_mut(dst_stride);
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
@@ -194,20 +194,15 @@ pub(crate) fn convolve_horizontal_plane_neon_rows_4_lb_u16(
                 jx += 1;
             }
 
-            let j0 = vqshrun_n_s32::<PRECISION>(store_0);
-            let j1 = vqshrun_n_s32::<PRECISION>(store_1);
-            let j2 = vqshrun_n_s32::<PRECISION>(store_2);
-            let j3 = vqshrun_n_s32::<PRECISION>(store_3);
+            let store_16_0 = ((vaddvq_s32(store_0).max(0) as u32) >> PRECISION).min(v_max_colors);
+            let store_16_1 = ((vaddvq_s32(store_1).max(0) as u32) >> PRECISION).min(v_max_colors);
+            let store_16_2 = ((vaddvq_s32(store_2).max(0) as u32) >> PRECISION).min(v_max_colors);
+            let store_16_3 = ((vaddvq_s32(store_3).max(0) as u32) >> PRECISION).min(v_max_colors);
 
-            let store_16_0 = vaddv_u16(j0).min(v_max_colors);
-            let store_16_1 = vaddv_u16(j1).min(v_max_colors);
-            let store_16_2 = vaddv_u16(j2).min(v_max_colors);
-            let store_16_3 = vaddv_u16(j3).min(v_max_colors);
-
-            *chunk0 = store_16_0;
-            *chunk1 = store_16_1;
-            *chunk2 = store_16_2;
-            *chunk3 = store_16_3;
+            *chunk0 = store_16_0 as u16;
+            *chunk1 = store_16_1 as u16;
+            *chunk2 = store_16_2 as u16;
+            *chunk3 = store_16_3 as u16;
         }
     }
 }
@@ -219,7 +214,7 @@ pub(crate) fn convolve_horizontal_plane_neon_u16_lb_row(
     bit_depth: u32,
 ) {
     unsafe {
-        let v_max_colors = (1u16 << bit_depth) - 1;
+        let v_max_colors = (1u32 << bit_depth) - 1;
 
         const PRECISION: i32 = 16;
         const ROUNDING_CONST: i32 = (1 << (PRECISION - 1)) - 1;
@@ -268,9 +263,9 @@ pub(crate) fn convolve_horizontal_plane_neon_u16_lb_row(
                 jx += 1;
             }
 
-            let j0 = vqshrun_n_s32::<PRECISION>(store);
-            let store_16_0 = vaddv_u16(j0).min(v_max_colors);
-            *dst = store_16_0;
+            let store_16_0 = (((vaddvq_s32(store)) >> PRECISION).max(0) as u32).min(v_max_colors);
+
+            *dst = store_16_0 as u16;
         }
     }
 }
