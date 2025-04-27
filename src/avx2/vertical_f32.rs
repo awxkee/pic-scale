@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::avx2::utils::_mm256_fma_ps;
+use crate::avx2::utils::{_mm256_fma_ps, _mm_prefer_fma_ps};
 use crate::filter_weights::FilterBounds;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
@@ -145,26 +145,23 @@ pub(crate) unsafe fn convolve_vertical_part_avx_f32<const FMA: bool>(
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
-    let mut store_0 = _mm256_setzero_ps();
+    let mut store_0 = _mm_setzero_ps();
 
     let px = start_x;
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = *filter.get_unchecked(j);
-        let v_weight = _mm256_set1_ps(weight);
+        let weight = filter.get_unchecked(j..);
+        let v_weight = _mm_load_ss(weight.as_ptr());
         let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
 
-        let item_row_0 = _mm256_set1_ps(src_ptr.read_unaligned());
+        let item_row_0 = _mm_load_ss(src_ptr);
 
-        store_0 = _mm256_fma_ps::<FMA>(store_0, item_row_0, v_weight);
+        store_0 = _mm_prefer_fma_ps::<FMA>(store_0, item_row_0, v_weight);
     }
 
     let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-    _mm_storeu_si32(
-        dst_ptr as *mut u8,
-        _mm256_castsi256_si128(_mm256_castps_si256(store_0)),
-    );
+    _mm_store_ss(dst_ptr, store_0);
 }
 
 #[inline]

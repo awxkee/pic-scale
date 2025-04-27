@@ -12,9 +12,10 @@ use fast_image_resize::{
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
-    ImageSize, ImageStore, ImageStoreMut, ImageStoreScaling, ResamplingFunction, Rgba16ImageStore,
-    Rgba16ImageStoreMut, Rgba8ImageStore, Rgba8ImageStoreMut, Scaler, Scaling, ScalingF32,
-    ScalingU16, ThreadingPolicy, WorkloadStrategy,
+    ImageSize, ImageStore, ImageStoreMut, ImageStoreScaling, Planar16ImageStore,
+    Planar16ImageStoreMut, ResamplingFunction, Rgba16ImageStore, Rgba16ImageStoreMut,
+    Rgba8ImageStore, Rgba8ImageStoreMut, Scaler, Scaling, ScalingF32, ScalingU16, ThreadingPolicy,
+    WorkloadStrategy,
 };
 
 fn resize_plane(
@@ -51,7 +52,7 @@ fn main() {
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
-    let transient = img.to_rgba8();
+    let transient = img.to_luma8();
     let mut bytes = Vec::from(transient.as_bytes());
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
@@ -75,20 +76,20 @@ fn main() {
 
     let bytes32 = bytes
         .iter()
-        .map(|&x| x)
-        // .map(|&x| u16::from_ne_bytes([x, x]))
+        // .map(|&x| x)
+        .map(|&x| u16::from_ne_bytes([x, x]))
         .collect::<Vec<_>>();
 
     let mut store =
-        Rgba8ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize)
+        Planar16ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
     store.bit_depth = 16;
-    let mut dst_store = Rgba8ImageStoreMut::alloc_with_depth(
+    let mut dst_store = Planar16ImageStoreMut::alloc_with_depth(
         dimensions.0 as usize / 4,
         dimensions.1 as usize / 4,
         16,
     );
-    scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
+    scaler.resize_plane_u16(&store, &mut dst_store).unwrap();
     //
     // let elapsed_time = start_time.elapsed();
     // // Print the elapsed time in milliseconds
@@ -139,8 +140,8 @@ fn main() {
     let dst = dst_store
         .as_bytes()
         .iter()
-        .map(|&x| x)
-        // .map(|&x| (x >> 8) as u8)
+        // .map(|&x| x)
+        .map(|&x| (x >> 8) as u8)
         .collect::<Vec<_>>();
 
     if dst_store.channels == 4 {
@@ -158,7 +159,7 @@ fn main() {
             &dst,
             dst_store.width as u32,
             dst_store.height as u32,
-            image::ColorType::Rgb8,
+            image::ColorType::L8,
         )
         .unwrap();
     }
