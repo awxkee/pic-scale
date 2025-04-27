@@ -80,7 +80,7 @@ pub(crate) unsafe fn i32x4_saturate_to_u8(a: v128) -> v128 {
     u8x16_shuffle::<0, 4, 8, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0>(a1, a)
 }
 
-/// Packs two u16x8 into one u8x16 using unsigned saturation
+/// Packs two i32x4 into one u8x16 using unsigned saturation
 #[inline]
 #[target_feature(enable = "simd128")]
 pub(crate) unsafe fn i32x4_saturate2_to_u8(a0: v128, a1: v128) -> v128 {
