@@ -69,6 +69,28 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
+    c.bench_function("Pic scale Plane10: Lanczos 3", |b| {
+        let copied: Vec<u16> = binding16
+            .as_raw()
+            .iter()
+            .map(|&x| x >> 6)
+            .collect::<Vec<_>>();
+        let store =
+            ImageStore::<u16, 1>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
+                .unwrap();
+        b.iter(|| {
+            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+            scaler.set_threading_policy(ThreadingPolicy::Single);
+            scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
+            let mut target = ImageStoreMut::alloc_with_depth(
+                dimensions.0 as usize / 4,
+                dimensions.1 as usize / 4,
+                10,
+            );
+            scaler.resize_plane_u16(&store, &mut target).unwrap();
+        })
+    });
+
     c.bench_function("Pic scale Plane8(Quality): Lanczos 3", |b| {
         let copied: Vec<u8> = binding.as_raw().to_vec();
         let store =

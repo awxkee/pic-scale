@@ -34,14 +34,13 @@ use std::arch::aarch64::*;
 unsafe fn conv_horiz_1_u16(
     start_x: usize,
     src: &[u16],
-    w0: int32x4_t,
+    w0: int16x4_t,
     store: int32x4_t,
 ) -> int32x4_t {
     const COMPONENTS: usize = 1;
     let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
     let px = vld1_lane_u16::<0>(src_ptr.as_ptr() as *const _, vdup_n_u16(0));
-    let lo = vreinterpretq_s32_u32(vshll_n_u16::<6>(px));
-    vqrdmlahq_s32(store, lo, w0)
+    vqdmlal_s16(store, vreinterpret_s16_u16(px), w0)
 }
 
 #[must_use]
@@ -49,18 +48,18 @@ unsafe fn conv_horiz_1_u16(
 unsafe fn conv_horiz_2_u16(
     start_x: usize,
     src: &[u16],
-    w0: int32x4_t,
+    w0: int16x4_t,
     store: int32x4_t,
 ) -> int32x4_t {
     const COMPONENTS: usize = 1;
     let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
 
-    let px = vreinterpret_u16_u32(vld1_lane_u32::<0>(
+    let px = vreinterpret_s16_u32(vld1_lane_u32::<0>(
         src_ptr.as_ptr() as *const _,
         vdup_n_u32(0),
     ));
 
-    vqrdmlahq_s32(store, vreinterpretq_s32_u32(vshll_n_u16::<6>(px)), w0)
+    vqdmlal_s16(store, px, w0)
 }
 
 #[must_use]
@@ -68,7 +67,7 @@ unsafe fn conv_horiz_2_u16(
 unsafe fn conv_horiz_4_u16(
     start_x: usize,
     src: &[u16],
-    weights: int32x4_t,
+    weights: int16x4_t,
     store: int32x4_t,
 ) -> int32x4_t {
     const COMPONENTS: usize = 1;
@@ -76,7 +75,7 @@ unsafe fn conv_horiz_4_u16(
 
     let px = vld1_u16(src_ptr.as_ptr());
 
-    vqrdmlahq_s32(store, vreinterpretq_s32_u32(vshll_n_u16::<6>(px)), weights)
+    vqdmlal_s16(store, vreinterpret_s16_u16(px), weights)
 }
 
 #[must_use]
@@ -84,59 +83,36 @@ unsafe fn conv_horiz_4_u16(
 unsafe fn conv_horiz_8_u16(
     start_x: usize,
     src: &[u16],
-    weights: (int32x4_t, int32x4_t),
+    weights: int16x8_t,
     store: int32x4_t,
 ) -> int32x4_t {
     const COMPONENTS: usize = 1;
     let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
 
-    let pixels = vld1q_u16(src_ptr.as_ptr());
+    let px = vld1q_u16(src_ptr.as_ptr());
 
-    let acc = vqrdmlahq_s32(
+    let acc = vqdmlal_s16(
         store,
-        vreinterpretq_s32_u32(vshll_high_n_u16::<6>(pixels)),
-        weights.1,
+        vreinterpret_s16_u16(vget_low_u16(px)),
+        vget_low_s16(weights),
     );
-    vqrdmlahq_s32(
-        acc,
-        vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(pixels))),
-        weights.0,
-    )
+    vqdmlal_high_s16(acc, vreinterpretq_s16_u16(px), weights)
 }
 
-pub(crate) fn convolve_horizontal_plane_neon_rows_4_hb_u16(
+pub(crate) fn convolve_horizontal_plane_neon_rows_4_lb_u16(
     src: &[u16],
     src_stride: usize,
     dst: &mut [u16],
     dst_stride: usize,
-    filter_weights: &FilterWeights<i32>,
+    filter_weights: &FilterWeights<i16>,
     bit_depth: u32,
 ) {
     unsafe {
-        convolve_horizontal_plane_neon_rows_4_hb_impl(
-            src,
-            src_stride,
-            dst,
-            dst_stride,
-            filter_weights,
-            bit_depth,
-        )
-    }
-}
+        const PRECISION: i32 = 16;
+        const ROUNDING_CONST: i32 = (1 << (PRECISION - 1)) - 1;
+        let init = vdupq_n_s32(ROUNDING_CONST);
 
-#[target_feature(enable = "rdm")]
-unsafe fn convolve_horizontal_plane_neon_rows_4_hb_impl(
-    src: &[u16],
-    src_stride: usize,
-    dst: &mut [u16],
-    dst_stride: usize,
-    filter_weights: &FilterWeights<i32>,
-    bit_depth: u32,
-) {
-    unsafe {
-        let init = vdupq_n_s32((1 << 5) - 1);
-
-        let v_max_colors = (1u32 << bit_depth) - 1;
+        let v_max_colors = (1u16 << bit_depth) - 1;
 
         let (row0_ref, rest) = dst.split_at_mut(dst_stride);
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
@@ -174,10 +150,7 @@ unsafe fn convolve_horizontal_plane_neon_rows_4_hb_impl(
             while jx + 8 < bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..(jx + 8));
-                let weights_set = (
-                    vld1q_s32(w_ptr.as_ptr()),
-                    vld1q_s32(w_ptr.get_unchecked(4..).as_ptr()),
-                );
+                let weights_set = vld1q_s16(w_ptr.as_ptr());
                 store_0 = conv_horiz_8_u16(bounds_start, src0, weights_set, store_0);
                 store_1 = conv_horiz_8_u16(bounds_start, src1, weights_set, store_1);
                 store_2 = conv_horiz_8_u16(bounds_start, src2, weights_set, store_2);
@@ -188,7 +161,7 @@ unsafe fn convolve_horizontal_plane_neon_rows_4_hb_impl(
             while jx + 4 < bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..(jx + 4));
-                let weights = vld1q_s32(w_ptr.as_ptr());
+                let weights = vld1_s16(w_ptr.as_ptr());
                 store_0 = conv_horiz_4_u16(bounds_start, src0, weights, store_0);
                 store_1 = conv_horiz_4_u16(bounds_start, src1, weights, store_1);
                 store_2 = conv_horiz_4_u16(bounds_start, src2, weights, store_2);
@@ -199,7 +172,10 @@ unsafe fn convolve_horizontal_plane_neon_rows_4_hb_impl(
             while jx + 2 < bounds_size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 2));
                 let bounds_start = bounds.start + jx;
-                let w0 = vcombine_s32(vld1_s32(w_ptr.as_ptr()), vdup_n_s32(0));
+                let w0 = vreinterpret_s16_s32(vld1_lane_s32::<0>(
+                    w_ptr.as_ptr() as *const _,
+                    vdup_n_s32(0),
+                ));
                 store_0 = conv_horiz_2_u16(bounds_start, src0, w0, store_0);
                 store_1 = conv_horiz_2_u16(bounds_start, src1, w0, store_1);
                 store_2 = conv_horiz_2_u16(bounds_start, src2, w0, store_2);
@@ -210,7 +186,7 @@ unsafe fn convolve_horizontal_plane_neon_rows_4_hb_impl(
             while jx < bounds_size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 1));
                 let bounds_start = bounds.start + jx;
-                let weight0 = vld1q_dup_s32(w_ptr.as_ptr());
+                let weight0 = vld1_dup_s16(w_ptr.as_ptr());
                 store_0 = conv_horiz_1_u16(bounds_start, src0, weight0, store_0);
                 store_1 = conv_horiz_1_u16(bounds_start, src1, weight0, store_1);
                 store_2 = conv_horiz_1_u16(bounds_start, src2, weight0, store_2);
@@ -218,44 +194,35 @@ unsafe fn convolve_horizontal_plane_neon_rows_4_hb_impl(
                 jx += 1;
             }
 
-            let j0 = vmaxq_s32(vshrq_n_s32::<6>(store_0), vdupq_n_s32(0));
-            let j1 = vmaxq_s32(vshrq_n_s32::<6>(store_1), vdupq_n_s32(0));
-            let j2 = vmaxq_s32(vshrq_n_s32::<6>(store_2), vdupq_n_s32(0));
-            let j3 = vmaxq_s32(vshrq_n_s32::<6>(store_3), vdupq_n_s32(0));
+            let j0 = vqshrun_n_s32::<PRECISION>(store_0);
+            let j1 = vqshrun_n_s32::<PRECISION>(store_1);
+            let j2 = vqshrun_n_s32::<PRECISION>(store_2);
+            let j3 = vqshrun_n_s32::<PRECISION>(store_3);
 
-            let store_16_0 = (vaddvq_s32(j0) as u32).min(v_max_colors);
-            let store_16_1 = (vaddvq_s32(j1) as u32).min(v_max_colors);
-            let store_16_2 = (vaddvq_s32(j2) as u32).min(v_max_colors);
-            let store_16_3 = (vaddvq_s32(j3) as u32).min(v_max_colors);
+            let store_16_0 = vaddv_u16(j0).min(v_max_colors);
+            let store_16_1 = vaddv_u16(j1).min(v_max_colors);
+            let store_16_2 = vaddv_u16(j2).min(v_max_colors);
+            let store_16_3 = vaddv_u16(j3).min(v_max_colors);
 
-            *chunk0 = store_16_0 as u16;
-            *chunk1 = store_16_1 as u16;
-            *chunk2 = store_16_2 as u16;
-            *chunk3 = store_16_3 as u16;
+            *chunk0 = store_16_0;
+            *chunk1 = store_16_1;
+            *chunk2 = store_16_2;
+            *chunk3 = store_16_3;
         }
     }
 }
 
-pub(crate) fn convolve_horizontal_plane_neon_u16_hb_row(
+pub(crate) fn convolve_horizontal_plane_neon_u16_lb_row(
     src: &[u16],
     dst: &mut [u16],
-    filter_weights: &FilterWeights<i32>,
+    filter_weights: &FilterWeights<i16>,
     bit_depth: u32,
 ) {
     unsafe {
-        convolve_horizontal_plane_neon_u16_hb_impl(src, dst, filter_weights, bit_depth);
-    }
-}
+        let v_max_colors = (1u16 << bit_depth) - 1;
 
-#[target_feature(enable = "rdm")]
-unsafe fn convolve_horizontal_plane_neon_u16_hb_impl(
-    src: &[u16],
-    dst: &mut [u16],
-    filter_weights: &FilterWeights<i32>,
-    bit_depth: u32,
-) {
-    unsafe {
-        let v_max_colors = (1u32 << bit_depth) - 1;
+        const PRECISION: i32 = 16;
+        const ROUNDING_CONST: i32 = (1 << (PRECISION - 1)) - 1;
 
         for ((dst, bounds), weights) in dst.iter_mut().zip(filter_weights.bounds.iter()).zip(
             filter_weights
@@ -264,22 +231,19 @@ unsafe fn convolve_horizontal_plane_neon_u16_hb_impl(
         ) {
             let bounds_size = bounds.size;
             let mut jx = 0usize;
-            let mut store = vdupq_n_s32((1 << 5) - 1);
+            let mut store = vdupq_n_s32(ROUNDING_CONST);
 
             while jx + 8 < bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..(jx + 8));
-                let weights_set = (
-                    vld1q_s32(w_ptr.as_ptr()),
-                    vld1q_s32(w_ptr.get_unchecked(4..).as_ptr()),
-                );
+                let weights_set = vld1q_s16(w_ptr.as_ptr());
                 store = conv_horiz_8_u16(bounds_start, src, weights_set, store);
                 jx += 8;
             }
 
             while jx + 4 < bounds_size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 4));
-                let weights = vld1q_s32(w_ptr.as_ptr());
+                let weights = vld1_s16(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
                 store = conv_horiz_4_u16(bounds_start, src, weights, store);
                 jx += 4;
@@ -288,23 +252,25 @@ unsafe fn convolve_horizontal_plane_neon_u16_hb_impl(
             while jx + 2 < bounds_size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 2));
                 let bounds_start = bounds.start + jx;
-                let w0 = vcombine_s32(vld1_s32(w_ptr.as_ptr()), vdup_n_s32(0));
+                let w0 = vreinterpret_s16_s32(vld1_lane_s32::<0>(
+                    w_ptr.as_ptr() as *const _,
+                    vdup_n_s32(0),
+                ));
                 store = conv_horiz_2_u16(bounds_start, src, w0, store);
                 jx += 2;
             }
 
             while jx < bounds_size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 1));
-                let weight0 = vld1q_dup_s32(w_ptr.as_ptr());
+                let weight0 = vld1_dup_s16(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
                 store = conv_horiz_1_u16(bounds_start, src, weight0, store);
                 jx += 1;
             }
 
-            let j0 = vmaxq_s32(vshrq_n_s32::<6>(store), vdupq_n_s32(0));
-            let store_16_0 = (vaddvq_s32(j0) as u32).min(v_max_colors);
-
-            *dst = store_16_0 as u16;
+            let j0 = vqshrun_n_s32::<PRECISION>(store);
+            let store_16_0 = vaddv_u16(j0).min(v_max_colors);
+            *dst = store_16_0;
         }
     }
 }
