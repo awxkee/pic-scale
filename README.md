@@ -49,7 +49,7 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 
 |                | NEON | SSE | AVX2 | AVX-512    | WASM | 
 |----------------|------|-----|------|------------|------| 
-| RGBA (8 bit)   | x    | x   | x    | x(avxvnni) | ~    | 
+| RGBA (8 bit)   | x    | x   | x    | x(avxvnni) | x    | 
 | RGB (8 bit)    | x    | x   | x    | x(avxvnni) | ~    | 
 | Plane (8 bit)  | x    | x   | ~    | ~          | ~    | 
 | RGBA (8+ bit)  | x    | x   | x    | x(avxvnni) | -    | 
