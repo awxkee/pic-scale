@@ -30,30 +30,30 @@ pub fn process(image: Uint8Array) -> Uint8Array {
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
-    let transient = img.to_rgba8();
+    let transient = img.to_rgb8();
     let mut bytes = Vec::from(transient.as_bytes());
 
     let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
 
     let store =
-        ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize)
+        ImageStore::<u8, 3>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
 
     let mut target_store =
-        ImageStoreMut::<u8, 4>::alloc(dimensions.0 as usize / 3, dimensions.1 as usize / 3);
+        ImageStoreMut::<u8, 3>::alloc(dimensions.0 as usize / 3, dimensions.1 as usize / 3);
 
-    scaler.resize_rgba(&store, &mut target_store, true).unwrap();
+    scaler.resize_rgb(&store, &mut target_store).unwrap();
 
     let dst: Vec<u8> = target_store.buffer.borrow().to_vec();
 
     let img = ImageBuffer::from_raw(target_store.width as u32, target_store.height as u32, dst)
-        .map(DynamicImage::ImageRgba8)
+        .map(DynamicImage::ImageRgb8)
         .expect("Failed to create image from raw data");
 
     let mut bytes: Vec<u8> = Vec::new();
 
-    img.write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::Png)
+    img.write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::Jpeg)
         .expect("Successfully write");
 
     let fixed_slice: &[u8] = &bytes;

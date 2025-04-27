@@ -27,12 +27,16 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 mod alpha_u8;
+mod rgb_u8;
 mod rgba_u8;
 mod transpose;
 mod utils;
 mod vertical_u8;
 
 pub(crate) use alpha_u8::{wasm_premultiply_alpha_rgba, wasm_unpremultiply_alpha_rgba};
+pub(crate) use rgb_u8::{
+    convolve_horizontal_rgb_wasm_row_one, convolve_horizontal_rgb_wasm_rows_4,
+};
 pub(crate) use rgba_u8::{
     convolve_horizontal_rgba_wasm_row, convolve_horizontal_rgba_wasm_rows_4_u8,
 };
