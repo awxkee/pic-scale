@@ -43,6 +43,7 @@ mod horizontal_ar30;
 #[cfg(feature = "rdm")]
 mod horizontal_ar30_rdm;
 mod plane_f32;
+#[cfg(feature = "rdm")]
 mod plane_u16_hb;
 mod plane_u16_lb;
 mod plane_u8;
