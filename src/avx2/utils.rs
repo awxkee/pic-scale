@@ -461,3 +461,13 @@ pub(crate) unsafe fn _mm_prefer_fma_ps<const FMA: bool>(a: __m128, b: __m128, c:
         _mm_add_ps(_mm_mul_ps(b, c), a)
     }
 }
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_reduce_r_epi32<const PRECISION: i32>(x: __m128i) -> __m128i {
+    const FIRST_MASK: i32 = shuffle(1, 0, 3, 2);
+    let hi64 = _mm_shuffle_epi32::<FIRST_MASK>(x);
+    let sum64 = _mm_add_epi32(hi64, x);
+    const SM: i32 = shuffle(1, 0, 3, 2);
+    let hi32 = _mm_shufflelo_epi16::<SM>(sum64);
+    _mm_srai_epi32::<PRECISION>(_mm_add_epi32(sum64, hi32))
+}

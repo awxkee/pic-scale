@@ -151,7 +151,7 @@ pub(crate) unsafe fn convolve_vertical_part_avx_f32<const FMA: bool>(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = *filter.get_unchecked(j..);
+        let weight = filter.get_unchecked(j..);
         let v_weight = _mm_load_ss(weight.as_ptr());
         let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
 
