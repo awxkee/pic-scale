@@ -42,11 +42,9 @@ pub enum ThreadingPolicy {
     /// Will use only one current thread
     Single,
     /// Spawn provided threads count, will not work for wasm - fallback to Single
-    #[cfg(not(target_arch = "wasm32"))]
     Fixed(usize),
     /// Computes adaptive thread count between 1...`available parallelism`
     /// for given image bounds, will not work for wasm - fallback to Single
-    #[cfg(not(target_arch = "wasm32"))]
     Adaptive,
 }
 
@@ -63,6 +61,7 @@ impl ThreadingPolicy {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn available_parallelism() -> usize {
         available_parallelism()
             .unwrap_or_else(|_| NonZeroUsize::new(1).unwrap())
