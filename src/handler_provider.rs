@@ -432,6 +432,16 @@ impl RowHandlerFixedPoint<u16> for u16 {
                 filter_weights,
                 bit_depth,
             );
+        } else if COMPONENTS == 1 {
+            use crate::neon::convolve_horizontal_plane_neon_rows_4_lb_u16;
+            return convolve_horizontal_plane_neon_rows_4_lb_u16(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                filter_weights,
+                bit_depth,
+            );
         } else {
             convolve_row_handler_fixed_point_4::<u16, J, COMPONENTS>(
                 src,
@@ -547,6 +557,9 @@ impl RowHandlerFixedPoint<u16> for u16 {
         } else if COMPONENTS == 3 {
             use crate::neon::convolve_horizontal_rgb_neon_u16_lb_row;
             convolve_horizontal_rgb_neon_u16_lb_row(src, dst, filter_weights, bit_depth)
+        } else if COMPONENTS == 1 {
+            use crate::neon::convolve_horizontal_plane_neon_u16_lb_row;
+            convolve_horizontal_plane_neon_u16_lb_row(src, dst, filter_weights, bit_depth)
         } else {
             convolve_row_handler_fixed_point::<u16, J, COMPONENTS>(
                 src,

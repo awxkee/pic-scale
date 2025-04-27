@@ -147,6 +147,18 @@ impl RowFactoryProducer for u16 {
                     handle_row_4_impl: convolve_horizontal_rgb_neon_rows_4_hb_u16,
                     handle_row_impl: convolve_horizontal_rgb_neon_u16_hb_row,
                 });
+            } else if has_rdm && CN == 1 {
+                use crate::neon::{
+                    convolve_horizontal_plane_neon_rows_4_hb_u16,
+                    convolve_horizontal_plane_neon_u16_hb_row,
+                };
+                let approx_num = weights.numerical_approximation::<i32, 31>(0);
+
+                return Box::new(HorizontalDefaultHandlerQ0_31 {
+                    weights: approx_num,
+                    handle_row_4_impl: convolve_horizontal_plane_neon_rows_4_hb_u16,
+                    handle_row_impl: convolve_horizontal_plane_neon_u16_hb_row,
+                });
             }
         }
         Box::new(HorizontalDefaultHandler {

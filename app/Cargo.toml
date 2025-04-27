@@ -23,3 +23,7 @@ harness = false
 [[bench]]
 name = "resize_rgba"
 harness = false
+
+[[bench]]
+name = "resize_plane"
+harness = false

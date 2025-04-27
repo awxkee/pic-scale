@@ -39,11 +39,12 @@ mod cbcr8_rdm;
 mod check_alpha;
 #[cfg(feature = "nightly_f16")]
 mod convolve_f16;
-mod f16_utils;
 mod horizontal_ar30;
 #[cfg(feature = "rdm")]
 mod horizontal_ar30_rdm;
 mod plane_f32;
+mod plane_u16_hb;
+mod plane_u16_lb;
 mod plane_u8;
 #[cfg(feature = "rdm")]
 mod plane_u8_rdm;
@@ -118,6 +119,13 @@ pub(crate) use horizontal_ar30::{
 pub(crate) use horizontal_ar30_rdm::neon_convolve_horizontal_rgba_rows_4_ar30_rdm;
 pub(crate) use plane_f32::convolve_horizontal_plane_neon_row_one;
 pub(crate) use plane_f32::convolve_horizontal_plane_neon_rows_4;
+#[cfg(feature = "rdm")]
+pub(crate) use plane_u16_hb::{
+    convolve_horizontal_plane_neon_rows_4_hb_u16, convolve_horizontal_plane_neon_u16_hb_row,
+};
+pub(crate) use plane_u16_lb::{
+    convolve_horizontal_plane_neon_rows_4_lb_u16, convolve_horizontal_plane_neon_u16_lb_row,
+};
 pub(crate) use plane_u8::{
     convolve_horizontal_plane_neon_row, convolve_horizontal_plane_neon_row_q,
     convolve_horizontal_plane_neon_rows_4_u8, convolve_horizontal_plane_neon_rows_4_u8_q,
