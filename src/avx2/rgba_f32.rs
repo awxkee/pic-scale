@@ -27,11 +27,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::avx2::routines::*;
-use std::arch::x86_64::*;
-
 use crate::avx2::utils::{_mm256_fma_ps, avx_combine_ps};
 use crate::filter_weights::FilterWeights;
+use std::arch::x86_64::*;
 
 #[inline(always)]
 unsafe fn convolve_horizontal_parts_one_rgba_f32<const FMA: bool>(
@@ -207,7 +205,7 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
         const CHANNELS: usize = 4;
         let mut filter_offset = 0usize;
         let zeros = _mm256_setzero_ps();
-        let weights_ptr = filter_weights.weights.as_ptr();
+        let weights_ptr = &filter_weights.weights;
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);
@@ -218,8 +216,22 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
             let mut store_3 = zeros;
 
             while jx + 8 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let (weight0, weight1, weight2, weight3) = load_8_weights_group_4_avx!(ptr);
+                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
+
+                let w0 = _mm_broadcast_ss(&ptr[0]);
+                let w1 = _mm_broadcast_ss(&ptr[1]);
+                let w2 = _mm_broadcast_ss(&ptr[2]);
+                let w3 = _mm_broadcast_ss(&ptr[3]);
+                let w4 = _mm_broadcast_ss(&ptr[4]);
+                let w5 = _mm_broadcast_ss(&ptr[5]);
+                let w6 = _mm_broadcast_ss(&ptr[6]);
+                let w7 = _mm_broadcast_ss(&ptr[7]);
+
+                let weight0 = avx_combine_ps(w0, w1);
+                let weight1 = avx_combine_ps(w2, w3);
+                let weight2 = avx_combine_ps(w4, w5);
+                let weight3 = avx_combine_ps(w6, w7);
+
                 let filter_start = jx + bounds.start;
 
                 store_0 = convolve_horizontal_parts_8_rgba_f32::<FMA>(
@@ -262,8 +274,14 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
             }
 
             while jx + 4 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let (weight0, weight1) = load_4_weights_group_2_avx!(ptr);
+                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
+                let w0 = _mm_broadcast_ss(&ptr[0]);
+                let w1 = _mm_broadcast_ss(&ptr[1]);
+                let w2 = _mm_broadcast_ss(&ptr[2]);
+                let w3 = _mm_broadcast_ss(&ptr[3]);
+
+                let weight0 = avx_combine_ps(w0, w1);
+                let weight1 = avx_combine_ps(w2, w3);
                 let filter_start = jx + bounds.start;
 
                 store_0 = convolve_horizontal_parts_4_rgba_f32::<FMA>(
@@ -298,9 +316,9 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
             }
 
             while jx + 2 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = _mm_set1_ps(ptr.read_unaligned());
-                let weight1 = _mm_set1_ps(ptr.add(1).read_unaligned());
+                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
+                let weight0 = _mm_broadcast_ss(&ptr[0]);
+                let weight1 = _mm_broadcast_ss(&ptr[1]);
                 let weight = avx_combine_ps(weight0, weight1);
                 let filter_start = jx + bounds.start;
                 store_0 =
@@ -327,9 +345,9 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
             }
 
             while jx < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
+                let ptr = weights_ptr.get_unchecked(jx + filter_offset);
                 let filter_start = jx + bounds.start;
-                let weight0 = _mm256_set1_ps(ptr.read_unaligned());
+                let weight0 = _mm256_set1_ps(*ptr);
                 store_0 = convolve_horizontal_parts_one_rgba_f32::<FMA>(
                     filter_start,
                     src,
@@ -465,7 +483,7 @@ impl<const FMA: bool> OneRowExecutionUnit<FMA> {
     ) {
         const CHANNELS: usize = 4;
         let mut filter_offset = 0usize;
-        let weights_ptr = filter_weights.weights.as_ptr();
+        let weights_ptr = &filter_weights.weights;
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);
@@ -473,8 +491,21 @@ impl<const FMA: bool> OneRowExecutionUnit<FMA> {
             let mut store = _mm256_setzero_ps();
 
             while jx + 8 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let (weight0, weight1, weight2, weight3) = load_8_weights_group_4_avx!(ptr);
+                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
+
+                let w0 = _mm_broadcast_ss(&ptr[0]);
+                let w1 = _mm_broadcast_ss(&ptr[1]);
+                let w2 = _mm_broadcast_ss(&ptr[2]);
+                let w3 = _mm_broadcast_ss(&ptr[3]);
+                let w4 = _mm_broadcast_ss(&ptr[4]);
+                let w5 = _mm_broadcast_ss(&ptr[5]);
+                let w6 = _mm_broadcast_ss(&ptr[6]);
+                let w7 = _mm_broadcast_ss(&ptr[7]);
+
+                let weight0 = avx_combine_ps(w0, w1);
+                let weight1 = avx_combine_ps(w2, w3);
+                let weight2 = avx_combine_ps(w4, w5);
+                let weight3 = avx_combine_ps(w6, w7);
                 let filter_start = jx + bounds.start;
 
                 store = convolve_horizontal_parts_8_rgba_f32::<FMA>(
@@ -490,8 +521,15 @@ impl<const FMA: bool> OneRowExecutionUnit<FMA> {
             }
 
             while jx + 4 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let (weight0, weight1) = load_4_weights_group_2_avx!(ptr);
+                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
+
+                let w0 = _mm_broadcast_ss(&ptr[0]);
+                let w1 = _mm_broadcast_ss(&ptr[1]);
+                let w2 = _mm_broadcast_ss(&ptr[2]);
+                let w3 = _mm_broadcast_ss(&ptr[3]);
+
+                let weight0 = avx_combine_ps(w0, w1);
+                let weight1 = avx_combine_ps(w2, w3);
                 let filter_start = jx + bounds.start;
                 store = convolve_horizontal_parts_4_rgba_f32::<FMA>(
                     filter_start,
@@ -504,9 +542,9 @@ impl<const FMA: bool> OneRowExecutionUnit<FMA> {
             }
 
             while jx + 2 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = _mm_load1_ps(ptr);
-                let weight1 = _mm_load1_ps(ptr.add(1));
+                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
+                let weight0 = _mm_broadcast_ss(&ptr[0]);
+                let weight1 = _mm_broadcast_ss(&ptr[1]);
                 let weight = avx_combine_ps(weight0, weight1);
                 let filter_start = jx + bounds.start;
                 store =
@@ -515,8 +553,8 @@ impl<const FMA: bool> OneRowExecutionUnit<FMA> {
             }
 
             while jx < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = _mm256_set1_ps(ptr.read_unaligned());
+                let ptr = weights_ptr.get_unchecked(jx + filter_offset);
+                let weight0 = _mm256_set1_ps(*ptr);
                 let filter_start = jx + bounds.start;
                 store = convolve_horizontal_parts_one_rgba_f32::<FMA>(
                     filter_start,

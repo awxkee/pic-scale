@@ -53,7 +53,40 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    c.bench_function("Fast image resize RGBA with alpha: Lanczos 3", |b| {
+    c.bench_function("Fast image resize RGBAf32 w/o alpha: Lanczos 3", |b| {
+        let packed_f32 = f32_image
+            .iter()
+            .flat_map(|&x| x.to_ne_bytes())
+            .collect::<Vec<u8>>();
+        let mut vc = Vec::from(packed_f32);
+        b.iter(|| {
+            let pixel_type: PixelType = PixelType::F32x4;
+            let src_image =
+                Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
+            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
+
+            let mut resizer = Resizer::new();
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            unsafe {
+                resizer.set_cpu_extensions(CpuExtensions::Neon);
+            }
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            unsafe {
+                resizer.set_cpu_extensions(CpuExtensions::Avx2);
+            }
+            resizer
+                .resize(
+                    &src_image,
+                    &mut dst_image,
+                    &ResizeOptions::new()
+                        .resize_alg(ResizeAlg::Convolution(Lanczos3))
+                        .use_alpha(false),
+                )
+                .unwrap();
+        })
+    });
+
+    c.bench_function("Fast image resize RGBA8 with alpha: Lanczos 3", |b| {
         let mut vc = Vec::from(img.as_bytes());
         b.iter(|| {
             let pixel_type: PixelType = PixelType::U8x4;

@@ -13,9 +13,10 @@ use fast_image_resize::{
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
     ImageSize, ImageStore, ImageStoreMut, ImageStoreScaling, Planar16ImageStore,
-    Planar16ImageStoreMut, ResamplingFunction, Rgba16ImageStore, Rgba16ImageStoreMut,
-    Rgba8ImageStore, Rgba8ImageStoreMut, Scaler, Scaling, ScalingF32, ScalingU16, ThreadingPolicy,
-    WorkloadStrategy,
+    Planar16ImageStoreMut, PlanarF32ImageStore, PlanarF32ImageStoreMut, ResamplingFunction,
+    RgbF32ImageStore, RgbF32ImageStoreMut, Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore,
+    Rgba8ImageStoreMut, RgbaF32ImageStore, RgbaF32ImageStoreMut, Scaler, Scaling, ScalingF32,
+    ScalingU16, ThreadingPolicy, WorkloadStrategy,
 };
 
 fn resize_plane(
@@ -77,19 +78,20 @@ fn main() {
     let bytes32 = bytes
         .iter()
         // .map(|&x| x)
-        .map(|&x| u16::from_ne_bytes([x, x]))
+        // .map(|&x| u16::from_ne_bytes([x, x]))
+        .map(|&x| x as f32 / 255.)
         .collect::<Vec<_>>();
 
     let mut store =
-        Planar16ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize)
+        PlanarF32ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
     store.bit_depth = 16;
-    let mut dst_store = Planar16ImageStoreMut::alloc_with_depth(
+    let mut dst_store = PlanarF32ImageStoreMut::alloc_with_depth(
         dimensions.0 as usize / 4,
         dimensions.1 as usize / 4,
         16,
     );
-    scaler.resize_plane_u16(&store, &mut dst_store).unwrap();
+    scaler.resize_plane_f32(&store, &mut dst_store).unwrap();
     //
     // let elapsed_time = start_time.elapsed();
     // // Print the elapsed time in milliseconds
@@ -141,7 +143,8 @@ fn main() {
         .as_bytes()
         .iter()
         // .map(|&x| x)
-        .map(|&x| (x >> 8) as u8)
+        // .map(|&x| (x >> 8) as u8)
+        .map(|&x| (x as f32 * 255.).round() as u8)
         .collect::<Vec<_>>();
 
     if dst_store.channels == 4 {
