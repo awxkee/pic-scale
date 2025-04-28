@@ -32,7 +32,9 @@ mod alpha_f16;
 mod alpha_f32;
 mod alpha_u16;
 mod alpha_u8;
+mod ar30_utils;
 mod check_alpha;
+mod horizontal_ar30;
 mod plane_f32;
 mod plane_u16;
 mod plane_u16_lb;
@@ -65,6 +67,9 @@ pub(crate) use alpha_u8::avx_premultiply_alpha_rgba;
 pub(crate) use alpha_u8::avx_unpremultiply_alpha_rgba;
 pub(crate) use check_alpha::{
     avx_has_non_constant_cap_alpha_rgba16, avx_has_non_constant_cap_alpha_rgba8,
+};
+pub(crate) use horizontal_ar30::{
+    avx_convolve_horizontal_rgba_rows_4_ar30, avx_convolve_horizontal_rgba_rows_ar30,
 };
 pub(crate) use plane_f32::{
     convolve_horizontal_plane_avx_row_one_f32, convolve_horizontal_plane_avx_rows_4_f32,

@@ -48,54 +48,15 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
     pool: &Option<ThreadPool>,
     _options: ConvolutionOptions,
 ) {
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
-    let is_rdm_available = std::arch::is_aarch64_feature_detected!("rdm");
+    let _dispatch4 = get_horizontal_dispatch4::<AR30_TYPE, AR30_ORDER>(_options);
+    let _dispatch = get_horizontal_dispatch::<AR30_TYPE, AR30_ORDER>();
     if let Some(pool) = pool {
         pool.install(|| {
             let approx = filter_weights.numerical_approximation_i16::<PRECISION>(0);
             dst.par_chunks_exact_mut(dst_stride * 4)
                 .zip(src.par_chunks_exact(src_stride * 4))
                 .for_each(|(dst, src)| {
-                    let mut _dispatch: fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>) =
-                        convolve_row_handler_fixed_point_4_ar30::<AR30_TYPE, AR30_ORDER>;
-                    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-                    {
-                        match _options.workload_strategy {
-                            crate::WorkloadStrategy::PreferSpeed =>
-                            {
-                                #[cfg(feature = "rdm")]
-                                if is_rdm_available {
-                                    use crate::neon::neon_convolve_horizontal_rgba_rows_4_ar30_rdm;
-                                    _dispatch = neon_convolve_horizontal_rgba_rows_4_ar30_rdm::<
-                                        AR30_TYPE,
-                                        AR30_ORDER,
-                                    >;
-                                } else {
-                                    use crate::neon::neon_convolve_horizontal_rgba_rows_4_ar30;
-                                    _dispatch = neon_convolve_horizontal_rgba_rows_4_ar30::<
-                                        AR30_TYPE,
-                                        AR30_ORDER,
-                                    >;
-                                }
-                            }
-                            crate::WorkloadStrategy::PreferQuality => {
-                                use crate::neon::neon_convolve_horizontal_rgba_rows_4_ar30;
-                                _dispatch = neon_convolve_horizontal_rgba_rows_4_ar30::<
-                                    AR30_TYPE,
-                                    AR30_ORDER,
-                                >;
-                            }
-                        }
-                    }
-                    #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
-                    {
-                        if std::arch::is_x86_feature_detected!("sse4.1") {
-                            use crate::sse::sse_convolve_horizontal_rgba_rows_4_ar30;
-                            _dispatch =
-                                sse_convolve_horizontal_rgba_rows_4_ar30::<AR30_TYPE, AR30_ORDER>;
-                        }
-                    }
-                    _dispatch(src, src_stride, dst, dst_stride, &approx);
+                    _dispatch4(src, src_stride, dst, dst_stride, &approx);
                 });
 
             let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
@@ -105,22 +66,6 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
                 .par_chunks_exact_mut(dst_stride)
                 .zip(src_remainder.par_chunks_exact(src_stride))
                 .for_each(|(dst, src)| {
-                    let mut _dispatch: fn(&[u8], &mut [u8], &FilterWeights<i16>) =
-                        convolve_row_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
-                    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-                    {
-                        use crate::neon::neon_convolve_horizontal_rgba_rows_ar30;
-                        _dispatch =
-                            neon_convolve_horizontal_rgba_rows_ar30::<AR30_TYPE, AR30_ORDER>;
-                    }
-                    #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
-                    {
-                        if std::arch::is_x86_feature_detected!("sse4.1") {
-                            use crate::sse::sse_convolve_horizontal_rgba_rows_ar30;
-                            _dispatch =
-                                sse_convolve_horizontal_rgba_rows_ar30::<AR30_TYPE, AR30_ORDER>;
-                        }
-                    }
                     _dispatch(src, dst, &approx);
                 });
         });
@@ -129,44 +74,7 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
         dst.chunks_exact_mut(dst_stride * 4)
             .zip(src.chunks_exact(src_stride * 4))
             .for_each(|(dst, src)| {
-                let mut _dispatch: fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>) =
-                    convolve_row_handler_fixed_point_4_ar30::<AR30_TYPE, AR30_ORDER>;
-                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-                {
-                    match _options.workload_strategy {
-                        crate::WorkloadStrategy::PreferSpeed =>
-                        {
-                            #[cfg(feature = "rdm")]
-                            if is_rdm_available {
-                                use crate::neon::neon_convolve_horizontal_rgba_rows_4_ar30_rdm;
-                                _dispatch = neon_convolve_horizontal_rgba_rows_4_ar30_rdm::<
-                                    AR30_TYPE,
-                                    AR30_ORDER,
-                                >;
-                            } else {
-                                use crate::neon::neon_convolve_horizontal_rgba_rows_4_ar30;
-                                _dispatch = neon_convolve_horizontal_rgba_rows_4_ar30::<
-                                    AR30_TYPE,
-                                    AR30_ORDER,
-                                >;
-                            }
-                        }
-                        crate::WorkloadStrategy::PreferQuality => {
-                            use crate::neon::neon_convolve_horizontal_rgba_rows_4_ar30;
-                            _dispatch =
-                                neon_convolve_horizontal_rgba_rows_4_ar30::<AR30_TYPE, AR30_ORDER>;
-                        }
-                    }
-                }
-                #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
-                {
-                    if std::arch::is_x86_feature_detected!("sse4.1") {
-                        use crate::sse::sse_convolve_horizontal_rgba_rows_4_ar30;
-                        _dispatch =
-                            sse_convolve_horizontal_rgba_rows_4_ar30::<AR30_TYPE, AR30_ORDER>;
-                    }
-                }
-                _dispatch(src, src_stride, dst, dst_stride, &approx);
+                _dispatch4(src, src_stride, dst, dst_stride, &approx);
             });
 
         let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
@@ -176,23 +84,80 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
             .chunks_exact_mut(dst_stride)
             .zip(src_remainder.chunks_exact(src_stride))
             .for_each(|(dst, src)| {
-                let mut _dispatch: fn(&[u8], &mut [u8], &FilterWeights<i16>) =
-                    convolve_row_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
-                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-                {
-                    use crate::neon::neon_convolve_horizontal_rgba_rows_ar30;
-                    _dispatch = neon_convolve_horizontal_rgba_rows_ar30::<AR30_TYPE, AR30_ORDER>;
-                }
-                #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
-                {
-                    if std::arch::is_x86_feature_detected!("sse4.1") {
-                        use crate::sse::sse_convolve_horizontal_rgba_rows_ar30;
-                        _dispatch = sse_convolve_horizontal_rgba_rows_ar30::<AR30_TYPE, AR30_ORDER>;
-                    }
-                }
                 _dispatch(src, dst, &approx);
             });
     }
+}
+
+fn get_horizontal_dispatch<const AR30_TYPE: usize, const AR30_ORDER: usize>(
+) -> fn(&[u8], &mut [u8], &FilterWeights<i16>) {
+    let mut _dispatch: fn(&[u8], &mut [u8], &FilterWeights<i16>) =
+        convolve_row_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    {
+        use crate::neon::neon_convolve_horizontal_rgba_rows_ar30;
+        _dispatch = neon_convolve_horizontal_rgba_rows_ar30::<AR30_TYPE, AR30_ORDER>;
+    }
+    #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+    {
+        if std::arch::is_x86_feature_detected!("sse4.1") {
+            use crate::sse::sse_convolve_horizontal_rgba_rows_ar30;
+            _dispatch = sse_convolve_horizontal_rgba_rows_ar30::<AR30_TYPE, AR30_ORDER>;
+        }
+    }
+    #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+    {
+        if std::arch::is_x86_feature_detected!("avx2") {
+            use crate::avx2::avx_convolve_horizontal_rgba_rows_ar30;
+            _dispatch = avx_convolve_horizontal_rgba_rows_ar30::<AR30_TYPE, AR30_ORDER>;
+        }
+    }
+    _dispatch
+}
+
+fn get_horizontal_dispatch4<const AR30_TYPE: usize, const AR30_ORDER: usize>(
+    _options: ConvolutionOptions,
+) -> fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>) {
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
+    let is_rdm_available = std::arch::is_aarch64_feature_detected!("rdm");
+    let mut _dispatch: fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>) =
+        convolve_row_handler_fixed_point_4_ar30::<AR30_TYPE, AR30_ORDER>;
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    {
+        match _options.workload_strategy {
+            crate::WorkloadStrategy::PreferSpeed =>
+            {
+                #[cfg(feature = "rdm")]
+                if is_rdm_available {
+                    use crate::neon::neon_convolve_horizontal_rgba_rows_4_ar30_rdm;
+                    _dispatch =
+                        neon_convolve_horizontal_rgba_rows_4_ar30_rdm::<AR30_TYPE, AR30_ORDER>;
+                } else {
+                    use crate::neon::neon_convolve_horizontal_rgba_rows_4_ar30;
+                    _dispatch = neon_convolve_horizontal_rgba_rows_4_ar30::<AR30_TYPE, AR30_ORDER>;
+                }
+            }
+            crate::WorkloadStrategy::PreferQuality => {
+                use crate::neon::neon_convolve_horizontal_rgba_rows_4_ar30;
+                _dispatch = neon_convolve_horizontal_rgba_rows_4_ar30::<AR30_TYPE, AR30_ORDER>;
+            }
+        }
+    }
+    #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+    {
+        if std::arch::is_x86_feature_detected!("sse4.1") {
+            use crate::sse::sse_convolve_horizontal_rgba_rows_4_ar30;
+            _dispatch = sse_convolve_horizontal_rgba_rows_4_ar30::<AR30_TYPE, AR30_ORDER>;
+        }
+    }
+    #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+    {
+        if std::arch::is_x86_feature_detected!("avx2") {
+            use crate::avx2::avx_convolve_horizontal_rgba_rows_4_ar30;
+            _dispatch = avx_convolve_horizontal_rgba_rows_4_ar30::<AR30_TYPE, AR30_ORDER>;
+        }
+    }
+    _dispatch
 }
 
 pub(crate) fn convolve_vertical_dispatch_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
