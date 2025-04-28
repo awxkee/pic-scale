@@ -50,8 +50,8 @@ unsafe fn convolve_vertical_part_avx_f16<const FMA: bool>(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = *filter.get_unchecked(j);
-        let v_weight = _mm256_set1_ps(weight);
+        let weight = filter.get_unchecked(j);
+        let v_weight = _mm256_broadcast_ss(weight);
         let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
 
         let s_ptr = src_ptr.add(px);
@@ -89,8 +89,8 @@ unsafe fn convolve_vertical_part_avx_4_f16<const FMA: bool>(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = *filter.get_unchecked(j);
-        let v_weight = _mm256_set1_ps(weight);
+        let weight = filter.get_unchecked(j);
+        let v_weight = _mm256_broadcast_ss(weight);
         let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
 
         let s_ptr = src_ptr.add(px);
@@ -125,8 +125,8 @@ unsafe fn convolve_vertical_part_avx_32_f16<const FMA: bool>(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = *filter.get_unchecked(j);
-        let v_weight = _mm256_set1_ps(weight);
+        let weight = filter.get_unchecked(j);
+        let v_weight = _mm256_broadcast_ss(weight);
         let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
 
         let s_ptr = src_ptr.add(px);
@@ -178,8 +178,8 @@ unsafe fn convolve_vertical_part_avx_16_f16<const FMA: bool>(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = *filter.get_unchecked(j);
-        let v_weight = _mm256_set1_ps(weight);
+        let weight = filter.get_unchecked(j);
+        let v_weight = _mm256_broadcast_ss(weight);
         let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
 
         let s_ptr = src_ptr.add(px);
