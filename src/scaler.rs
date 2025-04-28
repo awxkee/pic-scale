@@ -737,7 +737,7 @@ impl Scaler {
         new_immutable_store.convolve_horizontal(horizontal_filters, into, pool, options);
 
         if premultiply_alpha_requested && has_alpha_premultiplied {
-            into.unpremultiply_alpha(pool);
+            into.unpremultiply_alpha(pool, self.workload_strategy);
         }
 
         Ok(())
@@ -794,7 +794,7 @@ impl Scaler {
         src_store.convolve_vertical(vertical_filters, into, pool, options);
 
         if premultiply_alpha_requested && has_alpha_premultiplied {
-            into.unpremultiply_alpha(pool);
+            into.unpremultiply_alpha(pool, self.workload_strategy);
         }
 
         Ok(())
@@ -851,7 +851,7 @@ impl Scaler {
         src_store.convolve_horizontal(horizontal_filters, into, pool, options);
 
         if premultiply_alpha_requested && has_alpha_premultiplied {
-            into.unpremultiply_alpha(pool);
+            into.unpremultiply_alpha(pool, self.workload_strategy);
         }
 
         Ok(())

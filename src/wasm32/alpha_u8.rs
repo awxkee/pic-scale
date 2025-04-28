@@ -29,6 +29,7 @@
 use crate::alpha_handle_u8::premultiply_alpha_rgba_row_impl;
 use crate::wasm32::transpose::{wasm_load_deinterleave_u8x4, wasm_store_interleave_u8x4};
 use crate::wasm32::utils::*;
+use crate::WorkloadStrategy;
 use rayon::ThreadPool;
 use std::arch::wasm32::*;
 
@@ -38,6 +39,7 @@ pub fn wasm_unpremultiply_alpha_rgba(
     _: usize,
     stride: usize,
     _: &Option<ThreadPool>,
+    _: WorkloadStrategy,
 ) {
     unsafe {
         wasm_unpremultiply_alpha_rgba_impl(in_place, width, stride);

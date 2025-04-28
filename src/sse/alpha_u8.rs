@@ -28,6 +28,7 @@
  */
 
 use crate::sse::{sse_deinterleave_rgba, sse_interleave_rgba};
+use crate::WorkloadStrategy;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
@@ -269,6 +270,7 @@ pub(crate) fn sse_unpremultiply_alpha_rgba(
     height: usize,
     stride: usize,
     pool: &Option<ThreadPool>,
+    _: WorkloadStrategy,
 ) {
     unsafe {
         sse_unpremultiply_alpha_rgba_impl(in_place, width, height, stride, pool);

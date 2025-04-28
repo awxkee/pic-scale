@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::avx512::utils::{avx512_deinterleave_rgba, avx512_div_by255, avx512_interleave_rgba};
+use crate::WorkloadStrategy;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
@@ -392,6 +393,7 @@ pub(crate) fn avx512_unpremultiply_alpha_rgba(
     _: usize,
     stride: usize,
     pool: &Option<ThreadPool>,
+    _: WorkloadStrategy,
 ) {
     let has_vbmi = std::arch::is_x86_feature_detected!("avx512vbmi");
     let mut executor: fn(&mut [u8]) = |row: &mut [u8]| unsafe {

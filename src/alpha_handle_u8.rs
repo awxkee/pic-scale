@@ -34,6 +34,7 @@ use crate::neon::{neon_premultiply_alpha_rgba, neon_unpremultiply_alpha_rgba};
 use crate::sse::*;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128",))]
 use crate::wasm32::{wasm_premultiply_alpha_rgba, wasm_unpremultiply_alpha_rgba};
+use crate::WorkloadStrategy;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::ParallelSlice;
 use rayon::slice::ParallelSliceMut;
@@ -120,6 +121,7 @@ fn unpremultiply_alpha_rgba_impl(
     _: usize,
     stride: usize,
     pool: &Option<ThreadPool>,
+    _: WorkloadStrategy,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
@@ -182,8 +184,9 @@ pub(crate) fn unpremultiply_alpha_rgba(
     height: usize,
     stride: usize,
     pool: &Option<ThreadPool>,
+    workload_strategy: WorkloadStrategy,
 ) {
-    let mut _dispatcher: fn(&mut [u8], usize, usize, usize, &Option<ThreadPool>) =
+    let mut _dispatcher: fn(&mut [u8], usize, usize, usize, &Option<ThreadPool>, WorkloadStrategy) =
         unpremultiply_alpha_rgba_impl;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
@@ -212,5 +215,5 @@ pub(crate) fn unpremultiply_alpha_rgba(
     {
         _dispatcher = wasm_unpremultiply_alpha_rgba;
     }
-    _dispatcher(in_place, width, height, stride, pool);
+    _dispatcher(in_place, width, height, stride, pool, workload_strategy);
 }
