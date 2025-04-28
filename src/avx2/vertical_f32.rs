@@ -86,6 +86,7 @@ struct ExecutionUnit<const FMA: bool> {}
 impl<const FMA: bool> ExecutionUnit<FMA> {
     #[inline(always)]
     unsafe fn convolve_vertical_part_avx_32_f32(
+        &self,
         start_y: usize,
         start_x: usize,
         src: &[f32],
@@ -126,6 +127,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
 
     #[inline(always)]
     unsafe fn convolve_vertical_part_avx_8_f32(
+        &self,
         start_y: usize,
         start_x: usize,
         src: &[f32],
@@ -154,6 +156,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
 
     #[inline(always)]
     unsafe fn convolve_vertical_part_avx_16_f32(
+        &self,
         start_y: usize,
         start_x: usize,
         src: &[f32],
@@ -187,6 +190,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
 
     #[inline(always)]
     unsafe fn convolve_vertical_part_avx_f32(
+        &self,
         start_y: usize,
         start_x: usize,
         src: &[f32],
@@ -228,7 +232,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         let dst_width = dst.len();
 
         while cx + 32 < dst_width {
-            Self::convolve_vertical_part_avx_32_f32(
+            self.convolve_vertical_part_avx_32_f32(
                 bounds.start,
                 cx,
                 src,
@@ -242,7 +246,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         }
 
         while cx + 16 < dst_width {
-            Self::convolve_vertical_part_avx_16_f32(
+            self.convolve_vertical_part_avx_16_f32(
                 bounds.start,
                 cx,
                 src,
@@ -256,7 +260,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         }
 
         while cx + 8 < dst_width {
-            Self::convolve_vertical_part_avx_8_f32(
+            self.convolve_vertical_part_avx_8_f32(
                 bounds.start,
                 cx,
                 src,
@@ -270,7 +274,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         }
 
         while cx < dst_width {
-            Self::convolve_vertical_part_avx_f32(
+            self.convolve_vertical_part_avx_f32(
                 bounds.start,
                 cx,
                 src,
