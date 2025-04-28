@@ -162,7 +162,7 @@ unsafe fn convolve_horizontal_rgba_avx_row_4_impl(
             );
 
             while jx + 8 < bounds.size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
 
                 let weights = _mm256_permute4x64_epi64::<0x50>(_mm256_castsi128_si256(
@@ -209,7 +209,7 @@ unsafe fn convolve_horizontal_rgba_avx_row_4_impl(
             }
 
             while jx + 4 < bounds.size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
 
                 let weights = _mm256_permutevar8x32_epi32(
@@ -275,7 +275,7 @@ unsafe fn convolve_horizontal_rgba_avx_row_4_impl(
         }
 
         while jx + 2 < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 2));
+            let w_ptr = weights.get_unchecked(jx..);
             let bounds_start = bounds.start + jx;
 
             let weight01 = _mm_shuffle_epi8(
@@ -306,7 +306,7 @@ unsafe fn convolve_horizontal_rgba_avx_row_4_impl(
         }
 
         while jx < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 1));
+            let w_ptr = weights.get_unchecked(jx..);
             let weight0 = _mm_shuffle_epi8(
                 _mm_loadu_si16(w_ptr.as_ptr() as *const _),
                 shuffle_weights_table,
@@ -432,7 +432,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
             );
 
             while jx + 8 < bounds.size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
 
                 let weights = _mm256_permute4x64_epi64::<0x50>(_mm256_castsi128_si256(
@@ -455,7 +455,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
             }
 
             while jx + 4 < bounds.size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
 
                 let weights = _mm256_permutevar8x32_epi32(
@@ -483,7 +483,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
         }
 
         while jx + 2 < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 2));
+            let w_ptr = weights.get_unchecked(jx..);
             let bounds_start = bounds.start + jx;
 
             let weight01 = _mm_shuffle_epi8(
@@ -501,7 +501,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
         }
 
         while jx < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 1));
+            let w_ptr = weights.get_unchecked(jx..);
             let weight0 = _mm_shuffle_epi8(
                 _mm_loadu_si16(w_ptr.as_ptr() as *const _),
                 shuffle_weights_table,

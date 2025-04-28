@@ -30,6 +30,7 @@
 use crate::avx2::utils::{
     _mm256_select_si256, avx2_deinterleave_rgba, avx2_div_by255, avx2_interleave_rgba,
 };
+use crate::WorkloadStrategy;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
@@ -171,6 +172,7 @@ pub(crate) fn avx_unpremultiply_alpha_rgba(
     height: usize,
     stride: usize,
     pool: &Option<ThreadPool>,
+    _: WorkloadStrategy,
 ) {
     unsafe {
         avx_unpremultiply_alpha_rgba_impl(in_place, width, height, stride, pool);

@@ -29,6 +29,7 @@
 
 use std::arch::x86_64::*;
 
+#[cfg(feature = "nightly_f16")]
 macro_rules! load_4_weights_group_2_avx {
     ($src_ptr: expr) => {{
         let weight = _mm_loadu_ps($src_ptr);
@@ -47,11 +48,14 @@ macro_rules! load_4_weights_group_2_avx {
     }};
 }
 
+#[cfg(feature = "nightly_f16")]
 pub(crate) use load_4_weights_group_2_avx;
+#[cfg(feature = "nightly_f16")]
 use std::arch::x86_64::{
     __m128i, _mm_add_epi32, _mm_cvtsi128_si32, _mm_shuffle_epi32, _mm_shufflelo_epi16,
 };
 
+#[cfg(feature = "nightly_f16")]
 macro_rules! load_8_weights_group_4_avx {
     ($src_ptr: expr) => {{
         let weight_row_0 = _mm_loadu_ps($src_ptr);
@@ -79,6 +83,7 @@ macro_rules! load_8_weights_group_4_avx {
 }
 
 use crate::support::PRECISION;
+#[cfg(feature = "nightly_f16")]
 pub(crate) use load_8_weights_group_4_avx;
 
 pub(crate) const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {

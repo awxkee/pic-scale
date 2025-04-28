@@ -56,12 +56,12 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 | RGB (8+ bit)   | x    | ~   | ~    | ~          | -    | 
 | Plane (8+ bit) | x    | ~   | x    | ~          | -    | 
 | RGBA (f32)     | x    | x   | x    | -          | -    | 
-| RGB (f32)      | x    | x   | ~    | -          | -    | 
-| Plane (f32)    | x    | x   | ~    | -          | -    | 
+| RGB (f32)      | x    | x   | x    | -          | -    | 
+| Plane (f32)    | x    | x   | x    | -          | -    | 
 | RGBA (f16)     | x    | x   | x    | -          | -    | 
 | RGB (f16)      | x    | ~   | ~    | -          | -    | 
 | Plane (f16)    | ~    | ~   | ~    | -          | -    |
-| AR30/RA30      | x    | x   | -    | -          | -    |
+| AR30/RA30      | x    | x   | x    | -          | -    |
 
 #### Features
 
@@ -80,7 +80,7 @@ For x86 and aarch64 NEON runtime dispatch is used.
 `avx512` requires feature `nightly_avx512` and requires `nightly` compiler channel, runtime detection if it is available then will be used.
 
 `avxvnni` requires feature `nightly_avx512` and requires `nightly` compiler channel, runtime detection if it is available then will be used.
-AVX-VNNI is helpful extension on modern Intel and AMD CPU's, consider turn it on to ger maximum performance.
+AVX-VNNI is helpful extension on modern Intel and AMD CPU's, consider turn it on to get maximum performance.
 
 `fullfp16`, `fhm` NEON target detection performed in runtime, when available best the best paths for *f16* images are available on ARM.
 

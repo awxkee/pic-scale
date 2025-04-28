@@ -147,7 +147,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_impl(
         let src3 = src2.get_unchecked(src_stride..);
 
         while jx + 8 < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 8));
+            let w_ptr = weights.get_unchecked(jx..);
 
             let w01 = _mm_loadu_si32(w_ptr.as_ptr() as *const _);
             let w23 = _mm_loadu_si32(w_ptr.get_unchecked(2..).as_ptr() as *const _);
@@ -187,7 +187,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_impl(
         }
 
         while jx + 4 < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 4));
+            let w_ptr = weights.get_unchecked(jx..);
 
             let w01 = _mm_loadu_si32(w_ptr.as_ptr() as *const _);
             let w23 = _mm_loadu_si32(w_ptr.get_unchecked(2..).as_ptr() as *const _);
@@ -243,7 +243,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_impl(
         );
 
         while jx + 2 < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 2));
+            let w_ptr = weights.get_unchecked(jx..);
             let bounds_start = bounds.start + jx;
 
             let weight01 = _mm_shuffle_epi8(
@@ -358,7 +358,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
         let mut store = vld;
 
         while jx + 8 < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 8));
+            let w_ptr = weights.get_unchecked(jx..);
 
             let w01 = _mm_loadu_si32(w_ptr.as_ptr() as *const _);
             let w23 = _mm_loadu_si32(w_ptr.get_unchecked(2..).as_ptr() as *const _);
@@ -386,7 +386,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
         }
 
         while jx + 4 < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 4));
+            let w_ptr = weights.get_unchecked(jx..);
             let bounds_start = bounds.start + jx;
 
             let w01 = _mm_loadu_si32(w_ptr.as_ptr() as *const _);
@@ -414,7 +414,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
         );
 
         while jx + 2 < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 2));
+            let w_ptr = weights.get_unchecked(jx..);
             let bounds_start = bounds.start + jx;
 
             let weight01 = _mm_shuffle_epi8(
@@ -432,7 +432,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
         }
 
         while jx < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 1));
+            let w_ptr = weights.get_unchecked(jx..);
             let weight0 = _mm_set1_epi16(w_ptr[0]);
 
             let start_bounds = bounds.start + jx;

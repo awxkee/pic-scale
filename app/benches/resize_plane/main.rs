@@ -138,6 +138,60 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 .unwrap();
         })
     });
+
+    let binding_f32 = img.to_luma32f();
+
+    c.bench_function("Pic scale Plane32f: Lanczos 3", |b| {
+        let copied: Vec<f32> = binding_f32.as_raw().to_vec();
+        let store =
+            ImageStore::<f32, 1>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
+                .unwrap();
+        b.iter(|| {
+            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+            scaler.set_threading_policy(ThreadingPolicy::Single);
+            scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
+            let mut target = ImageStoreMut::alloc_with_depth(
+                dimensions.0 as usize / 4,
+                dimensions.1 as usize / 4,
+                16,
+            );
+            scaler.resize_plane_f32(&store, &mut target).unwrap();
+        })
+    });
+
+    c.bench_function("Fast image resize Plane F32: Lanczos 3", |b| {
+        let packed_f32 = binding_f32
+            .iter()
+            .flat_map(|&x| x.to_ne_bytes())
+            .collect::<Vec<u8>>();
+        let mut vc = packed_f32.to_vec();
+        let pixel_type: PixelType = PixelType::F32;
+
+        let src_image =
+            Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
+        b.iter(|| {
+            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
+
+            let mut resizer = Resizer::new();
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            unsafe {
+                resizer.set_cpu_extensions(CpuExtensions::Neon);
+            }
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            unsafe {
+                resizer.set_cpu_extensions(CpuExtensions::Avx2);
+            }
+            resizer
+                .resize(
+                    &src_image,
+                    &mut dst_image,
+                    &ResizeOptions::new()
+                        .resize_alg(ResizeAlg::Convolution(Lanczos3))
+                        .use_alpha(false),
+                )
+                .unwrap();
+        })
+    });
 }
 
 criterion_group!(benches, criterion_benchmark);

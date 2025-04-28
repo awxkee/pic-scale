@@ -30,6 +30,7 @@
 use crate::alpha_handle_f16::{premultiply_pixel_f16_row, unpremultiply_pixel_f16_row};
 use crate::sse::f16_utils::{_mm_cvtph_psx, _mm_cvtps_phx};
 use crate::sse::{sse_deinterleave_rgba_epi16, sse_interleave_rgba_epi16};
+use core::f16;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
@@ -48,7 +49,7 @@ pub(crate) fn sse_premultiply_alpha_rgba_f16(
     pool: &Option<ThreadPool>,
 ) {
     unsafe {
-        if is_x86_feature_detected!("f16c") {
+        if std::arch::is_x86_feature_detected!("f16c") {
             sse_premultiply_alpha_rgba_f16c(dst, dst_stride, src, src_stride, width, height, pool);
         } else {
             sse_premultiply_alpha_rgba_f16_regular(

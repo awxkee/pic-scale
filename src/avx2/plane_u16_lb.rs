@@ -376,8 +376,7 @@ impl<const D: bool> OneRowExecutionUnit<D> {
             let v_st0 = _mm_reduce_r_epi32::<PRECISION>(store);
 
             let v_zst1 = _mm_min_epi16(_mm_packus_epi32(v_st0, _mm_setzero_si128()), v_max_colors);
-
-            *dst = _mm_extract_epi16::<0>(v_zst1) as u16;
+            _mm_storeu_si16(dst as *mut u16 as *mut _, v_zst1);
         }
     }
 }

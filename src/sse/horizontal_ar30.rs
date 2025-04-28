@@ -176,7 +176,7 @@ unsafe fn sse_convolve_horizontal_rgba_rows_4_impl<const AR_TYPE: usize, const A
 
             while jx + 8 < bounds_size {
                 let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                let w_ptr = weights.get_unchecked(jx..);
                 let w0 = _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
                 let w1 = _mm_set1_epi32((w_ptr.as_ptr().add(2) as *const i32).read_unaligned());
                 let w2 = _mm_set1_epi32((w_ptr.as_ptr().add(4) as *const i32).read_unaligned());
@@ -222,7 +222,7 @@ unsafe fn sse_convolve_horizontal_rgba_rows_4_impl<const AR_TYPE: usize, const A
 
             while jx + 4 < bounds_size {
                 let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let w_ptr = weights.get_unchecked(jx..);
                 let w0 = _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
                 let w1 = _mm_set1_epi32((w_ptr.as_ptr().add(2) as *const i32).read_unaligned());
                 store_0 = conv_horiz_rgba_4_u8_i16::<AR_TYPE, AR_ORDER>(
@@ -257,9 +257,9 @@ unsafe fn sse_convolve_horizontal_rgba_rows_4_impl<const AR_TYPE: usize, const A
             }
 
             while jx < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                let w_ptr = weights.get_unchecked(jx);
                 let bounds_start = bounds.start + jx;
-                let weight0 = _mm_set1_epi16(w_ptr[0]);
+                let weight0 = _mm_set1_epi16(*w_ptr);
                 store_0 = conv_horiz_rgba_1_u8_i16::<AR_TYPE, AR_ORDER>(
                     bounds_start,
                     src0,
@@ -360,7 +360,7 @@ unsafe fn sse_convolve_horizontal_rgba_row_impl<const AR_TYPE: usize, const AR_O
 
             while jx + 8 < bounds_size {
                 let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                let w_ptr = weights.get_unchecked(jx..);
                 let w0 = _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
                 let w1 = _mm_set1_epi32((w_ptr.as_ptr().add(2) as *const i32).read_unaligned());
                 let w2 = _mm_set1_epi32((w_ptr.as_ptr().add(4) as *const i32).read_unaligned());
@@ -379,7 +379,7 @@ unsafe fn sse_convolve_horizontal_rgba_row_impl<const AR_TYPE: usize, const AR_O
 
             while jx + 4 < bounds_size {
                 let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let w_ptr = weights.get_unchecked(jx..);
                 let w0 = _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
                 let w1 = _mm_set1_epi32((w_ptr.as_ptr().add(2) as *const i32).read_unaligned());
                 store_0 = conv_horiz_rgba_4_u8_i16::<AR_TYPE, AR_ORDER>(
@@ -393,9 +393,9 @@ unsafe fn sse_convolve_horizontal_rgba_row_impl<const AR_TYPE: usize, const AR_O
             }
 
             while jx < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                let w_ptr = weights.get_unchecked(jx);
                 let bounds_start = bounds.start + jx;
-                let weight0 = _mm_set1_epi16(w_ptr[0]);
+                let weight0 = _mm_set1_epi16(*w_ptr);
                 store_0 = conv_horiz_rgba_1_u8_i16::<AR_TYPE, AR_ORDER>(
                     bounds_start,
                     src0,

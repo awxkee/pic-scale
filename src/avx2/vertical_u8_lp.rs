@@ -68,7 +68,6 @@ unsafe fn m256dot(
 }
 
 #[target_feature(enable = "avx2")]
-/// This inlining is required to activate all features for runtime dispatch
 unsafe fn convolve_vertical_avx2_row_impl(
     _: usize,
     bounds: &FilterBounds,
@@ -198,8 +197,8 @@ unsafe fn convolve_vertical_avx2_row_impl(
         } else {
             for j in 0..bounds_size {
                 let py = bounds.start + j;
-                let weight = weight.get_unchecked(j..(j + 1));
-                let v_weight = _mm256_set1_epi16(weight[0]);
+                let weight = weight.get_unchecked(j);
+                let v_weight = _mm256_set1_epi16(*weight);
                 let v_offset = src_stride * py + px;
                 let src_ptr = src.get_unchecked(v_offset..);
                 let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
@@ -304,8 +303,8 @@ unsafe fn convolve_vertical_avx2_row_impl(
         } else {
             for j in 0..bounds_size {
                 let py = bounds.start + j;
-                let weight = weight.get_unchecked(j..(j + 1));
-                let v_weight = _mm256_set1_epi16(weight[0]);
+                let weight = weight.get_unchecked(j);
+                let v_weight = _mm256_set1_epi16(*weight);
                 let v_offset = src_stride * py + px;
                 let src_ptr = src.get_unchecked(v_offset..);
                 let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
@@ -333,8 +332,8 @@ unsafe fn convolve_vertical_avx2_row_impl(
 
         for j in 0..bounds_size {
             let py = bounds.start + j;
-            let weight = weight.get_unchecked(j..(j + 1));
-            let v_weight = _mm256_set1_epi16(weight[0]);
+            let weight = weight.get_unchecked(j);
+            let v_weight = _mm256_set1_epi16(*weight);
             let v_offset = src_stride * py + px;
             let src_ptr = src.get_unchecked(v_offset..);
             let mut item_row = _mm256_permute4x64_epi64::<0x50>(_mm256_castsi128_si256(
@@ -367,8 +366,8 @@ unsafe fn convolve_vertical_avx2_row_impl(
 
         for j in 0..bounds_size {
             let py = bounds.start + j;
-            let weight = weight.get_unchecked(j..(j + 1));
-            let v_weight = _mm_set1_epi16(weight[0]);
+            let weight = weight.get_unchecked(j);
+            let v_weight = _mm_set1_epi16(*weight);
             let v_offset = src_stride * py + px;
             let src_ptr = src.get_unchecked(v_offset..);
             let mut item_row = _mm_loadu_si64(src_ptr.as_ptr());
@@ -395,8 +394,8 @@ unsafe fn convolve_vertical_avx2_row_impl(
 
         for j in 0..bounds_size {
             let py = bounds.start + j;
-            let weight = weight.get_unchecked(j..(j + 1));
-            let v_weight = _mm_set1_epi16(weight[0]);
+            let weight = weight.get_unchecked(j);
+            let v_weight = _mm_set1_epi16(*weight);
             let v_offset = src_stride * py + px;
             let src_ptr = src.get_unchecked(v_offset..(v_offset + 1));
             let item_row = _mm_set1_epi8(src_ptr[0] as i8);

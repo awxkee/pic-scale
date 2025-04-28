@@ -33,7 +33,7 @@ use crate::alpha_handle_f32::{premultiply_alpha_rgba_f32, unpremultiply_alpha_rg
 use crate::alpha_handle_u16::{premultiply_alpha_rgba_u16, unpremultiply_alpha_rgba_u16};
 use crate::alpha_handle_u8::{premultiply_alpha_rgba, unpremultiply_alpha_rgba};
 use crate::pic_scale_error::{PicScaleBufferMismatch, PicScaleError};
-use crate::ImageSize;
+use crate::{ImageSize, WorkloadStrategy};
 #[cfg(feature = "nightly_f16")]
 use core::f16;
 use rayon::ThreadPool;
@@ -519,7 +519,11 @@ pub(crate) trait AssociateAlpha<T: Clone + Copy + Debug, const N: usize> {
 }
 
 pub(crate) trait UnassociateAlpha<T: Clone + Copy + Debug, const N: usize> {
-    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>);
+    fn unpremultiply_alpha(
+        &mut self,
+        pool: &Option<ThreadPool>,
+        workload_strategy: WorkloadStrategy,
+    );
 }
 
 impl AssociateAlpha<u8, 4> for ImageStore<'_, u8, 4> {
@@ -589,10 +593,21 @@ impl AssociateAlpha<u8, 4> for ImageStore<'_, u8, 4> {
 }
 
 impl UnassociateAlpha<u8, 4> for ImageStoreMut<'_, u8, 4> {
-    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
+    fn unpremultiply_alpha(
+        &mut self,
+        pool: &Option<ThreadPool>,
+        workload_strategy: WorkloadStrategy,
+    ) {
         let src_stride = self.stride();
         let dst = self.buffer.borrow_mut();
-        unpremultiply_alpha_rgba(dst, self.width, self.height, src_stride, pool);
+        unpremultiply_alpha_rgba(
+            dst,
+            self.width,
+            self.height,
+            src_stride,
+            pool,
+            workload_strategy,
+        );
     }
 }
 
@@ -700,7 +715,7 @@ impl AssociateAlpha<f16, 4> for ImageStore<'_, f16, 4> {
 }
 
 impl UnassociateAlpha<u16, 4> for ImageStoreMut<'_, u16, 4> {
-    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
+    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>, _: WorkloadStrategy) {
         let src_stride = self.stride();
         let in_place = self.buffer.borrow_mut();
         unpremultiply_alpha_rgba_u16(
@@ -715,7 +730,7 @@ impl UnassociateAlpha<u16, 4> for ImageStoreMut<'_, u16, 4> {
 }
 
 impl UnassociateAlpha<f32, 4> for ImageStoreMut<'_, f32, 4> {
-    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
+    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>, _: WorkloadStrategy) {
         let stride = self.stride();
         let dst = self.buffer.borrow_mut();
         unpremultiply_alpha_rgba_f32(dst, stride, self.width, self.height, pool);
@@ -724,7 +739,7 @@ impl UnassociateAlpha<f32, 4> for ImageStoreMut<'_, f32, 4> {
 
 #[cfg(feature = "nightly_f16")]
 impl UnassociateAlpha<f16, 4> for ImageStoreMut<'_, f16, 4> {
-    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
+    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>, _: WorkloadStrategy) {
         let stride = self.stride();
         let dst = self.buffer.borrow_mut();
         unpremultiply_alpha_rgba_f16(dst, stride, self.width, self.height, pool);
