@@ -205,8 +205,8 @@ pub(crate) fn convolve_vertical_dispatch_ar30<const AR30_TYPE: usize, const AR30
     width: usize,
     _options: ConvolutionOptions,
 ) {
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
-    let is_rdm_available = std::arch::is_aarch64_feature_detected!("rdm");
+    let _dispatch = get_vertical_dispatcher::<AR30_TYPE, AR30_ORDER>(_options);
+
     if let Some(pool) = pool {
         pool.install(|| {
             let approx = filter_weights.numerical_approximation_i16::<PRECISION>(0);
@@ -216,51 +216,6 @@ pub(crate) fn convolve_vertical_dispatch_ar30<const AR30_TYPE: usize, const AR30
                     let bounds = approx.bounds[y];
                     let filter_offset = y * approx.aligned_size;
                     let weights = &approx.weights[filter_offset..];
-                    let mut _dispatch: fn(&FilterBounds, &[u8], &mut [u8], usize, &[i16]) =
-                        column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
-                    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-                    {
-                        match _options.workload_strategy {
-                            crate::WorkloadStrategy::PreferSpeed => {
-                                #[cfg(feature = "rdm")]
-                                if is_rdm_available {
-                                    use crate::neon::neon_column_handler_fixed_point_ar30_rdm;
-                                    _dispatch = neon_column_handler_fixed_point_ar30_rdm::<
-                                        AR30_TYPE,
-                                        AR30_ORDER,
-                                    >;
-                                } else {
-                                    use crate::neon::neon_column_handler_fixed_point_ar30;
-                                    _dispatch = neon_column_handler_fixed_point_ar30::<
-                                        AR30_TYPE,
-                                        AR30_ORDER,
-                                    >;
-                                }
-                                #[cfg(not(feature = "rdm"))]
-                                {
-                                    use crate::neon::neon_column_handler_fixed_point_ar30;
-                                    _dispatch = neon_column_handler_fixed_point_ar30::<
-                                        AR30_TYPE,
-                                        AR30_ORDER,
-                                    >;
-                                }
-                            }
-                            crate::WorkloadStrategy::PreferQuality => {
-                                use crate::neon::neon_column_handler_fixed_point_ar30;
-                                _dispatch =
-                                    neon_column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
-                            }
-                        }
-                    }
-                    #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
-                    {
-                        if std::arch::is_x86_feature_detected!("sse4.1") {
-                            use crate::sse::sse_column_handler_fixed_point_ar30;
-                            _dispatch =
-                                sse_column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
-                        }
-                    }
-
                     let row = &mut row[0..4 * width];
                     _dispatch(&bounds, src, row, src_stride, weights);
                 });
@@ -274,48 +229,56 @@ pub(crate) fn convolve_vertical_dispatch_ar30<const AR30_TYPE: usize, const AR30
                 let filter_offset = y * approx.aligned_size;
                 let weights = &approx.weights[filter_offset..];
 
-                let mut _dispatch: fn(&FilterBounds, &[u8], &mut [u8], usize, &[i16]) =
-                    column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
-                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-                {
-                    match _options.workload_strategy {
-                        crate::WorkloadStrategy::PreferSpeed => {
-                            #[cfg(feature = "rdm")]
-                            if is_rdm_available {
-                                use crate::neon::neon_column_handler_fixed_point_ar30_rdm;
-                                _dispatch = neon_column_handler_fixed_point_ar30_rdm::<
-                                    AR30_TYPE,
-                                    AR30_ORDER,
-                                >;
-                            } else {
-                                use crate::neon::neon_column_handler_fixed_point_ar30;
-                                _dispatch =
-                                    neon_column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
-                            }
-                            #[cfg(not(feature = "rdm"))]
-                            {
-                                use crate::neon::neon_column_handler_fixed_point_ar30;
-                                _dispatch =
-                                    neon_column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
-                            }
-                        }
-                        crate::WorkloadStrategy::PreferQuality => {
-                            use crate::neon::neon_column_handler_fixed_point_ar30;
-                            _dispatch =
-                                neon_column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
-                        }
-                    }
-                }
-                #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
-                {
-                    if std::arch::is_x86_feature_detected!("sse4.1") {
-                        use crate::sse::sse_column_handler_fixed_point_ar30;
-                        _dispatch = sse_column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
-                    }
-                }
-
                 let row = &mut row[0..4 * width];
                 _dispatch(&bounds, src, row, src_stride, weights);
             });
     }
+}
+
+fn get_vertical_dispatcher<const AR30_TYPE: usize, const AR30_ORDER: usize>(
+    _options: ConvolutionOptions,
+) -> fn(&FilterBounds, &[u8], &mut [u8], usize, &[i16]) {
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
+    let is_rdm_available = std::arch::is_aarch64_feature_detected!("rdm");
+    let mut _dispatch: fn(&FilterBounds, &[u8], &mut [u8], usize, &[i16]) =
+        column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    {
+        match _options.workload_strategy {
+            crate::WorkloadStrategy::PreferSpeed => {
+                #[cfg(feature = "rdm")]
+                if is_rdm_available {
+                    use crate::neon::neon_column_handler_fixed_point_ar30_rdm;
+                    _dispatch = neon_column_handler_fixed_point_ar30_rdm::<AR30_TYPE, AR30_ORDER>;
+                } else {
+                    use crate::neon::neon_column_handler_fixed_point_ar30;
+                    _dispatch = neon_column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
+                }
+                #[cfg(not(feature = "rdm"))]
+                {
+                    use crate::neon::neon_column_handler_fixed_point_ar30;
+                    _dispatch = neon_column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
+                }
+            }
+            crate::WorkloadStrategy::PreferQuality => {
+                use crate::neon::neon_column_handler_fixed_point_ar30;
+                _dispatch = neon_column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
+            }
+        }
+    }
+    #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+    {
+        if std::arch::is_x86_feature_detected!("sse4.1") {
+            use crate::sse::sse_column_handler_fixed_point_ar30;
+            _dispatch = sse_column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
+        }
+    }
+    #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+    {
+        if std::arch::is_x86_feature_detected!("avx2") {
+            use crate::avx2::avx_column_handler_fixed_point_ar30;
+            _dispatch = avx_column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
+        }
+    }
+    _dispatch
 }

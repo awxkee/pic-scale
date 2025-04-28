@@ -12,12 +12,13 @@ use fast_image_resize::{
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
-    ImageSize, ImageStore, ImageStoreMut, ImageStoreScaling, Planar16ImageStore,
+    Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, ImageStoreScaling, Planar16ImageStore,
     Planar16ImageStoreMut, PlanarF32ImageStore, PlanarF32ImageStoreMut, ResamplingFunction,
     RgbF32ImageStore, RgbF32ImageStoreMut, Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore,
     Rgba8ImageStoreMut, RgbaF32ImageStore, RgbaF32ImageStoreMut, Scaler, Scaling, ScalingF32,
     ScalingU16, ThreadingPolicy, WorkloadStrategy,
 };
+use yuv::{ar30_to_rgb8, rgba8_to_ar30, Rgb30ByteOrder};
 
 fn resize_plane(
     src_width: usize,
@@ -53,7 +54,7 @@ fn main() {
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
-    let transient = img.to_luma8();
+    let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
@@ -71,27 +72,76 @@ fn main() {
     // //
     // store.bit_depth = 12;
     //
+
     let mut src_ar = vec![0u8; dimensions.0 as usize * dimensions.1 as usize * 4];
+
+    rgba8_to_ar30(
+        &mut src_ar,
+        dimensions.0 * 4,
+        Rgb30ByteOrder::Host,
+        &bytes,
+        dimensions.0 * 4,
+        dimensions.0,
+        dimensions.1,
+    )
+    .unwrap();
 
     let dst_size = ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2);
 
-    let bytes32 = bytes
-        .iter()
-        // .map(|&x| x)
-        // .map(|&x| u16::from_ne_bytes([x, x]))
-        .map(|&x| x as f32 / 255.)
-        .collect::<Vec<_>>();
+    let mut dst_ar = vec![0u8; dst_size.width as usize * dst_size.height as usize * 4];
 
-    let mut store =
-        PlanarF32ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize)
-            .unwrap();
-    store.bit_depth = 16;
-    let mut dst_store = PlanarF32ImageStoreMut::alloc_with_depth(
-        dimensions.0 as usize / 4,
-        dimensions.1 as usize / 4,
-        16,
-    );
-    scaler.resize_plane_f32(&store, &mut dst_store).unwrap();
+    scaler
+        .resize_ar30(
+            &src_ar,
+            dimensions.0 as usize * 4,
+            ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+            &mut dst_ar,
+            dst_size.width * 4,
+            dst_size,
+            Ar30ByteOrder::Host,
+        )
+        .unwrap();
+
+    let mut dst_bytes = vec![0u8; dst_size.width as usize * dst_size.height as usize * 3];
+
+    ar30_to_rgb8(
+        &dst_ar,
+        dst_size.width as u32 * 4,
+        Rgb30ByteOrder::Host,
+        &mut dst_bytes,
+        dst_size.width as u32 * 3,
+        dst_size.width as u32,
+        dst_size.height as u32,
+    )
+    .unwrap();
+
+    image::save_buffer(
+        "converted.png",
+        &dst_bytes,
+        dst_size.width as u32,
+        dst_size.height as u32,
+        image::ColorType::Rgb8,
+    )
+    .unwrap();
+
+    /*
+    // let bytes32 = bytes
+    //     .iter()
+    //     // .map(|&x| x)
+    //     // .map(|&x| u16::from_ne_bytes([x, x]))
+    //     .map(|&x| x as f32 / 255.)
+    //     .collect::<Vec<_>>();
+    //
+    // let mut store =
+    //     PlanarF32ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize)
+    //         .unwrap();
+    // store.bit_depth = 16;
+    // let mut dst_store = PlanarF32ImageStoreMut::alloc_with_depth(
+    //     dimensions.0 as usize / 4,
+    //     dimensions.1 as usize / 4,
+    //     16,
+    // );
+    // scaler.resize_plane_f32(&store, &mut dst_store).unwrap();
     //
     // let elapsed_time = start_time.elapsed();
     // // Print the elapsed time in milliseconds
@@ -165,7 +215,7 @@ fn main() {
             image::ColorType::L8,
         )
         .unwrap();
-    }
+    }*/
 }
 
 fn u16_to_u8(u16_buffer: &[u16]) -> &[u8] {
