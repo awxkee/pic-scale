@@ -344,7 +344,8 @@ impl NeonDisassociateAlphaFast {
         )
     }
 
-    #[inline(always)]
+    #[inline]
+    #[target_feature(enable = "rdm")]
     unsafe fn unpremultiply_vech(
         v: uint8x8_t,
         mask: uint8x8_t,
