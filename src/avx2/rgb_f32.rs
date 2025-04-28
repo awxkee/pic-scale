@@ -42,16 +42,16 @@ unsafe fn ch_parts_4_rgb_f32_sse<const FMA: bool>(
     store_0: __m128,
 ) -> __m128 {
     const COMPONENTS: usize = 3;
-    let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
+    let src_ptr = src.get_unchecked(start_x * COMPONENTS..);
 
-    let rgb_pixel_0 = _mm_loadu_ps(src_ptr);
-    let rgb_pixel_1 = _mm_loadu_ps(src_ptr.add(3));
-    let rgb_pixel_2 = _mm_loadu_ps(src_ptr.add(6));
+    let rgb_pixel_0 = _mm_loadu_ps(src_ptr.as_ptr());
+    let rgb_pixel_1 = _mm_loadu_ps(src_ptr.get_unchecked(3..).as_ptr());
+    let rgb_pixel_2 = _mm_loadu_ps(src_ptr.get_unchecked(6..).as_ptr());
     let rgb_pixel_3 = _mm_setr_ps(
-        src_ptr.add(9).read_unaligned(),
-        src_ptr.add(10).read_unaligned(),
-        src_ptr.add(11).read_unaligned(),
-        0f32,
+        *src_ptr.get_unchecked(9),
+        *src_ptr.get_unchecked(10),
+        *src_ptr.get_unchecked(11),
+        0.,
     );
 
     let acc = _mm_prefer_fma_ps::<FMA>(store_0, rgb_pixel_0, weight0);
@@ -72,26 +72,26 @@ unsafe fn ch_parts_4_rgb_f32_avx<const FMA: bool>(
     store_0: __m256,
 ) -> __m256 {
     const COMPONENTS: usize = 3;
-    let src_ptr0 = src0.get_unchecked(start_x * COMPONENTS..).as_ptr();
-    let src_ptr1 = src1.get_unchecked(start_x * COMPONENTS..).as_ptr();
+    let src_ptr0 = src0.get_unchecked(start_x * COMPONENTS..);
+    let src_ptr1 = src1.get_unchecked(start_x * COMPONENTS..);
 
-    let rgb_pixel_0_0 = _mm_loadu_ps(src_ptr0);
-    let rgb_pixel_0_1 = _mm_loadu_ps(src_ptr0.add(3));
-    let rgb_pixel_0_2 = _mm_loadu_ps(src_ptr0.add(6));
+    let rgb_pixel_0_0 = _mm_loadu_ps(src_ptr0.as_ptr());
+    let rgb_pixel_0_1 = _mm_loadu_ps(src_ptr0.get_unchecked(3..).as_ptr());
+    let rgb_pixel_0_2 = _mm_loadu_ps(src_ptr0.get_unchecked(6..).as_ptr());
     let rgb_pixel_0_3 = _mm_setr_ps(
-        src_ptr0.add(9).read_unaligned(),
-        src_ptr0.add(10).read_unaligned(),
-        src_ptr0.add(11).read_unaligned(),
+        *src_ptr0.get_unchecked(9),
+        *src_ptr0.get_unchecked(10),
+        *src_ptr0.get_unchecked(11),
         0.,
     );
 
-    let rgb_pixel_1_0 = _mm_loadu_ps(src_ptr1);
-    let rgb_pixel_1_1 = _mm_loadu_ps(src_ptr1.add(3));
-    let rgb_pixel_1_2 = _mm_loadu_ps(src_ptr1.add(6));
+    let rgb_pixel_1_0 = _mm_loadu_ps(src_ptr1.as_ptr());
+    let rgb_pixel_1_1 = _mm_loadu_ps(src_ptr1.get_unchecked(3..).as_ptr());
+    let rgb_pixel_1_2 = _mm_loadu_ps(src_ptr1.get_unchecked(6..).as_ptr());
     let rgb_pixel_1_3 = _mm_setr_ps(
-        src_ptr1.add(9).read_unaligned(),
-        src_ptr1.add(10).read_unaligned(),
-        src_ptr1.add(11).read_unaligned(),
+        *src_ptr1.get_unchecked(9),
+        *src_ptr1.get_unchecked(10),
+        *src_ptr1.get_unchecked(11),
         0.,
     );
 
