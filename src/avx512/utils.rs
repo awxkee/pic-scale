@@ -153,11 +153,3 @@ pub(crate) unsafe fn _mm512_dot16_epi32<const HAS_DOT: bool>(
         _mm512_add_epi32(a, _mm512_madd_epi16(b, c))
     }
 }
-
-#[inline(always)]
-pub(crate) fn compress_i32(x: __m128i) -> __m128i {
-    unsafe {
-        let store_32 = _mm_srai_epi32::<PRECISION>(x);
-        _mm_packus_epi32(store_32, store_32)
-    }
-}
