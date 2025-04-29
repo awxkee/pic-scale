@@ -172,7 +172,7 @@ unsafe fn convolve_horizontal_rgb_neon_rows_4_impl<const PRECISION: i32>(
 
             while jx + 4 < bounds.size {
                 let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let w_ptr = weights.get_unchecked(jx..);
                 let w0 = v128_load16_splat(w_ptr.as_ptr() as *const _);
                 let w1 = v128_load16_splat(w_ptr.get_unchecked(1..).as_ptr() as *const _);
                 let w2 = v128_load16_splat(w_ptr.get_unchecked(2..).as_ptr() as *const _);
@@ -185,7 +185,7 @@ unsafe fn convolve_horizontal_rgb_neon_rows_4_impl<const PRECISION: i32>(
             }
 
             while jx + 2 < bounds.size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 2));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bnds = bounds.start + jx;
                 let w0 = v128_load16_splat(w_ptr.as_ptr() as *const _);
                 let w1 = v128_load16_splat(w_ptr.get_unchecked(1..).as_ptr() as *const _);
@@ -197,7 +197,7 @@ unsafe fn convolve_horizontal_rgb_neon_rows_4_impl<const PRECISION: i32>(
             }
 
             while jx < bounds.size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bnds = bounds.start + jx;
                 let w0 = v128_load16_splat(w_ptr.as_ptr() as *const _);
                 store_0 = conv_horiz_rgba_1_u8(bnds, src0, w0, store_0);
@@ -255,7 +255,7 @@ unsafe fn convolve_horizontal_rgb_neon_row_one_impl<const PRECISION: i32>(
 
             while jx + 4 < bounds_size {
                 let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let w_ptr = weights.get_unchecked(jx..);
                 let w0 = v128_load16_splat(w_ptr.as_ptr() as *const _);
                 let w1 = v128_load16_splat(w_ptr.get_unchecked(1..).as_ptr() as *const _);
                 let w2 = v128_load16_splat(w_ptr.get_unchecked(2..).as_ptr() as *const _);
@@ -265,7 +265,7 @@ unsafe fn convolve_horizontal_rgb_neon_row_one_impl<const PRECISION: i32>(
             }
 
             while jx + 2 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 2));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let w0 = v128_load16_splat(w_ptr.as_ptr() as *const _);
                 let w1 = v128_load16_splat(w_ptr.get_unchecked(1..).as_ptr() as *const _);
@@ -274,7 +274,7 @@ unsafe fn convolve_horizontal_rgb_neon_row_one_impl<const PRECISION: i32>(
             }
 
             while jx < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                let w_ptr = weights.get_unchecked(jx..);
                 let w0 = v128_load16_splat(w_ptr.as_ptr() as *const _);
                 let bnds = bounds.start + jx;
                 store = conv_horiz_rgba_1_u8(bnds, src, w0, store);

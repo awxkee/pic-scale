@@ -70,7 +70,7 @@ unsafe fn conv_horiz_rgba_2_u16<const FMA: bool>(
     );
     _mm_prefer_fma_ps::<FMA>(
         acc,
-        _mm_cvtepi32_ps(_mm_unpacklo_epi16(rgba_pixel, _mm_setzero_si128())),
+        _mm_cvtepi32_ps(_mm_unpackhi_epi16(rgba_pixel, _mm_setzero_si128())),
         w1,
     )
 }
@@ -204,6 +204,63 @@ struct Row4ExecutionHandler<const FMA: bool> {}
 
 impl<const FMA: bool> Row4ExecutionHandler<FMA> {
     #[inline(always)]
+    unsafe fn rgba_2_u16_avx(
+        &self,
+        start_x: usize,
+        src0: &[u16],
+        src1: &[u16],
+        w0: __m256,
+        w1: __m256,
+        store: __m256,
+    ) -> __m256 {
+        const COMPONENTS: usize = 4;
+        let src_ptr0 = src0.get_unchecked((start_x * COMPONENTS)..);
+        let src_ptr1 = src1.get_unchecked((start_x * COMPONENTS)..);
+
+        let rgba_pixel0 = _mm256_cvtepi32_ps(_mm256_cvtepu16_epi32(_mm_loadu_si128(
+            src_ptr0.as_ptr() as *const _,
+        )));
+        let rgba_pixel1 = _mm256_cvtepi32_ps(_mm256_cvtepu16_epi32(_mm_loadu_si128(
+            src_ptr1.as_ptr() as *const _,
+        )));
+
+        let lo = _mm256_insertf128_ps::<1>(
+            _mm256_castps128_ps256(_mm256_castps256_ps128(rgba_pixel0)),
+            _mm256_castps256_ps128(rgba_pixel1),
+        );
+        let hi = _mm256_insertf128_ps::<1>(
+            _mm256_castps128_ps256(_mm256_extractf128_ps::<1>(rgba_pixel0)),
+            _mm256_extractf128_ps::<1>(rgba_pixel1),
+        );
+
+        let acc = _mm256_prefer_fma_ps::<FMA>(store, lo, w0);
+        _mm256_prefer_fma_ps::<FMA>(acc, hi, w1)
+    }
+
+    #[inline(always)]
+    unsafe fn rgba_1_u16(
+        &self,
+        start_x: usize,
+        src0: &[u16],
+        src1: &[u16],
+        w0: __m256,
+        store: __m256,
+    ) -> __m256 {
+        const COMPONENTS: usize = 4;
+        let src_ptr0 = src0.get_unchecked((start_x * COMPONENTS)..);
+        let src_ptr1 = src1.get_unchecked((start_x * COMPONENTS)..);
+
+        let rgba_pixel0 = _mm_loadu_si64(src_ptr0.as_ptr() as *const u8);
+        let rgba_pixel1 = _mm_loadu_si64(src_ptr1.as_ptr() as *const u8);
+
+        let full_pixel = _mm256_cvtepu16_epi32(_mm_unpacklo_epi64(rgba_pixel0, rgba_pixel1));
+
+        let f_pixel = _mm256_cvtepi32_ps(full_pixel);
+
+        _mm256_prefer_fma_ps::<FMA>(store, f_pixel, w0)
+    }
+
+    #[inline(always)]
     unsafe fn pass(
         &self,
         src: &[u16],
@@ -215,7 +272,7 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
     ) {
         const CHANNELS: usize = 4;
 
-        let v_max_colors = _mm_set1_epi32((1i32 << bit_depth) - 1);
+        let v_max_colors = _mm256_set1_epi32((1i32 << bit_depth) - 1);
 
         let (row0_ref, rest) = dst.split_at_mut(dst_stride);
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
@@ -239,10 +296,8 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
         {
             let mut jx = 0usize;
 
-            let mut store_0 = _mm_setzero_ps();
-            let mut store_1 = _mm_setzero_ps();
-            let mut store_2 = _mm_setzero_ps();
-            let mut store_3 = _mm_setzero_ps();
+            let mut store_0 = _mm256_setzero_ps();
+            let mut store_1 = _mm256_setzero_ps();
 
             let bounds_size = bounds.size;
 
@@ -259,7 +314,7 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
 
                 while jx + 8 < bounds_size {
                     let bounds_start = bounds.start + jx;
-                    let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                    let w_ptr = weights.get_unchecked(jx..);
 
                     let w0 = _mm_load1_ps(w_ptr.as_ptr());
                     let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
@@ -316,7 +371,7 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
 
                 while jx + 4 < bounds_size {
                     let bounds_start = bounds.start + jx;
-                    let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                    let w_ptr = weights.get_unchecked(jx..);
                     let w0 = _mm_load1_ps(w_ptr.as_ptr());
                     let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
                     let w2 = _mm_load1_ps(w_ptr.as_ptr().add(2));
@@ -332,73 +387,75 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                     jx += 4;
                 }
 
-                store_0 = _mm_add_ps(
-                    _mm256_castps256_ps128(astore_0),
-                    _mm256_extractf128_ps::<1>(astore_0),
+                store_0 = _mm256_insertf128_ps::<1>(
+                    _mm256_castps128_ps256(_mm_add_ps(
+                        _mm256_castps256_ps128(astore_0),
+                        _mm256_extractf128_ps::<1>(astore_0),
+                    )),
+                    _mm_add_ps(
+                        _mm256_castps256_ps128(astore_1),
+                        _mm256_extractf128_ps::<1>(astore_1),
+                    ),
                 );
-                store_1 = _mm_add_ps(
-                    _mm256_castps256_ps128(astore_1),
-                    _mm256_extractf128_ps::<1>(astore_1),
-                );
-                store_2 = _mm_add_ps(
-                    _mm256_castps256_ps128(astore_2),
-                    _mm256_extractf128_ps::<1>(astore_2),
-                );
-                store_3 = _mm_add_ps(
-                    _mm256_castps256_ps128(astore_3),
-                    _mm256_extractf128_ps::<1>(astore_3),
+                store_1 = _mm256_insertf128_ps::<1>(
+                    _mm256_castps128_ps256(_mm_add_ps(
+                        _mm256_castps256_ps128(astore_2),
+                        _mm256_extractf128_ps::<1>(astore_2),
+                    )),
+                    _mm_add_ps(
+                        _mm256_castps256_ps128(astore_3),
+                        _mm256_extractf128_ps::<1>(astore_3),
+                    ),
                 );
             }
 
             while jx + 2 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 2));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
-                let w0 = _mm_load1_ps(w_ptr.as_ptr());
-                let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
-                store_0 = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src0, w0, w1, store_0);
-                store_1 = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src1, w0, w1, store_1);
-                store_2 = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src2, w0, w1, store_2);
-                store_3 = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src3, w0, w1, store_3);
+                let w0 = _mm256_broadcast_ss(w_ptr.get_unchecked(0));
+                let w1 = _mm256_broadcast_ss(w_ptr.get_unchecked(1));
+                store_0 = self.rgba_2_u16_avx(bounds_start, src0, src1, w0, w1, store_0);
+                store_1 = self.rgba_2_u16_avx(bounds_start, src2, src3, w0, w1, store_1);
                 jx += 2;
             }
 
             while jx < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
-                let w0 = _mm_load1_ps(w_ptr.as_ptr());
-                store_0 = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src0, w0, store_0);
-                store_1 = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src1, w0, store_1);
-                store_2 = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src2, w0, store_2);
-                store_3 = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src3, w0, store_3);
+                let w0 = _mm256_broadcast_ss(w_ptr.get_unchecked(0));
+                store_0 = self.rgba_1_u16(bounds_start, src0, src1, w0, store_0);
+                store_1 = self.rgba_1_u16(bounds_start, src2, src3, w0, store_1);
                 jx += 1;
             }
 
-            let v_st0 = _mm_min_epi32(
-                _mm_cvtps_epi32(_mm_max_ps(store_0, _mm_setzero_ps())),
+            let v_st0 = _mm256_min_epi32(
+                _mm256_cvtps_epi32(_mm256_max_ps(store_0, _mm256_setzero_ps())),
                 v_max_colors,
             );
-            let v_st1 = _mm_min_epi32(
-                _mm_cvtps_epi32(_mm_max_ps(store_1, _mm_setzero_ps())),
-                v_max_colors,
-            );
-            let v_st2 = _mm_min_epi32(
-                _mm_cvtps_epi32(_mm_max_ps(store_2, _mm_setzero_ps())),
-                v_max_colors,
-            );
-            let v_st3 = _mm_min_epi32(
-                _mm_cvtps_epi32(_mm_max_ps(store_3, _mm_setzero_ps())),
+            let v_st1 = _mm256_min_epi32(
+                _mm256_cvtps_epi32(_mm256_max_ps(store_1, _mm256_setzero_ps())),
                 v_max_colors,
             );
 
-            let store_16_0 = _mm_packus_epi32(v_st0, v_st0);
-            let store_16_1 = _mm_packus_epi32(v_st1, v_st1);
-            let store_16_2 = _mm_packus_epi32(v_st2, v_st2);
-            let store_16_3 = _mm_packus_epi32(v_st3, v_st3);
+            let store_16_0 = _mm256_packus_epi32(v_st0, v_st0);
+            let store_16_1 = _mm256_packus_epi32(v_st1, v_st1);
 
-            _mm_storeu_si64(chunk0.as_mut_ptr() as *mut u8, store_16_0);
-            _mm_storeu_si64(chunk1.as_mut_ptr() as *mut u8, store_16_1);
-            _mm_storeu_si64(chunk2.as_mut_ptr() as *mut u8, store_16_2);
-            _mm_storeu_si64(chunk3.as_mut_ptr() as *mut u8, store_16_3);
+            _mm_storeu_si64(
+                chunk0.as_mut_ptr() as *mut u8,
+                _mm256_castsi256_si128(store_16_0),
+            );
+            _mm_storeu_si64(
+                chunk1.as_mut_ptr() as *mut u8,
+                _mm256_extracti128_si256::<1>(store_16_0),
+            );
+            _mm_storeu_si64(
+                chunk2.as_mut_ptr() as *mut u8,
+                _mm256_castsi256_si128(store_16_1),
+            );
+            _mm_storeu_si64(
+                chunk3.as_mut_ptr() as *mut u8,
+                _mm256_extracti128_si256::<1>(store_16_1),
+            );
         }
     }
 }
@@ -476,7 +533,7 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
 
                 while jx + 8 < bounds_size {
                     let bounds_start = bounds.start + jx;
-                    let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                    let w_ptr = weights.get_unchecked(jx..);
                     let w0 = _mm_load1_ps(w_ptr.as_ptr());
                     let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
                     let w2 = _mm_load1_ps(w_ptr.as_ptr().add(2));
@@ -495,7 +552,7 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
                 }
 
                 while jx + 4 < bounds_size {
-                    let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                    let w_ptr = weights.get_unchecked(jx..);
                     let w0 = _mm_load1_ps(w_ptr.as_ptr());
                     let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
                     let w2 = _mm_load1_ps(w_ptr.as_ptr().add(2));
@@ -516,7 +573,7 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
             }
 
             while jx + 2 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 2));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let w0 = _mm_load1_ps(w_ptr.as_ptr());
                 let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
@@ -525,7 +582,7 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
             }
 
             while jx < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                let w_ptr = weights.get_unchecked(jx..);
                 let w0 = _mm_load1_ps(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
                 store = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src, w0, store);

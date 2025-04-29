@@ -304,10 +304,10 @@ impl<const FMA: bool> ExecutionUnit1Row<FMA> {
 
             while jx + 4 < bounds.size {
                 let ptr = weights.get_unchecked(jx + filter_offset..);
-                let weight0 = _mm_broadcast_ss(&ptr[0]);
-                let weight1 = _mm_broadcast_ss(&ptr[1]);
-                let weight2 = _mm_broadcast_ss(&ptr[2]);
-                let weight3 = _mm_broadcast_ss(&ptr[3]);
+                let weight0 = _mm_broadcast_ss(ptr.get_unchecked(0));
+                let weight1 = _mm_broadcast_ss(ptr.get_unchecked(1));
+                let weight2 = _mm_broadcast_ss(ptr.get_unchecked(2));
+                let weight3 = _mm_broadcast_ss(ptr.get_unchecked(3));
 
                 let filter_start = jx + bounds.start;
                 store = ch_parts_4_rgb_f32_sse::<FMA>(
@@ -324,8 +324,8 @@ impl<const FMA: bool> ExecutionUnit1Row<FMA> {
 
             while jx + 2 < bounds.size {
                 let ptr = weights.get_unchecked(jx + filter_offset..);
-                let weight0 = _mm_broadcast_ss(&ptr[0]);
-                let weight1 = _mm_broadcast_ss(&ptr[1]);
+                let weight0 = _mm_broadcast_ss(ptr.get_unchecked(0));
+                let weight1 = _mm_broadcast_ss(ptr.get_unchecked(1));
                 let filter_start = jx + bounds.start;
                 store = ch_parts_2_rgb_f32::<FMA>(filter_start, src, weight0, weight1, store);
                 jx += 2;
@@ -333,7 +333,7 @@ impl<const FMA: bool> ExecutionUnit1Row<FMA> {
 
             while jx < bounds.size {
                 let ptr = weights.get_unchecked(jx + filter_offset..);
-                let weight0 = _mm_broadcast_ss(&ptr[0]);
+                let weight0 = _mm_broadcast_ss(ptr.get_unchecked(0));
                 let filter_start = jx + bounds.start;
                 store = ch_parts_one_rgb_f32::<FMA>(filter_start, src, weight0, store);
                 jx += 1;
@@ -460,10 +460,10 @@ impl<const FMA: bool> ExecutionUnit4Row<FMA> {
             while jx + 4 < bounds.size {
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
 
-                let weight0 = _mm256_broadcast_ss(&ptr[0]);
-                let weight1 = _mm256_broadcast_ss(&ptr[1]);
-                let weight2 = _mm256_broadcast_ss(&ptr[2]);
-                let weight3 = _mm256_broadcast_ss(&ptr[3]);
+                let weight0 = _mm256_broadcast_ss(ptr.get_unchecked(0));
+                let weight1 = _mm256_broadcast_ss(ptr.get_unchecked(1));
+                let weight2 = _mm256_broadcast_ss(ptr.get_unchecked(2));
+                let weight3 = _mm256_broadcast_ss(ptr.get_unchecked(3));
 
                 let filter_start = jx + bounds.start;
                 store_0 = ch_parts_4_rgb_f32_avx::<FMA>(
@@ -491,8 +491,8 @@ impl<const FMA: bool> ExecutionUnit4Row<FMA> {
 
             while jx + 2 < bounds.size {
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
-                let weight0 = _mm256_broadcast_ss(&ptr[0]);
-                let weight1 = _mm256_broadcast_ss(&ptr[1]);
+                let weight0 = _mm256_broadcast_ss(ptr.get_unchecked(0));
+                let weight1 = _mm256_broadcast_ss(ptr.get_unchecked(1));
                 let filter_start = jx + bounds.start;
                 store_0 = ch_parts_2_rgb_f32_avx::<FMA>(
                     filter_start,
@@ -515,7 +515,7 @@ impl<const FMA: bool> ExecutionUnit4Row<FMA> {
 
             while jx < bounds.size {
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
-                let weight0 = _mm256_broadcast_ss(&ptr[0]);
+                let weight0 = _mm256_broadcast_ss(ptr.get_unchecked(0));
                 let filter_start = jx + bounds.start;
                 store_0 = ch_parts_one_rgb_f32_avx::<FMA>(
                     filter_start,
