@@ -269,9 +269,9 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_impl(
         }
 
         while jx < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 1));
+            let w_ptr = weights.get_unchecked(jx);
 
-            let weight0 = _mm_set1_epi16(w_ptr[0]);
+            let weight0 = _mm_set1_epi16(*w_ptr);
 
             let start_bounds = bounds.start + jx;
 
@@ -432,8 +432,8 @@ unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
         }
 
         while jx < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..);
-            let weight0 = _mm_set1_epi16(w_ptr[0]);
+            let w_ptr = weights.get_unchecked(jx);
+            let weight0 = _mm_set1_epi16(*w_ptr);
 
             let start_bounds = bounds.start + jx;
 

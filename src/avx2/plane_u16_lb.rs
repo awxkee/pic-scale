@@ -216,7 +216,7 @@ impl<const D: bool> Row4ExecutionHandler<D> {
             let src3 = src2.get_unchecked(src_stride..);
 
             while jx + 8 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let w_ptr = weights.get_unchecked(jx..);
                 let wl = _mm_loadu_si128(w_ptr.as_ptr() as *const _);
                 let bounds_start = bounds.start + jx;
                 store_0 = acc_8_dot::<D>(bounds_start, src0, wl, store_0);
@@ -228,7 +228,7 @@ impl<const D: bool> Row4ExecutionHandler<D> {
 
             while jx + 4 < bounds_size {
                 let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let w_ptr = weights.get_unchecked(jx..);
                 let w0 = _mm_loadu_si64(w_ptr.as_ptr() as *const _);
                 store_0 = acc_4_dot::<D>(bounds_start, src0, w0, store_0);
                 store_1 = acc_4_dot::<D>(bounds_start, src1, w0, store_1);
@@ -238,7 +238,7 @@ impl<const D: bool> Row4ExecutionHandler<D> {
             }
 
             while jx + 2 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 2));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let w0 = _mm_loadu_si32(w_ptr.as_ptr() as *const _);
                 store_0 = acc_2_dot::<D>(bounds_start, src0, w0, store_0);
@@ -249,7 +249,7 @@ impl<const D: bool> Row4ExecutionHandler<D> {
             }
 
             while jx < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let w0 = _mm_loadu_si16(w_ptr.as_ptr() as *const _);
                 store_0 = acc_1_dot::<D>(bounds_start, src0, w0, store_0);
@@ -342,7 +342,7 @@ impl<const D: bool> OneRowExecutionUnit<D> {
             );
 
             while jx + 8 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let w_ptr = weights.get_unchecked(jx..);
                 let wl = _mm_loadu_si128(w_ptr.as_ptr() as *const _);
                 let bounds_start = bounds.start + jx;
                 store = acc_8_dot::<D>(bounds_start, src, wl, store);
@@ -350,7 +350,7 @@ impl<const D: bool> OneRowExecutionUnit<D> {
             }
 
             while jx + 4 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let w_ptr = weights.get_unchecked(jx..);
                 let w0 = _mm_loadu_si64(w_ptr.as_ptr() as *const _);
                 let bounds_start = bounds.start + jx;
                 store = acc_4_dot::<D>(bounds_start, src, w0, store);
@@ -358,7 +358,7 @@ impl<const D: bool> OneRowExecutionUnit<D> {
             }
 
             while jx + 2 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 2));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let w0 = _mm_loadu_si32(w_ptr.as_ptr() as *const _);
                 store = acc_2_dot::<D>(bounds_start, src, w0, store);
@@ -366,7 +366,7 @@ impl<const D: bool> OneRowExecutionUnit<D> {
             }
 
             while jx < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                let w_ptr = weights.get_unchecked(jx..);
                 let w0 = _mm_loadu_si16(w_ptr.as_ptr() as *const _);
                 let bounds_start = bounds.start + jx;
                 store = acc_1_dot::<D>(bounds_start, src, w0, store);

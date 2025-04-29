@@ -370,9 +370,9 @@ impl<const D: bool> Row4ExecutionHandler<D> {
             }
 
             while jx < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..);
+                let w_ptr = weights.get_unchecked(jx);
                 let bounds_start = bounds.start + jx;
-                let ww0 = _mm_set1_epi16(w_ptr[0]);
+                let ww0 = _mm_set1_epi16(*w_ptr);
                 let w0 = _mm256_shuffle_epi8(
                     _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(ww0), ww0),
                     shuffle_weights_table,
@@ -556,8 +556,8 @@ impl<const D: bool> OneRowExecutionUnit<D> {
             }
 
             while jx < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..);
-                let w0 = _mm_shuffle_epi8(_mm_set1_epi16(w_ptr[0]), shuffle_weights_table);
+                let w_ptr = weights.get_unchecked(jx);
+                let w0 = _mm_shuffle_epi8(_mm_set1_epi16(*w_ptr), shuffle_weights_table);
                 let bounds_start = bounds.start + jx;
                 store = acc_1_dot::<D>(bounds_start, src, w0, store, shuffle_1_table);
                 jx += 1;
