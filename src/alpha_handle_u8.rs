@@ -93,7 +93,7 @@ const fn make_unpremultiplication_table() -> [u8; 65536] {
                 buf[alpha * 255 + pixel] = 0;
             } else {
                 let value = (pixel * 255 + alpha / 2) / alpha;
-                buf[alpha * 255 + pixel] = value as u8;
+                buf[alpha * 255 + pixel] = if value > 255 { 255 } else { value as u8 };
             }
             pixel += 1;
         }
