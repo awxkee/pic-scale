@@ -221,26 +221,14 @@ unsafe fn convolve_horizontal_rgba_avx_row_4_impl(
                 jx += 4;
             }
 
-            store_0 = _mm256_inserti128_si256::<1>(
-                _mm256_castsi128_si256(_mm_add_epi32(
-                    _mm256_castsi256_si128(store_avx0),
-                    _mm256_extracti128_si256::<1>(store_avx0),
-                )),
-                _mm_add_epi32(
-                    _mm256_castsi256_si128(store_avx1),
-                    _mm256_extracti128_si256::<1>(store_avx1),
-                ),
+            store_0 = _mm256_add_epi16(
+                _mm256_permute2x128_si256::<0x20>(store_avx0, store_avx1),
+                _mm256_permute2x128_si256::<0x31>(store_avx0, store_avx1),
             );
 
-            store_1 = _mm256_inserti128_si256::<1>(
-                _mm256_castsi128_si256(_mm_add_epi32(
-                    _mm256_castsi256_si128(store_avx2),
-                    _mm256_extracti128_si256::<1>(store_avx2),
-                )),
-                _mm_add_epi32(
-                    _mm256_castsi256_si128(store_avx3),
-                    _mm256_extracti128_si256::<1>(store_avx3),
-                ),
+            store_1 = _mm256_add_epi16(
+                _mm256_permute2x128_si256::<0x20>(store_avx2, store_avx3),
+                _mm256_permute2x128_si256::<0x31>(store_avx2, store_avx3),
             );
         }
 
