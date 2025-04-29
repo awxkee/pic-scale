@@ -267,7 +267,7 @@ unsafe fn convolve_horizontal_rgb_avx_rows_4_impl<const HAS_DOT: bool>(
             );
 
             while jx + 8 < bounds.size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                let w_ptr = weights.get_unchecked(jx..);
                 let full_weights =
                     _mm256_castsi128_si256(_mm_loadu_si128(w_ptr.as_ptr() as *const _));
 
@@ -305,7 +305,7 @@ unsafe fn convolve_horizontal_rgb_avx_rows_4_impl<const HAS_DOT: bool>(
             }
 
             while jx + 4 < bounds.size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let w_ptr = weights.get_unchecked(jx..);
                 let weights = _mm256_shuffle_epi8(
                     _mm256_permutevar8x32_epi32(
                         _mm256_castsi128_si256(_mm_loadu_si64(w_ptr.as_ptr() as *const u8)),
@@ -351,7 +351,7 @@ unsafe fn convolve_horizontal_rgb_avx_rows_4_impl<const HAS_DOT: bool>(
         }
 
         while jx + 2 < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 2));
+            let w_ptr = weights.get_unchecked(jx..);
             let bounds_start = (bounds.start + jx) * CHANNELS;
             let weight01 = _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
 
@@ -374,7 +374,7 @@ unsafe fn convolve_horizontal_rgb_avx_rows_4_impl<const HAS_DOT: bool>(
         }
 
         while jx < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 1));
+            let w_ptr = weights.get_unchecked(jx..);
             let bounds_start = bounds.start + jx;
 
             let weight0 = _mm_set1_epi32(w_ptr.as_ptr().read_unaligned() as i32);
@@ -529,7 +529,7 @@ unsafe fn convolve_horizontal_rgb_avx_row_one_impl<const HAS_DOT: bool>(
 
         let mut store = if bounds_size > 4 {
             while jx + 8 < bounds.size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                let w_ptr = weights.get_unchecked(jx..);
                 let full_weights =
                     _mm256_castsi128_si256(_mm_loadu_si128(w_ptr.as_ptr() as *const _));
 
@@ -558,7 +558,7 @@ unsafe fn convolve_horizontal_rgb_avx_row_one_impl<const HAS_DOT: bool>(
             }
 
             while jx + 4 < bounds.size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let w_ptr = weights.get_unchecked(jx..);
                 let weights = _mm256_shuffle_epi8(
                     _mm256_permutevar8x32_epi32(
                         _mm256_castsi128_si256(_mm_loadu_si64(w_ptr.as_ptr() as *const u8)),
@@ -583,7 +583,7 @@ unsafe fn convolve_horizontal_rgb_avx_row_one_impl<const HAS_DOT: bool>(
         };
 
         while jx + 2 < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 2));
+            let w_ptr = weights.get_unchecked(jx..);
             let weight0 = _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
             let src_ptr = src.get_unchecked(((bounds.start + jx) * 3)..);
             let rgb_pixel = load_rgb_x2(src_ptr);
@@ -593,7 +593,7 @@ unsafe fn convolve_horizontal_rgb_avx_row_one_impl<const HAS_DOT: bool>(
         }
 
         while jx < bounds_size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 1));
+            let w_ptr = weights.get_unchecked(jx..);
             let weight0 = _mm_set1_epi32(w_ptr.as_ptr().read_unaligned() as i32);
             store = add_one_weight::<HAS_DOT>(bounds.start + jx, src, weight0, store);
             jx += 1;

@@ -218,14 +218,14 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
             while jx + 8 < bounds.size {
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
 
-                let w0 = _mm_broadcast_ss(&ptr[0]);
-                let w1 = _mm_broadcast_ss(&ptr[1]);
-                let w2 = _mm_broadcast_ss(&ptr[2]);
-                let w3 = _mm_broadcast_ss(&ptr[3]);
-                let w4 = _mm_broadcast_ss(&ptr[4]);
-                let w5 = _mm_broadcast_ss(&ptr[5]);
-                let w6 = _mm_broadcast_ss(&ptr[6]);
-                let w7 = _mm_broadcast_ss(&ptr[7]);
+                let w0 = _mm_broadcast_ss(ptr.get_unchecked(0));
+                let w1 = _mm_broadcast_ss(ptr.get_unchecked(1));
+                let w2 = _mm_broadcast_ss(ptr.get_unchecked(2));
+                let w3 = _mm_broadcast_ss(ptr.get_unchecked(3));
+                let w4 = _mm_broadcast_ss(ptr.get_unchecked(4));
+                let w5 = _mm_broadcast_ss(ptr.get_unchecked(5));
+                let w6 = _mm_broadcast_ss(ptr.get_unchecked(6));
+                let w7 = _mm_broadcast_ss(ptr.get_unchecked(7));
 
                 let weight0 = avx_combine_ps(w0, w1);
                 let weight1 = avx_combine_ps(w2, w3);
@@ -275,10 +275,10 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
 
             while jx + 4 < bounds.size {
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
-                let w0 = _mm_broadcast_ss(&ptr[0]);
-                let w1 = _mm_broadcast_ss(&ptr[1]);
-                let w2 = _mm_broadcast_ss(&ptr[2]);
-                let w3 = _mm_broadcast_ss(&ptr[3]);
+                let w0 = _mm_broadcast_ss(ptr.get_unchecked(0));
+                let w1 = _mm_broadcast_ss(ptr.get_unchecked(1));
+                let w2 = _mm_broadcast_ss(ptr.get_unchecked(2));
+                let w3 = _mm_broadcast_ss(ptr.get_unchecked(3));
 
                 let weight0 = avx_combine_ps(w0, w1);
                 let weight1 = avx_combine_ps(w2, w3);
@@ -317,8 +317,8 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
 
             while jx + 2 < bounds.size {
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
-                let weight0 = _mm_broadcast_ss(&ptr[0]);
-                let weight1 = _mm_broadcast_ss(&ptr[1]);
+                let weight0 = _mm_broadcast_ss(ptr.get_unchecked(0));
+                let weight1 = _mm_broadcast_ss(ptr.get_unchecked(1));
                 let weight = avx_combine_ps(weight0, weight1);
                 let filter_start = jx + bounds.start;
                 store_0 =
@@ -493,14 +493,14 @@ impl<const FMA: bool> OneRowExecutionUnit<FMA> {
             while jx + 8 < bounds.size {
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
 
-                let w0 = _mm_broadcast_ss(&ptr[0]);
-                let w1 = _mm_broadcast_ss(&ptr[1]);
-                let w2 = _mm_broadcast_ss(&ptr[2]);
-                let w3 = _mm_broadcast_ss(&ptr[3]);
-                let w4 = _mm_broadcast_ss(&ptr[4]);
-                let w5 = _mm_broadcast_ss(&ptr[5]);
-                let w6 = _mm_broadcast_ss(&ptr[6]);
-                let w7 = _mm_broadcast_ss(&ptr[7]);
+                let w0 = _mm_broadcast_ss(ptr.get_unchecked(0));
+                let w1 = _mm_broadcast_ss(ptr.get_unchecked(1));
+                let w2 = _mm_broadcast_ss(ptr.get_unchecked(2));
+                let w3 = _mm_broadcast_ss(ptr.get_unchecked(3));
+                let w4 = _mm_broadcast_ss(ptr.get_unchecked(4));
+                let w5 = _mm_broadcast_ss(ptr.get_unchecked(5));
+                let w6 = _mm_broadcast_ss(ptr.get_unchecked(6));
+                let w7 = _mm_broadcast_ss(ptr.get_unchecked(7));
 
                 let weight0 = avx_combine_ps(w0, w1);
                 let weight1 = avx_combine_ps(w2, w3);
@@ -523,10 +523,10 @@ impl<const FMA: bool> OneRowExecutionUnit<FMA> {
             while jx + 4 < bounds.size {
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
 
-                let w0 = _mm_broadcast_ss(&ptr[0]);
-                let w1 = _mm_broadcast_ss(&ptr[1]);
-                let w2 = _mm_broadcast_ss(&ptr[2]);
-                let w3 = _mm_broadcast_ss(&ptr[3]);
+                let w0 = _mm_broadcast_ss(ptr.get_unchecked(0));
+                let w1 = _mm_broadcast_ss(ptr.get_unchecked(1));
+                let w2 = _mm_broadcast_ss(ptr.get_unchecked(2));
+                let w3 = _mm_broadcast_ss(ptr.get_unchecked(3));
 
                 let weight0 = avx_combine_ps(w0, w1);
                 let weight1 = avx_combine_ps(w2, w3);
@@ -543,8 +543,8 @@ impl<const FMA: bool> OneRowExecutionUnit<FMA> {
 
             while jx + 2 < bounds.size {
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
-                let weight0 = _mm_broadcast_ss(&ptr[0]);
-                let weight1 = _mm_broadcast_ss(&ptr[1]);
+                let weight0 = _mm_broadcast_ss(ptr.get_unchecked(0));
+                let weight1 = _mm_broadcast_ss(ptr.get_unchecked(1));
                 let weight = avx_combine_ps(weight0, weight1);
                 let filter_start = jx + bounds.start;
                 store =

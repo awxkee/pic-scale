@@ -379,9 +379,10 @@ pub(crate) fn avx_unpremultiply_alpha_rgba_u16(
 /// This inlining is required to activate all features for runtime dispatch
 #[inline(always)]
 unsafe fn avx_unpremultiply_alpha_rgba_u16_row_impl(in_place: &mut [u16], bit_depth: usize) {
-    let max_colors = (1 << bit_depth) - 1;
+    let max_colors = (1u32 << bit_depth) - 1;
 
     let v_scale_colors = _mm256_set1_ps(max_colors as f32);
+    let v_max_test = _mm256_set1_epi16(max_colors as i16);
 
     let mut rem = in_place;
 
@@ -414,6 +415,10 @@ unsafe fn avx_unpremultiply_alpha_rgba_u16_row_impl(in_place: &mut [u16], bit_de
         new_ggg = _mm256_select_si256(is_zero_alpha_mask, pixel.1, new_ggg);
         let mut new_bbb = _mm256_scale_by_alpha(pixel.2, low_alpha, high_alpha);
         new_bbb = _mm256_select_si256(is_zero_alpha_mask, pixel.2, new_bbb);
+
+        new_rrr = _mm256_min_epu16(new_rrr, v_max_test);
+        new_ggg = _mm256_min_epu16(new_ggg, v_max_test);
+        new_bbb = _mm256_min_epu16(new_bbb, v_max_test);
 
         let dst_ptr = dst.as_mut_ptr();
         let (d_lane0, d_lane1, d_lane2, d_lane3) =
@@ -460,6 +465,10 @@ unsafe fn avx_unpremultiply_alpha_rgba_u16_row_impl(in_place: &mut [u16], bit_de
         new_ggg = _mm256_select_si256(is_zero_alpha_mask, pixel.1, new_ggg);
         let mut new_bbb = _mm256_scale_by_alpha(pixel.2, low_alpha, high_alpha);
         new_bbb = _mm256_select_si256(is_zero_alpha_mask, pixel.2, new_bbb);
+
+        new_rrr = _mm256_min_epu16(new_rrr, v_max_test);
+        new_ggg = _mm256_min_epu16(new_ggg, v_max_test);
+        new_bbb = _mm256_min_epu16(new_bbb, v_max_test);
 
         let (d_lane0, d_lane1, d_lane2, d_lane3) =
             avx_interleave_rgba_epi16(new_rrr, new_ggg, new_bbb, pixel.3);

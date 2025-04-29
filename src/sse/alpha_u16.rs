@@ -121,8 +121,17 @@ struct DisassociateAlphaDefault {}
 
 impl DisassociateAlphaDefault {
     #[inline(always)]
-    unsafe fn disassociate_chunk(&self, in_place: &mut [u16], v_max_colors: __m128) {
+    unsafe fn disassociate_chunk(
+        &self,
+        in_place: &mut [u16],
+        v_max_colors: __m128,
+        bit_depth: usize,
+    ) {
         let src_ptr = in_place.as_ptr();
+
+        let max_colors = (1u32 << bit_depth) - 1;
+        let v_max_test = _mm_set1_epi16(max_colors as i16);
+
         let row0 = _mm_loadu_si128(src_ptr as *const __m128i);
         let row1 = _mm_loadu_si128(src_ptr.add(8) as *const __m128i);
         let row2 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
@@ -145,9 +154,13 @@ impl DisassociateAlphaDefault {
             v_max_colors,
         );
 
-        let new_rrrr = sse_unpremultiply_row_u16(rrrr, is_zero_mask, a_lo_f, a_hi_f);
-        let new_gggg = sse_unpremultiply_row_u16(gggg, is_zero_mask, a_lo_f, a_hi_f);
-        let new_bbbb = sse_unpremultiply_row_u16(bbbb, is_zero_mask, a_lo_f, a_hi_f);
+        let mut new_rrrr = sse_unpremultiply_row_u16(rrrr, is_zero_mask, a_lo_f, a_hi_f);
+        let mut new_gggg = sse_unpremultiply_row_u16(gggg, is_zero_mask, a_lo_f, a_hi_f);
+        let mut new_bbbb = sse_unpremultiply_row_u16(bbbb, is_zero_mask, a_lo_f, a_hi_f);
+
+        new_rrrr = _mm_min_epu16(new_rrrr, v_max_test);
+        new_gggg = _mm_min_epu16(new_gggg, v_max_test);
+        new_bbbb = _mm_min_epu16(new_bbbb, v_max_test);
 
         let (rgba0, rgba1, rgba2, rgba3) =
             sse_interleave_rgba_epi16(new_rrrr, new_gggg, new_bbbb, aaaa);
@@ -170,7 +183,7 @@ impl DisassociateAlpha for DisassociateAlphaDefault {
         let mut rem = in_place;
 
         for dst in rem.chunks_exact_mut(8 * 4) {
-            self.disassociate_chunk(dst, v_max_colors);
+            self.disassociate_chunk(dst, v_max_colors, bit_depth);
         }
 
         rem = rem.chunks_exact_mut(8 * 4).into_remainder();
@@ -181,7 +194,7 @@ impl DisassociateAlpha for DisassociateAlphaDefault {
 
             std::ptr::copy_nonoverlapping(rem.as_ptr(), buffer.as_mut_ptr(), rem.len());
 
-            self.disassociate_chunk(&mut buffer, v_max_colors);
+            self.disassociate_chunk(&mut buffer, v_max_colors, bit_depth);
 
             std::ptr::copy_nonoverlapping(buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
         }

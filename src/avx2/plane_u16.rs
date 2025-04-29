@@ -213,7 +213,7 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
 
             while jx + 8 < bounds_size {
                 let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                let w_ptr = weights.get_unchecked(jx..);
 
                 let w0 = _mm256_loadu_ps(w_ptr.as_ptr());
 
@@ -226,7 +226,7 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
 
             while jx + 4 < bounds_size {
                 let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let w_ptr = weights.get_unchecked(jx..);
                 let w0 = _mm_loadu_ps(w_ptr.as_ptr());
 
                 store_0 = conv_horiz_rgba_4_u16::<FMA>(bounds_start, src0, w0, store_0);
@@ -237,7 +237,7 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
             }
 
             while jx + 2 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 2));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let w0 = _mm_castsi128_ps(_mm_loadu_si64(w_ptr.as_ptr() as *const _));
                 store_0 = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src0, w0, store_0);
@@ -248,7 +248,7 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
             }
 
             while jx < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let w0 = _mm_load_ss(w_ptr.as_ptr());
                 store_0 = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src0, w0, store_0);
@@ -355,14 +355,14 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
 
             while jx + 8 < bounds_size {
                 let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                let w_ptr = weights.get_unchecked(jx..);
                 let w0 = _mm256_loadu_ps(w_ptr.as_ptr());
                 store = conv_horiz_rgba_8_u16::<FMA>(bounds_start, src, w0, store);
                 jx += 8;
             }
 
             while jx + 4 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let w_ptr = weights.get_unchecked(jx..);
                 let w0 = _mm_loadu_ps(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
 
@@ -371,7 +371,7 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
             }
 
             while jx + 2 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 2));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let w0 = _mm_castsi128_ps(_mm_loadu_si64(w_ptr.as_ptr() as *const _));
                 store = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src, w0, store);
@@ -379,7 +379,7 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
             }
 
             while jx < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                let w_ptr = weights.get_unchecked(jx..);
                 let w0 = _mm_load_ss(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
                 store = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src, w0, store);
