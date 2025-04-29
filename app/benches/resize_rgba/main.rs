@@ -2,7 +2,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use fast_image_resize::images::Image;
 use fast_image_resize::FilterType::Lanczos3;
-use fast_image_resize::{CpuExtensions, PixelType, ResizeAlg, ResizeOptions, Resizer};
+use fast_image_resize::{CpuExtensions, FilterType, PixelType, ResizeAlg, ResizeOptions, Resizer};
 use image::{GenericImageView, ImageReader};
 use pic_scale::{
     Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling,
@@ -47,6 +47,42 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 dimensions.1 as usize,
             )
             .unwrap();
+            let mut target =
+                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+            _ = scaler.resize_rgba(&store, &mut target, true);
+        })
+    });
+
+    c.bench_function("Pic scale RGBA with alpha: Bilinear", |b| {
+        let copied: Vec<u8> = Vec::from(src_bytes);
+        b.iter(|| {
+            let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+            scaler.set_threading_policy(ThreadingPolicy::Single);
+            scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
+            let store = ImageStore::<u8, 4>::from_slice(
+                &copied,
+                dimensions.0 as usize,
+                dimensions.1 as usize,
+            )
+                .unwrap();
+            let mut target =
+                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+            _ = scaler.resize_rgba(&store, &mut target, true);
+        })
+    });
+
+    c.bench_function("Pic scale RGBA with alpha(Speed): Bilinear", |b| {
+        let copied: Vec<u8> = Vec::from(src_bytes);
+        b.iter(|| {
+            let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+            scaler.set_threading_policy(ThreadingPolicy::Single);
+            scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
+            let store = ImageStore::<u8, 4>::from_slice(
+                &copied,
+                dimensions.0 as usize,
+                dimensions.1 as usize,
+            )
+                .unwrap();
             let mut target =
                 ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
             _ = scaler.resize_rgba(&store, &mut target, true);
@@ -128,6 +164,35 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     &mut dst_image,
                     &ResizeOptions::new()
                         .resize_alg(ResizeAlg::Convolution(Lanczos3))
+                        .use_alpha(true),
+                )
+                .unwrap();
+        })
+    });
+    
+    c.bench_function("Fast image resize RGBA8 with alpha: Bilinear", |b| {
+        let mut vc = Vec::from(img.as_bytes());
+        b.iter(|| {
+            let pixel_type: PixelType = PixelType::U8x4;
+            let src_image =
+                Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
+            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
+
+            let mut resizer = Resizer::new();
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            unsafe {
+                resizer.set_cpu_extensions(CpuExtensions::Neon);
+            }
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            unsafe {
+                resizer.set_cpu_extensions(CpuExtensions::Avx2);
+            }
+            resizer
+                .resize(
+                    &src_image,
+                    &mut dst_image,
+                    &ResizeOptions::new()
+                        .resize_alg(ResizeAlg::Convolution(FilterType::Bilinear))
                         .use_alpha(true),
                 )
                 .unwrap();
