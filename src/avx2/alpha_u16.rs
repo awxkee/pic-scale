@@ -39,11 +39,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-unsafe fn _mm256_scale_by_alpha<const FMA: bool>(
-    px: __m256i,
-    low_low_a: __m256,
-    low_high_a: __m256,
-) -> __m256i {
+unsafe fn _mm256_scale_by_alpha(px: __m256i, low_low_a: __m256, low_high_a: __m256) -> __m256i {
     let zeros = _mm256_setzero_si256();
     let ls = _mm256_unpacklo_epi16(px, zeros);
     let hs = _mm256_unpackhi_epi16(px, zeros);
@@ -51,18 +47,8 @@ unsafe fn _mm256_scale_by_alpha<const FMA: bool>(
     let low_px = _mm256_cvtepi32_ps(ls);
     let high_px = _mm256_cvtepi32_ps(hs);
 
-    let (lvs, hvs);
-
-    if FMA {
-        lvs = _mm256_fmadd_ps(low_px, low_low_a, _mm256_set1_ps(0.5f32));
-        hvs = _mm256_fmadd_ps(high_px, low_high_a, _mm256_set1_ps(0.5f32));
-    } else {
-        let lps = _mm256_mul_ps(low_px, low_low_a);
-        let hps = _mm256_mul_ps(high_px, low_high_a);
-
-        lvs = _mm256_round_ps::<0x00>(lps);
-        hvs = _mm256_round_ps::<0x00>(hps);
-    }
+    let lvs = _mm256_mul_ps(low_px, low_low_a);
+    let hvs = _mm256_mul_ps(high_px, low_high_a);
 
     let new_ll = _mm256_cvtps_epi32(lvs);
     let new_lh = _mm256_cvtps_epi32(hvs);
@@ -221,12 +207,7 @@ struct Avx2PremultiplyExecutorAnyBit {}
 
 impl Avx2PremultiplyExecutorAnyBit {
     #[inline(always)]
-    unsafe fn premultiply_chunk<const FMA: bool>(
-        &self,
-        dst: &mut [u16],
-        src: &[u16],
-        scale: __m256,
-    ) {
+    unsafe fn premultiply_chunk(&self, dst: &mut [u16], src: &[u16], scale: __m256) {
         let src_ptr = src.as_ptr();
         let lane0 = _mm256_loadu_si256(src_ptr as *const __m256i);
         let lane1 = _mm256_loadu_si256(src_ptr.add(16) as *const __m256i);
@@ -246,9 +227,9 @@ impl Avx2PremultiplyExecutorAnyBit {
         let low_alpha = _mm256_mul_ps(lla, scale);
         let high_alpha = _mm256_mul_ps(hla, scale);
 
-        let new_rrr = _mm256_scale_by_alpha::<FMA>(pixel.0, low_alpha, high_alpha);
-        let new_ggg = _mm256_scale_by_alpha::<FMA>(pixel.1, low_alpha, high_alpha);
-        let new_bbb = _mm256_scale_by_alpha::<FMA>(pixel.2, low_alpha, high_alpha);
+        let new_rrr = _mm256_scale_by_alpha(pixel.0, low_alpha, high_alpha);
+        let new_ggg = _mm256_scale_by_alpha(pixel.1, low_alpha, high_alpha);
+        let new_bbb = _mm256_scale_by_alpha(pixel.2, low_alpha, high_alpha);
 
         let dst_ptr = dst.as_mut_ptr();
 
@@ -262,12 +243,7 @@ impl Avx2PremultiplyExecutorAnyBit {
     }
 
     #[inline(always)]
-    unsafe fn premultiply_work<const FMA: bool>(
-        &self,
-        dst: &mut [u16],
-        src: &[u16],
-        bit_depth: usize,
-    ) {
+    unsafe fn premultiply_work(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
         let max_colors = (1 << bit_depth) - 1;
 
         let mut rem = dst;
@@ -278,7 +254,7 @@ impl Avx2PremultiplyExecutorAnyBit {
             .chunks_exact_mut(16 * 4)
             .zip(src_rem.chunks_exact(16 * 4))
         {
-            self.premultiply_chunk::<FMA>(dst, src, v_scale_colors);
+            self.premultiply_chunk(dst, src, v_scale_colors);
         }
 
         rem = rem.chunks_exact_mut(16 * 4).into_remainder();
@@ -293,7 +269,7 @@ impl Avx2PremultiplyExecutorAnyBit {
             let mut dst_buffer: [u16; 16 * 4] = [0u16; 16 * 4];
             std::ptr::copy_nonoverlapping(src_rem.as_ptr(), buffer.as_mut_ptr(), src_rem.len());
 
-            self.premultiply_chunk::<FMA>(&mut dst_buffer, &buffer, v_scale_colors);
+            self.premultiply_chunk(&mut dst_buffer, &buffer, v_scale_colors);
 
             std::ptr::copy_nonoverlapping(dst_buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
         }
@@ -301,23 +277,14 @@ impl Avx2PremultiplyExecutorAnyBit {
 
     #[target_feature(enable = "avx2")]
     unsafe fn premultiply_avx(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
-        self.premultiply_work::<false>(dst, src, bit_depth);
-    }
-
-    #[target_feature(enable = "avx2", enable = "fma")]
-    unsafe fn premultiply_fma(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
-        self.premultiply_work::<true>(dst, src, bit_depth);
+        self.premultiply_work(dst, src, bit_depth);
     }
 }
 
 impl Avx2PremultiplyExecutor for Avx2PremultiplyExecutorAnyBit {
     #[target_feature(enable = "avx2")]
     unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
-        if std::arch::is_x86_feature_detected!("fma") {
-            self.premultiply_fma(dst, src, bit_depth);
-        } else {
-            self.premultiply_avx(dst, src, bit_depth);
-        }
+        self.premultiply_avx(dst, src, bit_depth);
     }
 }
 
@@ -411,10 +378,7 @@ pub(crate) fn avx_unpremultiply_alpha_rgba_u16(
 
 /// This inlining is required to activate all features for runtime dispatch
 #[inline(always)]
-unsafe fn avx_unpremultiply_alpha_rgba_u16_row_impl<const FMA: bool>(
-    in_place: &mut [u16],
-    bit_depth: usize,
-) {
+unsafe fn avx_unpremultiply_alpha_rgba_u16_row_impl(in_place: &mut [u16], bit_depth: usize) {
     let max_colors = (1 << bit_depth) - 1;
 
     let v_scale_colors = _mm256_set1_ps(max_colors as f32);
@@ -444,11 +408,11 @@ unsafe fn avx_unpremultiply_alpha_rgba_u16_row_impl<const FMA: bool>(
 
         high_alpha = _mm256_mul_ps(high_alpha, v_scale_colors);
 
-        let mut new_rrr = _mm256_scale_by_alpha::<FMA>(pixel.0, low_alpha, high_alpha);
+        let mut new_rrr = _mm256_scale_by_alpha(pixel.0, low_alpha, high_alpha);
         new_rrr = _mm256_select_si256(is_zero_alpha_mask, pixel.0, new_rrr);
-        let mut new_ggg = _mm256_scale_by_alpha::<FMA>(pixel.1, low_alpha, high_alpha);
+        let mut new_ggg = _mm256_scale_by_alpha(pixel.1, low_alpha, high_alpha);
         new_ggg = _mm256_select_si256(is_zero_alpha_mask, pixel.1, new_ggg);
-        let mut new_bbb = _mm256_scale_by_alpha::<FMA>(pixel.2, low_alpha, high_alpha);
+        let mut new_bbb = _mm256_scale_by_alpha(pixel.2, low_alpha, high_alpha);
         new_bbb = _mm256_select_si256(is_zero_alpha_mask, pixel.2, new_bbb);
 
         let dst_ptr = dst.as_mut_ptr();
@@ -490,11 +454,11 @@ unsafe fn avx_unpremultiply_alpha_rgba_u16_row_impl<const FMA: bool>(
 
         high_alpha = _mm256_mul_ps(high_alpha, v_scale_colors);
 
-        let mut new_rrr = _mm256_scale_by_alpha::<FMA>(pixel.0, low_alpha, high_alpha);
+        let mut new_rrr = _mm256_scale_by_alpha(pixel.0, low_alpha, high_alpha);
         new_rrr = _mm256_select_si256(is_zero_alpha_mask, pixel.0, new_rrr);
-        let mut new_ggg = _mm256_scale_by_alpha::<FMA>(pixel.1, low_alpha, high_alpha);
+        let mut new_ggg = _mm256_scale_by_alpha(pixel.1, low_alpha, high_alpha);
         new_ggg = _mm256_select_si256(is_zero_alpha_mask, pixel.1, new_ggg);
-        let mut new_bbb = _mm256_scale_by_alpha::<FMA>(pixel.2, low_alpha, high_alpha);
+        let mut new_bbb = _mm256_scale_by_alpha(pixel.2, low_alpha, high_alpha);
         new_bbb = _mm256_select_si256(is_zero_alpha_mask, pixel.2, new_bbb);
 
         let (d_lane0, d_lane1, d_lane2, d_lane3) =
@@ -512,13 +476,7 @@ unsafe fn avx_unpremultiply_alpha_rgba_u16_row_impl<const FMA: bool>(
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch
 unsafe fn avx_unpremultiply_alpha_rgba_u16_row_avx(in_place: &mut [u16], bit_depth: usize) {
-    avx_unpremultiply_alpha_rgba_u16_row_impl::<false>(in_place, bit_depth);
-}
-
-#[target_feature(enable = "avx2", enable = "fma")]
-/// This inlining is required to activate all features for runtime dispatch
-unsafe fn avx_unpremultiply_alpha_rgba_u16_row_fma(in_place: &mut [u16], bit_depth: usize) {
-    avx_unpremultiply_alpha_rgba_u16_row_impl::<true>(in_place, bit_depth);
+    avx_unpremultiply_alpha_rgba_u16_row_impl(in_place, bit_depth);
 }
 
 #[target_feature(enable = "avx2")]
@@ -530,11 +488,7 @@ unsafe fn avx_unpremultiply_alpha_rgba_u16_impl(
     bit_depth: usize,
     pool: &Option<ThreadPool>,
 ) {
-    let dispatch = if std::arch::is_x86_feature_detected!("fma") {
-        avx_unpremultiply_alpha_rgba_u16_row_fma
-    } else {
-        avx_unpremultiply_alpha_rgba_u16_row_avx
-    };
+    let dispatch = avx_unpremultiply_alpha_rgba_u16_row_avx;
 
     if let Some(pool) = pool {
         pool.install(|| {

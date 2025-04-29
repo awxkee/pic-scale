@@ -27,7 +27,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::alpha_handle_u8::premultiply_alpha_rgba_row_impl;
 use crate::WorkloadStrategy;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
@@ -103,7 +102,17 @@ unsafe fn neon_premultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8]) {
     rem = rem.chunks_exact_mut(16 * 4).into_remainder();
     src_rem = src_rem.chunks_exact(16 * 4).remainder();
 
-    premultiply_alpha_rgba_row_impl(rem, src_rem);
+    if !rem.is_empty() && !src_rem.is_empty() {
+        assert!(rem.len() < 16 * 4);
+        let mut buffer: [u8; 16 * 4] = [0u8; 16 * 4];
+        std::ptr::copy_nonoverlapping(rem.as_ptr(), buffer.as_mut_ptr(), rem.len());
+        let mut pixel = vld4q_u8(buffer.as_ptr());
+        pixel.0 = premultiply_vec!(pixel.0, pixel.3);
+        pixel.1 = premultiply_vec!(pixel.1, pixel.3);
+        pixel.2 = premultiply_vec!(pixel.2, pixel.3);
+        vst4q_u8(buffer.as_mut_ptr(), pixel);
+        std::ptr::copy_nonoverlapping(buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
+    }
 }
 
 pub(crate) fn neon_premultiply_alpha_rgba(
