@@ -543,8 +543,8 @@ impl<const FMA: bool> OneRowExecutionUnit<FMA> {
 
             while jx + 2 < bounds.size {
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
-                let weight0 = _mm_broadcast_ss(&ptr[0]);
-                let weight1 = _mm_broadcast_ss(&ptr[1]);
+                let weight0 = _mm_broadcast_ss(ptr.get_unchecked(0));
+                let weight1 = _mm_broadcast_ss(ptr.get_unchecked(1));
                 let weight = avx_combine_ps(weight0, weight1);
                 let filter_start = jx + bounds.start;
                 store =
