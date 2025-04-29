@@ -64,7 +64,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 dimensions.0 as usize,
                 dimensions.1 as usize,
             )
-                .unwrap();
+            .unwrap();
             let mut target =
                 ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
             _ = scaler.resize_rgba(&store, &mut target, true);
@@ -82,7 +82,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 dimensions.0 as usize,
                 dimensions.1 as usize,
             )
-                .unwrap();
+            .unwrap();
             let mut target =
                 ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
             _ = scaler.resize_rgba(&store, &mut target, true);
@@ -169,7 +169,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 .unwrap();
         })
     });
-    
+
     c.bench_function("Fast image resize RGBA8 with alpha: Bilinear", |b| {
         let mut vc = Vec::from(img.as_bytes());
         b.iter(|| {
