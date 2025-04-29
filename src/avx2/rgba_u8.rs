@@ -267,13 +267,9 @@ unsafe fn convolve_horizontal_rgba_avx_row_4_impl(
         }
 
         while jx < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..);
-            let w0 = _mm_shuffle_epi8(
-                _mm_loadu_si16(w_ptr.as_ptr() as *const _),
-                shuffle_weights_table,
-            );
+            let w_ptr = weights.get_unchecked(jx);
 
-            let weight0 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(w0), w0);
+            let weight0 = _mm256_set1_epi32(*w_ptr as i32);
 
             let bounds_start = bounds.start + jx;
 
