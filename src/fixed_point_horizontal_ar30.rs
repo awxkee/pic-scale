@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
-use crate::color_group::{load_ar30, load_ar30_p, load_ar30_with_offset, ColorGroup};
+use crate::color_group::{ld_ar30, ld_ar30_with_offset, load_ar30_p, ColorGroup};
 use crate::filter_weights::FilterWeights;
 use crate::support::ROUNDING_CONST;
 use num_traits::AsPrimitive;
@@ -63,17 +63,17 @@ pub(crate) fn convolve_row_handler_fixed_point_ar30<
             let sliced_weights = &weights[0..2];
             let weight0 = sliced_weights[0] as i32;
             let weight1 = sliced_weights[1] as i32;
-            sums += load_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER) * weight0
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1) * weight1;
+            sums += ld_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER) * weight0
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1) * weight1;
         } else if bounds_size == 3 {
             let src_ptr0 = &src[px..(px + 3 * CN)];
             let sliced_weights = &weights[0..3];
             let weight0 = sliced_weights[0] as i32;
             let weight1 = sliced_weights[1] as i32;
             let weight2 = sliced_weights[2] as i32;
-            sums += load_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER) * weight0
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1) * weight1
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 2) * weight2;
+            sums += ld_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER) * weight0
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1) * weight1
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 2) * weight2;
         } else if bounds_size == 4 {
             let src_ptr0 = &src[px..(px + 4 * CN)];
             let sliced_weights = &weights[0..4];
@@ -81,10 +81,10 @@ pub(crate) fn convolve_row_handler_fixed_point_ar30<
             let weight1 = sliced_weights[1] as i32;
             let weight2 = sliced_weights[2] as i32;
             let weight3 = sliced_weights[3] as i32;
-            sums += load_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER) * weight0
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1) * weight1
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 2) * weight2
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 3) * weight3;
+            sums += ld_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER) * weight0
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1) * weight1
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 2) * weight2
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 3) * weight3;
         } else if bounds_size == 6 {
             let src_ptr0 = &src[px..(px + 6 * CN)];
 
@@ -95,12 +95,12 @@ pub(crate) fn convolve_row_handler_fixed_point_ar30<
             let weight3 = sliced_weights[3] as i32;
             let weight4 = sliced_weights[4] as i32;
             let weight5 = sliced_weights[5] as i32;
-            sums += load_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER) * weight0
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1) * weight1
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 2) * weight2
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 3) * weight3
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 4) * weight4
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 5) * weight5;
+            sums += ld_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER) * weight0
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1) * weight1
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 2) * weight2
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 3) * weight3
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 4) * weight4
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 5) * weight5;
         } else {
             let src_ptr0 = &src[px..(px + bounds_size)];
             for (&k_weight, src) in weights
@@ -175,14 +175,14 @@ pub(crate) fn convolve_row_handler_fixed_point_4_ar30<
             let sliced_weights = &weights[0..2];
             let weight0 = sliced_weights[0] as i32;
             let weight1 = sliced_weights[1] as i32;
-            sums0 += load_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER) * weight0
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1) * weight1;
-            sums1 += load_ar30!(src_ptr1, AR30_TYPE, AR30_ORDER) * weight0
-                + load_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 1) * weight1;
-            sums2 += load_ar30!(src_ptr2, AR30_TYPE, AR30_ORDER) * weight0
-                + load_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 1) * weight1;
-            sums3 += load_ar30!(src_ptr3, AR30_TYPE, AR30_ORDER) * weight0
-                + load_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 1) * weight1;
+            sums0 += ld_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER) * weight0
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1) * weight1;
+            sums1 += ld_ar30!(src_ptr1, AR30_TYPE, AR30_ORDER) * weight0
+                + ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 1) * weight1;
+            sums2 += ld_ar30!(src_ptr2, AR30_TYPE, AR30_ORDER) * weight0
+                + ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 1) * weight1;
+            sums3 += ld_ar30!(src_ptr3, AR30_TYPE, AR30_ORDER) * weight0
+                + ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 1) * weight1;
         } else if bounds_size == 3 {
             let src_ptr0 = &src[px..(px + 3 * CN)];
             let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 3 * 4)];
@@ -193,18 +193,18 @@ pub(crate) fn convolve_row_handler_fixed_point_4_ar30<
             let weight0 = sliced_weights[0] as i32;
             let weight1 = sliced_weights[1] as i32;
             let weight2 = sliced_weights[2] as i32;
-            sums0 += load_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER) * weight0
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1) * weight1
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 2) * weight2;
-            sums1 += load_ar30!(src_ptr1, AR30_TYPE, AR30_ORDER) * weight0
-                + load_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 1) * weight1
-                + load_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 2) * weight2;
-            sums2 += load_ar30!(src_ptr2, AR30_TYPE, AR30_ORDER) * weight0
-                + load_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 1) * weight1
-                + load_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 2) * weight2;
-            sums3 += load_ar30!(src_ptr3, AR30_TYPE, AR30_ORDER) * weight0
-                + load_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 1) * weight1
-                + load_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 2) * weight2;
+            sums0 += ld_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER) * weight0
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1) * weight1
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 2) * weight2;
+            sums1 += ld_ar30!(src_ptr1, AR30_TYPE, AR30_ORDER) * weight0
+                + ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 1) * weight1
+                + ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 2) * weight2;
+            sums2 += ld_ar30!(src_ptr2, AR30_TYPE, AR30_ORDER) * weight0
+                + ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 1) * weight1
+                + ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 2) * weight2;
+            sums3 += ld_ar30!(src_ptr3, AR30_TYPE, AR30_ORDER) * weight0
+                + ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 1) * weight1
+                + ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 2) * weight2;
         } else if bounds_size == 4 {
             let src_ptr0 = &src[px..(px + 4 * CN)];
             let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 4 * 4)];
@@ -216,22 +216,22 @@ pub(crate) fn convolve_row_handler_fixed_point_4_ar30<
             let weight1 = sliced_weights[1] as i32;
             let weight2 = sliced_weights[2] as i32;
             let weight3 = sliced_weights[3] as i32;
-            sums0 += load_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER) * weight0
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1) * weight1
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 2) * weight2
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 3) * weight3;
-            sums1 += load_ar30!(src_ptr1, AR30_TYPE, AR30_ORDER) * weight0
-                + load_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 1) * weight1
-                + load_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 2) * weight2
-                + load_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 3) * weight3;
-            sums2 += load_ar30!(src_ptr2, AR30_TYPE, AR30_ORDER) * weight0
-                + load_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 1) * weight1
-                + load_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 2) * weight2
-                + load_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 3) * weight3;
-            sums3 += load_ar30!(src_ptr3, AR30_TYPE, AR30_ORDER) * weight0
-                + load_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 1) * weight1
-                + load_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 2) * weight2
-                + load_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 3) * weight3;
+            sums0 += ld_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER) * weight0
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1) * weight1
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 2) * weight2
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 3) * weight3;
+            sums1 += ld_ar30!(src_ptr1, AR30_TYPE, AR30_ORDER) * weight0
+                + ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 1) * weight1
+                + ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 2) * weight2
+                + ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 3) * weight3;
+            sums2 += ld_ar30!(src_ptr2, AR30_TYPE, AR30_ORDER) * weight0
+                + ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 1) * weight1
+                + ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 2) * weight2
+                + ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 3) * weight3;
+            sums3 += ld_ar30!(src_ptr3, AR30_TYPE, AR30_ORDER) * weight0
+                + ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 1) * weight1
+                + ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 2) * weight2
+                + ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 3) * weight3;
         } else if bounds_size == 6 {
             let src_ptr0 = &src[px..(px + 6 * CN)];
             let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 6 * 4)];
@@ -245,30 +245,30 @@ pub(crate) fn convolve_row_handler_fixed_point_4_ar30<
             let weight3 = sliced_weights[3] as i32;
             let weight4 = sliced_weights[4] as i32;
             let weight5 = sliced_weights[5] as i32;
-            sums0 += load_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER) * weight0
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1) * weight1
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 2) * weight2
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 3) * weight3
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 4) * weight4
-                + load_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 5) * weight5;
-            sums1 += load_ar30!(src_ptr1, AR30_TYPE, AR30_ORDER) * weight0
-                + load_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 1) * weight1
-                + load_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 2) * weight2
-                + load_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 3) * weight3
-                + load_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 4) * weight4
-                + load_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 5) * weight5;
-            sums2 += load_ar30!(src_ptr2, AR30_TYPE, AR30_ORDER) * weight0
-                + load_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 1) * weight1
-                + load_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 2) * weight2
-                + load_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 3) * weight3
-                + load_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 4) * weight4
-                + load_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 5) * weight5;
-            sums3 += load_ar30!(src_ptr3, AR30_TYPE, AR30_ORDER) * weight0
-                + load_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 1) * weight1
-                + load_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 2) * weight2
-                + load_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 3) * weight3
-                + load_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 4) * weight4
-                + load_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 5) * weight5;
+            sums0 += ld_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER) * weight0
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1) * weight1
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 2) * weight2
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 3) * weight3
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 4) * weight4
+                + ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 5) * weight5;
+            sums1 += ld_ar30!(src_ptr1, AR30_TYPE, AR30_ORDER) * weight0
+                + ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 1) * weight1
+                + ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 2) * weight2
+                + ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 3) * weight3
+                + ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 4) * weight4
+                + ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 5) * weight5;
+            sums2 += ld_ar30!(src_ptr2, AR30_TYPE, AR30_ORDER) * weight0
+                + ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 1) * weight1
+                + ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 2) * weight2
+                + ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 3) * weight3
+                + ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 4) * weight4
+                + ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 5) * weight5;
+            sums3 += ld_ar30!(src_ptr3, AR30_TYPE, AR30_ORDER) * weight0
+                + ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 1) * weight1
+                + ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 2) * weight2
+                + ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 3) * weight3
+                + ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 4) * weight4
+                + ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 5) * weight5;
         } else {
             let src_ptr0 = &src[px..(px + bounds_size * CN)];
             let src_ptr1 = &src[(px + src_stride)..(px + src_stride + bounds_size * CN)];

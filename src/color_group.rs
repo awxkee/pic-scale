@@ -414,7 +414,7 @@ where
     }
 }
 
-macro_rules! load_ar30 {
+macro_rules! ld_ar30 {
     ($store: expr, $ar_type: expr, $ar_order: ty) => {{
         let ar_type: crate::ar30::Rgb30 = $ar_type.into();
         let read_bits = u32::from_ne_bytes([$store[0], $store[1], $store[2], $store[3]]);
@@ -428,7 +428,7 @@ macro_rules! load_ar30 {
     }};
 }
 
-pub(crate) use load_ar30;
+pub(crate) use ld_ar30;
 
 macro_rules! load_ar30_p {
     ($store: expr, $ar_type: expr, $ar_order: ty) => {{
@@ -446,7 +446,7 @@ macro_rules! load_ar30_p {
 
 pub(crate) use load_ar30_p;
 
-macro_rules! load_ar30_with_offset {
+macro_rules! ld_ar30_with_offset {
     ($store: expr, $ar_type: expr, $ar_order: ty, $offset: expr) => {{
         let ar_type: crate::ar30::Rgb30 = $ar_type.into();
         let cn = $offset * 4;
@@ -462,37 +462,37 @@ macro_rules! load_ar30_with_offset {
     }};
 }
 
-pub(crate) use load_ar30_with_offset;
+pub(crate) use ld_ar30_with_offset;
 
-macro_rules! load_color_group {
+macro_rules! ld_g {
     ($store: expr, $channels: expr, $vtype: ty) => {{
         if $channels == 1 {
             ColorGroup::<$channels, $vtype> {
-                r: $store.get_unchecked(0).as_(),
+                r: $store[0].as_(),
                 g: 0.as_(),
                 b: 0.as_(),
                 a: 0.as_(),
             }
         } else if $channels == 2 {
             ColorGroup::<$channels, $vtype> {
-                r: $store.get_unchecked(0).as_(),
-                g: $store.get_unchecked(1).as_(),
+                r: $store[0].as_(),
+                g: $store[1].as_(),
                 b: 0.as_(),
                 a: 0.as_(),
             }
         } else if $channels == 3 {
             ColorGroup::<$channels, $vtype> {
-                r: $store.get_unchecked(0).as_(),
-                g: $store.get_unchecked(1).as_(),
-                b: $store.get_unchecked(2).as_(),
+                r: $store[0].as_(),
+                g: $store[1].as_(),
+                b: $store[2].as_(),
                 a: 0.as_(),
             }
         } else if $channels == 4 {
             ColorGroup::<$channels, $vtype> {
-                r: $store.get_unchecked(0).as_(),
-                g: $store.get_unchecked(1).as_(),
-                b: $store.get_unchecked(2).as_(),
-                a: $store.get_unchecked(3).as_(),
+                r: $store[0].as_(),
+                g: $store[1].as_(),
+                b: $store[2].as_(),
+                a: $store[3].as_(),
             }
         } else {
             unimplemented!()
@@ -500,9 +500,9 @@ macro_rules! load_color_group {
     }};
 }
 
-pub(crate) use load_color_group;
+pub(crate) use ld_g;
 
-macro_rules! load_color_group_with_offset {
+macro_rules! ldg_with_offset {
     ($store: expr, $channels: expr, $offset: expr, $vtype: ty) => {{
         if $channels == 1 {
             ColorGroup::<$channels, $vtype> {
@@ -538,9 +538,9 @@ macro_rules! load_color_group_with_offset {
     }};
 }
 
-pub(crate) use load_color_group_with_offset;
+pub(crate) use ldg_with_offset;
 
-macro_rules! fast_store_color_group {
+macro_rules! st_g {
     ($color_group: expr, $store: expr, $components: expr) => {{
         $store[0] = $color_group.r;
         if $components > 1 {
@@ -555,23 +555,23 @@ macro_rules! fast_store_color_group {
     }};
 }
 
-pub(crate) use fast_store_color_group;
+pub(crate) use st_g;
 
-macro_rules! fast_mixed_store_color_group {
+macro_rules! st_g_mixed {
     ($color_group: expr, $store: expr, $components: expr, $bit_depth: expr) => {{
-        *$store.get_unchecked_mut(0) = $color_group.r.to_mixed($bit_depth);
+        $store[0] = $color_group.r.to_mixed($bit_depth);
         if $components > 1 {
-            *$store.get_unchecked_mut(1) = $color_group.g.to_mixed($bit_depth);
+            $store[1] = $color_group.g.to_mixed($bit_depth);
         }
         if $components > 2 {
-            *$store.get_unchecked_mut(2) = $color_group.b.to_mixed($bit_depth);
+            $store[2] = $color_group.b.to_mixed($bit_depth);
         }
         if $components == 4 {
-            *$store.get_unchecked_mut(3) = $color_group.a.to_mixed($bit_depth);
+            $store[3] = $color_group.a.to_mixed($bit_depth);
         }
     }};
 }
 
 use crate::ar30::Rgb30;
 use crate::support::PRECISION;
-pub(crate) use fast_mixed_store_color_group;
+pub(crate) use st_g_mixed;
