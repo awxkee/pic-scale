@@ -17,18 +17,24 @@ exclude = ["*.jpg", "/assets", "*.png", "*.sh", "/assets/*"]
 rust-version = "1.82.0"
 
 [dependencies]
-colorutils-rs = {version = "0.7.4", optional = true}
-num-traits = { version = "0.2.19", features = ["std"] }
-rayon = "1.10.0"
+colorutils-rs = {version = "0.7", optional = true}
+num-traits = { version = "0.2", features = ["std"] }
+rayon = "1.10"
 
 [features]
 default = ["colorspaces", "rdm", "sse", "avx"]
 colorspaces = ["dep:colorutils-rs"]
+# Allows to use x86_64 AVX-512 when available
 nightly_avx512 = []
+# Allows to use x86_64 AVX-512FP16 when available
 nightly_avx512fp16 = ["nightly_avx512"]
+# Allows to scale nightly `f16` type
 nightly_f16 = []
+# Allows to use ARM RDM when available
 rdm = []
+# Allows to use x86_64 AVX2 when available
 avx = []
+# Allows to use x86/x86_64 SSE4.1 when available
 sse = []
 
 [package.metadata.docs.rs]
