@@ -97,6 +97,7 @@ pub(crate) trait CheckStoreDensity {
     fn should_have_bit_depth(&self) -> bool;
 }
 
+/// Structure for mutable target buffer
 #[derive(Debug)]
 pub enum BufferStore<'a, T: Copy + Debug> {
     Borrowed(&'a mut [T]),
@@ -105,6 +106,7 @@ pub enum BufferStore<'a, T: Copy + Debug> {
 
 impl<T: Copy + Debug> BufferStore<'_, T> {
     #[allow(clippy::should_implement_trait)]
+    /// Borrowing immutable slice
     pub fn borrow(&self) -> &[T] {
         match self {
             Self::Borrowed(p_ref) => p_ref,
@@ -113,6 +115,7 @@ impl<T: Copy + Debug> BufferStore<'_, T> {
     }
 
     #[allow(clippy::should_implement_trait)]
+    /// Borrowing mutable slice
     pub fn borrow_mut(&mut self) -> &mut [T] {
         match self {
             Self::Borrowed(p_ref) => p_ref,
@@ -125,6 +128,7 @@ impl<'a, T, const N: usize> ImageStore<'a, T, N>
 where
     T: Clone + Copy + Debug + Default,
 {
+    /// Creates new store
     pub fn new(
         slice_ref: Vec<T>,
         width: usize,
@@ -150,6 +154,7 @@ where
         })
     }
 
+    /// Borrows immutable slice as new image store
     pub fn borrow(
         slice_ref: &'a [T],
         width: usize,
@@ -175,6 +180,7 @@ where
         })
     }
 
+    /// Allocates new owned image store
     pub fn alloc(width: usize, height: usize) -> ImageStore<'a, T, N> {
         let vc = vec![T::default(); width * N * height];
         ImageStore::<T, N> {
@@ -391,6 +397,7 @@ where
         ImageSize::new(self.width, self.height)
     }
 
+    /// Returns current image store as immutable slice
     pub fn as_bytes(&self) -> &[T] {
         match &self.buffer {
             std::borrow::Cow::Borrowed(br) => br,
@@ -398,6 +405,7 @@ where
         }
     }
 
+    /// Borrows immutable slice int oa new image store
     pub fn from_slice(
         slice_ref: &'a [T],
         width: usize,
@@ -423,6 +431,7 @@ where
         })
     }
 
+    /// Deep copy immutable image store into a new immutable store
     pub fn copied<'b>(&self) -> ImageStore<'b, T, N> {
         ImageStore::<T, N> {
             buffer: std::borrow::Cow::Owned(self.buffer.as_ref().to_vec()),
@@ -434,6 +443,7 @@ where
         }
     }
 
+    /// Deep copy immutable image into mutable
     pub fn copied_to_mut(&self, into: &mut ImageStoreMut<T, N>) {
         let into_stride = into.stride();
         for (src_row, dst_row) in self
@@ -458,6 +468,7 @@ where
         ImageSize::new(self.width, self.height)
     }
 
+    /// Returns current image as immutable slice
     pub fn as_bytes(&self) -> &[T] {
         match &self.buffer {
             BufferStore::Borrowed(p) => p,
@@ -465,6 +476,7 @@ where
         }
     }
 
+    /// Borrows mutable slice as new image store
     pub fn from_slice(
         slice_ref: &'a mut [T],
         width: usize,
@@ -490,6 +502,7 @@ where
         })
     }
 
+    /// Performs deep copy into a new mutable image
     pub fn copied<'b>(&self) -> ImageStoreMut<'b, T, N> {
         ImageStoreMut::<T, N> {
             buffer: BufferStore::Owned(self.buffer.borrow().to_vec()),
@@ -501,6 +514,7 @@ where
         }
     }
 
+    /// Performs deep copy into a new immutable image
     pub fn to_immutable(&self) -> ImageStore<'_, T, N> {
         ImageStore::<T, N> {
             buffer: std::borrow::Cow::Owned(self.buffer.borrow().to_owned()),

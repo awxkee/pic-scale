@@ -29,6 +29,7 @@
 use std::error::Error;
 use std::fmt::Display;
 
+/// Buffer mismatch error description
 #[derive(Copy, Clone, Debug)]
 pub struct PicScaleBufferMismatch {
     pub expected: usize,
@@ -38,6 +39,7 @@ pub struct PicScaleBufferMismatch {
     pub slice_len: usize,
 }
 
+/// Error enumeration type
 #[derive(Debug)]
 pub enum PicScaleError {
     ZeroImageDimensions,
@@ -50,6 +52,7 @@ pub enum PicScaleError {
 }
 
 impl PicScaleError {
+    /// Returns error as int code
     #[inline]
     pub fn code(&self) -> usize {
         match self {
