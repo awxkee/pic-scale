@@ -31,7 +31,7 @@
 
 use libfuzzer_sys::fuzz_target;
 use pic_scale::{
-    Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16,
+    Ar30ByteOrder, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16,
     WorkloadStrategy,
 };
 
@@ -89,15 +89,7 @@ fn resize_rgba(
         .resize_rgba_u16(&store, &mut target, premultiply_alpha)
         .unwrap();
 
-    let src_data_ar30 = vec![1u8; src_width * src_height * 4];
-    let mut dst_data_ar30 = vec![1u8; dst_width * dst_height * 4];
-    _ = scaler.resize_ar30(
-        &src_data_ar30,
-        src_width * 4,
-        ImageSize::new(src_width, src_height),
-        &mut dst_data_ar30,
-        dst_height * 4,
-        ImageSize::new(dst_width, dst_height),
-        Ar30ByteOrder::Host,
-    );
+    let store_ar30 = ImageStore::<u8, 4>::alloc(src_width, src_height);
+    let mut target_ar30 = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 10);
+    _ = scaler.resize_ar30(&store_ar30, &mut target_ar30, Ar30ByteOrder::Host);
 }

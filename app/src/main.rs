@@ -193,7 +193,7 @@ fn main() {
         .as_bytes()
         .iter()
         .map(|&x| x)
-        // .map(|&x| (x >> 8) as u8)
+        // .map(|&x| ((x >> 8) as u8).min(255))
         // .map(|&x| (x as f32 * 255.).round() as u8)
         .collect::<Vec<_>>();
 

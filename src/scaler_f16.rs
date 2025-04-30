@@ -32,7 +32,7 @@ use crate::pic_scale_error::PicScaleError;
 use crate::scaler::ScalingOptions;
 use crate::{
     CbCrF16ImageStore, ImageStore, ImageStoreScaling, PlanarF16ImageStore, RgbF16ImageStore,
-    RgbaF16ImageStore, Scaler, Scaling, ThreadingPolicy,
+    RgbaF16ImageStore, Scaler, Scaling,
 };
 use core::f16;
 
@@ -160,11 +160,7 @@ impl<'b> ImageStoreScaling<'b, f16, 1> for PlanarF16ImageStore<'b> {
         options: ScalingOptions,
     ) -> Result<(), PicScaleError> {
         let mut scaler = Scaler::new(options.resampling_function);
-        scaler.set_threading_policy(if options.use_multithreading {
-            ThreadingPolicy::Adaptive
-        } else {
-            ThreadingPolicy::Single
-        });
+        scaler.set_threading_policy(options.threading_policy);
         scaler.generic_resize(self, store)
     }
 }
@@ -177,11 +173,7 @@ impl<'b> ImageStoreScaling<'b, f16, 2> for CbCrF16ImageStore<'b> {
         options: ScalingOptions,
     ) -> Result<(), PicScaleError> {
         let mut scaler = Scaler::new(options.resampling_function);
-        scaler.set_threading_policy(if options.use_multithreading {
-            ThreadingPolicy::Adaptive
-        } else {
-            ThreadingPolicy::Single
-        });
+        scaler.set_threading_policy(options.threading_policy);
         scaler.generic_resize(self, store)
     }
 }
@@ -194,11 +186,7 @@ impl<'b> ImageStoreScaling<'b, f16, 3> for RgbF16ImageStore<'b> {
         options: ScalingOptions,
     ) -> Result<(), PicScaleError> {
         let mut scaler = Scaler::new(options.resampling_function);
-        scaler.set_threading_policy(if options.use_multithreading {
-            ThreadingPolicy::Adaptive
-        } else {
-            ThreadingPolicy::Single
-        });
+        scaler.set_threading_policy(options.threading_policy);
         scaler.generic_resize(self, store)
     }
 }
@@ -211,11 +199,7 @@ impl<'b> ImageStoreScaling<'b, f16, 4> for RgbaF16ImageStore<'b> {
         options: ScalingOptions,
     ) -> Result<(), PicScaleError> {
         let mut scaler = Scaler::new(options.resampling_function);
-        scaler.set_threading_policy(if options.use_multithreading {
-            ThreadingPolicy::Adaptive
-        } else {
-            ThreadingPolicy::Single
-        });
+        scaler.set_threading_policy(options.threading_policy);
         scaler.generic_resize_with_alpha(self, store, options.premultiply_alpha)
     }
 }

@@ -30,7 +30,7 @@
 use num_traits::FromPrimitive;
 use pic_scale::{
     BufferStore, ImageStore, ImageStoreMut, ImageStoreScaling, PicScaleError, ResamplingFunction,
-    ScalingOptions,
+    ScalingOptions, ThreadingPolicy,
 };
 use std::fmt::Debug;
 use std::slice;
@@ -133,7 +133,7 @@ where
             options.premultiply_alpha = true;
         }
         if flags & PIC_SCALE_USE_MULTITHREADING != 0 {
-            options.use_multithreading = true;
+            options.threading_policy = ThreadingPolicy::Adaptive;
         }
         options.resampling_function = resizing_filter.to_resampling();
 
