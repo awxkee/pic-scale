@@ -103,6 +103,8 @@ unsafe fn convolve_horizontal_rgba_avx_row_4_impl(
         0,
     );
 
+    let init256f = _mm256_set1_epi32(ROUNDING_CONST);
+
     for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
         .zip(iter_row1)
         .zip(iter_row2)
@@ -115,8 +117,8 @@ unsafe fn convolve_horizontal_rgba_avx_row_4_impl(
         )
     {
         let mut jx = 0usize;
-        let mut store_0 = init256;
-        let mut store_1 = init256;
+        let mut store_0 = init256f;
+        let mut store_1 = init256f;
 
         let src0 = src;
         let src1 = src0.get_unchecked(src_stride..);

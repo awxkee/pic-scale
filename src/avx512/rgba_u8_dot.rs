@@ -94,6 +94,8 @@ unsafe fn convolve_horizontal_rgba_vnni_row_4_impl(
         0,
     );
 
+    let init256f = _mm256_set1_epi32(ROUNDING_CONST);
+
     let (row0_ref, rest) = dst.split_at_mut(dst_stride);
     let (row1_ref, rest) = rest.split_at_mut(dst_stride);
     let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
@@ -115,8 +117,8 @@ unsafe fn convolve_horizontal_rgba_vnni_row_4_impl(
         )
     {
         let mut jx = 0usize;
-        let mut store_0 = vld;
-        let mut store_1 = vld;
+        let mut store_0 = init256f;
+        let mut store_1 = init256f;
 
         let src0 = src;
         let src1 = src0.get_unchecked(src_stride..);
