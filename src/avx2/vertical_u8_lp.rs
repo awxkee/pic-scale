@@ -85,6 +85,188 @@ unsafe fn convolve_vertical_avx2_row_impl(
 
     let mut rem = dst;
 
+    let iter_96 = rem.chunks_exact_mut(96);
+
+    for dst in iter_96 {
+        let mut store0 = _mm256_set1_epi16(ROUNDING);
+        let mut store1 = _mm256_set1_epi16(ROUNDING);
+        let mut store2 = _mm256_set1_epi16(ROUNDING);
+        let mut store3 = _mm256_set1_epi16(ROUNDING);
+        let mut store4 = _mm256_set1_epi16(ROUNDING);
+        let mut store5 = _mm256_set1_epi16(ROUNDING);
+
+        let px = cx;
+
+        if bounds_size == 2 {
+            let py = bounds.start;
+            let weights = weight.get_unchecked(0..2);
+            let v_weight0 = _mm256_set1_epi16(weights[0]);
+            let v_weight1 = _mm256_set1_epi16(weights[1]);
+            let v_offset0 = src_stride * py + px;
+            let src_ptr0 = src.get_unchecked(v_offset0..);
+            let v_offset1 = src_stride * (py + 1) + px;
+            let src_ptr1 = src.get_unchecked(v_offset1..);
+
+            let item_row0 = _mm256_loadu_si256(src_ptr0.as_ptr() as *const __m256i);
+            let item_row1 =
+                _mm256_loadu_si256(src_ptr0.get_unchecked(32..).as_ptr() as *const __m256i);
+            let item_row2 =
+                _mm256_loadu_si256(src_ptr0.get_unchecked(64..).as_ptr() as *const __m256i);
+
+            (store0, store1) = m256dot(store0, store1, item_row0, v_weight0);
+            (store2, store3) = m256dot(store2, store3, item_row1, v_weight0);
+            (store4, store5) = m256dot(store4, store5, item_row2, v_weight0);
+
+            let item_row10 = _mm256_loadu_si256(src_ptr1.as_ptr() as *const __m256i);
+            let item_row11 =
+                _mm256_loadu_si256(src_ptr1.get_unchecked(32..).as_ptr() as *const __m256i);
+            let item_row12 =
+                _mm256_loadu_si256(src_ptr1.get_unchecked(64..).as_ptr() as *const __m256i);
+
+            (store0, store1) = m256dot(store0, store1, item_row10, v_weight1);
+            (store2, store3) = m256dot(store2, store3, item_row11, v_weight1);
+            (store4, store5) = m256dot(store4, store5, item_row12, v_weight1);
+        } else if bounds_size == 3 {
+            let py = bounds.start;
+            let weights = weight.get_unchecked(0..3);
+            let v_weight0 = _mm256_set1_epi16(weights[0]);
+            let v_weight1 = _mm256_set1_epi16(weights[1]);
+            let v_weight2 = _mm256_set1_epi16(weights[2]);
+            let v_offset0 = src_stride * py + px;
+            let src_ptr0 = src.get_unchecked(v_offset0..);
+            let v_offset1 = src_stride * (py + 1) + px;
+            let src_ptr1 = src.get_unchecked(v_offset1..);
+            let v_offset2 = src_stride * (py + 2) + px;
+            let src_ptr2 = src.get_unchecked(v_offset2..);
+
+            let item_row0 = _mm256_loadu_si256(src_ptr0.as_ptr() as *const __m256i);
+            let item_row1 =
+                _mm256_loadu_si256(src_ptr0.get_unchecked(32..).as_ptr() as *const __m256i);
+            let item_row2 =
+                _mm256_loadu_si256(src_ptr0.get_unchecked(64..).as_ptr() as *const __m256i);
+
+            (store0, store1) = m256dot(store0, store1, item_row0, v_weight0);
+            (store2, store3) = m256dot(store2, store3, item_row1, v_weight0);
+            (store4, store5) = m256dot(store4, store5, item_row2, v_weight0);
+
+            let item_row10 = _mm256_loadu_si256(src_ptr1.as_ptr() as *const __m256i);
+            let item_row11 =
+                _mm256_loadu_si256(src_ptr1.get_unchecked(32..).as_ptr() as *const __m256i);
+            let item_row12 =
+                _mm256_loadu_si256(src_ptr1.get_unchecked(64..).as_ptr() as *const __m256i);
+
+            (store0, store1) = m256dot(store0, store1, item_row10, v_weight1);
+            (store2, store3) = m256dot(store2, store3, item_row11, v_weight1);
+            (store4, store5) = m256dot(store4, store5, item_row12, v_weight1);
+
+            let item_row20 = _mm256_loadu_si256(src_ptr2.as_ptr() as *const __m256i);
+            let item_row21 =
+                _mm256_loadu_si256(src_ptr2.get_unchecked(32..).as_ptr() as *const __m256i);
+            let item_row22 =
+                _mm256_loadu_si256(src_ptr2.get_unchecked(64..).as_ptr() as *const __m256i);
+
+            (store0, store1) = m256dot(store0, store1, item_row20, v_weight2);
+            (store2, store3) = m256dot(store2, store3, item_row21, v_weight2);
+            (store4, store5) = m256dot(store4, store5, item_row22, v_weight2);
+        } else if bounds_size == 4 {
+            let py = bounds.start;
+            let weights = weight.get_unchecked(0..4);
+            let v_weight0 = _mm256_set1_epi16(weights[0]);
+            let v_weight1 = _mm256_set1_epi16(weights[1]);
+            let v_weight2 = _mm256_set1_epi16(weights[2]);
+            let v_weight3 = _mm256_set1_epi16(weights[3]);
+            let v_offset0 = src_stride * py + px;
+            let src_ptr0 = src.get_unchecked(v_offset0..);
+            let v_offset1 = src_stride * (py + 1) + px;
+            let src_ptr1 = src.get_unchecked(v_offset1..);
+            let v_offset2 = src_stride * (py + 2) + px;
+            let src_ptr2 = src.get_unchecked(v_offset2..);
+            let v_offset3 = src_stride * (py + 3) + px;
+            let src_ptr3 = src.get_unchecked(v_offset3..);
+
+            let item_row0 = _mm256_loadu_si256(src_ptr0.as_ptr() as *const __m256i);
+            let item_row1 =
+                _mm256_loadu_si256(src_ptr0.get_unchecked(32..).as_ptr() as *const __m256i);
+            let item_row2 =
+                _mm256_loadu_si256(src_ptr0.get_unchecked(64..).as_ptr() as *const __m256i);
+
+            (store0, store1) = m256dot(store0, store1, item_row0, v_weight0);
+            (store2, store3) = m256dot(store2, store3, item_row1, v_weight0);
+            (store4, store5) = m256dot(store4, store5, item_row2, v_weight0);
+
+            let item_row10 = _mm256_loadu_si256(src_ptr1.as_ptr() as *const __m256i);
+            let item_row11 =
+                _mm256_loadu_si256(src_ptr1.get_unchecked(32..).as_ptr() as *const __m256i);
+            let item_row12 =
+                _mm256_loadu_si256(src_ptr1.get_unchecked(64..).as_ptr() as *const __m256i);
+
+            (store0, store1) = m256dot(store0, store1, item_row10, v_weight1);
+            (store2, store3) = m256dot(store2, store3, item_row11, v_weight1);
+            (store4, store5) = m256dot(store4, store5, item_row12, v_weight1);
+
+            let item_row20 = _mm256_loadu_si256(src_ptr2.as_ptr() as *const __m256i);
+            let item_row21 =
+                _mm256_loadu_si256(src_ptr2.get_unchecked(32..).as_ptr() as *const __m256i);
+            let item_row22 =
+                _mm256_loadu_si256(src_ptr2.get_unchecked(64..).as_ptr() as *const __m256i);
+
+            (store0, store1) = m256dot(store0, store1, item_row20, v_weight2);
+            (store2, store3) = m256dot(store2, store3, item_row21, v_weight2);
+            (store4, store5) = m256dot(store4, store5, item_row22, v_weight2);
+
+            let item_row30 = _mm256_loadu_si256(src_ptr3.as_ptr() as *const __m256i);
+            let item_row31 =
+                _mm256_loadu_si256(src_ptr3.get_unchecked(32..).as_ptr() as *const __m256i);
+            let item_row32 =
+                _mm256_loadu_si256(src_ptr3.get_unchecked(64..).as_ptr() as *const __m256i);
+
+            (store0, store1) = m256dot(store0, store1, item_row30, v_weight3);
+            (store2, store3) = m256dot(store2, store3, item_row31, v_weight3);
+            (store4, store5) = m256dot(store4, store5, item_row32, v_weight3);
+        } else {
+            for j in 0..bounds_size {
+                let py = bounds.start + j;
+                let weight = weight.get_unchecked(j);
+                let v_weight = _mm256_set1_epi16(*weight);
+                let v_offset = src_stride * py + px;
+                let src_ptr = src.get_unchecked(v_offset..);
+                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
+                let item_row1 =
+                    _mm256_loadu_si256(src_ptr.get_unchecked(32..).as_ptr() as *const __m256i);
+                let item_row2 =
+                    _mm256_loadu_si256(src_ptr.get_unchecked(64..).as_ptr() as *const __m256i);
+
+                (store0, store1) = m256dot(store0, store1, item_row0, v_weight);
+                (store2, store3) = m256dot(store2, store3, item_row1, v_weight);
+                (store4, store5) = m256dot(store4, store5, item_row2, v_weight);
+            }
+        }
+
+        let rebased0 = _mm256_srai_epi16::<R_SHR_SCALE>(store0);
+        let rebased1 = _mm256_srai_epi16::<R_SHR_SCALE>(store1);
+        let rebased2 = _mm256_srai_epi16::<R_SHR_SCALE>(store2);
+        let rebased3 = _mm256_srai_epi16::<R_SHR_SCALE>(store3);
+        let rebased4 = _mm256_srai_epi16::<R_SHR_SCALE>(store4);
+        let rebased5 = _mm256_srai_epi16::<R_SHR_SCALE>(store5);
+
+        let shrank0 = _mm256_packus_epi16(rebased0, rebased1);
+        let shrank1 = _mm256_packus_epi16(rebased2, rebased3);
+        let shrank2 = _mm256_packus_epi16(rebased4, rebased5);
+
+        _mm256_storeu_si256(dst.as_mut_ptr() as *mut __m256i, shrank0);
+        _mm256_storeu_si256(
+            dst.get_unchecked_mut(32..).as_mut_ptr() as *mut __m256i,
+            shrank1,
+        );
+        _mm256_storeu_si256(
+            dst.get_unchecked_mut(64..).as_mut_ptr() as *mut __m256i,
+            shrank2,
+        );
+
+        cx += 96;
+    }
+
+    rem = rem.chunks_exact_mut(96).into_remainder();
     let iter_64 = rem.chunks_exact_mut(64);
 
     for dst in iter_64 {
