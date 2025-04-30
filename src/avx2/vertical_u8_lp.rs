@@ -579,8 +579,8 @@ unsafe fn convolve_vertical_avx2_row_impl(
             let weight = weight.get_unchecked(j);
             let v_weight = _mm_set1_epi16(*weight);
             let v_offset = src_stride * py + px;
-            let src_ptr = src.get_unchecked(v_offset..(v_offset + 1));
-            let item_row = _mm_set1_epi8(src_ptr[0] as i8);
+            let src_ptr = *src.get_unchecked(v_offset);
+            let item_row = _mm_set1_epi8(src_ptr as i8);
 
             store = _mm_add_epi16(
                 store,
