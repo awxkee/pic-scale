@@ -12,10 +12,10 @@ use fast_image_resize::{
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
-    Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, ImageStoreScaling, Planar16ImageStore,
-    Planar16ImageStoreMut, PlanarF32ImageStore, PlanarF32ImageStoreMut, ResamplingFunction,
-    Rgb8ImageStore, Rgb8ImageStoreMut, RgbF32ImageStore, RgbF32ImageStoreMut, Rgba16ImageStore,
-    Rgba16ImageStoreMut, Rgba8ImageStore, Rgba8ImageStoreMut, RgbaF32ImageStore,
+    Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, ImageStoreScaling, LinearApproxScaler,
+    Planar16ImageStore, Planar16ImageStoreMut, PlanarF32ImageStore, PlanarF32ImageStoreMut,
+    ResamplingFunction, Rgb8ImageStore, Rgb8ImageStoreMut, RgbF32ImageStore, RgbF32ImageStoreMut,
+    Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore, Rgba8ImageStoreMut, RgbaF32ImageStore,
     RgbaF32ImageStoreMut, Scaler, Scaling, ScalingF32, ScalingU16, ThreadingPolicy,
     WorkloadStrategy,
 };
@@ -60,9 +60,9 @@ fn main() {
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
 
-    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    let mut scaler = LinearApproxScaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
-    scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
+    // scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
 
     //
     // // let rgb_feature16 = transient
@@ -127,20 +127,21 @@ fn main() {
 
     let bytes32 = bytes
         .iter()
-        // .map(|&x| x)
-        .map(|&x| u16::from_ne_bytes([x, x]))
+        .map(|&x| x)
+        // .map(|&x| u16::from_ne_bytes([x, x]))
         // .map(|&x| x as f32 / 255.)
         .collect::<Vec<_>>();
 
     let mut store =
-        Rgba16ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize).unwrap();
+        Rgba8ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize)
+            .unwrap();
     store.bit_depth = 16;
-    let mut dst_store = Rgba16ImageStoreMut::alloc_with_depth(
+    let mut dst_store = Rgba8ImageStoreMut::alloc_with_depth(
         dimensions.0 as usize / 4,
         dimensions.1 as usize / 4,
         16,
     );
-    scaler.resize_rgba_u16(&store, &mut dst_store, true).unwrap();
+    scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
     //
     // let elapsed_time = start_time.elapsed();
     // // Print the elapsed time in milliseconds
@@ -191,8 +192,8 @@ fn main() {
     let dst = dst_store
         .as_bytes()
         .iter()
-        // .map(|&x| x)
-        .map(|&x| (x >> 8) as u8)
+        .map(|&x| x)
+        // .map(|&x| (x >> 8) as u8)
         // .map(|&x| (x as f32 * 255.).round() as u8)
         .collect::<Vec<_>>();
 

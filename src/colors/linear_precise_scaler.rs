@@ -36,8 +36,8 @@ use colorutils_rs::{
 };
 
 #[derive(Debug, Copy, Clone)]
-/// Converts image to linear f32 components scales it and convert back. This is more precise and slower than scaling in linear u8
-/// If you want just scale faster use *LinearApproxScaler*
+/// Converts image to linear f32 components scales it and convert back. This is more precise and slower than scaling in linear u8.
+/// This is an expensive method, however its precision might not be required, consider to use [LinearApproxScaler] instead
 pub struct LinearScaler {
     pub(crate) scaler: Scaler,
     pub(crate) transfer_function: TransferFunction,
@@ -113,8 +113,7 @@ impl Scaling for LinearScaler {
         )?;
         lab_store.bit_depth = into.bit_depth;
 
-        let lab_stride =
-            lab_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<f32>() as u32;
+        let lab_stride = lab_store.width as u32 * COMPONENTS as u32 * size_of::<f32>() as u32;
 
         rgb_to_linear(
             store.buffer.as_ref(),
@@ -139,8 +138,7 @@ impl Scaling for LinearScaler {
 
         self.scaler
             .resize_rgb_f32(&new_immutable_store, &mut new_store)?;
-        let new_lab_stride =
-            new_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<f32>() as u32;
+        let new_lab_stride = new_store.width as u32 * COMPONENTS as u32 * size_of::<f32>() as u32;
         linear_to_rgb(
             new_store.buffer.borrow(),
             new_lab_stride,
@@ -187,8 +185,7 @@ impl Scaling for LinearScaler {
             ImageStoreMut::<f32, COMPONENTS>::from_slice(&mut target, store.width, store.height)?;
         lab_store.bit_depth = into.bit_depth;
 
-        let lab_stride =
-            lab_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<f32>() as u32;
+        let lab_stride = lab_store.width as u32 * COMPONENTS as u32 * size_of::<f32>() as u32;
         rgba_to_linear(
             store.buffer.as_ref(),
             store.width as u32 * COMPONENTS as u32,
@@ -212,8 +209,7 @@ impl Scaling for LinearScaler {
         self.scaler
             .resize_rgba_f32(&new_immutable_store, &mut new_store, premultiply_alpha)?;
 
-        let new_lab_stride =
-            new_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<f32>() as u32;
+        let new_lab_stride = new_store.width as u32 * COMPONENTS as u32 * size_of::<f32>() as u32;
 
         linear_to_rgba(
             new_store.buffer.borrow(),
