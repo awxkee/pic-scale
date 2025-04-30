@@ -36,26 +36,6 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    c.bench_function(
-        "Pic scale RGBA with alpha + Linearization: Lanczos 3",
-        |b| {
-            let copied: Vec<u8> = Vec::from(src_bytes);
-            b.iter(|| {
-                let mut scaler = LinearApproxScaler::new(ResamplingFunction::Lanczos3);
-                scaler.set_threading_policy(ThreadingPolicy::Single);
-                let store = ImageStore::<u8, 4>::from_slice(
-                    &copied,
-                    dimensions.0 as usize,
-                    dimensions.1 as usize,
-                )
-                .unwrap();
-                let mut target =
-                    ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
-                _ = scaler.resize_rgba(&store, &mut target, true);
-            })
-        },
-    );
-
     c.bench_function("Pic scale RGBA with alpha(Speed): Lanczos 3", |b| {
         let copied: Vec<u8> = Vec::from(src_bytes);
         b.iter(|| {
