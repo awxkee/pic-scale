@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+#![forbid(unsafe_code)]
 use crate::image_store::ImageStoreMut;
 use crate::pic_scale_error::PicScaleError;
 use crate::scaler::ScalingOptions;

@@ -27,14 +27,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use std::arch::aarch64::*;
-
 use crate::alpha_handle_f16::premultiply_pixel_f16_row;
-use crate::neon::f16_utils::*;
 use core::f16;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
+use std::arch::aarch64::*;
 
 #[target_feature(enable = "fp16")]
 unsafe fn neon_premultiply_alpha_rgba_row_f16_full(dst: &mut [f16], src: &[f16]) {
@@ -45,16 +43,16 @@ unsafe fn neon_premultiply_alpha_rgba_row_f16_full(dst: &mut [f16], src: &[f16])
         let src_ptr = src.as_ptr();
         let pixel = vld4q_u16(src_ptr as *const u16);
 
-        let low_alpha = xreinterpretq_f16_u16(pixel.3);
-        let r_values = xvmulq_f16(xreinterpretq_f16_u16(pixel.0), low_alpha);
-        let g_values = xvmulq_f16(xreinterpretq_f16_u16(pixel.1), low_alpha);
-        let b_values = xvmulq_f16(xreinterpretq_f16_u16(pixel.2), low_alpha);
+        let low_alpha = vreinterpretq_f16_u16(pixel.3);
+        let r_values = vmulq_f16(vreinterpretq_f16_u16(pixel.0), low_alpha);
+        let g_values = vmulq_f16(vreinterpretq_f16_u16(pixel.1), low_alpha);
+        let b_values = vmulq_f16(vreinterpretq_f16_u16(pixel.2), low_alpha);
 
         let dst_ptr = dst.as_mut_ptr();
         let store_pixel = uint16x8x4_t(
-            xreinterpretq_u16_f16(r_values),
-            xreinterpretq_u16_f16(g_values),
-            xreinterpretq_u16_f16(b_values),
+            vreinterpretq_u16_f16(r_values),
+            vreinterpretq_u16_f16(g_values),
+            vreinterpretq_u16_f16(b_values),
             pixel.3,
         );
         vst4q_u16(dst_ptr as *mut u16, store_pixel);
@@ -74,15 +72,15 @@ unsafe fn neon_premultiply_alpha_rgba_row_f16_full(dst: &mut [f16], src: &[f16])
 
         let pixel = vld4q_u16(transient.as_ptr() as *const u16);
 
-        let low_alpha = xreinterpretq_f16_u16(pixel.3);
-        let r_values = xvmulq_f16(xreinterpretq_f16_u16(pixel.0), low_alpha);
-        let g_values = xvmulq_f16(xreinterpretq_f16_u16(pixel.1), low_alpha);
-        let b_values = xvmulq_f16(xreinterpretq_f16_u16(pixel.2), low_alpha);
+        let low_alpha = vreinterpretq_f16_u16(pixel.3);
+        let r_values = vmulq_f16(vreinterpretq_f16_u16(pixel.0), low_alpha);
+        let g_values = vmulq_f16(vreinterpretq_f16_u16(pixel.1), low_alpha);
+        let b_values = vmulq_f16(vreinterpretq_f16_u16(pixel.2), low_alpha);
 
         let store_pixel = uint16x8x4_t(
-            xreinterpretq_u16_f16(r_values),
-            xreinterpretq_u16_f16(g_values),
-            xreinterpretq_u16_f16(b_values),
+            vreinterpretq_u16_f16(r_values),
+            vreinterpretq_u16_f16(g_values),
+            vreinterpretq_u16_f16(b_values),
             pixel.3,
         );
         vst4q_u16(transient.as_mut_ptr() as *mut u16, store_pixel);
@@ -128,30 +126,30 @@ unsafe fn neon_unpremultiply_alpha_rgba_f16_row_full(in_place: &mut [f16]) {
         let src_ptr = dst.as_ptr();
         let pixel = vld4q_u16(src_ptr as *const u16);
 
-        let alphas = xreinterpretq_f16_u16(pixel.3);
-        let zero_mask = xvceqzq_f16(alphas);
+        let alphas = vreinterpretq_f16_u16(pixel.3);
+        let zero_mask = vceqzq_f16(alphas);
 
-        let r_values = xvbslq_f16(
+        let r_values = vbslq_f16(
             zero_mask,
-            xreinterpretq_f16_u16(pixel.0),
-            xvdivq_f16(xreinterpretq_f16_u16(pixel.0), alphas),
+            vreinterpretq_f16_u16(pixel.0),
+            vdivq_f16(vreinterpretq_f16_u16(pixel.0), alphas),
         );
-        let g_values = xvbslq_f16(
+        let g_values = vbslq_f16(
             zero_mask,
-            xreinterpretq_f16_u16(pixel.1),
-            xvdivq_f16(xreinterpretq_f16_u16(pixel.1), alphas),
+            vreinterpretq_f16_u16(pixel.1),
+            vdivq_f16(vreinterpretq_f16_u16(pixel.1), alphas),
         );
-        let b_values = xvbslq_f16(
+        let b_values = vbslq_f16(
             zero_mask,
-            xreinterpretq_f16_u16(pixel.2),
-            xvdivq_f16(xreinterpretq_f16_u16(pixel.2), alphas),
+            vreinterpretq_f16_u16(pixel.2),
+            vdivq_f16(vreinterpretq_f16_u16(pixel.2), alphas),
         );
 
         let dst_ptr = dst.as_mut_ptr();
         let store_pixel = uint16x8x4_t(
-            xreinterpretq_u16_f16(r_values),
-            xreinterpretq_u16_f16(g_values),
-            xreinterpretq_u16_f16(b_values),
+            vreinterpretq_u16_f16(r_values),
+            vreinterpretq_u16_f16(g_values),
+            vreinterpretq_u16_f16(b_values),
             pixel.3,
         );
         vst4q_u16(dst_ptr as *mut u16, store_pixel);
@@ -165,29 +163,29 @@ unsafe fn neon_unpremultiply_alpha_rgba_f16_row_full(in_place: &mut [f16]) {
 
         let pixel = vld4q_u16(transient.as_ptr() as *const u16);
 
-        let alphas = xreinterpretq_f16_u16(pixel.3);
-        let zero_mask = xvceqzq_f16(alphas);
+        let alphas = vreinterpretq_f16_u16(pixel.3);
+        let zero_mask = vceqzq_f16(alphas);
 
-        let r_values = xvbslq_f16(
+        let r_values = vbslq_f16(
             zero_mask,
-            xreinterpretq_f16_u16(pixel.0),
-            xvdivq_f16(xreinterpretq_f16_u16(pixel.0), alphas),
+            vreinterpretq_f16_u16(pixel.0),
+            vdivq_f16(vreinterpretq_f16_u16(pixel.0), alphas),
         );
-        let g_values = xvbslq_f16(
+        let g_values = vbslq_f16(
             zero_mask,
-            xreinterpretq_f16_u16(pixel.1),
-            xvdivq_f16(xreinterpretq_f16_u16(pixel.1), alphas),
+            vreinterpretq_f16_u16(pixel.1),
+            vdivq_f16(vreinterpretq_f16_u16(pixel.1), alphas),
         );
-        let b_values = xvbslq_f16(
+        let b_values = vbslq_f16(
             zero_mask,
-            xreinterpretq_f16_u16(pixel.2),
-            xvdivq_f16(xreinterpretq_f16_u16(pixel.2), alphas),
+            vreinterpretq_f16_u16(pixel.2),
+            vdivq_f16(vreinterpretq_f16_u16(pixel.2), alphas),
         );
 
         let store_pixel = uint16x8x4_t(
-            xreinterpretq_u16_f16(r_values),
-            xreinterpretq_u16_f16(g_values),
-            xreinterpretq_u16_f16(b_values),
+            vreinterpretq_u16_f16(r_values),
+            vreinterpretq_u16_f16(g_values),
+            vreinterpretq_u16_f16(b_values),
             pixel.3,
         );
         vst4q_u16(transient.as_mut_ptr() as *mut u16, store_pixel);

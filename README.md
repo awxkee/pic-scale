@@ -49,19 +49,19 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 
 |                | NEON | SSE | AVX2 | AVX-512    | WASM | 
 |----------------|------|-----|------|------------|------| 
-| RGBA (8 bit)   | x    | x   | x    | x(avxvnni) | ~    | 
-| RGB (8 bit)    | x    | x   | x    | x(avxvnni) | ~    | 
+| RGBA (8 bit)   | x    | x   | x    | x(avxvnni) | x    | 
+| RGB (8 bit)    | x    | x   | x    | x(avxvnni) | x    | 
 | Plane (8 bit)  | x    | x   | ~    | ~          | ~    | 
 | RGBA (8+ bit)  | x    | x   | x    | x(avxvnni) | -    | 
 | RGB (8+ bit)   | x    | ~   | ~    | ~          | -    | 
-| Plane (8+ bit) | ~    | ~   | ~    | ~          | -    | 
+| Plane (8+ bit) | x    | ~   | x    | ~          | -    | 
 | RGBA (f32)     | x    | x   | x    | -          | -    | 
-| RGB (f32)      | x    | x   | ~    | -          | -    | 
-| Plane (f32)    | x    | x   | ~    | -          | -    | 
+| RGB (f32)      | x    | x   | x    | -          | -    | 
+| Plane (f32)    | x    | x   | x    | -          | -    | 
 | RGBA (f16)     | x    | x   | x    | -          | -    | 
 | RGB (f16)      | x    | ~   | ~    | -          | -    | 
 | Plane (f16)    | ~    | ~   | ~    | -          | -    |
-| AR30/RA30      | x    | x   | -    | -          | -    |
+| AR30/RA30      | x    | x   | x    | -          | -    |
 
 #### Features
 
@@ -80,7 +80,7 @@ For x86 and aarch64 NEON runtime dispatch is used.
 `avx512` requires feature `nightly_avx512` and requires `nightly` compiler channel, runtime detection if it is available then will be used.
 
 `avxvnni` requires feature `nightly_avx512` and requires `nightly` compiler channel, runtime detection if it is available then will be used.
-AVX-VNNI is helpful extension on modern Intel and AMD CPU's, consider turn it on to ger maximum performance.
+AVX-VNNI is helpful extension on modern Intel and AMD CPU's, consider turn it on to get maximum performance.
 
 `fullfp16`, `fhm` NEON target detection performed in runtime, when available best the best paths for *f16* images are available on ARM.
 
@@ -202,7 +202,7 @@ let resized = scaler.resize_rgba(
 
 #### Example in CIE XYZ colorspace
 ```rust
-let mut scaler = XYZScale::new(ResamplingFunction::Hermite);
+let mut scaler = XYZScaler::new(ResamplingFunction::Hermite);
 scaler.set_threading_policy(ThreadingPolicy::Single);
 let store = ImageStore::<u8, 4>::from_slice(&bytes, width, height).unwrap();
 let mut dst_store = ImageStoreMut::<u8, 4>::alloc(width / 2, height / 2);

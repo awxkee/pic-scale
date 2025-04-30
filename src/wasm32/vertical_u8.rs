@@ -55,8 +55,8 @@ unsafe fn consume_u8_32(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = *filter.get_unchecked(j);
-        let v_weight = v128_load16_splat(weight as *const u16);
+        let weight = filter.get_unchecked(j..);
+        let v_weight = v128_load16_splat(weight.as_ptr() as *const _);
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -135,8 +135,8 @@ unsafe fn consume_u8_16(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = *filter.get_unchecked(j);
-        let v_weight = v128_load16_splat(weight as *const u16);
+        let weight = filter.get_unchecked(j..);
+        let v_weight = v128_load16_splat(weight.as_ptr() as *const _);
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -190,13 +190,12 @@ unsafe fn consume_u8_8(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = *filter.get_unchecked(j);
-        let v_weight = v128_load16_splat(weight as *const u16);
+        let weight = filter.get_unchecked(j..);
+        let v_weight = v128_load16_splat(weight.as_ptr() as *const _);
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
-        let mut item_row_n = w_zeros();
-        item_row_n = i64x2_replace_lane::<0>(item_row_n, (s_ptr as *const i64).read_unaligned());
+        let mut item_row_n = v128_load64_lane::<0>(w_zeros(), s_ptr as *const u64);
         item_row_n = u16x8_extend_low_u8x16(item_row_n);
 
         store0 = i32x4_add(store0, i32x4_extmul_low_i16x8(item_row_n, v_weight));
@@ -214,8 +213,7 @@ unsafe fn consume_u8_8(
     let packed_8 = u16x8_pack_sat_u8x16(packed_16, packed_16);
 
     let dst_ptr = dst.add(px);
-    let value = i64x2_extract_lane::<0>(packed_8);
-    (dst_ptr as *mut i64).write_unaligned(value);
+    v128_store64_lane::<0>(packed_8, dst_ptr as *mut _);
 }
 
 #[inline]
@@ -235,8 +233,8 @@ unsafe fn consume_u8_1(
 
     for j in 0..bounds.size {
         let py = start_y + j;
-        let weight = *filter.get_unchecked(j);
-        let v_weight = v128_load16_splat(weight as *const u16);
+        let weight = filter.get_unchecked(j..);
+        let v_weight = v128_load16_splat(weight.as_ptr() as *const _);
         let src_ptr = src.add(src_stride * py);
 
         let s_ptr = src_ptr.add(px);
@@ -255,8 +253,7 @@ unsafe fn consume_u8_1(
     let packed_8 = u16x8_pack_sat_u8x16(packed_16, packed_16);
 
     let dst_ptr = dst.add(px);
-    let value = u8x16_extract_lane::<0>(packed_8);
-    dst_ptr.write_unaligned(value);
+    v128_store8_lane::<0>(packed_8, dst_ptr);
 }
 
 #[inline]

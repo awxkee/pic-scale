@@ -86,7 +86,7 @@ pub(crate) unsafe fn avx2_deinterleave_rgba(
     rgba3: __m256i,
 ) -> (__m256i, __m256i, __m256i, __m256i) {
     #[rustfmt::skip]
-        let sh = _mm256_setr_epi8(
+    let sh = _mm256_setr_epi8(
         0, 4, 8, 12, 1, 5,
         9, 13, 2, 6, 10, 14,
         3, 7, 11, 15, 0, 4,
@@ -430,4 +430,23 @@ pub(crate) unsafe fn _mm_prefer_fma_ps<const FMA: bool>(a: __m128, b: __m128, c:
     } else {
         _mm_add_ps(_mm_mul_ps(b, c), a)
     }
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_reduce_r_epi32<const PRECISION: i32>(x: __m128i) -> __m128i {
+    const FIRST_MASK: i32 = shuffle(1, 0, 3, 2);
+    let hi64 = _mm_shuffle_epi32::<FIRST_MASK>(x);
+    let sum64 = _mm_add_epi32(hi64, x);
+    const SM: i32 = shuffle(1, 0, 3, 2);
+    let hi32 = _mm_shufflelo_epi16::<SM>(sum64);
+    _mm_srai_epi32::<PRECISION>(_mm_add_epi32(sum64, hi32))
+}
+
+/// Sums all lanes in float32
+#[inline(always)]
+pub(crate) unsafe fn _mm_hsum_ps(v: __m128) -> __m128 {
+    let mut shuf = _mm_movehdup_ps(v);
+    let sums = _mm_add_ps(v, shuf);
+    shuf = _mm_movehl_ps(shuf, sums);
+    _mm_add_ss(sums, shuf)
 }

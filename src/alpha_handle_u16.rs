@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+#![forbid(unsafe_code)]
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::{avx_premultiply_alpha_rgba_u16, avx_unpremultiply_alpha_rgba_u16};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon",))]

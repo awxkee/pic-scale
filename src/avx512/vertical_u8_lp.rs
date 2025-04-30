@@ -237,8 +237,8 @@ unsafe fn convolve_vertical_avx512_row_masked_impl(
         } else {
             for j in 0..bounds_size {
                 let py = bounds.start + j;
-                let weight = weight.get_unchecked(j..(j + 1));
-                let v_weight = _mm512_set1_epi16(weight[0]);
+                let weight = weight.get_unchecked(j);
+                let v_weight = _mm512_set1_epi16(*weight);
                 let v_offset = src_stride * py + px;
                 let src_ptr = src.get_unchecked(v_offset..);
                 let item_row0 = _mm512_maskz_loadu_epi8(working_mask, src_ptr.as_ptr() as *const _);

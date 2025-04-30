@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#![forbid(unsafe_code)]
 use crate::color_group::{load_ar30_p, ColorGroup};
 use crate::filter_weights::FilterBounds;
 use crate::support::ROUNDING_CONST;

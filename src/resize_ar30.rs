@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#![forbid(unsafe_code)]
 use crate::convolution::ConvolutionOptions;
 use crate::dispatch_group_ar30::{
     convolve_horizontal_dispatch_ar30, convolve_vertical_dispatch_ar30,

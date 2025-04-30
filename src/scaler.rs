@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#![forbid(unsafe_code)]
 use crate::ar30::{Ar30ByteOrder, Rgb30};
 use crate::convolution::{ConvolutionOptions, HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::filter_weights::{FilterBounds, FilterWeights};
@@ -57,6 +58,7 @@ pub struct Scaler {
     pub workload_strategy: WorkloadStrategy,
 }
 
+/// 8 bit-depth images scaling trait
 pub trait Scaling {
     /// Sets threading policy
     ///
@@ -133,6 +135,7 @@ pub trait Scaling {
     ) -> Result<(), PicScaleError>;
 }
 
+/// f32 images scaling trait
 pub trait ScalingF32 {
     /// Performs rescaling for CbCr f32
     ///
@@ -197,6 +200,7 @@ pub trait ScalingF32 {
     ) -> Result<(), PicScaleError>;
 }
 
+/// Defines execution hint about preferred strategy
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Default)]
 pub enum WorkloadStrategy {
     /// Prefers quality to speed
@@ -206,6 +210,7 @@ pub enum WorkloadStrategy {
     PreferSpeed,
 }
 
+/// 8+ bit-depth images scaling trait
 pub trait ScalingU16 {
     /// Performs rescaling for Planar u16
     ///
@@ -346,6 +351,9 @@ impl Scaler {
         }
     }
 
+    /// Sets preferred workload strategy
+    ///
+    /// This is hint only, it may change something, or may not.
     pub fn set_workload_strategy(&mut self, workload_strategy: WorkloadStrategy) {
         self.workload_strategy = workload_strategy;
     }
@@ -419,7 +427,7 @@ impl Scaler {
 
                 let center = center_x - 0.5.as_();
 
-                for k in start..end {
+                for (k, filter) in (start..end).zip(local_filters.iter_mut()) {
                     let dx = k.as_() - center;
                     let weight;
                     if let Some(resampling_window) = window_func {
@@ -448,21 +456,17 @@ impl Scaler {
                         weight = resampling_function(dx * filter_scale);
                     }
                     weights_sum += weight;
-                    unsafe {
-                        *local_filters.get_unchecked_mut(local_filter_iteration) = weight;
-                    }
+                    *filter = weight;
                     local_filter_iteration += 1;
                 }
 
                 let alpha: T = 0.7f32.as_();
                 if resampling_filter.is_ewa && !local_filters.is_empty() {
-                    weights_sum = unsafe { *local_filters.get_unchecked(0) };
+                    weights_sum = local_filters[0];
                     for j in 1..local_filter_iteration {
-                        let new_weight = alpha * unsafe { *local_filters.get_unchecked(j) }
-                            + (1f32.as_() - alpha) * unsafe { *local_filters.get_unchecked(j - 1) };
-                        unsafe {
-                            *local_filters.get_unchecked_mut(j) = new_weight;
-                        }
+                        let new_weight =
+                            alpha * local_filters[j] + (1f32.as_() - alpha) * local_filters[j - 1];
+                        local_filters[j] = new_weight;
                         weights_sum += new_weight;
                     }
                 }
@@ -737,7 +741,7 @@ impl Scaler {
         new_immutable_store.convolve_horizontal(horizontal_filters, into, pool, options);
 
         if premultiply_alpha_requested && has_alpha_premultiplied {
-            into.unpremultiply_alpha(pool);
+            into.unpremultiply_alpha(pool, self.workload_strategy);
         }
 
         Ok(())
@@ -794,7 +798,7 @@ impl Scaler {
         src_store.convolve_vertical(vertical_filters, into, pool, options);
 
         if premultiply_alpha_requested && has_alpha_premultiplied {
-            into.unpremultiply_alpha(pool);
+            into.unpremultiply_alpha(pool, self.workload_strategy);
         }
 
         Ok(())
@@ -851,7 +855,7 @@ impl Scaler {
         src_store.convolve_horizontal(horizontal_filters, into, pool, options);
 
         if premultiply_alpha_requested && has_alpha_premultiplied {
-            into.unpremultiply_alpha(pool);
+            into.unpremultiply_alpha(pool, self.workload_strategy);
         }
 
         Ok(())

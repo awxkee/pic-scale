@@ -26,12 +26,10 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use std::arch::aarch64::{vdupq_n_f32, vld1q_dup_f32};
-
 use crate::filter_weights::FilterBounds;
-use crate::neon::f16_utils::*;
 use crate::neon::utils::prefer_vfmaq_f32;
 use core::f16;
+use std::arch::aarch64::*;
 
 #[inline(always)]
 pub(crate) unsafe fn convolve_vertical_part_neon_8_f16<const USE_BLENDING: bool>(
@@ -57,28 +55,31 @@ pub(crate) unsafe fn convolve_vertical_part_neon_8_f16<const USE_BLENDING: bool>
 
         let s_ptr = src_ptr.add(px);
         let item_row = if USE_BLENDING {
-            let mut transient: [f16; 8] = [0.; 8];
-            std::ptr::copy_nonoverlapping(s_ptr, transient.as_mut_ptr(), blend_length);
-            xvldq_f16(transient.as_ptr())
+            let mut transient: [u16; 8] = [0; 8];
+            std::ptr::copy_nonoverlapping(s_ptr as *const _, transient.as_mut_ptr(), blend_length);
+            vld1q_u16(transient.as_ptr())
         } else {
-            xvldq_f16(s_ptr)
+            vld1q_u16(s_ptr as *const _)
         };
 
-        let p1 = xvcvt_f32_f16(xvget_low_f16(item_row));
-        let p2 = xvcvt_f32_f16(xvget_high_f16(item_row));
+        let p1 = vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(item_row)));
+        let p2 = vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(item_row)));
 
         store_0 = prefer_vfmaq_f32(store_0, p1, v_weight);
         store_1 = prefer_vfmaq_f32(store_1, p2, v_weight);
     }
 
-    let item = xcombine_f16(xvcvt_f16_f32(store_0), xvcvt_f16_f32(store_1));
+    let item = vcombine_u16(
+        vreinterpret_u16_f16(vcvt_f16_f32(store_0)),
+        vreinterpret_u16_f16(vcvt_f16_f32(store_1)),
+    );
 
     let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
     if USE_BLENDING {
-        let mut transient: [f16; 8] = [0.; 8];
-        xvstq_f16(transient.as_mut_ptr(), item);
-        std::ptr::copy_nonoverlapping(transient.as_ptr(), dst_ptr, blend_length);
+        let mut transient: [u16; 8] = [0; 8];
+        vst1q_u16(transient.as_mut_ptr(), item);
+        std::ptr::copy_nonoverlapping(transient.as_ptr(), dst_ptr as *mut _, blend_length);
     } else {
-        xvstq_f16(dst_ptr, item);
+        vst1q_u16(dst_ptr as *mut _, item);
     }
 }

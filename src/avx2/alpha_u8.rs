@@ -30,6 +30,7 @@
 use crate::avx2::utils::{
     _mm256_select_si256, avx2_deinterleave_rgba, avx2_div_by255, avx2_interleave_rgba,
 };
+use crate::WorkloadStrategy;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
@@ -66,6 +67,10 @@ impl AssociateAlphaDefault {
             3, 3, 3, 3, 7, 7, 7, 7, 11, 11, 11, 11, 15, 15, 15, 15, 3, 3, 3, 3, 7, 7, 7, 7, 11, 11,
             11, 11, 15, 15, 15, 15,
         );
+        let blend_mask = _mm256_setr_epi8(
+            0, 0, 0, -1, 0, 0, 0, -1, 0, 0, 0, -1, 0, 0, 0, -1, 0, 0, 0, -1, 0, 0, 0, -1, 0, 0, 0,
+            -1, 0, 0, 0, -1,
+        );
         let src_ptr = src.as_ptr();
         let rgba0 = _mm256_loadu_si256(src_ptr as *const __m256i);
         let multiplicand = _mm256_shuffle_epi8(rgba0, shuffle);
@@ -84,7 +89,7 @@ impl AssociateAlphaDefault {
         v_ll = avx2_div_by255(la_lo);
         v_hi = avx2_div_by255(la_hi);
 
-        let values = _mm256_packus_epi16(v_ll, v_hi);
+        let values = _mm256_blendv_epi8(_mm256_packus_epi16(v_ll, v_hi), rgba0, blend_mask);
 
         let dst_ptr = dst.as_mut_ptr();
         _mm256_storeu_si256(dst_ptr as *mut __m256i, values);
@@ -171,6 +176,7 @@ pub(crate) fn avx_unpremultiply_alpha_rgba(
     height: usize,
     stride: usize,
     pool: &Option<ThreadPool>,
+    _: WorkloadStrategy,
 ) {
     unsafe {
         avx_unpremultiply_alpha_rgba_impl(in_place, width, height, stride, pool);

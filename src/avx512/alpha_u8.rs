@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::avx512::utils::{avx512_deinterleave_rgba, avx512_div_by255, avx512_interleave_rgba};
+use crate::WorkloadStrategy;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use rayon::ThreadPool;
@@ -56,6 +57,10 @@ impl AssociateAlphaDefault {
             43, 43, 39, 39, 39, 39, 35, 35, 35, 35, 31, 31, 31, 31, 27, 27, 27, 27, 23, 23, 23, 23,
             19, 19, 19, 19, 15, 15, 15, 15, 11, 11, 11, 11, 7, 7, 7, 7, 3, 3, 3, 3,
         );
+
+        let mask: __mmask64 =
+            0b0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001;
+
         let src_ptr = src.as_ptr();
         let rgba0 = _mm512_maskz_loadu_epi8(working_mask, src_ptr as *const _);
         let multiplicand = _mm512_shuffle_epi8(rgba0, shuffle);
@@ -71,7 +76,7 @@ impl AssociateAlphaDefault {
         v_ll = avx512_div_by255(_mm512_mullo_epi16(v_ll, a_lo));
         v_hi = avx512_div_by255(_mm512_mullo_epi16(v_hi, a_hi));
 
-        let values = _mm512_packus_epi16(v_ll, v_hi);
+        let values = _mm512_mask_blend_epi8(mask, _mm512_packus_epi16(v_ll, v_hi), rgba0);
 
         let dst_ptr = dst.as_mut_ptr();
         _mm512_mask_storeu_epi8(dst_ptr as *mut _, working_mask, values);
@@ -392,6 +397,7 @@ pub(crate) fn avx512_unpremultiply_alpha_rgba(
     _: usize,
     stride: usize,
     pool: &Option<ThreadPool>,
+    _: WorkloadStrategy,
 ) {
     let has_vbmi = std::arch::is_x86_feature_detected!("avx512vbmi");
     let mut executor: fn(&mut [u8]) = |row: &mut [u8]| unsafe {

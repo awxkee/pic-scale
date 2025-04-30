@@ -28,14 +28,13 @@
  */
 
 use crate::filter_weights::FilterWeights;
-use crate::neon::f16_utils::*;
 use crate::neon::utils::{prefer_vfmaq_f32, prefer_vfmaq_lane_f32, prefer_vfmaq_laneq_f32};
 use core::f16;
 use std::arch::aarch64::*;
 
 #[inline(always)]
 unsafe fn write_rgb_f16(store: float32x4_t, dest_ptr: &mut [f16]) {
-    let cvt = xreinterpret_u16_f16(xvcvt_f16_f32(store));
+    let cvt = vreinterpret_u16_f16(vcvt_f16_f32(store));
     let l1 = vget_lane_u32::<0>(vreinterpret_u32_u16(cvt));
     let l3 = vget_lane_u16::<2>(cvt);
     (dest_ptr.as_mut_ptr() as *mut u32).write_unaligned(l1);
@@ -55,33 +54,24 @@ unsafe fn conv_horiz_4_rgb_f16(
     const COMPONENTS: usize = 3;
     let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
 
-    let rgb_pixel_s = xvldq_f16(src_ptr as *const _);
-    let rgb_pixel_n = xvld_f16(src_ptr.add(8) as *const _);
+    let rgb_pixel_s = vld1q_u16(src_ptr as *const _);
+    let rgb_pixel_n = vld1_u16(src_ptr.add(8) as *const _);
 
-    let rgb_first_u = vget_low_u16(xreinterpretq_u16_f16(rgb_pixel_s));
-    let rgb_first = xreinterpret_f16_u16(rgb_first_u);
-    let rgb_second_u = vext_u16::<3>(
-        vget_low_u16(xreinterpretq_u16_f16(rgb_pixel_s)),
-        vget_high_u16(xreinterpretq_u16_f16(rgb_pixel_s)),
-    );
-    let rgb_second = xreinterpret_f16_u16(rgb_second_u);
+    let rgb_first_u = vget_low_u16(rgb_pixel_s);
+    let rgb_first = rgb_first_u;
+    let rgb_second_u = vext_u16::<3>(vget_low_u16(rgb_pixel_s), vget_high_u16(rgb_pixel_s));
+    let rgb_second = rgb_second_u;
 
-    let rgb_third_u = vext_u16::<2>(
-        vget_high_u16(xreinterpretq_u16_f16(rgb_pixel_s)),
-        xreinterpret_u16_f16(rgb_pixel_n),
-    );
-    let rgb_third = xreinterpret_f16_u16(rgb_third_u);
+    let rgb_third_u = vext_u16::<2>(vget_high_u16(rgb_pixel_s), rgb_pixel_n);
+    let rgb_third = rgb_third_u;
 
-    let rgb_fourth_u = vext_u16::<1>(
-        xreinterpret_u16_f16(rgb_pixel_n),
-        xreinterpret_u16_f16(rgb_pixel_n),
-    );
-    let rgb_fourth = xreinterpret_f16_u16(rgb_fourth_u);
+    let rgb_fourth_u = vext_u16::<1>(rgb_pixel_n, rgb_pixel_n);
+    let rgb_fourth = rgb_fourth_u;
 
-    let acc = prefer_vfmaq_laneq_f32::<0>(store, xvcvt_f32_f16(rgb_first), w);
-    let acc = prefer_vfmaq_laneq_f32::<1>(acc, xvcvt_f32_f16(rgb_second), w);
-    let acc = prefer_vfmaq_laneq_f32::<2>(acc, xvcvt_f32_f16(rgb_third), w);
-    prefer_vfmaq_laneq_f32::<3>(acc, xvcvt_f32_f16(rgb_fourth), w)
+    let acc = prefer_vfmaq_laneq_f32::<0>(store, vcvt_f32_f16(vreinterpret_f16_u16(rgb_first)), w);
+    let acc = prefer_vfmaq_laneq_f32::<1>(acc, vcvt_f32_f16(vreinterpret_f16_u16(rgb_second)), w);
+    let acc = prefer_vfmaq_laneq_f32::<2>(acc, vcvt_f32_f16(vreinterpret_f16_u16(rgb_third)), w);
+    prefer_vfmaq_laneq_f32::<3>(acc, vcvt_f32_f16(vreinterpret_f16_u16(rgb_fourth)), w)
 }
 
 #[must_use]
@@ -95,19 +85,19 @@ unsafe fn conv_horiz_2_rgb_f16(
     const COMPONENTS: usize = 3;
     let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
 
-    let rgb_pixel = xvld_f16(src_ptr);
+    let rgb_pixel = vld1_u16(src_ptr as *const _);
     let second_px = vreinterpret_u16_u32(vld1_lane_u32::<0>(
         src_ptr.add(4) as *const u32,
         vdup_n_u32(0),
     ));
 
-    let rgb_first_u = xreinterpret_u16_f16(rgb_pixel);
-    let rgb_first = xreinterpret_f16_u16(rgb_first_u);
-    let rgb_second_u = vext_u16::<3>(xreinterpret_u16_f16(rgb_pixel), second_px);
-    let rgb_second = xreinterpret_f16_u16(rgb_second_u);
+    let rgb_first_u = rgb_pixel;
+    let rgb_first = rgb_first_u;
+    let rgb_second_u = vext_u16::<3>(rgb_pixel, second_px);
+    let rgb_second = rgb_second_u;
 
-    let acc = prefer_vfmaq_lane_f32::<0>(store, xvcvt_f32_f16(rgb_first), w);
-    prefer_vfmaq_lane_f32::<1>(acc, xvcvt_f32_f16(rgb_second), w)
+    let acc = prefer_vfmaq_lane_f32::<0>(store, vcvt_f32_f16(vreinterpret_f16_u16(rgb_first)), w);
+    prefer_vfmaq_lane_f32::<1>(acc, vcvt_f32_f16(vreinterpret_f16_u16(rgb_second)), w)
 }
 
 #[must_use]
@@ -124,9 +114,8 @@ unsafe fn conv_horiz_1_rgb_f16(
     let mut fq = vreinterpret_u16_u32(vld1_lane_u32::<0>(src_ptr as *const _, vdup_n_u32(0)));
     fq = vld1_lane_u16::<2>(src_ptr.add(2) as *const _, fq);
 
-    let rgb_pixel = xreinterpret_f16_u16(fq);
-
-    prefer_vfmaq_f32(store, xvcvt_f32_f16(rgb_pixel), w)
+    let rgb_pixel = vreinterpret_f16_u16(fq);
+    prefer_vfmaq_f32(store, vcvt_f32_f16(rgb_pixel), w)
 }
 
 pub(crate) fn convolve_horizontal_rgb_neon_rows_4_f16(

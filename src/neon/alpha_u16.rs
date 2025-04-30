@@ -141,7 +141,7 @@ impl NeonPremultiplyExecutor for NeonPremultiplyExecutorAnyBitDepth {
     unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
         assert_ne!(bit_depth, 0, "Something goes wrong!");
         assert!((1..=16).contains(&bit_depth));
-        let max_colors = (1 << bit_depth) - 1;
+        let max_colors = (1u32 << bit_depth) - 1;
         let mut rem = dst;
         let mut src_rem = src;
 
@@ -157,9 +157,7 @@ impl NeonPremultiplyExecutor for NeonPremultiplyExecutorAnyBitDepth {
             let hi_a = vmulq_f32(vcvtq_f32_u32(high_a), v_max_colors_scale);
 
             let new_r = v_scale_by_alpha(pixel.0, low_a, hi_a);
-
             let new_g = v_scale_by_alpha(pixel.1, low_a, hi_a);
-
             let new_b = v_scale_by_alpha(pixel.2, low_a, hi_a);
 
             let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
@@ -186,9 +184,7 @@ impl NeonPremultiplyExecutor for NeonPremultiplyExecutorAnyBitDepth {
             let hi_a = vmulq_f32(vcvtq_f32_u32(high_a), v_max_colors_scale);
 
             let new_r = v_scale_by_alpha(pixel.0, low_a, hi_a);
-
             let new_g = v_scale_by_alpha(pixel.1, low_a, hi_a);
-
             let new_b = v_scale_by_alpha(pixel.2, low_a, hi_a);
 
             let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
@@ -306,12 +302,14 @@ struct NeonDisassociateAlpha {}
 
 impl DisassociateAlpha for NeonDisassociateAlpha {
     unsafe fn disassociate(&self, in_place: &mut [u16], bit_depth: usize) {
-        let max_colors = (1i32 << bit_depth) - 1;
+        let max_colors = (1u32 << bit_depth) - 1;
 
         let mut rem = in_place;
 
         let v_max_colors_f = vdupq_n_f32(max_colors as f32);
         let ones = vdupq_n_f32(1.);
+        let v_max_test = vdupq_n_u16(max_colors as u16);
+
         for dst in rem.chunks_exact_mut(8 * 4) {
             let pixel = vld4q_u16(dst.as_ptr());
 
@@ -323,23 +321,27 @@ impl DisassociateAlpha for NeonDisassociateAlpha {
             let low_a = vmulq_f32(vdivq_f32(ones, vcvtq_f32_u32(low_a)), v_max_colors_f);
             let hi_a = vmulq_f32(vdivq_f32(ones, vcvtq_f32_u32(high_a)), v_max_colors_f);
 
-            let new_r = vbslq_u16(
+            let mut new_r = vbslq_u16(
                 is_alpha_zero_mask,
                 pixel.0,
                 v_scale_by_alpha(pixel.0, low_a, hi_a),
             );
 
-            let new_g = vbslq_u16(
+            let mut new_g = vbslq_u16(
                 is_alpha_zero_mask,
                 pixel.1,
                 v_scale_by_alpha(pixel.1, low_a, hi_a),
             );
 
-            let new_b = vbslq_u16(
+            let mut new_b = vbslq_u16(
                 is_alpha_zero_mask,
                 pixel.2,
                 v_scale_by_alpha(pixel.2, low_a, hi_a),
             );
+
+            new_r = vminq_u16(new_r, v_max_test);
+            new_g = vminq_u16(new_g, v_max_test);
+            new_b = vminq_u16(new_b, v_max_test);
 
             let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
 
@@ -362,23 +364,27 @@ impl DisassociateAlpha for NeonDisassociateAlpha {
             let low_a = vmulq_f32(vdivq_f32(ones, vcvtq_f32_u32(low_a)), v_max_colors_f);
             let hi_a = vmulq_f32(vdivq_f32(ones, vcvtq_f32_u32(high_a)), v_max_colors_f);
 
-            let new_r = vbslq_u16(
+            let mut new_r = vbslq_u16(
                 is_alpha_zero_mask,
                 pixel.0,
                 v_scale_by_alpha(pixel.0, low_a, hi_a),
             );
 
-            let new_g = vbslq_u16(
+            let mut new_g = vbslq_u16(
                 is_alpha_zero_mask,
                 pixel.1,
                 v_scale_by_alpha(pixel.1, low_a, hi_a),
             );
 
-            let new_b = vbslq_u16(
+            let mut new_b = vbslq_u16(
                 is_alpha_zero_mask,
                 pixel.2,
                 v_scale_by_alpha(pixel.2, low_a, hi_a),
             );
+
+            new_r = vminq_u16(new_r, v_max_test);
+            new_g = vminq_u16(new_g, v_max_test);
+            new_b = vminq_u16(new_b, v_max_test);
 
             let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
 

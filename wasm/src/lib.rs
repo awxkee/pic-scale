@@ -1,9 +1,7 @@
 extern crate wee_alloc;
 use image::{DynamicImage, EncodableLayout, GenericImageView, ImageBuffer, ImageReader};
 use js_sys::Uint8Array;
-use pic_scale::{
-    ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ThreadingPolicy,
-};
+use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
 use std::io::Cursor;
 use std::panic;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -43,7 +41,7 @@ pub fn process(image: Uint8Array) -> Uint8Array {
             .unwrap();
 
     let mut target_store =
-        ImageStoreMut::<u8, 3>::alloc(dimensions.0 as usize / 2, dimensions.1 as usize / 2);
+        ImageStoreMut::<u8, 3>::alloc(dimensions.0 as usize / 3, dimensions.1 as usize / 3);
 
     scaler.resize_rgb(&store, &mut target_store).unwrap();
 

@@ -26,11 +26,10 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use std::arch::aarch64::*;
-
 use crate::filter_weights::FilterBounds;
-use crate::neon::f16_utils::*;
+use crate::neon::utils::*;
 use core::f16;
+use std::arch::aarch64::*;
 
 #[inline(always)]
 pub(crate) unsafe fn xconvolve_vertical_part_neon_8_f16<const USE_BLENDING: bool>(
@@ -43,63 +42,64 @@ pub(crate) unsafe fn xconvolve_vertical_part_neon_8_f16<const USE_BLENDING: bool
     bounds: &FilterBounds,
     blend_length: usize,
 ) {
-    let mut store_0 = xvzerosq_f16();
+    let mut store_0 = vdupq_n_f16(0.);
 
     let px = start_x;
 
     for j in 0..bounds.size {
         let py = start_y + j;
         let weight = filter.get_unchecked(j..);
-        let v_weight_h = xvcvt_f16_f32(vld1q_dup_f32(weight.as_ptr()));
-        let v_weight = xvcombine_f16(v_weight_h, v_weight_h);
+        let v_weight_h = vcvt_f16_f32(vld1q_dup_f32(weight.as_ptr()));
+        let v_weight = vcombine_f16(v_weight_h, v_weight_h);
         let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
 
         let s_ptr = src_ptr.add(px);
         let item_row = if USE_BLENDING {
             let mut transient: [f16; 8] = [0.; 8];
             std::ptr::copy_nonoverlapping(s_ptr, transient.as_mut_ptr(), blend_length);
-            xvldq_f16(transient.as_ptr())
+            vld1q_f16(transient.as_ptr())
         } else {
-            xvldq_f16(s_ptr)
+            vld1q_f16(s_ptr)
         };
 
-        store_0 = xvfmlaq_f16(store_0, item_row, v_weight);
+        store_0 = vfmaq_f16(store_0, item_row, v_weight);
     }
 
     let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
     if USE_BLENDING {
         let mut transient: [f16; 8] = [0.; 8];
-        xvstq_f16(transient.as_mut_ptr(), store_0);
+        vst1q_f16(transient.as_mut_ptr(), store_0);
         std::ptr::copy_nonoverlapping(transient.as_ptr(), dst_ptr, blend_length);
     } else {
-        xvstq_f16(dst_ptr, store_0);
+        vst1q_f16(dst_ptr, store_0);
     }
 }
 
 macro_rules! conv_vertical_part_neon_16_f16 {
     ($start_y: expr, $start_x: expr, $src: expr, $src_stride: expr, $dst: expr, $filter: expr, $bounds: expr) => {{
         unsafe {
-            let mut store_0 = xvzerosq_f16();
-            let mut store_1 = xvzerosq_f16();
+            let mut store_0 = vdupq_n_f16(0.);
+            let mut store_1 = vdupq_n_f16(0.);
 
             let px = $start_x;
 
             for j in 0..$bounds.size {
                 let py = $start_y + j;
-                let v_weight_h = xvcvt_f16_f32(vld1q_dup_f32($filter.get_unchecked(j..).as_ptr()));
-                let v_weight = xvcombine_f16(v_weight_h, v_weight_h);
+                let v_weight_h = vcvt_f16_f32(vld1q_dup_f32($filter.get_unchecked(j..).as_ptr()));
+                let v_weight = vcombine_f16(v_weight_h, v_weight_h);
                 let src_ptr = $src.get_unchecked($src_stride * py..).as_ptr();
 
                 let s_ptr = src_ptr.add(px);
-                let item_row = xvldq_f16_x2(s_ptr);
+                let item_row = xvld1q_u16_x2(s_ptr as *const _);
 
-                store_0 = xvfmlaq_f16(store_0, item_row.0, v_weight);
-                store_1 = xvfmlaq_f16(store_1, item_row.1, v_weight);
+                store_0 = vfmaq_f16(store_0, vreinterpretq_f16_u16(item_row.0), v_weight);
+                store_1 = vfmaq_f16(store_1, vreinterpretq_f16_u16(item_row.1), v_weight);
             }
 
             let dst_ptr = $dst.get_unchecked_mut(px..).as_mut_ptr();
-            let f_set = x_float16x8x2_t(store_0, store_1);
-            xvstq_f16_x2(dst_ptr, f_set);
+            let f_set = float16x8x2_t(store_0, store_1);
+            vst1q_f16(dst_ptr, f_set.0);
+            vst1q_f16(dst_ptr.add(8), f_set.1);
         }
     }};
 }
@@ -107,31 +107,34 @@ macro_rules! conv_vertical_part_neon_16_f16 {
 macro_rules! conv_vertical_part_neon_32_f16 {
     ($start_y: expr, $start_x: expr, $src: expr, $src_stride: expr, $dst: expr, $filter: expr, $bounds: expr) => {{
         unsafe {
-            let mut store_0 = xvzerosq_f16();
-            let mut store_1 = xvzerosq_f16();
-            let mut store_2 = xvzerosq_f16();
-            let mut store_3 = xvzerosq_f16();
+            let mut store_0 = vdupq_n_f16(0.);
+            let mut store_1 = vdupq_n_f16(0.);
+            let mut store_2 = vdupq_n_f16(0.);
+            let mut store_3 = vdupq_n_f16(0.);
 
             let px = $start_x;
 
             for j in 0..$bounds.size {
                 let py = $start_y + j;
-                let v_weight_h = xvcvt_f16_f32(vld1q_dup_f32($filter.get_unchecked(j..).as_ptr()));
-                let v_weight = xvcombine_f16(v_weight_h, v_weight_h);
+                let v_weight_h = vcvt_f16_f32(vld1q_dup_f32($filter.get_unchecked(j..).as_ptr()));
+                let v_weight = vcombine_f16(v_weight_h, v_weight_h);
                 let src_ptr = $src.get_unchecked($src_stride * py..).as_ptr();
 
                 let s_ptr = src_ptr.add(px);
-                let item_row = xvldq_f16_x4(s_ptr);
+                let item_row = xvld1q_u16_x4(s_ptr as *const _);
 
-                store_0 = xvfmlaq_f16(store_0, item_row.0, v_weight);
-                store_1 = xvfmlaq_f16(store_1, item_row.1, v_weight);
-                store_2 = xvfmlaq_f16(store_2, item_row.2, v_weight);
-                store_3 = xvfmlaq_f16(store_3, item_row.3, v_weight);
+                store_0 = vfmaq_f16(store_0, vreinterpretq_f16_u16(item_row.0), v_weight);
+                store_1 = vfmaq_f16(store_1, vreinterpretq_f16_u16(item_row.1), v_weight);
+                store_2 = vfmaq_f16(store_2, vreinterpretq_f16_u16(item_row.2), v_weight);
+                store_3 = vfmaq_f16(store_3, vreinterpretq_f16_u16(item_row.3), v_weight);
             }
 
             let dst_ptr = $dst.get_unchecked_mut(px..).as_mut_ptr();
-            let f_set = x_float16x8x4_t(store_0, store_1, store_2, store_3);
-            xvstq_f16_x4(dst_ptr, f_set);
+            let f_set = float16x8x4_t(store_0, store_1, store_2, store_3);
+            vst1q_f16(dst_ptr, f_set.0);
+            vst1q_f16(dst_ptr.add(8), f_set.1);
+            vst1q_f16(dst_ptr.add(16), f_set.2);
+            vst1q_f16(dst_ptr.add(24), f_set.3);
         }
     }};
 }
@@ -139,42 +142,46 @@ macro_rules! conv_vertical_part_neon_32_f16 {
 macro_rules! conv_vertical_part_neon_48_f16 {
     ($start_y: expr, $start_x: expr, $src: expr, $src_stride: expr, $dst: expr, $filter: expr, $bounds: expr) => {{
         unsafe {
-            let mut store_0 = xvzerosq_f16();
-            let mut store_1 = xvzerosq_f16();
-            let mut store_2 = xvzerosq_f16();
-            let mut store_3 = xvzerosq_f16();
+            let mut store_0 = vdupq_n_f16(0.);
+            let mut store_1 = vdupq_n_f16(0.);
+            let mut store_2 = vdupq_n_f16(0.);
+            let mut store_3 = vdupq_n_f16(0.);
 
-            let mut store_4 = xvzerosq_f16();
-            let mut store_5 = xvzerosq_f16();
+            let mut store_4 = vdupq_n_f16(0.);
+            let mut store_5 = vdupq_n_f16(0.);
 
             let px = $start_x;
 
             for j in 0..$bounds.size {
                 let py = $start_y + j;
-                let v_weight_h = xvcvt_f16_f32(vld1q_dup_f32($filter.get_unchecked(j..).as_ptr()));
-                let v_weight = xvcombine_f16(v_weight_h, v_weight_h);
+                let v_weight_h = vcvt_f16_f32(vld1q_dup_f32($filter.get_unchecked(j..).as_ptr()));
+                let v_weight = vcombine_f16(v_weight_h, v_weight_h);
                 let src_ptr = $src.get_unchecked($src_stride * py..).as_ptr();
 
                 let s_ptr = src_ptr.add(px);
-                let item_row_0 = xvldq_f16_x4(s_ptr);
-                let item_row_1 = xvldq_f16_x2(s_ptr.add(32));
+                let item_row_0 = xvld1q_u16_x4(s_ptr as *const _);
+                let item_row_1 = xvld1q_u16_x2(s_ptr.add(32) as *const _);
 
-                store_0 = xvfmlaq_f16(store_0, item_row_0.0, v_weight);
-                store_1 = xvfmlaq_f16(store_1, item_row_0.1, v_weight);
-                store_2 = xvfmlaq_f16(store_2, item_row_0.2, v_weight);
-                store_3 = xvfmlaq_f16(store_3, item_row_0.3, v_weight);
+                store_0 = vfmaq_f16(store_0, vreinterpretq_f16_u16(item_row_0.0), v_weight);
+                store_1 = vfmaq_f16(store_1, vreinterpretq_f16_u16(item_row_0.1), v_weight);
+                store_2 = vfmaq_f16(store_2, vreinterpretq_f16_u16(item_row_0.2), v_weight);
+                store_3 = vfmaq_f16(store_3, vreinterpretq_f16_u16(item_row_0.3), v_weight);
 
-                store_4 = xvfmlaq_f16(store_4, item_row_1.0, v_weight);
-                store_5 = xvfmlaq_f16(store_5, item_row_1.1, v_weight);
+                store_4 = vfmaq_f16(store_4, vreinterpretq_f16_u16(item_row_1.0), v_weight);
+                store_5 = vfmaq_f16(store_5, vreinterpretq_f16_u16(item_row_1.1), v_weight);
             }
 
             let dst_ptr = $dst.get_unchecked_mut(px..).as_mut_ptr();
-            let f_set = x_float16x8x4_t(store_0, store_1, store_2, store_3);
-            xvstq_f16_x4(dst_ptr, f_set);
+            let f_set = float16x8x4_t(store_0, store_1, store_2, store_3);
+            vst1q_f16(dst_ptr, f_set.0);
+            vst1q_f16(dst_ptr.add(8), f_set.1);
+            vst1q_f16(dst_ptr.add(16), f_set.2);
+            vst1q_f16(dst_ptr.add(24), f_set.3);
             let dst_ptr2 = dst_ptr.add(32);
 
-            let f_set1 = x_float16x8x2_t(store_4, store_5);
-            xvstq_f16_x2(dst_ptr2, f_set1);
+            let f_set1 = float16x8x2_t(store_4, store_5);
+            vst1q_f16(dst_ptr2, f_set1.0);
+            vst1q_f16(dst_ptr2.add(8), f_set1.1);
         }
     }};
 }

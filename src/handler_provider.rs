@@ -219,6 +219,18 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
                 return convolve_horizontal_rgba_avx_u16_row_f(src, dst, filter_weights, bit_depth);
             }
         }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            if COMPONENTS == 1 && std::arch::is_x86_feature_detected!("avx2") {
+                use crate::avx2::convolve_horizontal_plane_avx_u16_row_f;
+                return convolve_horizontal_plane_avx_u16_row_f(
+                    src,
+                    dst,
+                    filter_weights,
+                    bit_depth,
+                );
+            }
+        }
         #[cfg(feature = "sse")]
         if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("sse4.1") {
             return convolve_horizontal_rgba_sse_u16_row(src, dst, filter_weights, bit_depth);
@@ -264,6 +276,20 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
             if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("avx2") {
                 use crate::avx2::convolve_horizontal_rgba_avx_rows_4_u16_f;
                 return convolve_horizontal_rgba_avx_rows_4_u16_f(
+                    src,
+                    src_stride,
+                    dst,
+                    dst_stride,
+                    filter_weights,
+                    bit_depth,
+                );
+            }
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            if COMPONENTS == 1 && std::arch::is_x86_feature_detected!("avx2") {
+                use crate::avx2::convolve_horizontal_plane_avx_rows_4_u16_f;
+                return convolve_horizontal_plane_avx_rows_4_u16_f(
                     src,
                     src_stride,
                     dst,
@@ -432,6 +458,16 @@ impl RowHandlerFixedPoint<u16> for u16 {
                 filter_weights,
                 bit_depth,
             );
+        } else if COMPONENTS == 1 {
+            use crate::neon::convolve_horizontal_plane_neon_rows_4_lb_u16;
+            return convolve_horizontal_plane_neon_rows_4_lb_u16(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                filter_weights,
+                bit_depth,
+            );
         } else {
             convolve_row_handler_fixed_point_4::<u16, J, COMPONENTS>(
                 src,
@@ -469,6 +505,18 @@ impl RowHandlerFixedPoint<u16> for u16 {
         if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("avx2") {
             use crate::avx2::convolve_horizontal_rgba_avx_rows_4_u16;
             return convolve_horizontal_rgba_avx_rows_4_u16(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                filter_weights,
+                bit_depth,
+            );
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        if COMPONENTS == 1 && std::arch::is_x86_feature_detected!("avx2") {
+            use crate::avx2::convolve_horizontal_plane_avx_rows_4_u16;
+            return convolve_horizontal_plane_avx_rows_4_u16(
                 src,
                 src_stride,
                 dst,
@@ -547,6 +595,9 @@ impl RowHandlerFixedPoint<u16> for u16 {
         } else if COMPONENTS == 3 {
             use crate::neon::convolve_horizontal_rgb_neon_u16_lb_row;
             convolve_horizontal_rgb_neon_u16_lb_row(src, dst, filter_weights, bit_depth)
+        } else if COMPONENTS == 1 {
+            use crate::neon::convolve_horizontal_plane_neon_u16_lb_row;
+            convolve_horizontal_plane_neon_u16_lb_row(src, dst, filter_weights, bit_depth)
         } else {
             convolve_row_handler_fixed_point::<u16, J, COMPONENTS>(
                 src,
@@ -580,6 +631,11 @@ impl RowHandlerFixedPoint<u16> for u16 {
         if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("avx2") {
             use crate::avx2::convolve_horizontal_rgba_avx_u16lp_row;
             return convolve_horizontal_rgba_avx_u16lp_row(src, dst, filter_weights, bit_depth);
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        if COMPONENTS == 1 && std::arch::is_x86_feature_detected!("avx2") {
+            use crate::avx2::convolve_horizontal_plane_avx_u16lp_row;
+            return convolve_horizontal_plane_avx_u16lp_row(src, dst, filter_weights, bit_depth);
         }
         #[cfg(feature = "sse")]
         if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("sse4.1") {

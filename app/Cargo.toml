@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-image = { version = "0.25.5", features = ["default"] }
+image = { version = "0.25.6", features = ["default"] }
 pic-scale = { path = "..", features = ["nightly_f16", "nightly_avx512", "sse", "rdm", "avx"], default-features = false }
-fast_image_resize = { version = "5.0.0", features = [] }
+fast_image_resize = { version = "5", features = [] }
 accelerate = {path = "accelerate/"}
 yuv = "0.8.3"
 libc = "0.2.169"
@@ -14,7 +14,7 @@ libc = "0.2.169"
 [dev-dependencies]
 criterion = "0.5.1"
 #image = { version = "0.25.2", features = ["default"] }
-fast_image_resize = { version = "5.0.0", features = [] }
+fast_image_resize = { version = "5", features = [] }
 
 [[bench]]
 name = "resize_rgb"
@@ -22,4 +22,8 @@ harness = false
 
 [[bench]]
 name = "resize_rgba"
+harness = false
+
+[[bench]]
+name = "resize_plane"
 harness = false

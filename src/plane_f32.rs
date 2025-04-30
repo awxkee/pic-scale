@@ -71,12 +71,27 @@ impl HorizontalConvolutionPass<f32, 1> for ImageStore<'_, f32, 1> {
         }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
-            if is_x86_feature_detected!("sse4.1") {
+            if std::arch::is_x86_feature_detected!("sse4.1") {
                 _dispatcher_4_rows = Some(convolve_horizontal_plane_sse_rows_4::<false>);
                 _dispatcher_row = convolve_horizontal_plane_sse_row_one::<false>;
-                if is_x86_feature_detected!("fma") {
+                if std::arch::is_x86_feature_detected!("fma") {
                     _dispatcher_4_rows = Some(convolve_horizontal_plane_sse_rows_4::<true>);
                     _dispatcher_row = convolve_horizontal_plane_sse_row_one::<true>;
+                }
+            }
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            use crate::avx2::{
+                convolve_horizontal_plane_avx_row_one_f32, convolve_horizontal_plane_avx_rows_4_f32,
+            };
+            let has_fma = std::arch::is_x86_feature_detected!("fma");
+            if std::arch::is_x86_feature_detected!("avx2") {
+                _dispatcher_4_rows = Some(convolve_horizontal_plane_avx_rows_4_f32::<false>);
+                _dispatcher_row = convolve_horizontal_plane_avx_row_one_f32::<false>;
+                if has_fma {
+                    _dispatcher_4_rows = Some(convolve_horizontal_plane_avx_rows_4_f32::<true>);
+                    _dispatcher_row = convolve_horizontal_plane_avx_row_one_f32::<true>;
                 }
             }
         }

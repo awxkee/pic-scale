@@ -29,6 +29,7 @@
 use std::error::Error;
 use std::fmt::Display;
 
+/// Buffer mismatch error description
 #[derive(Copy, Clone, Debug)]
 pub struct PicScaleBufferMismatch {
     pub expected: usize,
@@ -38,6 +39,7 @@ pub struct PicScaleBufferMismatch {
     pub slice_len: usize,
 }
 
+/// Error enumeration type
 #[derive(Debug)]
 pub enum PicScaleError {
     ZeroImageDimensions,
@@ -50,6 +52,7 @@ pub enum PicScaleError {
 }
 
 impl PicScaleError {
+    /// Returns error as int code
     #[inline]
     pub fn code(&self) -> usize {
         match self {
@@ -68,8 +71,7 @@ impl Display for PicScaleError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             PicScaleError::InvalidStride(min_stride, real_stride) => f.write_fmt(format_args!(
-                "Stride must be at least {}, but received {}",
-                min_stride, real_stride
+                "Stride must be at least {min_stride}, but received {real_stride}",
             )),
             PicScaleError::ZeroImageDimensions => {
                 f.write_str("One of image dimensions is 0, this should not happen")
@@ -88,10 +90,9 @@ impl Display for PicScaleError {
                 buffer_mismatch.channels,
                 buffer_mismatch.slice_len,
             )),
-            PicScaleError::UnsupportedBitDepth(depth) => f.write_fmt(format_args!(
-                "Bit depth must be in [1, 16] but got {}",
-                depth
-            )),
+            PicScaleError::UnsupportedBitDepth(depth) => {
+                f.write_fmt(format_args!("Bit-depth must be in [1, 16] but got {depth}",))
+            }
             PicScaleError::UnknownResizingFilter => {
                 f.write_str("Unknown resizing filter was requested")
             }

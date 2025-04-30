@@ -28,6 +28,7 @@
 #
 
 set -e
+cd wasm
 RUSTFLAGS="-C target-feature=+simd128" cargo build --target wasm32-unknown-unknown --package wasm
 wasm-pack build
 cd www

@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#![forbid(unsafe_code)]
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::{avx_premultiply_alpha_rgba, avx_unpremultiply_alpha_rgba};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -34,6 +35,7 @@ use crate::neon::{neon_premultiply_alpha_rgba, neon_unpremultiply_alpha_rgba};
 use crate::sse::*;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128",))]
 use crate::wasm32::{wasm_premultiply_alpha_rgba, wasm_unpremultiply_alpha_rgba};
+use crate::WorkloadStrategy;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::ParallelSlice;
 use rayon::slice::ParallelSliceMut;
@@ -92,7 +94,7 @@ const fn make_unpremultiplication_table() -> [u8; 65536] {
                 buf[alpha * 255 + pixel] = 0;
             } else {
                 let value = (pixel * 255 + alpha / 2) / alpha;
-                buf[alpha * 255 + pixel] = value as u8;
+                buf[alpha * 255 + pixel] = if value > 255 { 255 } else { value as u8 };
             }
             pixel += 1;
         }
@@ -120,6 +122,7 @@ fn unpremultiply_alpha_rgba_impl(
     _: usize,
     stride: usize,
     pool: &Option<ThreadPool>,
+    _: WorkloadStrategy,
 ) {
     if let Some(pool) = pool {
         pool.install(|| {
@@ -158,7 +161,7 @@ pub(crate) fn premultiply_alpha_rgba(
     }
     #[cfg(all(target_arch = "x86_64", feature = "avx"))]
     {
-        if is_x86_feature_detected!("avx2") {
+        if std::arch::is_x86_feature_detected!("avx2") {
             _dispatcher = avx_premultiply_alpha_rgba;
         }
     }
@@ -182,8 +185,9 @@ pub(crate) fn unpremultiply_alpha_rgba(
     height: usize,
     stride: usize,
     pool: &Option<ThreadPool>,
+    workload_strategy: WorkloadStrategy,
 ) {
-    let mut _dispatcher: fn(&mut [u8], usize, usize, usize, &Option<ThreadPool>) =
+    let mut _dispatcher: fn(&mut [u8], usize, usize, usize, &Option<ThreadPool>, WorkloadStrategy) =
         unpremultiply_alpha_rgba_impl;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
@@ -212,5 +216,5 @@ pub(crate) fn unpremultiply_alpha_rgba(
     {
         _dispatcher = wasm_unpremultiply_alpha_rgba;
     }
-    _dispatcher(in_place, width, height, stride, pool);
+    _dispatcher(in_place, width, height, stride, pool, workload_strategy);
 }

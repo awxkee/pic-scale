@@ -75,24 +75,24 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_impl(
     const CHANNELS: usize = 4;
 
     #[rustfmt::skip]
-        let shuffle_lo = _mm_setr_epi8(0, -1,
-                                               4, -1,
-                                               1, -1,
-                                               5, -1,
-                                               2, -1 ,
-                                               6,-1,
-                                               3, -1,
-                                               7, -1);
+    let shuffle_lo = _mm_setr_epi8(0, -1,
+                                   4, -1,
+                                   1, -1,
+                                   5, -1,
+                                   2, -1 ,
+                                   6,-1,
+                                   3, -1,
+                                   7, -1);
 
     #[rustfmt::skip]
-        let shuffle_hi = _mm_setr_epi8(8, -1,
-                                               12, -1,
-                                               9, -1,
-                                               13, -1 ,
-                                               10,-1,
-                                               14, -1,
-                                               11, -1,
-                                               15, -1);
+    let shuffle_hi = _mm_setr_epi8(8, -1,
+                                   12, -1,
+                                   9, -1,
+                                   13, -1 ,
+                                   10,-1,
+                                   14, -1,
+                                   11, -1,
+                                   15, -1);
 
     let vld = _mm_set1_epi32(ROUNDING_CONST);
 
@@ -128,7 +128,7 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_impl(
         let src3 = src2.get_unchecked(src_stride..);
 
         while jx + 4 < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 4));
+            let w_ptr = weights.get_unchecked(jx..);
             let weights = _mm_loadu_si64(w_ptr.as_ptr() as *const u8);
             const SHUFFLE_01: i32 = shuffle(0, 0, 0, 0);
             let weight01 = _mm_shuffle_epi32::<SHUFFLE_01>(weights);
@@ -173,7 +173,7 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_impl(
         }
 
         while jx + 2 < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 2));
+            let w_ptr = weights.get_unchecked(jx..);
             let bounds_start = bounds.start + jx;
 
             let weight01 = _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
@@ -201,9 +201,9 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_impl(
         }
 
         while jx < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 1));
+            let w_ptr = weights.get_unchecked(jx);
 
-            let weight0 = _mm_set1_epi32(w_ptr[0] as i32);
+            let weight0 = _mm_set1_epi32(*w_ptr as i32);
 
             let start_bounds = bounds.start + jx;
 
@@ -259,23 +259,23 @@ unsafe fn convolve_horizontal_rgba_sse_rows_one_impl(
 
     #[rustfmt::skip]
     let shuffle_lo = _mm_setr_epi8(0, -1,
-                                           4, -1,
-                                           1, -1,
-                                           5, -1,
-                                           2, -1 ,
-                                           6,-1,
-                                           3, -1,
-                                           7, -1);
+                                   4, -1,
+                                   1, -1,
+                                   5, -1,
+                                   2, -1 ,
+                                   6,-1,
+                                   3, -1,
+                                   7, -1);
 
     #[rustfmt::skip]
     let shuffle_hi = _mm_setr_epi8(8, -1,
-                                           12, -1,
-                                           9, -1,
-                                           13, -1 ,
-                                           10,-1,
-                                           14, -1,
-                                           11, -1,
-                                           15, -1);
+                                   12, -1,
+                                   9, -1,
+                                   13, -1 ,
+                                   10,-1,
+                                   14, -1,
+                                   11, -1,
+                                   15, -1);
 
     let vld = _mm_set1_epi32(ROUNDING_CONST);
 

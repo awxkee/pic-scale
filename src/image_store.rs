@@ -33,7 +33,7 @@ use crate::alpha_handle_f32::{premultiply_alpha_rgba_f32, unpremultiply_alpha_rg
 use crate::alpha_handle_u16::{premultiply_alpha_rgba_u16, unpremultiply_alpha_rgba_u16};
 use crate::alpha_handle_u8::{premultiply_alpha_rgba, unpremultiply_alpha_rgba};
 use crate::pic_scale_error::{PicScaleBufferMismatch, PicScaleError};
-use crate::ImageSize;
+use crate::{ImageSize, WorkloadStrategy};
 #[cfg(feature = "nightly_f16")]
 use core::f16;
 use rayon::ThreadPool;
@@ -97,6 +97,7 @@ pub(crate) trait CheckStoreDensity {
     fn should_have_bit_depth(&self) -> bool;
 }
 
+/// Structure for mutable target buffer
 #[derive(Debug)]
 pub enum BufferStore<'a, T: Copy + Debug> {
     Borrowed(&'a mut [T]),
@@ -105,6 +106,7 @@ pub enum BufferStore<'a, T: Copy + Debug> {
 
 impl<T: Copy + Debug> BufferStore<'_, T> {
     #[allow(clippy::should_implement_trait)]
+    /// Borrowing immutable slice
     pub fn borrow(&self) -> &[T] {
         match self {
             Self::Borrowed(p_ref) => p_ref,
@@ -113,6 +115,7 @@ impl<T: Copy + Debug> BufferStore<'_, T> {
     }
 
     #[allow(clippy::should_implement_trait)]
+    /// Borrowing mutable slice
     pub fn borrow_mut(&mut self) -> &mut [T] {
         match self {
             Self::Borrowed(p_ref) => p_ref,
@@ -125,6 +128,7 @@ impl<'a, T, const N: usize> ImageStore<'a, T, N>
 where
     T: Clone + Copy + Debug + Default,
 {
+    /// Creates new store
     pub fn new(
         slice_ref: Vec<T>,
         width: usize,
@@ -150,6 +154,7 @@ where
         })
     }
 
+    /// Borrows immutable slice as new image store
     pub fn borrow(
         slice_ref: &'a [T],
         width: usize,
@@ -175,6 +180,7 @@ where
         })
     }
 
+    /// Allocates new owned image store
     pub fn alloc(width: usize, height: usize) -> ImageStore<'a, T, N> {
         let vc = vec![T::default(); width * N * height];
         ImageStore::<T, N> {
@@ -391,6 +397,7 @@ where
         ImageSize::new(self.width, self.height)
     }
 
+    /// Returns current image store as immutable slice
     pub fn as_bytes(&self) -> &[T] {
         match &self.buffer {
             std::borrow::Cow::Borrowed(br) => br,
@@ -398,6 +405,7 @@ where
         }
     }
 
+    /// Borrows immutable slice int oa new image store
     pub fn from_slice(
         slice_ref: &'a [T],
         width: usize,
@@ -423,6 +431,7 @@ where
         })
     }
 
+    /// Deep copy immutable image store into a new immutable store
     pub fn copied<'b>(&self) -> ImageStore<'b, T, N> {
         ImageStore::<T, N> {
             buffer: std::borrow::Cow::Owned(self.buffer.as_ref().to_vec()),
@@ -434,6 +443,7 @@ where
         }
     }
 
+    /// Deep copy immutable image into mutable
     pub fn copied_to_mut(&self, into: &mut ImageStoreMut<T, N>) {
         let into_stride = into.stride();
         for (src_row, dst_row) in self
@@ -458,6 +468,7 @@ where
         ImageSize::new(self.width, self.height)
     }
 
+    /// Returns current image as immutable slice
     pub fn as_bytes(&self) -> &[T] {
         match &self.buffer {
             BufferStore::Borrowed(p) => p,
@@ -465,6 +476,7 @@ where
         }
     }
 
+    /// Borrows mutable slice as new image store
     pub fn from_slice(
         slice_ref: &'a mut [T],
         width: usize,
@@ -490,6 +502,7 @@ where
         })
     }
 
+    /// Performs deep copy into a new mutable image
     pub fn copied<'b>(&self) -> ImageStoreMut<'b, T, N> {
         ImageStoreMut::<T, N> {
             buffer: BufferStore::Owned(self.buffer.borrow().to_vec()),
@@ -501,6 +514,7 @@ where
         }
     }
 
+    /// Performs deep copy into a new immutable image
     pub fn to_immutable(&self) -> ImageStore<'_, T, N> {
         ImageStore::<T, N> {
             buffer: std::borrow::Cow::Owned(self.buffer.borrow().to_owned()),
@@ -519,7 +533,11 @@ pub(crate) trait AssociateAlpha<T: Clone + Copy + Debug, const N: usize> {
 }
 
 pub(crate) trait UnassociateAlpha<T: Clone + Copy + Debug, const N: usize> {
-    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>);
+    fn unpremultiply_alpha(
+        &mut self,
+        pool: &Option<ThreadPool>,
+        workload_strategy: WorkloadStrategy,
+    );
 }
 
 impl AssociateAlpha<u8, 4> for ImageStore<'_, u8, 4> {
@@ -589,10 +607,21 @@ impl AssociateAlpha<u8, 4> for ImageStore<'_, u8, 4> {
 }
 
 impl UnassociateAlpha<u8, 4> for ImageStoreMut<'_, u8, 4> {
-    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
+    fn unpremultiply_alpha(
+        &mut self,
+        pool: &Option<ThreadPool>,
+        workload_strategy: WorkloadStrategy,
+    ) {
         let src_stride = self.stride();
         let dst = self.buffer.borrow_mut();
-        unpremultiply_alpha_rgba(dst, self.width, self.height, src_stride, pool);
+        unpremultiply_alpha_rgba(
+            dst,
+            self.width,
+            self.height,
+            src_stride,
+            pool,
+            workload_strategy,
+        );
     }
 }
 
@@ -700,7 +729,7 @@ impl AssociateAlpha<f16, 4> for ImageStore<'_, f16, 4> {
 }
 
 impl UnassociateAlpha<u16, 4> for ImageStoreMut<'_, u16, 4> {
-    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
+    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>, _: WorkloadStrategy) {
         let src_stride = self.stride();
         let in_place = self.buffer.borrow_mut();
         unpremultiply_alpha_rgba_u16(
@@ -715,7 +744,7 @@ impl UnassociateAlpha<u16, 4> for ImageStoreMut<'_, u16, 4> {
 }
 
 impl UnassociateAlpha<f32, 4> for ImageStoreMut<'_, f32, 4> {
-    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
+    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>, _: WorkloadStrategy) {
         let stride = self.stride();
         let dst = self.buffer.borrow_mut();
         unpremultiply_alpha_rgba_f32(dst, stride, self.width, self.height, pool);
@@ -724,7 +753,7 @@ impl UnassociateAlpha<f32, 4> for ImageStoreMut<'_, f32, 4> {
 
 #[cfg(feature = "nightly_f16")]
 impl UnassociateAlpha<f16, 4> for ImageStoreMut<'_, f16, 4> {
-    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>) {
+    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>, _: WorkloadStrategy) {
         let stride = self.stride();
         let dst = self.buffer.borrow_mut();
         unpremultiply_alpha_rgba_f16(dst, stride, self.width, self.height, pool);

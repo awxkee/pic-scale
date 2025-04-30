@@ -105,6 +105,14 @@ impl HorizontalConvolutionPass<u8, 3> for ImageStore<'_, u8, 3> {
                 _dispatcher_1_row = convolve_horizontal_rgb_avx_row_one;
             }
         }
+        #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+        {
+            use crate::wasm32::{
+                convolve_horizontal_rgb_wasm_row_one, convolve_horizontal_rgb_wasm_rows_4,
+            };
+            _dispatcher_4_rows = Some(convolve_horizontal_rgb_wasm_rows_4);
+            _dispatcher_1_row = convolve_horizontal_rgb_wasm_row_one;
+        }
         convolve_horizontal_dispatch_u8(
             self,
             filter_weights,
