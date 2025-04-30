@@ -144,7 +144,7 @@ Example comparison time for downscale RGB 4000x6000 10 bit image in 4 times usin
 
 #### Example in sRGB
 
-In common, you should not downsize an image in sRGB colorspace, however if speed is more preferable than more proper scale you may omit linearizing 
+In common, you should not downsize an image in sRGB colorspace, however if speed is more preferable than more proper scale, then you may omit linearizing 
 
 ```rust
 let mut scaler = Scaler::new(ResamplingFunction::Hermite);
@@ -202,7 +202,7 @@ let resized = scaler.resize_rgba(
 
 #### Example in CIE XYZ colorspace
 ```rust
-let mut scaler = XYZScale::new(ResamplingFunction::Hermite);
+let mut scaler = XYZScaler::new(ResamplingFunction::Hermite);
 scaler.set_threading_policy(ThreadingPolicy::Single);
 let store = ImageStore::<u8, 4>::from_slice(&bytes, width, height).unwrap();
 let mut dst_store = ImageStoreMut::<u8, 4>::alloc(width / 2, height / 2);

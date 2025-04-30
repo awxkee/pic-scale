@@ -103,6 +103,8 @@ unsafe fn convolve_horizontal_rgba_avx_row_4_impl(
         0,
     );
 
+    let init256f = _mm256_set1_epi32(ROUNDING_CONST);
+
     for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
         .zip(iter_row1)
         .zip(iter_row2)
@@ -115,8 +117,8 @@ unsafe fn convolve_horizontal_rgba_avx_row_4_impl(
         )
     {
         let mut jx = 0usize;
-        let mut store_0 = init256;
-        let mut store_1 = init256;
+        let mut store_0 = init256f;
+        let mut store_1 = init256f;
 
         let src0 = src;
         let src1 = src0.get_unchecked(src_stride..);
@@ -221,26 +223,14 @@ unsafe fn convolve_horizontal_rgba_avx_row_4_impl(
                 jx += 4;
             }
 
-            store_0 = _mm256_inserti128_si256::<1>(
-                _mm256_castsi128_si256(_mm_add_epi32(
-                    _mm256_castsi256_si128(store_avx0),
-                    _mm256_extracti128_si256::<1>(store_avx0),
-                )),
-                _mm_add_epi32(
-                    _mm256_castsi256_si128(store_avx1),
-                    _mm256_extracti128_si256::<1>(store_avx1),
-                ),
+            store_0 = _mm256_add_epi32(
+                _mm256_permute2x128_si256::<0x20>(store_avx0, store_avx1),
+                _mm256_permute2x128_si256::<0x31>(store_avx0, store_avx1),
             );
 
-            store_1 = _mm256_inserti128_si256::<1>(
-                _mm256_castsi128_si256(_mm_add_epi32(
-                    _mm256_castsi256_si128(store_avx2),
-                    _mm256_extracti128_si256::<1>(store_avx2),
-                )),
-                _mm_add_epi32(
-                    _mm256_castsi256_si128(store_avx3),
-                    _mm256_extracti128_si256::<1>(store_avx3),
-                ),
+            store_1 = _mm256_add_epi32(
+                _mm256_permute2x128_si256::<0x20>(store_avx2, store_avx3),
+                _mm256_permute2x128_si256::<0x31>(store_avx2, store_avx3),
             );
         }
 
@@ -279,13 +269,9 @@ unsafe fn convolve_horizontal_rgba_avx_row_4_impl(
         }
 
         while jx < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..);
-            let w0 = _mm_shuffle_epi8(
-                _mm_loadu_si16(w_ptr.as_ptr() as *const _),
-                shuffle_weights_table,
-            );
+            let w_ptr = weights.get_unchecked(jx);
 
-            let weight0 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(w0), w0);
+            let weight0 = _mm256_set1_epi32(*w_ptr as i32);
 
             let bounds_start = bounds.start + jx;
 

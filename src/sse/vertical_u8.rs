@@ -140,6 +140,15 @@ pub(crate) unsafe fn convolve_vertical_part_sse_32(
             dot_prod(store_4, store_5, store_6, store_7, item_row_1, v_weight);
     }
 
+    store_0 = _mm_srai_epi32::<PRECISION>(store_0);
+    store_1 = _mm_srai_epi32::<PRECISION>(store_1);
+    store_2 = _mm_srai_epi32::<PRECISION>(store_2);
+    store_3 = _mm_srai_epi32::<PRECISION>(store_3);
+    store_4 = _mm_srai_epi32::<PRECISION>(store_4);
+    store_5 = _mm_srai_epi32::<PRECISION>(store_5);
+    store_6 = _mm_srai_epi32::<PRECISION>(store_6);
+    store_7 = _mm_srai_epi32::<PRECISION>(store_7);
+
     let rgb0 = _mm_packs_epi32(store_0, store_1);
     let rgb2 = _mm_packs_epi32(store_2, store_3);
     let rgb = _mm_packus_epi16(rgb0, rgb2);

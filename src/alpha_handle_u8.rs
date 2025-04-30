@@ -161,7 +161,7 @@ pub(crate) fn premultiply_alpha_rgba(
     }
     #[cfg(all(target_arch = "x86_64", feature = "avx"))]
     {
-        if is_x86_feature_detected!("avx2") {
+        if std::arch::is_x86_feature_detected!("avx2") {
             _dispatcher = avx_premultiply_alpha_rgba;
         }
     }

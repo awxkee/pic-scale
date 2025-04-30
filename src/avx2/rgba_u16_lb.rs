@@ -332,25 +332,14 @@ impl<const D: bool> Row4ExecutionHandler<D> {
                     jx += 4;
                 }
 
-                store_0 = _mm256_inserti128_si256::<1>(
-                    _mm256_castsi128_si256(_mm_add_epi32(
-                        _mm256_castsi256_si128(astore_0),
-                        _mm256_extracti128_si256::<1>(astore_0),
-                    )),
-                    _mm_add_epi32(
-                        _mm256_castsi256_si128(astore_1),
-                        _mm256_extracti128_si256::<1>(astore_1),
-                    ),
+                store_0 = _mm256_add_epi32(
+                    _mm256_permute2x128_si256::<0x20>(astore_0, astore_1),
+                    _mm256_permute2x128_si256::<0x31>(astore_0, astore_1),
                 );
-                store_1 = _mm256_inserti128_si256::<1>(
-                    _mm256_castsi128_si256(_mm_add_epi32(
-                        _mm256_castsi256_si128(astore_2),
-                        _mm256_extracti128_si256::<1>(astore_2),
-                    )),
-                    _mm_add_epi32(
-                        _mm256_castsi256_si128(astore_3),
-                        _mm256_extracti128_si256::<1>(astore_3),
-                    ),
+
+                store_1 = _mm256_add_epi32(
+                    _mm256_permute2x128_si256::<0x20>(astore_2, astore_3),
+                    _mm256_permute2x128_si256::<0x31>(astore_2, astore_3),
                 );
             }
 

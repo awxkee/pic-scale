@@ -94,6 +94,8 @@ unsafe fn convolve_horizontal_rgba_vnni_row_4_impl(
         0,
     );
 
+    let init256f = _mm256_set1_epi32(ROUNDING_CONST);
+
     let (row0_ref, rest) = dst.split_at_mut(dst_stride);
     let (row1_ref, rest) = rest.split_at_mut(dst_stride);
     let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
@@ -115,8 +117,8 @@ unsafe fn convolve_horizontal_rgba_vnni_row_4_impl(
         )
     {
         let mut jx = 0usize;
-        let mut store_0 = vld;
-        let mut store_1 = vld;
+        let mut store_0 = init256f;
+        let mut store_1 = init256f;
 
         let src0 = src;
         let src1 = src0.get_unchecked(src_stride..);
@@ -221,26 +223,14 @@ unsafe fn convolve_horizontal_rgba_vnni_row_4_impl(
                 jx += 4;
             }
 
-            store_0 = _mm256_inserti128_si256::<1>(
-                _mm256_castsi128_si256(_mm_add_epi32(
-                    _mm256_castsi256_si128(store_avx0),
-                    _mm256_extracti128_si256::<1>(store_avx0),
-                )),
-                _mm_add_epi32(
-                    _mm256_castsi256_si128(store_avx1),
-                    _mm256_extracti128_si256::<1>(store_avx1),
-                ),
+            store_0 = _mm256_add_epi16(
+                _mm256_permute2x128_si256::<0x20>(store_avx0, store_avx1),
+                _mm256_permute2x128_si256::<0x31>(store_avx0, store_avx1),
             );
 
-            store_1 = _mm256_inserti128_si256::<1>(
-                _mm256_castsi128_si256(_mm_add_epi32(
-                    _mm256_castsi256_si128(store_avx2),
-                    _mm256_extracti128_si256::<1>(store_avx2),
-                )),
-                _mm_add_epi32(
-                    _mm256_castsi256_si128(store_avx3),
-                    _mm256_extracti128_si256::<1>(store_avx3),
-                ),
+            store_1 = _mm256_add_epi16(
+                _mm256_permute2x128_si256::<0x20>(store_avx2, store_avx3),
+                _mm256_permute2x128_si256::<0x31>(store_avx2, store_avx3),
             );
         }
 
