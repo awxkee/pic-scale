@@ -202,7 +202,7 @@ let resized = scaler.resize_rgba(
 
 #### Example in CIE XYZ colorspace
 ```rust
-let mut scaler = XYZScale::new(ResamplingFunction::Hermite);
+let mut scaler = XYZScaler::new(ResamplingFunction::Hermite);
 scaler.set_threading_policy(ThreadingPolicy::Single);
 let store = ImageStore::<u8, 4>::from_slice(&bytes, width, height).unwrap();
 let mut dst_store = ImageStoreMut::<u8, 4>::alloc(width / 2, height / 2);
