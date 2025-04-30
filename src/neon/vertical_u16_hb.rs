@@ -690,12 +690,12 @@ unsafe fn convolve_column_hb_impl(
 
                 let py = bounds.start;
                 let offset0 = src_stride * py + v_px;
-                let src_ptr0 = src.get_unchecked(offset0..(offset0 + 1));
+                let src_ptr0 = *src.get_unchecked(offset0);
                 let offset1 = src_stride * (py + 1) + v_px;
-                let src_ptr1 = src.get_unchecked(offset1..(offset1 + 1));
+                let src_ptr1 = *src.get_unchecked(offset1);
 
-                store0 += src_ptr0[0] as i64 * weight0 as i64;
-                store0 += src_ptr1[0] as i64 * weight1 as i64;
+                store0 += src_ptr0 as i64 * weight0 as i64;
+                store0 += src_ptr1 as i64 * weight1 as i64;
             } else if bounds_size == 3 {
                 let weights = weight.get_unchecked(0..3);
                 let weight0 = weights[0];
@@ -704,15 +704,15 @@ unsafe fn convolve_column_hb_impl(
 
                 let py = bounds.start;
                 let offset0 = src_stride * py + v_px;
-                let src_ptr0 = src.get_unchecked(offset0..(offset0 + 1));
+                let src_ptr0 = *src.get_unchecked(offset0);
                 let offset1 = src_stride * (py + 1) + v_px;
-                let src_ptr1 = src.get_unchecked(offset1..(offset1 + 1));
+                let src_ptr1 = *src.get_unchecked(offset1);
                 let offset2 = src_stride * (py + 2) + v_px;
-                let src_ptr2 = src.get_unchecked(offset2..(offset2 + 1));
+                let src_ptr2 = *src.get_unchecked(offset2);
 
-                store0 += src_ptr0[0] as i64 * weight0 as i64;
-                store0 += src_ptr1[0] as i64 * weight1 as i64;
-                store0 += src_ptr2[0] as i64 * weight2 as i64;
+                store0 += src_ptr0 as i64 * weight0 as i64;
+                store0 += src_ptr1 as i64 * weight1 as i64;
+                store0 += src_ptr2 as i64 * weight2 as i64;
             } else if bounds_size == 4 {
                 let weights = weight.get_unchecked(0..4);
                 let weight0 = weights[0];
@@ -722,25 +722,25 @@ unsafe fn convolve_column_hb_impl(
 
                 let py = bounds.start;
                 let offset0 = src_stride * py + v_px;
-                let src_ptr0 = src.get_unchecked(offset0..(offset0 + 1));
+                let src_ptr0 = *src.get_unchecked(offset0);
                 let offset1 = src_stride * (py + 1) + v_px;
-                let src_ptr1 = src.get_unchecked(offset1..(offset1 + 1));
+                let src_ptr1 = *src.get_unchecked(offset1);
                 let offset2 = src_stride * (py + 2) + v_px;
-                let src_ptr2 = src.get_unchecked(offset2..(offset2 + 1));
+                let src_ptr2 = *src.get_unchecked(offset2);
                 let offset3 = src_stride * (py + 3) + v_px;
-                let src_ptr3 = src.get_unchecked(offset3..(offset3 + 1));
+                let src_ptr3 = *src.get_unchecked(offset3);
 
-                store0 += src_ptr0[0] as i64 * weight0 as i64;
-                store0 += src_ptr1[0] as i64 * weight1 as i64;
-                store0 += src_ptr2[0] as i64 * weight2 as i64;
-                store0 += src_ptr3[0] as i64 * weight3 as i64;
+                store0 += src_ptr0 as i64 * weight0 as i64;
+                store0 += src_ptr1 as i64 * weight1 as i64;
+                store0 += src_ptr2 as i64 * weight2 as i64;
+                store0 += src_ptr3 as i64 * weight3 as i64;
             } else {
                 for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
                     let py = bounds.start + j;
                     let offset = src_stride * py + v_px;
-                    let src_ptr = src.get_unchecked(offset..(offset + 1));
+                    let src_ptr = src.get_unchecked(offset);
 
-                    store0 += src_ptr[0] as i64 * k_weight as i64;
+                    store0 += *src_ptr as i64 * k_weight as i64;
                 }
             }
 

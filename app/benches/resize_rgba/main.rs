@@ -5,8 +5,9 @@ use fast_image_resize::FilterType::Lanczos3;
 use fast_image_resize::{CpuExtensions, FilterType, PixelType, ResizeAlg, ResizeOptions, Resizer};
 use image::{GenericImageView, ImageReader};
 use pic_scale::{
-    Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling,
-    ScalingF32, ScalingU16, ThreadingPolicy, WorkloadStrategy,
+    Ar30ByteOrder, ImageStore, ImageStoreMut, LinearApproxScaler, ResamplingFunction,
+    Rgba8ImageStore, Rgba8ImageStoreMut, Scaler, Scaling, ScalingF32, ScalingU16, ThreadingPolicy,
+    WorkloadStrategy,
 };
 
 pub fn criterion_benchmark(c: &mut Criterion) {
@@ -527,7 +528,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 data: copied.as_ptr() as *mut libc::c_void,
                 width: dimensions.0 as usize,
                 height: dimensions.1 as usize,
-                row_bytes: dimensions.0 as usize * 4 * std::mem::size_of::<f16>(),
+                row_bytes: dimensions.0 as usize * 4 * size_of::<f16>(),
             };
 
             let target_stride = target.stride();
@@ -537,7 +538,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 data: target_ptr,
                 width: target.width,
                 height: target.height,
-                row_bytes: target_stride * std::mem::size_of::<f16>(),
+                row_bytes: target_stride * size_of::<f16>(),
             };
 
             let result = unsafe {
@@ -556,46 +557,38 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("Pic scale RGBA1010102(N): Lanczos 3/Speed", |b| {
         let copied: Vec<u8> = Vec::from(src_bytes);
+
+        let src_image =
+            Rgba8ImageStore::borrow(&copied, dimensions.0 as usize, dimensions.1 as usize).unwrap();
+        let mut dst_ar30 =
+            Rgba8ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
             scaler.set_threading_policy(ThreadingPolicy::Single);
             scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
-            let mut dst_data_ar30 =
-                vec![1u8; (dimensions.0 as usize / 4) * (dimensions.1 as usize / 4) * 4];
             scaler
-                .resize_ar30(
-                    &copied,
-                    dimensions.0 as usize * 4,
-                    ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-                    &mut dst_data_ar30,
-                    (dimensions.0 as usize / 4) * 4,
-                    ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
-                    Ar30ByteOrder::Network,
-                )
+                .resize_ar30(&src_image, &mut dst_ar30, Ar30ByteOrder::Network)
                 .unwrap();
         })
     });
 
     c.bench_function("Pic scale RGBA1010102(N): Lanczos 3/Quality", |b| {
         let copied: Vec<u8> = Vec::from(src_bytes);
+
+        let src_image =
+            Rgba8ImageStore::borrow(&copied, dimensions.0 as usize, dimensions.1 as usize).unwrap();
+        let mut dst_ar30 =
+            Rgba8ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
             scaler.set_threading_policy(ThreadingPolicy::Single);
             scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
 
-            let mut dst_data_ar30 =
-                vec![1u8; (dimensions.0 as usize / 4) * (dimensions.1 as usize / 4) * 4];
             scaler
-                .resize_ar30(
-                    &copied,
-                    dimensions.0 as usize * 4,
-                    ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-                    &mut dst_data_ar30,
-                    (dimensions.0 as usize / 4) * 4,
-                    ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
-                    Ar30ByteOrder::Network,
-                )
+                .resize_ar30(&src_image, &mut dst_ar30, Ar30ByteOrder::Network)
                 .unwrap();
         })
     });
@@ -604,10 +597,11 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("Apple Accelerate RGBX1010102(N): Lanczos 3", |b| {
         let copied: Vec<u8> = Vec::from(src_bytes);
         use accelerate::{kvImageDoNotTile, vImageScale_XRGB2101010W, vImage_Buffer};
-        b.iter(|| {
-            let mut target =
-                ImageStoreMut::<u8, 4>::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
 
+        let mut target =
+            ImageStoreMut::<u8, 4>::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+
+        b.iter(|| {
             let src_buffer = vImage_Buffer {
                 data: copied.as_ptr() as *mut libc::c_void,
                 width: dimensions.0 as usize,

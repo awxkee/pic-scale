@@ -36,10 +36,11 @@ use std::thread::available_parallelism;
 use crate::ImageSize;
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Default)]
 /// Declares thread policy usage
 pub enum ThreadingPolicy {
     /// Will use only one current thread
+    #[default]
     Single,
     /// Spawn provided threads count, will not work for wasm - fallback to Single
     Fixed(usize),

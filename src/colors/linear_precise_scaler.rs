@@ -69,6 +69,14 @@ impl Scaling for LinearScaler {
         self.scaler.threading_policy = threading_policy;
     }
 
+    fn resize_plane<'a>(
+        &'a self,
+        _: &ImageStore<'a, u8, 1>,
+        _: &mut ImageStoreMut<'a, u8, 1>,
+    ) -> Result<(), PicScaleError> {
+        unimplemented!()
+    }
+
     fn resize_cbcr8<'a>(
         &'a self,
         _: &ImageStore<'a, u8, 2>,

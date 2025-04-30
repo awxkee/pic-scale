@@ -30,9 +30,6 @@
 use crate::avx2::utils::{_mm256_prefer_fma_ps, _mm_prefer_fma_ps, shuffle};
 use crate::filter_weights::FilterBounds;
 use crate::mlaf::mlaf;
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
-#[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
 pub(crate) fn convolve_column_avx_u16(

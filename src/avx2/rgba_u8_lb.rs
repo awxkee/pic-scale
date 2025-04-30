@@ -108,9 +108,14 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_impl(
 
     let shuffle_weights = _mm_setr_epi8(0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3);
 
-    let distr_weights = _mm256_setr_epi8(
-        0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3, 0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3,
-        2, 3,
+    let distr_weights8_0 = _mm256_setr_epi8(
+        0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3, 4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6, 7,
+        6, 7,
+    );
+
+    let distr_weights8_1 = _mm256_setr_epi8(
+        8, 9, 8, 9, 8, 9, 8, 9, 10, 11, 10, 11, 10, 11, 10, 11, 12, 13, 12, 13, 12, 13, 12, 13, 14,
+        15, 14, 15, 14, 15, 14, 15,
     );
 
     let (row0_ref, rest) = dst.split_at_mut(dst_stride);
@@ -148,19 +153,11 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_impl(
         while jx + 8 < bounds.size {
             let w_ptr = weights.get_unchecked(jx..);
 
-            let w01 = _mm_loadu_si32(w_ptr.as_ptr() as *const _);
-            let w23 = _mm_loadu_si32(w_ptr.get_unchecked(2..).as_ptr() as *const _);
-            let w45 = _mm_loadu_si32(w_ptr.get_unchecked(4..).as_ptr() as *const _);
-            let w67 = _mm_loadu_si32(w_ptr.get_unchecked(6..).as_ptr() as *const _);
+            let w0_7 = _mm_loadu_si128(w_ptr.as_ptr() as *const _);
+            let wz0 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(w0_7), w0_7);
 
-            let w0145 = _mm256_shuffle_epi8(
-                _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(w01), w45),
-                distr_weights,
-            );
-            let w2367 = _mm256_shuffle_epi8(
-                _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(w23), w67),
-                distr_weights,
-            );
+            let w0145 = _mm256_shuffle_epi8(wz0, distr_weights8_0);
+            let w2367 = _mm256_shuffle_epi8(wz0, distr_weights8_1);
 
             let start_bounds = bounds.start + jx;
 
@@ -198,19 +195,11 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_impl(
         while jx + 4 < bounds.size {
             let w_ptr = weights.get_unchecked(jx..);
 
-            let w01 = _mm_cvtsi32_si128((w_ptr.as_ptr() as *const i32).read_unaligned());
-            let w23 = _mm_cvtsi32_si128(
-                (w_ptr.get_unchecked(2..).as_ptr() as *const i32).read_unaligned(),
-            );
+            let w0_3 = _mm_loadu_si64(w_ptr.as_ptr() as *const _);
+            let wz0 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(w0_3), w0_3);
 
-            let weights01 = _mm256_shuffle_epi8(
-                _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(w01), w01),
-                distr_weights,
-            );
-            let weights23 = _mm256_shuffle_epi8(
-                _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(w23), w23),
-                distr_weights,
-            );
+            let w0145 = _mm256_shuffle_epi8(wz0, distr_weights8_0);
+            let w2367 = _mm256_shuffle_epi8(wz0, distr_weights8_1);
 
             let start_bounds = bounds.start + jx;
 
@@ -236,14 +225,14 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_impl(
             let lo0 = _mm256_srli_epi16::<2>(_mm256_unpacklo_epi8(px0, px0));
             let lo1 = _mm256_srli_epi16::<2>(_mm256_unpacklo_epi8(px1, px1));
 
-            store_0 = _mm256_add_epi16(store_0, _mm256_mulhrs_epi16(lo0, weights01));
-            store_1 = _mm256_add_epi16(store_1, _mm256_mulhrs_epi16(lo1, weights01));
+            store_0 = _mm256_add_epi16(store_0, _mm256_mulhrs_epi16(lo0, w0145));
+            store_1 = _mm256_add_epi16(store_1, _mm256_mulhrs_epi16(lo1, w0145));
 
             let hi0 = _mm256_srli_epi16::<2>(_mm256_unpackhi_epi8(px0, px0));
             let hi1 = _mm256_srli_epi16::<2>(_mm256_unpackhi_epi8(px1, px1));
 
-            store_0 = _mm256_add_epi16(store_0, _mm256_mulhrs_epi16(hi0, weights23));
-            store_1 = _mm256_add_epi16(store_1, _mm256_mulhrs_epi16(hi1, weights23));
+            store_0 = _mm256_add_epi16(store_0, _mm256_mulhrs_epi16(hi0, w2367));
+            store_1 = _mm256_add_epi16(store_1, _mm256_mulhrs_epi16(hi1, w2367));
 
             jx += 4;
         }
@@ -383,6 +372,16 @@ unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
         2, 3,
     );
 
+    let distr_weights8_0 = _mm256_setr_epi8(
+        0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3, 4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6, 7,
+        6, 7,
+    );
+
+    let distr_weights8_1 = _mm256_setr_epi8(
+        8, 9, 8, 9, 8, 9, 8, 9, 10, 11, 10, 11, 10, 11, 10, 11, 12, 13, 12, 13, 12, 13, 12, 13, 14,
+        15, 14, 15, 14, 15, 14, 15,
+    );
+
     for ((dst, bounds), weights) in dst
         .chunks_exact_mut(CHANNELS)
         .zip(filter_weights.bounds.iter())
@@ -398,19 +397,11 @@ unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
         while jx + 8 < bounds.size {
             let w_ptr = weights.get_unchecked(jx..);
 
-            let w01 = _mm_loadu_si32(w_ptr.as_ptr() as *const _);
-            let w23 = _mm_loadu_si32(w_ptr.get_unchecked(2..).as_ptr() as *const _);
-            let w45 = _mm_loadu_si32(w_ptr.get_unchecked(4..).as_ptr() as *const _);
-            let w67 = _mm_loadu_si32(w_ptr.get_unchecked(6..).as_ptr() as *const _);
+            let w0_7 = _mm_loadu_si128(w_ptr.as_ptr() as *const _);
+            let wz0 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(w0_7), w0_7);
 
-            let w0145 = _mm256_shuffle_epi8(
-                _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(w01), w45),
-                distr_weights,
-            );
-            let w2367 = _mm256_shuffle_epi8(
-                _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(w23), w67),
-                distr_weights,
-            );
+            let w0145 = _mm256_shuffle_epi8(wz0, distr_weights8_0);
+            let w2367 = _mm256_shuffle_epi8(wz0, distr_weights8_1);
 
             let start_bounds = bounds.start + jx;
 

@@ -60,7 +60,7 @@ fn main() {
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
 
-    let mut scaler = LinearApproxScaler::new(ResamplingFunction::Lanczos3);
+    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
     // scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
 
@@ -193,7 +193,7 @@ fn main() {
         .as_bytes()
         .iter()
         .map(|&x| x)
-        // .map(|&x| (x >> 8) as u8)
+        // .map(|&x| ((x >> 8) as u8).min(255))
         // .map(|&x| (x as f32 * 255.).round() as u8)
         .collect::<Vec<_>>();
 
