@@ -55,7 +55,7 @@ fn main() {
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
-    let transient = img.to_rgb8();
+    let transient = img.to_rgba8();
     let mut bytes = Vec::from(transient.as_bytes());
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
@@ -127,20 +127,20 @@ fn main() {
 
     let bytes32 = bytes
         .iter()
-        .map(|&x| x)
-        // .map(|&x| u16::from_ne_bytes([x, x]))
+        // .map(|&x| x)
+        .map(|&x| u16::from_ne_bytes([x, x]))
         // .map(|&x| x as f32 / 255.)
         .collect::<Vec<_>>();
 
     let mut store =
-        Rgb8ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize).unwrap();
+        Rgba16ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     store.bit_depth = 16;
-    let mut dst_store = Rgb8ImageStoreMut::alloc_with_depth(
+    let mut dst_store = Rgba16ImageStoreMut::alloc_with_depth(
         dimensions.0 as usize / 4,
         dimensions.1 as usize / 4,
         16,
     );
-    scaler.resize_rgb(&store, &mut dst_store).unwrap();
+    scaler.resize_rgba_u16(&store, &mut dst_store, true).unwrap();
     //
     // let elapsed_time = start_time.elapsed();
     // // Print the elapsed time in milliseconds
@@ -191,8 +191,8 @@ fn main() {
     let dst = dst_store
         .as_bytes()
         .iter()
-        .map(|&x| x)
-        // .map(|&x| (x >> 8) as u8)
+        // .map(|&x| x)
+        .map(|&x| (x >> 8) as u8)
         // .map(|&x| (x as f32 * 255.).round() as u8)
         .collect::<Vec<_>>();
 

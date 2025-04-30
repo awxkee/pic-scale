@@ -144,7 +144,7 @@ Example comparison time for downscale RGB 4000x6000 10 bit image in 4 times usin
 
 #### Example in sRGB
 
-In common, you should not downsize an image in sRGB colorspace, however if speed is more preferable than more proper scale you may omit linearizing 
+In common, you should not downsize an image in sRGB colorspace, however if speed is more preferable than more proper scale, then you may omit linearizing 
 
 ```rust
 let mut scaler = Scaler::new(ResamplingFunction::Hermite);
