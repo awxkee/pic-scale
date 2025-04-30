@@ -350,12 +350,12 @@ impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
                     jx += 4;
                 }
 
-                store_0 = _mm256_add_epi16(
+                store_0 = _mm256_add_epi32(
                     _mm256_permute2x128_si256::<0x20>(store0, store1),
                     _mm256_permute2x128_si256::<0x31>(store0, store1),
                 );
 
-                store_1 = _mm256_add_epi16(
+                store_1 = _mm256_add_epi32(
                     _mm256_permute2x128_si256::<0x20>(store2, store3),
                     _mm256_permute2x128_si256::<0x31>(store2, store3),
                 );

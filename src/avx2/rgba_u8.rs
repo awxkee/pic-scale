@@ -223,12 +223,12 @@ unsafe fn convolve_horizontal_rgba_avx_row_4_impl(
                 jx += 4;
             }
 
-            store_0 = _mm256_add_epi16(
+            store_0 = _mm256_add_epi32(
                 _mm256_permute2x128_si256::<0x20>(store_avx0, store_avx1),
                 _mm256_permute2x128_si256::<0x31>(store_avx0, store_avx1),
             );
 
-            store_1 = _mm256_add_epi16(
+            store_1 = _mm256_add_epi32(
                 _mm256_permute2x128_si256::<0x20>(store_avx2, store_avx3),
                 _mm256_permute2x128_si256::<0x31>(store_avx2, store_avx3),
             );

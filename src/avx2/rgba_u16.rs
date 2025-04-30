@@ -387,25 +387,14 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                     jx += 4;
                 }
 
-                store_0 = _mm256_insertf128_ps::<1>(
-                    _mm256_castps128_ps256(_mm_add_ps(
-                        _mm256_castps256_ps128(astore_0),
-                        _mm256_extractf128_ps::<1>(astore_0),
-                    )),
-                    _mm_add_ps(
-                        _mm256_castps256_ps128(astore_1),
-                        _mm256_extractf128_ps::<1>(astore_1),
-                    ),
+                store_0 = _mm256_add_ps(
+                    _mm256_permute2f128_ps::<0x20>(astore_0, astore_1),
+                    _mm256_permute2f128_ps::<0x31>(astore_0, astore_1),
                 );
-                store_1 = _mm256_insertf128_ps::<1>(
-                    _mm256_castps128_ps256(_mm_add_ps(
-                        _mm256_castps256_ps128(astore_2),
-                        _mm256_extractf128_ps::<1>(astore_2),
-                    )),
-                    _mm_add_ps(
-                        _mm256_castps256_ps128(astore_3),
-                        _mm256_extractf128_ps::<1>(astore_3),
-                    ),
+
+                store_1 = _mm256_add_ps(
+                    _mm256_permute2f128_ps::<0x20>(astore_2, astore_3),
+                    _mm256_permute2f128_ps::<0x31>(astore_2, astore_3),
                 );
             }
 
