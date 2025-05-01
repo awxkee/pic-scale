@@ -30,7 +30,7 @@ use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::fixed_point_horizontal::{
     convolve_row_handler_fixed_point, convolve_row_handler_fixed_point_4,
 };
-use crate::fixed_point_vertical::column_handler_fixed_point;
+use crate::fixed_point_vertical::{column_handler_fixed_point, RoundableAccumulator};
 use crate::floating_point_horizontal::{
     convolve_row_handler_floating_point, convolve_row_handler_floating_point_4,
 };
@@ -338,7 +338,7 @@ pub(crate) trait ColumnHandlerFixedPoint<T> {
             + Mul<Output = J>
             + AddAssign
             + SaturateNarrow<T>
-            + Default,
+            + RoundableAccumulator<J>,
         i32: AsPrimitive<J>,
         i16: AsPrimitive<J>;
 }
@@ -666,7 +666,7 @@ impl ColumnHandlerFixedPoint<u16> for u16 {
             + Mul<Output = J>
             + AddAssign
             + SaturateNarrow<u16>
-            + Default,
+            + RoundableAccumulator<J>,
         i32: AsPrimitive<J>,
         i16: AsPrimitive<J>,
     {
@@ -692,7 +692,7 @@ impl ColumnHandlerFixedPoint<u16> for u16 {
             + Mul<Output = J>
             + AddAssign
             + SaturateNarrow<u16>
-            + Default,
+            + RoundableAccumulator<J>,
         i32: AsPrimitive<J>,
         i16: AsPrimitive<J>,
     {
@@ -716,7 +716,7 @@ impl ColumnHandlerFixedPoint<u16> for u16 {
             + Mul<Output = J>
             + AddAssign
             + SaturateNarrow<u16>
-            + Default,
+            + RoundableAccumulator<J>,
         i32: AsPrimitive<J>,
         i16: AsPrimitive<J>,
     {
