@@ -93,49 +93,44 @@ impl Scaling for SigmoidalScaler {
             return Ok(());
         }
 
-        const COMPONENTS: usize = 3;
+        const CN: usize = 3;
 
-        let mut target_vertical = vec![f32::default(); store.width * store.height * COMPONENTS];
+        let mut target_vertical = vec![f32::default(); store.width * store.height * CN];
 
-        let mut lab_store = ImageStoreMut::<f32, COMPONENTS>::from_slice(
-            &mut target_vertical,
-            store.width,
-            store.height,
-        )?;
+        let mut lab_store =
+            ImageStoreMut::<f32, CN>::from_slice(&mut target_vertical, store.width, store.height)?;
         lab_store.bit_depth = into.bit_depth;
 
-        let lab_stride =
-            lab_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<f32>() as u32;
+        let lab_stride = lab_store.width as u32 * CN as u32 * size_of::<f32>() as u32;
         rgb_to_sigmoidal(
             store.buffer.as_ref(),
-            store.width as u32 * COMPONENTS as u32,
+            store.width as u32 * CN as u32,
             lab_store.buffer.borrow_mut(),
             lab_stride,
             lab_store.width as u32,
             lab_store.height as u32,
         );
 
-        let new_immutable_store = ImageStore::<f32, COMPONENTS> {
+        let new_immutable_store = ImageStore::<f32, CN> {
             buffer: std::borrow::Cow::Owned(target_vertical),
-            channels: COMPONENTS,
+            channels: CN,
             width: store.width,
             height: store.height,
-            stride: store.width * COMPONENTS,
+            stride: store.width * CN,
             bit_depth: into.bit_depth,
         };
 
-        let mut new_store = ImageStoreMut::<f32, COMPONENTS>::alloc(into.width, into.height);
+        let mut new_store = ImageStoreMut::<f32, CN>::alloc(into.width, into.height);
         self.scaler
             .resize_rgb_f32(&new_immutable_store, &mut new_store)?;
 
-        let new_lab_stride =
-            new_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<f32>() as u32;
+        let new_lab_stride = new_store.width as u32 * CN as u32 * size_of::<f32>() as u32;
 
         sigmoidal_to_rgb(
             new_store.buffer.borrow(),
             new_lab_stride,
             into.buffer.borrow_mut(),
-            into.width as u32 * COMPONENTS as u32,
+            into.width as u32 * CN as u32,
             new_store.width as u32,
             new_store.height as u32,
         );
@@ -168,49 +163,44 @@ impl Scaling for SigmoidalScaler {
             return Ok(());
         }
 
-        const COMPONENTS: usize = 4;
+        const CN: usize = 4;
 
-        let mut target_vertical = vec![f32::default(); store.width * store.height * COMPONENTS];
+        let mut target_vertical = vec![f32::default(); store.width * store.height * CN];
 
-        let mut lab_store = ImageStoreMut::<f32, COMPONENTS>::from_slice(
-            &mut target_vertical,
-            store.width,
-            store.height,
-        )?;
+        let mut lab_store =
+            ImageStoreMut::<f32, CN>::from_slice(&mut target_vertical, store.width, store.height)?;
         lab_store.bit_depth = into.bit_depth;
 
-        let lab_stride =
-            lab_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<f32>() as u32;
+        let lab_stride = lab_store.width as u32 * CN as u32 * size_of::<f32>() as u32;
         rgba_to_sigmoidal(
             store.buffer.as_ref(),
-            store.width as u32 * COMPONENTS as u32,
+            store.width as u32 * CN as u32,
             lab_store.buffer.borrow_mut(),
             lab_stride,
             lab_store.width as u32,
             lab_store.height as u32,
         );
 
-        let new_immutable_store = ImageStore::<f32, COMPONENTS> {
+        let new_immutable_store = ImageStore::<f32, CN> {
             buffer: std::borrow::Cow::Owned(target_vertical),
-            channels: COMPONENTS,
+            channels: CN,
             width: store.width,
             height: store.height,
-            stride: store.width * COMPONENTS,
+            stride: store.width * CN,
             bit_depth: into.bit_depth,
         };
 
-        let mut new_store = ImageStoreMut::<f32, COMPONENTS>::alloc(into.width, into.height);
+        let mut new_store = ImageStoreMut::<f32, CN>::alloc(into.width, into.height);
         self.scaler
             .resize_rgba_f32(&new_immutable_store, &mut new_store, premultiply_alpha)?;
 
-        let new_lab_stride =
-            new_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<f32>() as u32;
+        let new_lab_stride = new_store.width as u32 * CN as u32 * size_of::<f32>() as u32;
 
         sigmoidal_to_rgba(
             new_store.buffer.borrow(),
             new_lab_stride,
             into.buffer.borrow_mut(),
-            into.width as u32 * COMPONENTS as u32,
+            into.width as u32 * CN as u32,
             new_store.width as u32,
             new_store.height as u32,
         );

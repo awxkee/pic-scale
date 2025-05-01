@@ -51,7 +51,7 @@ impl LabScaler {
 
     fn rgba_to_laba<'a>(store: &ImageStore<'a, u8, 4>) -> ImageStore<'a, f32, 4> {
         let mut source_slice = vec![f32::default(); 4 * store.width * store.height];
-        let lab_stride = store.width as u32 * 4u32 * std::mem::size_of::<f32>() as u32;
+        let lab_stride = store.width as u32 * 4u32 * size_of::<f32>() as u32;
         rgba_to_lab_with_alpha(
             store.buffer.as_ref(),
             store.width as u32 * 4u32,
@@ -76,7 +76,7 @@ impl LabScaler {
     fn laba_to_srgba<'a>(store: &ImageStoreMut<'a, f32, 4>, into: &mut ImageStoreMut<'a, u8, 4>) {
         lab_with_alpha_to_rgba(
             store.buffer.borrow(),
-            store.width as u32 * 4u32 * std::mem::size_of::<f32>() as u32,
+            store.width as u32 * 4u32 * size_of::<f32>() as u32,
             into.buffer.borrow_mut(),
             store.width as u32 * 4u32,
             store.width as u32,
@@ -141,8 +141,7 @@ impl Scaling for LabScaler {
             ImageStoreMut::<f32, COMPONENTS>::from_slice(&mut target, store.width, store.height)?;
         lab_store.bit_depth = into.bit_depth;
 
-        let lab_stride =
-            lab_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<f32>() as u32;
+        let lab_stride = lab_store.width as u32 * COMPONENTS as u32 * size_of::<f32>() as u32;
 
         rgb_to_lab(
             store.buffer.as_ref(),
@@ -168,8 +167,7 @@ impl Scaling for LabScaler {
         self.scaler
             .resize_rgb_f32(&new_immutable_store, &mut new_store)?;
 
-        let new_lab_stride =
-            new_store.width as u32 * COMPONENTS as u32 * std::mem::size_of::<f32>() as u32;
+        let new_lab_stride = new_store.width as u32 * COMPONENTS as u32 * size_of::<f32>() as u32;
         lab_to_srgb(
             new_store.buffer.borrow(),
             new_lab_stride,

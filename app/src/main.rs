@@ -11,7 +11,14 @@ use fast_image_resize::{
     CpuExtensions, FilterType, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
-use pic_scale::{Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, ImageStoreScaling, LinearApproxScaler, LinearScaler, Planar16ImageStore, Planar16ImageStoreMut, PlanarF32ImageStore, PlanarF32ImageStoreMut, ResamplingFunction, Rgb8ImageStore, Rgb8ImageStoreMut, RgbF32ImageStore, RgbF32ImageStoreMut, Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore, Rgba8ImageStoreMut, RgbaF32ImageStore, RgbaF32ImageStoreMut, Scaler, Scaling, ScalingF32, ScalingU16, ThreadingPolicy, WorkloadStrategy};
+use pic_scale::{
+    Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, ImageStoreScaling, LinearApproxScaler,
+    LinearScaler, Planar16ImageStore, Planar16ImageStoreMut, PlanarF32ImageStore,
+    PlanarF32ImageStoreMut, ResamplingFunction, Rgb8ImageStore, Rgb8ImageStoreMut,
+    RgbF32ImageStore, RgbF32ImageStoreMut, Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore,
+    Rgba8ImageStoreMut, RgbaF32ImageStore, RgbaF32ImageStoreMut, Scaler, Scaling, ScalingF32,
+    ScalingU16, ThreadingPolicy, WorkloadStrategy,
+};
 use yuv::{ar30_to_rgb8, rgba8_to_ar30, Rgb30ByteOrder};
 
 fn resize_plane(
@@ -134,7 +141,9 @@ fn main() {
         dimensions.1 as usize / 4,
         16,
     );
-    scaler.resize_rgba_u16(&store, &mut dst_store, true).unwrap();
+    scaler
+        .resize_rgba_u16(&store, &mut dst_store, true)
+        .unwrap();
     //
     // let elapsed_time = start_time.elapsed();
     // // Print the elapsed time in milliseconds
