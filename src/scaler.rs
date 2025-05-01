@@ -1167,6 +1167,8 @@ impl Scaler {
         dst_image: &mut ImageStoreMut<u8, 4>,
         order: Ar30ByteOrder,
     ) -> Result<(), PicScaleError> {
+        src_image.validate()?;
+        dst_image.validate()?;
         let dst_size = dst_image.get_size();
         let dst_stride = dst_image.stride();
         match order {
@@ -1209,6 +1211,8 @@ impl Scaler {
         dst_image: &mut ImageStoreMut<u8, 4>,
         order: Ar30ByteOrder,
     ) -> Result<(), PicScaleError> {
+        src_image.validate()?;
+        dst_image.validate()?;
         let dst_size = dst_image.get_size();
         let dst_stride = dst_image.stride();
         match order {
@@ -1257,149 +1261,50 @@ where
     ) -> Result<(), PicScaleError>;
 }
 
-impl<'b> ImageStoreScaling<'b, u8, 4> for Rgba8ImageStore<'b> {
-    fn scale(
-        &self,
-        store: &mut ImageStoreMut<'b, u8, 4>,
-        options: ScalingOptions,
-    ) -> Result<(), PicScaleError> {
-        let mut scaler = Scaler::new(options.resampling_function);
-        scaler.set_threading_policy(options.threading_policy);
-        scaler.generic_resize_with_alpha(self, store, options.premultiply_alpha)
-    }
+macro_rules! def_image_scaling_alpha {
+    ($clazz: ident, $fx_type: ident, $cn: expr) => {
+        impl<'b> ImageStoreScaling<'b, $fx_type, $cn> for $clazz<'b> {
+            fn scale(
+                &self,
+                store: &mut ImageStoreMut<'b, $fx_type, $cn>,
+                options: ScalingOptions,
+            ) -> Result<(), PicScaleError> {
+                let mut scaler = Scaler::new(options.resampling_function);
+                scaler.set_threading_policy(options.threading_policy);
+                scaler.generic_resize_with_alpha(self, store, options.premultiply_alpha)
+            }
+        }
+    };
 }
 
-impl<'b> ImageStoreScaling<'b, u8, 3> for Rgb8ImageStore<'b> {
-    fn scale(
-        &self,
-        store: &mut ImageStoreMut<'b, u8, 3>,
-        options: ScalingOptions,
-    ) -> Result<(), PicScaleError> {
-        let mut scaler = Scaler::new(options.resampling_function);
-        scaler.set_threading_policy(options.threading_policy);
-        scaler.generic_resize(self, store)
-    }
+macro_rules! def_image_scaling {
+    ($clazz: ident, $fx_type: ident, $cn: expr) => {
+        impl<'b> ImageStoreScaling<'b, $fx_type, $cn> for $clazz<'b> {
+            fn scale(
+                &self,
+                store: &mut ImageStoreMut<'b, $fx_type, $cn>,
+                options: ScalingOptions,
+            ) -> Result<(), PicScaleError> {
+                let mut scaler = Scaler::new(options.resampling_function);
+                scaler.set_threading_policy(options.threading_policy);
+                scaler.generic_resize(self, store)
+            }
+        }
+    };
 }
 
-impl<'b> ImageStoreScaling<'b, u8, 2> for CbCr8ImageStore<'b> {
-    fn scale(
-        &self,
-        store: &mut ImageStoreMut<'b, u8, 2>,
-        options: ScalingOptions,
-    ) -> Result<(), PicScaleError> {
-        let mut scaler = Scaler::new(options.resampling_function);
-        scaler.set_threading_policy(options.threading_policy);
-        scaler.generic_resize(self, store)
-    }
-}
-
-impl<'b> ImageStoreScaling<'b, u8, 1> for Planar8ImageStore<'b> {
-    fn scale(
-        &self,
-        store: &mut ImageStoreMut<'b, u8, 1>,
-        options: ScalingOptions,
-    ) -> Result<(), PicScaleError> {
-        let mut scaler = Scaler::new(options.resampling_function);
-        scaler.set_threading_policy(options.threading_policy);
-        scaler.generic_resize(self, store)
-    }
-}
-
-impl<'b> ImageStoreScaling<'b, u16, 1> for Planar16ImageStore<'b> {
-    fn scale(
-        &self,
-        store: &mut ImageStoreMut<'b, u16, 1>,
-        options: ScalingOptions,
-    ) -> Result<(), PicScaleError> {
-        let mut scaler = Scaler::new(options.resampling_function);
-        scaler.set_threading_policy(options.threading_policy);
-        scaler.generic_resize(self, store)
-    }
-}
-
-impl<'b> ImageStoreScaling<'b, u16, 2> for CbCr16ImageStore<'b> {
-    fn scale<'a>(
-        &self,
-        store: &mut ImageStoreMut<'b, u16, 2>,
-        options: ScalingOptions,
-    ) -> Result<(), PicScaleError> {
-        let mut scaler = Scaler::new(options.resampling_function);
-        scaler.set_threading_policy(options.threading_policy);
-        scaler.generic_resize(self, store)
-    }
-}
-
-impl<'b> ImageStoreScaling<'b, u16, 3> for Rgb16ImageStore<'b> {
-    fn scale(
-        &self,
-        store: &mut ImageStoreMut<'b, u16, 3>,
-        options: ScalingOptions,
-    ) -> Result<(), PicScaleError> {
-        let mut scaler = Scaler::new(options.resampling_function);
-        scaler.set_threading_policy(options.threading_policy);
-        scaler.generic_resize(self, store)
-    }
-}
-
-impl<'b> ImageStoreScaling<'b, u16, 4> for Rgba16ImageStore<'b> {
-    fn scale(
-        &self,
-        store: &mut ImageStoreMut<'b, u16, 4>,
-        options: ScalingOptions,
-    ) -> Result<(), PicScaleError> {
-        let mut scaler = Scaler::new(options.resampling_function);
-        scaler.set_threading_policy(options.threading_policy);
-        scaler.generic_resize_with_alpha(self, store, options.premultiply_alpha)
-    }
-}
-
-impl<'b> ImageStoreScaling<'b, f32, 1> for PlanarF32ImageStore<'b> {
-    fn scale<'a>(
-        &self,
-        store: &mut ImageStoreMut<'b, f32, 1>,
-        options: ScalingOptions,
-    ) -> Result<(), PicScaleError> {
-        let mut scaler = Scaler::new(options.resampling_function);
-        scaler.set_threading_policy(options.threading_policy);
-        scaler.generic_resize(self, store)
-    }
-}
-
-impl<'b> ImageStoreScaling<'b, f32, 2> for CbCrF32ImageStore<'b> {
-    fn scale<'a>(
-        &self,
-        store: &mut ImageStoreMut<'b, f32, 2>,
-        options: ScalingOptions,
-    ) -> Result<(), PicScaleError> {
-        let mut scaler = Scaler::new(options.resampling_function);
-        scaler.set_threading_policy(options.threading_policy);
-        scaler.generic_resize(self, store)
-    }
-}
-
-impl<'b> ImageStoreScaling<'b, f32, 3> for RgbF32ImageStore<'b> {
-    fn scale(
-        &self,
-        store: &mut ImageStoreMut<'b, f32, 3>,
-        options: ScalingOptions,
-    ) -> Result<(), PicScaleError> {
-        let mut scaler = Scaler::new(options.resampling_function);
-        scaler.set_threading_policy(options.threading_policy);
-        scaler.generic_resize(self, store)
-    }
-}
-
-impl<'b> ImageStoreScaling<'b, f32, 4> for RgbaF32ImageStore<'b> {
-    fn scale(
-        &self,
-        store: &mut ImageStoreMut<'b, f32, 4>,
-        options: ScalingOptions,
-    ) -> Result<(), PicScaleError> {
-        let mut scaler = Scaler::new(options.resampling_function);
-        scaler.set_threading_policy(options.threading_policy);
-        scaler.generic_resize_with_alpha(self, store, options.premultiply_alpha)
-    }
-}
+def_image_scaling_alpha!(Rgba8ImageStore, u8, 4);
+def_image_scaling!(Rgb8ImageStore, u8, 3);
+def_image_scaling!(CbCr8ImageStore, u8, 2);
+def_image_scaling!(Planar8ImageStore, u8, 1);
+def_image_scaling!(Planar16ImageStore, u16, 1);
+def_image_scaling!(CbCr16ImageStore, u16, 2);
+def_image_scaling!(Rgb16ImageStore, u16, 3);
+def_image_scaling_alpha!(Rgba16ImageStore, u16, 4);
+def_image_scaling!(PlanarF32ImageStore, f32, 1);
+def_image_scaling!(CbCrF32ImageStore, f32, 2);
+def_image_scaling!(RgbF32ImageStore, f32, 3);
+def_image_scaling_alpha!(RgbaF32ImageStore, f32, 4);
 
 #[cfg(test)]
 mod tests {
