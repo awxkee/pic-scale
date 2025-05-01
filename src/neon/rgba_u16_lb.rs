@@ -167,7 +167,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_rows_4_lb_u16(
 
             while jx + 8 < bounds_size {
                 let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                let w_ptr = weights.get_unchecked(jx..);
                 let weights_set = vld1q_s16(w_ptr.as_ptr());
                 store_0 = conv_horiz_rgba_8_u16(bounds_start, src0, weights_set, store_0);
                 store_1 = conv_horiz_rgba_8_u16(bounds_start, src1, weights_set, store_1);
@@ -178,7 +178,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_rows_4_lb_u16(
 
             while jx + 4 < bounds_size {
                 let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1_s16(w_ptr.as_ptr());
                 store_0 = conv_horiz_rgba_4_u16(bounds_start, src0, weights, store_0);
                 store_1 = conv_horiz_rgba_4_u16(bounds_start, src1, weights, store_1);
@@ -188,7 +188,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_rows_4_lb_u16(
             }
 
             while jx + 2 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 2));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let w0 = vld1_dup_s16(w_ptr.as_ptr());
                 let w1 = vld1q_dup_s16(w_ptr.get_unchecked(1..).as_ptr());
@@ -200,7 +200,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_rows_4_lb_u16(
             }
 
             while jx < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let weight0 = vld1_dup_s16(w_ptr.as_ptr());
                 store_0 = conv_horiz_rgba_1_u16(bounds_start, src0, weight0, store_0);
@@ -257,14 +257,14 @@ pub(crate) fn convolve_horizontal_rgba_neon_u16_lb_row(
 
             while jx + 8 < bounds_size {
                 let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                let w_ptr = weights.get_unchecked(jx..);
                 let weights_set = vld1q_s16(w_ptr.as_ptr());
                 store = conv_horiz_rgba_8_u16(bounds_start, src, weights_set, store);
                 jx += 8;
             }
 
             while jx + 4 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1_s16(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
                 store = conv_horiz_rgba_4_u16(bounds_start, src, weights, store);
@@ -272,7 +272,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_u16_lb_row(
             }
 
             while jx + 2 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 2));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let weight0 = vld1_dup_s16(w_ptr.as_ptr());
                 let weight1 = vld1q_dup_s16(w_ptr.get_unchecked(1..).as_ptr());
@@ -281,7 +281,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_u16_lb_row(
             }
 
             while jx < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                let w_ptr = weights.get_unchecked(jx..);
                 let weight0 = vld1_dup_s16(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
                 store = conv_horiz_rgba_1_u16(bounds_start, src, weight0, store);

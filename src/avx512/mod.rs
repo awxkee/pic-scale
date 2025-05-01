@@ -29,14 +29,14 @@
 mod alpha_u8;
 mod avx512_setr;
 mod check_alpha;
-mod rgba_u8_dot;
+mod rgba_u8_dot_vnni;
 mod utils;
 mod vertical_u16_lb;
 mod vertical_u8_lp;
 
 pub(crate) use alpha_u8::{avx512_premultiply_alpha_rgba, avx512_unpremultiply_alpha_rgba};
 pub(crate) use check_alpha::avx512_has_non_constant_cap_alpha_rgba8;
-pub(crate) use rgba_u8_dot::{
+pub(crate) use rgba_u8_dot_vnni::{
     convolve_horizontal_rgba_vnni_row_1, convolve_horizontal_rgba_vnni_row_4,
 };
 pub(crate) use vertical_u16_lb::convolve_column_lb_avx512_u16;
