@@ -181,7 +181,7 @@ pub(crate) fn convolve_vertical_dispatch_ar30<const AR30_TYPE: usize, const AR30
                     let bounds = approx.bounds[y];
                     let filter_offset = y * approx.aligned_size;
                     let weights = &approx.weights[filter_offset..];
-                    let row = &mut row[0..4 * width];
+                    let row = &mut row[..4 * width];
                     _dispatch(&bounds, src, row, src_stride, weights);
                 });
         });
@@ -194,7 +194,7 @@ pub(crate) fn convolve_vertical_dispatch_ar30<const AR30_TYPE: usize, const AR30
                 let filter_offset = y * approx.aligned_size;
                 let weights = &approx.weights[filter_offset..];
 
-                let row = &mut row[0..4 * width];
+                let row = &mut row[..4 * width];
                 _dispatch(&bounds, src, row, src_stride, weights);
             });
     }

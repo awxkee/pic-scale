@@ -52,7 +52,7 @@ impl LChScaler {
 
     fn rgba_to_lcha<'a>(store: &ImageStore<'a, u8, 4>) -> ImageStore<'a, f32, 4> {
         let mut source_slice = vec![f32::default(); 4 * store.width * store.height];
-        let lab_stride = store.width as u32 * 4u32 * std::mem::size_of::<f32>() as u32;
+        let lab_stride = store.width as u32 * 4u32 * size_of::<f32>() as u32;
         rgba_to_lch_with_alpha(
             store.buffer.as_ref(),
             store.width as u32 * 4u32,
@@ -77,7 +77,7 @@ impl LChScaler {
     fn lcha_to_srgba<'a>(store: &ImageStoreMut<'a, f32, 4>, into: &mut ImageStoreMut<'a, u8, 4>) {
         lch_with_alpha_to_rgba(
             store.buffer.borrow(),
-            store.width as u32 * 4u32 * std::mem::size_of::<f32>() as u32,
+            store.width as u32 * 4u32 * size_of::<f32>() as u32,
             into.buffer.borrow_mut(),
             store.width as u32 * 4u32,
             store.width as u32,
