@@ -29,8 +29,17 @@
 #![forbid(unsafe_code)]
 use crate::filter_weights::FilterBounds;
 use crate::saturate_narrow::SaturateNarrow;
+use crate::support::ROUNDING_CONST;
 use num_traits::AsPrimitive;
 use std::ops::{AddAssign, Mul};
+
+pub(crate) trait RoundableAccumulator<T> {
+    const ROUNDING: T;
+}
+
+impl RoundableAccumulator<i32> for i32 {
+    const ROUNDING: i32 = ROUNDING_CONST;
+}
 
 #[inline(always)]
 /// # Generics
@@ -38,7 +47,13 @@ use std::ops::{AddAssign, Mul};
 /// `J` - accumulator type
 pub(crate) fn convolve_column_handler_fixed_point_direct_buffer<
     T: Copy + 'static + AsPrimitive<J> + Default,
-    J: Copy + 'static + AsPrimitive<T> + Mul<Output = J> + AddAssign + SaturateNarrow<T> + Default,
+    J: Copy
+        + 'static
+        + AsPrimitive<T>
+        + Mul<Output = J>
+        + AddAssign
+        + SaturateNarrow<T>
+        + RoundableAccumulator<J>,
     const BUFFER_SIZE: usize,
 >(
     src: &[T],
@@ -55,7 +70,7 @@ pub(crate) fn convolve_column_handler_fixed_point_direct_buffer<
     if filter.is_empty() {
         return;
     }
-    let mut direct_store: [J; BUFFER_SIZE] = [J::default(); BUFFER_SIZE];
+    let mut direct_store: [J; BUFFER_SIZE] = [J::ROUNDING; BUFFER_SIZE];
 
     let v_start_px = x;
 
@@ -92,7 +107,13 @@ pub(crate) fn convolve_column_handler_fixed_point_direct_buffer<
 /// `J` - accumulator type
 pub(crate) fn convolve_column_handler_fixed_point_direct_buffer_double<
     T: Copy + 'static + AsPrimitive<J> + Default,
-    J: Copy + 'static + AsPrimitive<T> + Mul<Output = J> + AddAssign + SaturateNarrow<T> + Default,
+    J: Copy
+        + 'static
+        + AsPrimitive<T>
+        + Mul<Output = J>
+        + AddAssign
+        + SaturateNarrow<T>
+        + RoundableAccumulator<J>,
     const BUFFER_SIZE: usize,
 >(
     src: &[T],
@@ -109,8 +130,8 @@ pub(crate) fn convolve_column_handler_fixed_point_direct_buffer_double<
     if filter.is_empty() {
         return;
     }
-    let mut direct_store0: [J; BUFFER_SIZE] = [J::default(); BUFFER_SIZE];
-    let mut direct_store1: [J; BUFFER_SIZE] = [J::default(); BUFFER_SIZE];
+    let mut direct_store0: [J; BUFFER_SIZE] = [J::ROUNDING; BUFFER_SIZE];
+    let mut direct_store1: [J; BUFFER_SIZE] = [J::ROUNDING; BUFFER_SIZE];
 
     let v_start_px = x;
 
@@ -161,7 +182,13 @@ pub(crate) fn convolve_column_handler_fixed_point_direct_buffer_double<
 /// `J` - accumulator type
 pub(crate) fn convolve_column_handler_fixed_point_direct_buffer_four<
     T: Copy + 'static + AsPrimitive<J> + Default,
-    J: Copy + 'static + AsPrimitive<T> + Mul<Output = J> + AddAssign + SaturateNarrow<T> + Default,
+    J: Copy
+        + 'static
+        + AsPrimitive<T>
+        + Mul<Output = J>
+        + AddAssign
+        + SaturateNarrow<T>
+        + RoundableAccumulator<J>,
     const BUFFER_SIZE: usize,
 >(
     src: &[T],
@@ -178,10 +205,10 @@ pub(crate) fn convolve_column_handler_fixed_point_direct_buffer_four<
     if filter.is_empty() {
         return;
     }
-    let mut direct_store0: [J; BUFFER_SIZE] = [J::default(); BUFFER_SIZE];
-    let mut direct_store1: [J; BUFFER_SIZE] = [J::default(); BUFFER_SIZE];
-    let mut direct_store2: [J; BUFFER_SIZE] = [J::default(); BUFFER_SIZE];
-    let mut direct_store3: [J; BUFFER_SIZE] = [J::default(); BUFFER_SIZE];
+    let mut direct_store0: [J; BUFFER_SIZE] = [J::ROUNDING; BUFFER_SIZE];
+    let mut direct_store1: [J; BUFFER_SIZE] = [J::ROUNDING; BUFFER_SIZE];
+    let mut direct_store2: [J; BUFFER_SIZE] = [J::ROUNDING; BUFFER_SIZE];
+    let mut direct_store3: [J; BUFFER_SIZE] = [J::ROUNDING; BUFFER_SIZE];
 
     let v_start_px = x;
 
@@ -259,7 +286,13 @@ pub(crate) fn convolve_column_handler_fixed_point_direct_buffer_four<
 /// `J` - accumulator type
 pub(crate) fn column_handler_fixed_point<
     T: Copy + 'static + AsPrimitive<J> + Default,
-    J: Copy + 'static + AsPrimitive<T> + Mul<Output = J> + AddAssign + SaturateNarrow<T> + Default,
+    J: Copy
+        + 'static
+        + AsPrimitive<T>
+        + Mul<Output = J>
+        + AddAssign
+        + SaturateNarrow<T>
+        + RoundableAccumulator<J>,
 >(
     _: usize,
     bounds: &FilterBounds,
