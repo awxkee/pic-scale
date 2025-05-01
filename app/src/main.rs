@@ -189,12 +189,6 @@ fn main() {
     //     .map(|&x| (x >> 4) as u8)
     //     .collect();
 
-    for s in dst_store.as_bytes().chunks_exact(4) {
-        if s[3] != 255 {
-            panic!("{}", s[3]);
-        }
-    }
-
     let dst = dst_store
         .as_bytes()
         .iter()
