@@ -313,14 +313,14 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                     let bounds_start = bounds.start + jx;
                     let w_ptr = weights.get_unchecked(jx..);
 
-                    let w0 = _mm_load1_ps(w_ptr.as_ptr());
-                    let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
-                    let w2 = _mm_load1_ps(w_ptr.as_ptr().add(2));
-                    let w3 = _mm_load1_ps(w_ptr.as_ptr().add(3));
-                    let w4 = _mm_load1_ps(w_ptr.as_ptr().add(4));
-                    let w5 = _mm_load1_ps(w_ptr.as_ptr().add(5));
-                    let w6 = _mm_load1_ps(w_ptr.as_ptr().add(6));
-                    let w7 = _mm_load1_ps(w_ptr.as_ptr().add(7));
+                    let w0 = _mm_broadcast_ss(w_ptr.get_unchecked(0));
+                    let w1 = _mm_broadcast_ss(w_ptr.get_unchecked(1));
+                    let w2 = _mm_broadcast_ss(w_ptr.get_unchecked(2));
+                    let w3 = _mm_broadcast_ss(w_ptr.get_unchecked(3));
+                    let w4 = _mm_broadcast_ss(w_ptr.get_unchecked(4));
+                    let w5 = _mm_broadcast_ss(w_ptr.get_unchecked(5));
+                    let w6 = _mm_broadcast_ss(w_ptr.get_unchecked(6));
+                    let w7 = _mm_broadcast_ss(w_ptr.get_unchecked(7));
 
                     let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
                     let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
@@ -369,10 +369,11 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                 while jx + 4 < bounds_size {
                     let bounds_start = bounds.start + jx;
                     let w_ptr = weights.get_unchecked(jx..);
-                    let w0 = _mm_load1_ps(w_ptr.as_ptr());
-                    let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
-                    let w2 = _mm_load1_ps(w_ptr.as_ptr().add(2));
-                    let w3 = _mm_load1_ps(w_ptr.as_ptr().add(3));
+
+                    let w0 = _mm_broadcast_ss(w_ptr.get_unchecked(0));
+                    let w1 = _mm_broadcast_ss(w_ptr.get_unchecked(1));
+                    let w2 = _mm_broadcast_ss(w_ptr.get_unchecked(2));
+                    let w3 = _mm_broadcast_ss(w_ptr.get_unchecked(3));
 
                     let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
                     let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
@@ -514,14 +515,14 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
                 while jx + 8 < bounds_size {
                     let bounds_start = bounds.start + jx;
                     let w_ptr = weights.get_unchecked(jx..);
-                    let w0 = _mm_load1_ps(w_ptr.as_ptr());
-                    let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
-                    let w2 = _mm_load1_ps(w_ptr.as_ptr().add(2));
-                    let w3 = _mm_load1_ps(w_ptr.as_ptr().add(3));
-                    let w4 = _mm_load1_ps(w_ptr.as_ptr().add(4));
-                    let w5 = _mm_load1_ps(w_ptr.as_ptr().add(5));
-                    let w6 = _mm_load1_ps(w_ptr.as_ptr().add(6));
-                    let w7 = _mm_load1_ps(w_ptr.as_ptr().add(7));
+                    let w0 = _mm_broadcast_ss(w_ptr.get_unchecked(0));
+                    let w1 = _mm_broadcast_ss(w_ptr.get_unchecked(1));
+                    let w2 = _mm_broadcast_ss(w_ptr.get_unchecked(2));
+                    let w3 = _mm_broadcast_ss(w_ptr.get_unchecked(3));
+                    let w4 = _mm_broadcast_ss(w_ptr.get_unchecked(4));
+                    let w5 = _mm_broadcast_ss(w_ptr.get_unchecked(5));
+                    let w6 = _mm_broadcast_ss(w_ptr.get_unchecked(6));
+                    let w7 = _mm_broadcast_ss(w_ptr.get_unchecked(7));
                     let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
                     let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
                     let w45 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w4), w5);
@@ -533,10 +534,12 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
 
                 while jx + 4 < bounds_size {
                     let w_ptr = weights.get_unchecked(jx..);
-                    let w0 = _mm_load1_ps(w_ptr.as_ptr());
-                    let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
-                    let w2 = _mm_load1_ps(w_ptr.as_ptr().add(2));
-                    let w3 = _mm_load1_ps(w_ptr.as_ptr().add(3));
+
+                    let w0 = _mm_broadcast_ss(w_ptr.get_unchecked(0));
+                    let w1 = _mm_broadcast_ss(w_ptr.get_unchecked(1));
+                    let w2 = _mm_broadcast_ss(w_ptr.get_unchecked(2));
+                    let w3 = _mm_broadcast_ss(w_ptr.get_unchecked(3));
+
                     let bounds_start = bounds.start + jx;
 
                     let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
@@ -555,15 +558,15 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
             while jx + 2 < bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
-                let w0 = _mm_load1_ps(w_ptr.as_ptr());
-                let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
+                let w0 = _mm_broadcast_ss(w_ptr.get_unchecked(0));
+                let w1 = _mm_broadcast_ss(w_ptr.get_unchecked(1));
                 store = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src, w0, w1, store);
                 jx += 2;
             }
 
             while jx < bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
-                let w0 = _mm_load1_ps(w_ptr.as_ptr());
+                let w0 = _mm_broadcast_ss(w_ptr.get_unchecked(0));
                 let bounds_start = bounds.start + jx;
                 store = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src, w0, store);
                 jx += 1;
