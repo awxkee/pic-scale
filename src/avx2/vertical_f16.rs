@@ -29,9 +29,6 @@
 use crate::avx2::utils::{_mm256_fma_ps, avx_combine_epi};
 use crate::filter_weights::FilterBounds;
 use core::f16;
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
-#[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
 #[inline(always)]

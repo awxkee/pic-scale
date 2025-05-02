@@ -174,8 +174,9 @@ impl From<u32> for ResamplingFunction {
     }
 }
 
+/// Resampling window representation
 #[derive(Debug, Copy, Clone)]
-pub struct ResamplingWindow<T> {
+pub(crate) struct ResamplingWindow<T> {
     pub(crate) window: fn(T) -> T,
     pub(crate) window_size: f32,
     pub(crate) blur: f32,
@@ -193,8 +194,9 @@ impl<T> ResamplingWindow<T> {
     }
 }
 
+/// Resampling filter representation
 #[derive(Debug, Copy, Clone)]
-pub struct ResamplingFilter<T> {
+pub(crate) struct ResamplingFilter<T> {
     pub kernel: fn(T) -> T,
     pub window: Option<ResamplingWindow<T>>,
     pub min_kernel_size: f32,
@@ -262,7 +264,7 @@ const JINC_R3: f32 = 3.2383154841662362f32;
 const JINC_R4: f32 = 4.2410628637960699f32;
 
 impl ResamplingFunction {
-    pub fn get_resampling_filter<T>(&self) -> ResamplingFilter<T>
+    pub(crate) fn get_resampling_filter<T>(&self) -> ResamplingFilter<T>
     where
         T: Copy
             + Neg

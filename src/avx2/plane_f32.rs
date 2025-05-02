@@ -29,9 +29,6 @@
 
 use crate::avx2::utils::_mm_hsum_ps;
 use crate::filter_weights::FilterWeights;
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
-#[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
 macro_rules! conv_horiz_plane_4_f32 {

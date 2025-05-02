@@ -28,9 +28,6 @@
  */
 use crate::avx2::utils::avx2_pack_u16;
 use crate::filter_weights::FilterBounds;
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
-#[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
 pub(crate) fn convolve_vertical_avx_row_lp(

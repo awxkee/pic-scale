@@ -120,7 +120,7 @@ mod scaler_f16;
 mod sse;
 mod support;
 mod threading_policy;
-#[cfg(all(target_arch = "wasm32", target_feature = "simd128",))]
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 mod wasm32;
 
 pub use ar30::Ar30ByteOrder;
@@ -143,9 +143,9 @@ pub use image_store::{
     CbCrF16ImageStore, CbCrF16ImageStoreMut, PlanarF16ImageStore, PlanarF16ImageStoreMut,
     RgbF16ImageStore, RgbF16ImageStoreMut, RgbaF16ImageStore, RgbaF16ImageStoreMut,
 };
-pub use math::*;
+pub(crate) use math::*;
 pub use pic_scale_error::{PicScaleBufferMismatch, PicScaleError};
 pub use sampler::*;
 pub use scaler::{ImageStoreScaling, Scaler, ScalingOptions, WorkloadStrategy};
 pub use scaler::{Scaling, ScalingF32, ScalingU16};
-pub use threading_policy::*;
+pub use threading_policy::ThreadingPolicy;
