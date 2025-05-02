@@ -27,13 +27,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+use crate::ImageStore;
 use crate::filter_weights::{FilterBounds, FilterWeights, WeightsConverter};
 use crate::image_store::ImageStoreMut;
-use crate::ImageStore;
 use core::f16;
+use rayon::ThreadPool;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
-use rayon::ThreadPool;
 
 #[allow(clippy::type_complexity)]
 pub(crate) fn convolve_vertical_dispatch_f16<V: Copy + Send + Sync, const COMPONENTS: usize>(

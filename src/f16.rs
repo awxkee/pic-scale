@@ -29,6 +29,7 @@
 
 // RGBA
 
+use crate::ImageStore;
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::{
     convolve_horizontal_rgba_avx_row_one_f16, convolve_horizontal_rgba_avx_rows_4_f16,
@@ -60,7 +61,6 @@ use crate::sse::{
     convolve_horizontal_rgba_sse_row_one_f16, convolve_horizontal_rgba_sse_rows_4_f16,
     convolve_vertical_sse_row_f16,
 };
-use crate::ImageStore;
 use core::{f16, f32};
 use rayon::ThreadPool;
 

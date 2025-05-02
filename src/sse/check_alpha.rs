@@ -48,60 +48,62 @@ unsafe fn sse_has_non_constant_cap_alpha_rgba8_impl(
     width: usize,
     stride: usize,
 ) -> bool {
-    if store.is_empty() {
-        return true;
-    }
-
-    let sh0 = _mm_setr_epi8(3, -1, -1, -1, 7, -1, -1, -1, 11, -1, -1, -1, 15, -1, -1, -1);
-
-    let first_alpha = store[3];
-    let def_alpha = _mm_set1_epi32(first_alpha as i32);
-
-    for row in store.chunks_exact(stride) {
-        let row = &row[0..width * 4];
-        let mut sums = _mm_set1_epi32(0);
-        for chunk in row.chunks_exact(16 * 4) {
-            let mut r0 = _mm_loadu_si128(chunk.as_ptr() as *const __m128i);
-            let mut r1 = _mm_loadu_si128(chunk.get_unchecked(16..).as_ptr() as *const __m128i);
-            let mut r2 = _mm_loadu_si128(chunk.get_unchecked(32..).as_ptr() as *const __m128i);
-            let mut r3 = _mm_loadu_si128(chunk.get_unchecked(48..).as_ptr() as *const __m128i);
-
-            r0 = _mm_xor_si128(_mm_shuffle_epi8(r0, sh0), def_alpha);
-            r1 = _mm_xor_si128(_mm_shuffle_epi8(r1, sh0), def_alpha);
-            r2 = _mm_xor_si128(_mm_shuffle_epi8(r2, sh0), def_alpha);
-            r3 = _mm_xor_si128(_mm_shuffle_epi8(r3, sh0), def_alpha);
-
-            sums = _mm_add_epi32(sums, r0);
-            sums = _mm_add_epi32(sums, r1);
-            sums = _mm_add_epi32(sums, r2);
-            sums = _mm_add_epi32(sums, r3);
-        }
-
-        let row = row.chunks_exact(16 * 4).remainder();
-
-        for chunk in row.chunks_exact(16) {
-            let mut r0 = _mm_loadu_si128(chunk.as_ptr() as *const __m128i);
-
-            r0 = _mm_shuffle_epi8(r0, sh0);
-
-            let alphas = _mm_xor_si128(r0, def_alpha);
-
-            sums = _mm_add_epi32(sums, alphas);
-        }
-
-        let row = row.chunks_exact(16).remainder();
-
-        let mut h_sum = _mm_hsum_epi32(sums);
-
-        for chunk in row.chunks_exact(4) {
-            h_sum += chunk[3] as i32 ^ first_alpha as i32;
-        }
-
-        if h_sum != 0 {
+    unsafe {
+        if store.is_empty() {
             return true;
         }
+
+        let sh0 = _mm_setr_epi8(3, -1, -1, -1, 7, -1, -1, -1, 11, -1, -1, -1, 15, -1, -1, -1);
+
+        let first_alpha = store[3];
+        let def_alpha = _mm_set1_epi32(first_alpha as i32);
+
+        for row in store.chunks_exact(stride) {
+            let row = &row[0..width * 4];
+            let mut sums = _mm_set1_epi32(0);
+            for chunk in row.chunks_exact(16 * 4) {
+                let mut r0 = _mm_loadu_si128(chunk.as_ptr() as *const __m128i);
+                let mut r1 = _mm_loadu_si128(chunk.get_unchecked(16..).as_ptr() as *const __m128i);
+                let mut r2 = _mm_loadu_si128(chunk.get_unchecked(32..).as_ptr() as *const __m128i);
+                let mut r3 = _mm_loadu_si128(chunk.get_unchecked(48..).as_ptr() as *const __m128i);
+
+                r0 = _mm_xor_si128(_mm_shuffle_epi8(r0, sh0), def_alpha);
+                r1 = _mm_xor_si128(_mm_shuffle_epi8(r1, sh0), def_alpha);
+                r2 = _mm_xor_si128(_mm_shuffle_epi8(r2, sh0), def_alpha);
+                r3 = _mm_xor_si128(_mm_shuffle_epi8(r3, sh0), def_alpha);
+
+                sums = _mm_add_epi32(sums, r0);
+                sums = _mm_add_epi32(sums, r1);
+                sums = _mm_add_epi32(sums, r2);
+                sums = _mm_add_epi32(sums, r3);
+            }
+
+            let row = row.chunks_exact(16 * 4).remainder();
+
+            for chunk in row.chunks_exact(16) {
+                let mut r0 = _mm_loadu_si128(chunk.as_ptr() as *const __m128i);
+
+                r0 = _mm_shuffle_epi8(r0, sh0);
+
+                let alphas = _mm_xor_si128(r0, def_alpha);
+
+                sums = _mm_add_epi32(sums, alphas);
+            }
+
+            let row = row.chunks_exact(16).remainder();
+
+            let mut h_sum = _mm_hsum_epi32(sums);
+
+            for chunk in row.chunks_exact(4) {
+                h_sum += chunk[3] as i32 ^ first_alpha as i32;
+            }
+
+            if h_sum != 0 {
+                return true;
+            }
+        }
+        false
     }
-    false
 }
 
 /// Checks if image has constant alpha by xor rows for image 16bits
@@ -119,61 +121,63 @@ unsafe fn sse_has_non_constant_cap_alpha_rgba16_impl(
     width: usize,
     stride: usize,
 ) -> bool {
-    if store.is_empty() {
-        return true;
-    }
-
-    let sh0 = _mm_setr_epi8(6, 7, -1, -1, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1);
-
-    let first_alpha = store[3];
-    let def_alpha = _mm_set1_epi32(first_alpha as i32);
-
-    for row in store.chunks_exact(stride) {
-        let row = &row[0..width * 4];
-        let mut sums = _mm_set1_epi32(0);
-        for chunk in row.chunks_exact(8 * 4) {
-            let mut r0 = _mm_loadu_si128(chunk.as_ptr() as *const __m128i);
-            let mut r1 = _mm_loadu_si128(chunk.get_unchecked(8..).as_ptr() as *const __m128i);
-            let mut r2 = _mm_loadu_si128(chunk.get_unchecked(16..).as_ptr() as *const __m128i);
-            let mut r3 = _mm_loadu_si128(chunk.get_unchecked(24..).as_ptr() as *const __m128i);
-
-            r0 = _mm_shuffle_epi8(r0, sh0);
-            r1 = _mm_shuffle_epi8(r1, sh0);
-            r2 = _mm_shuffle_epi8(r2, sh0);
-            r3 = _mm_shuffle_epi8(r3, sh0);
-
-            let r01 = _mm_xor_si128(_mm_unpacklo_epi32(r0, r1), def_alpha);
-            let r23 = _mm_xor_si128(_mm_unpacklo_epi32(r2, r3), def_alpha);
-
-            sums = _mm_add_epi32(sums, r01);
-            sums = _mm_add_epi32(sums, r23);
-        }
-
-        let row = row.chunks_exact(8 * 4).remainder();
-
-        for chunk in row.chunks_exact(8) {
-            let mut r0 = _mm_loadu_si128(chunk.as_ptr() as *const __m128i);
-
-            r0 = _mm_shuffle_epi8(r0, sh0);
-
-            let alphas = _mm_xor_si128(_mm_unpacklo_epi32(r0, r0), def_alpha);
-
-            sums = _mm_add_epi32(sums, alphas);
-        }
-
-        let row = row.chunks_exact(8).remainder();
-
-        let mut h_sum = _mm_hsum_epi32(sums);
-
-        for chunk in row.chunks_exact(4) {
-            h_sum += chunk[3] as i32 ^ first_alpha as i32;
-        }
-
-        if h_sum != 0 {
+    unsafe {
+        if store.is_empty() {
             return true;
         }
+
+        let sh0 = _mm_setr_epi8(6, 7, -1, -1, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1);
+
+        let first_alpha = store[3];
+        let def_alpha = _mm_set1_epi32(first_alpha as i32);
+
+        for row in store.chunks_exact(stride) {
+            let row = &row[0..width * 4];
+            let mut sums = _mm_set1_epi32(0);
+            for chunk in row.chunks_exact(8 * 4) {
+                let mut r0 = _mm_loadu_si128(chunk.as_ptr() as *const __m128i);
+                let mut r1 = _mm_loadu_si128(chunk.get_unchecked(8..).as_ptr() as *const __m128i);
+                let mut r2 = _mm_loadu_si128(chunk.get_unchecked(16..).as_ptr() as *const __m128i);
+                let mut r3 = _mm_loadu_si128(chunk.get_unchecked(24..).as_ptr() as *const __m128i);
+
+                r0 = _mm_shuffle_epi8(r0, sh0);
+                r1 = _mm_shuffle_epi8(r1, sh0);
+                r2 = _mm_shuffle_epi8(r2, sh0);
+                r3 = _mm_shuffle_epi8(r3, sh0);
+
+                let r01 = _mm_xor_si128(_mm_unpacklo_epi32(r0, r1), def_alpha);
+                let r23 = _mm_xor_si128(_mm_unpacklo_epi32(r2, r3), def_alpha);
+
+                sums = _mm_add_epi32(sums, r01);
+                sums = _mm_add_epi32(sums, r23);
+            }
+
+            let row = row.chunks_exact(8 * 4).remainder();
+
+            for chunk in row.chunks_exact(8) {
+                let mut r0 = _mm_loadu_si128(chunk.as_ptr() as *const __m128i);
+
+                r0 = _mm_shuffle_epi8(r0, sh0);
+
+                let alphas = _mm_xor_si128(_mm_unpacklo_epi32(r0, r0), def_alpha);
+
+                sums = _mm_add_epi32(sums, alphas);
+            }
+
+            let row = row.chunks_exact(8).remainder();
+
+            let mut h_sum = _mm_hsum_epi32(sums);
+
+            for chunk in row.chunks_exact(4) {
+                h_sum += chunk[3] as i32 ^ first_alpha as i32;
+            }
+
+            if h_sum != 0 {
+                return true;
+            }
+        }
+        false
     }
-    false
 }
 
 #[cfg(test)]

@@ -35,19 +35,23 @@ use std::arch::aarch64::*;
 #[inline(always)]
 #[cfg(feature = "nightly_f16")]
 pub(crate) unsafe fn xvst1q_u16_x2(ptr: *mut u16, x: uint16x8x2_t) {
-    let ptr_u16 = ptr;
-    vst1q_u16(ptr_u16, x.0);
-    vst1q_u16(ptr_u16.add(8), x.1);
+    unsafe {
+        let ptr_u16 = ptr;
+        vst1q_u16(ptr_u16, x.0);
+        vst1q_u16(ptr_u16.add(8), x.1);
+    }
 }
 
 #[inline(always)]
 #[cfg(feature = "nightly_f16")]
 pub(crate) unsafe fn xvst1q_u16_x4(ptr: *const f16, x: uint16x8x4_t) {
-    let ptr_u16 = ptr as *mut u16;
-    vst1q_u16(ptr_u16, x.0);
-    vst1q_u16(ptr_u16.add(8), x.1);
-    vst1q_u16(ptr_u16.add(16), x.2);
-    vst1q_u16(ptr_u16.add(24), x.3);
+    unsafe {
+        let ptr_u16 = ptr as *mut u16;
+        vst1q_u16(ptr_u16, x.0);
+        vst1q_u16(ptr_u16.add(8), x.1);
+        vst1q_u16(ptr_u16.add(16), x.2);
+        vst1q_u16(ptr_u16.add(24), x.3);
+    }
 }
 
 macro_rules! conv_vertical_part_neon_16_f16 {

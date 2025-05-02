@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::ImageStore;
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::convolve_vertical_avx_row_f32;
 use crate::convolution::{ConvolutionOptions, HorizontalConvolutionPass, VerticalConvolutionPass};
@@ -46,7 +47,6 @@ use crate::sse::{
     convolve_horizontal_plane_sse_row_one, convolve_horizontal_plane_sse_rows_4,
     convolve_vertical_rgb_sse_row_f32,
 };
-use crate::ImageStore;
 use rayon::ThreadPool;
 
 impl HorizontalConvolutionPass<f32, 1> for ImageStore<'_, f32, 1> {

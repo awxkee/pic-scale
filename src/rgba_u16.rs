@@ -27,11 +27,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
+use crate::ImageStore;
 use crate::convolution::{ConvolutionOptions, HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::dispatch_group_u16::{convolve_horizontal_dispatch_u16, convolve_vertical_dispatch_u16};
 use crate::filter_weights::FilterWeights;
 use crate::image_store::ImageStoreMut;
-use crate::ImageStore;
 use rayon::ThreadPool;
 
 impl HorizontalConvolutionPass<u16, 4> for ImageStore<'_, u16, 4> {

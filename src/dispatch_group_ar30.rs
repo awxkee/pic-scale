@@ -34,9 +34,9 @@ use crate::fixed_point_horizontal_ar30::{
 };
 use crate::fixed_point_vertical_ar30::column_handler_fixed_point_ar30;
 use crate::support::PRECISION;
+use rayon::ThreadPool;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
-use rayon::ThreadPool;
 
 #[allow(clippy::type_complexity)]
 pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
@@ -89,8 +89,8 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
     }
 }
 
-fn get_horizontal_dispatch<const AR30_TYPE: usize, const AR30_ORDER: usize>(
-) -> fn(&[u8], &mut [u8], &FilterWeights<i16>) {
+fn get_horizontal_dispatch<const AR30_TYPE: usize, const AR30_ORDER: usize>()
+-> fn(&[u8], &mut [u8], &FilterWeights<i16>) {
     let mut _dispatch: fn(&[u8], &mut [u8], &FilterWeights<i16>) =
         convolve_row_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]

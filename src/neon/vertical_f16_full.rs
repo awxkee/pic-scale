@@ -42,36 +42,38 @@ pub(crate) unsafe fn xconvolve_vertical_part_neon_8_f16<const USE_BLENDING: bool
     bounds: &FilterBounds,
     blend_length: usize,
 ) {
-    let mut store_0 = vdupq_n_f16(0.);
+    unsafe {
+        let mut store_0 = vdupq_n_f16(0.);
 
-    let px = start_x;
+        let px = start_x;
 
-    for j in 0..bounds.size {
-        let py = start_y + j;
-        let weight = filter.get_unchecked(j..);
-        let v_weight_h = vcvt_f16_f32(vld1q_dup_f32(weight.as_ptr()));
-        let v_weight = vcombine_f16(v_weight_h, v_weight_h);
-        let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
+        for j in 0..bounds.size {
+            let py = start_y + j;
+            let weight = filter.get_unchecked(j..);
+            let v_weight_h = vcvt_f16_f32(vld1q_dup_f32(weight.as_ptr()));
+            let v_weight = vcombine_f16(v_weight_h, v_weight_h);
+            let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
 
-        let s_ptr = src_ptr.add(px);
-        let item_row = if USE_BLENDING {
+            let s_ptr = src_ptr.add(px);
+            let item_row = if USE_BLENDING {
+                let mut transient: [f16; 8] = [0.; 8];
+                std::ptr::copy_nonoverlapping(s_ptr, transient.as_mut_ptr(), blend_length);
+                vld1q_f16(transient.as_ptr())
+            } else {
+                vld1q_f16(s_ptr)
+            };
+
+            store_0 = vfmaq_f16(store_0, item_row, v_weight);
+        }
+
+        let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
+        if USE_BLENDING {
             let mut transient: [f16; 8] = [0.; 8];
-            std::ptr::copy_nonoverlapping(s_ptr, transient.as_mut_ptr(), blend_length);
-            vld1q_f16(transient.as_ptr())
+            vst1q_f16(transient.as_mut_ptr(), store_0);
+            std::ptr::copy_nonoverlapping(transient.as_ptr(), dst_ptr, blend_length);
         } else {
-            vld1q_f16(s_ptr)
-        };
-
-        store_0 = vfmaq_f16(store_0, item_row, v_weight);
-    }
-
-    let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-    if USE_BLENDING {
-        let mut transient: [f16; 8] = [0.; 8];
-        vst1q_f16(transient.as_mut_ptr(), store_0);
-        std::ptr::copy_nonoverlapping(transient.as_ptr(), dst_ptr, blend_length);
-    } else {
-        vst1q_f16(dst_ptr, store_0);
+            vst1q_f16(dst_ptr, store_0);
+        }
     }
 }
 

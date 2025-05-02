@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
-use crate::color_group::{ld_g, ldg_with_offset, st_g_mixed, ColorGroup};
+use crate::color_group::{ColorGroup, ld_g, ldg_with_offset, st_g_mixed};
 use crate::filter_weights::FilterBounds;
 use crate::mixed_storage::MixedStorage;
 use num_traits::{AsPrimitive, Float, MulAdd};

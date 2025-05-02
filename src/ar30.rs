@@ -78,11 +78,7 @@ impl Rgb30 {
             Rgb30::Ar30 => ((3u32 << 30u32) | ((b as u32) << 20)) | (((g as u32) << 10) | r as u32),
             Rgb30::Ra30 => (((r as u32) << 22) | ((g as u32) << 12)) | (((b as u32) << 2) | 3),
         };
-        if STORE == 0 {
-            value
-        } else {
-            htonl(value)
-        }
+        if STORE == 0 { value } else { htonl(value) }
     }
 
     #[inline(always)]

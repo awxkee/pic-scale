@@ -35,18 +35,20 @@ use std::arch::x86_64::*;
 #[inline]
 #[cfg(target_feature = "avx2")]
 pub(crate) unsafe fn _mm_srlv_epi32x(c: __m128i, n: __m128i) -> __m128i {
-    _mm_srlv_epi32(c, n)
+    unsafe { _mm_srlv_epi32(c, n) }
 }
 
 #[inline]
 #[cfg(not(target_feature = "avx2"))]
 pub(crate) unsafe fn _mm_srlv_epi32x(c: __m128i, n: __m128i) -> __m128i {
-    _mm_setr_epi32(
-        _mm_extract_epi32::<0>(c).wrapping_shr(_mm_extract_epi32::<0>(n) as u32),
-        _mm_extract_epi32::<1>(c).wrapping_shr(_mm_extract_epi32::<1>(n) as u32),
-        _mm_extract_epi32::<2>(c).wrapping_shr(_mm_extract_epi32::<2>(n) as u32),
-        _mm_extract_epi32::<3>(c).wrapping_shr(_mm_extract_epi32::<3>(n) as u32),
-    )
+    unsafe {
+        _mm_setr_epi32(
+            _mm_extract_epi32::<0>(c).wrapping_shr(_mm_extract_epi32::<0>(n) as u32),
+            _mm_extract_epi32::<1>(c).wrapping_shr(_mm_extract_epi32::<1>(n) as u32),
+            _mm_extract_epi32::<2>(c).wrapping_shr(_mm_extract_epi32::<2>(n) as u32),
+            _mm_extract_epi32::<3>(c).wrapping_shr(_mm_extract_epi32::<3>(n) as u32),
+        )
+    }
 }
 
 #[inline]
@@ -58,21 +60,25 @@ pub(crate) unsafe fn _mm_sllv_epi32x(c: __m128i, n: __m128i) -> __m128i {
 #[inline]
 #[cfg(not(target_feature = "avx2"))]
 pub(crate) unsafe fn _mm_sllv_epi32x(c: __m128i, n: __m128i) -> __m128i {
-    _mm_setr_epi32(
-        _mm_extract_epi32::<0>(c).wrapping_shl(_mm_extract_epi32::<0>(n) as u32),
-        _mm_extract_epi32::<1>(c).wrapping_shl(_mm_extract_epi32::<1>(n) as u32),
-        _mm_extract_epi32::<2>(c).wrapping_shl(_mm_extract_epi32::<2>(n) as u32),
-        _mm_extract_epi32::<3>(c).wrapping_shl(_mm_extract_epi32::<3>(n) as u32),
-    )
+    unsafe {
+        _mm_setr_epi32(
+            _mm_extract_epi32::<0>(c).wrapping_shl(_mm_extract_epi32::<0>(n) as u32),
+            _mm_extract_epi32::<1>(c).wrapping_shl(_mm_extract_epi32::<1>(n) as u32),
+            _mm_extract_epi32::<2>(c).wrapping_shl(_mm_extract_epi32::<2>(n) as u32),
+            _mm_extract_epi32::<3>(c).wrapping_shl(_mm_extract_epi32::<3>(n) as u32),
+        )
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_blendv_epi32(xmm0: __m128i, xmm1: __m128i, mask: __m128i) -> __m128i {
-    _mm_castps_si128(_mm_blendv_ps(
-        _mm_castsi128_ps(xmm0),
-        _mm_castsi128_ps(xmm1),
-        _mm_castsi128_ps(mask),
-    ))
+    unsafe {
+        _mm_castps_si128(_mm_blendv_ps(
+            _mm_castsi128_ps(xmm0),
+            _mm_castsi128_ps(xmm1),
+            _mm_castsi128_ps(mask),
+        ))
+    }
 }
 
 #[inline(always)]
@@ -82,14 +88,16 @@ pub(crate) unsafe fn _mm_select_epi32(
     true_vals: __m128i,
     false_vals: __m128i,
 ) -> __m128i {
-    _mm_blendv_epi32(false_vals, true_vals, mask)
+    unsafe { _mm_blendv_epi32(false_vals, true_vals, mask) }
 }
 
 #[inline]
 unsafe fn _mm_cmpneq_epi32(a: __m128i, b: __m128i) -> __m128i {
-    // Compare for equality
-    let eq_mask = _mm_cmpeq_epi32(a, b);
-    _mm_xor_si128(eq_mask, _mm_set1_epi32(-1)) // XOR with all 1s (0xFFFFFFFF) to invert
+    unsafe {
+        // Compare for equality
+        let eq_mask = _mm_cmpeq_epi32(a, b);
+        _mm_xor_si128(eq_mask, _mm_set1_epi32(-1)) // XOR with all 1s (0xFFFFFFFF) to invert
+    }
 }
 
 /**
@@ -97,38 +105,40 @@ unsafe fn _mm_cmpneq_epi32(a: __m128i, b: __m128i) -> __m128i {
 **/
 #[inline]
 unsafe fn _mm_cvtph_ps_fallback(k: __m128i) -> __m128 {
-    let h = _mm_unpacklo_epi16(k, _mm_setzero_si128());
-    // Constants
-    let exp_mask = _mm_set1_epi32(0x7C00);
-    let mantissa_mask = _mm_set1_epi32(0x03FF);
+    unsafe {
+        let h = _mm_unpacklo_epi16(k, _mm_setzero_si128());
+        // Constants
+        let exp_mask = _mm_set1_epi32(0x7C00);
+        let mantissa_mask = _mm_set1_epi32(0x03FF);
 
-    // Extract the exponent and mantissa
-    let exp = _mm_srli_epi32::<10>(_mm_and_si128(h, exp_mask));
-    let mantissa = _mm_slli_epi32::<13>(_mm_and_si128(h, mantissa_mask));
-    let v = _mm_srli_epi32::<23>(_mm_castps_si128(_mm_cvtepi32_ps(mantissa)));
-    let j1 = _mm_slli_epi32::<16>(_mm_and_si128(h, _mm_set1_epi32(0x8000)));
-    let is_exp_zero = _mm_cmpeq_epi32(exp, _mm_setzero_si128());
-    let j2 = _mm_select_epi32(
-        is_exp_zero,
-        _mm_setzero_si128(),
-        _mm_or_si128(
-            _mm_slli_epi32::<23>(_mm_add_epi32(exp, _mm_set1_epi32(112))),
-            mantissa,
-        ),
-    );
+        // Extract the exponent and mantissa
+        let exp = _mm_srli_epi32::<10>(_mm_and_si128(h, exp_mask));
+        let mantissa = _mm_slli_epi32::<13>(_mm_and_si128(h, mantissa_mask));
+        let v = _mm_srli_epi32::<23>(_mm_castps_si128(_mm_cvtepi32_ps(mantissa)));
+        let j1 = _mm_slli_epi32::<16>(_mm_and_si128(h, _mm_set1_epi32(0x8000)));
+        let is_exp_zero = _mm_cmpeq_epi32(exp, _mm_setzero_si128());
+        let j2 = _mm_select_epi32(
+            is_exp_zero,
+            _mm_setzero_si128(),
+            _mm_or_si128(
+                _mm_slli_epi32::<23>(_mm_add_epi32(exp, _mm_set1_epi32(112))),
+                mantissa,
+            ),
+        );
 
-    let pvm = _mm_slli_epi32::<23>(_mm_sub_epi32(v, _mm_set1_epi32(37)));
-    let vgm = _mm_and_si128(
-        _mm_sllv_epi32x(mantissa, _mm_sub_epi32(_mm_set1_epi32(150), v)),
-        _mm_set1_epi32(0x007FE000),
-    );
+        let pvm = _mm_slli_epi32::<23>(_mm_sub_epi32(v, _mm_set1_epi32(37)));
+        let vgm = _mm_and_si128(
+            _mm_sllv_epi32x(mantissa, _mm_sub_epi32(_mm_set1_epi32(150), v)),
+            _mm_set1_epi32(0x007FE000),
+        );
 
-    let j3 = _mm_select_epi32(
-        _mm_and_si128(is_exp_zero, _mm_cmpneq_epi32(mantissa, _mm_setzero_si128())),
-        _mm_or_si128(pvm, vgm),
-        _mm_setzero_si128(),
-    );
-    _mm_castsi128_ps(_mm_or_si128(_mm_or_si128(j1, j2), j3))
+        let j3 = _mm_select_epi32(
+            _mm_and_si128(is_exp_zero, _mm_cmpneq_epi32(mantissa, _mm_setzero_si128())),
+            _mm_or_si128(pvm, vgm),
+            _mm_setzero_si128(),
+        );
+        _mm_castsi128_ps(_mm_or_si128(_mm_or_si128(j1, j2), j3))
+    }
 }
 
 /**
@@ -136,46 +146,48 @@ unsafe fn _mm_cvtph_ps_fallback(k: __m128i) -> __m128 {
 **/
 #[inline]
 unsafe fn _mm_cvtps_ph_fallback(x: __m128) -> __m128i {
-    let b = _mm_add_epi32(_mm_castps_si128(x), _mm_set1_epi32(0x00001000));
-    let e = _mm_srli_epi32::<23>(_mm_and_si128(b, _mm_set1_epi32(0x7F800000)));
-    let m = _mm_and_si128(b, _mm_set1_epi32(0x007FFFFF));
+    unsafe {
+        let b = _mm_add_epi32(_mm_castps_si128(x), _mm_set1_epi32(0x00001000));
+        let e = _mm_srli_epi32::<23>(_mm_and_si128(b, _mm_set1_epi32(0x7F800000)));
+        let m = _mm_and_si128(b, _mm_set1_epi32(0x007FFFFF));
 
-    let v_112 = _mm_set1_epi32(112);
-    let j1 = _mm_select_epi32(
-        _mm_cmpgt_epi32(e, v_112),
-        _mm_or_si128(
-            _mm_and_si128(
-                _mm_slli_epi32::<10>(_mm_sub_epi32(e, v_112)),
-                _mm_set1_epi32(0x7C00),
+        let v_112 = _mm_set1_epi32(112);
+        let j1 = _mm_select_epi32(
+            _mm_cmpgt_epi32(e, v_112),
+            _mm_or_si128(
+                _mm_and_si128(
+                    _mm_slli_epi32::<10>(_mm_sub_epi32(e, v_112)),
+                    _mm_set1_epi32(0x7C00),
+                ),
+                _mm_srli_epi32::<13>(m),
             ),
-            _mm_srli_epi32::<13>(m),
-        ),
-        _mm_setzero_si128(),
-    );
-
-    let v2_count = _mm_sub_epi32(_mm_set1_epi32(125), e);
-    let v2 = _mm_srli_epi32::<1>(_mm_add_epi32(
-        _mm_srlv_epi32x(_mm_add_epi32(_mm_set1_epi32(0x007FF000), m), v2_count),
-        _mm_set1_epi32(1),
-    ));
-    let j2 = _mm_select_epi32(
-        _mm_and_si128(
-            _mm_cmplt_epi32(e, _mm_set1_epi32(113)),
-            _mm_cmpgt_epi32(e, _mm_set1_epi32(101)),
-        ),
-        v2,
-        _mm_setzero_si128(),
-    );
-    let sat = _mm_mullo_epi32(
-        _mm_select_epi32(
-            _mm_cmpgt_epi32(e, _mm_set1_epi32(143)),
-            _mm_set1_epi32(1),
             _mm_setzero_si128(),
-        ),
-        _mm_set1_epi32(0x7FFF),
-    );
-    let packed_32 = _mm_or_si128(_mm_or_si128(j1, j2), sat);
-    _mm_packus_epi32(packed_32, _mm_setzero_si128())
+        );
+
+        let v2_count = _mm_sub_epi32(_mm_set1_epi32(125), e);
+        let v2 = _mm_srli_epi32::<1>(_mm_add_epi32(
+            _mm_srlv_epi32x(_mm_add_epi32(_mm_set1_epi32(0x007FF000), m), v2_count),
+            _mm_set1_epi32(1),
+        ));
+        let j2 = _mm_select_epi32(
+            _mm_and_si128(
+                _mm_cmplt_epi32(e, _mm_set1_epi32(113)),
+                _mm_cmpgt_epi32(e, _mm_set1_epi32(101)),
+            ),
+            v2,
+            _mm_setzero_si128(),
+        );
+        let sat = _mm_mullo_epi32(
+            _mm_select_epi32(
+                _mm_cmpgt_epi32(e, _mm_set1_epi32(143)),
+                _mm_set1_epi32(1),
+                _mm_setzero_si128(),
+            ),
+            _mm_set1_epi32(0x7FFF),
+        );
+        let packed_32 = _mm_or_si128(_mm_or_si128(j1, j2), sat);
+        _mm_packus_epi32(packed_32, _mm_setzero_si128())
+    }
 }
 
 #[inline]
@@ -186,10 +198,12 @@ unsafe fn _mm_cvtps_phdx(x: __m128) -> __m128i {
 
 #[inline]
 pub(crate) unsafe fn _mm_cvtps_phx<const F16C: bool>(x: __m128) -> __m128i {
-    if F16C {
-        _mm_cvtps_phdx(x)
-    } else {
-        _mm_cvtps_ph_fallback(x)
+    unsafe {
+        if F16C {
+            _mm_cvtps_phdx(x)
+        } else {
+            _mm_cvtps_ph_fallback(x)
+        }
     }
 }
 
@@ -201,10 +215,12 @@ unsafe fn _mm_cvtph_psdx(x: __m128i) -> __m128 {
 
 #[inline]
 pub(crate) unsafe fn _mm_cvtph_psx<const F16C: bool>(x: __m128i) -> __m128 {
-    if F16C {
-        _mm_cvtph_ps(x)
-    } else {
-        _mm_cvtph_ps_fallback(x)
+    unsafe {
+        if F16C {
+            _mm_cvtph_ps(x)
+        } else {
+            _mm_cvtph_ps_fallback(x)
+        }
     }
 }
 

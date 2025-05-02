@@ -41,24 +41,26 @@ unsafe fn conv_horiz_rgb_4_u8<const D: bool>(
     store: int32x4_t,
     shuffle: uint8x16_t,
 ) -> int32x4_t {
-    const COMPONENTS: usize = 3;
-    let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+    unsafe {
+        const COMPONENTS: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
 
-    let px_lo = vld1_u8(src_ptr.as_ptr());
-    let px_hi_part = vset_lane_u32::<0>(
-        (src_ptr.get_unchecked(8..).as_ptr() as *const u32).read_unaligned(),
-        vdup_n_u32(0),
-    );
+        let px_lo = vld1_u8(src_ptr.as_ptr());
+        let px_hi_part = vset_lane_u32::<0>(
+            (src_ptr.get_unchecked(8..).as_ptr() as *const u32).read_unaligned(),
+            vdup_n_u32(0),
+        );
 
-    let mut rgb_pixel = vcombine_u8(px_lo, vreinterpret_u8_u32(px_hi_part));
-    rgb_pixel = vqtbl1q_u8(rgb_pixel, shuffle);
-    let hi = vreinterpretq_s16_u16(vmovl_high_u8(rgb_pixel));
-    let lo = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(rgb_pixel)));
+        let mut rgb_pixel = vcombine_u8(px_lo, vreinterpret_u8_u32(px_hi_part));
+        rgb_pixel = vqtbl1q_u8(rgb_pixel, shuffle);
+        let hi = vreinterpretq_s16_u16(vmovl_high_u8(rgb_pixel));
+        let lo = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(rgb_pixel)));
 
-    let acc = vxmlal_high_lane_s16::<D, 3>(store, hi, weights);
-    let acc = vxmlal_lane_s16::<D, 2>(acc, vget_low_s16(hi), weights);
-    let acc = vxmlal_high_lane_s16::<D, 1>(acc, lo, weights);
-    vxmlal_lane_s16::<D, 0>(acc, vget_low_s16(lo), weights)
+        let acc = vxmlal_high_lane_s16::<D, 3>(store, hi, weights);
+        let acc = vxmlal_lane_s16::<D, 2>(acc, vget_low_s16(hi), weights);
+        let acc = vxmlal_high_lane_s16::<D, 1>(acc, lo, weights);
+        vxmlal_lane_s16::<D, 0>(acc, vget_low_s16(lo), weights)
+    }
 }
 
 #[must_use]
@@ -70,19 +72,21 @@ unsafe fn conv_horiz_rgba_2_u8<const D: bool>(
     store: int32x4_t,
     shuffle: uint8x8_t,
 ) -> int32x4_t {
-    const COMPONENTS: usize = 3;
-    let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
-    let mut rgb_pixel = vld1_lane_u32::<0>(src_ptr.as_ptr() as *const u32, vdup_n_u32(0));
-    rgb_pixel = vreinterpret_u32_u16(vset_lane_u16::<2>(
-        (src_ptr.get_unchecked(4..).as_ptr() as *const u16).read_unaligned(),
-        vreinterpret_u16_u32(rgb_pixel),
-    ));
-    rgb_pixel = vreinterpret_u32_u8(vtbl1_u8(vreinterpret_u8_u32(rgb_pixel), shuffle));
+    unsafe {
+        const COMPONENTS: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        let mut rgb_pixel = vld1_lane_u32::<0>(src_ptr.as_ptr() as *const u32, vdup_n_u32(0));
+        rgb_pixel = vreinterpret_u32_u16(vset_lane_u16::<2>(
+            (src_ptr.get_unchecked(4..).as_ptr() as *const u16).read_unaligned(),
+            vreinterpret_u16_u32(rgb_pixel),
+        ));
+        rgb_pixel = vreinterpret_u32_u8(vtbl1_u8(vreinterpret_u8_u32(rgb_pixel), shuffle));
 
-    let wide = vreinterpretq_s16_u16(vmovl_u8(vreinterpret_u8_u32(rgb_pixel)));
+        let wide = vreinterpretq_s16_u16(vmovl_u8(vreinterpret_u8_u32(rgb_pixel)));
 
-    let acc = vxmlal_high_lane_s16::<D, 1>(store, wide, weights);
-    vxmlal_lane_s16::<D, 0>(acc, vget_low_s16(wide), weights)
+        let acc = vxmlal_high_lane_s16::<D, 1>(store, wide, weights);
+        vxmlal_lane_s16::<D, 0>(acc, vget_low_s16(wide), weights)
+    }
 }
 
 #[must_use]
@@ -93,22 +97,26 @@ unsafe fn conv_horiz_rgba_1_u8<const D: bool>(
     w0: int16x4_t,
     store: int32x4_t,
 ) -> int32x4_t {
-    const COMPONENTS: usize = 3;
-    let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
-    let rgb_pixel = load_3b_as_u16x4(src_ptr.as_ptr());
-    let lo = vreinterpret_s16_u16(rgb_pixel);
-    vxmlal_s16::<D>(store, lo, w0)
+    unsafe {
+        const COMPONENTS: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        let rgb_pixel = load_3b_as_u16x4(src_ptr.as_ptr());
+        let lo = vreinterpret_s16_u16(rgb_pixel);
+        vxmlal_s16::<D>(store, lo, w0)
+    }
 }
 
 #[inline(always)]
 unsafe fn write_accumulator_u8<const PRECISION: i32>(store: int32x4_t, dst: &mut [u8]) {
-    let store_16 = vqshrun_n_s32::<PRECISION>(store);
-    let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
-    vst1_lane_u16::<0>(
-        dst.as_mut_ptr() as *mut u16,
-        vreinterpret_u16_u8(store_16_8),
-    );
-    vst1_lane_u8::<2>(dst.as_mut_ptr().add(2), store_16_8);
+    unsafe {
+        let store_16 = vqshrun_n_s32::<PRECISION>(store);
+        let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
+        vst1_lane_u16::<0>(
+            dst.as_mut_ptr() as *mut u16,
+            vreinterpret_u16_u8(store_16_8),
+        );
+        vst1_lane_u8::<2>(dst.as_mut_ptr().add(2), store_16_8);
+    }
 }
 
 pub(crate) fn convolve_horizontal_rgb_neon_rows_4(

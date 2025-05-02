@@ -49,60 +49,66 @@ pub(crate) unsafe fn convolve_horizontal_parts_one_sse_rgb(
     weight0: __m128i,
     store_0: __m128i,
 ) -> __m128i {
-    const COMPONENTS: usize = 3;
-    let src_ptr = src.get_unchecked((start_x * COMPONENTS)..).as_ptr();
-    let base_pixel = _mm_loadu_si16(src_ptr);
-    let m_vl = _mm_insert_epi8::<2>(base_pixel, src_ptr.add(2).read_unaligned() as i32);
-    let lo = _mm_unpacklo_epi8(m_vl, _mm_setzero_si128());
-    _mm_add_epi32(
-        store_0,
-        _mm_madd_epi16(_mm_unpacklo_epi16(lo, _mm_setzero_si128()), weight0),
-    )
+    unsafe {
+        const COMPONENTS: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..).as_ptr();
+        let base_pixel = _mm_loadu_si16(src_ptr);
+        let m_vl = _mm_insert_epi8::<2>(base_pixel, src_ptr.add(2).read_unaligned() as i32);
+        let lo = _mm_unpacklo_epi8(m_vl, _mm_setzero_si128());
+        _mm_add_epi32(
+            store_0,
+            _mm_madd_epi16(_mm_unpacklo_epi16(lo, _mm_setzero_si128()), weight0),
+        )
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_rev128_epi32(v: __m128i) -> __m128i {
-    let sh = _mm_setr_epi8(3, 2, 1, 0, 7, 6, 5, 4, 11, 10, 9, 8, 15, 14, 13, 12);
-    _mm_shuffle_epi8(v, sh)
+    unsafe {
+        let sh = _mm_setr_epi8(3, 2, 1, 0, 7, 6, 5, 4, 11, 10, 9, 8, 15, 14, 13, 12);
+        _mm_shuffle_epi8(v, sh)
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_unzip_3_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: (__m128i, __m128i),
 ) -> (__m128i, __m128i, __m128i) {
-    let mask = _mm_set1_epi32(0x3ff);
-    let ar_type: Rgb30 = AR30_TYPE.into();
+    unsafe {
+        let mask = _mm_set1_epi32(0x3ff);
+        let ar_type: Rgb30 = AR30_TYPE.into();
 
-    let v = if AR30_ORDER == 0 {
-        v
-    } else {
-        (_mm_rev128_epi32(v.0), _mm_rev128_epi32(v.1))
-    };
+        let v = if AR30_ORDER == 0 {
+            v
+        } else {
+            (_mm_rev128_epi32(v.0), _mm_rev128_epi32(v.1))
+        };
 
-    match ar_type {
-        Rgb30::Ar30 => {
-            let r0 = _mm_and_si128(v.0, mask);
-            let r1 = _mm_and_si128(v.1, mask);
-            let g0 = _mm_srli_epi32::<10>(v.0);
-            let g1 = _mm_srli_epi32::<10>(v.1);
-            let b0 = _mm_srli_epi32::<20>(v.0);
-            let b1 = _mm_srli_epi32::<20>(v.1);
-            let r = _mm_packus_epi32(r0, r1);
-            let g = _mm_packus_epi32(_mm_and_si128(g0, mask), _mm_and_si128(g1, mask));
-            let b = _mm_packus_epi32(_mm_and_si128(b0, mask), _mm_and_si128(b1, mask));
-            (r, g, b)
-        }
-        Rgb30::Ra30 => {
-            let r0 = _mm_srli_epi32::<22>(v.0);
-            let r1 = _mm_srli_epi32::<22>(v.1);
-            let g0 = _mm_srli_epi32::<12>(v.0);
-            let g1 = _mm_srli_epi32::<12>(v.1);
-            let b0 = _mm_srli_epi32::<2>(v.0);
-            let b1 = _mm_srli_epi32::<2>(v.1);
-            let r = _mm_packus_epi32(_mm_and_si128(r0, mask), _mm_and_si128(r1, mask));
-            let g = _mm_packus_epi32(_mm_and_si128(g0, mask), _mm_and_si128(g1, mask));
-            let b = _mm_packus_epi32(_mm_and_si128(b0, mask), _mm_and_si128(b1, mask));
-            (r, g, b)
+        match ar_type {
+            Rgb30::Ar30 => {
+                let r0 = _mm_and_si128(v.0, mask);
+                let r1 = _mm_and_si128(v.1, mask);
+                let g0 = _mm_srli_epi32::<10>(v.0);
+                let g1 = _mm_srli_epi32::<10>(v.1);
+                let b0 = _mm_srli_epi32::<20>(v.0);
+                let b1 = _mm_srli_epi32::<20>(v.1);
+                let r = _mm_packus_epi32(r0, r1);
+                let g = _mm_packus_epi32(_mm_and_si128(g0, mask), _mm_and_si128(g1, mask));
+                let b = _mm_packus_epi32(_mm_and_si128(b0, mask), _mm_and_si128(b1, mask));
+                (r, g, b)
+            }
+            Rgb30::Ra30 => {
+                let r0 = _mm_srli_epi32::<22>(v.0);
+                let r1 = _mm_srli_epi32::<22>(v.1);
+                let g0 = _mm_srli_epi32::<12>(v.0);
+                let g1 = _mm_srli_epi32::<12>(v.1);
+                let b0 = _mm_srli_epi32::<2>(v.0);
+                let b1 = _mm_srli_epi32::<2>(v.1);
+                let r = _mm_packus_epi32(_mm_and_si128(r0, mask), _mm_and_si128(r1, mask));
+                let g = _mm_packus_epi32(_mm_and_si128(g0, mask), _mm_and_si128(g1, mask));
+                let b = _mm_packus_epi32(_mm_and_si128(b0, mask), _mm_and_si128(b1, mask));
+                (r, g, b)
+            }
         }
     }
 }
@@ -111,67 +117,69 @@ pub(crate) unsafe fn _mm_unzip_3_ar30<const AR30_TYPE: usize, const AR30_ORDER: 
 pub(crate) unsafe fn _mm_zip_4_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: (__m128i, __m128i, __m128i, __m128i),
 ) -> (__m128i, __m128i) {
-    let ar_type: Rgb30 = AR30_TYPE.into();
-    match ar_type {
-        Rgb30::Ar30 => {
-            let mut a0 = _mm_set1_epi32(3 << 30);
-            let mut a1 = _mm_set1_epi32(3 << 30);
+    unsafe {
+        let ar_type: Rgb30 = AR30_TYPE.into();
+        match ar_type {
+            Rgb30::Ar30 => {
+                let mut a0 = _mm_set1_epi32(3 << 30);
+                let mut a1 = _mm_set1_epi32(3 << 30);
 
-            let r0 = _mm_slli_epi32::<20>(_mm_unpacklo_epi16(v.2, _mm_setzero_si128()));
-            let r1 = _mm_slli_epi32::<20>(_mm_unpackhi_epi16(v.2, _mm_setzero_si128()));
+                let r0 = _mm_slli_epi32::<20>(_mm_unpacklo_epi16(v.2, _mm_setzero_si128()));
+                let r1 = _mm_slli_epi32::<20>(_mm_unpackhi_epi16(v.2, _mm_setzero_si128()));
 
-            a0 = _mm_or_si128(a0, r0);
-            a1 = _mm_or_si128(a1, r1);
+                a0 = _mm_or_si128(a0, r0);
+                a1 = _mm_or_si128(a1, r1);
 
-            let j0 = _mm_unpacklo_epi16(v.0, _mm_setzero_si128());
-            let j1 = _mm_unpackhi_epi16(v.0, _mm_setzero_si128());
+                let j0 = _mm_unpacklo_epi16(v.0, _mm_setzero_si128());
+                let j1 = _mm_unpackhi_epi16(v.0, _mm_setzero_si128());
 
-            let g0 = _mm_slli_epi32::<10>(_mm_unpacklo_epi16(v.1, _mm_setzero_si128()));
-            let g1 = _mm_slli_epi32::<10>(_mm_unpackhi_epi16(v.1, _mm_setzero_si128()));
+                let g0 = _mm_slli_epi32::<10>(_mm_unpacklo_epi16(v.1, _mm_setzero_si128()));
+                let g1 = _mm_slli_epi32::<10>(_mm_unpackhi_epi16(v.1, _mm_setzero_si128()));
 
-            a0 = _mm_or_si128(a0, g0);
-            a1 = _mm_or_si128(a1, g1);
+                a0 = _mm_or_si128(a0, g0);
+                a1 = _mm_or_si128(a1, g1);
 
-            a0 = _mm_or_si128(a0, j0);
-            a1 = _mm_or_si128(a1, j1);
+                a0 = _mm_or_si128(a0, j0);
+                a1 = _mm_or_si128(a1, j1);
 
-            if AR30_ORDER == 0 {
-                (a0, a1)
-            } else {
-                (_mm_rev128_epi32(a0), _mm_rev128_epi32(a1))
+                if AR30_ORDER == 0 {
+                    (a0, a1)
+                } else {
+                    (_mm_rev128_epi32(a0), _mm_rev128_epi32(a1))
+                }
             }
-        }
-        Rgb30::Ra30 => {
-            let mut a0 = _mm_set1_epi32(3);
-            let mut a1 = _mm_set1_epi32(3);
+            Rgb30::Ra30 => {
+                let mut a0 = _mm_set1_epi32(3);
+                let mut a1 = _mm_set1_epi32(3);
 
-            let j0 = _mm_unpacklo_epi16(v.0, _mm_setzero_si128());
-            let j1 = _mm_unpackhi_epi16(v.0, _mm_setzero_si128());
-            let j2 = _mm_unpacklo_epi16(v.1, _mm_setzero_si128());
-            let j3 = _mm_unpackhi_epi16(v.1, _mm_setzero_si128());
+                let j0 = _mm_unpacklo_epi16(v.0, _mm_setzero_si128());
+                let j1 = _mm_unpackhi_epi16(v.0, _mm_setzero_si128());
+                let j2 = _mm_unpacklo_epi16(v.1, _mm_setzero_si128());
+                let j3 = _mm_unpackhi_epi16(v.1, _mm_setzero_si128());
 
-            let r0 = _mm_slli_epi32::<22>(j0);
-            let r1 = _mm_slli_epi32::<22>(j1);
+                let r0 = _mm_slli_epi32::<22>(j0);
+                let r1 = _mm_slli_epi32::<22>(j1);
 
-            a0 = _mm_or_si128(a0, r0);
-            a1 = _mm_or_si128(a1, r1);
+                a0 = _mm_or_si128(a0, r0);
+                a1 = _mm_or_si128(a1, r1);
 
-            let j4 = _mm_unpacklo_epi16(v.2, _mm_setzero_si128());
-            let j5 = _mm_unpackhi_epi16(v.2, _mm_setzero_si128());
+                let j4 = _mm_unpacklo_epi16(v.2, _mm_setzero_si128());
+                let j5 = _mm_unpackhi_epi16(v.2, _mm_setzero_si128());
 
-            let g0 = _mm_slli_epi32::<12>(j2);
-            let g1 = _mm_slli_epi32::<12>(j3);
+                let g0 = _mm_slli_epi32::<12>(j2);
+                let g1 = _mm_slli_epi32::<12>(j3);
 
-            a0 = _mm_or_si128(a0, g0);
-            a1 = _mm_or_si128(a1, g1);
+                a0 = _mm_or_si128(a0, g0);
+                a1 = _mm_or_si128(a1, g1);
 
-            a0 = _mm_or_si128(a0, _mm_slli_epi32::<2>(j4));
-            a1 = _mm_or_si128(a1, _mm_slli_epi32::<2>(j5));
+                a0 = _mm_or_si128(a0, _mm_slli_epi32::<2>(j4));
+                a1 = _mm_or_si128(a1, _mm_slli_epi32::<2>(j5));
 
-            if AR30_ORDER == 0 {
-                (a0, a1)
-            } else {
-                (_mm_rev128_epi32(a0), _mm_rev128_epi32(a1))
+                if AR30_ORDER == 0 {
+                    (a0, a1)
+                } else {
+                    (_mm_rev128_epi32(a0), _mm_rev128_epi32(a1))
+                }
             }
         }
     }
@@ -181,100 +189,106 @@ pub(crate) unsafe fn _mm_zip_4_ar30<const AR30_TYPE: usize, const AR30_ORDER: us
 pub(crate) unsafe fn _mm_extract_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: __m128i,
 ) -> __m128i {
-    let v_mask = _mm_set1_epi64x(0x3ff);
-    let k1 = _mm_srli_epi64::<16>(v);
-    let k2 = _mm_srli_epi64::<32>(v);
-    let r = _mm_and_si128(v, v_mask);
-    let g = _mm_and_si128(k1, v_mask);
-    let b = _mm_and_si128(k2, v_mask);
+    unsafe {
+        let v_mask = _mm_set1_epi64x(0x3ff);
+        let k1 = _mm_srli_epi64::<16>(v);
+        let k2 = _mm_srli_epi64::<32>(v);
+        let r = _mm_and_si128(v, v_mask);
+        let g = _mm_and_si128(k1, v_mask);
+        let b = _mm_and_si128(k2, v_mask);
 
-    let ar_type: Rgb30 = AR30_TYPE.into();
+        let ar_type: Rgb30 = AR30_TYPE.into();
 
-    let mut a;
+        let mut a;
 
-    match ar_type {
-        Rgb30::Ar30 => {
-            a = _mm_set1_epi64x(3 << 30);
-            let j0 = _mm_slli_epi64::<20>(b);
-            let j1 = _mm_slli_epi64::<10>(g);
-            a = _mm_or_si128(a, j0);
-            a = _mm_or_si128(a, j1);
-            a = _mm_or_si128(a, r);
+        match ar_type {
+            Rgb30::Ar30 => {
+                a = _mm_set1_epi64x(3 << 30);
+                let j0 = _mm_slli_epi64::<20>(b);
+                let j1 = _mm_slli_epi64::<10>(g);
+                a = _mm_or_si128(a, j0);
+                a = _mm_or_si128(a, j1);
+                a = _mm_or_si128(a, r);
+            }
+            Rgb30::Ra30 => {
+                a = _mm_set1_epi64x(3);
+                let j0 = _mm_slli_epi64::<2>(b);
+                let j1 = _mm_slli_epi64::<12>(g);
+                let j2 = _mm_slli_epi64::<22>(r);
+                a = _mm_or_si128(a, j0);
+                a = _mm_or_si128(a, j1);
+                a = _mm_or_si128(a, j2);
+            }
         }
-        Rgb30::Ra30 => {
-            a = _mm_set1_epi64x(3);
-            let j0 = _mm_slli_epi64::<2>(b);
-            let j1 = _mm_slli_epi64::<12>(g);
-            let j2 = _mm_slli_epi64::<22>(r);
-            a = _mm_or_si128(a, j0);
-            a = _mm_or_si128(a, j1);
-            a = _mm_or_si128(a, j2);
-        }
-    }
 
-    if AR30_ORDER == 1 {
-        a = _mm_rev128_epi32(a);
+        if AR30_ORDER == 1 {
+            a = _mm_rev128_epi32(a);
+        }
+        a
     }
-    a
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_ld1_ar30_s16<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     arr: &[u8],
 ) -> __m128i {
-    let item = u32::from_ne_bytes([
-        *arr.get_unchecked(0),
-        *arr.get_unchecked(1),
-        *arr.get_unchecked(2),
-        *arr.get_unchecked(3),
-    ]);
-    let ar_type: Rgb30 = AR30_TYPE.into();
-    let vl = ar_type.unpack::<AR30_ORDER>(item);
-    let temp = [vl.0 as i16, vl.1 as i16, vl.2 as i16, 1023];
-    _mm_loadu_si64(temp.as_ptr() as *const _)
+    unsafe {
+        let item = u32::from_ne_bytes([
+            *arr.get_unchecked(0),
+            *arr.get_unchecked(1),
+            *arr.get_unchecked(2),
+            *arr.get_unchecked(3),
+        ]);
+        let ar_type: Rgb30 = AR30_TYPE.into();
+        let vl = ar_type.unpack::<AR30_ORDER>(item);
+        let temp = [vl.0 as i16, vl.1 as i16, vl.2 as i16, 1023];
+        _mm_loadu_si64(temp.as_ptr() as *const _)
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_unzips_3_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: __m128i,
 ) -> (__m128i, __m128i, __m128i, __m128i) {
-    let mask = _mm_set1_epi32(0x3ff);
-    let ar_type: Rgb30 = AR30_TYPE.into();
+    unsafe {
+        let mask = _mm_set1_epi32(0x3ff);
+        let ar_type: Rgb30 = AR30_TYPE.into();
 
-    let v = if AR30_ORDER == 0 {
-        v
-    } else {
-        _mm_rev128_epi32(v)
-    };
+        let v = if AR30_ORDER == 0 {
+            v
+        } else {
+            _mm_rev128_epi32(v)
+        };
 
-    match ar_type {
-        Rgb30::Ar30 => {
-            let j0 = _mm_and_si128(v, mask);
-            let j1 = _mm_srli_epi32::<10>(v);
-            let j2 = _mm_srli_epi32::<20>(v);
-            let r = j0;
-            let g = _mm_and_si128(j1, mask);
-            let b = _mm_and_si128(j2, mask);
-            (
-                _mm_packus_epi32(r, r),
-                _mm_packus_epi32(g, g),
-                _mm_packus_epi32(b, b),
-                _mm_set1_epi16(3),
-            )
-        }
-        Rgb30::Ra30 => {
-            let j0 = _mm_srli_epi32::<22>(v);
-            let j1 = _mm_srli_epi32::<12>(v);
-            let j2 = _mm_srli_epi32::<2>(v);
-            let r = _mm_and_si128(j0, mask);
-            let g = _mm_and_si128(j1, mask);
-            let b = _mm_and_si128(j2, mask);
-            (
-                _mm_packus_epi32(r, r),
-                _mm_packus_epi32(g, g),
-                _mm_packus_epi32(b, b),
-                _mm_set1_epi16(3),
-            )
+        match ar_type {
+            Rgb30::Ar30 => {
+                let j0 = _mm_and_si128(v, mask);
+                let j1 = _mm_srli_epi32::<10>(v);
+                let j2 = _mm_srli_epi32::<20>(v);
+                let r = j0;
+                let g = _mm_and_si128(j1, mask);
+                let b = _mm_and_si128(j2, mask);
+                (
+                    _mm_packus_epi32(r, r),
+                    _mm_packus_epi32(g, g),
+                    _mm_packus_epi32(b, b),
+                    _mm_set1_epi16(3),
+                )
+            }
+            Rgb30::Ra30 => {
+                let j0 = _mm_srli_epi32::<22>(v);
+                let j1 = _mm_srli_epi32::<12>(v);
+                let j2 = _mm_srli_epi32::<2>(v);
+                let r = _mm_and_si128(j0, mask);
+                let g = _mm_and_si128(j1, mask);
+                let b = _mm_and_si128(j2, mask);
+                (
+                    _mm_packus_epi32(r, r),
+                    _mm_packus_epi32(g, g),
+                    _mm_packus_epi32(b, b),
+                    _mm_set1_epi16(3),
+                )
+            }
         }
     }
 }
@@ -283,54 +297,58 @@ pub(crate) unsafe fn _mm_unzips_3_ar30<const AR30_TYPE: usize, const AR30_ORDER:
 pub(crate) unsafe fn _mm_unzips_4_ar30_separate<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: __m128i,
 ) -> (__m128i, __m128i) {
-    let values = _mm_unzips_3_ar30::<AR30_TYPE, AR30_ORDER>(v);
-    let a0 = (
-        _mm_unpacklo_epi16(values.0, values.1),
-        _mm_unpackhi_epi16(values.0, values.1),
-    );
-    let a1 = (
-        _mm_unpacklo_epi16(values.2, values.3),
-        _mm_unpackhi_epi16(values.2, values.3),
-    );
-    let v1 = (
-        _mm_unpacklo_epi32(a0.0, a1.0),
-        _mm_unpackhi_epi32(a0.0, a1.0),
-    );
-    let v2 = (
-        _mm_unpacklo_epi32(a0.1, a1.1),
-        _mm_unpackhi_epi32(a0.1, a1.1),
-    );
-    let k0 = v1.0;
-    let k1 = v2.0;
-    let k2 = v1.1;
-    let k3 = v2.1;
-    (_mm_unpacklo_epi64(k0, k1), _mm_unpacklo_epi64(k2, k3))
+    unsafe {
+        let values = _mm_unzips_3_ar30::<AR30_TYPE, AR30_ORDER>(v);
+        let a0 = (
+            _mm_unpacklo_epi16(values.0, values.1),
+            _mm_unpackhi_epi16(values.0, values.1),
+        );
+        let a1 = (
+            _mm_unpacklo_epi16(values.2, values.3),
+            _mm_unpackhi_epi16(values.2, values.3),
+        );
+        let v1 = (
+            _mm_unpacklo_epi32(a0.0, a1.0),
+            _mm_unpackhi_epi32(a0.0, a1.0),
+        );
+        let v2 = (
+            _mm_unpacklo_epi32(a0.1, a1.1),
+            _mm_unpackhi_epi32(a0.1, a1.1),
+        );
+        let k0 = v1.0;
+        let k1 = v2.0;
+        let k2 = v1.1;
+        let k3 = v2.1;
+        (_mm_unpacklo_epi64(k0, k1), _mm_unpacklo_epi64(k2, k3))
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_unzip_4_ar30_separate<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: (__m128i, __m128i),
 ) -> (__m128i, __m128i, __m128i, __m128i) {
-    let values = _mm_unzip_3_ar30::<AR30_TYPE, AR30_ORDER>(v);
-    let a0 = (
-        _mm_unpacklo_epi16(values.0, values.1),
-        _mm_unpackhi_epi16(values.0, values.1),
-    );
-    let a1 = (
-        _mm_unpacklo_epi16(values.2, _mm_set1_epi16(3)),
-        _mm_unpackhi_epi16(values.2, _mm_set1_epi16(3)),
-    );
-    let v1 = (
-        _mm_unpacklo_epi32(a0.0, a1.0),
-        _mm_unpackhi_epi32(a0.0, a1.0),
-    );
-    let v2 = (
-        _mm_unpacklo_epi32(a0.1, a1.1),
-        _mm_unpackhi_epi32(a0.1, a1.1),
-    );
-    let k0 = v1.0;
-    let k1 = v2.0;
-    let k2 = v1.1;
-    let k3 = v2.1;
-    (k0, k1, k2, k3)
+    unsafe {
+        let values = _mm_unzip_3_ar30::<AR30_TYPE, AR30_ORDER>(v);
+        let a0 = (
+            _mm_unpacklo_epi16(values.0, values.1),
+            _mm_unpackhi_epi16(values.0, values.1),
+        );
+        let a1 = (
+            _mm_unpacklo_epi16(values.2, _mm_set1_epi16(3)),
+            _mm_unpackhi_epi16(values.2, _mm_set1_epi16(3)),
+        );
+        let v1 = (
+            _mm_unpacklo_epi32(a0.0, a1.0),
+            _mm_unpackhi_epi32(a0.0, a1.0),
+        );
+        let v2 = (
+            _mm_unpacklo_epi32(a0.1, a1.1),
+            _mm_unpackhi_epi32(a0.1, a1.1),
+        );
+        let k0 = v1.0;
+        let k1 = v2.0;
+        let k2 = v1.1;
+        let k3 = v2.1;
+        (k0, k1, k2, k3)
+    }
 }

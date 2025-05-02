@@ -28,8 +28,8 @@
  */
 
 use colorutils_rs::{
-    lch_to_rgb, lch_with_alpha_to_rgba, rgb_to_lch, rgba_to_lch_with_alpha, TransferFunction,
-    SRGB_TO_XYZ_D65, XYZ_TO_SRGB_D65,
+    SRGB_TO_XYZ_D65, TransferFunction, XYZ_TO_SRGB_D65, lch_to_rgb, lch_with_alpha_to_rgba,
+    rgb_to_lch, rgba_to_lch_with_alpha,
 };
 
 use crate::pic_scale_error::PicScaleError;
@@ -63,15 +63,15 @@ impl LChScaler {
             &SRGB_TO_XYZ_D65,
             TransferFunction::Srgb,
         );
-        let new_store = ImageStore::<f32, 4> {
+
+        ImageStore::<f32, 4> {
             buffer: std::borrow::Cow::Owned(source_slice),
             channels: 4,
             width: store.width,
             height: store.height,
             stride: store.width * 4,
             bit_depth: store.bit_depth,
-        };
-        new_store
+        }
     }
 
     fn lcha_to_srgba<'a>(store: &ImageStoreMut<'a, f32, 4>, into: &mut ImageStoreMut<'a, u8, 4>) {

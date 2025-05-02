@@ -65,44 +65,46 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
         w3: __m256i,
         store: __m256i,
     ) -> __m256i {
-        let src_ptr0 = src0.get_unchecked(start_x * 4..);
-        let src_ptr1 = src1.get_unchecked(start_x * 4..);
+        unsafe {
+            let src_ptr0 = src0.get_unchecked(start_x * 4..);
+            let src_ptr1 = src1.get_unchecked(start_x * 4..);
 
-        let l0_0 = _mm_loadu_si128(src_ptr0.as_ptr() as *const _);
-        let l0_1 = _mm_loadu_si128(src_ptr0.get_unchecked(16..).as_ptr() as *const _);
+            let l0_0 = _mm_loadu_si128(src_ptr0.as_ptr() as *const _);
+            let l0_1 = _mm_loadu_si128(src_ptr0.get_unchecked(16..).as_ptr() as *const _);
 
-        let l1_0 = _mm_loadu_si128(src_ptr1.as_ptr() as *const _);
-        let l1_1 = _mm_loadu_si128(src_ptr1.get_unchecked(16..).as_ptr() as *const _);
+            let l1_0 = _mm_loadu_si128(src_ptr1.as_ptr() as *const _);
+            let l1_1 = _mm_loadu_si128(src_ptr1.get_unchecked(16..).as_ptr() as *const _);
 
-        let rgba_pixel0 = _mm_unzip_4_ar30_separate::<AR_TYPE, AR_ORDER>((l0_0, l0_1));
-        let rgba_pixel1 = _mm_unzip_4_ar30_separate::<AR_TYPE, AR_ORDER>((l1_0, l1_1));
+            let rgba_pixel0 = _mm_unzip_4_ar30_separate::<AR_TYPE, AR_ORDER>((l0_0, l0_1));
+            let rgba_pixel1 = _mm_unzip_4_ar30_separate::<AR_TYPE, AR_ORDER>((l1_0, l1_1));
 
-        let sh1 = _mm256_setr_epi8(
-            0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15, 0, 1, 8, 9, 2, 3, 10, 11, 4, 5,
-            12, 13, 6, 7, 14, 15,
-        );
+            let sh1 = _mm256_setr_epi8(
+                0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15, 0, 1, 8, 9, 2, 3, 10, 11, 4,
+                5, 12, 13, 6, 7, 14, 15,
+            );
 
-        let v0 = _mm256_shuffle_epi8(
-            _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgba_pixel0.0), rgba_pixel1.0),
-            sh1,
-        );
-        let v1 = _mm256_shuffle_epi8(
-            _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgba_pixel0.1), rgba_pixel1.1),
-            sh1,
-        );
-        let v2 = _mm256_shuffle_epi8(
-            _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgba_pixel0.2), rgba_pixel1.2),
-            sh1,
-        );
-        let v3 = _mm256_shuffle_epi8(
-            _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgba_pixel0.3), rgba_pixel1.3),
-            sh1,
-        );
+            let v0 = _mm256_shuffle_epi8(
+                _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgba_pixel0.0), rgba_pixel1.0),
+                sh1,
+            );
+            let v1 = _mm256_shuffle_epi8(
+                _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgba_pixel0.1), rgba_pixel1.1),
+                sh1,
+            );
+            let v2 = _mm256_shuffle_epi8(
+                _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgba_pixel0.2), rgba_pixel1.2),
+                sh1,
+            );
+            let v3 = _mm256_shuffle_epi8(
+                _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgba_pixel0.3), rgba_pixel1.3),
+                sh1,
+            );
 
-        let mut v = _mm256_add_epi32(store, _mm256_madd_epi16(v0, w0));
-        v = _mm256_add_epi32(v, _mm256_madd_epi16(v1, w1));
-        v = _mm256_add_epi32(v, _mm256_madd_epi16(v2, w2));
-        _mm256_add_epi32(v, _mm256_madd_epi16(v3, w3))
+            let mut v = _mm256_add_epi32(store, _mm256_madd_epi16(v0, w0));
+            v = _mm256_add_epi32(v, _mm256_madd_epi16(v1, w1));
+            v = _mm256_add_epi32(v, _mm256_madd_epi16(v2, w2));
+            _mm256_add_epi32(v, _mm256_madd_epi16(v3, w3))
+        }
     }
 
     #[inline]
@@ -116,32 +118,34 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
         w1: __m256i,
         store: __m256i,
     ) -> __m256i {
-        let src_ptr0 = src0.get_unchecked(start_x * 4..);
-        let src_ptr1 = src1.get_unchecked(start_x * 4..);
+        unsafe {
+            let src_ptr0 = src0.get_unchecked(start_x * 4..);
+            let src_ptr1 = src1.get_unchecked(start_x * 4..);
 
-        let rgba_pixel0 = _mm_unzips_4_ar30_separate::<AR_TYPE, AR_ORDER>(_mm_loadu_si128(
-            src_ptr0.as_ptr() as *const _,
-        ));
-        let rgba_pixel1 = _mm_unzips_4_ar30_separate::<AR_TYPE, AR_ORDER>(_mm_loadu_si128(
-            src_ptr1.as_ptr() as *const _,
-        ));
+            let rgba_pixel0 = _mm_unzips_4_ar30_separate::<AR_TYPE, AR_ORDER>(_mm_loadu_si128(
+                src_ptr0.as_ptr() as *const _,
+            ));
+            let rgba_pixel1 = _mm_unzips_4_ar30_separate::<AR_TYPE, AR_ORDER>(_mm_loadu_si128(
+                src_ptr1.as_ptr() as *const _,
+            ));
 
-        let sh1 = _mm256_setr_epi8(
-            0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15, 0, 1, 8, 9, 2, 3, 10, 11, 4, 5,
-            12, 13, 6, 7, 14, 15,
-        );
+            let sh1 = _mm256_setr_epi8(
+                0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15, 0, 1, 8, 9, 2, 3, 10, 11, 4,
+                5, 12, 13, 6, 7, 14, 15,
+            );
 
-        let v0 = _mm256_shuffle_epi8(
-            _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgba_pixel0.0), rgba_pixel1.0),
-            sh1,
-        );
-        let v1 = _mm256_shuffle_epi8(
-            _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgba_pixel0.1), rgba_pixel1.1),
-            sh1,
-        );
+            let v0 = _mm256_shuffle_epi8(
+                _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgba_pixel0.0), rgba_pixel1.0),
+                sh1,
+            );
+            let v1 = _mm256_shuffle_epi8(
+                _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgba_pixel0.1), rgba_pixel1.1),
+                sh1,
+            );
 
-        let v = _mm256_add_epi32(store, _mm256_madd_epi16(v0, w0));
-        _mm256_add_epi32(v, _mm256_madd_epi16(v1, w1))
+            let v = _mm256_add_epi32(store, _mm256_madd_epi16(v0, w0));
+            _mm256_add_epi32(v, _mm256_madd_epi16(v1, w1))
+        }
     }
 
     #[inline]
@@ -154,18 +158,20 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
         w0: __m256i,
         store: __m256i,
     ) -> __m256i {
-        let src_ptr0 = src0.get_unchecked(start_x * 4..);
-        let src_ptr1 = src1.get_unchecked(start_x * 4..);
+        unsafe {
+            let src_ptr0 = src0.get_unchecked(start_x * 4..);
+            let src_ptr1 = src1.get_unchecked(start_x * 4..);
 
-        let ld0 = _mm_ld1_ar30_s16::<AR_TYPE, AR_ORDER>(src_ptr0);
-        let ld1 = _mm_ld1_ar30_s16::<AR_TYPE, AR_ORDER>(src_ptr1);
+            let ld0 = _mm_ld1_ar30_s16::<AR_TYPE, AR_ORDER>(src_ptr0);
+            let ld1 = _mm_ld1_ar30_s16::<AR_TYPE, AR_ORDER>(src_ptr1);
 
-        let full_lane = _mm_unpacklo_epi64(ld0, ld1);
+            let full_lane = _mm_unpacklo_epi64(ld0, ld1);
 
-        _mm256_add_epi32(
-            store,
-            _mm256_madd_epi16(_mm256_cvtepu16_epi32(full_lane), w0),
-        )
+            _mm256_add_epi32(
+                store,
+                _mm256_madd_epi16(_mm256_cvtepu16_epi32(full_lane), w0),
+            )
+        }
     }
 
     #[target_feature(enable = "avx2")]
@@ -324,12 +330,14 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row1ExecutionUnit<AR_TYPE, AR_
         w0: __m128i,
         store: __m128i,
     ) -> __m128i {
-        let src_ptr = src.get_unchecked(start_x * 4..);
-        let ld = _mm_ld1_ar30_s16::<AR_TYPE, AR_ORDER>(src_ptr);
-        _mm_add_epi32(
-            store,
-            _mm_madd_epi16(_mm_unpacklo_epi16(ld, _mm_setzero_si128()), w0),
-        )
+        unsafe {
+            let src_ptr = src.get_unchecked(start_x * 4..);
+            let ld = _mm_ld1_ar30_s16::<AR_TYPE, AR_ORDER>(src_ptr);
+            _mm_add_epi32(
+                store,
+                _mm_madd_epi16(_mm_unpacklo_epi16(ld, _mm_setzero_si128()), w0),
+            )
+        }
     }
 
     #[inline]
@@ -344,24 +352,26 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row1ExecutionUnit<AR_TYPE, AR_
         w3: __m128i,
         store: __m128i,
     ) -> __m128i {
-        let src_ptr = src.get_unchecked(start_x * 4..);
+        unsafe {
+            let src_ptr = src.get_unchecked(start_x * 4..);
 
-        let l0 = _mm_loadu_si128(src_ptr.as_ptr() as *const _);
-        let l1 = _mm_loadu_si128(src_ptr.as_ptr().add(4 * 4) as *const _);
+            let l0 = _mm_loadu_si128(src_ptr.as_ptr() as *const _);
+            let l1 = _mm_loadu_si128(src_ptr.as_ptr().add(4 * 4) as *const _);
 
-        let rgba_pixel = _mm_unzip_4_ar30_separate::<AR_TYPE, AR_ORDER>((l0, l1));
+            let rgba_pixel = _mm_unzip_4_ar30_separate::<AR_TYPE, AR_ORDER>((l0, l1));
 
-        let sh1 = _mm_setr_epi8(0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15);
+            let sh1 = _mm_setr_epi8(0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15);
 
-        let v0 = _mm_shuffle_epi8(rgba_pixel.0, sh1);
-        let v1 = _mm_shuffle_epi8(rgba_pixel.1, sh1);
-        let v2 = _mm_shuffle_epi8(rgba_pixel.2, sh1);
-        let v3 = _mm_shuffle_epi8(rgba_pixel.3, sh1);
+            let v0 = _mm_shuffle_epi8(rgba_pixel.0, sh1);
+            let v1 = _mm_shuffle_epi8(rgba_pixel.1, sh1);
+            let v2 = _mm_shuffle_epi8(rgba_pixel.2, sh1);
+            let v3 = _mm_shuffle_epi8(rgba_pixel.3, sh1);
 
-        let mut v = _mm_add_epi32(store, _mm_madd_epi16(v0, w0));
-        v = _mm_add_epi32(v, _mm_madd_epi16(v1, w1));
-        v = _mm_add_epi32(v, _mm_madd_epi16(v2, w2));
-        _mm_add_epi32(v, _mm_madd_epi16(v3, w3))
+            let mut v = _mm_add_epi32(store, _mm_madd_epi16(v0, w0));
+            v = _mm_add_epi32(v, _mm_madd_epi16(v1, w1));
+            v = _mm_add_epi32(v, _mm_madd_epi16(v2, w2));
+            _mm_add_epi32(v, _mm_madd_epi16(v3, w3))
+        }
     }
 
     #[inline]
@@ -374,19 +384,21 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row1ExecutionUnit<AR_TYPE, AR_
         w1: __m128i,
         store: __m128i,
     ) -> __m128i {
-        let src_ptr = src.get_unchecked(start_x * 4..);
+        unsafe {
+            let src_ptr = src.get_unchecked(start_x * 4..);
 
-        let rgba_pixel = _mm_unzips_4_ar30_separate::<AR_TYPE, AR_ORDER>(_mm_loadu_si128(
-            src_ptr.as_ptr() as *const _,
-        ));
+            let rgba_pixel = _mm_unzips_4_ar30_separate::<AR_TYPE, AR_ORDER>(_mm_loadu_si128(
+                src_ptr.as_ptr() as *const _,
+            ));
 
-        let sh1 = _mm_setr_epi8(0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15);
+            let sh1 = _mm_setr_epi8(0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15);
 
-        let v0 = _mm_shuffle_epi8(rgba_pixel.0, sh1);
-        let v1 = _mm_shuffle_epi8(rgba_pixel.1, sh1);
+            let v0 = _mm_shuffle_epi8(rgba_pixel.0, sh1);
+            let v1 = _mm_shuffle_epi8(rgba_pixel.1, sh1);
 
-        let v = _mm_add_epi32(store, _mm_madd_epi16(v0, w0));
-        _mm_add_epi32(v, _mm_madd_epi16(v1, w1))
+            let v = _mm_add_epi32(store, _mm_madd_epi16(v0, w0));
+            _mm_add_epi32(v, _mm_madd_epi16(v1, w1))
+        }
     }
 
     #[target_feature(enable = "avx2")]

@@ -30,7 +30,7 @@ use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::fixed_point_horizontal::{
     convolve_row_handler_fixed_point, convolve_row_handler_fixed_point_4,
 };
-use crate::fixed_point_vertical::{column_handler_fixed_point, RoundableAccumulator};
+use crate::fixed_point_vertical::{RoundableAccumulator, column_handler_fixed_point};
 use crate::floating_point_horizontal::{
     convolve_row_handler_floating_point, convolve_row_handler_floating_point_4,
 };

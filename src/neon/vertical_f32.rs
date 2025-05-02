@@ -179,26 +179,28 @@ unsafe fn convolve_vertical_part_neon_8_f32(
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
-    let mut store_0 = vdupq_n_f32(0.);
-    let mut store_1 = vdupq_n_f32(0.);
+    unsafe {
+        let mut store_0 = vdupq_n_f32(0.);
+        let mut store_1 = vdupq_n_f32(0.);
 
-    let px = start_x;
+        let px = start_x;
 
-    for j in 0..bounds.size {
-        let py = start_y + j;
-        let weight = filter.get_unchecked(j..);
-        let v_weight = vld1q_dup_f32(weight.as_ptr());
-        let src_ptr = src.get_unchecked(src_stride * py + px..);
-        let item_row = xvld1q_f32_x2(src_ptr.as_ptr());
+        for j in 0..bounds.size {
+            let py = start_y + j;
+            let weight = filter.get_unchecked(j..);
+            let v_weight = vld1q_dup_f32(weight.as_ptr());
+            let src_ptr = src.get_unchecked(src_stride * py + px..);
+            let item_row = xvld1q_f32_x2(src_ptr.as_ptr());
 
-        store_0 = prefer_vfmaq_f32(store_0, item_row.0, v_weight);
-        store_1 = prefer_vfmaq_f32(store_1, item_row.1, v_weight);
+            store_0 = prefer_vfmaq_f32(store_0, item_row.0, v_weight);
+            store_1 = prefer_vfmaq_f32(store_1, item_row.1, v_weight);
+        }
+
+        let item = float32x4x2_t(store_0, store_1);
+
+        let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
+        xvst1q_f32_x2(dst_ptr, item);
     }
-
-    let item = float32x4x2_t(store_0, store_1);
-
-    let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-    xvst1q_f32_x2(dst_ptr, item);
 }
 
 #[inline(always)]
@@ -211,23 +213,25 @@ unsafe fn convolve_vertical_part_neon_4_f32(
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
-    let mut store_0 = vdupq_n_f32(0.);
+    unsafe {
+        let mut store_0 = vdupq_n_f32(0.);
 
-    let px = start_x;
+        let px = start_x;
 
-    for j in 0..bounds.size {
-        let py = start_y + j;
-        let weight = filter.get_unchecked(j..);
-        let v_weight = vld1q_dup_f32(weight.as_ptr());
-        let src_ptr = src.get_unchecked(src_stride * py + px..);
+        for j in 0..bounds.size {
+            let py = start_y + j;
+            let weight = filter.get_unchecked(j..);
+            let v_weight = vld1q_dup_f32(weight.as_ptr());
+            let src_ptr = src.get_unchecked(src_stride * py + px..);
 
-        let item_row = xvld1q_f32_x2(src_ptr.as_ptr());
+            let item_row = xvld1q_f32_x2(src_ptr.as_ptr());
 
-        store_0 = prefer_vfmaq_f32(store_0, item_row.0, v_weight);
+            store_0 = prefer_vfmaq_f32(store_0, item_row.0, v_weight);
+        }
+
+        let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
+        vst1q_f32(dst_ptr, store_0);
     }
-
-    let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-    vst1q_f32(dst_ptr, store_0);
 }
 
 #[inline(always)]
@@ -240,22 +244,24 @@ unsafe fn convolve_vertical_part_neon_1_f32(
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
-    let mut store_0 = vdupq_n_f32(0.);
+    unsafe {
+        let mut store_0 = vdupq_n_f32(0.);
 
-    let px = start_x;
+        let px = start_x;
 
-    for j in 0..bounds.size {
-        let py = start_y + j;
-        let weight = filter.get_unchecked(j..);
-        let v_weight = vld1q_dup_f32(weight.as_ptr());
-        let src_ptr = src.get_unchecked(src_stride * py + px..);
-        let item_row = vld1q_dup_f32(src_ptr.as_ptr());
+        for j in 0..bounds.size {
+            let py = start_y + j;
+            let weight = filter.get_unchecked(j..);
+            let v_weight = vld1q_dup_f32(weight.as_ptr());
+            let src_ptr = src.get_unchecked(src_stride * py + px..);
+            let item_row = vld1q_dup_f32(src_ptr.as_ptr());
 
-        store_0 = prefer_vfmaq_f32(store_0, item_row, v_weight);
+            store_0 = prefer_vfmaq_f32(store_0, item_row, v_weight);
+        }
+
+        let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
+        vst1q_lane_f32::<0>(dst_ptr, store_0);
     }
-
-    let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-    vst1q_lane_f32::<0>(dst_ptr, store_0);
 }
 
 pub(crate) fn convolve_vertical_rgb_neon_row_f32<const CHANNELS: usize>(

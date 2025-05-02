@@ -28,6 +28,7 @@
  */
 #![forbid(unsafe_code)]
 
+use crate::ImageStore;
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::{
     convolve_horizontal_rgba_avx_rows_4_lb, convolve_horizontal_rgba_avx_rows_one_lb,
@@ -50,7 +51,6 @@ use crate::sse::{
 };
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 use crate::wasm32::wasm_vertical_neon_row;
-use crate::ImageStore;
 use rayon::ThreadPool;
 
 impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {

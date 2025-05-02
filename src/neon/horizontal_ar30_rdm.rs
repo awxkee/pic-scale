@@ -44,10 +44,12 @@ unsafe fn conv_horiz_rgba_1_u8_i16<
     w0: int16x4_t,
     store: int16x4_t,
 ) -> int16x4_t {
-    let src_ptr = src.get_unchecked(start_x * 4..);
-    let ld = vld1_ar30_s16::<AR_TYPE, AR_ORDER>(src_ptr);
-    let rgba_pixel = vshl_n_s16::<SCALE>(ld);
-    vqrdmlah_s16(store, rgba_pixel, w0)
+    unsafe {
+        let src_ptr = src.get_unchecked(start_x * 4..);
+        let ld = vld1_ar30_s16::<AR_TYPE, AR_ORDER>(src_ptr);
+        let rgba_pixel = vshl_n_s16::<SCALE>(ld);
+        vqrdmlah_s16(store, rgba_pixel, w0)
+    }
 }
 
 #[inline(always)]
@@ -62,25 +64,28 @@ unsafe fn conv_horiz_rgba_8_u8_i16<
     set2: (int16x4_t, int16x4_t, int16x4_t, int16x4_t),
     store: int16x4_t,
 ) -> int16x4_t {
-    let src_ptr = src.get_unchecked(start_x * 4..);
+    unsafe {
+        let src_ptr = src.get_unchecked(start_x * 4..);
 
-    let rgba_pixel =
-        vunzip_3_ar30_separate::<AR_TYPE, AR_ORDER>(xvld1q_u32_x2(src_ptr.as_ptr() as *const _));
+        let rgba_pixel = vunzip_3_ar30_separate::<AR_TYPE, AR_ORDER>(xvld1q_u32_x2(
+            src_ptr.as_ptr() as *const _,
+        ));
 
-    let hi0 = vshlq_n_s16::<SCALE>(rgba_pixel.1);
-    let lo0 = vshlq_n_s16::<SCALE>(rgba_pixel.0);
-    let hi1 = vshlq_n_s16::<SCALE>(rgba_pixel.3);
-    let lo1 = vshlq_n_s16::<SCALE>(rgba_pixel.2);
+        let hi0 = vshlq_n_s16::<SCALE>(rgba_pixel.1);
+        let lo0 = vshlq_n_s16::<SCALE>(rgba_pixel.0);
+        let hi1 = vshlq_n_s16::<SCALE>(rgba_pixel.3);
+        let lo1 = vshlq_n_s16::<SCALE>(rgba_pixel.2);
 
-    let hi_v = vqrdmulhq_s16(hi0, vcombine_s16(set1.2, set1.3));
-    let mut product = vqrdmlahq_s16(hi_v, lo0, vcombine_s16(set1.0, set1.1));
-    product = vqrdmlahq_s16(product, hi1, vcombine_s16(set2.2, set2.3));
-    product = vqrdmlahq_s16(product, lo1, vcombine_s16(set2.0, set2.1));
+        let hi_v = vqrdmulhq_s16(hi0, vcombine_s16(set1.2, set1.3));
+        let mut product = vqrdmlahq_s16(hi_v, lo0, vcombine_s16(set1.0, set1.1));
+        product = vqrdmlahq_s16(product, hi1, vcombine_s16(set2.2, set2.3));
+        product = vqrdmlahq_s16(product, lo1, vcombine_s16(set2.0, set2.1));
 
-    vadd_s16(
-        vadd_s16(store, vget_low_s16(product)),
-        vget_high_s16(product),
-    )
+        vadd_s16(
+            vadd_s16(store, vget_low_s16(product)),
+            vget_high_s16(product),
+        )
+    }
 }
 
 #[inline]
@@ -97,21 +102,23 @@ unsafe fn conv_horiz_rgba_4_u8_i16<
     w3: int16x4_t,
     store: int16x4_t,
 ) -> int16x4_t {
-    let src_ptr = src.get_unchecked(start_x * 4..);
+    unsafe {
+        let src_ptr = src.get_unchecked(start_x * 4..);
 
-    let rgba_pixel =
-        vunzips_4_ar30_separate::<AR_TYPE, AR_ORDER>(vld1q_u32(src_ptr.as_ptr() as *const _));
+        let rgba_pixel =
+            vunzips_4_ar30_separate::<AR_TYPE, AR_ORDER>(vld1q_u32(src_ptr.as_ptr() as *const _));
 
-    let hi = vshlq_n_s16::<SCALE>(rgba_pixel.1);
-    let lo = vshlq_n_s16::<SCALE>(rgba_pixel.0);
+        let hi = vshlq_n_s16::<SCALE>(rgba_pixel.1);
+        let lo = vshlq_n_s16::<SCALE>(rgba_pixel.0);
 
-    let hi_v = vqrdmulhq_s16(hi, vcombine_s16(w2, w3));
-    let product = vqrdmlahq_s16(hi_v, lo, vcombine_s16(w0, w1));
+        let hi_v = vqrdmulhq_s16(hi, vcombine_s16(w2, w3));
+        let product = vqrdmlahq_s16(hi_v, lo, vcombine_s16(w0, w1));
 
-    vadd_s16(
-        vadd_s16(store, vget_low_s16(product)),
-        vget_high_s16(product),
-    )
+        vadd_s16(
+            vadd_s16(store, vget_low_s16(product)),
+            vget_high_s16(product),
+        )
+    }
 }
 
 pub(crate) fn neon_convolve_horizontal_rgba_rows_4_ar30_rdm<

@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::color_group::{ld_g, ldg_with_offset, st_g_mixed, ColorGroup};
+use crate::color_group::{ColorGroup, ld_g, ldg_with_offset, st_g_mixed};
 use crate::filter_weights::FilterWeights;
 use crate::mixed_storage::MixedStorage;
 use num_traits::{AsPrimitive, Float, MulAdd};

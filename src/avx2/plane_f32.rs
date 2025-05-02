@@ -138,13 +138,15 @@ unsafe fn convolve_horizontal_plane_avx_row_one_regular(
     src: &[f32],
     dst: &mut [f32],
 ) {
-    convolve_horizontal_plane_avx_row_one_impl::<false>(
-        dst_width,
-        src_width,
-        filter_weights,
-        src,
-        dst,
-    );
+    unsafe {
+        convolve_horizontal_plane_avx_row_one_impl::<false>(
+            dst_width,
+            src_width,
+            filter_weights,
+            src,
+            dst,
+        );
+    }
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
@@ -156,13 +158,15 @@ unsafe fn convolve_horizontal_plane_avx_row_one_fma(
     src: &[f32],
     dst: &mut [f32],
 ) {
-    convolve_horizontal_plane_avx_row_one_impl::<true>(
-        dst_width,
-        src_width,
-        filter_weights,
-        src,
-        dst,
-    );
+    unsafe {
+        convolve_horizontal_plane_avx_row_one_impl::<true>(
+            dst_width,
+            src_width,
+            filter_weights,
+            src,
+            dst,
+        );
+    }
 }
 
 #[inline(always)]
@@ -173,45 +177,47 @@ unsafe fn convolve_horizontal_plane_avx_row_one_impl<const FMA: bool>(
     src: &[f32],
     dst: &mut [f32],
 ) {
-    let mut filter_offset = 0usize;
-    let weights_ptr = &filter_weights.weights;
+    unsafe {
+        let mut filter_offset = 0usize;
+        let weights_ptr = &filter_weights.weights;
 
-    for x in 0..dst_width {
-        let bounds = filter_weights.bounds.get_unchecked(x);
-        let mut jx = 0usize;
-        let mut store = _mm_setzero_ps();
+        for x in 0..dst_width {
+            let bounds = filter_weights.bounds.get_unchecked(x);
+            let mut jx = 0usize;
+            let mut store = _mm_setzero_ps();
 
-        use crate::avx2::utils::_mm_prefer_fma_ps;
+            use crate::avx2::utils::_mm_prefer_fma_ps;
 
-        while jx + 4 < bounds.size {
-            let bounds_start = bounds.start + jx;
-            let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
-            let read_weights = _mm_loadu_ps(ptr.as_ptr());
-            store = conv_horiz_plane_4_f32!(bounds_start, src, read_weights, store, FMA);
-            jx += 4;
+            while jx + 4 < bounds.size {
+                let bounds_start = bounds.start + jx;
+                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
+                let read_weights = _mm_loadu_ps(ptr.as_ptr());
+                store = conv_horiz_plane_4_f32!(bounds_start, src, read_weights, store, FMA);
+                jx += 4;
+            }
+
+            while jx + 2 < bounds.size {
+                let bounds_start = bounds.start + jx;
+                let w = weights_ptr.get_unchecked(jx + filter_offset..);
+                let weights = _mm_castsi128_ps(_mm_loadu_si64(w.as_ptr() as *const _));
+                store = conv_horiz_plane_2_f32!(bounds_start, src, weights, store, FMA);
+                jx += 2;
+            }
+
+            while jx < bounds.size {
+                let bounds_start = bounds.start + jx;
+                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
+                let weight0 = _mm_load_ss(ptr.as_ptr());
+                store = conv_horiz_plane_1_f32!(bounds_start, src, weight0, store, FMA);
+                jx += 1;
+            }
+
+            let px = x;
+            let dest_ptr = dst.get_unchecked_mut(px);
+            _mm_store_ss(dest_ptr, _mm_hsum_ps(store));
+
+            filter_offset += filter_weights.aligned_size;
         }
-
-        while jx + 2 < bounds.size {
-            let bounds_start = bounds.start + jx;
-            let w = weights_ptr.get_unchecked(jx + filter_offset..);
-            let weights = _mm_castsi128_ps(_mm_loadu_si64(w.as_ptr() as *const _));
-            store = conv_horiz_plane_2_f32!(bounds_start, src, weights, store, FMA);
-            jx += 2;
-        }
-
-        while jx < bounds.size {
-            let bounds_start = bounds.start + jx;
-            let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
-            let weight0 = _mm_load_ss(ptr.as_ptr());
-            store = conv_horiz_plane_1_f32!(bounds_start, src, weight0, store, FMA);
-            jx += 1;
-        }
-
-        let px = x;
-        let dest_ptr = dst.get_unchecked_mut(px);
-        _mm_store_ss(dest_ptr, _mm_hsum_ps(store));
-
-        filter_offset += filter_weights.aligned_size;
     }
 }
 
@@ -260,15 +266,17 @@ unsafe fn convolve_horizontal_plane_avx_rows_4_regular(
     dst: &mut [f32],
     dst_stride: usize,
 ) {
-    convolve_horizontal_plane_avx_rows_4_impl::<false>(
-        dst_width,
-        src_width,
-        filter_weights,
-        src,
-        src_stride,
-        dst,
-        dst_stride,
-    );
+    unsafe {
+        convolve_horizontal_plane_avx_rows_4_impl::<false>(
+            dst_width,
+            src_width,
+            filter_weights,
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+        );
+    }
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
@@ -282,15 +290,17 @@ unsafe fn convolve_horizontal_plane_avx_rows_4_fma(
     dst: &mut [f32],
     dst_stride: usize,
 ) {
-    convolve_horizontal_plane_avx_rows_4_impl::<true>(
-        dst_width,
-        src_width,
-        filter_weights,
-        src,
-        src_stride,
-        dst,
-        dst_stride,
-    );
+    unsafe {
+        convolve_horizontal_plane_avx_rows_4_impl::<true>(
+            dst_width,
+            src_width,
+            filter_weights,
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+        );
+    }
 }
 
 #[inline(always)]
@@ -303,78 +313,98 @@ unsafe fn convolve_horizontal_plane_avx_rows_4_impl<const FMA: bool>(
     dst: &mut [f32],
     dst_stride: usize,
 ) {
-    let mut filter_offset = 0usize;
-    let weights_ptr = &filter_weights.weights;
+    unsafe {
+        let mut filter_offset = 0usize;
+        let weights_ptr = &filter_weights.weights;
 
-    use crate::avx2::utils::_mm256_prefer_fma_ps;
+        use crate::avx2::utils::_mm256_prefer_fma_ps;
 
-    for x in 0..dst_width {
-        let bounds = filter_weights.bounds.get_unchecked(x);
-        let mut jx = 0usize;
-        let mut store_0 = _mm256_setzero_ps();
-        let mut store_1 = _mm256_setzero_ps();
+        for x in 0..dst_width {
+            let bounds = filter_weights.bounds.get_unchecked(x);
+            let mut jx = 0usize;
+            let mut store_0 = _mm256_setzero_ps();
+            let mut store_1 = _mm256_setzero_ps();
 
-        while jx + 4 < bounds.size {
-            let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
-            let w0 = _mm_loadu_ps(ptr.as_ptr());
+            while jx + 4 < bounds.size {
+                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
+                let w0 = _mm_loadu_ps(ptr.as_ptr());
 
-            let weights = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w0);
+                let weights = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w0);
 
-            let bounds_start = bounds.start + jx;
-            let s_ptr_1 = src.get_unchecked(src_stride..);
-            store_0 =
-                conv_horiz_plane_4_f32_avx!(bounds_start, src, s_ptr_1, weights, store_0, FMA);
-            let s_ptr2 = src.get_unchecked(src_stride * 2..);
-            let s_ptr3 = src.get_unchecked(src_stride * 3..);
-            store_1 =
-                conv_horiz_plane_4_f32_avx!(bounds_start, s_ptr2, s_ptr3, weights, store_1, FMA);
-            jx += 4;
+                let bounds_start = bounds.start + jx;
+                let s_ptr_1 = src.get_unchecked(src_stride..);
+                store_0 =
+                    conv_horiz_plane_4_f32_avx!(bounds_start, src, s_ptr_1, weights, store_0, FMA);
+                let s_ptr2 = src.get_unchecked(src_stride * 2..);
+                let s_ptr3 = src.get_unchecked(src_stride * 3..);
+                store_1 = conv_horiz_plane_4_f32_avx!(
+                    bounds_start,
+                    s_ptr2,
+                    s_ptr3,
+                    weights,
+                    store_1,
+                    FMA
+                );
+                jx += 4;
+            }
+
+            while jx + 2 < bounds.size {
+                let w = weights_ptr.get_unchecked(jx + filter_offset..);
+                let w0 = _mm_castsi128_ps(_mm_loadu_si64(w.as_ptr() as *const _));
+                let weights = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w0);
+                let bounds_start = bounds.start + jx;
+                let s_ptr_1 = src.get_unchecked(src_stride..);
+                store_0 =
+                    conv_horiz_plane_2_f32_avx!(bounds_start, src, s_ptr_1, weights, store_0, FMA);
+                let s_ptr2 = src.get_unchecked(src_stride * 2..);
+                let s_ptr3 = src.get_unchecked(src_stride * 3..);
+                store_1 = conv_horiz_plane_2_f32_avx!(
+                    bounds_start,
+                    s_ptr2,
+                    s_ptr3,
+                    weights,
+                    store_1,
+                    FMA
+                );
+                jx += 2;
+            }
+
+            while jx < bounds.size {
+                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
+                let w0 = _mm_load_ss(ptr.as_ptr());
+                let weights = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w0);
+
+                let bounds_start = bounds.start + jx;
+                let s_ptr_1 = src.get_unchecked(src_stride..);
+                store_0 =
+                    conv_horiz_plane_1_f32_avx!(bounds_start, src, s_ptr_1, weights, store_0, FMA);
+                let s_ptr2 = src.get_unchecked(src_stride * 2..);
+                let s_ptr3 = src.get_unchecked(src_stride * 3..);
+                store_1 = conv_horiz_plane_1_f32_avx!(
+                    bounds_start,
+                    s_ptr2,
+                    s_ptr3,
+                    weights,
+                    store_1,
+                    FMA
+                );
+                jx += 1;
+            }
+
+            let px = x;
+            let dest_ptr = dst.get_unchecked_mut(px);
+            _mm_store_ss(dest_ptr, _mm_hsum_ps(_mm256_castps256_ps128(store_0)));
+
+            let dest_ptr = dst.get_unchecked_mut(px + dst_stride);
+            _mm_store_ss(dest_ptr, _mm_hsum_ps(_mm256_extractf128_ps::<1>(store_0)));
+
+            let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 2);
+            _mm_store_ss(dest_ptr, _mm_hsum_ps(_mm256_castps256_ps128(store_1)));
+
+            let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 3);
+            _mm_store_ss(dest_ptr, _mm_hsum_ps(_mm256_extractf128_ps::<1>(store_1)));
+
+            filter_offset += filter_weights.aligned_size;
         }
-
-        while jx + 2 < bounds.size {
-            let w = weights_ptr.get_unchecked(jx + filter_offset..);
-            let w0 = _mm_castsi128_ps(_mm_loadu_si64(w.as_ptr() as *const _));
-            let weights = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w0);
-            let bounds_start = bounds.start + jx;
-            let s_ptr_1 = src.get_unchecked(src_stride..);
-            store_0 =
-                conv_horiz_plane_2_f32_avx!(bounds_start, src, s_ptr_1, weights, store_0, FMA);
-            let s_ptr2 = src.get_unchecked(src_stride * 2..);
-            let s_ptr3 = src.get_unchecked(src_stride * 3..);
-            store_1 =
-                conv_horiz_plane_2_f32_avx!(bounds_start, s_ptr2, s_ptr3, weights, store_1, FMA);
-            jx += 2;
-        }
-
-        while jx < bounds.size {
-            let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
-            let w0 = _mm_load_ss(ptr.as_ptr());
-            let weights = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w0);
-
-            let bounds_start = bounds.start + jx;
-            let s_ptr_1 = src.get_unchecked(src_stride..);
-            store_0 =
-                conv_horiz_plane_1_f32_avx!(bounds_start, src, s_ptr_1, weights, store_0, FMA);
-            let s_ptr2 = src.get_unchecked(src_stride * 2..);
-            let s_ptr3 = src.get_unchecked(src_stride * 3..);
-            store_1 =
-                conv_horiz_plane_1_f32_avx!(bounds_start, s_ptr2, s_ptr3, weights, store_1, FMA);
-            jx += 1;
-        }
-
-        let px = x;
-        let dest_ptr = dst.get_unchecked_mut(px);
-        _mm_store_ss(dest_ptr, _mm_hsum_ps(_mm256_castps256_ps128(store_0)));
-
-        let dest_ptr = dst.get_unchecked_mut(px + dst_stride);
-        _mm_store_ss(dest_ptr, _mm_hsum_ps(_mm256_extractf128_ps::<1>(store_0)));
-
-        let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 2);
-        _mm_store_ss(dest_ptr, _mm_hsum_ps(_mm256_castps256_ps128(store_1)));
-
-        let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 3);
-        _mm_store_ss(dest_ptr, _mm_hsum_ps(_mm256_extractf128_ps::<1>(store_1)));
-
-        filter_offset += filter_weights.aligned_size;
     }
 }

@@ -32,8 +32,8 @@ use crate::scaler::{Scaling, ScalingF32};
 use crate::support::check_image_size_overflow;
 use crate::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy};
 use colorutils_rs::{
-    lab_to_srgb, lab_with_alpha_to_rgba, rgb_to_lab, rgba_to_lab_with_alpha, TransferFunction,
-    SRGB_TO_XYZ_D65, XYZ_TO_SRGB_D65,
+    SRGB_TO_XYZ_D65, TransferFunction, XYZ_TO_SRGB_D65, lab_to_srgb, lab_with_alpha_to_rgba,
+    rgb_to_lab, rgba_to_lab_with_alpha,
 };
 
 #[derive(Debug, Copy, Clone)]
@@ -62,15 +62,14 @@ impl LabScaler {
             &SRGB_TO_XYZ_D65,
             TransferFunction::Srgb,
         );
-        let new_store = ImageStore::<f32, 4> {
+        ImageStore::<f32, 4> {
             buffer: std::borrow::Cow::Owned(source_slice),
             channels: 4,
             width: store.width,
             height: store.height,
             stride: store.width * 4,
             bit_depth: store.bit_depth,
-        };
-        new_store
+        }
     }
 
     fn laba_to_srgba<'a>(store: &ImageStoreMut<'a, f32, 4>, into: &mut ImageStoreMut<'a, u8, 4>) {

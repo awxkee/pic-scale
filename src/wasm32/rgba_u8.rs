@@ -28,7 +28,7 @@
  */
 
 use crate::filter_weights::FilterWeights;
-use crate::wasm32::utils::{i32x4_saturate2_to_u8, i32x4_saturate_to_u8};
+use crate::wasm32::utils::{i32x4_saturate_to_u8, i32x4_saturate2_to_u8};
 use std::arch::wasm32::*;
 
 #[must_use]
@@ -40,14 +40,16 @@ unsafe fn conv_horiz_rgba_2_u8(
     w1: v128,
     store: v128,
 ) -> v128 {
-    const COMPONENTS: usize = 4;
-    let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+    unsafe {
+        const COMPONENTS: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
 
-    let rgb_pixel = v128_load64_lane::<0>(i32x4_splat(0), src_ptr.as_ptr() as *const _);
-    let wide = u16x8_extend_low_u8x16(rgb_pixel);
+        let rgb_pixel = v128_load64_lane::<0>(i32x4_splat(0), src_ptr.as_ptr() as *const _);
+        let wide = u16x8_extend_low_u8x16(rgb_pixel);
 
-    let acc = i32x4_add(store, i32x4_extmul_high_i16x8(wide, w1));
-    i32x4_add(acc, i32x4_extmul_low_i16x8(wide, w0))
+        let acc = i32x4_add(store, i32x4_extmul_high_i16x8(wide, w1));
+        i32x4_add(acc, i32x4_extmul_low_i16x8(wide, w0))
+    }
 }
 
 #[must_use]
@@ -61,28 +63,32 @@ unsafe fn conv_horiz_rgba_4_u8(
     w3: v128,
     store: v128,
 ) -> v128 {
-    const COMPONENTS: usize = 4;
-    let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+    unsafe {
+        const COMPONENTS: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
 
-    let rgba_pixel = v128_load(src_ptr.as_ptr() as *const _);
+        let rgba_pixel = v128_load(src_ptr.as_ptr() as *const _);
 
-    let hi = u16x8_extend_high_u8x16(rgba_pixel);
-    let lo = u16x8_extend_low_u8x16(rgba_pixel);
+        let hi = u16x8_extend_high_u8x16(rgba_pixel);
+        let lo = u16x8_extend_low_u8x16(rgba_pixel);
 
-    let acc = i32x4_add(store, i32x4_extmul_high_i16x8(hi, w3));
-    let acc = i32x4_add(acc, i32x4_extmul_low_i16x8(hi, w2));
-    let acc = i32x4_add(acc, i32x4_extmul_high_i16x8(lo, w1));
-    i32x4_add(acc, i32x4_extmul_low_i16x8(lo, w0))
+        let acc = i32x4_add(store, i32x4_extmul_high_i16x8(hi, w3));
+        let acc = i32x4_add(acc, i32x4_extmul_low_i16x8(hi, w2));
+        let acc = i32x4_add(acc, i32x4_extmul_high_i16x8(lo, w1));
+        i32x4_add(acc, i32x4_extmul_low_i16x8(lo, w0))
+    }
 }
 
 #[must_use]
 #[inline(always)]
 unsafe fn conv_horiz_rgba_1_u8(start_x: usize, src: &[u8], w0: v128, store: v128) -> v128 {
-    const COMPONENTS: usize = 4;
-    let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
-    let rgba_pixel = v128_load32_lane::<0>(i32x4_splat(0), src_ptr.as_ptr() as *const _);
-    let lo = u16x8_extend_low_u8x16(rgba_pixel);
-    i32x4_add(store, i32x4_extmul_low_i16x8(lo, w0))
+    unsafe {
+        const COMPONENTS: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        let rgba_pixel = v128_load32_lane::<0>(i32x4_splat(0), src_ptr.as_ptr() as *const _);
+        let lo = u16x8_extend_low_u8x16(rgba_pixel);
+        i32x4_add(store, i32x4_extmul_low_i16x8(lo, w0))
+    }
 }
 
 pub(crate) fn convolve_horizontal_rgba_wasm_rows_4_u8(

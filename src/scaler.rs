@@ -40,10 +40,9 @@ use crate::resize_ar30::resize_ar30_impl;
 use crate::support::check_image_size_overflow;
 use crate::threading_policy::ThreadingPolicy;
 use crate::{
-    CbCr16ImageStore, CbCr8ImageStore, CbCrF32ImageStore, ConstPI, ConstSqrt2, Jinc,
-    Planar16ImageStore, Planar8ImageStore, PlanarF32ImageStore, ResamplingFunction,
-    Rgb16ImageStore, Rgb8ImageStore, RgbF32ImageStore, Rgba16ImageStore, Rgba8ImageStore,
-    RgbaF32ImageStore,
+    CbCr8ImageStore, CbCr16ImageStore, CbCrF32ImageStore, ConstPI, ConstSqrt2, Jinc,
+    Planar8ImageStore, Planar16ImageStore, PlanarF32ImageStore, ResamplingFunction, Rgb8ImageStore,
+    Rgb16ImageStore, RgbF32ImageStore, Rgba8ImageStore, Rgba16ImageStore, RgbaF32ImageStore,
 };
 use num_traits::{AsPrimitive, Float, Signed};
 use rayon::ThreadPool;

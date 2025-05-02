@@ -29,68 +29,70 @@
 
 use crate::alpha_handle_f16::{premultiply_pixel_f16_row, unpremultiply_pixel_f16_row};
 use core::f16;
+use rayon::ThreadPool;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
-use rayon::ThreadPool;
 use std::arch::aarch64::*;
 
 unsafe fn neon_premultiply_alpha_rgba_row_f16(dst: &mut [f16], src: &[f16]) {
-    let mut rem = dst;
-    let mut src_rem = src;
+    unsafe {
+        let mut rem = dst;
+        let mut src_rem = src;
 
-    for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
-        let src_ptr = src.as_ptr();
-        let pixel = vld4q_u16(src_ptr as *const u16);
+        for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
+            let src_ptr = src.as_ptr();
+            let pixel = vld4q_u16(src_ptr as *const u16);
 
-        let low_alpha = vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(pixel.3)));
-        let low_r = vmulq_f32(
-            vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(pixel.0))),
-            low_alpha,
-        );
-        let low_g = vmulq_f32(
-            vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(pixel.1))),
-            low_alpha,
-        );
-        let low_b = vmulq_f32(
-            vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(pixel.2))),
-            low_alpha,
-        );
+            let low_alpha = vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(pixel.3)));
+            let low_r = vmulq_f32(
+                vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(pixel.0))),
+                low_alpha,
+            );
+            let low_g = vmulq_f32(
+                vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(pixel.1))),
+                low_alpha,
+            );
+            let low_b = vmulq_f32(
+                vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(pixel.2))),
+                low_alpha,
+            );
 
-        let high_alpha = vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(pixel.3)));
-        let high_r = vmulq_f32(
-            vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(pixel.0))),
-            high_alpha,
-        );
-        let high_g = vmulq_f32(
-            vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(pixel.1))),
-            high_alpha,
-        );
-        let high_b = vmulq_f32(
-            vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(pixel.2))),
-            high_alpha,
-        );
-        let r_values = vcombine_u16(
-            vreinterpret_u16_f16(vcvt_f16_f32(low_r)),
-            vreinterpret_u16_f16(vcvt_f16_f32(high_r)),
-        );
-        let g_values = vcombine_u16(
-            vreinterpret_u16_f16(vcvt_f16_f32(low_g)),
-            vreinterpret_u16_f16(vcvt_f16_f32(high_g)),
-        );
-        let b_values = vcombine_u16(
-            vreinterpret_u16_f16(vcvt_f16_f32(low_b)),
-            vreinterpret_u16_f16(vcvt_f16_f32(high_b)),
-        );
+            let high_alpha = vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(pixel.3)));
+            let high_r = vmulq_f32(
+                vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(pixel.0))),
+                high_alpha,
+            );
+            let high_g = vmulq_f32(
+                vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(pixel.1))),
+                high_alpha,
+            );
+            let high_b = vmulq_f32(
+                vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(pixel.2))),
+                high_alpha,
+            );
+            let r_values = vcombine_u16(
+                vreinterpret_u16_f16(vcvt_f16_f32(low_r)),
+                vreinterpret_u16_f16(vcvt_f16_f32(high_r)),
+            );
+            let g_values = vcombine_u16(
+                vreinterpret_u16_f16(vcvt_f16_f32(low_g)),
+                vreinterpret_u16_f16(vcvt_f16_f32(high_g)),
+            );
+            let b_values = vcombine_u16(
+                vreinterpret_u16_f16(vcvt_f16_f32(low_b)),
+                vreinterpret_u16_f16(vcvt_f16_f32(high_b)),
+            );
 
-        let dst_ptr = dst.as_mut_ptr();
-        let store_pixel = uint16x8x4_t(r_values, g_values, b_values, pixel.3);
-        vst4q_u16(dst_ptr as *mut u16, store_pixel);
+            let dst_ptr = dst.as_mut_ptr();
+            let store_pixel = uint16x8x4_t(r_values, g_values, b_values, pixel.3);
+            vst4q_u16(dst_ptr as *mut u16, store_pixel);
+        }
+
+        rem = rem.chunks_exact_mut(8 * 4).into_remainder();
+        src_rem = src_rem.chunks_exact(8 * 4).remainder();
+
+        premultiply_pixel_f16_row(rem, src_rem);
     }
-
-    rem = rem.chunks_exact_mut(8 * 4).into_remainder();
-    src_rem = src_rem.chunks_exact(8 * 4).remainder();
-
-    premultiply_pixel_f16_row(rem, src_rem);
 }
 
 pub(crate) fn neon_premultiply_alpha_rgba_f16(
@@ -120,79 +122,81 @@ pub(crate) fn neon_premultiply_alpha_rgba_f16(
 }
 
 unsafe fn neon_unpremultiply_alpha_rgba_row_f16(in_place: &mut [f16]) {
-    let mut rem = in_place;
+    unsafe {
+        let mut rem = in_place;
 
-    for dst in rem.chunks_exact_mut(8 * 4) {
-        let src_ptr = dst.as_ptr();
-        let pixel = vld4q_u16(src_ptr as *const u16);
+        for dst in rem.chunks_exact_mut(8 * 4) {
+            let src_ptr = dst.as_ptr();
+            let pixel = vld4q_u16(src_ptr as *const u16);
 
-        let zero_mask = vceqzq_u16(pixel.3);
+            let zero_mask = vceqzq_u16(pixel.3);
 
-        let low_alpha = vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(pixel.3)));
+            let low_alpha = vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(pixel.3)));
 
-        let low_r = vdivq_f32(
-            vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(pixel.0))),
-            low_alpha,
-        );
-        let low_g = vdivq_f32(
-            vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(pixel.1))),
-            low_alpha,
-        );
-        let low_b = vdivq_f32(
-            vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(pixel.2))),
-            low_alpha,
-        );
+            let low_r = vdivq_f32(
+                vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(pixel.0))),
+                low_alpha,
+            );
+            let low_g = vdivq_f32(
+                vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(pixel.1))),
+                low_alpha,
+            );
+            let low_b = vdivq_f32(
+                vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(pixel.2))),
+                low_alpha,
+            );
 
-        let high_alpha = vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(pixel.3)));
+            let high_alpha = vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(pixel.3)));
 
-        let high_r = vdivq_f32(
-            vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(pixel.0))),
-            high_alpha,
-        );
-        let high_g = vdivq_f32(
-            vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(pixel.1))),
-            high_alpha,
-        );
-        let high_b = vdivq_f32(
-            vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(pixel.2))),
-            high_alpha,
-        );
+            let high_r = vdivq_f32(
+                vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(pixel.0))),
+                high_alpha,
+            );
+            let high_g = vdivq_f32(
+                vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(pixel.1))),
+                high_alpha,
+            );
+            let high_b = vdivq_f32(
+                vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(pixel.2))),
+                high_alpha,
+            );
 
-        let u_zeros = vdupq_n_u16(0);
+            let u_zeros = vdupq_n_u16(0);
 
-        let r_values = vbslq_u16(
-            zero_mask,
-            u_zeros,
-            vcombine_u16(
-                vreinterpret_u16_f16(vcvt_f16_f32(low_r)),
-                vreinterpret_u16_f16(vcvt_f16_f32(high_r)),
-            ),
-        );
-        let g_values = vbslq_u16(
-            zero_mask,
-            u_zeros,
-            vcombine_u16(
-                vreinterpret_u16_f16(vcvt_f16_f32(low_g)),
-                vreinterpret_u16_f16(vcvt_f16_f32(high_g)),
-            ),
-        );
-        let b_values = vbslq_u16(
-            zero_mask,
-            u_zeros,
-            vcombine_u16(
-                vreinterpret_u16_f16(vcvt_f16_f32(low_b)),
-                vreinterpret_u16_f16(vcvt_f16_f32(high_b)),
-            ),
-        );
+            let r_values = vbslq_u16(
+                zero_mask,
+                u_zeros,
+                vcombine_u16(
+                    vreinterpret_u16_f16(vcvt_f16_f32(low_r)),
+                    vreinterpret_u16_f16(vcvt_f16_f32(high_r)),
+                ),
+            );
+            let g_values = vbslq_u16(
+                zero_mask,
+                u_zeros,
+                vcombine_u16(
+                    vreinterpret_u16_f16(vcvt_f16_f32(low_g)),
+                    vreinterpret_u16_f16(vcvt_f16_f32(high_g)),
+                ),
+            );
+            let b_values = vbslq_u16(
+                zero_mask,
+                u_zeros,
+                vcombine_u16(
+                    vreinterpret_u16_f16(vcvt_f16_f32(low_b)),
+                    vreinterpret_u16_f16(vcvt_f16_f32(high_b)),
+                ),
+            );
 
-        let dst_ptr = dst.as_mut_ptr();
-        let store_pixel = uint16x8x4_t(r_values, g_values, b_values, pixel.3);
-        vst4q_u16(dst_ptr as *mut u16, store_pixel);
+            let dst_ptr = dst.as_mut_ptr();
+            let store_pixel = uint16x8x4_t(r_values, g_values, b_values, pixel.3);
+            vst4q_u16(dst_ptr as *mut u16, store_pixel);
+        }
+
+        rem = rem.chunks_exact_mut(8 * 4).into_remainder();
+
+        unpremultiply_pixel_f16_row(rem);
     }
-
-    rem = rem.chunks_exact_mut(8 * 4).into_remainder();
-
-    unpremultiply_pixel_f16_row(rem);
 }
 
 pub(crate) fn neon_unpremultiply_alpha_rgba_f16(

@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
-use crate::color_group::{ld_g, ldg_with_offset, st_g, ColorGroup};
+use crate::color_group::{ColorGroup, ld_g, ldg_with_offset, st_g};
 use crate::filter_weights::FilterWeights;
 use crate::saturate_narrow::SaturateNarrow;
 use crate::support::ROUNDING_CONST;

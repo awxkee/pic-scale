@@ -28,8 +28,8 @@
  */
 
 use colorutils_rs::{
-    rgba_to_xyz_with_alpha, srgb_to_xyz, xyz_to_srgb, xyz_with_alpha_to_rgba, TransferFunction,
-    SRGB_TO_XYZ_D65, XYZ_TO_SRGB_D65,
+    SRGB_TO_XYZ_D65, TransferFunction, XYZ_TO_SRGB_D65, rgba_to_xyz_with_alpha, srgb_to_xyz,
+    xyz_to_srgb, xyz_with_alpha_to_rgba,
 };
 
 use crate::pic_scale_error::PicScaleError;

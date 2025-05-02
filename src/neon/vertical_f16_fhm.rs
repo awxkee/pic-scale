@@ -86,48 +86,51 @@ pub(crate) unsafe fn conv_vertical_part_neon_32_f16(
     filter: &[f16],
     bounds: &FilterBounds,
 ) {
-    let mut store_0 = vdupq_n_f32(0.);
-    let mut store_1 = vdupq_n_f32(0.);
-    let mut store_2 = vdupq_n_f32(0.);
-    let mut store_3 = vdupq_n_f32(0.);
-    let mut store_4 = vdupq_n_f32(0.);
-    let mut store_5 = vdupq_n_f32(0.);
-    let mut store_6 = vdupq_n_f32(0.);
-    let mut store_7 = vdupq_n_f32(0.);
+    unsafe {
+        let mut store_0 = vdupq_n_f32(0.);
+        let mut store_1 = vdupq_n_f32(0.);
+        let mut store_2 = vdupq_n_f32(0.);
+        let mut store_3 = vdupq_n_f32(0.);
+        let mut store_4 = vdupq_n_f32(0.);
+        let mut store_5 = vdupq_n_f32(0.);
+        let mut store_6 = vdupq_n_f32(0.);
+        let mut store_7 = vdupq_n_f32(0.);
 
-    let px = start_x;
+        let px = start_x;
 
-    for j in 0..bounds.size {
-        let py = start_y + j;
-        let v_weight =
-            vreinterpretq_f16_u16(vld1q_dup_u16(filter.get_unchecked(j..).as_ptr() as *const _));
-        let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
+        for j in 0..bounds.size {
+            let py = start_y + j;
+            let v_weight = vreinterpretq_f16_u16(vld1q_dup_u16(
+                filter.get_unchecked(j..).as_ptr() as *const _
+            ));
+            let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
 
-        let s_ptr = src_ptr.add(px);
-        let item_row = xvld1q_u16_x4(s_ptr as *const _);
+            let s_ptr = src_ptr.add(px);
+            let item_row = xvld1q_u16_x4(s_ptr as *const _);
 
-        store_0 = vfmlalq_low_f16(store_0, vreinterpretq_f16_u16(item_row.0), v_weight);
-        store_1 = vfmlalq_high_f16(store_1, vreinterpretq_f16_u16(item_row.0), v_weight);
-        store_2 = vfmlalq_low_f16(store_2, vreinterpretq_f16_u16(item_row.1), v_weight);
-        store_3 = vfmlalq_high_f16(store_3, vreinterpretq_f16_u16(item_row.1), v_weight);
+            store_0 = vfmlalq_low_f16(store_0, vreinterpretq_f16_u16(item_row.0), v_weight);
+            store_1 = vfmlalq_high_f16(store_1, vreinterpretq_f16_u16(item_row.0), v_weight);
+            store_2 = vfmlalq_low_f16(store_2, vreinterpretq_f16_u16(item_row.1), v_weight);
+            store_3 = vfmlalq_high_f16(store_3, vreinterpretq_f16_u16(item_row.1), v_weight);
 
-        store_4 = vfmlalq_low_f16(store_4, vreinterpretq_f16_u16(item_row.2), v_weight);
-        store_5 = vfmlalq_high_f16(store_5, vreinterpretq_f16_u16(item_row.2), v_weight);
-        store_6 = vfmlalq_low_f16(store_6, vreinterpretq_f16_u16(item_row.3), v_weight);
-        store_7 = vfmlalq_high_f16(store_7, vreinterpretq_f16_u16(item_row.3), v_weight);
+            store_4 = vfmlalq_low_f16(store_4, vreinterpretq_f16_u16(item_row.2), v_weight);
+            store_5 = vfmlalq_high_f16(store_5, vreinterpretq_f16_u16(item_row.2), v_weight);
+            store_6 = vfmlalq_low_f16(store_6, vreinterpretq_f16_u16(item_row.3), v_weight);
+            store_7 = vfmlalq_high_f16(store_7, vreinterpretq_f16_u16(item_row.3), v_weight);
+        }
+
+        let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
+        let f_set = float16x8x4_t(
+            vcombine_f16(vcvt_f16_f32(store_0), vcvt_f16_f32(store_1)),
+            vcombine_f16(vcvt_f16_f32(store_2), vcvt_f16_f32(store_3)),
+            vcombine_f16(vcvt_f16_f32(store_4), vcvt_f16_f32(store_5)),
+            vcombine_f16(vcvt_f16_f32(store_6), vcvt_f16_f32(store_7)),
+        );
+        vst1q_f16(dst_ptr, f_set.0);
+        vst1q_f16(dst_ptr.add(8), f_set.1);
+        vst1q_f16(dst_ptr.add(16), f_set.2);
+        vst1q_f16(dst_ptr.add(24), f_set.3);
     }
-
-    let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-    let f_set = float16x8x4_t(
-        vcombine_f16(vcvt_f16_f32(store_0), vcvt_f16_f32(store_1)),
-        vcombine_f16(vcvt_f16_f32(store_2), vcvt_f16_f32(store_3)),
-        vcombine_f16(vcvt_f16_f32(store_4), vcvt_f16_f32(store_5)),
-        vcombine_f16(vcvt_f16_f32(store_6), vcvt_f16_f32(store_7)),
-    );
-    vst1q_f16(dst_ptr, f_set.0);
-    vst1q_f16(dst_ptr.add(8), f_set.1);
-    vst1q_f16(dst_ptr.add(16), f_set.2);
-    vst1q_f16(dst_ptr.add(24), f_set.3);
 }
 
 #[inline(always)]
@@ -230,39 +233,42 @@ unsafe fn convolve_vertical_part_neon_8_f16_fhm<const USE_BLENDING: bool>(
     bounds: &FilterBounds,
     blend_length: usize,
 ) {
-    let mut store_0 = vdupq_n_f32(0f32);
-    let mut store_1 = vdupq_n_f32(0f32);
+    unsafe {
+        let mut store_0 = vdupq_n_f32(0f32);
+        let mut store_1 = vdupq_n_f32(0f32);
 
-    let px = start_x;
+        let px = start_x;
 
-    for j in 0..bounds.size {
-        let py = start_y + j;
-        let v_weight =
-            vreinterpretq_f16_u16(vld1q_dup_u16(filter.get_unchecked(j..).as_ptr() as *const _));
-        let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
+        for j in 0..bounds.size {
+            let py = start_y + j;
+            let v_weight = vreinterpretq_f16_u16(vld1q_dup_u16(
+                filter.get_unchecked(j..).as_ptr() as *const _
+            ));
+            let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
 
-        let s_ptr = src_ptr.add(px);
-        let item_row = if USE_BLENDING {
+            let s_ptr = src_ptr.add(px);
+            let item_row = if USE_BLENDING {
+                let mut transient: [f16; 8] = [0.; 8];
+                std::ptr::copy_nonoverlapping(s_ptr, transient.as_mut_ptr(), blend_length);
+                vld1q_f16(transient.as_ptr())
+            } else {
+                vld1q_f16(s_ptr)
+            };
+
+            store_0 = vfmlalq_low_f16(store_0, item_row, v_weight);
+            store_1 = vfmlalq_high_f16(store_1, item_row, v_weight);
+        }
+
+        let item = vcombine_f16(vcvt_f16_f32(store_0), vcvt_f16_f32(store_1));
+
+        let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
+        if USE_BLENDING {
             let mut transient: [f16; 8] = [0.; 8];
-            std::ptr::copy_nonoverlapping(s_ptr, transient.as_mut_ptr(), blend_length);
-            vld1q_f16(transient.as_ptr())
+            vst1q_f16(transient.as_mut_ptr(), item);
+            std::ptr::copy_nonoverlapping(transient.as_ptr(), dst_ptr, blend_length);
         } else {
-            vld1q_f16(s_ptr)
-        };
-
-        store_0 = vfmlalq_low_f16(store_0, item_row, v_weight);
-        store_1 = vfmlalq_high_f16(store_1, item_row, v_weight);
-    }
-
-    let item = vcombine_f16(vcvt_f16_f32(store_0), vcvt_f16_f32(store_1));
-
-    let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-    if USE_BLENDING {
-        let mut transient: [f16; 8] = [0.; 8];
-        vst1q_f16(transient.as_mut_ptr(), item);
-        std::ptr::copy_nonoverlapping(transient.as_ptr(), dst_ptr, blend_length);
-    } else {
-        vst1q_f16(dst_ptr, item);
+            vst1q_f16(dst_ptr, item);
+        }
     }
 }
 
@@ -275,29 +281,53 @@ unsafe fn convolve_vertical_rgb_neon_row_f16_impl(
     src_stride: usize,
     weight_ptr: &[f16],
 ) {
-    let mut cx = 0usize;
-    let dst_width = dst.len();
+    unsafe {
+        let mut cx = 0usize;
+        let dst_width = dst.len();
 
-    while cx + 48 < dst_width {
-        conv_vertical_part_neon_48_f16(bounds.start, cx, src, src_stride, dst, weight_ptr, bounds);
+        while cx + 48 < dst_width {
+            conv_vertical_part_neon_48_f16(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weight_ptr,
+                bounds,
+            );
 
-        cx += 48;
-    }
+            cx += 48;
+        }
 
-    while cx + 32 < dst_width {
-        conv_vertical_part_neon_32_f16(bounds.start, cx, src, src_stride, dst, weight_ptr, bounds);
+        while cx + 32 < dst_width {
+            conv_vertical_part_neon_32_f16(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weight_ptr,
+                bounds,
+            );
 
-        cx += 32;
-    }
+            cx += 32;
+        }
 
-    while cx + 16 < dst_width {
-        conv_vertical_part_neon_16_f16(bounds.start, cx, src, src_stride, dst, weight_ptr, bounds);
+        while cx + 16 < dst_width {
+            conv_vertical_part_neon_16_f16(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weight_ptr,
+                bounds,
+            );
 
-        cx += 16;
-    }
+            cx += 16;
+        }
 
-    while cx + 8 < dst_width {
-        unsafe {
+        while cx + 8 < dst_width {
             convolve_vertical_part_neon_8_f16_fhm::<false>(
                 bounds.start,
                 cx,
@@ -308,15 +338,13 @@ unsafe fn convolve_vertical_rgb_neon_row_f16_impl(
                 bounds,
                 8,
             );
+
+            cx += 8;
         }
 
-        cx += 8;
-    }
+        let left = dst_width - cx;
 
-    let left = dst_width - cx;
-
-    if left > 0 {
-        unsafe {
+        if left > 0 {
             convolve_vertical_part_neon_8_f16_fhm::<true>(
                 bounds.start,
                 cx,

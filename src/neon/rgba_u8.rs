@@ -42,26 +42,28 @@ unsafe fn conv_horiz_rgba_8_u8<const D: bool>(
     weights: int16x8_t,
     store: int32x4_t,
 ) -> int32x4_t {
-    const COMPONENTS: usize = 4;
-    let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+    unsafe {
+        const COMPONENTS: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
 
-    let rgba_pixel = xvld1q_u8_x2(src_ptr.as_ptr());
+        let rgba_pixel = xvld1q_u8_x2(src_ptr.as_ptr());
 
-    let hi0 = vreinterpretq_s16_u16(vmovl_high_u8(rgba_pixel.0));
-    let lo0 = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(rgba_pixel.0)));
-    let hi1 = vreinterpretq_s16_u16(vmovl_high_u8(rgba_pixel.1));
-    let lo1 = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(rgba_pixel.1)));
+        let hi0 = vreinterpretq_s16_u16(vmovl_high_u8(rgba_pixel.0));
+        let lo0 = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(rgba_pixel.0)));
+        let hi1 = vreinterpretq_s16_u16(vmovl_high_u8(rgba_pixel.1));
+        let lo1 = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(rgba_pixel.1)));
 
-    let mut acc = vxmlal_high_laneq_s16::<D, 3>(store, hi0, weights);
-    acc = vxmlal_laneq_s16::<D, 2>(acc, vget_low_s16(hi0), weights);
-    acc = vxmlal_high_laneq_s16::<D, 1>(acc, lo0, weights);
-    acc = vxmlal_laneq_s16::<D, 0>(acc, vget_low_s16(lo0), weights);
+        let mut acc = vxmlal_high_laneq_s16::<D, 3>(store, hi0, weights);
+        acc = vxmlal_laneq_s16::<D, 2>(acc, vget_low_s16(hi0), weights);
+        acc = vxmlal_high_laneq_s16::<D, 1>(acc, lo0, weights);
+        acc = vxmlal_laneq_s16::<D, 0>(acc, vget_low_s16(lo0), weights);
 
-    acc = vxmlal_high_laneq_s16::<D, 7>(acc, hi1, weights);
-    acc = vxmlal_laneq_s16::<D, 6>(acc, vget_low_s16(hi1), weights);
-    acc = vxmlal_high_laneq_s16::<D, 5>(acc, lo1, weights);
-    acc = vxmlal_laneq_s16::<D, 4>(acc, vget_low_s16(lo1), weights);
-    acc
+        acc = vxmlal_high_laneq_s16::<D, 7>(acc, hi1, weights);
+        acc = vxmlal_laneq_s16::<D, 6>(acc, vget_low_s16(hi1), weights);
+        acc = vxmlal_high_laneq_s16::<D, 5>(acc, lo1, weights);
+        acc = vxmlal_laneq_s16::<D, 4>(acc, vget_low_s16(lo1), weights);
+        acc
+    }
 }
 
 #[must_use]
@@ -72,14 +74,16 @@ unsafe fn conv_horiz_rgba_2_u8<const D: bool>(
     weights: int16x4_t,
     store: int32x4_t,
 ) -> int32x4_t {
-    const COMPONENTS: usize = 4;
-    let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+    unsafe {
+        const COMPONENTS: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
 
-    let rgb_pixel = vld1_u8(src_ptr.as_ptr());
-    let wide = vreinterpretq_s16_u16(vmovl_u8(rgb_pixel));
+        let rgb_pixel = vld1_u8(src_ptr.as_ptr());
+        let wide = vreinterpretq_s16_u16(vmovl_u8(rgb_pixel));
 
-    let acc = vxmlal_high_lane_s16::<D, 1>(store, wide, weights);
-    vxmlal_lane_s16::<D, 0>(acc, vget_low_s16(wide), weights)
+        let acc = vxmlal_high_lane_s16::<D, 1>(store, wide, weights);
+        vxmlal_lane_s16::<D, 0>(acc, vget_low_s16(wide), weights)
+    }
 }
 
 #[must_use]
@@ -90,18 +94,20 @@ unsafe fn conv_horiz_rgba_4_u8<const D: bool>(
     weights: int16x4_t,
     store: int32x4_t,
 ) -> int32x4_t {
-    const COMPONENTS: usize = 4;
-    let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+    unsafe {
+        const COMPONENTS: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
 
-    let rgba_pixel = vld1q_u8(src_ptr.as_ptr());
+        let rgba_pixel = vld1q_u8(src_ptr.as_ptr());
 
-    let hi = vreinterpretq_s16_u16(vmovl_high_u8(rgba_pixel));
-    let lo = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(rgba_pixel)));
+        let hi = vreinterpretq_s16_u16(vmovl_high_u8(rgba_pixel));
+        let lo = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(rgba_pixel)));
 
-    let acc = vxmlal_high_lane_s16::<D, 3>(store, hi, weights);
-    let acc = vxmlal_lane_s16::<D, 2>(acc, vget_low_s16(hi), weights);
-    let acc = vxmlal_high_lane_s16::<D, 1>(acc, lo, weights);
-    vxmlal_lane_s16::<D, 0>(acc, vget_low_s16(lo), weights)
+        let acc = vxmlal_high_lane_s16::<D, 3>(store, hi, weights);
+        let acc = vxmlal_lane_s16::<D, 2>(acc, vget_low_s16(hi), weights);
+        let acc = vxmlal_high_lane_s16::<D, 1>(acc, lo, weights);
+        vxmlal_lane_s16::<D, 0>(acc, vget_low_s16(lo), weights)
+    }
 }
 
 #[must_use]
@@ -112,11 +118,13 @@ unsafe fn conv_horiz_rgba_1_u8<const D: bool>(
     w0: int16x4_t,
     store: int32x4_t,
 ) -> int32x4_t {
-    const COMPONENTS: usize = 4;
-    let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
-    let rgba_pixel = load_4b_as_u16x4(src_ptr.as_ptr());
-    let lo = vreinterpret_s16_u16(rgba_pixel);
-    vxmlal_s16::<D>(store, lo, w0)
+    unsafe {
+        const COMPONENTS: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        let rgba_pixel = load_4b_as_u16x4(src_ptr.as_ptr());
+        let lo = vreinterpret_s16_u16(rgba_pixel);
+        vxmlal_s16::<D>(store, lo, w0)
+    }
 }
 
 pub(crate) fn convolve_horizontal_rgba_neon_rows_4_u8(

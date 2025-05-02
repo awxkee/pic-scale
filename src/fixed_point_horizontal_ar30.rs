@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
-use crate::color_group::{ld_ar30, ld_ar30_with_offset, load_ar30_p, ColorGroup};
+use crate::color_group::{ColorGroup, ld_ar30, ld_ar30_with_offset, load_ar30_p};
 use crate::filter_weights::FilterWeights;
 use crate::support::ROUNDING_CONST;
 use num_traits::AsPrimitive;

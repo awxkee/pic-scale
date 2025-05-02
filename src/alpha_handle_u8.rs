@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
+use crate::WorkloadStrategy;
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::{avx_premultiply_alpha_rgba, avx_unpremultiply_alpha_rgba};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -35,11 +36,10 @@ use crate::neon::{neon_premultiply_alpha_rgba, neon_unpremultiply_alpha_rgba};
 use crate::sse::*;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128",))]
 use crate::wasm32::{wasm_premultiply_alpha_rgba, wasm_unpremultiply_alpha_rgba};
-use crate::WorkloadStrategy;
+use rayon::ThreadPool;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::ParallelSlice;
 use rayon::slice::ParallelSliceMut;
-use rayon::ThreadPool;
 
 #[inline]
 /// Divides value by 255 with rounding to nearest

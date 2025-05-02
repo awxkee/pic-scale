@@ -27,9 +27,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![allow(clippy::excessive_precision)]
+use crate::Jinc;
 use crate::math::consts::ConstPI;
 use crate::sinc::sinc;
-use crate::Jinc;
 use num_traits::{AsPrimitive, Float};
 use std::ops::Div;
 
