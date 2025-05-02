@@ -269,7 +269,7 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
     ) {
         const CHANNELS: usize = 4;
 
-        let v_max_colors = _mm256_set1_epi32((1i32 << bit_depth) - 1);
+        let v_cap_colors = _mm256_set1_epi16((((1i32 << bit_depth) - 1) as u16) as i16);
 
         let (row0_ref, rest) = dst.split_at_mut(dst_stride);
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
@@ -414,17 +414,11 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                 jx += 1;
             }
 
-            let v_st0 = _mm256_min_epi32(
-                _mm256_cvtps_epi32(_mm256_max_ps(store_0, _mm256_setzero_ps())),
-                v_max_colors,
-            );
-            let v_st1 = _mm256_min_epi32(
-                _mm256_cvtps_epi32(_mm256_max_ps(store_1, _mm256_setzero_ps())),
-                v_max_colors,
-            );
+            let v_st0 = _mm256_cvtps_epi32(store_0);
+            let v_st1 = _mm256_cvtps_epi32(store_1);
 
-            let store_16_0 = _mm256_packus_epi32(v_st0, v_st0);
-            let store_16_1 = _mm256_packus_epi32(v_st1, v_st1);
+            let store_16_0 = _mm256_min_epu16(_mm256_packus_epi32(v_st0, v_st0), v_cap_colors);
+            let store_16_1 = _mm256_min_epu16(_mm256_packus_epi32(v_st1, v_st1), v_cap_colors);
 
             _mm_storeu_si64(
                 chunk0.as_mut_ptr() as *mut u8,
@@ -499,7 +493,7 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
     ) {
         const CHANNELS: usize = 4;
 
-        let v_max_colors = _mm_set1_epi32((1i32 << bit_depth) - 1);
+        let v_cap_colors = _mm_set1_epi16((((1i32 << bit_depth) - 1) as u16) as i16);
 
         for ((dst, bounds), weights) in dst
             .chunks_exact_mut(CHANNELS)
@@ -575,12 +569,9 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
                 jx += 1;
             }
 
-            let v_st = _mm_min_epi32(
-                _mm_cvtps_epi32(_mm_max_ps(store, _mm_setzero_ps())),
-                v_max_colors,
-            );
+            let v_st = _mm_cvtps_epi32(store);
 
-            let store_16_0 = _mm_packus_epi32(v_st, v_st);
+            let store_16_0 = _mm_min_epu16(_mm_packus_epi32(v_st, v_st), v_cap_colors);
             _mm_storeu_si64(dst.as_mut_ptr() as *mut u8, store_16_0);
         }
     }
