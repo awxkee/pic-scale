@@ -36,9 +36,9 @@ use crate::neon::{neon_premultiply_alpha_rgba_f16_full, neon_unpremultiply_alpha
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::{sse_premultiply_alpha_rgba_f16, sse_unpremultiply_alpha_rgba_f16};
 use core::f16;
+use rayon::ThreadPool;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
-use rayon::ThreadPool;
 
 #[inline]
 pub(crate) fn unpremultiply_pixel_f16_row(in_place: &mut [f16]) {

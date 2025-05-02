@@ -44,21 +44,23 @@ unsafe fn conv_horiz_rgb_4_u8(
     store: v128,
     shuffle: v128,
 ) -> v128 {
-    const COMPONENTS: usize = 3;
-    let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+    unsafe {
+        const COMPONENTS: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
 
-    let px_lo = v128_load64_lane::<0>(i32x4_splat(0), src_ptr.as_ptr() as *const _);
-    let mut rgb_pixel =
-        v128_load32_lane::<2>(px_lo, src_ptr.get_unchecked(8..).as_ptr() as *const u32);
+        let px_lo = v128_load64_lane::<0>(i32x4_splat(0), src_ptr.as_ptr() as *const _);
+        let mut rgb_pixel =
+            v128_load32_lane::<2>(px_lo, src_ptr.get_unchecked(8..).as_ptr() as *const u32);
 
-    rgb_pixel = u8x16_swizzle(rgb_pixel, shuffle);
-    let hi = u16x8_extend_high_u8x16(rgb_pixel);
-    let lo = u16x8_extend_low_u8x16(rgb_pixel);
+        rgb_pixel = u8x16_swizzle(rgb_pixel, shuffle);
+        let hi = u16x8_extend_high_u8x16(rgb_pixel);
+        let lo = u16x8_extend_low_u8x16(rgb_pixel);
 
-    let acc = i32x4_add(store, i32x4_extmul_high_i16x8(hi, w3));
-    let acc = i32x4_add(acc, i32x4_extmul_low_i16x8(hi, w2));
-    let acc = i32x4_add(acc, i32x4_extmul_high_i16x8(lo, w1));
-    i32x4_add(acc, i32x4_extmul_low_i16x8(lo, w0))
+        let acc = i32x4_add(store, i32x4_extmul_high_i16x8(hi, w3));
+        let acc = i32x4_add(acc, i32x4_extmul_low_i16x8(hi, w2));
+        let acc = i32x4_add(acc, i32x4_extmul_high_i16x8(lo, w1));
+        i32x4_add(acc, i32x4_extmul_low_i16x8(lo, w0))
+    }
 }
 
 #[must_use]
@@ -71,36 +73,43 @@ unsafe fn conv_horiz_rgba_2_u8(
     store: v128,
     shuffle: v128,
 ) -> v128 {
-    const COMPONENTS: usize = 3;
-    let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
-    let mut rgb_pixel = v128_load32_lane::<0>(i32x4_splat(0), src_ptr.as_ptr() as *const u32);
-    rgb_pixel = v128_load16_lane::<2>(rgb_pixel, src_ptr.get_unchecked(4..).as_ptr() as *const u16);
-    rgb_pixel = u8x16_swizzle(rgb_pixel, shuffle);
+    unsafe {
+        const COMPONENTS: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        let mut rgb_pixel = v128_load32_lane::<0>(i32x4_splat(0), src_ptr.as_ptr() as *const u32);
+        rgb_pixel =
+            v128_load16_lane::<2>(rgb_pixel, src_ptr.get_unchecked(4..).as_ptr() as *const u16);
+        rgb_pixel = u8x16_swizzle(rgb_pixel, shuffle);
 
-    let wide = u16x8_extend_low_u8x16(rgb_pixel);
+        let wide = u16x8_extend_low_u8x16(rgb_pixel);
 
-    let acc = i32x4_add(store, i32x4_extmul_high_i16x8(wide, w1));
-    i32x4_add(acc, i32x4_extmul_low_i16x8(wide, w0))
+        let acc = i32x4_add(store, i32x4_extmul_high_i16x8(wide, w1));
+        i32x4_add(acc, i32x4_extmul_low_i16x8(wide, w0))
+    }
 }
 
 #[must_use]
 #[inline(always)]
 unsafe fn conv_horiz_rgba_1_u8(start_x: usize, src: &[u8], w0: v128, store: v128) -> v128 {
-    const COMPONENTS: usize = 3;
-    let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
-    let mut rgb_pixel = v128_load16_lane::<0>(i32x4_splat(0), src_ptr.as_ptr() as *const _);
-    rgb_pixel = v128_load8_lane::<2>(rgb_pixel, src_ptr.get_unchecked(2..).as_ptr());
-    let lo = u16x8_extend_low_u8x16(rgb_pixel);
-    i32x4_add(store, i32x4_extmul_low_i16x8(lo, w0))
+    unsafe {
+        const COMPONENTS: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        let mut rgb_pixel = v128_load16_lane::<0>(i32x4_splat(0), src_ptr.as_ptr() as *const _);
+        rgb_pixel = v128_load8_lane::<2>(rgb_pixel, src_ptr.get_unchecked(2..).as_ptr());
+        let lo = u16x8_extend_low_u8x16(rgb_pixel);
+        i32x4_add(store, i32x4_extmul_low_i16x8(lo, w0))
+    }
 }
 
 #[inline(always)]
 unsafe fn write_accumulator_u8<const PRECISION: i32>(store: v128, dst: &mut [u8]) {
-    let mut store_16 = i32x4_shr(store, PRECISION as u32);
-    store_16 = i32x4_max(store_16, i32x4_splat(0));
-    store_16 = i32x4_saturate_to_u8(store_16);
-    v128_store16_lane::<0>(store_16, dst.as_mut_ptr() as *mut u16);
-    v128_store8_lane::<2>(store_16, dst.get_unchecked_mut(2..).as_mut_ptr());
+    unsafe {
+        let mut store_16 = i32x4_shr(store, PRECISION as u32);
+        store_16 = i32x4_max(store_16, i32x4_splat(0));
+        store_16 = i32x4_saturate_to_u8(store_16);
+        v128_store16_lane::<0>(store_16, dst.as_mut_ptr() as *mut u16);
+        v128_store8_lane::<2>(store_16, dst.get_unchecked_mut(2..).as_mut_ptr());
+    }
 }
 
 pub(crate) fn convolve_horizontal_rgb_wasm_rows_4(

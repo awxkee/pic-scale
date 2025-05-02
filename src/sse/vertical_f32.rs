@@ -43,43 +43,45 @@ unsafe fn convolve_vertical_part_sse_24_f32<const FMA: bool>(
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
-    let mut store_0 = _mm_setzero_ps();
-    let mut store_1 = _mm_setzero_ps();
-    let mut store_2 = _mm_setzero_ps();
-    let mut store_3 = _mm_setzero_ps();
-    let mut store_4 = _mm_setzero_ps();
-    let mut store_5 = _mm_setzero_ps();
+    unsafe {
+        let mut store_0 = _mm_setzero_ps();
+        let mut store_1 = _mm_setzero_ps();
+        let mut store_2 = _mm_setzero_ps();
+        let mut store_3 = _mm_setzero_ps();
+        let mut store_4 = _mm_setzero_ps();
+        let mut store_5 = _mm_setzero_ps();
 
-    let px = start_x;
+        let px = start_x;
 
-    for j in 0..bounds.size {
-        let py = start_y + j;
-        let weight = filter.get_unchecked(j..);
-        let v_weight = _mm_load1_ps(weight.as_ptr());
-        let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
+        for j in 0..bounds.size {
+            let py = start_y + j;
+            let weight = filter.get_unchecked(j..);
+            let v_weight = _mm_load1_ps(weight.as_ptr());
+            let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
 
-        let item_row_0 = _mm_loadu_ps(src_ptr);
-        let item_row_1 = _mm_loadu_ps(src_ptr.add(4));
-        let item_row_2 = _mm_loadu_ps(src_ptr.add(8));
-        let item_row_3 = _mm_loadu_ps(src_ptr.add(12));
-        let item_row_4 = _mm_loadu_ps(src_ptr.add(16));
-        let item_row_5 = _mm_loadu_ps(src_ptr.add(20));
+            let item_row_0 = _mm_loadu_ps(src_ptr);
+            let item_row_1 = _mm_loadu_ps(src_ptr.add(4));
+            let item_row_2 = _mm_loadu_ps(src_ptr.add(8));
+            let item_row_3 = _mm_loadu_ps(src_ptr.add(12));
+            let item_row_4 = _mm_loadu_ps(src_ptr.add(16));
+            let item_row_5 = _mm_loadu_ps(src_ptr.add(20));
 
-        store_0 = _mm_prefer_fma_ps::<FMA>(store_0, item_row_0, v_weight);
-        store_1 = _mm_prefer_fma_ps::<FMA>(store_1, item_row_1, v_weight);
-        store_2 = _mm_prefer_fma_ps::<FMA>(store_2, item_row_2, v_weight);
-        store_3 = _mm_prefer_fma_ps::<FMA>(store_3, item_row_3, v_weight);
-        store_4 = _mm_prefer_fma_ps::<FMA>(store_4, item_row_4, v_weight);
-        store_5 = _mm_prefer_fma_ps::<FMA>(store_5, item_row_5, v_weight);
+            store_0 = _mm_prefer_fma_ps::<FMA>(store_0, item_row_0, v_weight);
+            store_1 = _mm_prefer_fma_ps::<FMA>(store_1, item_row_1, v_weight);
+            store_2 = _mm_prefer_fma_ps::<FMA>(store_2, item_row_2, v_weight);
+            store_3 = _mm_prefer_fma_ps::<FMA>(store_3, item_row_3, v_weight);
+            store_4 = _mm_prefer_fma_ps::<FMA>(store_4, item_row_4, v_weight);
+            store_5 = _mm_prefer_fma_ps::<FMA>(store_5, item_row_5, v_weight);
+        }
+
+        let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
+        _mm_storeu_ps(dst_ptr, store_0);
+        _mm_storeu_ps(dst_ptr.add(4), store_1);
+        _mm_storeu_ps(dst_ptr.add(8), store_2);
+        _mm_storeu_ps(dst_ptr.add(12), store_3);
+        _mm_storeu_ps(dst_ptr.add(16), store_4);
+        _mm_storeu_ps(dst_ptr.add(20), store_5);
     }
-
-    let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-    _mm_storeu_ps(dst_ptr, store_0);
-    _mm_storeu_ps(dst_ptr.add(4), store_1);
-    _mm_storeu_ps(dst_ptr.add(8), store_2);
-    _mm_storeu_ps(dst_ptr.add(12), store_3);
-    _mm_storeu_ps(dst_ptr.add(16), store_4);
-    _mm_storeu_ps(dst_ptr.add(20), store_5);
 }
 
 #[inline(always)]
@@ -92,35 +94,37 @@ unsafe fn convolve_vertical_part_sse_16_f32<const FMA: bool>(
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
-    let mut store_0 = _mm_setzero_ps();
-    let mut store_1 = _mm_setzero_ps();
-    let mut store_2 = _mm_setzero_ps();
-    let mut store_3 = _mm_setzero_ps();
+    unsafe {
+        let mut store_0 = _mm_setzero_ps();
+        let mut store_1 = _mm_setzero_ps();
+        let mut store_2 = _mm_setzero_ps();
+        let mut store_3 = _mm_setzero_ps();
 
-    let px = start_x;
+        let px = start_x;
 
-    for j in 0..bounds.size {
-        let py = start_y + j;
-        let weight = filter.get_unchecked(j..);
-        let v_weight = _mm_load1_ps(weight.as_ptr());
-        let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
+        for j in 0..bounds.size {
+            let py = start_y + j;
+            let weight = filter.get_unchecked(j..);
+            let v_weight = _mm_load1_ps(weight.as_ptr());
+            let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
 
-        let item_row_0 = _mm_loadu_ps(src_ptr);
-        let item_row_1 = _mm_loadu_ps(src_ptr.add(4));
-        let item_row_2 = _mm_loadu_ps(src_ptr.add(8));
-        let item_row_3 = _mm_loadu_ps(src_ptr.add(12));
+            let item_row_0 = _mm_loadu_ps(src_ptr);
+            let item_row_1 = _mm_loadu_ps(src_ptr.add(4));
+            let item_row_2 = _mm_loadu_ps(src_ptr.add(8));
+            let item_row_3 = _mm_loadu_ps(src_ptr.add(12));
 
-        store_0 = _mm_prefer_fma_ps::<FMA>(store_0, item_row_0, v_weight);
-        store_1 = _mm_prefer_fma_ps::<FMA>(store_1, item_row_1, v_weight);
-        store_2 = _mm_prefer_fma_ps::<FMA>(store_2, item_row_2, v_weight);
-        store_3 = _mm_prefer_fma_ps::<FMA>(store_3, item_row_3, v_weight);
+            store_0 = _mm_prefer_fma_ps::<FMA>(store_0, item_row_0, v_weight);
+            store_1 = _mm_prefer_fma_ps::<FMA>(store_1, item_row_1, v_weight);
+            store_2 = _mm_prefer_fma_ps::<FMA>(store_2, item_row_2, v_weight);
+            store_3 = _mm_prefer_fma_ps::<FMA>(store_3, item_row_3, v_weight);
+        }
+
+        let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
+        _mm_storeu_ps(dst_ptr, store_0);
+        _mm_storeu_ps(dst_ptr.add(4), store_1);
+        _mm_storeu_ps(dst_ptr.add(8), store_2);
+        _mm_storeu_ps(dst_ptr.add(12), store_3);
     }
-
-    let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-    _mm_storeu_ps(dst_ptr, store_0);
-    _mm_storeu_ps(dst_ptr.add(4), store_1);
-    _mm_storeu_ps(dst_ptr.add(8), store_2);
-    _mm_storeu_ps(dst_ptr.add(12), store_3);
 }
 
 #[inline(always)]
@@ -133,27 +137,29 @@ unsafe fn convolve_vertical_part_sse_8_f32<const FMA: bool>(
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
-    let mut store_0 = _mm_setzero_ps();
-    let mut store_1 = _mm_setzero_ps();
+    unsafe {
+        let mut store_0 = _mm_setzero_ps();
+        let mut store_1 = _mm_setzero_ps();
 
-    let px = start_x;
+        let px = start_x;
 
-    for j in 0..bounds.size {
-        let py = start_y + j;
-        let weight = filter.get_unchecked(j..);
-        let v_weight = _mm_load1_ps(weight.as_ptr());
-        let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
+        for j in 0..bounds.size {
+            let py = start_y + j;
+            let weight = filter.get_unchecked(j..);
+            let v_weight = _mm_load1_ps(weight.as_ptr());
+            let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
 
-        let item_row_0 = _mm_loadu_ps(src_ptr);
-        let item_row_1 = _mm_loadu_ps(src_ptr.add(4));
+            let item_row_0 = _mm_loadu_ps(src_ptr);
+            let item_row_1 = _mm_loadu_ps(src_ptr.add(4));
 
-        store_0 = _mm_prefer_fma_ps::<FMA>(store_0, item_row_0, v_weight);
-        store_1 = _mm_prefer_fma_ps::<FMA>(store_1, item_row_1, v_weight);
+            store_0 = _mm_prefer_fma_ps::<FMA>(store_0, item_row_0, v_weight);
+            store_1 = _mm_prefer_fma_ps::<FMA>(store_1, item_row_1, v_weight);
+        }
+
+        let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
+        _mm_storeu_ps(dst_ptr, store_0);
+        _mm_storeu_ps(dst_ptr.add(4), store_1);
     }
-
-    let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-    _mm_storeu_ps(dst_ptr, store_0);
-    _mm_storeu_ps(dst_ptr.add(4), store_1);
 }
 
 #[inline(always)]
@@ -166,24 +172,26 @@ unsafe fn convolve_vertical_part_sse_4_f32<const FMA: bool>(
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
-    let mut store_0 = _mm_setzero_ps();
+    unsafe {
+        let mut store_0 = _mm_setzero_ps();
 
-    let px = start_x;
+        let px = start_x;
 
-    for j in 0..bounds.size {
-        let py = start_y + j;
-        let weight = filter.get_unchecked(j..);
-        let v_weight = _mm_load1_ps(weight.as_ptr());
+        for j in 0..bounds.size {
+            let py = start_y + j;
+            let weight = filter.get_unchecked(j..);
+            let v_weight = _mm_load1_ps(weight.as_ptr());
 
-        let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
+            let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
 
-        let item_row_0 = _mm_loadu_ps(src_ptr);
+            let item_row_0 = _mm_loadu_ps(src_ptr);
 
-        store_0 = _mm_prefer_fma_ps::<FMA>(store_0, item_row_0, v_weight);
+            store_0 = _mm_prefer_fma_ps::<FMA>(store_0, item_row_0, v_weight);
+        }
+
+        let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
+        _mm_storeu_ps(dst_ptr, store_0);
     }
-
-    let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-    _mm_storeu_ps(dst_ptr, store_0);
 }
 
 #[inline(always)]
@@ -196,23 +204,25 @@ pub(crate) unsafe fn convolve_vertical_part_sse_f32<const FMA: bool>(
     filter: &[f32],
     bounds: &FilterBounds,
 ) {
-    let mut store_0 = _mm_setzero_ps();
+    unsafe {
+        let mut store_0 = _mm_setzero_ps();
 
-    let px = start_x;
+        let px = start_x;
 
-    for j in 0..bounds.size {
-        let py = start_y + j;
-        let weight = filter.get_unchecked(j..);
-        let v_weight = _mm_load_ss(weight.as_ptr());
-        let src_ptr = src.get_unchecked(src_stride * py + px..);
+        for j in 0..bounds.size {
+            let py = start_y + j;
+            let weight = filter.get_unchecked(j..);
+            let v_weight = _mm_load_ss(weight.as_ptr());
+            let src_ptr = src.get_unchecked(src_stride * py + px..);
 
-        let item_row_0 = _mm_load_ss(src_ptr.as_ptr());
+            let item_row_0 = _mm_load_ss(src_ptr.as_ptr());
 
-        store_0 = _mm_prefer_fma_ps::<FMA>(store_0, item_row_0, v_weight);
+            store_0 = _mm_prefer_fma_ps::<FMA>(store_0, item_row_0, v_weight);
+        }
+
+        let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
+        _mm_store_ss(dst_ptr, store_0);
     }
-
-    let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-    _mm_store_ss(dst_ptr, store_0);
 }
 
 pub(crate) fn convolve_vertical_rgb_sse_row_f32<const FMA: bool>(
@@ -244,9 +254,11 @@ unsafe fn convolve_vertical_rgb_sse_row_f32_regular(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    convolve_vertical_rgb_sse_row_f32_impl::<false>(
-        width, bounds, src, dst, src_stride, weight_ptr,
-    );
+    unsafe {
+        convolve_vertical_rgb_sse_row_f32_impl::<false>(
+            width, bounds, src, dst, src_stride, weight_ptr,
+        );
+    }
 }
 
 #[target_feature(enable = "sse4.1", enable = "fma")]
@@ -259,7 +271,11 @@ unsafe fn convolve_vertical_rgb_sse_row_f32_fma(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    convolve_vertical_rgb_sse_row_f32_impl::<true>(width, bounds, src, dst, src_stride, weight_ptr);
+    unsafe {
+        convolve_vertical_rgb_sse_row_f32_impl::<true>(
+            width, bounds, src, dst, src_stride, weight_ptr,
+        );
+    }
 }
 
 #[inline(always)]
@@ -271,75 +287,77 @@ unsafe fn convolve_vertical_rgb_sse_row_f32_impl<const FMA: bool>(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    let mut cx = 0usize;
-    let dst_width = dst.len();
+    unsafe {
+        let mut cx = 0usize;
+        let dst_width = dst.len();
 
-    while cx + 24 < dst_width {
-        convolve_vertical_part_sse_24_f32::<FMA>(
-            bounds.start,
-            cx,
-            src,
-            src_stride,
-            dst,
-            weight_ptr,
-            bounds,
-        );
+        while cx + 24 < dst_width {
+            convolve_vertical_part_sse_24_f32::<FMA>(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weight_ptr,
+                bounds,
+            );
 
-        cx += 24;
-    }
+            cx += 24;
+        }
 
-    while cx + 16 < dst_width {
-        convolve_vertical_part_sse_16_f32::<FMA>(
-            bounds.start,
-            cx,
-            src,
-            src_stride,
-            dst,
-            weight_ptr,
-            bounds,
-        );
+        while cx + 16 < dst_width {
+            convolve_vertical_part_sse_16_f32::<FMA>(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weight_ptr,
+                bounds,
+            );
 
-        cx += 16;
-    }
+            cx += 16;
+        }
 
-    while cx + 8 < dst_width {
-        convolve_vertical_part_sse_8_f32::<FMA>(
-            bounds.start,
-            cx,
-            src,
-            src_stride,
-            dst,
-            weight_ptr,
-            bounds,
-        );
+        while cx + 8 < dst_width {
+            convolve_vertical_part_sse_8_f32::<FMA>(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weight_ptr,
+                bounds,
+            );
 
-        cx += 8;
-    }
+            cx += 8;
+        }
 
-    while cx + 4 < dst_width {
-        convolve_vertical_part_sse_4_f32::<FMA>(
-            bounds.start,
-            cx,
-            src,
-            src_stride,
-            dst,
-            weight_ptr,
-            bounds,
-        );
+        while cx + 4 < dst_width {
+            convolve_vertical_part_sse_4_f32::<FMA>(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weight_ptr,
+                bounds,
+            );
 
-        cx += 4;
-    }
+            cx += 4;
+        }
 
-    while cx < dst_width {
-        convolve_vertical_part_sse_f32::<FMA>(
-            bounds.start,
-            cx,
-            src,
-            src_stride,
-            dst,
-            weight_ptr,
-            bounds,
-        );
-        cx += 1;
+        while cx < dst_width {
+            convolve_vertical_part_sse_f32::<FMA>(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weight_ptr,
+                bounds,
+            );
+            cx += 1;
+        }
     }
 }

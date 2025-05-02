@@ -39,5 +39,5 @@ pub(crate) use check_alpha::avx512_has_non_constant_cap_alpha_rgba8;
 pub(crate) use rgba_u8_dot_vnni::{
     convolve_horizontal_rgba_vnni_row_1, convolve_horizontal_rgba_vnni_row_4,
 };
-pub(crate) use vertical_u16_lb::convolve_column_lb_avx512_u16;
 pub(crate) use vertical_u8_lp::convolve_vertical_avx512_row_lp;
+pub(crate) use vertical_u16_lb::convolve_column_lb_avx512_u16;

@@ -40,15 +40,17 @@ unsafe fn pack_weights<const PRECISION: i32>(
     store_2: int32x4_t,
     store_3: int32x4_t,
 ) -> uint8x16_t {
-    let low_u16 = vcombine_u16(
-        vqshrun_n_s32::<PRECISION>(store_0),
-        vqshrun_n_s32::<PRECISION>(store_1),
-    );
-    let high_u16 = vcombine_u16(
-        vqshrun_n_s32::<PRECISION>(store_2),
-        vqshrun_n_s32::<PRECISION>(store_3),
-    );
-    vcombine_u8(vqmovn_u16(low_u16), vqmovn_u16(high_u16))
+    unsafe {
+        let low_u16 = vcombine_u16(
+            vqshrun_n_s32::<PRECISION>(store_0),
+            vqshrun_n_s32::<PRECISION>(store_1),
+        );
+        let high_u16 = vcombine_u16(
+            vqshrun_n_s32::<PRECISION>(store_2),
+            vqshrun_n_s32::<PRECISION>(store_3),
+        );
+        vcombine_u8(vqmovn_u16(low_u16), vqmovn_u16(high_u16))
+    }
 }
 
 #[must_use]
@@ -61,14 +63,16 @@ unsafe fn accumulate_4_into<const D: bool>(
     store_3: int32x4_t,
     weight: int16x8_t,
 ) -> (int32x4_t, int32x4_t, int32x4_t, int32x4_t) {
-    let low = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(item)));
-    let high = vreinterpretq_s16_u16(vmovl_high_u8(item));
+    unsafe {
+        let low = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(item)));
+        let high = vreinterpretq_s16_u16(vmovl_high_u8(item));
 
-    let store_0 = vxmlal_s16::<D>(store_0, vget_low_s16(low), vget_low_s16(weight));
-    let store_1 = vxmlal_high_s16::<D>(store_1, low, weight);
-    let store_2 = vxmlal_s16::<D>(store_2, vget_low_s16(high), vget_low_s16(weight));
-    let store_3 = vxmlal_high_s16::<D>(store_3, high, weight);
-    (store_0, store_1, store_2, store_3)
+        let store_0 = vxmlal_s16::<D>(store_0, vget_low_s16(low), vget_low_s16(weight));
+        let store_1 = vxmlal_high_s16::<D>(store_1, low, weight);
+        let store_2 = vxmlal_s16::<D>(store_2, vget_low_s16(high), vget_low_s16(weight));
+        let store_3 = vxmlal_high_s16::<D>(store_3, high, weight);
+        (store_0, store_1, store_2, store_3)
+    }
 }
 
 #[must_use]
@@ -81,14 +85,16 @@ unsafe fn accumulate_4_into_lane<const D: bool, const W: i32>(
     store_3: int32x4_t,
     weight: int16x4_t,
 ) -> (int32x4_t, int32x4_t, int32x4_t, int32x4_t) {
-    let low = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(item)));
-    let high = vreinterpretq_s16_u16(vmovl_high_u8(item));
+    unsafe {
+        let low = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(item)));
+        let high = vreinterpretq_s16_u16(vmovl_high_u8(item));
 
-    let store_0 = vxmlal_lane_s16::<D, W>(store_0, vget_low_s16(low), weight);
-    let store_1 = vxmlal_high_lane_s16::<D, W>(store_1, low, weight);
-    let store_2 = vxmlal_lane_s16::<D, W>(store_2, vget_low_s16(high), weight);
-    let store_3 = vxmlal_high_lane_s16::<D, W>(store_3, high, weight);
-    (store_0, store_1, store_2, store_3)
+        let store_0 = vxmlal_lane_s16::<D, W>(store_0, vget_low_s16(low), weight);
+        let store_1 = vxmlal_high_lane_s16::<D, W>(store_1, low, weight);
+        let store_2 = vxmlal_lane_s16::<D, W>(store_2, vget_low_s16(high), weight);
+        let store_3 = vxmlal_high_lane_s16::<D, W>(store_3, high, weight);
+        (store_0, store_1, store_2, store_3)
+    }
 }
 
 pub(crate) fn convolve_vertical_neon_i32_precision(

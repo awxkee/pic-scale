@@ -38,16 +38,18 @@ unsafe fn accumulate_16_horiz<const D: bool>(
     ptr: &[u8],
     weights: int16x8x2_t,
 ) -> int32x4_t {
-    let pixel_colors = vld1q_u8(ptr.as_ptr());
-    let px_high_16 = vreinterpretq_s16_u16(vmovl_high_u8(pixel_colors));
-    let px_low_16 = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(pixel_colors)));
+    unsafe {
+        let pixel_colors = vld1q_u8(ptr.as_ptr());
+        let px_high_16 = vreinterpretq_s16_u16(vmovl_high_u8(pixel_colors));
+        let px_low_16 = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(pixel_colors)));
 
-    let mut store = vxmlal_high_s16::<D>(store, px_high_16, weights.1);
-    store = vxmlal_s16::<D>(store, vget_low_s16(px_high_16), vget_low_s16(weights.1));
+        let mut store = vxmlal_high_s16::<D>(store, px_high_16, weights.1);
+        store = vxmlal_s16::<D>(store, vget_low_s16(px_high_16), vget_low_s16(weights.1));
 
-    store = vxmlal_high_s16::<D>(store, px_low_16, weights.0);
-    store = vxmlal_s16::<D>(store, vget_low_s16(px_low_16), vget_low_s16(weights.0));
-    store
+        store = vxmlal_high_s16::<D>(store, px_low_16, weights.0);
+        store = vxmlal_s16::<D>(store, vget_low_s16(px_low_16), vget_low_s16(weights.0));
+        store
+    }
 }
 
 #[must_use]
@@ -57,12 +59,14 @@ unsafe fn accumulate_8_horiz<const D: bool>(
     ptr: &[u8],
     weight: int16x8_t,
 ) -> int32x4_t {
-    let pixel_colors = vld1_u8(ptr.as_ptr());
-    let px_16 = vreinterpretq_s16_u16(vmovl_u8(pixel_colors));
+    unsafe {
+        let pixel_colors = vld1_u8(ptr.as_ptr());
+        let px_16 = vreinterpretq_s16_u16(vmovl_u8(pixel_colors));
 
-    let mut store = vxmlal_high_s16::<D>(store, px_16, weight);
-    store = vxmlal_s16::<D>(store, vget_low_s16(px_16), vget_low_s16(weight));
-    store
+        let mut store = vxmlal_high_s16::<D>(store, px_16, weight);
+        store = vxmlal_s16::<D>(store, vget_low_s16(px_16), vget_low_s16(weight));
+        store
+    }
 }
 
 #[inline(always)]
@@ -71,12 +75,14 @@ unsafe fn accumulate_4_horiz<const D: bool>(
     ptr: &[u8],
     weight: int16x4_t,
 ) -> int32x4_t {
-    let pixel_colors = vmovl_u8(vreinterpret_u8_u32(vld1_lane_u32::<0>(
-        ptr.as_ptr() as *const u32,
-        vdup_n_u32(0),
-    )));
-    let px_16 = vreinterpret_s16_u16(vget_low_u16(pixel_colors));
-    vxmlal_s16::<D>(store, px_16, weight)
+    unsafe {
+        let pixel_colors = vmovl_u8(vreinterpret_u8_u32(vld1_lane_u32::<0>(
+            ptr.as_ptr() as *const u32,
+            vdup_n_u32(0),
+        )));
+        let px_16 = vreinterpret_s16_u16(vget_low_u16(pixel_colors));
+        vxmlal_s16::<D>(store, px_16, weight)
+    }
 }
 
 #[inline(always)]
@@ -85,9 +91,11 @@ unsafe fn accumulate_1_horiz<const D: bool>(
     ptr: &[u8],
     weight: int16x4_t,
 ) -> int32x4_t {
-    let pixel_colors = vmovl_u8(vld1_lane_u8::<0>(ptr.as_ptr(), vdup_n_u8(0)));
-    let px_16 = vreinterpret_s16_u16(vget_low_u16(pixel_colors));
-    vxmlal_s16::<D>(store, px_16, weight)
+    unsafe {
+        let pixel_colors = vmovl_u8(vld1_lane_u8::<0>(ptr.as_ptr(), vdup_n_u8(0)));
+        let px_16 = vreinterpret_s16_u16(vget_low_u16(pixel_colors));
+        vxmlal_s16::<D>(store, px_16, weight)
+    }
 }
 
 pub(crate) fn convolve_horizontal_plane_neon_rows_4_u8(

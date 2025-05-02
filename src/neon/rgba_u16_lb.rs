@@ -38,11 +38,13 @@ unsafe fn conv_horiz_rgba_1_u16(
     w0: int16x4_t,
     store: int32x4_t,
 ) -> int32x4_t {
-    const COMPONENTS: usize = 4;
-    let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
-    let rgba_pixel = vld1_u16(src_ptr.as_ptr());
-    let lo = vreinterpret_s16_u16(rgba_pixel);
-    vqdmlal_s16(store, lo, w0)
+    unsafe {
+        const COMPONENTS: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        let rgba_pixel = vld1_u16(src_ptr.as_ptr());
+        let lo = vreinterpret_s16_u16(rgba_pixel);
+        vqdmlal_s16(store, lo, w0)
+    }
 }
 
 #[must_use]
@@ -54,14 +56,16 @@ unsafe fn conv_horiz_rgba_2_u16(
     w1: int16x8_t,
     store: int32x4_t,
 ) -> int32x4_t {
-    const COMPONENTS: usize = 4;
-    let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+    unsafe {
+        const COMPONENTS: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
 
-    let rgb_pixel = vld1q_u16(src_ptr.as_ptr());
-    let wide = vreinterpretq_s16_u16(rgb_pixel);
+        let rgb_pixel = vld1q_u16(src_ptr.as_ptr());
+        let wide = vreinterpretq_s16_u16(rgb_pixel);
 
-    let acc = vqdmlal_high_s16(store, wide, w1);
-    vqdmlal_s16(acc, vget_low_s16(wide), w0)
+        let acc = vqdmlal_high_s16(store, wide, w1);
+        vqdmlal_s16(acc, vget_low_s16(wide), w0)
+    }
 }
 
 #[must_use]
@@ -72,18 +76,20 @@ unsafe fn conv_horiz_rgba_4_u16(
     weights: int16x4_t,
     store: int32x4_t,
 ) -> int32x4_t {
-    const COMPONENTS: usize = 4;
-    let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+    unsafe {
+        const COMPONENTS: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
 
-    let rgba_pixel = xvld1q_u16_x2(src_ptr.as_ptr());
+        let rgba_pixel = xvld1q_u16_x2(src_ptr.as_ptr());
 
-    let hi = vreinterpretq_s16_u16(rgba_pixel.1);
-    let lo = vreinterpretq_s16_u16(rgba_pixel.0);
+        let hi = vreinterpretq_s16_u16(rgba_pixel.1);
+        let lo = vreinterpretq_s16_u16(rgba_pixel.0);
 
-    let acc = vqdmlal_high_lane_s16::<3>(store, hi, weights);
-    let acc = vqdmlal_lane_s16::<2>(acc, vget_low_s16(hi), weights);
-    let acc = vqdmlal_high_lane_s16::<1>(acc, lo, weights);
-    vqdmlal_lane_s16::<0>(acc, vget_low_s16(lo), weights)
+        let acc = vqdmlal_high_lane_s16::<3>(store, hi, weights);
+        let acc = vqdmlal_lane_s16::<2>(acc, vget_low_s16(hi), weights);
+        let acc = vqdmlal_high_lane_s16::<1>(acc, lo, weights);
+        vqdmlal_lane_s16::<0>(acc, vget_low_s16(lo), weights)
+    }
 }
 
 #[must_use]
@@ -94,26 +100,28 @@ unsafe fn conv_horiz_rgba_8_u16(
     weights: int16x8_t,
     store: int32x4_t,
 ) -> int32x4_t {
-    const COMPONENTS: usize = 4;
-    let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+    unsafe {
+        const COMPONENTS: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
 
-    let rgba_pixel = xvld1q_u16_x4(src_ptr.as_ptr());
+        let rgba_pixel = xvld1q_u16_x4(src_ptr.as_ptr());
 
-    let hi0 = vreinterpretq_s16_u16(rgba_pixel.1);
-    let lo0 = vreinterpretq_s16_u16(rgba_pixel.0);
-    let hi1 = vreinterpretq_s16_u16(rgba_pixel.3);
-    let lo1 = vreinterpretq_s16_u16(rgba_pixel.2);
+        let hi0 = vreinterpretq_s16_u16(rgba_pixel.1);
+        let lo0 = vreinterpretq_s16_u16(rgba_pixel.0);
+        let hi1 = vreinterpretq_s16_u16(rgba_pixel.3);
+        let lo1 = vreinterpretq_s16_u16(rgba_pixel.2);
 
-    let mut acc = vqdmlal_high_laneq_s16::<3>(store, hi0, weights);
-    acc = vqdmlal_laneq_s16::<2>(acc, vget_low_s16(hi0), weights);
-    acc = vqdmlal_high_laneq_s16::<1>(acc, lo0, weights);
-    acc = vqdmlal_laneq_s16::<0>(acc, vget_low_s16(lo0), weights);
+        let mut acc = vqdmlal_high_laneq_s16::<3>(store, hi0, weights);
+        acc = vqdmlal_laneq_s16::<2>(acc, vget_low_s16(hi0), weights);
+        acc = vqdmlal_high_laneq_s16::<1>(acc, lo0, weights);
+        acc = vqdmlal_laneq_s16::<0>(acc, vget_low_s16(lo0), weights);
 
-    acc = vqdmlal_high_laneq_s16::<7>(acc, hi1, weights);
-    acc = vqdmlal_laneq_s16::<6>(acc, vget_low_s16(hi1), weights);
-    acc = vqdmlal_high_laneq_s16::<5>(acc, lo1, weights);
-    acc = vqdmlal_laneq_s16::<4>(acc, vget_low_s16(lo1), weights);
-    acc
+        acc = vqdmlal_high_laneq_s16::<7>(acc, hi1, weights);
+        acc = vqdmlal_laneq_s16::<6>(acc, vget_low_s16(hi1), weights);
+        acc = vqdmlal_high_laneq_s16::<5>(acc, lo1, weights);
+        acc = vqdmlal_laneq_s16::<4>(acc, vget_low_s16(lo1), weights);
+        acc
+    }
 }
 
 pub(crate) fn convolve_horizontal_rgba_neon_rows_4_lb_u16(

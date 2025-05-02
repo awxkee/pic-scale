@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use colorutils_rs::{
-    jzazbz_to_rgb, jzazbz_to_rgba, rgb_to_jzazbz, rgba_to_jzazbz, TransferFunction,
+    TransferFunction, jzazbz_to_rgb, jzazbz_to_rgba, rgb_to_jzazbz, rgba_to_jzazbz,
 };
 
 use crate::pic_scale_error::PicScaleError;
@@ -72,15 +72,15 @@ impl JzazbzScaler {
             self.display_luminance,
             self.transfer_function,
         );
-        let new_store = ImageStore::<f32, 4> {
+
+        ImageStore::<f32, 4> {
             buffer: std::borrow::Cow::Owned(source_slice),
             channels: 4,
             width: store.width,
             height: store.height,
             stride: store.width * 4,
             bit_depth: store.bit_depth,
-        };
-        new_store
+        }
     }
 
     fn laba_to_srgba<'a>(

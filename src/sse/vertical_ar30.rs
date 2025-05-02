@@ -62,15 +62,15 @@ unsafe fn sse_column_handler_fixed_point_ar30_impl<
     src_stride: usize,
     weight: &[i16],
 ) {
-    let mut cx = 0usize;
+    unsafe {
+        let mut cx = 0usize;
 
-    let total_width = dst.len() / 4;
+        let total_width = dst.len() / 4;
 
-    const PREC: i32 = 15;
-    const RND_CONST: i32 = (1 << (PREC - 1)) - 1;
+        const PREC: i32 = 15;
+        const RND_CONST: i32 = (1 << (PREC - 1)) - 1;
 
-    while cx + 8 < total_width {
-        unsafe {
+        while cx + 8 < total_width {
             let v_max = _mm_set1_epi16(1023);
             let filter = weight;
             let v_start_px = cx * 4;
@@ -137,79 +137,83 @@ unsafe fn sse_column_handler_fixed_point_ar30_impl<
 
             cx += 8;
         }
-    }
 
-    if cx < total_width {
-        let diff = total_width - cx;
+        if cx < total_width {
+            let diff = total_width - cx;
 
-        let mut src_transient: [u8; 4 * 8] = [0; 4 * 8];
-        let mut dst_transient: [u8; 4 * 8] = [0; 4 * 8];
+            let mut src_transient: [u8; 4 * 8] = [0; 4 * 8];
+            let mut dst_transient: [u8; 4 * 8] = [0; 4 * 8];
 
-        let v_max = _mm_set1_epi16(1023);
-        let filter = weight;
-        let v_start_px = cx * 4;
+            let v_max = _mm_set1_epi16(1023);
+            let filter = weight;
+            let v_start_px = cx * 4;
 
-        let mut v0 = _mm_set1_epi32(RND_CONST);
-        let mut v1 = _mm_set1_epi32(RND_CONST);
-        let mut v2 = _mm_set1_epi32(RND_CONST);
-        let mut v3 = _mm_set1_epi32(RND_CONST);
-        let mut v4 = _mm_set1_epi32(RND_CONST);
-        let mut v5 = _mm_set1_epi32(RND_CONST);
+            let mut v0 = _mm_set1_epi32(RND_CONST);
+            let mut v1 = _mm_set1_epi32(RND_CONST);
+            let mut v2 = _mm_set1_epi32(RND_CONST);
+            let mut v3 = _mm_set1_epi32(RND_CONST);
+            let mut v4 = _mm_set1_epi32(RND_CONST);
+            let mut v5 = _mm_set1_epi32(RND_CONST);
 
-        for (j, &k_weight) in filter.iter().take(bounds.size).enumerate() {
-            let py = bounds.start + j;
-            let weight = _mm_set1_epi16(k_weight);
-            let offset = src_stride * py + v_start_px;
-            let src_ptr = src.get_unchecked(offset..(offset + diff * 4));
+            for (j, &k_weight) in filter.iter().take(bounds.size).enumerate() {
+                let py = bounds.start + j;
+                let weight = _mm_set1_epi16(k_weight);
+                let offset = src_stride * py + v_start_px;
+                let src_ptr = src.get_unchecked(offset..(offset + diff * 4));
 
-            std::ptr::copy_nonoverlapping(src_ptr.as_ptr(), src_transient.as_mut_ptr(), diff * 4);
+                std::ptr::copy_nonoverlapping(
+                    src_ptr.as_ptr(),
+                    src_transient.as_mut_ptr(),
+                    diff * 4,
+                );
 
-            let l0 = _mm_loadu_si128(src_transient.as_ptr() as *const __m128i);
-            let l1 = _mm_loadu_si128(src_transient.as_ptr().add(4 * 4) as *const __m128i);
+                let l0 = _mm_loadu_si128(src_transient.as_ptr() as *const __m128i);
+                let l1 = _mm_loadu_si128(src_transient.as_ptr().add(4 * 4) as *const __m128i);
 
-            let ps = _mm_unzip_3_ar30::<AR30_TYPE, AR30_ORDER>((l0, l1));
-            v0 = _mm_add_epi32(
-                v0,
-                _mm_madd_epi16(_mm_unpacklo_epi16(ps.0, _mm_setzero_si128()), weight),
-            );
-            v1 = _mm_add_epi32(
-                v1,
-                _mm_madd_epi16(_mm_unpackhi_epi16(ps.0, _mm_setzero_si128()), weight),
-            );
-            v2 = _mm_add_epi32(
-                v2,
-                _mm_madd_epi16(_mm_unpacklo_epi16(ps.1, _mm_setzero_si128()), weight),
-            );
-            v3 = _mm_add_epi32(
-                v3,
-                _mm_madd_epi16(_mm_unpackhi_epi16(ps.1, _mm_setzero_si128()), weight),
-            );
-            v4 = _mm_add_epi32(
-                v4,
-                _mm_madd_epi16(_mm_unpacklo_epi16(ps.2, _mm_setzero_si128()), weight),
-            );
-            v5 = _mm_add_epi32(
-                v5,
-                _mm_madd_epi16(_mm_unpackhi_epi16(ps.2, _mm_setzero_si128()), weight),
-            );
+                let ps = _mm_unzip_3_ar30::<AR30_TYPE, AR30_ORDER>((l0, l1));
+                v0 = _mm_add_epi32(
+                    v0,
+                    _mm_madd_epi16(_mm_unpacklo_epi16(ps.0, _mm_setzero_si128()), weight),
+                );
+                v1 = _mm_add_epi32(
+                    v1,
+                    _mm_madd_epi16(_mm_unpackhi_epi16(ps.0, _mm_setzero_si128()), weight),
+                );
+                v2 = _mm_add_epi32(
+                    v2,
+                    _mm_madd_epi16(_mm_unpacklo_epi16(ps.1, _mm_setzero_si128()), weight),
+                );
+                v3 = _mm_add_epi32(
+                    v3,
+                    _mm_madd_epi16(_mm_unpackhi_epi16(ps.1, _mm_setzero_si128()), weight),
+                );
+                v4 = _mm_add_epi32(
+                    v4,
+                    _mm_madd_epi16(_mm_unpacklo_epi16(ps.2, _mm_setzero_si128()), weight),
+                );
+                v5 = _mm_add_epi32(
+                    v5,
+                    _mm_madd_epi16(_mm_unpackhi_epi16(ps.2, _mm_setzero_si128()), weight),
+                );
+            }
+
+            let v0 = _mm_srai_epi32::<PREC>(v0);
+            let v1 = _mm_srai_epi32::<PREC>(v1);
+            let v2 = _mm_srai_epi32::<PREC>(v2);
+            let v3 = _mm_srai_epi32::<PREC>(v3);
+            let v4 = _mm_srai_epi32::<PREC>(v4);
+            let v5 = _mm_srai_epi32::<PREC>(v5);
+
+            let r_v = _mm_min_epi16(_mm_packus_epi32(v0, v1), v_max);
+            let g_v = _mm_min_epi16(_mm_packus_epi32(v2, v3), v_max);
+            let b_v = _mm_min_epi16(_mm_packus_epi32(v4, v5), v_max);
+
+            let vals = _mm_zip_4_ar30::<AR30_TYPE, AR30_ORDER>((r_v, g_v, b_v, _mm_set1_epi16(3)));
+            _mm_storeu_si128(dst_transient.as_mut_ptr() as *mut _, vals.0);
+            _mm_storeu_si128(dst_transient.as_mut_ptr().add(4 * 4) as *mut _, vals.1);
+
+            let v_dst = dst.get_unchecked_mut(v_start_px..(v_start_px + diff * 4));
+            std::ptr::copy_nonoverlapping(dst_transient.as_ptr(), v_dst.as_mut_ptr(), diff * 4);
         }
-
-        let v0 = _mm_srai_epi32::<PREC>(v0);
-        let v1 = _mm_srai_epi32::<PREC>(v1);
-        let v2 = _mm_srai_epi32::<PREC>(v2);
-        let v3 = _mm_srai_epi32::<PREC>(v3);
-        let v4 = _mm_srai_epi32::<PREC>(v4);
-        let v5 = _mm_srai_epi32::<PREC>(v5);
-
-        let r_v = _mm_min_epi16(_mm_packus_epi32(v0, v1), v_max);
-        let g_v = _mm_min_epi16(_mm_packus_epi32(v2, v3), v_max);
-        let b_v = _mm_min_epi16(_mm_packus_epi32(v4, v5), v_max);
-
-        let vals = _mm_zip_4_ar30::<AR30_TYPE, AR30_ORDER>((r_v, g_v, b_v, _mm_set1_epi16(3)));
-        _mm_storeu_si128(dst_transient.as_mut_ptr() as *mut _, vals.0);
-        _mm_storeu_si128(dst_transient.as_mut_ptr().add(4 * 4) as *mut _, vals.1);
-
-        let v_dst = dst.get_unchecked_mut(v_start_px..(v_start_px + diff * 4));
-        std::ptr::copy_nonoverlapping(dst_transient.as_ptr(), v_dst.as_mut_ptr(), diff * 4);
     }
 }

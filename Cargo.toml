@@ -3,7 +3,7 @@ workspace = { members = ["app", "wasm", "fuzz", "app/accelerate"], exclude = ["p
 [package]
 name = "pic-scale"
 version = "0.6.0"
-edition = "2021"
+edition = "2024"
 description = "High performance image scaling"
 readme = "README.md"
 keywords = ["scale", "resize", "image-resize"]
@@ -14,7 +14,7 @@ categories = ["multimedia::images", "multimedia::video"]
 homepage = "https://github.com/awxkee/pic-scale"
 repository = "https://github.com/awxkee/pic-scale"
 exclude = ["*.jpg", "/assets", "*.png", "*.sh", "/assets/*"]
-rust-version = "1.82.0"
+rust-version = "1.85.0"
 
 [dependencies]
 colorutils-rs = {version = "0.7", optional = true}

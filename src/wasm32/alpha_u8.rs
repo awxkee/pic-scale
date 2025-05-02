@@ -26,10 +26,10 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::WorkloadStrategy;
 use crate::alpha_handle_u8::premultiply_alpha_rgba_row_impl;
 use crate::wasm32::transpose::{wasm_load_deinterleave_u8x4, wasm_store_interleave_u8x4};
 use crate::wasm32::utils::*;
-use crate::WorkloadStrategy;
 use rayon::ThreadPool;
 use std::arch::wasm32::*;
 
@@ -48,33 +48,35 @@ pub fn wasm_unpremultiply_alpha_rgba(
 
 #[inline]
 unsafe fn unpremultiply_vec(pixel: v128, alpha: v128) -> v128 {
-    let scale_back = u8x16_splat(255);
+    unsafe {
+        let scale_back = u8x16_splat(255);
 
-    let low_part = u16x8_extmul_low_u8x16(pixel, scale_back);
-    let high_part = u16x8_extmul_high_u8x16(pixel, scale_back);
+        let low_part = u16x8_extmul_low_u8x16(pixel, scale_back);
+        let high_part = u16x8_extmul_high_u8x16(pixel, scale_back);
 
-    let low_alpha_part = u16x8_extend_low_u8x16(alpha);
-    let high_alpha_part = u16x8_extend_high_u8x16(alpha);
+        let low_alpha_part = u16x8_extend_low_u8x16(alpha);
+        let high_alpha_part = u16x8_extend_high_u8x16(alpha);
 
-    let lo_lo = f32x4_convert_u32x4(u32x4_extend_low_u16x8(low_part));
-    let lo_hi = f32x4_convert_u32x4(u32x4_extend_high_u16x8(low_part));
-    let hi_lo = f32x4_convert_u32x4(u32x4_extend_low_u16x8(high_part));
-    let hi_hi = f32x4_convert_u32x4(u32x4_extend_high_u16x8(high_part));
+        let lo_lo = f32x4_convert_u32x4(u32x4_extend_low_u16x8(low_part));
+        let lo_hi = f32x4_convert_u32x4(u32x4_extend_high_u16x8(low_part));
+        let hi_lo = f32x4_convert_u32x4(u32x4_extend_low_u16x8(high_part));
+        let hi_hi = f32x4_convert_u32x4(u32x4_extend_high_u16x8(high_part));
 
-    // f32x4_convert_u32x4 properly handles NaN so we can ignore 0 masking
-    let lo_lo_alpha = f32x4_convert_u32x4(u32x4_extend_low_u16x8(low_alpha_part));
-    let lo_hi_alpha = f32x4_convert_u32x4(u32x4_extend_high_u16x8(low_alpha_part));
-    let hi_lo_alpha = f32x4_convert_u32x4(u32x4_extend_low_u16x8(high_alpha_part));
-    let hi_hi_alpha = f32x4_convert_u32x4(u32x4_extend_high_u16x8(high_alpha_part));
+        // f32x4_convert_u32x4 properly handles NaN so we can ignore 0 masking
+        let lo_lo_alpha = f32x4_convert_u32x4(u32x4_extend_low_u16x8(low_alpha_part));
+        let lo_hi_alpha = f32x4_convert_u32x4(u32x4_extend_high_u16x8(low_alpha_part));
+        let hi_lo_alpha = f32x4_convert_u32x4(u32x4_extend_low_u16x8(high_alpha_part));
+        let hi_hi_alpha = f32x4_convert_u32x4(u32x4_extend_high_u16x8(high_alpha_part));
 
-    let lo_lo_0 = u32x4_trunc_sat_f32x4(f32x4_div(lo_lo, lo_lo_alpha));
-    let lo_hi_0 = u32x4_trunc_sat_f32x4(f32x4_div(lo_hi, lo_hi_alpha));
-    let hi_lo_0 = u32x4_trunc_sat_f32x4(f32x4_div(hi_lo, hi_lo_alpha));
-    let hi_hi_0 = u32x4_trunc_sat_f32x4(f32x4_div(hi_hi, hi_hi_alpha));
+        let lo_lo_0 = u32x4_trunc_sat_f32x4(f32x4_div(lo_lo, lo_lo_alpha));
+        let lo_hi_0 = u32x4_trunc_sat_f32x4(f32x4_div(lo_hi, lo_hi_alpha));
+        let hi_lo_0 = u32x4_trunc_sat_f32x4(f32x4_div(hi_lo, hi_lo_alpha));
+        let hi_hi_0 = u32x4_trunc_sat_f32x4(f32x4_div(hi_hi, hi_hi_alpha));
 
-    let packed_lo_16 = u32x4_pack_trunc_u16x8(lo_lo_0, lo_hi_0);
-    let packed_hi_16 = u32x4_pack_trunc_u16x8(hi_lo_0, hi_hi_0);
-    u16x8_pack_sat_u8x16(packed_lo_16, packed_hi_16)
+        let packed_lo_16 = u32x4_pack_trunc_u16x8(lo_lo_0, lo_hi_0);
+        let packed_hi_16 = u32x4_pack_trunc_u16x8(hi_lo_0, hi_hi_0);
+        u16x8_pack_sat_u8x16(packed_lo_16, packed_hi_16)
+    }
 }
 
 #[inline]
@@ -85,12 +87,14 @@ pub(crate) unsafe fn wasm_u16x8_div_by_255(v: v128) -> v128 {
 
 #[inline]
 unsafe fn premultiply_vec(pixel: v128, alpha: v128) -> v128 {
-    let lo_product = u16x8_extmul_low_u8x16(pixel, alpha);
-    let hi_product = u16x8_extmul_high_u8x16(pixel, alpha);
+    unsafe {
+        let lo_product = u16x8_extmul_low_u8x16(pixel, alpha);
+        let hi_product = u16x8_extmul_high_u8x16(pixel, alpha);
 
-    let lo_packed = wasm_u16x8_div_by_255(lo_product);
-    let hi_packed = wasm_u16x8_div_by_255(hi_product);
-    u16x8_pack_sat_u8x16(lo_packed, hi_packed)
+        let lo_packed = wasm_u16x8_div_by_255(lo_product);
+        let hi_packed = wasm_u16x8_div_by_255(hi_product);
+        u16x8_pack_sat_u8x16(lo_packed, hi_packed)
+    }
 }
 
 #[target_feature(enable = "simd128")]

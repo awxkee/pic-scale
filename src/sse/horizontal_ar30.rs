@@ -42,12 +42,14 @@ unsafe fn conv_horiz_rgba_1_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
     w0: __m128i,
     store: __m128i,
 ) -> __m128i {
-    let src_ptr = src.get_unchecked(start_x * 4..);
-    let ld = _mm_ld1_ar30_s16::<AR_TYPE, AR_ORDER>(src_ptr);
-    _mm_add_epi32(
-        store,
-        _mm_madd_epi16(_mm_unpacklo_epi16(ld, _mm_setzero_si128()), w0),
-    )
+    unsafe {
+        let src_ptr = src.get_unchecked(start_x * 4..);
+        let ld = _mm_ld1_ar30_s16::<AR_TYPE, AR_ORDER>(src_ptr);
+        _mm_add_epi32(
+            store,
+            _mm_madd_epi16(_mm_unpacklo_epi16(ld, _mm_setzero_si128()), w0),
+        )
+    }
 }
 
 #[inline(always)]
@@ -60,24 +62,26 @@ unsafe fn conv_horiz_rgba_8_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
     w3: __m128i,
     store: __m128i,
 ) -> __m128i {
-    let src_ptr = src.get_unchecked(start_x * 4..);
+    unsafe {
+        let src_ptr = src.get_unchecked(start_x * 4..);
 
-    let l0 = _mm_loadu_si128(src_ptr.as_ptr() as *const _);
-    let l1 = _mm_loadu_si128(src_ptr.as_ptr().add(4 * 4) as *const _);
+        let l0 = _mm_loadu_si128(src_ptr.as_ptr() as *const _);
+        let l1 = _mm_loadu_si128(src_ptr.as_ptr().add(4 * 4) as *const _);
 
-    let rgba_pixel = _mm_unzip_4_ar30_separate::<AR_TYPE, AR_ORDER>((l0, l1));
+        let rgba_pixel = _mm_unzip_4_ar30_separate::<AR_TYPE, AR_ORDER>((l0, l1));
 
-    let sh1 = _mm_setr_epi8(0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15);
+        let sh1 = _mm_setr_epi8(0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15);
 
-    let v0 = _mm_shuffle_epi8(rgba_pixel.0, sh1);
-    let v1 = _mm_shuffle_epi8(rgba_pixel.1, sh1);
-    let v2 = _mm_shuffle_epi8(rgba_pixel.2, sh1);
-    let v3 = _mm_shuffle_epi8(rgba_pixel.3, sh1);
+        let v0 = _mm_shuffle_epi8(rgba_pixel.0, sh1);
+        let v1 = _mm_shuffle_epi8(rgba_pixel.1, sh1);
+        let v2 = _mm_shuffle_epi8(rgba_pixel.2, sh1);
+        let v3 = _mm_shuffle_epi8(rgba_pixel.3, sh1);
 
-    let mut v = _mm_add_epi32(store, _mm_madd_epi16(v0, w0));
-    v = _mm_add_epi32(v, _mm_madd_epi16(v1, w1));
-    v = _mm_add_epi32(v, _mm_madd_epi16(v2, w2));
-    _mm_add_epi32(v, _mm_madd_epi16(v3, w3))
+        let mut v = _mm_add_epi32(store, _mm_madd_epi16(v0, w0));
+        v = _mm_add_epi32(v, _mm_madd_epi16(v1, w1));
+        v = _mm_add_epi32(v, _mm_madd_epi16(v2, w2));
+        _mm_add_epi32(v, _mm_madd_epi16(v3, w3))
+    }
 }
 
 #[inline]
@@ -88,19 +92,21 @@ unsafe fn conv_horiz_rgba_4_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
     w1: __m128i,
     store: __m128i,
 ) -> __m128i {
-    let src_ptr = src.get_unchecked(start_x * 4..);
+    unsafe {
+        let src_ptr = src.get_unchecked(start_x * 4..);
 
-    let rgba_pixel = _mm_unzips_4_ar30_separate::<AR_TYPE, AR_ORDER>(_mm_loadu_si128(
-        src_ptr.as_ptr() as *const _,
-    ));
+        let rgba_pixel = _mm_unzips_4_ar30_separate::<AR_TYPE, AR_ORDER>(_mm_loadu_si128(
+            src_ptr.as_ptr() as *const _,
+        ));
 
-    let sh1 = _mm_setr_epi8(0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15);
+        let sh1 = _mm_setr_epi8(0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15);
 
-    let v0 = _mm_shuffle_epi8(rgba_pixel.0, sh1);
-    let v1 = _mm_shuffle_epi8(rgba_pixel.1, sh1);
+        let v0 = _mm_shuffle_epi8(rgba_pixel.0, sh1);
+        let v1 = _mm_shuffle_epi8(rgba_pixel.1, sh1);
 
-    let v = _mm_add_epi32(store, _mm_madd_epi16(v0, w0));
-    _mm_add_epi32(v, _mm_madd_epi16(v1, w1))
+        let v = _mm_add_epi32(store, _mm_madd_epi16(v0, w0));
+        _mm_add_epi32(v, _mm_madd_epi16(v1, w1))
+    }
 }
 
 pub(crate) fn sse_convolve_horizontal_rgba_rows_4_ar30<

@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::avx2::utils::{_mm256_fma_ps, _mm_prefer_fma_ps};
+use crate::avx2::utils::{_mm_prefer_fma_ps, _mm256_fma_ps};
 use crate::filter_weights::FilterBounds;
 use std::arch::x86_64::*;
 
@@ -59,8 +59,10 @@ unsafe fn convolve_vertical_avx_row_f32_regular(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    let unit = ExecutionUnit::<false>::default();
-    unit.pass(width, bounds, src, dst, src_stride, weight_ptr);
+    unsafe {
+        let unit = ExecutionUnit::<false>::default();
+        unit.pass(width, bounds, src, dst, src_stride, weight_ptr);
+    }
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
@@ -73,8 +75,10 @@ unsafe fn convolve_vertical_avx_row_f32_fma(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    let unit = ExecutionUnit::<true>::default();
-    unit.pass(width, bounds, src, dst, src_stride, weight_ptr);
+    unsafe {
+        let unit = ExecutionUnit::<true>::default();
+        unit.pass(width, bounds, src, dst, src_stride, weight_ptr);
+    }
 }
 
 #[derive(Copy, Clone, Default)]
@@ -92,34 +96,36 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         filter: &[f32],
         bounds: &FilterBounds,
     ) {
-        let mut store_0 = _mm256_setzero_ps();
-        let mut store_1 = _mm256_setzero_ps();
-        let mut store_2 = _mm256_setzero_ps();
-        let mut store_3 = _mm256_setzero_ps();
+        unsafe {
+            let mut store_0 = _mm256_setzero_ps();
+            let mut store_1 = _mm256_setzero_ps();
+            let mut store_2 = _mm256_setzero_ps();
+            let mut store_3 = _mm256_setzero_ps();
 
-        let px = start_x;
+            let px = start_x;
 
-        for j in 0..bounds.size {
-            let py = start_y + j;
-            let weight = filter.get_unchecked(j);
-            let v_weight = _mm256_broadcast_ss(weight);
-            let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
-            let item_row_0 = _mm256_loadu_ps(src_ptr);
-            let item_row_1 = _mm256_loadu_ps(src_ptr.add(8));
-            let item_row_2 = _mm256_loadu_ps(src_ptr.add(16));
-            let item_row_3 = _mm256_loadu_ps(src_ptr.add(24));
+            for j in 0..bounds.size {
+                let py = start_y + j;
+                let weight = filter.get_unchecked(j);
+                let v_weight = _mm256_broadcast_ss(weight);
+                let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
+                let item_row_0 = _mm256_loadu_ps(src_ptr);
+                let item_row_1 = _mm256_loadu_ps(src_ptr.add(8));
+                let item_row_2 = _mm256_loadu_ps(src_ptr.add(16));
+                let item_row_3 = _mm256_loadu_ps(src_ptr.add(24));
 
-            store_0 = _mm256_fma_ps::<FMA>(store_0, item_row_0, v_weight);
-            store_1 = _mm256_fma_ps::<FMA>(store_1, item_row_1, v_weight);
-            store_2 = _mm256_fma_ps::<FMA>(store_2, item_row_2, v_weight);
-            store_3 = _mm256_fma_ps::<FMA>(store_3, item_row_3, v_weight);
+                store_0 = _mm256_fma_ps::<FMA>(store_0, item_row_0, v_weight);
+                store_1 = _mm256_fma_ps::<FMA>(store_1, item_row_1, v_weight);
+                store_2 = _mm256_fma_ps::<FMA>(store_2, item_row_2, v_weight);
+                store_3 = _mm256_fma_ps::<FMA>(store_3, item_row_3, v_weight);
+            }
+
+            let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
+            _mm256_storeu_ps(dst_ptr, store_0);
+            _mm256_storeu_ps(dst_ptr.add(8), store_1);
+            _mm256_storeu_ps(dst_ptr.add(16), store_2);
+            _mm256_storeu_ps(dst_ptr.add(24), store_3);
         }
-
-        let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-        _mm256_storeu_ps(dst_ptr, store_0);
-        _mm256_storeu_ps(dst_ptr.add(8), store_1);
-        _mm256_storeu_ps(dst_ptr.add(16), store_2);
-        _mm256_storeu_ps(dst_ptr.add(24), store_3);
     }
 
     #[inline(always)]
@@ -133,22 +139,24 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         filter: &[f32],
         bounds: &FilterBounds,
     ) {
-        let mut store_0 = _mm256_setzero_ps();
+        unsafe {
+            let mut store_0 = _mm256_setzero_ps();
 
-        let px = start_x;
+            let px = start_x;
 
-        for j in 0..bounds.size {
-            let py = start_y + j;
-            let weight = filter.get_unchecked(j);
-            let v_weight = _mm256_broadcast_ss(weight);
-            let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
-            let item_row_0 = _mm256_loadu_ps(src_ptr);
+            for j in 0..bounds.size {
+                let py = start_y + j;
+                let weight = filter.get_unchecked(j);
+                let v_weight = _mm256_broadcast_ss(weight);
+                let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
+                let item_row_0 = _mm256_loadu_ps(src_ptr);
 
-            store_0 = _mm256_fma_ps::<FMA>(store_0, item_row_0, v_weight);
+                store_0 = _mm256_fma_ps::<FMA>(store_0, item_row_0, v_weight);
+            }
+
+            let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
+            _mm256_storeu_ps(dst_ptr, store_0);
         }
-
-        let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-        _mm256_storeu_ps(dst_ptr, store_0);
     }
 
     #[inline(always)]
@@ -162,27 +170,29 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         filter: &[f32],
         bounds: &FilterBounds,
     ) {
-        let mut store_0 = _mm256_setzero_ps();
-        let mut store_1 = _mm256_setzero_ps();
+        unsafe {
+            let mut store_0 = _mm256_setzero_ps();
+            let mut store_1 = _mm256_setzero_ps();
 
-        let px = start_x;
+            let px = start_x;
 
-        for j in 0..bounds.size {
-            let py = start_y + j;
-            let weight = filter.get_unchecked(j);
-            let v_weight = _mm256_broadcast_ss(weight);
-            let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
+            for j in 0..bounds.size {
+                let py = start_y + j;
+                let weight = filter.get_unchecked(j);
+                let v_weight = _mm256_broadcast_ss(weight);
+                let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
 
-            let item_row_0 = _mm256_loadu_ps(src_ptr);
-            let item_row_1 = _mm256_loadu_ps(src_ptr.add(8));
+                let item_row_0 = _mm256_loadu_ps(src_ptr);
+                let item_row_1 = _mm256_loadu_ps(src_ptr.add(8));
 
-            store_0 = _mm256_fma_ps::<FMA>(store_0, item_row_0, v_weight);
-            store_1 = _mm256_fma_ps::<FMA>(store_1, item_row_1, v_weight);
+                store_0 = _mm256_fma_ps::<FMA>(store_0, item_row_0, v_weight);
+                store_1 = _mm256_fma_ps::<FMA>(store_1, item_row_1, v_weight);
+            }
+
+            let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
+            _mm256_storeu_ps(dst_ptr, store_0);
+            _mm256_storeu_ps(dst_ptr.add(8), store_1);
         }
-
-        let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-        _mm256_storeu_ps(dst_ptr, store_0);
-        _mm256_storeu_ps(dst_ptr.add(8), store_1);
     }
 
     #[inline(always)]
@@ -196,23 +206,25 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         filter: &[f32],
         bounds: &FilterBounds,
     ) {
-        let mut store_0 = _mm_setzero_ps();
+        unsafe {
+            let mut store_0 = _mm_setzero_ps();
 
-        let px = start_x;
+            let px = start_x;
 
-        for j in 0..bounds.size {
-            let py = start_y + j;
-            let weight = filter.get_unchecked(j..);
-            let v_weight = _mm_load_ss(weight.as_ptr());
-            let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
+            for j in 0..bounds.size {
+                let py = start_y + j;
+                let weight = filter.get_unchecked(j..);
+                let v_weight = _mm_load_ss(weight.as_ptr());
+                let src_ptr = src.get_unchecked(src_stride * py + px..).as_ptr();
 
-            let item_row_0 = _mm_load_ss(src_ptr);
+                let item_row_0 = _mm_load_ss(src_ptr);
 
-            store_0 = _mm_prefer_fma_ps::<FMA>(store_0, item_row_0, v_weight);
+                store_0 = _mm_prefer_fma_ps::<FMA>(store_0, item_row_0, v_weight);
+            }
+
+            let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
+            _mm_store_ss(dst_ptr, store_0);
         }
-
-        let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-        _mm_store_ss(dst_ptr, store_0);
     }
 
     #[inline(always)]
@@ -225,62 +237,64 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         src_stride: usize,
         weight_ptr: &[f32],
     ) {
-        let mut cx = 0usize;
-        let dst_width = dst.len();
+        unsafe {
+            let mut cx = 0usize;
+            let dst_width = dst.len();
 
-        while cx + 32 < dst_width {
-            self.convolve_vertical_part_avx_32_f32(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
+            while cx + 32 < dst_width {
+                self.convolve_vertical_part_avx_32_f32(
+                    bounds.start,
+                    cx,
+                    src,
+                    src_stride,
+                    dst,
+                    weight_ptr,
+                    bounds,
+                );
 
-            cx += 32;
-        }
+                cx += 32;
+            }
 
-        while cx + 16 < dst_width {
-            self.convolve_vertical_part_avx_16_f32(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
+            while cx + 16 < dst_width {
+                self.convolve_vertical_part_avx_16_f32(
+                    bounds.start,
+                    cx,
+                    src,
+                    src_stride,
+                    dst,
+                    weight_ptr,
+                    bounds,
+                );
 
-            cx += 16;
-        }
+                cx += 16;
+            }
 
-        while cx + 8 < dst_width {
-            self.convolve_vertical_part_avx_8_f32(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
+            while cx + 8 < dst_width {
+                self.convolve_vertical_part_avx_8_f32(
+                    bounds.start,
+                    cx,
+                    src,
+                    src_stride,
+                    dst,
+                    weight_ptr,
+                    bounds,
+                );
 
-            cx += 8;
-        }
+                cx += 8;
+            }
 
-        while cx < dst_width {
-            self.convolve_vertical_part_avx_f32(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
-            cx += 1;
+            while cx < dst_width {
+                self.convolve_vertical_part_avx_f32(
+                    bounds.start,
+                    cx,
+                    src,
+                    src_stride,
+                    dst,
+                    weight_ptr,
+                    bounds,
+                );
+                cx += 1;
+            }
         }
     }
 }

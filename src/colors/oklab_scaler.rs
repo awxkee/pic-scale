@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use colorutils_rs::{oklab_to_rgb, oklab_to_rgba, rgb_to_oklab, rgba_to_oklab, TransferFunction};
+use colorutils_rs::{TransferFunction, oklab_to_rgb, oklab_to_rgba, rgb_to_oklab, rgba_to_oklab};
 
 use crate::pic_scale_error::PicScaleError;
 use crate::scaler::ScalingF32;

@@ -44,51 +44,53 @@ unsafe fn conv_horiz_rgba_8_f16(
     set2: float32x4_t,
     store: float32x4_t,
 ) -> float32x4_t {
-    const COMPONENTS: usize = 4;
-    let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
+    unsafe {
+        const COMPONENTS: usize = 4;
+        let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
 
-    let rgb_pixel = xvld1q_u16_x4(src_ptr as *const _);
+        let rgb_pixel = xvld1q_u16_x4(src_ptr as *const _);
 
-    let mut acc = prefer_vfmaq_laneq_f32::<0>(
-        store,
-        vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(rgb_pixel.0))),
-        set1,
-    );
-    acc = prefer_vfmaq_laneq_f32::<1>(
-        acc,
-        vcvt_high_f32_f16(vreinterpretq_f16_u16(rgb_pixel.0)),
-        set1,
-    );
-    acc = prefer_vfmaq_laneq_f32::<2>(
-        acc,
-        vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(rgb_pixel.1))),
-        set1,
-    );
-    acc = prefer_vfmaq_laneq_f32::<3>(
-        acc,
-        vcvt_high_f32_f16(vreinterpretq_f16_u16(rgb_pixel.1)),
-        set1,
-    );
-    acc = prefer_vfmaq_laneq_f32::<0>(
-        acc,
-        vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(rgb_pixel.2))),
-        set2,
-    );
-    acc = prefer_vfmaq_laneq_f32::<1>(
-        acc,
-        vcvt_high_f32_f16(vreinterpretq_f16_u16(rgb_pixel.2)),
-        set2,
-    );
-    acc = prefer_vfmaq_laneq_f32::<2>(
-        acc,
-        vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(rgb_pixel.3))),
-        set2,
-    );
-    prefer_vfmaq_laneq_f32::<3>(
-        acc,
-        vcvt_high_f32_f16(vreinterpretq_f16_u16(rgb_pixel.3)),
-        set2,
-    )
+        let mut acc = prefer_vfmaq_laneq_f32::<0>(
+            store,
+            vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(rgb_pixel.0))),
+            set1,
+        );
+        acc = prefer_vfmaq_laneq_f32::<1>(
+            acc,
+            vcvt_high_f32_f16(vreinterpretq_f16_u16(rgb_pixel.0)),
+            set1,
+        );
+        acc = prefer_vfmaq_laneq_f32::<2>(
+            acc,
+            vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(rgb_pixel.1))),
+            set1,
+        );
+        acc = prefer_vfmaq_laneq_f32::<3>(
+            acc,
+            vcvt_high_f32_f16(vreinterpretq_f16_u16(rgb_pixel.1)),
+            set1,
+        );
+        acc = prefer_vfmaq_laneq_f32::<0>(
+            acc,
+            vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(rgb_pixel.2))),
+            set2,
+        );
+        acc = prefer_vfmaq_laneq_f32::<1>(
+            acc,
+            vcvt_high_f32_f16(vreinterpretq_f16_u16(rgb_pixel.2)),
+            set2,
+        );
+        acc = prefer_vfmaq_laneq_f32::<2>(
+            acc,
+            vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(rgb_pixel.3))),
+            set2,
+        );
+        prefer_vfmaq_laneq_f32::<3>(
+            acc,
+            vcvt_high_f32_f16(vreinterpretq_f16_u16(rgb_pixel.3)),
+            set2,
+        )
+    }
 }
 
 #[must_use]
@@ -99,31 +101,33 @@ unsafe fn conv_horiz_rgba_4_f16(
     set1: float32x4_t,
     store: float32x4_t,
 ) -> float32x4_t {
-    const COMPONENTS: usize = 4;
-    let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
+    unsafe {
+        const COMPONENTS: usize = 4;
+        let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
 
-    let rgb_pixel = xvld1q_u16_x2(src_ptr as *const _);
+        let rgb_pixel = xvld1q_u16_x2(src_ptr as *const _);
 
-    let acc = prefer_vfmaq_laneq_f32::<0>(
-        store,
-        vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(rgb_pixel.0))),
-        set1,
-    );
-    let acc = prefer_vfmaq_laneq_f32::<1>(
-        acc,
-        vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(rgb_pixel.0))),
-        set1,
-    );
-    let acc = prefer_vfmaq_laneq_f32::<2>(
-        acc,
-        vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(rgb_pixel.1))),
-        set1,
-    );
-    prefer_vfmaq_laneq_f32::<3>(
-        acc,
-        vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(rgb_pixel.0))),
-        set1,
-    )
+        let acc = prefer_vfmaq_laneq_f32::<0>(
+            store,
+            vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(rgb_pixel.0))),
+            set1,
+        );
+        let acc = prefer_vfmaq_laneq_f32::<1>(
+            acc,
+            vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(rgb_pixel.0))),
+            set1,
+        );
+        let acc = prefer_vfmaq_laneq_f32::<2>(
+            acc,
+            vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(rgb_pixel.1))),
+            set1,
+        );
+        prefer_vfmaq_laneq_f32::<3>(
+            acc,
+            vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(rgb_pixel.0))),
+            set1,
+        )
+    }
 }
 
 #[must_use]
@@ -134,21 +138,23 @@ unsafe fn conv_horiz_rgba_2_f32(
     set: float32x2_t,
     store: float32x4_t,
 ) -> float32x4_t {
-    const COMPONENTS: usize = 4;
-    let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
+    unsafe {
+        const COMPONENTS: usize = 4;
+        let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
 
-    let rgb_pixel = vld1q_u16(src_ptr as *const _);
+        let rgb_pixel = vld1q_u16(src_ptr as *const _);
 
-    let acc = prefer_vfmaq_lane_f32::<0>(
-        store,
-        vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(rgb_pixel))),
-        set,
-    );
-    prefer_vfmaq_lane_f32::<1>(
-        acc,
-        vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(rgb_pixel))),
-        set,
-    )
+        let acc = prefer_vfmaq_lane_f32::<0>(
+            store,
+            vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(rgb_pixel))),
+            set,
+        );
+        prefer_vfmaq_lane_f32::<1>(
+            acc,
+            vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(rgb_pixel))),
+            set,
+        )
+    }
 }
 
 #[must_use]
@@ -159,10 +165,12 @@ unsafe fn conv_horiz_rgba_1_f16(
     set: float32x4_t,
     store: float32x4_t,
 ) -> float32x4_t {
-    const COMPONENTS: usize = 4;
-    let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
-    let rgb_pixel = vld1_u16(src_ptr as *const _);
-    prefer_vfmaq_f32(store, vcvt_f32_f16(vreinterpret_f16_u16(rgb_pixel)), set)
+    unsafe {
+        const COMPONENTS: usize = 4;
+        let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
+        let rgb_pixel = vld1_u16(src_ptr as *const _);
+        prefer_vfmaq_f32(store, vcvt_f32_f16(vreinterpret_f16_u16(rgb_pixel)), set)
+    }
 }
 
 pub(crate) fn convolve_horizontal_rgba_neon_row_one_f16(

@@ -130,12 +130,12 @@ pub use colors::*;
 pub use colorutils_rs::TransferFunction;
 pub use image_size::ImageSize;
 pub use image_store::{
-    BufferStore, CbCr16ImageStore, CbCr16ImageStoreMut, CbCr8ImageStore, CbCr8ImageStoreMut,
-    CbCrF32ImageStore, CbCrF32ImageStoreMut, ImageStore, ImageStoreMut, Planar16ImageStore,
-    Planar16ImageStoreMut, Planar8ImageStore, Planar8ImageStoreMut, PlanarF32ImageStore,
-    PlanarF32ImageStoreMut, Rgb16ImageStore, Rgb16ImageStoreMut, Rgb8ImageStore, Rgb8ImageStoreMut,
-    RgbF32ImageStore, RgbF32ImageStoreMut, Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore,
-    Rgba8ImageStoreMut, RgbaF32ImageStore, RgbaF32ImageStoreMut,
+    BufferStore, CbCr8ImageStore, CbCr8ImageStoreMut, CbCr16ImageStore, CbCr16ImageStoreMut,
+    CbCrF32ImageStore, CbCrF32ImageStoreMut, ImageStore, ImageStoreMut, Planar8ImageStore,
+    Planar8ImageStoreMut, Planar16ImageStore, Planar16ImageStoreMut, PlanarF32ImageStore,
+    PlanarF32ImageStoreMut, Rgb8ImageStore, Rgb8ImageStoreMut, Rgb16ImageStore, Rgb16ImageStoreMut,
+    RgbF32ImageStore, RgbF32ImageStoreMut, Rgba8ImageStore, Rgba8ImageStoreMut, Rgba16ImageStore,
+    Rgba16ImageStoreMut, RgbaF32ImageStore, RgbaF32ImageStoreMut,
 };
 #[cfg(feature = "nightly_f16")]
 #[cfg_attr(docsrs, doc(cfg(feature = "nightly_f16")))]

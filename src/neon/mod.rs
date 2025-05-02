@@ -103,15 +103,15 @@ pub(crate) use alpha_f16_full::{
 };
 pub(crate) use alpha_f32::neon_premultiply_alpha_rgba_f32;
 pub(crate) use alpha_f32::neon_unpremultiply_alpha_rgba_f32;
-pub(crate) use alpha_u16::{neon_premultiply_alpha_rgba_u16, neon_unpremultiply_alpha_rgba_u16};
 pub(crate) use alpha_u8::neon_premultiply_alpha_rgba;
 pub(crate) use alpha_u8::neon_unpremultiply_alpha_rgba;
+pub(crate) use alpha_u16::{neon_premultiply_alpha_rgba_u16, neon_unpremultiply_alpha_rgba_u16};
 #[cfg(feature = "rdm")]
 pub(crate) use cbcr8_rdm::{
     convolve_horizontal_cbcr_neon_rdm_row, convolve_horizontal_cbcr_neon_rows_rdm_4_u8,
 };
 pub(crate) use check_alpha::{
-    neon_has_non_constant_cap_alpha_rgba16, neon_has_non_constant_cap_alpha_rgba8,
+    neon_has_non_constant_cap_alpha_rgba8, neon_has_non_constant_cap_alpha_rgba16,
 };
 pub(crate) use horizontal_ar30::{
     neon_convolve_horizontal_rgba_rows_4_ar30, neon_convolve_horizontal_rgba_rows_ar30,
@@ -120,13 +120,6 @@ pub(crate) use horizontal_ar30::{
 pub(crate) use horizontal_ar30_rdm::neon_convolve_horizontal_rgba_rows_4_ar30_rdm;
 pub(crate) use plane_f32::convolve_horizontal_plane_neon_row_one;
 pub(crate) use plane_f32::convolve_horizontal_plane_neon_rows_4;
-#[cfg(feature = "rdm")]
-pub(crate) use plane_u16_hb::{
-    convolve_horizontal_plane_neon_rows_4_hb_u16, convolve_horizontal_plane_neon_u16_hb_row,
-};
-pub(crate) use plane_u16_lb::{
-    convolve_horizontal_plane_neon_rows_4_lb_u16, convolve_horizontal_plane_neon_u16_lb_row,
-};
 pub(crate) use plane_u8::{
     convolve_horizontal_plane_neon_row, convolve_horizontal_plane_neon_row_q,
     convolve_horizontal_plane_neon_rows_4_u8, convolve_horizontal_plane_neon_rows_4_u8_q,
@@ -134,6 +127,13 @@ pub(crate) use plane_u8::{
 #[cfg(feature = "rdm")]
 pub(crate) use plane_u8_rdm::{
     convolve_horizontal_plane_neon_rdm_row, convolve_horizontal_plane_neon_rows_rdm_4_u8,
+};
+#[cfg(feature = "rdm")]
+pub(crate) use plane_u16_hb::{
+    convolve_horizontal_plane_neon_rows_4_hb_u16, convolve_horizontal_plane_neon_u16_hb_row,
+};
+pub(crate) use plane_u16_lb::{
+    convolve_horizontal_plane_neon_rows_4_lb_u16, convolve_horizontal_plane_neon_u16_lb_row,
 };
 #[cfg(feature = "nightly_f16")]
 pub(crate) use rgb_f16::{
@@ -150,13 +150,6 @@ pub(crate) use rgb_f16_full::{
 pub(crate) use rgb_f32::{
     convolve_horizontal_rgb_neon_row_one_f32, convolve_horizontal_rgb_neon_rows_4_f32,
 };
-#[cfg(feature = "rdm")]
-pub(crate) use rgb_u16_hb::{
-    convolve_horizontal_rgb_neon_rows_4_hb_u16, convolve_horizontal_rgb_neon_u16_hb_row,
-};
-pub(crate) use rgb_u16_lb::{
-    convolve_horizontal_rgb_neon_rows_4_lb_u16, convolve_horizontal_rgb_neon_u16_lb_row,
-};
 pub(crate) use rgb_u8::{
     convolve_horizontal_rgb_neon_row_one, convolve_horizontal_rgb_neon_row_one_q,
     convolve_horizontal_rgb_neon_rows_4, convolve_horizontal_rgb_neon_rows_4_q,
@@ -164,6 +157,13 @@ pub(crate) use rgb_u8::{
 #[cfg(feature = "rdm")]
 pub(crate) use rgb_u8_sqrdml::{
     convolve_horizontal_rgb_neon_rdm_row_one, convolve_horizontal_rgb_neon_rdm_rows_4,
+};
+#[cfg(feature = "rdm")]
+pub(crate) use rgb_u16_hb::{
+    convolve_horizontal_rgb_neon_rows_4_hb_u16, convolve_horizontal_rgb_neon_u16_hb_row,
+};
+pub(crate) use rgb_u16_lb::{
+    convolve_horizontal_rgb_neon_rows_4_lb_u16, convolve_horizontal_rgb_neon_u16_lb_row,
 };
 #[cfg(feature = "nightly_f16")]
 pub(crate) use rgba_f16::convolve_horizontal_rgba_neon_row_one_f16;
@@ -180,13 +180,6 @@ pub(crate) use rgba_f16_full::{
 pub(crate) use rgba_f32::{
     convolve_horizontal_rgba_neon_row_one, convolve_horizontal_rgba_neon_rows_4,
 };
-#[cfg(feature = "rdm")]
-pub(crate) use rgba_u16_hb::{
-    convolve_horizontal_rgba_neon_rows_4_hb_u16, convolve_horizontal_rgba_neon_u16_hb_row,
-};
-pub(crate) use rgba_u16_lb::{
-    convolve_horizontal_rgba_neon_rows_4_lb_u16, convolve_horizontal_rgba_neon_u16_lb_row,
-};
 pub(crate) use rgba_u8::{
     convolve_horizontal_rgba_neon_row, convolve_horizontal_rgba_neon_row_q,
     convolve_horizontal_rgba_neon_rows_4_u8, convolve_horizontal_rgba_neon_rows_4_u8_q,
@@ -194,6 +187,13 @@ pub(crate) use rgba_u8::{
 #[cfg(feature = "rdm")]
 pub(crate) use rgba_u8_rdm::{
     convolve_horizontal_rgba_neon_row_i16, convolve_horizontal_rgba_neon_rows_4_u8_i16,
+};
+#[cfg(feature = "rdm")]
+pub(crate) use rgba_u16_hb::{
+    convolve_horizontal_rgba_neon_rows_4_hb_u16, convolve_horizontal_rgba_neon_u16_hb_row,
+};
+pub(crate) use rgba_u16_lb::{
+    convolve_horizontal_rgba_neon_rows_4_lb_u16, convolve_horizontal_rgba_neon_u16_lb_row,
 };
 pub(crate) use vertical_ar30::neon_column_handler_fixed_point_ar30;
 #[cfg(feature = "rdm")]
@@ -205,14 +205,14 @@ pub(crate) use vertical_f16_fhm::convolve_vertical_rgb_neon_row_f16_fhm;
 #[cfg(feature = "nightly_f16")]
 pub(crate) use vertical_f16_full::xconvolve_vertical_rgb_neon_row_f16;
 pub(crate) use vertical_f32::convolve_vertical_rgb_neon_row_f32;
-pub(crate) use vertical_u16::convolve_column_u16;
-#[cfg(feature = "rdm")]
-pub(crate) use vertical_u16_hb::convolve_column_hb_u16;
-pub(crate) use vertical_u16_lb::convolve_column_lb_u16;
 pub(crate) use vertical_u8::{
     convolve_vertical_neon_i32_precision, convolve_vertical_neon_i32_precision_d,
 };
 #[cfg(feature = "rdm")]
 pub(crate) use vertical_u8_rdm::convolve_vertical_neon_i16_precision;
+pub(crate) use vertical_u16::convolve_column_u16;
+#[cfg(feature = "rdm")]
+pub(crate) use vertical_u16_hb::convolve_column_hb_u16;
+pub(crate) use vertical_u16_lb::convolve_column_lb_u16;
 #[cfg(feature = "nightly_f16")]
 pub(crate) use weights::convert_weights_to_f16_fhm;

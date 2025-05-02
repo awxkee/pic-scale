@@ -31,46 +31,48 @@ use std::arch::aarch64::*;
 
 #[inline(always)]
 pub(crate) unsafe fn vrev128_u32(v: uint32x4_t) -> uint32x4_t {
-    vreinterpretq_u32_u8(vrev32q_u8(vreinterpretq_u8_u32(v)))
+    unsafe { vreinterpretq_u32_u8(vrev32q_u8(vreinterpretq_u8_u32(v))) }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn vunzips_3_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: uint32x4_t,
 ) -> int16x4x4_t {
-    let mask = vdupq_n_u32(0x3ff);
-    let ar_type: Rgb30 = AR30_TYPE.into();
+    unsafe {
+        let mask = vdupq_n_u32(0x3ff);
+        let ar_type: Rgb30 = AR30_TYPE.into();
 
-    let v = if AR30_ORDER == 0 { v } else { vrev128_u32(v) };
+        let v = if AR30_ORDER == 0 { v } else { vrev128_u32(v) };
 
-    match ar_type {
-        Rgb30::Ar30 => {
-            let j0 = vandq_u32(v, mask);
-            let j1 = vshrq_n_u32::<10>(v);
-            let j2 = vshrq_n_u32::<20>(v);
-            let r = j0;
-            let g = vandq_u32(j1, mask);
-            let b = vandq_u32(j2, mask);
-            int16x4x4_t(
-                vreinterpret_s16_u16(vmovn_u32(r)),
-                vreinterpret_s16_u16(vmovn_u32(g)),
-                vreinterpret_s16_u16(vmovn_u32(b)),
-                vdup_n_s16(3),
-            )
-        }
-        Rgb30::Ra30 => {
-            let j0 = vshrq_n_u32::<22>(v);
-            let j1 = vshrq_n_u32::<12>(v);
-            let j2 = vshrq_n_u32::<2>(v);
-            let r = vandq_u32(j0, mask);
-            let g = vandq_u32(j1, mask);
-            let b = vandq_u32(j2, mask);
-            int16x4x4_t(
-                vreinterpret_s16_u16(vmovn_u32(r)),
-                vreinterpret_s16_u16(vmovn_u32(g)),
-                vreinterpret_s16_u16(vmovn_u32(b)),
-                vdup_n_s16(3),
-            )
+        match ar_type {
+            Rgb30::Ar30 => {
+                let j0 = vandq_u32(v, mask);
+                let j1 = vshrq_n_u32::<10>(v);
+                let j2 = vshrq_n_u32::<20>(v);
+                let r = j0;
+                let g = vandq_u32(j1, mask);
+                let b = vandq_u32(j2, mask);
+                int16x4x4_t(
+                    vreinterpret_s16_u16(vmovn_u32(r)),
+                    vreinterpret_s16_u16(vmovn_u32(g)),
+                    vreinterpret_s16_u16(vmovn_u32(b)),
+                    vdup_n_s16(3),
+                )
+            }
+            Rgb30::Ra30 => {
+                let j0 = vshrq_n_u32::<22>(v);
+                let j1 = vshrq_n_u32::<12>(v);
+                let j2 = vshrq_n_u32::<2>(v);
+                let r = vandq_u32(j0, mask);
+                let g = vandq_u32(j1, mask);
+                let b = vandq_u32(j2, mask);
+                int16x4x4_t(
+                    vreinterpret_s16_u16(vmovn_u32(r)),
+                    vreinterpret_s16_u16(vmovn_u32(g)),
+                    vreinterpret_s16_u16(vmovn_u32(b)),
+                    vdup_n_s16(3),
+                )
+            }
         }
     }
 }
@@ -139,53 +141,55 @@ pub(crate) unsafe fn vunzips_3_ar30<const AR30_TYPE: usize, const AR30_ORDER: us
 pub(crate) unsafe fn vunzip_3_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: uint32x4x2_t,
 ) -> int16x8x3_t {
-    let mask = vdupq_n_u32(0x3ff);
-    let ar_type: Rgb30 = AR30_TYPE.into();
+    unsafe {
+        let mask = vdupq_n_u32(0x3ff);
+        let ar_type: Rgb30 = AR30_TYPE.into();
 
-    let v = if AR30_ORDER == 0 {
-        v
-    } else {
-        uint32x4x2_t(vrev128_u32(v.0), vrev128_u32(v.1))
-    };
+        let v = if AR30_ORDER == 0 {
+            v
+        } else {
+            uint32x4x2_t(vrev128_u32(v.0), vrev128_u32(v.1))
+        };
 
-    match ar_type {
-        Rgb30::Ar30 => {
-            let r = vcombine_u16(
-                vmovn_u32(vandq_u32(v.0, mask)),
-                vmovn_u32(vandq_u32(v.1, mask)),
-            );
-            let g = vcombine_u16(
-                vmovn_u32(vandq_u32(vshrq_n_u32::<10>(v.0), mask)),
-                vmovn_u32(vandq_u32(vshrq_n_u32::<10>(v.1), mask)),
-            );
-            let b = vcombine_u16(
-                vmovn_u32(vandq_u32(vshrq_n_u32::<20>(v.0), mask)),
-                vmovn_u32(vandq_u32(vshrq_n_u32::<20>(v.1), mask)),
-            );
-            int16x8x3_t(
-                vreinterpretq_s16_u16(r),
-                vreinterpretq_s16_u16(g),
-                vreinterpretq_s16_u16(b),
-            )
-        }
-        Rgb30::Ra30 => {
-            let r = vcombine_u16(
-                vmovn_u32(vandq_u32(vshrq_n_u32::<22>(v.0), mask)),
-                vmovn_u32(vandq_u32(vshrq_n_u32::<22>(v.1), mask)),
-            );
-            let g = vcombine_u16(
-                vmovn_u32(vandq_u32(vshrq_n_u32::<12>(v.0), mask)),
-                vmovn_u32(vandq_u32(vshrq_n_u32::<12>(v.1), mask)),
-            );
-            let b = vcombine_u16(
-                vmovn_u32(vandq_u32(vshrq_n_u32::<2>(v.0), mask)),
-                vmovn_u32(vandq_u32(vshrq_n_u32::<2>(v.1), mask)),
-            );
-            int16x8x3_t(
-                vreinterpretq_s16_u16(r),
-                vreinterpretq_s16_u16(g),
-                vreinterpretq_s16_u16(b),
-            )
+        match ar_type {
+            Rgb30::Ar30 => {
+                let r = vcombine_u16(
+                    vmovn_u32(vandq_u32(v.0, mask)),
+                    vmovn_u32(vandq_u32(v.1, mask)),
+                );
+                let g = vcombine_u16(
+                    vmovn_u32(vandq_u32(vshrq_n_u32::<10>(v.0), mask)),
+                    vmovn_u32(vandq_u32(vshrq_n_u32::<10>(v.1), mask)),
+                );
+                let b = vcombine_u16(
+                    vmovn_u32(vandq_u32(vshrq_n_u32::<20>(v.0), mask)),
+                    vmovn_u32(vandq_u32(vshrq_n_u32::<20>(v.1), mask)),
+                );
+                int16x8x3_t(
+                    vreinterpretq_s16_u16(r),
+                    vreinterpretq_s16_u16(g),
+                    vreinterpretq_s16_u16(b),
+                )
+            }
+            Rgb30::Ra30 => {
+                let r = vcombine_u16(
+                    vmovn_u32(vandq_u32(vshrq_n_u32::<22>(v.0), mask)),
+                    vmovn_u32(vandq_u32(vshrq_n_u32::<22>(v.1), mask)),
+                );
+                let g = vcombine_u16(
+                    vmovn_u32(vandq_u32(vshrq_n_u32::<12>(v.0), mask)),
+                    vmovn_u32(vandq_u32(vshrq_n_u32::<12>(v.1), mask)),
+                );
+                let b = vcombine_u16(
+                    vmovn_u32(vandq_u32(vshrq_n_u32::<2>(v.0), mask)),
+                    vmovn_u32(vandq_u32(vshrq_n_u32::<2>(v.1), mask)),
+                );
+                int16x8x3_t(
+                    vreinterpretq_s16_u16(r),
+                    vreinterpretq_s16_u16(g),
+                    vreinterpretq_s16_u16(b),
+                )
+            }
         }
     }
 }
@@ -282,97 +286,103 @@ pub(crate) unsafe fn vunzip_3_ar30<const AR30_TYPE: usize, const AR30_ORDER: usi
 pub(crate) unsafe fn vunzip_3_ar30_separate<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: uint32x4x2_t,
 ) -> int16x8x4_t {
-    let values = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(v);
-    let a0 = vtrnq_s16(values.0, values.1);
-    let a1 = vtrnq_s16(values.2, vdupq_n_s16(3));
-    let v1 = vtrnq_s32(vreinterpretq_s32_s16(a0.0), vreinterpretq_s32_s16(a1.0));
-    let v2 = vtrnq_s32(vreinterpretq_s32_s16(a0.1), vreinterpretq_s32_s16(a1.1));
-    let k0 = vreinterpretq_s16_s32(v1.0);
-    let k1 = vreinterpretq_s16_s32(v2.0);
-    let k2 = vreinterpretq_s16_s32(v1.1);
-    let k3 = vreinterpretq_s16_s32(v2.1);
-    int16x8x4_t(k0, k1, k2, k3)
+    unsafe {
+        let values = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(v);
+        let a0 = vtrnq_s16(values.0, values.1);
+        let a1 = vtrnq_s16(values.2, vdupq_n_s16(3));
+        let v1 = vtrnq_s32(vreinterpretq_s32_s16(a0.0), vreinterpretq_s32_s16(a1.0));
+        let v2 = vtrnq_s32(vreinterpretq_s32_s16(a0.1), vreinterpretq_s32_s16(a1.1));
+        let k0 = vreinterpretq_s16_s32(v1.0);
+        let k1 = vreinterpretq_s16_s32(v2.0);
+        let k2 = vreinterpretq_s16_s32(v1.1);
+        let k3 = vreinterpretq_s16_s32(v2.1);
+        int16x8x4_t(k0, k1, k2, k3)
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn vunzips_4_ar30_separate<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: uint32x4_t,
 ) -> int16x8x2_t {
-    let values = vunzips_3_ar30::<AR30_TYPE, AR30_ORDER>(v);
-    let a0 = vtrn_s16(values.0, values.1);
-    let a1 = vtrn_s16(values.2, values.3);
-    let v1 = vtrn_s32(vreinterpret_s32_s16(a0.0), vreinterpret_s32_s16(a1.0));
-    let v2 = vtrn_s32(vreinterpret_s32_s16(a0.1), vreinterpret_s32_s16(a1.1));
-    let k0 = vreinterpret_s16_s32(v1.0);
-    let k1 = vreinterpret_s16_s32(v2.0);
-    let k2 = vreinterpret_s16_s32(v1.1);
-    let k3 = vreinterpret_s16_s32(v2.1);
-    int16x8x2_t(vcombine_s16(k0, k1), vcombine_s16(k2, k3))
+    unsafe {
+        let values = vunzips_3_ar30::<AR30_TYPE, AR30_ORDER>(v);
+        let a0 = vtrn_s16(values.0, values.1);
+        let a1 = vtrn_s16(values.2, values.3);
+        let v1 = vtrn_s32(vreinterpret_s32_s16(a0.0), vreinterpret_s32_s16(a1.0));
+        let v2 = vtrn_s32(vreinterpret_s32_s16(a0.1), vreinterpret_s32_s16(a1.1));
+        let k0 = vreinterpret_s16_s32(v1.0);
+        let k1 = vreinterpret_s16_s32(v2.0);
+        let k2 = vreinterpret_s16_s32(v1.1);
+        let k3 = vreinterpret_s16_s32(v2.1);
+        int16x8x2_t(vcombine_s16(k0, k1), vcombine_s16(k2, k3))
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn vzip_4_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: int16x8x4_t,
 ) -> uint32x4x2_t {
-    let ar_type: Rgb30 = AR30_TYPE.into();
-    // let a_max = vdupq_n_s16(3);
-    match ar_type {
-        Rgb30::Ar30 => {
-            // let v3 = vminq_s16(vrshrq_n_s16::<8>(v.3), a_max);
-            let mut a0 = vdupq_n_u32(3 << 30); //vshlq_n_u32::<30>(vmovl_u16(vreinterpret_u16_s16(vget_low_s16(v3))));
-            let mut a1 = vdupq_n_u32(3 << 30); // vshlq_n_u32::<30>(vmovl_u16(vreinterpret_u16_s16(vget_high_s16(v3))));
+    unsafe {
+        let ar_type: Rgb30 = AR30_TYPE.into();
+        // let a_max = vdupq_n_s16(3);
+        match ar_type {
+            Rgb30::Ar30 => {
+                // let v3 = vminq_s16(vrshrq_n_s16::<8>(v.3), a_max);
+                let mut a0 = vdupq_n_u32(3 << 30); //vshlq_n_u32::<30>(vmovl_u16(vreinterpret_u16_s16(vget_low_s16(v3))));
+                let mut a1 = vdupq_n_u32(3 << 30); // vshlq_n_u32::<30>(vmovl_u16(vreinterpret_u16_s16(vget_high_s16(v3))));
 
-            let r0 = vshlq_n_u32::<20>(vmovl_u16(vreinterpret_u16_s16(vget_low_s16(v.2))));
-            let r1 = vshlq_n_u32::<20>(vmovl_u16(vreinterpret_u16_s16(vget_high_s16(v.2))));
+                let r0 = vshlq_n_u32::<20>(vmovl_u16(vreinterpret_u16_s16(vget_low_s16(v.2))));
+                let r1 = vshlq_n_u32::<20>(vmovl_u16(vreinterpret_u16_s16(vget_high_s16(v.2))));
 
-            a0 = vorrq_u32(a0, r0);
-            a1 = vorrq_u32(a1, r1);
+                a0 = vorrq_u32(a0, r0);
+                a1 = vorrq_u32(a1, r1);
 
-            let g0 = vshlq_n_u32::<10>(vmovl_u16(vreinterpret_u16_s16(vget_low_s16(v.1))));
-            let g1 = vshlq_n_u32::<10>(vmovl_u16(vreinterpret_u16_s16(vget_high_s16(v.1))));
+                let g0 = vshlq_n_u32::<10>(vmovl_u16(vreinterpret_u16_s16(vget_low_s16(v.1))));
+                let g1 = vshlq_n_u32::<10>(vmovl_u16(vreinterpret_u16_s16(vget_high_s16(v.1))));
 
-            a0 = vorrq_u32(a0, g0);
-            a1 = vorrq_u32(a1, g1);
+                a0 = vorrq_u32(a0, g0);
+                a1 = vorrq_u32(a1, g1);
 
-            a0 = vorrq_u32(a0, vmovl_u16(vreinterpret_u16_s16(vget_low_s16(v.0))));
-            a1 = vorrq_u32(a1, vmovl_u16(vreinterpret_u16_s16(vget_high_s16(v.0))));
+                a0 = vorrq_u32(a0, vmovl_u16(vreinterpret_u16_s16(vget_low_s16(v.0))));
+                a1 = vorrq_u32(a1, vmovl_u16(vreinterpret_u16_s16(vget_high_s16(v.0))));
 
-            if AR30_ORDER == 0 {
-                uint32x4x2_t(a0, a1)
-            } else {
-                uint32x4x2_t(vrev128_u32(a0), vrev128_u32(a1))
+                if AR30_ORDER == 0 {
+                    uint32x4x2_t(a0, a1)
+                } else {
+                    uint32x4x2_t(vrev128_u32(a0), vrev128_u32(a1))
+                }
             }
-        }
-        Rgb30::Ra30 => {
-            // let v3 = vminq_s16(vrshrq_n_s16::<8>(v.3), a_max);
-            let mut a0 = vdupq_n_u32(3); //vmovl_u16(vreinterpret_u16_s16(vget_low_s16(v3)));
-            let mut a1 = vdupq_n_u32(3); //vmovl_u16(vreinterpret_u16_s16(vget_high_s16(v3)));
+            Rgb30::Ra30 => {
+                // let v3 = vminq_s16(vrshrq_n_s16::<8>(v.3), a_max);
+                let mut a0 = vdupq_n_u32(3); //vmovl_u16(vreinterpret_u16_s16(vget_low_s16(v3)));
+                let mut a1 = vdupq_n_u32(3); //vmovl_u16(vreinterpret_u16_s16(vget_high_s16(v3)));
 
-            let r0 = vshlq_n_u32::<22>(vmovl_u16(vreinterpret_u16_s16(vget_low_s16(v.0))));
-            let r1 = vshlq_n_u32::<22>(vmovl_u16(vreinterpret_u16_s16(vget_high_s16(v.0))));
+                let r0 = vshlq_n_u32::<22>(vmovl_u16(vreinterpret_u16_s16(vget_low_s16(v.0))));
+                let r1 = vshlq_n_u32::<22>(vmovl_u16(vreinterpret_u16_s16(vget_high_s16(v.0))));
 
-            a0 = vorrq_u32(a0, r0);
-            a1 = vorrq_u32(a1, r1);
+                a0 = vorrq_u32(a0, r0);
+                a1 = vorrq_u32(a1, r1);
 
-            let g0 = vshlq_n_u32::<12>(vmovl_u16(vreinterpret_u16_s16(vget_low_s16(v.1))));
-            let g1 = vshlq_n_u32::<12>(vmovl_u16(vreinterpret_u16_s16(vget_high_s16(v.1))));
+                let g0 = vshlq_n_u32::<12>(vmovl_u16(vreinterpret_u16_s16(vget_low_s16(v.1))));
+                let g1 = vshlq_n_u32::<12>(vmovl_u16(vreinterpret_u16_s16(vget_high_s16(v.1))));
 
-            a0 = vorrq_u32(a0, g0);
-            a1 = vorrq_u32(a1, g1);
+                a0 = vorrq_u32(a0, g0);
+                a1 = vorrq_u32(a1, g1);
 
-            a0 = vorrq_u32(
-                a0,
-                vshlq_n_u32::<2>(vmovl_u16(vreinterpret_u16_s16(vget_low_s16(v.2)))),
-            );
-            a1 = vorrq_u32(
-                a1,
-                vshlq_n_u32::<2>(vmovl_u16(vreinterpret_u16_s16(vget_high_s16(v.2)))),
-            );
+                a0 = vorrq_u32(
+                    a0,
+                    vshlq_n_u32::<2>(vmovl_u16(vreinterpret_u16_s16(vget_low_s16(v.2)))),
+                );
+                a1 = vorrq_u32(
+                    a1,
+                    vshlq_n_u32::<2>(vmovl_u16(vreinterpret_u16_s16(vget_high_s16(v.2)))),
+                );
 
-            if AR30_ORDER == 0 {
-                uint32x4x2_t(a0, a1)
-            } else {
-                uint32x4x2_t(vrev128_u32(a0), vrev128_u32(a1))
+                if AR30_ORDER == 0 {
+                    uint32x4x2_t(a0, a1)
+                } else {
+                    uint32x4x2_t(vrev128_u32(a0), vrev128_u32(a1))
+                }
             }
         }
     }
@@ -382,51 +392,55 @@ pub(crate) unsafe fn vzip_4_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize
 pub(crate) unsafe fn vld1_ar30_s16<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     arr: &[u8],
 ) -> int16x4_t {
-    let item = u32::from_ne_bytes([
-        *arr.get_unchecked(0),
-        *arr.get_unchecked(1),
-        *arr.get_unchecked(2),
-        *arr.get_unchecked(3),
-    ]);
-    let ar_type: Rgb30 = AR30_TYPE.into();
-    let vl = ar_type.unpack::<AR30_ORDER>(item);
-    let temp = [vl.0 as i16, vl.1 as i16, vl.2 as i16, 1023];
-    vld1_s16(temp.as_ptr())
+    unsafe {
+        let item = u32::from_ne_bytes([
+            *arr.get_unchecked(0),
+            *arr.get_unchecked(1),
+            *arr.get_unchecked(2),
+            *arr.get_unchecked(3),
+        ]);
+        let ar_type: Rgb30 = AR30_TYPE.into();
+        let vl = ar_type.unpack::<AR30_ORDER>(item);
+        let temp = [vl.0 as i16, vl.1 as i16, vl.2 as i16, 1023];
+        vld1_s16(temp.as_ptr())
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn vextract_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: uint16x4_t,
 ) -> uint32x2_t {
-    let v0 = vreinterpret_u64_u16(v);
-    let v_mask = vdup_n_u64(0x3ff);
-    let j0 = vshr_n_u64::<16>(v0);
-    let j1 = vshr_n_u64::<32>(v0);
-    let r = vand_u64(v0, v_mask);
-    let g = vand_u64(j0, v_mask);
-    let b = vand_u64(j1, v_mask);
+    unsafe {
+        let v0 = vreinterpret_u64_u16(v);
+        let v_mask = vdup_n_u64(0x3ff);
+        let j0 = vshr_n_u64::<16>(v0);
+        let j1 = vshr_n_u64::<32>(v0);
+        let r = vand_u64(v0, v_mask);
+        let g = vand_u64(j0, v_mask);
+        let b = vand_u64(j1, v_mask);
 
-    let ar_type: Rgb30 = AR30_TYPE.into();
+        let ar_type: Rgb30 = AR30_TYPE.into();
 
-    let mut a;
+        let mut a;
 
-    match ar_type {
-        Rgb30::Ar30 => {
-            a = vdup_n_u64(3 << 30);
-            a = vorr_u64(a, vshl_n_u64::<20>(b));
-            a = vorr_u64(a, vshl_n_u64::<10>(g));
-            a = vorr_u64(a, r);
+        match ar_type {
+            Rgb30::Ar30 => {
+                a = vdup_n_u64(3 << 30);
+                a = vorr_u64(a, vshl_n_u64::<20>(b));
+                a = vorr_u64(a, vshl_n_u64::<10>(g));
+                a = vorr_u64(a, r);
+            }
+            Rgb30::Ra30 => {
+                a = vdup_n_u64(3);
+                a = vorr_u64(a, vshl_n_u64::<2>(b));
+                a = vorr_u64(a, vshl_n_u64::<12>(g));
+                a = vorr_u64(a, vshl_n_u64::<22>(r));
+            }
         }
-        Rgb30::Ra30 => {
-            a = vdup_n_u64(3);
-            a = vorr_u64(a, vshl_n_u64::<2>(b));
-            a = vorr_u64(a, vshl_n_u64::<12>(g));
-            a = vorr_u64(a, vshl_n_u64::<22>(r));
-        }
-    }
 
-    if AR30_ORDER == 1 {
-        a = vreinterpret_u64_u8(vrev32_u8(vreinterpret_u8_u64(a)));
+        if AR30_ORDER == 1 {
+            a = vreinterpret_u64_u8(vrev32_u8(vreinterpret_u8_u64(a)));
+        }
+        vreinterpret_u32_u64(a)
     }
-    vreinterpret_u32_u64(a)
 }

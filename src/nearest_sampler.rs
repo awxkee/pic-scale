@@ -27,9 +27,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
+use rayon::ThreadPool;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::ParallelSliceMut;
-use rayon::ThreadPool;
 
 pub(crate) fn resize_nearest<T: Copy + Send + Sync, const CHANNELS: usize>(
     src: &[T],

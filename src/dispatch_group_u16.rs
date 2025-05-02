@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![allow(clippy::type_complexity)]
+use crate::ImageStore;
 use crate::convolution::ConvolutionOptions;
 use crate::filter_weights::{
     DefaultWeightsConverter, FilterBounds, FilterWeights, WeightsConverter,
@@ -37,10 +38,9 @@ use crate::handler_provider::{
 };
 use crate::image_store::ImageStoreMut;
 use crate::support::PRECISION;
-use crate::ImageStore;
+use rayon::ThreadPool;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
-use rayon::ThreadPool;
 
 trait HorizontalHandlerRow {
     fn handle_row_4(

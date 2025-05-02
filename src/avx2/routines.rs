@@ -92,13 +92,15 @@ pub(crate) const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_hsum_epi32(x: __m128i) -> i32 {
-    const FIRST_MASK: i32 = shuffle(1, 0, 3, 2);
-    let hi64 = _mm_shuffle_epi32::<FIRST_MASK>(x);
-    let sum64 = _mm_add_epi32(hi64, x);
-    const SM: i32 = shuffle(1, 0, 3, 2);
-    let hi32 = _mm_shufflelo_epi16::<SM>(sum64);
-    let sum32 = _mm_add_epi32(sum64, hi32);
-    _mm_cvtsi128_si32(sum32)
+    unsafe {
+        const FIRST_MASK: i32 = shuffle(1, 0, 3, 2);
+        let hi64 = _mm_shuffle_epi32::<FIRST_MASK>(x);
+        let sum64 = _mm_add_epi32(hi64, x);
+        const SM: i32 = shuffle(1, 0, 3, 2);
+        let hi32 = _mm_shufflelo_epi16::<SM>(sum64);
+        let sum32 = _mm_add_epi32(sum64, hi32);
+        _mm_cvtsi128_si32(sum32)
+    }
 }
 
 #[inline(always)]

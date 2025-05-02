@@ -44,83 +44,88 @@ unsafe fn avx_has_non_constant_cap_alpha_rgba8_impl(
     width: usize,
     stride: usize,
 ) -> bool {
-    if store.is_empty() {
-        return true;
-    }
-
-    let ash0 = _mm256_setr_epi8(
-        3, -1, -1, -1, 7, -1, -1, -1, 11, -1, -1, -1, 15, -1, -1, -1, 3, -1, -1, -1, 7, -1, -1, -1,
-        11, -1, -1, -1, 15, -1, -1, -1,
-    );
-
-    let sh0 = _mm_setr_epi8(3, -1, -1, -1, 7, -1, -1, -1, 11, -1, -1, -1, 15, -1, -1, -1);
-
-    let first_alpha = store[3];
-    let def_alpha = _mm256_set1_epi32(first_alpha as i32);
-
-    for row in store.chunks_exact(stride) {
-        let row = &row[0..width * 4];
-        let mut sums = _mm256_set1_epi32(0);
-
-        for chunk in row.chunks_exact(32 * 4) {
-            let mut r0 = _mm256_loadu_si256(chunk.as_ptr() as *const __m256i);
-            let mut r1 = _mm256_loadu_si256(chunk.get_unchecked(32..).as_ptr() as *const __m256i);
-            let mut r2 = _mm256_loadu_si256(chunk.get_unchecked(64..).as_ptr() as *const __m256i);
-            let mut r3 = _mm256_loadu_si256(chunk.get_unchecked(96..).as_ptr() as *const __m256i);
-
-            r0 = _mm256_xor_si256(_mm256_shuffle_epi8(r0, ash0), def_alpha);
-            r1 = _mm256_xor_si256(_mm256_shuffle_epi8(r1, ash0), def_alpha);
-            r2 = _mm256_xor_si256(_mm256_shuffle_epi8(r2, ash0), def_alpha);
-            r3 = _mm256_xor_si256(_mm256_shuffle_epi8(r3, ash0), def_alpha);
-
-            sums = _mm256_add_epi32(sums, r0);
-            sums = _mm256_add_epi32(sums, r1);
-            sums = _mm256_add_epi32(sums, r2);
-            sums = _mm256_add_epi32(sums, r3);
-        }
-
-        let row = row.chunks_exact(32 * 4).remainder();
-
-        for chunk in row.chunks_exact(32) {
-            let mut r0 = _mm256_loadu_si256(chunk.as_ptr() as *const __m256i);
-
-            r0 = _mm256_xor_si256(_mm256_shuffle_epi8(r0, ash0), def_alpha);
-
-            sums = _mm256_add_epi32(sums, r0);
-        }
-
-        let row = row.chunks_exact(32).remainder();
-
-        let mut sums = _mm_add_epi32(
-            _mm256_castsi256_si128(sums),
-            _mm256_extracti128_si256::<1>(sums),
-        );
-        let def_alpha = _mm_set1_epi32(first_alpha as i32);
-
-        for chunk in row.chunks_exact(16) {
-            let mut r0 = _mm_loadu_si128(chunk.as_ptr() as *const __m128i);
-
-            r0 = _mm_shuffle_epi8(r0, sh0);
-
-            let alphas = _mm_xor_si128(r0, def_alpha);
-
-            sums = _mm_add_epi32(sums, alphas);
-        }
-
-        let row = row.chunks_exact(16).remainder();
-
-        use crate::avx2::routines::_mm_hsum_epi32;
-        let mut h_sum = _mm_hsum_epi32(sums);
-
-        for chunk in row.chunks_exact(4) {
-            h_sum += chunk[3] as i32 ^ first_alpha as i32;
-        }
-
-        if h_sum != 0 {
+    unsafe {
+        if store.is_empty() {
             return true;
         }
+
+        let ash0 = _mm256_setr_epi8(
+            3, -1, -1, -1, 7, -1, -1, -1, 11, -1, -1, -1, 15, -1, -1, -1, 3, -1, -1, -1, 7, -1, -1,
+            -1, 11, -1, -1, -1, 15, -1, -1, -1,
+        );
+
+        let sh0 = _mm_setr_epi8(3, -1, -1, -1, 7, -1, -1, -1, 11, -1, -1, -1, 15, -1, -1, -1);
+
+        let first_alpha = store[3];
+        let def_alpha = _mm256_set1_epi32(first_alpha as i32);
+
+        for row in store.chunks_exact(stride) {
+            let row = &row[0..width * 4];
+            let mut sums = _mm256_set1_epi32(0);
+
+            for chunk in row.chunks_exact(32 * 4) {
+                let mut r0 = _mm256_loadu_si256(chunk.as_ptr() as *const __m256i);
+                let mut r1 =
+                    _mm256_loadu_si256(chunk.get_unchecked(32..).as_ptr() as *const __m256i);
+                let mut r2 =
+                    _mm256_loadu_si256(chunk.get_unchecked(64..).as_ptr() as *const __m256i);
+                let mut r3 =
+                    _mm256_loadu_si256(chunk.get_unchecked(96..).as_ptr() as *const __m256i);
+
+                r0 = _mm256_xor_si256(_mm256_shuffle_epi8(r0, ash0), def_alpha);
+                r1 = _mm256_xor_si256(_mm256_shuffle_epi8(r1, ash0), def_alpha);
+                r2 = _mm256_xor_si256(_mm256_shuffle_epi8(r2, ash0), def_alpha);
+                r3 = _mm256_xor_si256(_mm256_shuffle_epi8(r3, ash0), def_alpha);
+
+                sums = _mm256_add_epi32(sums, r0);
+                sums = _mm256_add_epi32(sums, r1);
+                sums = _mm256_add_epi32(sums, r2);
+                sums = _mm256_add_epi32(sums, r3);
+            }
+
+            let row = row.chunks_exact(32 * 4).remainder();
+
+            for chunk in row.chunks_exact(32) {
+                let mut r0 = _mm256_loadu_si256(chunk.as_ptr() as *const __m256i);
+
+                r0 = _mm256_xor_si256(_mm256_shuffle_epi8(r0, ash0), def_alpha);
+
+                sums = _mm256_add_epi32(sums, r0);
+            }
+
+            let row = row.chunks_exact(32).remainder();
+
+            let mut sums = _mm_add_epi32(
+                _mm256_castsi256_si128(sums),
+                _mm256_extracti128_si256::<1>(sums),
+            );
+            let def_alpha = _mm_set1_epi32(first_alpha as i32);
+
+            for chunk in row.chunks_exact(16) {
+                let mut r0 = _mm_loadu_si128(chunk.as_ptr() as *const __m128i);
+
+                r0 = _mm_shuffle_epi8(r0, sh0);
+
+                let alphas = _mm_xor_si128(r0, def_alpha);
+
+                sums = _mm_add_epi32(sums, alphas);
+            }
+
+            let row = row.chunks_exact(16).remainder();
+
+            use crate::avx2::routines::_mm_hsum_epi32;
+            let mut h_sum = _mm_hsum_epi32(sums);
+
+            for chunk in row.chunks_exact(4) {
+                h_sum += chunk[3] as i32 ^ first_alpha as i32;
+            }
+
+            if h_sum != 0 {
+                return true;
+            }
+        }
+        false
     }
-    false
 }
 
 /// Checks if image has constant alpha by xor rows for image 16bits
@@ -138,68 +143,73 @@ unsafe fn avx_has_non_constant_cap_alpha_rgba16_impl(
     width: usize,
     stride: usize,
 ) -> bool {
-    if store.is_empty() {
-        return true;
-    }
-
-    let ash0 = _mm256_setr_epi8(
-        6, 7, -1, -1, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 6, 7, -1, -1, 14, 15, -1, -1,
-        -1, -1, -1, -1, -1, -1, -1, -1,
-    );
-
-    let first_alpha = store[3];
-    let def_alpha = _mm256_set1_epi32(first_alpha as i32);
-
-    for row in store.chunks_exact(stride) {
-        let row = &row[0..width * 4];
-        let mut sums = _mm256_set1_epi32(0);
-        for chunk in row.chunks_exact(16 * 4) {
-            let mut r0 = _mm256_loadu_si256(chunk.as_ptr() as *const __m256i);
-            let mut r1 = _mm256_loadu_si256(chunk.get_unchecked(16..).as_ptr() as *const __m256i);
-            let mut r2 = _mm256_loadu_si256(chunk.get_unchecked(32..).as_ptr() as *const __m256i);
-            let mut r3 = _mm256_loadu_si256(chunk.get_unchecked(48..).as_ptr() as *const __m256i);
-
-            r0 = _mm256_shuffle_epi8(r0, ash0);
-            r1 = _mm256_shuffle_epi8(r1, ash0);
-            r2 = _mm256_shuffle_epi8(r2, ash0);
-            r3 = _mm256_shuffle_epi8(r3, ash0);
-
-            let r01 = _mm256_xor_si256(_mm256_unpacklo_epi32(r0, r1), def_alpha);
-            let r23 = _mm256_xor_si256(_mm256_unpacklo_epi32(r2, r3), def_alpha);
-
-            sums = _mm256_add_epi32(sums, r01);
-            sums = _mm256_add_epi32(sums, r23);
-        }
-
-        let row = row.chunks_exact(16 * 4).remainder();
-
-        for chunk in row.chunks_exact(16) {
-            let mut r0 = _mm256_loadu_si256(chunk.as_ptr() as *const __m256i);
-
-            r0 = _mm256_shuffle_epi8(r0, ash0);
-
-            let alphas = _mm256_xor_si256(_mm256_unpacklo_epi32(r0, r0), def_alpha);
-
-            sums = _mm256_add_epi32(sums, alphas);
-        }
-
-        let row = row.chunks_exact(16).remainder();
-
-        use crate::avx2::routines::_mm_hsum_epi32;
-        let mut h_sum = _mm_hsum_epi32(_mm_add_epi32(
-            _mm256_castsi256_si128(sums),
-            _mm256_extracti128_si256::<1>(sums),
-        ));
-
-        for chunk in row.chunks_exact(4) {
-            h_sum += chunk[3] as i32 ^ first_alpha as i32;
-        }
-
-        if h_sum != 0 {
+    unsafe {
+        if store.is_empty() {
             return true;
         }
+
+        let ash0 = _mm256_setr_epi8(
+            6, 7, -1, -1, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 6, 7, -1, -1, 14, 15, -1,
+            -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        );
+
+        let first_alpha = store[3];
+        let def_alpha = _mm256_set1_epi32(first_alpha as i32);
+
+        for row in store.chunks_exact(stride) {
+            let row = &row[0..width * 4];
+            let mut sums = _mm256_set1_epi32(0);
+            for chunk in row.chunks_exact(16 * 4) {
+                let mut r0 = _mm256_loadu_si256(chunk.as_ptr() as *const __m256i);
+                let mut r1 =
+                    _mm256_loadu_si256(chunk.get_unchecked(16..).as_ptr() as *const __m256i);
+                let mut r2 =
+                    _mm256_loadu_si256(chunk.get_unchecked(32..).as_ptr() as *const __m256i);
+                let mut r3 =
+                    _mm256_loadu_si256(chunk.get_unchecked(48..).as_ptr() as *const __m256i);
+
+                r0 = _mm256_shuffle_epi8(r0, ash0);
+                r1 = _mm256_shuffle_epi8(r1, ash0);
+                r2 = _mm256_shuffle_epi8(r2, ash0);
+                r3 = _mm256_shuffle_epi8(r3, ash0);
+
+                let r01 = _mm256_xor_si256(_mm256_unpacklo_epi32(r0, r1), def_alpha);
+                let r23 = _mm256_xor_si256(_mm256_unpacklo_epi32(r2, r3), def_alpha);
+
+                sums = _mm256_add_epi32(sums, r01);
+                sums = _mm256_add_epi32(sums, r23);
+            }
+
+            let row = row.chunks_exact(16 * 4).remainder();
+
+            for chunk in row.chunks_exact(16) {
+                let mut r0 = _mm256_loadu_si256(chunk.as_ptr() as *const __m256i);
+
+                r0 = _mm256_shuffle_epi8(r0, ash0);
+
+                let alphas = _mm256_xor_si256(_mm256_unpacklo_epi32(r0, r0), def_alpha);
+
+                sums = _mm256_add_epi32(sums, alphas);
+            }
+
+            let row = row.chunks_exact(16).remainder();
+
+            use crate::avx2::routines::_mm_hsum_epi32;
+            let mut h_sum = _mm_hsum_epi32(_mm_add_epi32(
+                _mm256_castsi256_si128(sums),
+                _mm256_extracti128_si256::<1>(sums),
+            ));
+
+            for chunk in row.chunks_exact(4) {
+                h_sum += chunk[3] as i32 ^ first_alpha as i32;
+            }
+
+            if h_sum != 0 {
+                return true;
+            }
+        }
+        false
     }
-    false
 }
 
 #[cfg(test)]

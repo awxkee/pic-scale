@@ -86,15 +86,17 @@ pub(crate) fn convolve_horizontal_plane_sse_rows_4_u8(
 
 #[inline(always)]
 unsafe fn _mm_hsum_reduce_epi32<const PRECISION: i32>(x: __m128i) -> u8 {
-    const FIRST_MASK: i32 = shuffle(1, 0, 3, 2);
-    let hi64 = _mm_shuffle_epi32::<FIRST_MASK>(x);
-    let sum64 = _mm_add_epi32(hi64, x);
-    const SM: i32 = shuffle(1, 0, 3, 2);
-    let hi32 = _mm_shufflelo_epi16::<SM>(sum64);
-    let sum32 = _mm_srai_epi32::<PRECISION>(_mm_add_epi32(sum64, hi32));
-    let v0 = _mm_packus_epi32(sum32, sum32);
-    let v1 = _mm_packus_epi16(v0, v0);
-    _mm_extract_epi8::<0>(v1) as u8
+    unsafe {
+        const FIRST_MASK: i32 = shuffle(1, 0, 3, 2);
+        let hi64 = _mm_shuffle_epi32::<FIRST_MASK>(x);
+        let sum64 = _mm_add_epi32(hi64, x);
+        const SM: i32 = shuffle(1, 0, 3, 2);
+        let hi32 = _mm_shufflelo_epi16::<SM>(sum64);
+        let sum32 = _mm_srai_epi32::<PRECISION>(_mm_add_epi32(sum64, hi32));
+        let v0 = _mm_packus_epi32(sum32, sum32);
+        let v1 = _mm_packus_epi16(v0, v0);
+        _mm_extract_epi8::<0>(v1) as u8
+    }
 }
 
 #[target_feature(enable = "sse4.1")]
@@ -105,114 +107,116 @@ unsafe fn convolve_horizontal_plane_sse_rows_4_u8_impl(
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
 ) {
-    let zeros = _mm_setzero_si128();
+    unsafe {
+        let zeros = _mm_setzero_si128();
 
-    let (row0_ref, rest) = dst.split_at_mut(dst_stride);
-    let (row1_ref, rest) = rest.split_at_mut(dst_stride);
-    let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
+        let (row0_ref, rest) = dst.split_at_mut(dst_stride);
+        let (row1_ref, rest) = rest.split_at_mut(dst_stride);
+        let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-    let iter_row0 = row0_ref.iter_mut();
-    let iter_row1 = row1_ref.iter_mut();
-    let iter_row2 = row2_ref.iter_mut();
-    let iter_row3 = row3_ref.iter_mut();
+        let iter_row0 = row0_ref.iter_mut();
+        let iter_row1 = row1_ref.iter_mut();
+        let iter_row2 = row2_ref.iter_mut();
+        let iter_row3 = row3_ref.iter_mut();
 
-    for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
-        .zip(iter_row1)
-        .zip(iter_row2)
-        .zip(iter_row3)
-        .zip(filter_weights.bounds.iter())
-        .zip(
-            filter_weights
-                .weights
-                .chunks_exact(filter_weights.aligned_size),
-        )
-    {
-        let mut jx = 0usize;
-        let mut store0 = _mm_setr_epi32(ROUNDING_CONST, 0i32, 0i32, 0i32);
-        let mut store1 = _mm_setr_epi32(ROUNDING_CONST, 0i32, 0i32, 0i32);
-        let mut store2 = _mm_setr_epi32(ROUNDING_CONST, 0i32, 0i32, 0i32);
-        let mut store3 = _mm_setr_epi32(ROUNDING_CONST, 0i32, 0i32, 0i32);
+        for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
+            .zip(iter_row1)
+            .zip(iter_row2)
+            .zip(iter_row3)
+            .zip(filter_weights.bounds.iter())
+            .zip(
+                filter_weights
+                    .weights
+                    .chunks_exact(filter_weights.aligned_size),
+            )
+        {
+            let mut jx = 0usize;
+            let mut store0 = _mm_setr_epi32(ROUNDING_CONST, 0i32, 0i32, 0i32);
+            let mut store1 = _mm_setr_epi32(ROUNDING_CONST, 0i32, 0i32, 0i32);
+            let mut store2 = _mm_setr_epi32(ROUNDING_CONST, 0i32, 0i32, 0i32);
+            let mut store3 = _mm_setr_epi32(ROUNDING_CONST, 0i32, 0i32, 0i32);
 
-        let src0 = src;
-        let src1 = src0.get_unchecked(src_stride..);
-        let src2 = src1.get_unchecked(src_stride..);
-        let src3 = src2.get_unchecked(src_stride..);
+            let src0 = src;
+            let src1 = src0.get_unchecked(src_stride..);
+            let src2 = src1.get_unchecked(src_stride..);
+            let src3 = src2.get_unchecked(src_stride..);
 
-        while jx + 8 < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 8));
-            let weights_i16 = _mm_loadu_si128(w_ptr.as_ptr() as *const __m128i);
-            let weights = (
-                _mm_unpacklo_epi16(weights_i16, zeros),
-                _mm_unpackhi_epi16(weights_i16, zeros),
-            );
-            let bounds_start = bounds.start + jx;
+            while jx + 8 < bounds.size {
+                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                let weights_i16 = _mm_loadu_si128(w_ptr.as_ptr() as *const __m128i);
+                let weights = (
+                    _mm_unpacklo_epi16(weights_i16, zeros),
+                    _mm_unpackhi_epi16(weights_i16, zeros),
+                );
+                let bounds_start = bounds.start + jx;
 
-            let src_ptr = src0.get_unchecked(bounds_start..);
-            s_accumulate_8_horiz!(store0, src_ptr.as_ptr(), weights);
+                let src_ptr = src0.get_unchecked(bounds_start..);
+                s_accumulate_8_horiz!(store0, src_ptr.as_ptr(), weights);
 
-            let src_ptr1 = src1.get_unchecked(bounds_start..);
-            s_accumulate_8_horiz!(store1, src_ptr1.as_ptr(), weights);
+                let src_ptr1 = src1.get_unchecked(bounds_start..);
+                s_accumulate_8_horiz!(store1, src_ptr1.as_ptr(), weights);
 
-            let src_ptr2 = src2.get_unchecked(bounds_start..);
-            s_accumulate_8_horiz!(store2, src_ptr2.as_ptr(), weights);
+                let src_ptr2 = src2.get_unchecked(bounds_start..);
+                s_accumulate_8_horiz!(store2, src_ptr2.as_ptr(), weights);
 
-            let src_ptr3 = src3.get_unchecked(bounds_start..);
-            s_accumulate_8_horiz!(store3, src_ptr3.as_ptr(), weights);
+                let src_ptr3 = src3.get_unchecked(bounds_start..);
+                s_accumulate_8_horiz!(store3, src_ptr3.as_ptr(), weights);
 
-            jx += 8;
+                jx += 8;
+            }
+
+            while jx + 4 < bounds.size {
+                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let weights = _mm_cvtepi16_epi32(_mm_loadu_si64(w_ptr.as_ptr() as *const u8));
+                let bounds_start = bounds.start + jx;
+
+                let src_ptr = src0.get_unchecked(bounds_start..);
+                s_accumulate_4_horiz!(store0, src_ptr.as_ptr(), weights);
+
+                let src_ptr1 = src1.get_unchecked(bounds_start..);
+                s_accumulate_4_horiz!(store1, src_ptr1.as_ptr(), weights);
+
+                let src_ptr2 = src2.get_unchecked(bounds_start..);
+                s_accumulate_4_horiz!(store2, src_ptr2.as_ptr(), weights);
+
+                let src_ptr3 = src3.get_unchecked(bounds_start..);
+                s_accumulate_4_horiz!(store3, src_ptr3.as_ptr(), weights);
+
+                jx += 4;
+            }
+
+            while jx < bounds.size {
+                let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                let weight = _mm_setr_epi32(w_ptr.as_ptr().read_unaligned() as i32, 0, 0, 0);
+                let bounds_start = bounds.start + jx;
+
+                let src_ptr = src0.get_unchecked(bounds_start..);
+                s_accumulate_1_horiz!(store0, src_ptr.as_ptr(), weight);
+
+                let src_ptr1 = src1.get_unchecked(bounds_start..);
+                s_accumulate_1_horiz!(store1, src_ptr1.as_ptr(), weight);
+
+                let src_ptr2 = src2.get_unchecked(bounds_start..);
+                s_accumulate_1_horiz!(store2, src_ptr2.as_ptr(), weight);
+
+                let src_ptr3 = src3.get_unchecked(bounds_start..);
+                s_accumulate_1_horiz!(store3, src_ptr3.as_ptr(), weight);
+
+                jx += 1;
+            }
+
+            let value0 = _mm_hsum_reduce_epi32::<PRECISION>(store0);
+            *chunk0 = value0;
+
+            let value1 = _mm_hsum_reduce_epi32::<PRECISION>(store1);
+            *chunk1 = value1;
+
+            let value2 = _mm_hsum_reduce_epi32::<PRECISION>(store2);
+            *chunk2 = value2;
+
+            let value3 = _mm_hsum_reduce_epi32::<PRECISION>(store3);
+            *chunk3 = value3;
         }
-
-        while jx + 4 < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 4));
-            let weights = _mm_cvtepi16_epi32(_mm_loadu_si64(w_ptr.as_ptr() as *const u8));
-            let bounds_start = bounds.start + jx;
-
-            let src_ptr = src0.get_unchecked(bounds_start..);
-            s_accumulate_4_horiz!(store0, src_ptr.as_ptr(), weights);
-
-            let src_ptr1 = src1.get_unchecked(bounds_start..);
-            s_accumulate_4_horiz!(store1, src_ptr1.as_ptr(), weights);
-
-            let src_ptr2 = src2.get_unchecked(bounds_start..);
-            s_accumulate_4_horiz!(store2, src_ptr2.as_ptr(), weights);
-
-            let src_ptr3 = src3.get_unchecked(bounds_start..);
-            s_accumulate_4_horiz!(store3, src_ptr3.as_ptr(), weights);
-
-            jx += 4;
-        }
-
-        while jx < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 1));
-            let weight = _mm_setr_epi32(w_ptr.as_ptr().read_unaligned() as i32, 0, 0, 0);
-            let bounds_start = bounds.start + jx;
-
-            let src_ptr = src0.get_unchecked(bounds_start..);
-            s_accumulate_1_horiz!(store0, src_ptr.as_ptr(), weight);
-
-            let src_ptr1 = src1.get_unchecked(bounds_start..);
-            s_accumulate_1_horiz!(store1, src_ptr1.as_ptr(), weight);
-
-            let src_ptr2 = src2.get_unchecked(bounds_start..);
-            s_accumulate_1_horiz!(store2, src_ptr2.as_ptr(), weight);
-
-            let src_ptr3 = src3.get_unchecked(bounds_start..);
-            s_accumulate_1_horiz!(store3, src_ptr3.as_ptr(), weight);
-
-            jx += 1;
-        }
-
-        let value0 = _mm_hsum_reduce_epi32::<PRECISION>(store0);
-        *chunk0 = value0;
-
-        let value1 = _mm_hsum_reduce_epi32::<PRECISION>(store1);
-        *chunk1 = value1;
-
-        let value2 = _mm_hsum_reduce_epi32::<PRECISION>(store2);
-        *chunk2 = value2;
-
-        let value3 = _mm_hsum_reduce_epi32::<PRECISION>(store3);
-        *chunk3 = value3;
     }
 }
 
@@ -232,52 +236,54 @@ unsafe fn convolve_horizontal_plane_sse_row_impl(
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
 ) {
-    let zeros = _mm_setzero_si128();
+    unsafe {
+        let zeros = _mm_setzero_si128();
 
-    for ((dst, bounds), weights) in dst.iter_mut().zip(filter_weights.bounds.iter()).zip(
-        filter_weights
-            .weights
-            .chunks_exact(filter_weights.aligned_size),
-    ) {
-        let mut jx = 0usize;
-        let mut store = _mm_setr_epi32(ROUNDING_CONST, 0i32, 0i32, 0i32);
+        for ((dst, bounds), weights) in dst.iter_mut().zip(filter_weights.bounds.iter()).zip(
+            filter_weights
+                .weights
+                .chunks_exact(filter_weights.aligned_size),
+        ) {
+            let mut jx = 0usize;
+            let mut store = _mm_setr_epi32(ROUNDING_CONST, 0i32, 0i32, 0i32);
 
-        while jx + 8 < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 8));
-            let weights_i16 = _mm_loadu_si128(w_ptr.as_ptr() as *const __m128i);
-            let weights = (
-                _mm_unpacklo_epi16(weights_i16, zeros),
-                _mm_unpackhi_epi16(weights_i16, zeros),
-            );
-            let bounds_start = bounds.start + jx;
+            while jx + 8 < bounds.size {
+                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                let weights_i16 = _mm_loadu_si128(w_ptr.as_ptr() as *const __m128i);
+                let weights = (
+                    _mm_unpacklo_epi16(weights_i16, zeros),
+                    _mm_unpackhi_epi16(weights_i16, zeros),
+                );
+                let bounds_start = bounds.start + jx;
 
-            let src_ptr = src.get_unchecked(bounds_start..);
-            s_accumulate_8_horiz!(store, src_ptr.as_ptr(), weights);
+                let src_ptr = src.get_unchecked(bounds_start..);
+                s_accumulate_8_horiz!(store, src_ptr.as_ptr(), weights);
 
-            jx += 8;
+                jx += 8;
+            }
+
+            while jx + 4 < bounds.size {
+                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let weights = _mm_cvtepi16_epi32(_mm_loadu_si64(w_ptr.as_ptr() as *const u8));
+                let bounds_start = bounds.start + jx;
+
+                let src_ptr = src.get_unchecked(bounds_start..);
+                s_accumulate_4_horiz!(store, src_ptr.as_ptr(), weights);
+
+                jx += 4;
+            }
+
+            while jx < bounds.size {
+                let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                let weight = _mm_setr_epi32(w_ptr.as_ptr().read_unaligned() as i32, 0, 0, 0);
+                let bounds_start = bounds.start + jx;
+                let src_ptr = src.get_unchecked(bounds_start..);
+                s_accumulate_1_horiz!(store, src_ptr.as_ptr(), weight);
+                jx += 1;
+            }
+
+            let value = _mm_hsum_reduce_epi32::<PRECISION>(store);
+            *dst = value;
         }
-
-        while jx + 4 < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 4));
-            let weights = _mm_cvtepi16_epi32(_mm_loadu_si64(w_ptr.as_ptr() as *const u8));
-            let bounds_start = bounds.start + jx;
-
-            let src_ptr = src.get_unchecked(bounds_start..);
-            s_accumulate_4_horiz!(store, src_ptr.as_ptr(), weights);
-
-            jx += 4;
-        }
-
-        while jx < bounds.size {
-            let w_ptr = weights.get_unchecked(jx..(jx + 1));
-            let weight = _mm_setr_epi32(w_ptr.as_ptr().read_unaligned() as i32, 0, 0, 0);
-            let bounds_start = bounds.start + jx;
-            let src_ptr = src.get_unchecked(bounds_start..);
-            s_accumulate_1_horiz!(store, src_ptr.as_ptr(), weight);
-            jx += 1;
-        }
-
-        let value = _mm_hsum_reduce_epi32::<PRECISION>(store);
-        *dst = value;
     }
 }

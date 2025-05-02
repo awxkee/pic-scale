@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
-use crate::color_group::{load_ar30_p, ColorGroup};
+use crate::color_group::{ColorGroup, load_ar30_p};
 use crate::filter_weights::FilterBounds;
 use crate::support::ROUNDING_CONST;
 
