@@ -31,7 +31,6 @@ use crate::mlaf::mlaf;
 use crate::neon::utils::{prefer_vfmaq_f32, prefer_vfmaq_lane_f32, prefer_vfmaq_laneq_f32};
 use std::arch::aarch64::*;
 
-#[inline(always)]
 pub(crate) fn convolve_column_u16(
     _: usize,
     bounds: &FilterBounds,
@@ -49,7 +48,7 @@ pub(crate) fn convolve_column_u16(
 
         let zeros = vdupq_n_f32(0.);
 
-        let v_max_colors = vdupq_n_u32(max_colors);
+        let v_max_colors = vdupq_n_u16(max_colors);
 
         let v_px = k_cx;
 
@@ -217,14 +216,20 @@ pub(crate) fn convolve_column_u16(
                     store3 = prefer_vfmaq_f32(store3, hi1, v_weight);
                 }
             }
-            let u_store0 = vminq_u32(vcvtaq_u32_f32(store0), v_max_colors);
-            let u_store1 = vminq_u32(vcvtaq_u32_f32(store1), v_max_colors);
-            let u_store2 = vminq_u32(vcvtaq_u32_f32(store2), v_max_colors);
-            let u_store3 = vminq_u32(vcvtaq_u32_f32(store3), v_max_colors);
+            let u_store0 = vcvtaq_u32_f32(store0);
+            let u_store1 = vcvtaq_u32_f32(store1);
+            let u_store2 = vcvtaq_u32_f32(store2);
+            let u_store3 = vcvtaq_u32_f32(store3);
 
-            let item0 = vcombine_u16(vqmovn_u32(u_store0), vqmovn_u32(u_store1));
+            let item0 = vminq_u16(
+                vcombine_u16(vqmovn_u32(u_store0), vqmovn_u32(u_store1)),
+                v_max_colors,
+            );
             vst1q_u16(dst.as_mut_ptr(), item0);
-            let item1 = vcombine_u16(vqmovn_u32(u_store2), vqmovn_u32(u_store3));
+            let item1 = vminq_u16(
+                vcombine_u16(vqmovn_u32(u_store2), vqmovn_u32(u_store3)),
+                v_max_colors,
+            );
             vst1q_u16(dst.as_mut_ptr().add(8), item1);
 
             k_cx = v_dx;
@@ -340,10 +345,13 @@ pub(crate) fn convolve_column_u16(
                 }
             }
 
-            let u_store0 = vminq_u32(vcvtaq_u32_f32(store0), v_max_colors);
-            let u_store1 = vminq_u32(vcvtaq_u32_f32(store1), v_max_colors);
+            let u_store0 = vcvtaq_u32_f32(store0);
+            let u_store1 = vcvtaq_u32_f32(store1);
 
-            let item = vcombine_u16(vqmovn_u32(u_store0), vqmovn_u32(u_store1));
+            let item = vminq_u16(
+                vcombine_u16(vqmovn_u32(u_store0), vqmovn_u32(u_store1)),
+                v_max_colors,
+            );
             vst1q_u16(dst.as_mut_ptr(), item);
 
             k_cx = v_dx;
@@ -433,9 +441,12 @@ pub(crate) fn convolve_column_u16(
                 }
             }
 
-            let u_store0 = vminq_u32(vcvtaq_u32_f32(store0), v_max_colors);
+            let u_store0 = vcvtaq_u32_f32(store0);
 
-            vst1_u16(dst.as_mut_ptr(), vqmovn_u32(u_store0));
+            vst1_u16(
+                dst.as_mut_ptr(),
+                vmin_u16(vqmovn_u32(u_store0), vget_low_u16(v_max_colors)),
+            );
 
             k_cx = v_dx;
         }
