@@ -93,7 +93,7 @@ unsafe fn convolve_column_lb_u16_impl<const FMA: bool>(
     let zeros_ps = _mm_setzero_ps();
     let zeros = _mm_setzero_si128();
 
-    let v_max_colors = _mm256_set1_epi32(max_colors);
+    let v_cap_colors = _mm256_set1_epi16((max_colors as u16) as i16);
 
     let v_px = cx;
 
@@ -138,13 +138,13 @@ unsafe fn convolve_column_lb_u16_impl<const FMA: bool>(
             );
         }
 
-        let v_st0 = _mm256_min_epi32(_mm256_cvtps_epi32(store0), v_max_colors);
-        let v_st1 = _mm256_min_epi32(_mm256_cvtps_epi32(store1), v_max_colors);
-        let v_st2 = _mm256_min_epi32(_mm256_cvtps_epi32(store2), v_max_colors);
-        let v_st3 = _mm256_min_epi32(_mm256_cvtps_epi32(store3), v_max_colors);
+        let v_st0 = _mm256_cvtps_epi32(store0);
+        let v_st1 = _mm256_cvtps_epi32(store1);
+        let v_st2 = _mm256_cvtps_epi32(store2);
+        let v_st3 = _mm256_cvtps_epi32(store3);
 
-        let item0 = _mm256_packus_epi32(v_st0, v_st1);
-        let item1 = _mm256_packus_epi32(v_st2, v_st3);
+        let item0 = _mm256_min_epu16(_mm256_packus_epi32(v_st0, v_st1), v_cap_colors);
+        let item1 = _mm256_min_epu16(_mm256_packus_epi32(v_st2, v_st3), v_cap_colors);
 
         _mm256_storeu_si256(dst.as_mut_ptr() as *mut __m256i, item0);
         _mm256_storeu_si256(dst.as_mut_ptr().add(16) as *mut __m256i, item1);
@@ -181,10 +181,10 @@ unsafe fn convolve_column_lb_u16_impl<const FMA: bool>(
             );
         }
 
-        let v_st0 = _mm256_min_epi32(_mm256_cvtps_epi32(store0), v_max_colors);
-        let v_st1 = _mm256_min_epi32(_mm256_cvtps_epi32(store1), v_max_colors);
+        let v_st0 = _mm256_cvtps_epi32(store0);
+        let v_st1 = _mm256_cvtps_epi32(store1);
 
-        let item0 = _mm256_packus_epi32(v_st0, v_st1);
+        let item0 = _mm256_min_epu16(_mm256_packus_epi32(v_st0, v_st1), v_cap_colors);
 
         _mm256_storeu_si256(dst.as_mut_ptr() as *mut __m256i, item0);
 
@@ -220,10 +220,12 @@ unsafe fn convolve_column_lb_u16_impl<const FMA: bool>(
             );
         }
 
-        let v_st0 = _mm256_min_epi32(_mm256_cvtps_epi32(store0), v_max_colors);
+        let v_st0 = _mm256_cvtps_epi32(store0);
 
-        let item =
-            _mm256_permute4x64_epi64::<S>(_mm256_packus_epi32(v_st0, _mm256_setzero_si256()));
+        let item = _mm256_min_epu16(
+            _mm256_permute4x64_epi64::<S>(_mm256_packus_epi32(v_st0, _mm256_setzero_si256())),
+            v_cap_colors,
+        );
         _mm_storeu_si128(
             dst.as_mut_ptr() as *mut __m128i,
             _mm256_castsi256_si128(item),
@@ -367,12 +369,12 @@ unsafe fn convolve_column_lb_u16_impl<const FMA: bool>(
             }
         }
 
-        let v_st = _mm_min_epi32(
-            _mm_cvtps_epi32(store0),
-            _mm256_castsi256_si128(v_max_colors),
-        );
+        let v_st = _mm_cvtps_epi32(store0);
 
-        let u_store0 = _mm_packus_epi32(v_st, v_st);
+        let u_store0 = _mm_min_epu16(
+            _mm_packus_epi32(v_st, v_st),
+            _mm256_castsi256_si128(v_cap_colors),
+        );
         _mm_storeu_si64(dst.as_mut_ptr() as *mut u8, u_store0);
 
         cx = v_dx;

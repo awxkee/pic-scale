@@ -269,7 +269,7 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
     ) {
         const CHANNELS: usize = 4;
 
-        let v_max_colors = _mm256_set1_epi32((1i32 << bit_depth) - 1);
+        let v_cap_colors = _mm256_set1_epi16((((1i32 << bit_depth) - 1) as u16) as i16);
 
         let (row0_ref, rest) = dst.split_at_mut(dst_stride);
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
@@ -313,14 +313,14 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                     let bounds_start = bounds.start + jx;
                     let w_ptr = weights.get_unchecked(jx..);
 
-                    let w0 = _mm_load1_ps(w_ptr.as_ptr());
-                    let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
-                    let w2 = _mm_load1_ps(w_ptr.as_ptr().add(2));
-                    let w3 = _mm_load1_ps(w_ptr.as_ptr().add(3));
-                    let w4 = _mm_load1_ps(w_ptr.as_ptr().add(4));
-                    let w5 = _mm_load1_ps(w_ptr.as_ptr().add(5));
-                    let w6 = _mm_load1_ps(w_ptr.as_ptr().add(6));
-                    let w7 = _mm_load1_ps(w_ptr.as_ptr().add(7));
+                    let w0 = _mm_broadcast_ss(w_ptr.get_unchecked(0));
+                    let w1 = _mm_broadcast_ss(w_ptr.get_unchecked(1));
+                    let w2 = _mm_broadcast_ss(w_ptr.get_unchecked(2));
+                    let w3 = _mm_broadcast_ss(w_ptr.get_unchecked(3));
+                    let w4 = _mm_broadcast_ss(w_ptr.get_unchecked(4));
+                    let w5 = _mm_broadcast_ss(w_ptr.get_unchecked(5));
+                    let w6 = _mm_broadcast_ss(w_ptr.get_unchecked(6));
+                    let w7 = _mm_broadcast_ss(w_ptr.get_unchecked(7));
 
                     let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
                     let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
@@ -369,10 +369,11 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                 while jx + 4 < bounds_size {
                     let bounds_start = bounds.start + jx;
                     let w_ptr = weights.get_unchecked(jx..);
-                    let w0 = _mm_load1_ps(w_ptr.as_ptr());
-                    let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
-                    let w2 = _mm_load1_ps(w_ptr.as_ptr().add(2));
-                    let w3 = _mm_load1_ps(w_ptr.as_ptr().add(3));
+
+                    let w0 = _mm_broadcast_ss(w_ptr.get_unchecked(0));
+                    let w1 = _mm_broadcast_ss(w_ptr.get_unchecked(1));
+                    let w2 = _mm_broadcast_ss(w_ptr.get_unchecked(2));
+                    let w3 = _mm_broadcast_ss(w_ptr.get_unchecked(3));
 
                     let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
                     let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
@@ -414,17 +415,11 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                 jx += 1;
             }
 
-            let v_st0 = _mm256_min_epi32(
-                _mm256_cvtps_epi32(_mm256_max_ps(store_0, _mm256_setzero_ps())),
-                v_max_colors,
-            );
-            let v_st1 = _mm256_min_epi32(
-                _mm256_cvtps_epi32(_mm256_max_ps(store_1, _mm256_setzero_ps())),
-                v_max_colors,
-            );
+            let v_st0 = _mm256_cvtps_epi32(store_0);
+            let v_st1 = _mm256_cvtps_epi32(store_1);
 
-            let store_16_0 = _mm256_packus_epi32(v_st0, v_st0);
-            let store_16_1 = _mm256_packus_epi32(v_st1, v_st1);
+            let store_16_0 = _mm256_min_epu16(_mm256_packus_epi32(v_st0, v_st0), v_cap_colors);
+            let store_16_1 = _mm256_min_epu16(_mm256_packus_epi32(v_st1, v_st1), v_cap_colors);
 
             _mm_storeu_si64(
                 chunk0.as_mut_ptr() as *mut u8,
@@ -499,7 +494,7 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
     ) {
         const CHANNELS: usize = 4;
 
-        let v_max_colors = _mm_set1_epi32((1i32 << bit_depth) - 1);
+        let v_cap_colors = _mm_set1_epi16((((1i32 << bit_depth) - 1) as u16) as i16);
 
         for ((dst, bounds), weights) in dst
             .chunks_exact_mut(CHANNELS)
@@ -520,14 +515,14 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
                 while jx + 8 < bounds_size {
                     let bounds_start = bounds.start + jx;
                     let w_ptr = weights.get_unchecked(jx..);
-                    let w0 = _mm_load1_ps(w_ptr.as_ptr());
-                    let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
-                    let w2 = _mm_load1_ps(w_ptr.as_ptr().add(2));
-                    let w3 = _mm_load1_ps(w_ptr.as_ptr().add(3));
-                    let w4 = _mm_load1_ps(w_ptr.as_ptr().add(4));
-                    let w5 = _mm_load1_ps(w_ptr.as_ptr().add(5));
-                    let w6 = _mm_load1_ps(w_ptr.as_ptr().add(6));
-                    let w7 = _mm_load1_ps(w_ptr.as_ptr().add(7));
+                    let w0 = _mm_broadcast_ss(w_ptr.get_unchecked(0));
+                    let w1 = _mm_broadcast_ss(w_ptr.get_unchecked(1));
+                    let w2 = _mm_broadcast_ss(w_ptr.get_unchecked(2));
+                    let w3 = _mm_broadcast_ss(w_ptr.get_unchecked(3));
+                    let w4 = _mm_broadcast_ss(w_ptr.get_unchecked(4));
+                    let w5 = _mm_broadcast_ss(w_ptr.get_unchecked(5));
+                    let w6 = _mm_broadcast_ss(w_ptr.get_unchecked(6));
+                    let w7 = _mm_broadcast_ss(w_ptr.get_unchecked(7));
                     let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
                     let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
                     let w45 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w4), w5);
@@ -539,10 +534,12 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
 
                 while jx + 4 < bounds_size {
                     let w_ptr = weights.get_unchecked(jx..);
-                    let w0 = _mm_load1_ps(w_ptr.as_ptr());
-                    let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
-                    let w2 = _mm_load1_ps(w_ptr.as_ptr().add(2));
-                    let w3 = _mm_load1_ps(w_ptr.as_ptr().add(3));
+
+                    let w0 = _mm_broadcast_ss(w_ptr.get_unchecked(0));
+                    let w1 = _mm_broadcast_ss(w_ptr.get_unchecked(1));
+                    let w2 = _mm_broadcast_ss(w_ptr.get_unchecked(2));
+                    let w3 = _mm_broadcast_ss(w_ptr.get_unchecked(3));
+
                     let bounds_start = bounds.start + jx;
 
                     let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
@@ -561,26 +558,23 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
             while jx + 2 < bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
-                let w0 = _mm_load1_ps(w_ptr.as_ptr());
-                let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
+                let w0 = _mm_broadcast_ss(w_ptr.get_unchecked(0));
+                let w1 = _mm_broadcast_ss(w_ptr.get_unchecked(1));
                 store = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src, w0, w1, store);
                 jx += 2;
             }
 
             while jx < bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
-                let w0 = _mm_load1_ps(w_ptr.as_ptr());
+                let w0 = _mm_broadcast_ss(w_ptr.get_unchecked(0));
                 let bounds_start = bounds.start + jx;
                 store = conv_horiz_rgba_1_u16::<FMA>(bounds_start, src, w0, store);
                 jx += 1;
             }
 
-            let v_st = _mm_min_epi32(
-                _mm_cvtps_epi32(_mm_max_ps(store, _mm_setzero_ps())),
-                v_max_colors,
-            );
+            let v_st = _mm_cvtps_epi32(store);
 
-            let store_16_0 = _mm_packus_epi32(v_st, v_st);
+            let store_16_0 = _mm_min_epu16(_mm_packus_epi32(v_st, v_st), v_cap_colors);
             _mm_storeu_si64(dst.as_mut_ptr() as *mut u8, store_16_0);
         }
     }
