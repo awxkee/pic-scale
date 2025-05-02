@@ -224,10 +224,10 @@ pub(crate) fn convolve_horizontal_dispatch_u16<const CHANNELS: usize>(
     }
 }
 
-pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
-    image_store: &ImageStore<u16, COMPONENTS>,
+pub(crate) fn convolve_vertical_dispatch_u16<const CN: usize>(
+    image_store: &ImageStore<u16, CN>,
     filter_weights: FilterWeights<f32>,
-    destination: &mut ImageStoreMut<'_, u16, COMPONENTS>,
+    destination: &mut ImageStoreMut<'_, u16, CN>,
     pool: &Option<ThreadPool>,
     _options: ConvolutionOptions,
 ) {
@@ -241,6 +241,23 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
         pool.install(|| {
             let destination_image = destination.buffer.borrow_mut();
             if bit_depth > 12 {
+                #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
+                {
+                    if DefaultHighBitDepthHighHandlerNeon::is_available() {
+                        return execute_low_precision_row(
+                            true,
+                            image_store,
+                            &filter_weights,
+                            src_stride,
+                            dst_stride,
+                            bit_depth,
+                            dst_width,
+                            destination.buffer.borrow_mut(),
+                            DefaultHighBitDepthHighHandlerNeon::default(),
+                            WeightsConverterQ0_31::default(),
+                        );
+                    }
+                }
                 destination_image
                     .par_chunks_exact_mut(dst_stride)
                     .enumerate()
@@ -253,7 +270,7 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
                             dst_width,
                             &bounds,
                             source_buffer,
-                            &mut row[..dst_width * COMPONENTS],
+                            &mut row[..dst_width * CN],
                             src_stride,
                             weights,
                             bit_depth as u32,
@@ -305,7 +322,7 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
                     dst_width,
                     &bounds,
                     source_buffer,
-                    &mut row[..dst_width * COMPONENTS],
+                    &mut row[..dst_width * CN],
                     src_stride,
                     weights,
                     bit_depth as u32,
@@ -327,7 +344,7 @@ pub(crate) fn convolve_vertical_dispatch_u16<const COMPONENTS: usize>(
     }
 }
 
-trait HandleHighBitDepthLower<W, const COMPONENTS: usize> {
+trait HandleVertical<W, const CN: usize> {
     fn handle_fixed_column(
         &self,
         dst_width: usize,
@@ -343,9 +360,7 @@ trait HandleHighBitDepthLower<W, const COMPONENTS: usize> {
 #[derive(Default)]
 struct DefaultHighBitDepthLowerHandler {}
 
-impl<const COMPONENTS: usize> HandleHighBitDepthLower<i16, COMPONENTS>
-    for DefaultHighBitDepthLowerHandler
-{
+impl<const CN: usize> HandleVertical<i16, CN> for DefaultHighBitDepthLowerHandler {
     fn handle_fixed_column(
         &self,
         dst_width: usize,
@@ -356,7 +371,7 @@ impl<const COMPONENTS: usize> HandleHighBitDepthLower<i16, COMPONENTS>
         weight: &[i16],
         bit_depth: u32,
     ) {
-        u16::handle_fixed_column::<i32, COMPONENTS>(
+        u16::handle_fixed_column::<i32, CN>(
             dst_width, bounds, src, dst, src_stride, weight, bit_depth,
         );
     }
@@ -385,9 +400,7 @@ impl DefaultHighBitDepthHighHandlerNeon {
 }
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
-impl<const COMPONENTS: usize> HandleHighBitDepthLower<i32, COMPONENTS>
-    for DefaultHighBitDepthHighHandlerNeon
-{
+impl<const CN: usize> HandleVertical<i32, CN> for DefaultHighBitDepthHighHandlerNeon {
     fn handle_fixed_column(
         &self,
         dst_width: usize,
@@ -404,16 +417,16 @@ impl<const COMPONENTS: usize> HandleHighBitDepthLower<i32, COMPONENTS>
 }
 
 #[inline]
-fn execute_low_precision_row<W: Send + Sync, const COMPONENTS: usize>(
+fn execute_low_precision_row<W: Send + Sync, const CN: usize>(
     is_parallel: bool,
-    image_store: &ImageStore<u16, COMPONENTS>,
+    image_store: &ImageStore<u16, CN>,
     filter_weights: &FilterWeights<f32>,
     src_stride: usize,
     dst_stride: usize,
     bit_depth: usize,
     dst_width: usize,
     destination_image: &mut [u16],
-    handler: impl HandleHighBitDepthLower<W, COMPONENTS> + Sync,
+    handler: impl HandleVertical<W, CN> + Sync + Send,
     weights: impl WeightsConverter<W>,
 ) {
     let approx = weights.prepare_weights(filter_weights);
@@ -430,7 +443,7 @@ fn execute_low_precision_row<W: Send + Sync, const COMPONENTS: usize>(
                     dst_width,
                     &bounds,
                     source_buffer,
-                    &mut row[..dst_width * COMPONENTS],
+                    &mut row[..dst_width * CN],
                     src_stride,
                     weights,
                     bit_depth as u32,
@@ -449,7 +462,7 @@ fn execute_low_precision_row<W: Send + Sync, const COMPONENTS: usize>(
                     dst_width,
                     &bounds,
                     source_buffer,
-                    &mut row[..dst_width * COMPONENTS],
+                    &mut row[..dst_width * CN],
                     src_stride,
                     weights,
                     bit_depth as u32,
