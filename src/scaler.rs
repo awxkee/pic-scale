@@ -1250,6 +1250,7 @@ pub struct ScalingOptions {
     pub threading_policy: ThreadingPolicy,
 }
 
+/// Generic trait for [ImageStore] to implement abstract scaling.
 pub trait ImageStoreScaling<'b, T, const N: usize>
 where
     T: Clone + Copy + Debug,

@@ -29,9 +29,6 @@
 
 use crate::filter_weights::FilterWeights;
 use crate::support::{PRECISION, ROUNDING_CONST};
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
-#[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
 pub(crate) fn convolve_horizontal_rgba_row_4(

@@ -30,9 +30,6 @@
 use crate::avx2::utils::{_mm256_dot16_avx_epi32, _mm_dot16_avx_epi32};
 use crate::filter_weights::FilterWeights;
 use crate::support::{PRECISION, ROUNDING_CONST};
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
-#[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
 #[inline(always)]
