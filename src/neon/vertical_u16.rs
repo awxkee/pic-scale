@@ -41,14 +41,14 @@ pub(crate) fn convolve_column_u16(
     bit_depth: u32,
 ) {
     unsafe {
-        let max_colors = (1 << bit_depth) - 1;
+        let max_colors = (1u32 << bit_depth) - 1;
         let mut k_cx = 0usize;
 
         let bounds_size = bounds.size;
 
         let zeros = vdupq_n_f32(0.);
 
-        let v_max_colors = vdupq_n_u16(max_colors);
+        let v_max_colors = vdupq_n_u16(max_colors as u16);
 
         let v_px = k_cx;
 
