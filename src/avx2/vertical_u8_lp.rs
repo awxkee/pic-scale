@@ -70,9 +70,12 @@ unsafe fn convolve_vertical_avx2_row_impl(
     src: &[u8],
     dst: &mut [u8],
     src_stride: usize,
-    weight: &[i16],
+    weights: &[i16],
 ) {
     unsafe {
+        if weights.is_empty() {
+            return;
+        }
         let bounds_size = bounds.size;
         const SCALE: i32 = 6;
         const R_SHR_SCALE: i32 = SCALE;
@@ -96,7 +99,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
 
             if bounds_size == 2 {
                 let py = bounds.start;
-                let weights = weight.get_unchecked(0..2);
+                let weights = weights.get_unchecked(0..2);
                 let v_weight0 = _mm256_set1_epi16(weights[0]);
                 let v_weight1 = _mm256_set1_epi16(weights[1]);
                 let v_offset0 = src_stride * py + px;
@@ -125,7 +128,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
                 (store4, store5) = m256dot!(store4, store5, item_row12, v_weight1);
             } else if bounds_size == 3 {
                 let py = bounds.start;
-                let weights = weight.get_unchecked(0..3);
+                let weights = weights.get_unchecked(0..3);
                 let v_weight0 = _mm256_set1_epi16(weights[0]);
                 let v_weight1 = _mm256_set1_epi16(weights[1]);
                 let v_weight2 = _mm256_set1_epi16(weights[2]);
@@ -167,7 +170,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
                 (store4, store5) = m256dot!(store4, store5, item_row22, v_weight2);
             } else if bounds_size == 4 {
                 let py = bounds.start;
-                let weights = weight.get_unchecked(0..4);
+                let weights = weights.get_unchecked(0..4);
                 let v_weight0 = _mm256_set1_epi16(weights[0]);
                 let v_weight1 = _mm256_set1_epi16(weights[1]);
                 let v_weight2 = _mm256_set1_epi16(weights[2]);
@@ -221,9 +224,24 @@ unsafe fn convolve_vertical_avx2_row_impl(
                 (store2, store3) = m256dot!(store2, store3, item_row31, v_weight3);
                 (store4, store5) = m256dot!(store4, store5, item_row32, v_weight3);
             } else {
-                for j in 0..bounds_size {
-                    let py = bounds.start + j;
-                    let weight = weight.get_unchecked(j);
+                let py = bounds.start;
+                let w0 = weights.get_unchecked(0);
+                let v_weight = _mm256_set1_epi16(*w0);
+                let v_offset = src_stride * py + px;
+                let src_ptr = src.get_unchecked(v_offset..);
+                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
+                let item_row1 =
+                    _mm256_loadu_si256(src_ptr.get_unchecked(32..).as_ptr() as *const __m256i);
+                let item_row2 =
+                    _mm256_loadu_si256(src_ptr.get_unchecked(64..).as_ptr() as *const __m256i);
+
+                (store0, store1) = m256dot!(store0, store1, item_row0, v_weight);
+                (store2, store3) = m256dot!(store2, store3, item_row1, v_weight);
+                (store4, store5) = m256dot!(store4, store5, item_row2, v_weight);
+
+                for j in 1..bounds_size {
+                    let py = bounds.start + j + 1;
+                    let weight = weights.get_unchecked(j);
                     let v_weight = _mm256_set1_epi16(*weight);
                     let v_offset = src_stride * py + px;
                     let src_ptr = src.get_unchecked(v_offset..);
@@ -276,7 +294,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
 
             if bounds_size == 2 {
                 let py = bounds.start;
-                let weights = weight.get_unchecked(0..2);
+                let weights = weights.get_unchecked(0..2);
                 let v_weight0 = _mm256_set1_epi16(weights[0]);
                 let v_weight1 = _mm256_set1_epi16(weights[1]);
                 let v_offset0 = src_stride * py + px;
@@ -299,7 +317,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
                 (store2, store3) = m256dot!(store2, store3, item_row11, v_weight1);
             } else if bounds_size == 3 {
                 let py = bounds.start;
-                let weights = weight.get_unchecked(0..3);
+                let weights = weights.get_unchecked(0..3);
                 let v_weight0 = _mm256_set1_epi16(weights[0]);
                 let v_weight1 = _mm256_set1_epi16(weights[1]);
                 let v_weight2 = _mm256_set1_epi16(weights[2]);
@@ -332,7 +350,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
                 (store2, store3) = m256dot!(store2, store3, item_row21, v_weight2);
             } else if bounds_size == 4 {
                 let py = bounds.start;
-                let weights = weight.get_unchecked(0..4);
+                let weights = weights.get_unchecked(0..4);
                 let v_weight0 = _mm256_set1_epi16(weights[0]);
                 let v_weight1 = _mm256_set1_epi16(weights[1]);
                 let v_weight2 = _mm256_set1_epi16(weights[2]);
@@ -376,7 +394,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
             } else {
                 for j in 0..bounds_size {
                     let py = bounds.start + j;
-                    let weight = weight.get_unchecked(j);
+                    let weight = weights.get_unchecked(j);
                     let v_weight = _mm256_set1_epi16(*weight);
                     let v_offset = src_stride * py + px;
                     let src_ptr = src.get_unchecked(v_offset..);
@@ -418,7 +436,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
 
             if bounds_size == 2 {
                 let py = bounds.start;
-                let weights = weight.get_unchecked(0..2);
+                let weights = weights.get_unchecked(0..2);
                 let v_weight0 = _mm256_set1_epi16(weights[0]);
                 let v_weight1 = _mm256_set1_epi16(weights[1]);
                 let v_offset0 = src_stride * py + px;
@@ -433,7 +451,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
                 (store0, store1) = m256dot!(store0, store1, item_row1, v_weight1);
             } else if bounds_size == 3 {
                 let py = bounds.start;
-                let weights = weight.get_unchecked(0..3);
+                let weights = weights.get_unchecked(0..3);
                 let v_weight0 = _mm256_set1_epi16(weights[0]);
                 let v_weight1 = _mm256_set1_epi16(weights[1]);
                 let v_weight2 = _mm256_set1_epi16(weights[2]);
@@ -454,7 +472,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
                 (store0, store1) = m256dot!(store0, store1, item_row2, v_weight2);
             } else if bounds_size == 4 {
                 let py = bounds.start;
-                let weights = weight.get_unchecked(0..4);
+                let weights = weights.get_unchecked(0..4);
                 let v_weight0 = _mm256_set1_epi16(weights[0]);
                 let v_weight1 = _mm256_set1_epi16(weights[1]);
                 let v_weight2 = _mm256_set1_epi16(weights[2]);
@@ -482,7 +500,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
             } else {
                 for j in 0..bounds_size {
                     let py = bounds.start + j;
-                    let weight = weight.get_unchecked(j);
+                    let weight = weights.get_unchecked(j);
                     let v_weight = _mm256_set1_epi16(*weight);
                     let v_offset = src_stride * py + px;
                     let src_ptr = src.get_unchecked(v_offset..);
@@ -511,7 +529,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
 
             for j in 0..bounds_size {
                 let py = bounds.start + j;
-                let weight = weight.get_unchecked(j);
+                let weight = weights.get_unchecked(j);
                 let v_weight = _mm256_set1_epi16(*weight);
                 let v_offset = src_stride * py + px;
                 let src_ptr = src.get_unchecked(v_offset..);
@@ -545,7 +563,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
 
             for j in 0..bounds_size {
                 let py = bounds.start + j;
-                let weight = weight.get_unchecked(j);
+                let weight = weights.get_unchecked(j);
                 let v_weight = _mm_set1_epi16(*weight);
                 let v_offset = src_stride * py + px;
                 let src_ptr = src.get_unchecked(v_offset..);
@@ -573,7 +591,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
 
             for j in 0..bounds_size {
                 let py = bounds.start + j;
-                let weight = weight.get_unchecked(j);
+                let weight = weights.get_unchecked(j);
                 let v_weight = _mm_set1_epi16(*weight);
                 let v_offset = src_stride * py + px;
                 let src_ptr = *src.get_unchecked(v_offset);

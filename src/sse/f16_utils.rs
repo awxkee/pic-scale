@@ -54,7 +54,7 @@ pub(crate) unsafe fn _mm_srlv_epi32x(c: __m128i, n: __m128i) -> __m128i {
 #[inline]
 #[cfg(target_feature = "avx2")]
 pub(crate) unsafe fn _mm_sllv_epi32x(c: __m128i, n: __m128i) -> __m128i {
-    _mm_sllv_epi32(c, n)
+    unsafe { _mm_sllv_epi32(c, n) }
 }
 
 #[inline]
@@ -227,7 +227,7 @@ pub(crate) unsafe fn _mm_cvtph_psx<const F16C: bool>(x: __m128i) -> __m128 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use f16;
+    use core::f16;
 
     #[test]
     fn test_conversion_into_f16() {
