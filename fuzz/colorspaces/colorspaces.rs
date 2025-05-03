@@ -161,7 +161,7 @@ fn resize_rgba16(
             let store_rgba =
                 ImageStore::<u16, 4>::from_slice(&mut src_data_rgba, src_width, src_height)
                     .unwrap();
-            let mut target_store_rgba = ImageStoreMut::alloc(dst_width, dst_height);
+            let mut target_store_rgba = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
             scaler
                 .resize_rgba_u16(&store_rgba, &mut target_store_rgba, true)
                 .unwrap();
@@ -242,8 +242,9 @@ fn resize_cbcr16(
     for scaler in scalers {
         let mut src_data_rgba = vec![data as u16; src_width * src_height * 2];
         src_data_rgba[1] = 18;
-        let store_rgba =
+        let mut store_rgba =
             ImageStore::<u16, 2>::from_slice(&mut src_data_rgba, src_width, src_height).unwrap();
+        store_rgba.bit_depth = 16;
         let mut target_store_rgba = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
         scaler
             .resize_gray_alpha16(&store_rgba, &mut target_store_rgba, mul_alpha)
