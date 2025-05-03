@@ -207,7 +207,7 @@ unsafe fn convolve_column_lb_avx_u16_impl<const HAS_DOT: bool>(
             cx = v_dx;
         }
 
-        let tail16 = dst.chunks_exact_mut(16).into_remainder();
+        let tail16 = iter32_rem.chunks_exact_mut(16).into_remainder();
         let iter8 = tail16.chunks_exact_mut(8);
 
         let v_px = cx;

@@ -240,7 +240,7 @@ unsafe fn convolve_vertical_avx2_row_impl(
                 (store4, store5) = m256dot!(store4, store5, item_row2, v_weight);
 
                 for j in 1..bounds_size {
-                    let py = bounds.start + j + 1;
+                    let py = bounds.start + j;
                     let weight = weights.get_unchecked(j);
                     let v_weight = _mm256_set1_epi16(*weight);
                     let v_offset = src_stride * py + px;
