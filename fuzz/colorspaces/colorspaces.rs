@@ -244,7 +244,7 @@ fn resize_cbcr16(
         src_data_rgba[1] = 18;
         let store_rgba =
             ImageStore::<u16, 2>::from_slice(&mut src_data_rgba, src_width, src_height).unwrap();
-        let mut target_store_rgba = ImageStoreMut::alloc(dst_width, dst_height);
+        let mut target_store_rgba = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
         scaler
             .resize_gray_alpha16(&store_rgba, &mut target_store_rgba, mul_alpha)
             .unwrap();
