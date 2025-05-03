@@ -160,6 +160,8 @@ unsafe fn convolve_column_lb_u16_impl<const FMA: bool>(
         let tail32 = dst.chunks_exact_mut(32).into_remainder();
         let iter16 = tail32.chunks_exact_mut(16);
 
+        let v_px = cx;
+
         for (x, dst) in iter16.enumerate() {
             let mut store0 = _mm256_setzero_ps();
             let mut store1 = _mm256_setzero_ps();
@@ -196,7 +198,7 @@ unsafe fn convolve_column_lb_u16_impl<const FMA: bool>(
             cx = v_dx;
         }
 
-        let tail16 = dst.chunks_exact_mut(16).into_remainder();
+        let tail16 = tail32.chunks_exact_mut(16).into_remainder();
         let iter8 = tail16.chunks_exact_mut(8);
 
         let v_px = cx;
@@ -449,9 +451,9 @@ unsafe fn convolve_column_lb_u16_impl<const FMA: bool>(
                 for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
                     let py = bounds.start + j;
                     let offset = src_stride * py + v_px;
-                    let src_ptr = src.get_unchecked(offset..(offset + 1));
+                    let src_ptr = src.get_unchecked(offset);
 
-                    store0 = mlaf(store0, src_ptr[0] as f32, k_weight);
+                    store0 = mlaf(store0, *src_ptr as f32, k_weight);
                 }
             }
 
