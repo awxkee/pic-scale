@@ -169,7 +169,7 @@ fn resize_rgba16(
             let mut src_data_rgb = vec![data as u16; src_width * src_height * 3];
             let store =
                 ImageStore::<u16, 3>::from_slice(&mut src_data_rgb, src_width, src_height).unwrap();
-            let mut target_store = ImageStoreMut::alloc(dst_width, dst_height);
+            let mut target_store = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
             scaler.resize_rgb_u16(&store, &mut target_store).unwrap();
         }
     }
