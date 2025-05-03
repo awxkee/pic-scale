@@ -306,6 +306,81 @@ impl Scaling for LinearScaler {
         )
     }
 
+    fn resize_gray_alpha<'a>(
+        &'a self,
+        store: &ImageStore<'a, u8, 2>,
+        into: &mut ImageStoreMut<'a, u8, 2>,
+        premultiply_alpha: bool,
+    ) -> Result<(), PicScaleError> {
+        let new_size = into.get_size();
+        into.validate()?;
+        store.validate()?;
+        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
+            return Err(PicScaleError::ZeroImageDimensions);
+        }
+
+        if check_image_size_overflow(store.width, store.height, store.channels) {
+            return Err(PicScaleError::SourceImageIsTooLarge);
+        }
+
+        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
+            return Err(PicScaleError::DestinationImageIsTooLarge);
+        }
+
+        if store.width == new_size.width && store.height == new_size.height {
+            store.copied_to_mut(into);
+            return Ok(());
+        }
+
+        const CN: usize = 2;
+
+        let mut target_vertical = vec![f32::default(); store.width * store.height * CN];
+
+        let mut linear_store =
+            ImageStoreMut::<f32, CN>::from_slice(&mut target_vertical, store.width, store.height)?;
+
+        let linearization = make_linearization(self.transfer_function);
+
+        for (src, dst) in store
+            .as_bytes()
+            .chunks_exact(2)
+            .zip(linear_store.buffer.borrow_mut().chunks_exact_mut(2))
+        {
+            dst[0] = linearization.linearization[src[0] as usize];
+            dst[1] = src[1] as f32 / 255.;
+        }
+
+        let new_immutable_store = ImageStore::<f32, CN> {
+            buffer: std::borrow::Cow::Owned(target_vertical),
+            channels: CN,
+            width: store.width,
+            height: store.height,
+            stride: store.width * CN,
+            bit_depth: 12,
+        };
+
+        let mut new_store = ImageStoreMut::<f32, CN>::alloc(into.width, into.height);
+
+        self.scaler.resize_gray_alpha_f32(
+            &new_immutable_store,
+            &mut new_store,
+            premultiply_alpha,
+        )?;
+
+        for (src, dst) in new_store
+            .as_bytes()
+            .chunks_exact(2)
+            .zip(into.buffer.borrow_mut().chunks_exact_mut(2))
+        {
+            let v0 = (src[0] * 65535.).round().min(65535.).max(0.) as u16;
+
+            dst[0] = linearization.gamma[v0 as usize];
+            dst[1] = (src[1] * 255.).round().min(255.).max(0.) as u8;
+        }
+
+        Ok(())
+    }
+
     fn resize_rgb<'a>(
         &'a self,
         store: &ImageStore<'a, u8, 3>,
@@ -426,6 +501,88 @@ impl ScalingU16 for LinearScaler {
             store,
             into,
         )
+    }
+
+    fn resize_gray_alpha16<'a>(
+        &'a self,
+        store: &ImageStore<'a, u16, 2>,
+        into: &mut ImageStoreMut<'a, u16, 2>,
+        premultiply_alpha: bool,
+    ) -> Result<(), PicScaleError> {
+        let new_size = into.get_size();
+        into.validate()?;
+        store.validate()?;
+        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
+            return Err(PicScaleError::ZeroImageDimensions);
+        }
+
+        if check_image_size_overflow(store.width, store.height, store.channels) {
+            return Err(PicScaleError::SourceImageIsTooLarge);
+        }
+
+        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
+            return Err(PicScaleError::DestinationImageIsTooLarge);
+        }
+
+        if store.width == new_size.width && store.height == new_size.height {
+            store.copied_to_mut(into);
+            return Ok(());
+        }
+
+        const CN: usize = 2;
+
+        let mut target_vertical = vec![f32::default(); store.width * store.height * CN];
+
+        let mut linear_store =
+            ImageStoreMut::<f32, CN>::from_slice(&mut target_vertical, store.width, store.height)?;
+
+        let linearization = make_linearization16(self.transfer_function, into.bit_depth)?;
+
+        let max_bit_depth_value = ((1u32 << into.bit_depth) - 1) as f32;
+
+        let v_recip = 1. / max_bit_depth_value;
+
+        for (src, dst) in store
+            .as_bytes()
+            .chunks_exact(2)
+            .zip(linear_store.buffer.borrow_mut().chunks_exact_mut(2))
+        {
+            dst[0] = linearization.linearization[src[0] as usize];
+            dst[1] = src[1] as f32 * v_recip;
+        }
+
+        let new_immutable_store = ImageStore::<f32, CN> {
+            buffer: std::borrow::Cow::Owned(target_vertical),
+            channels: CN,
+            width: store.width,
+            height: store.height,
+            stride: store.width * CN,
+            bit_depth: 16,
+        };
+
+        let mut new_store = ImageStoreMut::<f32, CN>::alloc(into.width, into.height);
+
+        self.scaler.resize_gray_alpha_f32(
+            &new_immutable_store,
+            &mut new_store,
+            premultiply_alpha,
+        )?;
+
+        for (src, dst) in new_store
+            .as_bytes()
+            .chunks_exact(2)
+            .zip(into.buffer.borrow_mut().chunks_exact_mut(2))
+        {
+            let v0 = ((src[0] * 262143.).round().max(0.) as u32).min(262143);
+
+            dst[0] = linearization.gamma[v0 as usize];
+            dst[1] = (src[1] * max_bit_depth_value)
+                .round()
+                .min(max_bit_depth_value)
+                .max(0.) as u16;
+        }
+
+        Ok(())
     }
 
     fn resize_rgb_u16<'a>(

@@ -64,7 +64,6 @@ pub(crate) fn div_by_65535(v: u32) -> u16 {
     (((v >> 16) + v) >> 16) as u16
 }
 
-#[inline(always)]
 pub(crate) fn premultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], max_colors: u32) {
     if max_colors == 1023 {
         for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
@@ -105,6 +104,36 @@ pub(crate) fn premultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], max_color
     }
 }
 
+pub(crate) fn premultiply_alpha_gray_alpha_row(dst: &mut [u16], src: &[u16], max_colors: u32) {
+    if max_colors == 1023 {
+        for (dst, src) in dst.chunks_exact_mut(2).zip(src.chunks_exact(2)) {
+            let a = src[1] as u32;
+            dst[0] = div_by_1023(src[0] as u32 * a);
+            dst[1] = div_by_1023(a * a);
+        }
+    } else if max_colors == 4096 {
+        for (dst, src) in dst.chunks_exact_mut(2).zip(src.chunks_exact(2)) {
+            let a = src[1] as u32;
+            dst[0] = div_by_4095(src[0] as u32 * a);
+            dst[1] = div_by_4095(a * a);
+        }
+    } else if max_colors == 65535 {
+        for (dst, src) in dst.chunks_exact_mut(2).zip(src.chunks_exact(2)) {
+            let a = src[1] as u32;
+            dst[0] = div_by_65535(src[0] as u32 * a);
+            dst[1] = div_by_65535(a * a);
+        }
+    } else {
+        let recip_max_colors = 1. / max_colors as f32;
+        for (dst, src) in dst.chunks_exact_mut(2).zip(src.chunks_exact(2)) {
+            let a = src[1] as u32;
+            dst[0] =
+                (((src[0] as u32 * a) as f32 * recip_max_colors) as u32).min(max_colors) as u16;
+            dst[1] = (((a * a) as f32 * recip_max_colors) as u32).min(max_colors) as u16;
+        }
+    }
+}
+
 pub(crate) fn unpremultiply_alpha_rgba_row(in_place: &mut [u16], max_colors: u32) {
     for dst in in_place.chunks_exact_mut(4) {
         let a = dst[3] as u32;
@@ -120,6 +149,21 @@ pub(crate) fn unpremultiply_alpha_rgba_row(in_place: &mut [u16], max_colors: u32
                 .round()
                 .min(max_colors as f32) as u16;
             dst[3] = ((a * max_colors) as f32 * a_recip)
+                .round()
+                .min(max_colors as f32) as u16;
+        }
+    }
+}
+
+pub(crate) fn unpremultiply_alpha_gray_alpha_row(in_place: &mut [u16], max_colors: u32) {
+    for dst in in_place.chunks_exact_mut(2) {
+        let a = dst[1] as u32;
+        if a != 0 {
+            let a_recip = 1. / a as f32;
+            dst[0] = ((dst[0] as u32 * max_colors) as f32 * a_recip)
+                .round()
+                .min(max_colors as f32) as u16;
+            dst[1] = ((a * max_colors) as f32 * a_recip)
                 .round()
                 .min(max_colors as f32) as u16;
         }
@@ -158,6 +202,42 @@ fn premultiply_alpha_rgba_impl(
     }
 }
 
+fn premultiply_alpha_gray_alpha_impl(
+    dst: &mut [u16],
+    dst_stride: usize,
+    src: &[u16],
+    width: usize,
+    _: usize,
+    src_stride: usize,
+    bit_depth: usize,
+    pool: &Option<ThreadPool>,
+) {
+    let max_colors = (1 << bit_depth) - 1;
+    if let Some(pool) = pool {
+        pool.install(|| {
+            dst.par_chunks_exact_mut(dst_stride)
+                .zip(src.par_chunks_exact(src_stride))
+                .for_each(|(dst, src)| {
+                    premultiply_alpha_gray_alpha_row(
+                        &mut dst[..width * 2],
+                        &src[..width * 2],
+                        max_colors,
+                    );
+                });
+        });
+    } else {
+        dst.chunks_exact_mut(dst_stride)
+            .zip(src.chunks_exact(src_stride))
+            .for_each(|(dst, src)| {
+                premultiply_alpha_gray_alpha_row(
+                    &mut dst[..width * 2],
+                    &src[..width * 2],
+                    max_colors,
+                );
+            });
+    }
+}
+
 fn unpremultiply_alpha_rgba_impl(
     in_place: &mut [u16],
     src_stride: usize,
@@ -176,6 +256,28 @@ fn unpremultiply_alpha_rgba_impl(
     } else {
         in_place.chunks_exact_mut(src_stride).for_each(|row| {
             unpremultiply_alpha_rgba_row(&mut row[..width * 4], max_colors);
+        });
+    }
+}
+
+fn unpremultiply_alpha_gray_alpha_impl(
+    in_place: &mut [u16],
+    src_stride: usize,
+    width: usize,
+    _: usize,
+    bit_depth: usize,
+    pool: &Option<ThreadPool>,
+) {
+    let max_colors = (1 << bit_depth) - 1;
+    if let Some(pool) = pool {
+        pool.install(|| {
+            in_place.par_chunks_exact_mut(src_stride).for_each(|row| {
+                unpremultiply_alpha_gray_alpha_row(&mut row[..width * 2], max_colors);
+            });
+        });
+    } else {
+        in_place.chunks_exact_mut(src_stride).for_each(|row| {
+            unpremultiply_alpha_gray_alpha_row(&mut row[..width * 2], max_colors);
         });
     }
 }
@@ -222,6 +324,32 @@ pub(crate) fn premultiply_alpha_rgba_u16(
     );
 }
 
+pub(crate) fn premultiply_alpha_gray_alpha_u16(
+    dst: &mut [u16],
+    dst_stride: usize,
+    src: &[u16],
+    width: usize,
+    height: usize,
+    src_stride: usize,
+    bit_depth: usize,
+    pool: &Option<ThreadPool>,
+) {
+    #[allow(clippy::type_complexity)]
+    let mut _dispatcher: fn(
+        &mut [u16],
+        usize,
+        &[u16],
+        usize,
+        usize,
+        usize,
+        usize,
+        &Option<ThreadPool>,
+    ) = premultiply_alpha_gray_alpha_impl;
+    _dispatcher(
+        dst, dst_stride, src, width, height, src_stride, bit_depth, pool,
+    );
+}
+
 pub(crate) fn unpremultiply_alpha_rgba_u16(
     in_place: &mut [u16],
     src_stride: usize,
@@ -249,5 +377,19 @@ pub(crate) fn unpremultiply_alpha_rgba_u16(
     {
         _dispatcher = neon_unpremultiply_alpha_rgba_u16;
     }
+    _dispatcher(in_place, src_stride, width, height, bit_depth, pool);
+}
+
+pub(crate) fn unpremultiply_alpha_gray_alpha_u16(
+    in_place: &mut [u16],
+    src_stride: usize,
+    width: usize,
+    height: usize,
+    bit_depth: usize,
+    pool: &Option<ThreadPool>,
+) {
+    #[allow(clippy::type_complexity)]
+    let mut _dispatcher: fn(&mut [u16], usize, usize, usize, usize, &Option<ThreadPool>) =
+        unpremultiply_alpha_gray_alpha_impl;
     _dispatcher(in_place, src_stride, width, height, bit_depth, pool);
 }

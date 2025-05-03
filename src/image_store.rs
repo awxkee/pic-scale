@@ -540,6 +540,76 @@ pub(crate) trait UnassociateAlpha<T: Clone + Copy + Debug, const N: usize> {
     );
 }
 
+impl AssociateAlpha<u8, 2> for ImageStore<'_, u8, 2> {
+    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, u8, 2>, pool: &Option<ThreadPool>) {
+        let dst_stride = into.stride();
+        let dst = into.buffer.borrow_mut();
+        let src = self.buffer.as_ref();
+        use crate::alpha_handle_u8::premultiply_alpha_gray_alpha;
+        premultiply_alpha_gray_alpha(
+            dst,
+            dst_stride,
+            src,
+            self.width,
+            self.height,
+            self.stride(),
+            pool,
+        );
+    }
+
+    fn is_alpha_premultiplication_needed(&self) -> bool {
+        use crate::alpha_check::has_non_constant_cap_alpha_gray_alpha8;
+        has_non_constant_cap_alpha_gray_alpha8(self.buffer.as_ref(), self.width, self.stride())
+    }
+}
+
+impl AssociateAlpha<u16, 2> for ImageStore<'_, u16, 2> {
+    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, u16, 2>, pool: &Option<ThreadPool>) {
+        let dst_stride = into.stride();
+        let dst = into.buffer.borrow_mut();
+        let src = self.buffer.as_ref();
+        use crate::alpha_handle_u16::premultiply_alpha_gray_alpha_u16;
+        premultiply_alpha_gray_alpha_u16(
+            dst,
+            dst_stride,
+            src,
+            self.width,
+            self.height,
+            self.stride(),
+            into.bit_depth,
+            pool,
+        );
+    }
+
+    fn is_alpha_premultiplication_needed(&self) -> bool {
+        use crate::alpha_check::has_non_constant_cap_alpha_gray_alpha16;
+        has_non_constant_cap_alpha_gray_alpha16(self.buffer.as_ref(), self.width, self.stride())
+    }
+}
+
+impl AssociateAlpha<f32, 2> for ImageStore<'_, f32, 2> {
+    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, f32, 2>, pool: &Option<ThreadPool>) {
+        let dst_stride = into.stride();
+        let dst = into.buffer.borrow_mut();
+        let src = self.buffer.as_ref();
+        use crate::alpha_handle_f32::premultiply_alpha_gray_alpha_f32;
+        premultiply_alpha_gray_alpha_f32(
+            dst,
+            dst_stride,
+            src,
+            self.stride(),
+            self.width,
+            self.height,
+            pool,
+        );
+    }
+
+    fn is_alpha_premultiplication_needed(&self) -> bool {
+        use crate::alpha_check::has_non_constant_cap_alpha_gray_alpha_f32;
+        has_non_constant_cap_alpha_gray_alpha_f32(self.buffer.as_ref(), self.width, self.stride())
+    }
+}
+
 impl AssociateAlpha<u8, 4> for ImageStore<'_, u8, 4> {
     fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, u8, 4>, pool: &Option<ThreadPool>) {
         let dst_stride = into.stride();
@@ -621,6 +691,51 @@ impl UnassociateAlpha<u8, 4> for ImageStoreMut<'_, u8, 4> {
             src_stride,
             pool,
             workload_strategy,
+        );
+    }
+}
+
+impl UnassociateAlpha<u8, 2> for ImageStoreMut<'_, u8, 2> {
+    fn unpremultiply_alpha(
+        &mut self,
+        pool: &Option<ThreadPool>,
+        workload_strategy: WorkloadStrategy,
+    ) {
+        let src_stride = self.stride();
+        let dst = self.buffer.borrow_mut();
+        use crate::alpha_handle_u8::unpremultiply_alpha_gray_alpha;
+        unpremultiply_alpha_gray_alpha(
+            dst,
+            self.width,
+            self.height,
+            src_stride,
+            pool,
+            workload_strategy,
+        );
+    }
+}
+
+impl UnassociateAlpha<f32, 2> for ImageStoreMut<'_, f32, 2> {
+    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>, _: WorkloadStrategy) {
+        let src_stride = self.stride();
+        let dst = self.buffer.borrow_mut();
+        use crate::alpha_handle_f32::unpremultiply_alpha_gray_alpha_f32;
+        unpremultiply_alpha_gray_alpha_f32(dst, src_stride, self.width, self.height, pool);
+    }
+}
+
+impl UnassociateAlpha<u16, 2> for ImageStoreMut<'_, u16, 2> {
+    fn unpremultiply_alpha(&mut self, pool: &Option<ThreadPool>, _: WorkloadStrategy) {
+        let src_stride = self.stride();
+        let dst = self.buffer.borrow_mut();
+        use crate::alpha_handle_u16::unpremultiply_alpha_gray_alpha_u16;
+        unpremultiply_alpha_gray_alpha_u16(
+            dst,
+            src_stride,
+            self.width,
+            self.height,
+            self.bit_depth,
+            pool,
         );
     }
 }
@@ -764,6 +879,8 @@ pub type Planar8ImageStore<'a> = ImageStore<'a, u8, 1>;
 pub type Planar8ImageStoreMut<'a> = ImageStoreMut<'a, u8, 1>;
 pub type CbCr8ImageStore<'a> = ImageStore<'a, u8, 2>;
 pub type CbCr8ImageStoreMut<'a> = ImageStoreMut<'a, u8, 2>;
+pub type GrayAlpha8ImageStore<'a> = ImageStore<'a, u8, 2>;
+pub type GrayAlpha8ImageStoreMut<'a> = ImageStoreMut<'a, u8, 2>;
 pub type Rgba8ImageStore<'a> = ImageStore<'a, u8, 4>;
 pub type Rgba8ImageStoreMut<'a> = ImageStoreMut<'a, u8, 4>;
 pub type Rgb8ImageStore<'a> = ImageStore<'a, u8, 3>;
@@ -773,6 +890,8 @@ pub type Planar16ImageStore<'a> = ImageStore<'a, u16, 1>;
 pub type Planar16ImageStoreMut<'a> = ImageStoreMut<'a, u16, 1>;
 pub type CbCr16ImageStore<'a> = ImageStore<'a, u16, 2>;
 pub type CbCr16ImageStoreMut<'a> = ImageStoreMut<'a, u16, 2>;
+pub type GrayAlpha16ImageStore<'a> = ImageStore<'a, u16, 2>;
+pub type GrayAlpha16ImageStoreMut<'a> = ImageStoreMut<'a, u16, 2>;
 pub type Rgba16ImageStore<'a> = ImageStore<'a, u16, 4>;
 pub type Rgba16ImageStoreMut<'a> = ImageStoreMut<'a, u16, 4>;
 pub type Rgb16ImageStore<'a> = ImageStore<'a, u16, 3>;
@@ -799,6 +918,8 @@ pub type PlanarF32ImageStore<'a> = ImageStore<'a, f32, 1>;
 pub type PlanarF32ImageStoreMut<'a> = ImageStoreMut<'a, f32, 1>;
 pub type CbCrF32ImageStore<'a> = ImageStore<'a, f32, 2>;
 pub type CbCrF32ImageStoreMut<'a> = ImageStoreMut<'a, f32, 2>;
+pub type GrayAlphaF32ImageStore<'a> = ImageStore<'a, f32, 2>;
+pub type GrayAlphaF32ImageStoreMut<'a> = ImageStoreMut<'a, f32, 2>;
 pub type RgbaF32ImageStore<'a> = ImageStore<'a, f32, 4>;
 pub type RgbaF32ImageStoreMut<'a> = ImageStoreMut<'a, f32, 4>;
 pub type RgbF32ImageStore<'a> = ImageStore<'a, f32, 3>;

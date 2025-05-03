@@ -40,7 +40,7 @@ use crate::neon::*;
 use crate::sse::*;
 use rayon::ThreadPool;
 
-pub(crate) fn convolve_vertical_rgb_native_row_f32<const COMPONENTS: usize>(
+pub(crate) fn convolve_vertical_rgb_native_row_f32(
     _: usize,
     bounds: &FilterBounds,
     src: &[f32],
@@ -117,7 +117,7 @@ impl VerticalConvolutionPass<f32, 3> for ImageStore<'_, f32, 3> {
     ) {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(usize, &FilterBounds, &[f32], &mut [f32], usize, &[f32]) =
-            convolve_vertical_rgb_native_row_f32::<3>;
+            convolve_vertical_rgb_native_row_f32;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             _dispatcher = convolve_vertical_rgb_neon_row_f32::<3>;

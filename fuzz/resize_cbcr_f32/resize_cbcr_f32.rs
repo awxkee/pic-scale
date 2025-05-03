@@ -32,22 +32,26 @@
 use libfuzzer_sys::fuzz_target;
 use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingF32};
 
-fuzz_target!(|data: (u16, u16, u16, u16)| {
+fuzz_target!(|data: (u16, u16, u16, u16, u16, bool)| {
     resize_cbcr_f32(
+        data.4 as f32 / 65535.,
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
         data.3 as usize,
         ResamplingFunction::Bilinear,
+        data.5,
     )
 });
 
 fn resize_cbcr_f32(
+    data: f32,
     src_width: usize,
     src_height: usize,
     dst_width: usize,
     dst_height: usize,
     sampler: ResamplingFunction,
+    mul_alpha: bool,
 ) {
     if src_width == 0
         || src_width > 2000
@@ -61,11 +65,19 @@ fn resize_cbcr_f32(
         return;
     }
 
-    let mut src_data = vec![0f32; src_width * src_height * 2];
+    let mut src_data = vec![data; src_width * src_height * 2];
+    src_data[0] = 0.432432f32;
+    src_data[1] = 0.54323f32;
 
     let store = ImageStore::<f32, 2>::from_slice(&mut src_data, src_width, src_height).unwrap();
     let mut target = ImageStoreMut::alloc(dst_width, dst_height);
 
     let scaler = Scaler::new(sampler);
-    scaler.resize_cbcr_f32(&store, &mut target).unwrap();
+    if mul_alpha {
+        scaler
+            .resize_gray_alpha_f32(&store, &mut target, mul_alpha)
+            .unwrap();
+    } else {
+        scaler.resize_cbcr_f32(&store, &mut target).unwrap();
+    }
 }

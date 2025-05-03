@@ -36,22 +36,35 @@ use pic_scale::{
     TransferFunction, XYZScaler,
 };
 
-fuzz_target!(|data: (u16, u16, u16, u16)| {
-    resize_plane(
+fuzz_target!(|data: (u16, u16, u16, u16, u8, bool)| {
+    resize_rgba(
+        data.4,
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
         data.3 as usize,
         ResamplingFunction::Bilinear,
-    )
+        data.5,
+    );
+    resize_cbcr(
+        data.4,
+        data.0 as usize,
+        data.1 as usize,
+        data.2 as usize,
+        data.3 as usize,
+        ResamplingFunction::Bilinear,
+        data.5,
+    );
 });
 
-fn resize_plane(
+fn resize_rgba(
+    data: u8,
     src_width: usize,
     src_height: usize,
     dst_width: usize,
     dst_height: usize,
     sampler: ResamplingFunction,
+    mul_alpha: bool,
 ) {
     if src_width == 0
         || src_width > 2000
@@ -78,18 +91,59 @@ fn resize_plane(
     ];
 
     for scaler in scalers {
-        let mut src_data_rgb = vec![15u8; src_width * src_height * 3];
-        let store =
-            ImageStore::<u8, 3>::from_slice(&mut src_data_rgb, src_width, src_height).unwrap();
-        let mut target_store = ImageStoreMut::alloc(dst_width, dst_height);
-        scaler.resize_rgb(&store, &mut target_store).unwrap();
+        if mul_alpha {
+            let mut src_data_rgba = vec![data; src_width * src_height * 4];
+            src_data_rgba[3] = 18;
+            let store_rgba =
+                ImageStore::<u8, 4>::from_slice(&mut src_data_rgba, src_width, src_height).unwrap();
+            let mut target_store_rgba = ImageStoreMut::alloc(dst_width, dst_height);
+            scaler
+                .resize_rgba(&store_rgba, &mut target_store_rgba, true)
+                .unwrap();
+        } else {
+            let mut src_data_rgb = vec![data; src_width * src_height * 3];
+            let store =
+                ImageStore::<u8, 3>::from_slice(&mut src_data_rgb, src_width, src_height).unwrap();
+            let mut target_store = ImageStoreMut::alloc(dst_width, dst_height);
+            scaler.resize_rgb(&store, &mut target_store).unwrap();
+        }
+    }
+}
 
-        let mut src_data_rgba = vec![15u8; src_width * src_height * 4];
+fn resize_cbcr(
+    data: u8,
+    src_width: usize,
+    src_height: usize,
+    dst_width: usize,
+    dst_height: usize,
+    sampler: ResamplingFunction,
+    mul_alpha: bool,
+) {
+    if src_width == 0
+        || src_width > 2000
+        || src_height == 0
+        || src_height > 2000
+        || dst_width == 0
+        || dst_width > 512
+        || dst_height == 0
+        || dst_height > 512
+    {
+        return;
+    }
+
+    let scalers: Vec<Box<dyn Scaling>> = vec![
+        Box::new(LinearScaler::new(sampler)),
+        Box::new(LinearApproxScaler::new(sampler)),
+    ];
+
+    for scaler in scalers {
+        let mut src_data_rgba = vec![data; src_width * src_height * 2];
+        src_data_rgba[1] = 18;
         let store_rgba =
-            ImageStore::<u8, 4>::from_slice(&mut src_data_rgba, src_width, src_height).unwrap();
+            ImageStore::<u8, 2>::from_slice(&mut src_data_rgba, src_width, src_height).unwrap();
         let mut target_store_rgba = ImageStoreMut::alloc(dst_width, dst_height);
         scaler
-            .resize_rgba(&store_rgba, &mut target_store_rgba, false)
+            .resize_gray_alpha(&store_rgba, &mut target_store_rgba, mul_alpha)
             .unwrap();
     }
 }

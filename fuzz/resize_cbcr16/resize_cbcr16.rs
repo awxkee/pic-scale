@@ -32,12 +32,13 @@
 use libfuzzer_sys::fuzz_target;
 use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16};
 
-fuzz_target!(|data: (u16, u16, u16, u16)| {
+fuzz_target!(|data: (u16, u16, u16, u16, bool)| {
     resize_cbcr16(
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
         data.3 as usize,
+        data.4,
         ResamplingFunction::Bilinear,
     )
 });
@@ -47,6 +48,7 @@ fn resize_cbcr16(
     src_height: usize,
     dst_width: usize,
     dst_height: usize,
+    mul_alpha: bool,
     sampler: ResamplingFunction,
 ) {
     if src_width == 0
@@ -61,13 +63,32 @@ fn resize_cbcr16(
         return;
     }
 
-    let store = ImageStore::<u16, 2>::alloc(src_width, src_height);
+    let mut src_data = vec![0u16; src_width * src_height * 2];
+    src_data[0] = 255;
+    src_data[1] = 17;
+
+    let store = ImageStore::<u16, 2>::borrow(&src_data, src_width, src_height).unwrap();
     let mut target = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 10);
 
-    let scaler = Scaler::new(sampler);
-    scaler.resize_cbcr_u16(&store, &mut target).unwrap();
+    target.buffer.borrow_mut()[0] = 16;
+    target.buffer.borrow_mut()[1] = 17;
 
-    let store = ImageStore::<u16, 2>::alloc(src_width, src_height);
+    let scaler = Scaler::new(sampler);
+    if mul_alpha {
+        scaler
+            .resize_gray_alpha16(&store, &mut target, true)
+            .unwrap();
+    } else {
+        scaler.resize_cbcr_u16(&store, &mut target).unwrap();
+    }
+
+    let store = ImageStore::<u16, 2>::borrow(&src_data, src_width, src_height).unwrap();
     let mut target16 = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
-    scaler.resize_cbcr_u16(&store, &mut target16).unwrap();
+    if mul_alpha {
+        scaler
+            .resize_gray_alpha16(&store, &mut target16, true)
+            .unwrap();
+    } else {
+        scaler.resize_cbcr_u16(&store, &mut target16).unwrap();
+    }
 }

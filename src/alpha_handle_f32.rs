@@ -38,7 +38,7 @@ use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::ParallelSlice;
 use rayon::slice::ParallelSliceMut;
 
-pub(crate) fn unpremultiply_pixel_f32_row(in_place: &mut [f32]) {
+pub(crate) fn unpremultiply_rgba_f32_row(in_place: &mut [f32]) {
     for dst in in_place.chunks_exact_mut(4) {
         let mut r = dst[0];
         let mut g = dst[1];
@@ -61,7 +61,22 @@ pub(crate) fn unpremultiply_pixel_f32_row(in_place: &mut [f32]) {
     }
 }
 
-pub(crate) fn premultiply_pixel_f32_row(dst: &mut [f32], src: &[f32]) {
+pub(crate) fn unpremultiply_gray_alpha_f32_row(in_place: &mut [f32]) {
+    for dst in in_place.chunks_exact_mut(2) {
+        let mut r = dst[0];
+        let a = dst[1];
+        if a != 0. {
+            let scale_alpha = 1. / a;
+            r *= scale_alpha;
+        } else {
+            r = 0.;
+        }
+        dst[0] = r;
+        dst[1] = a;
+    }
+}
+
+pub(crate) fn premultiply_rgba_f32_row(dst: &mut [f32], src: &[f32]) {
     for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
         let mut r = src[0];
         let mut g = src[1];
@@ -74,6 +89,16 @@ pub(crate) fn premultiply_pixel_f32_row(dst: &mut [f32], src: &[f32]) {
         dst[1] = g;
         dst[2] = b;
         dst[3] = a;
+    }
+}
+
+pub(crate) fn premultiply_gray_alpha_f32_row(dst: &mut [f32], src: &[f32]) {
+    for (dst, src) in dst.chunks_exact_mut(2).zip(src.chunks_exact(2)) {
+        let mut r = src[0];
+        let a = src[1];
+        r *= a;
+        dst[0] = r;
+        dst[1] = a;
     }
 }
 
@@ -91,14 +116,40 @@ fn premultiply_alpha_rgba_impl_f32(
             dst.par_chunks_exact_mut(dst_stride)
                 .zip(src.par_chunks_exact(src_stride))
                 .for_each(|(dst, src)| {
-                    premultiply_pixel_f32_row(&mut dst[..width * 4], &src[..width * 4]);
+                    premultiply_rgba_f32_row(&mut dst[..width * 4], &src[..width * 4]);
                 });
         });
     } else {
         dst.chunks_exact_mut(dst_stride)
             .zip(src.chunks_exact(src_stride))
             .for_each(|(dst, src)| {
-                premultiply_pixel_f32_row(&mut dst[..width * 4], &src[..width * 4]);
+                premultiply_rgba_f32_row(&mut dst[..width * 4], &src[..width * 4]);
+            });
+    }
+}
+
+fn premultiply_alpha_gray_alpha_impl_f32(
+    dst: &mut [f32],
+    dst_stride: usize,
+    src: &[f32],
+    src_stride: usize,
+    width: usize,
+    _: usize,
+    pool: &Option<ThreadPool>,
+) {
+    if let Some(pool) = pool {
+        pool.install(|| {
+            dst.par_chunks_exact_mut(dst_stride)
+                .zip(src.par_chunks_exact(src_stride))
+                .for_each(|(dst, src)| {
+                    premultiply_gray_alpha_f32_row(&mut dst[..width * 2], &src[..width * 2]);
+                });
+        });
+    } else {
+        dst.chunks_exact_mut(dst_stride)
+            .zip(src.chunks_exact(src_stride))
+            .for_each(|(dst, src)| {
+                premultiply_gray_alpha_f32_row(&mut dst[..width * 2], &src[..width * 2]);
             });
     }
 }
@@ -113,12 +164,32 @@ fn unpremultiply_alpha_rgba_impl_f32(
     if let Some(pool) = pool {
         pool.install(|| {
             in_place.par_chunks_exact_mut(stride).for_each(|row| {
-                unpremultiply_pixel_f32_row(&mut row[..width * 4]);
+                unpremultiply_rgba_f32_row(&mut row[..width * 4]);
             });
         });
     } else {
         in_place.chunks_exact_mut(stride).for_each(|row| {
-            unpremultiply_pixel_f32_row(&mut row[..width * 4]);
+            unpremultiply_rgba_f32_row(&mut row[..width * 4]);
+        });
+    }
+}
+
+fn unpremultiply_alpha_gray_alpha_impl_f32(
+    in_place: &mut [f32],
+    stride: usize,
+    width: usize,
+    _: usize,
+    pool: &Option<ThreadPool>,
+) {
+    if let Some(pool) = pool {
+        pool.install(|| {
+            in_place.par_chunks_exact_mut(stride).for_each(|row| {
+                unpremultiply_gray_alpha_f32_row(&mut row[..width * 2]);
+            });
+        });
+    } else {
+        in_place.chunks_exact_mut(stride).for_each(|row| {
+            unpremultiply_gray_alpha_f32_row(&mut row[..width * 2]);
         });
     }
 }
@@ -161,6 +232,28 @@ pub(crate) fn premultiply_alpha_rgba_f32(
     _dispatcher(dst, dst_stride, src, src_stride, width, height, pool);
 }
 
+pub(crate) fn premultiply_alpha_gray_alpha_f32(
+    dst: &mut [f32],
+    dst_stride: usize,
+    src: &[f32],
+    src_stride: usize,
+    width: usize,
+    height: usize,
+    pool: &Option<ThreadPool>,
+) {
+    #[allow(clippy::type_complexity)]
+    let mut _dispatcher: fn(
+        &mut [f32],
+        usize,
+        &[f32],
+        usize,
+        usize,
+        usize,
+        &Option<ThreadPool>,
+    ) = premultiply_alpha_gray_alpha_impl_f32;
+    _dispatcher(dst, dst_stride, src, src_stride, width, height, pool);
+}
+
 pub(crate) fn unpremultiply_alpha_rgba_f32(
     in_place: &mut [f32],
     stride: usize,
@@ -186,5 +279,17 @@ pub(crate) fn unpremultiply_alpha_rgba_f32(
             _dispatcher = avx_unpremultiply_alpha_rgba_f32;
         }
     }
+    _dispatcher(in_place, stride, width, height, pool);
+}
+
+pub(crate) fn unpremultiply_alpha_gray_alpha_f32(
+    in_place: &mut [f32],
+    stride: usize,
+    width: usize,
+    height: usize,
+    pool: &Option<ThreadPool>,
+) {
+    let mut _dispatcher: fn(&mut [f32], usize, usize, usize, &Option<ThreadPool>) =
+        unpremultiply_alpha_gray_alpha_impl_f32;
     _dispatcher(in_place, stride, width, height, pool);
 }

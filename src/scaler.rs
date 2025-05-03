@@ -111,6 +111,27 @@ pub trait Scaling {
         into: &mut ImageStoreMut<'a, u8, 2>,
     ) -> Result<(), PicScaleError>;
 
+    /// Performs rescaling for Gray Alpha ( or 2 interleaved channels with aloha )
+    ///
+    /// Scales 2 interleaved channels as Gray Alpha
+    ///
+    /// # Example
+    ///
+    /// #[no_build]
+    /// ```rust
+    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling};
+    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+    ///  let src_store = ImageStore::alloc(100, 100);
+    ///  let mut dst_store = ImageStoreMut::<u8, 2>::alloc(50, 50);
+    ///  scaler.resize_gray_alpha(&src_store, &mut dst_store, true).unwrap();
+    /// ```
+    fn resize_gray_alpha<'a>(
+        &'a self,
+        store: &ImageStore<'a, u8, 2>,
+        into: &mut ImageStoreMut<'a, u8, 2>,
+        premultiply_alpha: bool,
+    ) -> Result<(), PicScaleError>;
+
     /// Performs rescaling for RGB, channel order does not matter
     ///
     /// # Example
@@ -190,6 +211,27 @@ pub trait ScalingF32 {
         &'a self,
         store: &ImageStore<'a, f32, 2>,
         into: &mut ImageStoreMut<'a, f32, 2>,
+    ) -> Result<(), PicScaleError>;
+
+    /// Performs rescaling for Gray Alpha f32 image
+    ///
+    /// Scales an interleaved Gray and Alpha in f32.
+    ///
+    /// # Example
+    ///
+    /// #[no_build]
+    /// ```rust
+    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32};
+    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    ///  let src_store = ImageStore::alloc(100, 100);
+    ///  let mut dst_store = ImageStoreMut::<f32, 2>::alloc(50, 50);
+    ///  scaler.resize_gray_alpha_f32(&src_store, &mut dst_store, true).unwrap();
+    /// ```
+    fn resize_gray_alpha_f32<'a>(
+        &'a self,
+        store: &ImageStore<'a, f32, 2>,
+        into: &mut ImageStoreMut<'a, f32, 2>,
+        premultiply_alpha: bool,
     ) -> Result<(), PicScaleError>;
 
     /// Performs rescaling for RGB f32
@@ -305,6 +347,27 @@ pub trait ScalingU16 {
         &'a self,
         store: &ImageStore<'a, u16, 2>,
         into: &mut ImageStoreMut<'a, u16, 2>,
+    ) -> Result<(), PicScaleError>;
+
+    /// Performs rescaling for Gray Alpha high bit-depth ( or 2 interleaved channels with aloha )
+    ///
+    /// Scales 2 interleaved channels as Gray Alpha
+    ///
+    /// # Example
+    ///
+    /// #[no_build]
+    /// ```rust
+    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingU16};
+    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+    ///  let src_store = ImageStore::alloc(100, 100);
+    ///  let mut dst_store = ImageStoreMut::<u16, 2>::alloc_with_depth(50, 50, 16);
+    ///  scaler.resize_gray_alpha16(&src_store, &mut dst_store, true).unwrap();
+    /// ```
+    fn resize_gray_alpha16<'a>(
+        &'a self,
+        store: &ImageStore<'a, u16, 2>,
+        into: &mut ImageStoreMut<'a, u16, 2>,
+        premultiply_alpha: bool,
     ) -> Result<(), PicScaleError>;
 
     /// Performs rescaling for RGB
@@ -993,6 +1056,15 @@ impl Scaling for Scaler {
         self.generic_resize(store, into)
     }
 
+    fn resize_gray_alpha<'a>(
+        &'a self,
+        store: &ImageStore<'a, u8, 2>,
+        into: &mut ImageStoreMut<'a, u8, 2>,
+        premultiply_alpha: bool,
+    ) -> Result<(), PicScaleError> {
+        self.generic_resize_with_alpha(store, into, premultiply_alpha)
+    }
+
     fn resize_rgb<'a>(
         &'a self,
         store: &ImageStore<'a, u8, 3>,
@@ -1026,6 +1098,15 @@ impl ScalingF32 for Scaler {
         into: &mut ImageStoreMut<'a, f32, 2>,
     ) -> Result<(), PicScaleError> {
         self.generic_resize(store, into)
+    }
+
+    fn resize_gray_alpha_f32<'a>(
+        &'a self,
+        store: &ImageStore<'a, f32, 2>,
+        into: &mut ImageStoreMut<'a, f32, 2>,
+        premultiply_alpha: bool,
+    ) -> Result<(), PicScaleError> {
+        self.generic_resize_with_alpha(store, into, premultiply_alpha)
     }
 
     fn resize_rgb_f32<'a>(
@@ -1086,6 +1167,15 @@ impl ScalingU16 for Scaler {
         into: &mut ImageStoreMut<'a, u16, 2>,
     ) -> Result<(), PicScaleError> {
         self.generic_resize(store, into)
+    }
+
+    fn resize_gray_alpha16<'a>(
+        &'a self,
+        store: &ImageStore<'a, u16, 2>,
+        into: &mut ImageStoreMut<'a, u16, 2>,
+        premultiply_alpha: bool,
+    ) -> Result<(), PicScaleError> {
+        self.generic_resize_with_alpha(store, into, premultiply_alpha)
     }
 
     /// Resizes u16 image

@@ -47,7 +47,6 @@ pub(crate) fn div_by_255(v: u16) -> u8 {
     ((((v + 0x80) >> 8) + v + 0x80) >> 8) as u8
 }
 
-#[inline]
 pub(crate) fn premultiply_alpha_rgba_row_impl(dst: &mut [u8], src: &[u8]) {
     for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
         let a = src[3] as u16;
@@ -55,6 +54,14 @@ pub(crate) fn premultiply_alpha_rgba_row_impl(dst: &mut [u8], src: &[u8]) {
         dst[1] = div_by_255(src[1] as u16 * a);
         dst[2] = div_by_255(src[2] as u16 * a);
         dst[3] = div_by_255(a * a);
+    }
+}
+
+pub(crate) fn premultiply_alpha_gray_alpha_row_impl(dst: &mut [u8], src: &[u8]) {
+    for (dst, src) in dst.chunks_exact_mut(2).zip(src.chunks_exact(2)) {
+        let a = src[1] as u16;
+        dst[0] = div_by_255(src[0] as u16 * a);
+        dst[1] = div_by_255(a * a);
     }
 }
 
@@ -80,6 +87,32 @@ fn premultiply_alpha_rgba_impl(
             .zip(src.chunks_exact(stride))
             .for_each(|(dst, src)| {
                 premultiply_alpha_rgba_row_impl(&mut dst[..width * 4], &src[..width * 4]);
+            });
+    }
+}
+
+fn premultiply_alpha_gray_alpha_impl(
+    dst: &mut [u8],
+    dst_stride: usize,
+    src: &[u8],
+    width: usize,
+    _: usize,
+    stride: usize,
+    pool: &Option<ThreadPool>,
+) {
+    if let Some(pool) = pool {
+        pool.install(|| {
+            dst.par_chunks_exact_mut(dst_stride)
+                .zip(src.par_chunks_exact(stride))
+                .for_each(|(dst, src)| {
+                    premultiply_alpha_gray_alpha_row_impl(&mut dst[..width * 2], &src[..width * 2]);
+                });
+        });
+    } else {
+        dst.chunks_exact_mut(dst_stride)
+            .zip(src.chunks_exact(stride))
+            .for_each(|(dst, src)| {
+                premultiply_alpha_gray_alpha_row_impl(&mut dst[..width * 2], &src[..width * 2]);
             });
     }
 }
@@ -113,6 +146,15 @@ pub(crate) fn unpremultiply_alpha_rgba_row_impl(in_place: &mut [u8]) {
         dst[0] = UNPREMULTIPLICATION_TABLE[(z + dst[0] as u16) as usize];
         dst[1] = UNPREMULTIPLICATION_TABLE[(z + dst[1] as u16) as usize];
         dst[2] = UNPREMULTIPLICATION_TABLE[(z + dst[2] as u16) as usize];
+    }
+}
+
+#[inline]
+pub(crate) fn unpremultiply_alpha_gray_alpha_row_impl(in_place: &mut [u8]) {
+    for dst in in_place.chunks_exact_mut(2) {
+        let a = dst[1];
+        let z = a as u16 * 255;
+        dst[0] = UNPREMULTIPLICATION_TABLE[(z + dst[0] as u16) as usize];
     }
 }
 
@@ -179,6 +221,21 @@ pub(crate) fn premultiply_alpha_rgba(
     _dispatcher(dst, dst_stride, src, width, height, src_stride, pool);
 }
 
+pub(crate) fn premultiply_alpha_gray_alpha(
+    dst: &mut [u8],
+    dst_stride: usize,
+    src: &[u8],
+    width: usize,
+    height: usize,
+    src_stride: usize,
+    pool: &Option<ThreadPool>,
+) {
+    #[allow(clippy::type_complexity)]
+    let mut _dispatcher: fn(&mut [u8], usize, &[u8], usize, usize, usize, &Option<ThreadPool>) =
+        premultiply_alpha_gray_alpha_impl;
+    _dispatcher(dst, dst_stride, src, width, height, src_stride, pool);
+}
+
 pub(crate) fn unpremultiply_alpha_rgba(
     in_place: &mut [u8],
     width: usize,
@@ -216,5 +273,39 @@ pub(crate) fn unpremultiply_alpha_rgba(
     {
         _dispatcher = wasm_unpremultiply_alpha_rgba;
     }
+    _dispatcher(in_place, width, height, stride, pool, workload_strategy);
+}
+
+fn unpremultiply_alpha_gray_alpha_impl(
+    in_place: &mut [u8],
+    width: usize,
+    _: usize,
+    stride: usize,
+    pool: &Option<ThreadPool>,
+    _: WorkloadStrategy,
+) {
+    if let Some(pool) = pool {
+        pool.install(|| {
+            in_place.par_chunks_exact_mut(stride).for_each(|row| {
+                unpremultiply_alpha_gray_alpha_row_impl(&mut row[..width * 2]);
+            });
+        });
+    } else {
+        in_place.chunks_exact_mut(stride).for_each(|row| {
+            unpremultiply_alpha_gray_alpha_row_impl(&mut row[..width * 2]);
+        });
+    }
+}
+
+pub(crate) fn unpremultiply_alpha_gray_alpha(
+    in_place: &mut [u8],
+    width: usize,
+    height: usize,
+    stride: usize,
+    pool: &Option<ThreadPool>,
+    workload_strategy: WorkloadStrategy,
+) {
+    let mut _dispatcher: fn(&mut [u8], usize, usize, usize, &Option<ThreadPool>, WorkloadStrategy) =
+        unpremultiply_alpha_gray_alpha_impl;
     _dispatcher(in_place, width, height, stride, pool, workload_strategy);
 }
