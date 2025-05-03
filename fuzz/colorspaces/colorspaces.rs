@@ -36,8 +36,9 @@ use pic_scale::{
     TransferFunction, XYZScaler,
 };
 
-fuzz_target!(|data: (u16, u16, u16, u16)| {
-    resize_plane(
+fuzz_target!(|data: (u16, u16, u16, u16, u8)| {
+    resize_rgba(
+        data.4,
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
@@ -46,7 +47,8 @@ fuzz_target!(|data: (u16, u16, u16, u16)| {
     )
 });
 
-fn resize_plane(
+fn resize_rgba(
+    data: u8,
     src_width: usize,
     src_height: usize,
     dst_width: usize,
@@ -78,18 +80,23 @@ fn resize_plane(
     ];
 
     for scaler in scalers {
-        let mut src_data_rgb = vec![15u8; src_width * src_height * 3];
+        let mut src_data_rgb = vec![data; src_width * src_height * 3];
         let store =
             ImageStore::<u8, 3>::from_slice(&mut src_data_rgb, src_width, src_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(dst_width, dst_height);
         scaler.resize_rgb(&store, &mut target_store).unwrap();
 
-        let mut src_data_rgba = vec![15u8; src_width * src_height * 4];
+        let mut src_data_rgba = vec![data; src_width * src_height * 4];
+        src_data_rgba[3] = 18;
         let store_rgba =
             ImageStore::<u8, 4>::from_slice(&mut src_data_rgba, src_width, src_height).unwrap();
         let mut target_store_rgba = ImageStoreMut::alloc(dst_width, dst_height);
         scaler
             .resize_rgba(&store_rgba, &mut target_store_rgba, false)
+            .unwrap();
+
+        scaler
+            .resize_rgba(&store_rgba, &mut target_store_rgba, true)
             .unwrap();
     }
 }

@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::alpha_handle_f32::{premultiply_pixel_f32_row, unpremultiply_pixel_f32_row};
+use crate::alpha_handle_f32::{premultiply_rgba_f32_row, unpremultiply_rgba_f32_row};
 use crate::sse::{sse_deinterleave_rgba_ps, sse_interleave_rgba_ps};
 use rayon::ThreadPool;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
@@ -85,7 +85,7 @@ unsafe fn sse_unpremultiply_alpha_rgba_f32_row_impl(in_place: &mut [f32]) {
 
         let rem = in_place.chunks_exact_mut(4 * 4).into_remainder();
 
-        unpremultiply_pixel_f32_row(rem);
+        unpremultiply_rgba_f32_row(rem);
     }
 }
 
@@ -156,7 +156,7 @@ unsafe fn sse_premultiply_alpha_rgba_f32_row_impl(dst: &mut [f32], src: &[f32]) 
         rem = rem.chunks_exact_mut(4 * 4).into_remainder();
         src_rem = src_rem.chunks_exact(4 * 4).remainder();
 
-        premultiply_pixel_f32_row(rem, src_rem);
+        premultiply_rgba_f32_row(rem, src_rem);
     }
 }
 

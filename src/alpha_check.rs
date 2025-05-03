@@ -36,6 +36,15 @@ pub(crate) fn has_non_constant_cap_alpha_rgba8(store: &[u8], width: usize, strid
 }
 
 #[allow(dead_code)]
+pub(crate) fn has_non_constant_cap_alpha_gray_alpha8(
+    store: &[u8],
+    width: usize,
+    stride: usize,
+) -> bool {
+    has_non_constant_cap_alpha::<u8, u32, 1, 2>(store, width, stride)
+}
+
+#[allow(dead_code)]
 pub(crate) fn has_non_constant_cap_alpha_rgba16(
     store: &[u16],
     width: usize,
@@ -44,12 +53,29 @@ pub(crate) fn has_non_constant_cap_alpha_rgba16(
     has_non_constant_cap_alpha::<u16, u64, 3, 4>(store, width, stride)
 }
 
+#[allow(dead_code)]
+pub(crate) fn has_non_constant_cap_alpha_gray_alpha16(
+    store: &[u16],
+    width: usize,
+    stride: usize,
+) -> bool {
+    has_non_constant_cap_alpha::<u16, u64, 1, 2>(store, width, stride)
+}
+
 pub(crate) fn has_non_constant_cap_alpha_rgba_f32(
     store: &[f32],
     width: usize,
     stride: usize,
 ) -> bool {
     has_non_constant_cap_alpha_f32_impl::<3, 4>(store, width, stride)
+}
+
+pub(crate) fn has_non_constant_cap_alpha_gray_alpha_f32(
+    store: &[f32],
+    width: usize,
+    stride: usize,
+) -> bool {
+    has_non_constant_cap_alpha_f32_impl::<1, 2>(store, width, stride)
 }
 
 /// Scans an image to check if alpha is not constant

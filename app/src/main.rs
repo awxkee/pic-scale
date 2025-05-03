@@ -50,7 +50,7 @@ fn resize_plane(
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/asset.jpg")
+    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -136,11 +136,8 @@ fn main() {
         Rgba16ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
     store.bit_depth = 16;
-    let mut dst_store = Rgba16ImageStoreMut::alloc_with_depth(
-        dimensions.0 as usize / 4,
-        dimensions.1 as usize / 4,
-        16,
-    );
+    let mut dst_store =
+        Rgba16ImageStoreMut::alloc_with_depth(dimensions.0 as usize, dimensions.1 as usize, 16);
     scaler
         .resize_rgba_u16(&store, &mut dst_store, true)
         .unwrap();

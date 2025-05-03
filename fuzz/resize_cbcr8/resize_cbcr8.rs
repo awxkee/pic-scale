@@ -32,12 +32,13 @@
 use libfuzzer_sys::fuzz_target;
 use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling};
 
-fuzz_target!(|data: (u16, u16, u16, u16)| {
+fuzz_target!(|data: (u16, u16, u16, u16, bool)| {
     resize_cbcr8(
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
         data.3 as usize,
+        data.4,
         ResamplingFunction::Bilinear,
     )
 });
@@ -47,6 +48,7 @@ fn resize_cbcr8(
     src_height: usize,
     dst_width: usize,
     dst_height: usize,
+    mul_alpha: bool,
     sampler: ResamplingFunction,
 ) {
     if src_width == 0
@@ -62,9 +64,15 @@ fn resize_cbcr8(
     }
 
     let mut src_data = vec![0u8; src_width * src_height * 2];
+    src_data[0] = 255;
+    src_data[1] = 17;
 
     let store = ImageStore::<u8, 2>::from_slice(&mut src_data, src_width, src_height).unwrap();
     let mut target = ImageStoreMut::alloc(dst_width, dst_height);
     let scaler = Scaler::new(sampler);
-    scaler.resize_cbcr8(&store, &mut target).unwrap();
+    if mul_alpha {
+        scaler.resize_gray_alpha(&store, &mut target, true).unwrap();
+    } else {
+        scaler.resize_cbcr8(&store, &mut target).unwrap();
+    }
 }

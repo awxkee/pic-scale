@@ -35,13 +35,14 @@ use pic_scale::{
     WorkloadStrategy,
 };
 
-fuzz_target!(|data: (u16, u16, u16, u16, bool, bool)| {
+fuzz_target!(|data: (u16, u16, u16, u16, bool, bool, u16)| {
     let strategy = if data.5 {
         WorkloadStrategy::PreferQuality
     } else {
         WorkloadStrategy::PreferSpeed
     };
     resize_rgba(
+        data.6,
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
@@ -53,6 +54,7 @@ fuzz_target!(|data: (u16, u16, u16, u16, bool, bool)| {
 });
 
 fn resize_rgba(
+    data: u16,
     src_width: usize,
     src_height: usize,
     dst_width: usize,
@@ -73,7 +75,12 @@ fn resize_rgba(
         return;
     }
 
-    let store = ImageStore::<u16, 4>::alloc(src_width, src_height);
+    let mut src_data = vec![data; src_width * src_height * 4];
+    src_data[0] = 255;
+    src_data[3] = 17;
+
+    let store = ImageStore::<u16, 4>::borrow(&src_data, src_width, src_height).unwrap();
+
     let mut target = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 10);
 
     let mut scaler = Scaler::new(sampler);
@@ -84,7 +91,7 @@ fn resize_rgba(
 
     let mut target = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
 
-    let store = ImageStore::<u16, 4>::alloc(src_width, src_height);
+    let store = ImageStore::<u16, 4>::borrow(&src_data, src_width, src_height).unwrap();
     scaler
         .resize_rgba_u16(&store, &mut target, premultiply_alpha)
         .unwrap();

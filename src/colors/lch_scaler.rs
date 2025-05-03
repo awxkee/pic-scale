@@ -109,6 +109,15 @@ impl Scaling for LChScaler {
         unimplemented!()
     }
 
+    fn resize_gray_alpha<'a>(
+        &'a self,
+        _: &ImageStore<'a, u8, 2>,
+        _: &mut ImageStoreMut<'a, u8, 2>,
+        _: bool,
+    ) -> Result<(), PicScaleError> {
+        unimplemented!()
+    }
+
     fn resize_rgb<'a>(
         &'a self,
         store: &ImageStore<'a, u8, 3>,
