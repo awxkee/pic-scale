@@ -161,7 +161,7 @@ unsafe fn convolve_horizontal_cbcr_neon_rows_4_u8_impl(
             let src3 = src2.get_unchecked(src_stride..);
 
             while jx + 8 < bounds.size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1q_s16(w_ptr.as_ptr());
                 let w0 = vreinterpretq_s16_u8(vqtbl1q_u8(
                     vreinterpretq_u8_s16(weights),
@@ -189,7 +189,7 @@ unsafe fn convolve_horizontal_cbcr_neon_rows_4_u8_impl(
             }
 
             while jx + 4 < bounds.size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let w_ptr = weights.get_unchecked(jx..);
                 let weights = vreinterpretq_s16_u8(vqtbl1q_u8(
                     vreinterpretq_u8_s16(vcombine_s16(vld1_s16(w_ptr.as_ptr()), vdup_n_s16(0))),
                     weights_shuffle,
@@ -212,7 +212,7 @@ unsafe fn convolve_horizontal_cbcr_neon_rows_4_u8_impl(
             }
 
             while jx < bounds.size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                let w_ptr = weights.get_unchecked(jx..);
                 let weight = vreinterpretq_s16_u8(vqtbl1q_u8(
                     vreinterpretq_u8_s16(vcombine_s16(
                         vld1_lane_s16::<0>(w_ptr.as_ptr(), vdup_n_s16(0)),
@@ -262,7 +262,7 @@ unsafe fn convolve_horizontal_cbcr_neon_rdm_row_impl(
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        const COMPONENTS: usize = 2;
+        const CN: usize = 2;
         const PRECISION: i32 = 6;
         const ROUNDING_CONST: i16 = 1 << (PRECISION - 1);
 
@@ -295,7 +295,7 @@ unsafe fn convolve_horizontal_cbcr_neon_rdm_row_impl(
             let mut store = base_val;
 
             while jx + 8 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1q_s16(w_ptr.as_ptr());
                 let w0 = vreinterpretq_s16_u8(vqtbl1q_u8(
                     vreinterpretq_u8_s16(weights),
@@ -305,7 +305,7 @@ unsafe fn convolve_horizontal_cbcr_neon_rdm_row_impl(
                     vreinterpretq_u8_s16(weights),
                     weights_shuffle1,
                 ));
-                let bounds_start = (bounds.start + jx) * COMPONENTS;
+                let bounds_start = (bounds.start + jx) * CN;
 
                 let src_ptr = src.get_unchecked(bounds_start..).as_ptr();
                 store = accumulate_8_horiz(store, src_ptr, w0, w1);
@@ -314,12 +314,12 @@ unsafe fn convolve_horizontal_cbcr_neon_rdm_row_impl(
             }
 
             while jx + 4 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let w_ptr = weights.get_unchecked(jx..);
                 let weights = vreinterpretq_s16_u8(vqtbl1q_u8(
                     vreinterpretq_u8_s16(vcombine_s16(vld1_s16(w_ptr.as_ptr()), vdup_n_s16(0))),
                     weights_shuffle,
                 ));
-                let bounds_start = (bounds.start + jx) * COMPONENTS;
+                let bounds_start = (bounds.start + jx) * CN;
 
                 let src_ptr = src.get_unchecked(bounds_start..).as_ptr();
                 store = accumulate_4_horiz(store, src_ptr, weights);
@@ -328,7 +328,7 @@ unsafe fn convolve_horizontal_cbcr_neon_rdm_row_impl(
             }
 
             while jx < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                let w_ptr = weights.get_unchecked(jx..);
                 let weight = vreinterpretq_s16_u8(vqtbl1q_u8(
                     vreinterpretq_u8_s16(vcombine_s16(
                         vld1_lane_s16::<0>(w_ptr.as_ptr(), vdup_n_s16(0)),
@@ -336,7 +336,7 @@ unsafe fn convolve_horizontal_cbcr_neon_rdm_row_impl(
                     )),
                     weights_shuffle,
                 ));
-                let bounds_start = (bounds.start + jx) * COMPONENTS;
+                let bounds_start = (bounds.start + jx) * CN;
                 let src_ptr = src.get_unchecked(bounds_start..).as_ptr();
                 store = accumulate_1_horiz(store, src_ptr, weight);
                 jx += 1;

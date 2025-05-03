@@ -600,8 +600,8 @@ unsafe fn convolve_vertical_neon_row_upper(
                 }
             }
 
-            let shrinked_store = vqshrun_n_s16::<R_SHR_SCALE>(store);
-            let value = vget_lane_u8::<0>(shrinked_store);
+            let shrank_store = vqshrun_n_s16::<R_SHR_SCALE>(store);
+            let value = vget_lane_u8::<0>(shrank_store);
             *dst = value;
             cx += 1;
         }

@@ -43,8 +43,8 @@ pub(crate) unsafe fn convolve_vertical_part_neon_8_f16<const USE_BLENDING: bool>
     blend_length: usize,
 ) {
     unsafe {
-        let mut store_0 = vdupq_n_f32(0f32);
-        let mut store_1 = vdupq_n_f32(0f32);
+        let mut store_0 = vdupq_n_f32(0.);
+        let mut store_1 = vdupq_n_f32(0.);
 
         let px = start_x;
 

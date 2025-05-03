@@ -760,9 +760,9 @@ fn convolve_vertical_neon_row_full<const D: bool, const PRECISION: i32>(
                 }
             }
 
-            let shrinked_store = vqshrun_n_s32::<PRECISION>(store);
+            let shrank_store = vqshrun_n_s32::<PRECISION>(store);
 
-            let low_16 = vcombine_u16(shrinked_store, shrinked_store);
+            let low_16 = vcombine_u16(shrank_store, shrank_store);
 
             let item = vqmovn_u16(low_16);
             vst1_lane_u8::<0>(dst, item);
