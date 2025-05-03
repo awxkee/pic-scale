@@ -360,7 +360,7 @@ pub trait ScalingU16 {
     ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingU16};
     ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
     ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u16, 2>::alloc(50, 50);
+    ///  let mut dst_store = ImageStoreMut::<u16, 2>::alloc_with_depth(50, 50, 16);
     ///  scaler.resize_gray_alpha16(&src_store, &mut dst_store, true).unwrap();
     /// ```
     fn resize_gray_alpha16<'a>(

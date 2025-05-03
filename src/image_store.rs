@@ -731,9 +731,9 @@ impl UnassociateAlpha<u16, 2> for ImageStoreMut<'_, u16, 2> {
         use crate::alpha_handle_u16::unpremultiply_alpha_gray_alpha_u16;
         unpremultiply_alpha_gray_alpha_u16(
             dst,
+            src_stride,
             self.width,
             self.height,
-            src_stride,
             self.bit_depth,
             pool,
         );
