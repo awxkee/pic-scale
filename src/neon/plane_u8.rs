@@ -69,6 +69,7 @@ unsafe fn accumulate_8_horiz<const D: bool>(
     }
 }
 
+#[must_use]
 #[inline(always)]
 unsafe fn accumulate_4_horiz<const D: bool>(
     store: int32x4_t,
@@ -85,6 +86,7 @@ unsafe fn accumulate_4_horiz<const D: bool>(
     }
 }
 
+#[must_use]
 #[inline(always)]
 unsafe fn accumulate_1_horiz<const D: bool>(
     store: int32x4_t,
@@ -222,16 +224,16 @@ fn convolve_horizontal_plane_neon_rows_4_u8_impl<const D: bool, const PRECISION:
                 let bounds_start = bounds.start + jx;
 
                 let src_ptr = src0.get_unchecked(bounds_start..);
-                accumulate_4_horiz::<D>(store0, src_ptr, weights);
+                store0 = accumulate_4_horiz::<D>(store0, src_ptr, weights);
 
                 let src_ptr1 = src1.get_unchecked(bounds_start..);
-                accumulate_4_horiz::<D>(store1, src_ptr1, weights);
+                store1 = accumulate_4_horiz::<D>(store1, src_ptr1, weights);
 
                 let src_ptr2 = src2.get_unchecked(bounds_start..);
-                accumulate_4_horiz::<D>(store2, src_ptr2, weights);
+                store2 = accumulate_4_horiz::<D>(store2, src_ptr2, weights);
 
                 let src_ptr3 = src3.get_unchecked(bounds_start..);
-                accumulate_4_horiz::<D>(store3, src_ptr3, weights);
+                store3 = accumulate_4_horiz::<D>(store3, src_ptr3, weights);
 
                 jx += 4;
             }
@@ -242,36 +244,36 @@ fn convolve_horizontal_plane_neon_rows_4_u8_impl<const D: bool, const PRECISION:
                 let bounds_start = bounds.start + jx;
 
                 let src_ptr = src0.get_unchecked(bounds_start..);
-                accumulate_1_horiz::<D>(store0, src_ptr, weight);
+                store0 = accumulate_1_horiz::<D>(store0, src_ptr, weight);
 
                 let src_ptr1 = src1.get_unchecked(bounds_start..);
-                accumulate_1_horiz::<D>(store1, src_ptr1, weight);
+                store1 = accumulate_1_horiz::<D>(store1, src_ptr1, weight);
 
                 let src_ptr2 = src2.get_unchecked(bounds_start..);
-                accumulate_1_horiz::<D>(store2, src_ptr2, weight);
+                store2 = accumulate_1_horiz::<D>(store2, src_ptr2, weight);
 
                 let src_ptr3 = src3.get_unchecked(bounds_start..);
-                accumulate_1_horiz::<D>(store3, src_ptr3, weight);
+                store3 = accumulate_1_horiz::<D>(store3, src_ptr3, weight);
 
                 jx += 1;
             }
 
-            let sums = vaddvq_s32(store0).max(0);
+            let sums = vaddvq_s32(vmaxq_s32(vdupq_n_s32(0), store0));
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
             *chunk0 = value;
 
-            let sums = vaddvq_s32(store1).max(0);
+            let sums = vaddvq_s32(vmaxq_s32(vdupq_n_s32(0), store1));
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
             *chunk1 = value;
 
-            let sums = vaddvq_s32(store2).max(0);
+            let sums = vaddvq_s32(vmaxq_s32(vdupq_n_s32(0), store2));
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
             *chunk2 = value;
 
-            let sums = vaddvq_s32(store3).max(0);
+            let sums = vaddvq_s32(vmaxq_s32(vdupq_n_s32(0), store3));
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
             *chunk3 = value;
@@ -345,7 +347,7 @@ fn convolve_horizontal_plane_neon_row_impl<const D: bool, const PRECISION: i32>(
                 let bounds_start = bounds.start + jx;
 
                 let src_ptr = src.get_unchecked(bounds_start..);
-                accumulate_4_horiz::<D>(store, src_ptr, weights);
+                store = accumulate_4_horiz::<D>(store, src_ptr, weights);
 
                 jx += 4;
             }
@@ -355,11 +357,11 @@ fn convolve_horizontal_plane_neon_row_impl<const D: bool, const PRECISION: i32>(
                 let weight = vld1_lane_s16::<0>(w_ptr.as_ptr(), vdup_n_s16(0));
                 let bounds_start = bounds.start + jx;
                 let src_ptr = src.get_unchecked(bounds_start..);
-                accumulate_1_horiz::<D>(store, src_ptr, weight);
+                store = accumulate_1_horiz::<D>(store, src_ptr, weight);
                 jx += 1;
             }
 
-            let sums = vaddvq_s32(store).max(0);
+            let sums = vaddvq_s32(vmaxq_s32(vdupq_n_s32(0), store));
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
             *dst = value;

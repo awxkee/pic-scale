@@ -33,6 +33,7 @@ use crate::neon::ar30::{
 use crate::neon::utils::xvld1q_u32_x2;
 use std::arch::aarch64::*;
 
+#[must_use]
 #[inline]
 unsafe fn conv_horiz_rgba_1_u8_i16<
     const SCALE: i32,
@@ -52,6 +53,7 @@ unsafe fn conv_horiz_rgba_1_u8_i16<
     }
 }
 
+#[must_use]
 #[inline(always)]
 unsafe fn conv_horiz_rgba_8_u8_i16<
     const SCALE: i32,
@@ -88,6 +90,7 @@ unsafe fn conv_horiz_rgba_8_u8_i16<
     }
 }
 
+#[must_use]
 #[inline]
 unsafe fn conv_horiz_rgba_4_u8_i16<
     const SCALE: i32,

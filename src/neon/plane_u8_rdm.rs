@@ -254,22 +254,22 @@ unsafe fn convolve_horizontal_plane_neon_rows_4_u8_impl(
                 jx += 1;
             }
 
-            let sums = vaddvq_s16(store0).max(0);
+            let sums = vaddvq_s16(vmaxq_s16(store0, vdupq_n_s16(0)));
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
             *chunk0 = value;
 
-            let sums = vaddvq_s16(store1).max(0);
+            let sums = vaddvq_s16(vmaxq_s16(store1, vdupq_n_s16(0)));
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
             *chunk1 = value;
 
-            let sums = vaddvq_s16(store2).max(0);
+            let sums = vaddvq_s16(vmaxq_s16(store2, vdupq_n_s16(0)));
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
             *chunk2 = value;
 
-            let sums = vaddvq_s16(store3).max(0);
+            let sums = vaddvq_s16(vmaxq_s16(store3, vdupq_n_s16(0)));
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
             *chunk3 = value;
@@ -367,7 +367,7 @@ unsafe fn convolve_horizontal_plane_neon_rdm_row_impl(
                 jx += 1;
             }
 
-            let sums = vaddvq_s16(store).max(0);
+            let sums = vaddvq_s16(vmaxq_s16(store, vdupq_n_s16(0)));
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
             *dst = value;
