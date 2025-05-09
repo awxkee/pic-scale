@@ -43,6 +43,7 @@ mod horizontal_ar30;
 #[cfg(feature = "rdm")]
 mod horizontal_ar30_rdm;
 mod plane_f32;
+mod plane_f32_f64;
 #[cfg(feature = "rdm")]
 mod plane_u16_hb;
 mod plane_u16_lb;
@@ -56,6 +57,7 @@ mod rgb_f16_fhm;
 #[cfg(feature = "nightly_f16")]
 mod rgb_f16_full;
 mod rgb_f32;
+mod rgb_f32_f64;
 #[cfg(feature = "rdm")]
 mod rgb_u16_hb;
 mod rgb_u16_lb;
@@ -69,6 +71,7 @@ mod rgba_f16_fhm;
 #[cfg(feature = "nightly_f16")]
 mod rgba_f16_full;
 mod rgba_f32;
+mod rgba_f32_f64;
 #[cfg(feature = "rdm")]
 mod rgba_u16_hb;
 mod rgba_u16_lb;
@@ -86,6 +89,7 @@ mod vertical_f16_fhm;
 #[cfg(feature = "nightly_f16")]
 mod vertical_f16_full;
 mod vertical_f32;
+mod vertical_f32_f64;
 mod vertical_u16;
 #[cfg(feature = "rdm")]
 mod vertical_u16_hb;
@@ -120,6 +124,9 @@ pub(crate) use horizontal_ar30::{
 pub(crate) use horizontal_ar30_rdm::neon_convolve_horizontal_rgba_rows_4_ar30_rdm;
 pub(crate) use plane_f32::convolve_horizontal_plane_neon_row_one;
 pub(crate) use plane_f32::convolve_horizontal_plane_neon_rows_4;
+pub(crate) use plane_f32_f64::{
+    convolve_horizontal_plane_neon_row_one_f32_f64, convolve_horizontal_plane_neon_rows_4_f32_f64,
+};
 pub(crate) use plane_u8::{
     convolve_horizontal_plane_neon_row, convolve_horizontal_plane_neon_row_q,
     convolve_horizontal_plane_neon_rows_4_u8, convolve_horizontal_plane_neon_rows_4_u8_q,
@@ -149,6 +156,9 @@ pub(crate) use rgb_f16_full::{
 };
 pub(crate) use rgb_f32::{
     convolve_horizontal_rgb_neon_row_one_f32, convolve_horizontal_rgb_neon_rows_4_f32,
+};
+pub(crate) use rgb_f32_f64::{
+    convolve_horizontal_rgb_neon_row_one_f32_f64, convolve_horizontal_rgb_neon_rows_4_f32_f64,
 };
 pub(crate) use rgb_u8::{
     convolve_horizontal_rgb_neon_row_one, convolve_horizontal_rgb_neon_row_one_q,
@@ -180,6 +190,9 @@ pub(crate) use rgba_f16_full::{
 pub(crate) use rgba_f32::{
     convolve_horizontal_rgba_neon_row_one, convolve_horizontal_rgba_neon_rows_4,
 };
+pub(crate) use rgba_f32_f64::{
+    convolve_horizontal_rgba_neon_row_one_f32_f64, convolve_horizontal_rgba_neon_rows_4_f32_f64,
+};
 pub(crate) use rgba_u8::{
     convolve_horizontal_rgba_neon_row, convolve_horizontal_rgba_neon_row_q,
     convolve_horizontal_rgba_neon_rows_4_u8, convolve_horizontal_rgba_neon_rows_4_u8_q,
@@ -205,6 +218,7 @@ pub(crate) use vertical_f16_fhm::convolve_vertical_rgb_neon_row_f16_fhm;
 #[cfg(feature = "nightly_f16")]
 pub(crate) use vertical_f16_full::xconvolve_vertical_rgb_neon_row_f16;
 pub(crate) use vertical_f32::convolve_vertical_rgb_neon_row_f32;
+pub(crate) use vertical_f32_f64::convolve_vertical_neon_row_f32_f64;
 pub(crate) use vertical_u8::{
     convolve_vertical_neon_i32_precision, convolve_vertical_neon_i32_precision_d,
 };

@@ -176,6 +176,25 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
             scaler.set_threading_policy(ThreadingPolicy::Single);
+            scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
+            let mut target =
+                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+            scaler.resize_rgb_f32(&store, &mut target).unwrap();
+        })
+    });
+
+    c.bench_function("Pic scale RGB f32(Quality): Lanczos 3", |b| {
+        let mut copied: Vec<f32> = Vec::from(f32_image.clone());
+        let store = ImageStore::<f32, 3>::from_slice(
+            &mut copied,
+            dimensions.0 as usize,
+            dimensions.1 as usize,
+        )
+        .unwrap();
+        b.iter(|| {
+            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+            scaler.set_threading_policy(ThreadingPolicy::Single);
+            scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
             let mut target =
                 ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
             scaler.resize_rgb_f32(&store, &mut target).unwrap();

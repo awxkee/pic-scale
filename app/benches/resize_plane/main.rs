@@ -141,7 +141,25 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     let binding_f32 = img.to_luma32f();
 
-    c.bench_function("Pic scale Plane32f: Lanczos 3", |b| {
+    c.bench_function("Pic scale Plane32f(Speed): Lanczos 3", |b| {
+        let copied: Vec<f32> = binding_f32.as_raw().to_vec();
+        let store =
+            ImageStore::<f32, 1>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
+                .unwrap();
+        b.iter(|| {
+            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+            scaler.set_threading_policy(ThreadingPolicy::Single);
+            scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
+            let mut target = ImageStoreMut::alloc_with_depth(
+                dimensions.0 as usize / 4,
+                dimensions.1 as usize / 4,
+                16,
+            );
+            scaler.resize_plane_f32(&store, &mut target).unwrap();
+        })
+    });
+
+    c.bench_function("Pic scale Plane32f(Quality): Lanczos 3", |b| {
         let copied: Vec<f32> = binding_f32.as_raw().to_vec();
         let store =
             ImageStore::<f32, 1>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)

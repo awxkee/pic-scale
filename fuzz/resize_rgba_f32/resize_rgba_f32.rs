@@ -29,18 +29,33 @@
 
 #![no_main]
 
+use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
-use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingF32};
+use pic_scale::{
+    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingF32, WorkloadStrategy,
+};
 
-fuzz_target!(|data: (u16, u16, u16, u16, bool, u16)| {
+#[derive(Clone, Debug, Arbitrary)]
+pub struct SrcImage {
+    pub src_width: u16,
+    pub src_height: u16,
+    pub dst_width: u16,
+    pub dst_height: u16,
+    pub value: u16,
+    pub premultiply_alpha: bool,
+    pub use_quality: bool,
+}
+
+fuzz_target!(|data: SrcImage| {
     resize_rgba(
-        data.5 as f32 / 65535.,
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
-        data.3 as usize,
+        data.value as f32 / 65535.,
+        data.src_width as usize,
+        data.src_height as usize,
+        data.dst_width as usize,
+        data.dst_height as usize,
         ResamplingFunction::Bilinear,
-        data.4,
+        data.premultiply_alpha,
+        data.use_quality,
     )
 });
 
@@ -52,6 +67,7 @@ fn resize_rgba(
     dst_height: usize,
     sampler: ResamplingFunction,
     premultiply_alpha: bool,
+    use_quality: bool,
 ) {
     if src_width == 0
         || src_width > 2000
@@ -72,7 +88,12 @@ fn resize_rgba(
     let store = ImageStore::<f32, 4>::borrow(&src_data, src_width, src_height).unwrap();
     let mut target = ImageStoreMut::alloc(dst_width, dst_height);
 
-    let scaler = Scaler::new(sampler);
+    let mut scaler = Scaler::new(sampler);
+    scaler.set_workload_strategy(if use_quality {
+        WorkloadStrategy::PreferQuality
+    } else {
+        WorkloadStrategy::PreferSpeed
+    });
     scaler
         .resize_rgba_f32(&store, &mut target, premultiply_alpha)
         .unwrap();

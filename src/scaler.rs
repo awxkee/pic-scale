@@ -1400,13 +1400,53 @@ def_image_scaling_alpha!(RgbaF32ImageStore, f32, 4);
 mod tests {
     use super::*;
 
+    macro_rules! check_rgba8 {
+        ($dst: expr, $image_width: expr, $max: expr) => {
+            {
+                for (y, row) in $dst.chunks_exact($image_width * 4).enumerate() {
+                    for (i, dst) in row.chunks_exact(4).enumerate() {
+                        let diff0 = (dst[0] as i32 - 124).abs();
+                        let diff1 = (dst[1] as i32 - 41).abs();
+                        let diff2 = (dst[2] as i32 - 99).abs();
+                        let diff3 = (dst[3] as i32 - 77).abs();
+                        assert!(
+                            diff0 < $max,
+                            "Diff for channel 0 is expected < {}, but it was {diff0}, at (y: {y}, x: {i})",
+                            $max
+                        );
+                        assert!(
+                            diff1 < $max,
+                            "Diff for channel 1 is expected < {}, but it was {diff1}, at (y: {y}, x: {i})",
+                            $max
+                        );
+                        assert!(
+                            diff2 < $max,
+                            "Diff for channel 2 is expected < {}, but it was {diff2}, at (y: {y}, x: {i})",
+                            $max
+                        );
+                        assert!(
+                            diff3 < $max,
+                            "Diff for channel 3 is expected < {}, but it was {diff3}, at (y: {y}, x: {i})",
+                            $max
+                        );
+                    }
+                }
+            }
+        };
+    }
+
     #[test]
     fn check_rgba8_resizing_vertical() {
         let image_width = 255;
         let image_height = 512;
         const CN: usize = 4;
         let mut image = vec![0u8; image_height * image_width * CN];
-        image[image_width * CN * (image_height.div_ceil(2)) + (image_width - 1) * CN] = 174;
+        for dst in image.chunks_exact_mut(4) {
+            dst[0] = 124;
+            dst[1] = 41;
+            dst[2] = 99;
+            dst[3] = 77;
+        }
         let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
         scaler.set_threading_policy(ThreadingPolicy::Single);
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
@@ -1415,10 +1455,7 @@ mod tests {
             .resize_rgba(&src_store, &mut target_store, false)
             .unwrap();
         let target_data = target_store.buffer.borrow();
-
-        let resized = target_data
-            [image_width * CN * ((image_height / 2).div_ceil(2)) + (image_width - 1) * CN];
-        assert_ne!(resized, 0);
+        check_rgba8!(target_data, image_width, 34);
     }
 
     #[test]
@@ -1427,7 +1464,13 @@ mod tests {
         let image_height = 512;
         const CN: usize = 4;
         let mut image = vec![0u8; image_height * image_width * CN];
-        image[0] = 174;
+        for dst in image.chunks_exact_mut(4) {
+            dst[0] = 124;
+            dst[1] = 41;
+            dst[2] = 99;
+            dst[3] = 77;
+        }
+        image[3] = 78;
         let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
         scaler.set_threading_policy(ThreadingPolicy::Single);
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
@@ -1436,9 +1479,7 @@ mod tests {
             .resize_rgba(&src_store, &mut target_store, false)
             .unwrap();
         let target_data = target_store.buffer.borrow();
-
-        let resized = target_data[0];
-        assert_ne!(resized, 0);
+        check_rgba8!(target_data, image_width, 34);
     }
 
     #[test]
@@ -1447,9 +1488,14 @@ mod tests {
         let image_height = 512;
         const CN: usize = 4;
         let mut image = vec![0u8; image_height * image_width * CN];
-        image[0] = 174;
-        image[7] = 1;
-        let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+        for dst in image.chunks_exact_mut(4) {
+            dst[0] = 124;
+            dst[1] = 41;
+            dst[2] = 99;
+            dst[3] = 77;
+        }
+        image[3] = 78;
+        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
         scaler.set_threading_policy(ThreadingPolicy::Single);
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width / 2, image_height / 2);
@@ -1457,9 +1503,7 @@ mod tests {
             .resize_rgba(&src_store, &mut target_store, true)
             .unwrap();
         let target_data = target_store.buffer.borrow();
-
-        let resized = target_data[0];
-        assert_eq!(resized, 0);
+        check_rgba8!(target_data, image_width, 126);
     }
 
     #[test]

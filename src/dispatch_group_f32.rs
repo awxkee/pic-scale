@@ -35,12 +35,12 @@ use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn convolve_vertical_dispatch_f32<const COMPONENTS: usize>(
-    image_store: &ImageStore<f32, COMPONENTS>,
-    filter_weights: FilterWeights<f32>,
-    destination: &mut ImageStoreMut<f32, COMPONENTS>,
+pub(crate) fn convolve_vertical_dispatch_f32<const CN: usize, F: Sync + Send>(
+    image_store: &ImageStore<f32, CN>,
+    filter_weights: FilterWeights<F>,
+    destination: &mut ImageStoreMut<f32, CN>,
     pool: &Option<ThreadPool>,
-    dispatcher: fn(usize, &FilterBounds, &[f32], &mut [f32], usize, &[f32]),
+    dispatcher: fn(usize, &FilterBounds, &[f32], &mut [f32], usize, &[F]),
 ) {
     let src_stride = image_store.stride();
     let dst_stride = destination.stride();
@@ -63,7 +63,7 @@ pub(crate) fn convolve_vertical_dispatch_f32<const COMPONENTS: usize>(
                         dst_width,
                         &bounds,
                         source_buffer,
-                        &mut row[..dst_width * COMPONENTS],
+                        &mut row[..dst_width * CN],
                         src_stride,
                         weights,
                     );
@@ -84,7 +84,7 @@ pub(crate) fn convolve_vertical_dispatch_f32<const COMPONENTS: usize>(
                     dst_width,
                     &bounds,
                     source_buffer,
-                    &mut row[..dst_width * COMPONENTS],
+                    &mut row[..dst_width * CN],
                     src_stride,
                     weights,
                 );
@@ -93,15 +93,15 @@ pub(crate) fn convolve_vertical_dispatch_f32<const COMPONENTS: usize>(
 }
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn convolve_horizontal_dispatch_f32<const CHANNELS: usize>(
-    image_store: &ImageStore<f32, CHANNELS>,
-    filter_weights: FilterWeights<f32>,
-    destination: &mut ImageStoreMut<f32, CHANNELS>,
+pub(crate) fn convolve_horizontal_dispatch_f32<const CN: usize, F: Send + Sync>(
+    image_store: &ImageStore<f32, CN>,
+    filter_weights: FilterWeights<F>,
+    destination: &mut ImageStoreMut<f32, CN>,
     pool: &Option<ThreadPool>,
     dispatcher_4_rows: Option<
-        fn(usize, usize, &FilterWeights<f32>, &[f32], usize, &mut [f32], usize),
+        fn(usize, usize, &FilterWeights<F>, &[f32], usize, &mut [f32], usize),
     >,
-    dispatcher_row: fn(usize, usize, &FilterWeights<f32>, &[f32], &mut [f32]),
+    dispatcher_row: fn(usize, usize, &FilterWeights<F>, &[f32], &mut [f32]),
 ) {
     let src_stride = image_store.stride();
     let dst_stride = destination.stride();

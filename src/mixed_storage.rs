@@ -90,3 +90,11 @@ impl MixedStorage<f64> for f64 {
         self
     }
 }
+
+impl MixedStorage<f32> for f64 {
+    #[inline(always)]
+    #[allow(clippy::manual_clamp)]
+    fn to_mixed(self, _: u32) -> f32 {
+        self as f32
+    }
+}

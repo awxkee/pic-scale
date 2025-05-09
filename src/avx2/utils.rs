@@ -29,7 +29,29 @@
 
 use std::arch::x86_64::*;
 
-#[inline]
+#[inline(always)]
+pub(crate) unsafe fn _mm256_fma_pd<const FMA: bool>(a: __m256d, b: __m256d, c: __m256d) -> __m256d {
+    unsafe {
+        if FMA {
+            _mm256_fmadd_pd(b, c, a)
+        } else {
+            _mm256_add_pd(_mm256_mul_pd(b, c), a)
+        }
+    }
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_fma_pd<const FMA: bool>(a: __m128d, b: __m128d, c: __m128d) -> __m128d {
+    unsafe {
+        if FMA {
+            _mm_fmadd_pd(b, c, a)
+        } else {
+            _mm_add_pd(_mm_mul_pd(b, c), a)
+        }
+    }
+}
+
+#[inline(always)]
 pub(crate) unsafe fn _mm256_fma_ps<const FMA: bool>(a: __m256, b: __m256, c: __m256) -> __m256 {
     unsafe {
         if FMA {
@@ -461,13 +483,28 @@ pub(crate) unsafe fn _mm256_prefer_fma_ps<const FMA: bool>(
     }
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) unsafe fn _mm_prefer_fma_ps<const FMA: bool>(a: __m128, b: __m128, c: __m128) -> __m128 {
     unsafe {
         if FMA {
             _mm_fmadd_ps(b, c, a)
         } else {
             _mm_add_ps(_mm_mul_ps(b, c), a)
+        }
+    }
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_prefer_fma_pd<const FMA: bool>(
+    a: __m128d,
+    b: __m128d,
+    c: __m128d,
+) -> __m128d {
+    unsafe {
+        if FMA {
+            _mm_fmadd_pd(b, c, a)
+        } else {
+            _mm_add_pd(_mm_mul_pd(b, c), a)
         }
     }
 }
@@ -492,5 +529,15 @@ pub(crate) unsafe fn _mm_hsum_ps(v: __m128) -> __m128 {
         let sums = _mm_add_ps(v, shuf);
         shuf = _mm_movehl_ps(shuf, sums);
         _mm_add_ss(sums, shuf)
+    }
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_hsum_pd(v: __m128d) -> __m128d {
+    unsafe {
+        let undef = _mm_undefined_ps();
+        let shuftmp = _mm_movehl_ps(undef, _mm_castpd_ps(v));
+        let shuf = _mm_castps_pd(shuftmp);
+        _mm_add_sd(v, shuf)
     }
 }
