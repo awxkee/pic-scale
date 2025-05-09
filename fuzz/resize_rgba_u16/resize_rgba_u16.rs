@@ -75,7 +75,7 @@ fn resize_rgba(
         return;
     }
 
-    let mut src_data = vec![data; src_width * src_height * 4];
+    let mut src_data = vec![data.min(1023); src_width * src_height * 4];
     src_data[0] = 255;
     src_data[3] = 17;
 
