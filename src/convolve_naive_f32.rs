@@ -31,8 +31,7 @@ use crate::floating_point_horizontal::{
     convolve_row_handler_floating_point, convolve_row_handler_floating_point_4,
 };
 
-#[inline]
-pub(crate) fn convolve_horizontal_rgb_native_row<const CHANNELS: usize>(
+pub(crate) fn convolve_horizontal_native_row_f32<const CHANNELS: usize>(
     _: usize,
     _: usize,
     filter_weights: &FilterWeights<f32>,
@@ -40,6 +39,16 @@ pub(crate) fn convolve_horizontal_rgb_native_row<const CHANNELS: usize>(
     dst: &mut [f32],
 ) {
     convolve_row_handler_floating_point::<f32, f32, f32, CHANNELS>(src, dst, filter_weights, 8)
+}
+
+pub(crate) fn convolve_horizontal_native_row_f32_f64<const CN: usize>(
+    _: usize,
+    _: usize,
+    filter_weights: &FilterWeights<f64>,
+    src: &[f32],
+    dst: &mut [f32],
+) {
+    convolve_row_handler_floating_point::<f32, f64, f64, CN>(src, dst, filter_weights, 8)
 }
 
 pub(crate) fn convolve_horizontal_rgba_4_row_f32<const CHANNELS: usize>(
@@ -52,6 +61,25 @@ pub(crate) fn convolve_horizontal_rgba_4_row_f32<const CHANNELS: usize>(
     dst_stride: usize,
 ) {
     convolve_row_handler_floating_point_4::<f32, f32, f32, CHANNELS>(
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+        filter_weights,
+        8,
+    )
+}
+
+pub(crate) fn convolve_horizontal_4_row_f32_f64<const CN: usize>(
+    _: usize,
+    _: usize,
+    filter_weights: &FilterWeights<f64>,
+    src: &[f32],
+    src_stride: usize,
+    dst: &mut [f32],
+    dst_stride: usize,
+) {
+    convolve_row_handler_floating_point_4::<f32, f64, f64, CN>(
         src,
         src_stride,
         dst,
