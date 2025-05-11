@@ -47,6 +47,7 @@ pub fn wasm_unpremultiply_alpha_rgba(
 }
 
 #[inline]
+#[target_feature(enable = "simd128")]
 unsafe fn unpremultiply_vec(pixel: v128, alpha: v128) -> v128 {
     unsafe {
         let scale_back = u8x16_splat(255);
@@ -80,12 +81,14 @@ unsafe fn unpremultiply_vec(pixel: v128, alpha: v128) -> v128 {
 }
 
 #[inline]
+#[target_feature(enable = "simd128")]
 pub(crate) unsafe fn wasm_u16x8_div_by_255(v: v128) -> v128 {
     let addition = u16x8_splat(127);
     u16x8_shr(u16x8_add(u16x8_add(v, addition), u16x8_shr(v, 8)), 8)
 }
 
 #[inline]
+#[target_feature(enable = "simd128")]
 unsafe fn premultiply_vec(pixel: v128, alpha: v128) -> v128 {
     unsafe {
         let lo_product = u16x8_extmul_low_u8x16(pixel, alpha);

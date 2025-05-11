@@ -264,8 +264,8 @@ unsafe fn convolve_vertical_part_neon_1_f32(
     }
 }
 
-pub(crate) fn convolve_vertical_rgb_neon_row_f32<const CHANNELS: usize>(
-    width: usize,
+pub(crate) fn convolve_vertical_rgb_neon_row_f32(
+    _: usize,
     bounds: &FilterBounds,
     src: &[f32],
     dst: &mut [f32],
@@ -273,7 +273,7 @@ pub(crate) fn convolve_vertical_rgb_neon_row_f32<const CHANNELS: usize>(
     weight_ptr: &[f32],
 ) {
     let mut cx = 0usize;
-    let dst_width = width * CHANNELS;
+    let dst_width = dst.len();
 
     while cx + 48 < dst_width {
         conv_vertical_part_neon_48_f32(bounds.start, cx, src, src_stride, dst, weight_ptr, bounds);

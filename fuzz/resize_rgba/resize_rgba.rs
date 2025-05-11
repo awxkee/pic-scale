@@ -29,21 +29,33 @@
 
 #![no_main]
 
+use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, WorkloadStrategy};
 
-fuzz_target!(|data: (u16, u16, u16, u16, bool, u8)| {
-    let quality = if data.4 {
+#[derive(Clone, Debug, Arbitrary)]
+pub struct SrcImage {
+    pub src_width: u16,
+    pub src_height: u16,
+    pub dst_width: u16,
+    pub dst_height: u16,
+    pub value: u8,
+    pub use_quality: bool,
+    pub premultiply_alpha: bool,
+}
+
+fuzz_target!(|data: SrcImage| {
+    let quality = if data.use_quality {
         WorkloadStrategy::PreferQuality
     } else {
         WorkloadStrategy::PreferSpeed
     };
     resize_rgba(
-        data.5,
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
-        data.3 as usize,
+        data.value,
+        data.src_width as usize,
+        data.src_height as usize,
+        data.dst_width as usize,
+        data.dst_height as usize,
         ResamplingFunction::Bilinear,
         quality,
     )

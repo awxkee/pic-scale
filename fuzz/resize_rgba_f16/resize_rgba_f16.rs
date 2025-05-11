@@ -73,6 +73,7 @@ fn resize_rgba(
 
     let store = ImageStore::<f16, 4>::alloc(src_width, src_height);
     let mut target = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 10);
+    target.buffer.borrow_mut()[3] = 0.5;
 
     let mut scaler = Scaler::new(sampler);
     scaler.set_workload_strategy(workload_strategy);

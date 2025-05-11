@@ -10,6 +10,7 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 pic-scale = { path = "../", features = ["nightly_f16"], default-features = false }
+arbitrary = { version = "1.4.1", features = ["derive"] }
 
 [features]
 nightly_avx512 = ["pic-scale/nightly_avx512"]

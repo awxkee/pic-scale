@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::WorkloadStrategy;
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::convolve_vertical_avx_row_f32;
 use crate::convolution::{ConvolutionOptions, HorizontalConvolutionPass, VerticalConvolutionPass};
@@ -51,6 +52,17 @@ pub(crate) fn convolve_vertical_rgb_native_row_f32(
     column_handler_floating_point::<f32, f32, f32>(bounds, src, dst, src_stride, weight, 8);
 }
 
+pub(crate) fn convolve_vertical_rgb_native_row_f64(
+    _: usize,
+    bounds: &FilterBounds,
+    src: &[f32],
+    dst: &mut [f32],
+    src_stride: usize,
+    weight: &[f64],
+) {
+    column_handler_floating_point::<f32, f64, f64>(bounds, src, dst, src_stride, weight, 8);
+}
+
 impl HorizontalConvolutionPass<f32, 3> for ImageStore<'_, f32, 3> {
     #[allow(clippy::type_complexity)]
     fn convolve_horizontal(
@@ -58,52 +70,102 @@ impl HorizontalConvolutionPass<f32, 3> for ImageStore<'_, f32, 3> {
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f32, 3>,
         pool: &Option<ThreadPool>,
-        _: ConvolutionOptions,
+        options: ConvolutionOptions,
     ) {
-        let mut _dispatcher_4_rows: Option<
-            fn(usize, usize, &FilterWeights<f32>, &[f32], usize, &mut [f32], usize),
-        > = Some(convolve_horizontal_rgba_4_row_f32::<3>);
-        let mut _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, &[f32], &mut [f32]) =
-            convolve_horizontal_rgb_native_row::<3>;
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rows_4_f32);
-            _dispatcher_row = convolve_horizontal_rgb_neon_row_one_f32;
-        }
-        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
-        {
-            if std::arch::is_x86_feature_detected!("sse4.1") {
-                _dispatcher_4_rows = Some(convolve_horizontal_rgb_sse_rows_4_f32::<false>);
-                _dispatcher_row = convolve_horizontal_rgb_sse_row_one_f32::<false>;
-                if std::arch::is_x86_feature_detected!("fma") {
-                    _dispatcher_4_rows = Some(convolve_horizontal_rgb_sse_rows_4_f32::<true>);
-                    _dispatcher_row = convolve_horizontal_rgb_sse_row_one_f32::<true>;
+        match options.workload_strategy {
+            WorkloadStrategy::PreferQuality => {
+                let mut _dispatcher_4_rows: Option<
+                    fn(usize, usize, &FilterWeights<f64>, &[f32], usize, &mut [f32], usize),
+                > = Some(convolve_horizontal_4_row_f32_f64::<3>);
+                let mut _dispatcher_row: fn(usize, usize, &FilterWeights<f64>, &[f32], &mut [f32]) =
+                    convolve_horizontal_native_row_f32_f64::<3>;
+                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+                {
+                    use crate::neon::{
+                        convolve_horizontal_rgb_neon_row_one_f32_f64,
+                        convolve_horizontal_rgb_neon_rows_4_f32_f64,
+                    };
+                    _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rows_4_f32_f64);
+                    _dispatcher_row = convolve_horizontal_rgb_neon_row_one_f32_f64;
                 }
+                #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+                {
+                    use crate::avx2::{
+                        convolve_horizontal_rgb_avx_row_one_f32_f64,
+                        convolve_horizontal_rgb_avx_rows_4_f32_f64,
+                    };
+                    let has_fma = std::arch::is_x86_feature_detected!("fma");
+                    if std::arch::is_x86_feature_detected!("avx2") {
+                        _dispatcher_4_rows =
+                            Some(convolve_horizontal_rgb_avx_rows_4_f32_f64::<false>);
+                        _dispatcher_row = convolve_horizontal_rgb_avx_row_one_f32_f64::<false>;
+                        if has_fma {
+                            _dispatcher_4_rows =
+                                Some(convolve_horizontal_rgb_avx_rows_4_f32_f64::<true>);
+                            _dispatcher_row = convolve_horizontal_rgb_avx_row_one_f32_f64::<true>;
+                        }
+                    }
+                }
+                let weights = filter_weights.cast::<f64>();
+                convolve_horizontal_dispatch_f32(
+                    self,
+                    weights,
+                    destination,
+                    pool,
+                    _dispatcher_4_rows,
+                    _dispatcher_row,
+                );
+            }
+            WorkloadStrategy::PreferSpeed => {
+                let mut _dispatcher_4_rows: Option<
+                    fn(usize, usize, &FilterWeights<f32>, &[f32], usize, &mut [f32], usize),
+                > = Some(convolve_horizontal_rgba_4_row_f32::<3>);
+                let mut _dispatcher_row: fn(usize, usize, &FilterWeights<f32>, &[f32], &mut [f32]) =
+                    convolve_horizontal_native_row_f32::<3>;
+                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+                {
+                    _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rows_4_f32);
+                    _dispatcher_row = convolve_horizontal_rgb_neon_row_one_f32;
+                }
+                #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+                {
+                    if std::arch::is_x86_feature_detected!("sse4.1") {
+                        _dispatcher_4_rows = Some(convolve_horizontal_rgb_sse_rows_4_f32::<false>);
+                        _dispatcher_row = convolve_horizontal_rgb_sse_row_one_f32::<false>;
+                        if std::arch::is_x86_feature_detected!("fma") {
+                            _dispatcher_4_rows =
+                                Some(convolve_horizontal_rgb_sse_rows_4_f32::<true>);
+                            _dispatcher_row = convolve_horizontal_rgb_sse_row_one_f32::<true>;
+                        }
+                    }
+                }
+                #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+                {
+                    use crate::avx2::{
+                        convolve_horizontal_rgb_avx_row_one_f32,
+                        convolve_horizontal_rgb_avx_rows_4_f32,
+                    };
+                    let has_fma = std::arch::is_x86_feature_detected!("fma");
+                    if std::arch::is_x86_feature_detected!("avx2") {
+                        _dispatcher_4_rows = Some(convolve_horizontal_rgb_avx_rows_4_f32::<false>);
+                        _dispatcher_row = convolve_horizontal_rgb_avx_row_one_f32::<false>;
+                        if has_fma {
+                            _dispatcher_4_rows =
+                                Some(convolve_horizontal_rgb_avx_rows_4_f32::<true>);
+                            _dispatcher_row = convolve_horizontal_rgb_avx_row_one_f32::<true>;
+                        }
+                    }
+                }
+                convolve_horizontal_dispatch_f32(
+                    self,
+                    filter_weights,
+                    destination,
+                    pool,
+                    _dispatcher_4_rows,
+                    _dispatcher_row,
+                );
             }
         }
-        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
-        {
-            use crate::avx2::{
-                convolve_horizontal_rgb_avx_row_one_f32, convolve_horizontal_rgb_avx_rows_4_f32,
-            };
-            let has_fma = std::arch::is_x86_feature_detected!("fma");
-            if std::arch::is_x86_feature_detected!("avx2") {
-                _dispatcher_4_rows = Some(convolve_horizontal_rgb_avx_rows_4_f32::<false>);
-                _dispatcher_row = convolve_horizontal_rgb_avx_row_one_f32::<false>;
-                if has_fma {
-                    _dispatcher_4_rows = Some(convolve_horizontal_rgb_avx_rows_4_f32::<true>);
-                    _dispatcher_row = convolve_horizontal_rgb_avx_row_one_f32::<true>;
-                }
-            }
-        }
-        convolve_horizontal_dispatch_f32(
-            self,
-            filter_weights,
-            destination,
-            pool,
-            _dispatcher_4_rows,
-            _dispatcher_row,
-        );
     }
 }
 
@@ -113,31 +175,80 @@ impl VerticalConvolutionPass<f32, 3> for ImageStore<'_, f32, 3> {
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f32, 3>,
         pool: &Option<ThreadPool>,
-        _: ConvolutionOptions,
+        options: ConvolutionOptions,
     ) {
-        #[allow(clippy::type_complexity)]
-        let mut _dispatcher: fn(usize, &FilterBounds, &[f32], &mut [f32], usize, &[f32]) =
-            convolve_vertical_rgb_native_row_f32;
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            _dispatcher = convolve_vertical_rgb_neon_row_f32::<3>;
-        }
-        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
-        {
-            if std::arch::is_x86_feature_detected!("sse4.1") {
-                _dispatcher = convolve_vertical_rgb_sse_row_f32::<false>;
-            }
-        }
-        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
-        {
-            let has_fma = std::arch::is_x86_feature_detected!("fma");
-            if std::arch::is_x86_feature_detected!("avx2") {
-                _dispatcher = convolve_vertical_avx_row_f32::<false>;
-                if has_fma {
-                    _dispatcher = convolve_vertical_avx_row_f32::<true>;
+        match options.workload_strategy {
+            WorkloadStrategy::PreferQuality => {
+                #[allow(clippy::type_complexity)]
+                let mut _dispatcher: fn(
+                    usize,
+                    &FilterBounds,
+                    &[f32],
+                    &mut [f32],
+                    usize,
+                    &[f64],
+                ) = convolve_vertical_rgb_native_row_f64;
+                if options.workload_strategy == WorkloadStrategy::PreferQuality {
+                    use crate::rgb_f32::convolve_vertical_rgb_native_row_f64;
+                    _dispatcher = convolve_vertical_rgb_native_row_f64;
                 }
+                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+                {
+                    use crate::neon::convolve_vertical_neon_row_f32_f64;
+                    _dispatcher = convolve_vertical_neon_row_f32_f64;
+                }
+                #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+                {
+                    if std::arch::is_x86_feature_detected!("avx2") {
+                        use crate::avx2::convolve_vertical_avx_row_f32_f64;
+                        if std::arch::is_x86_feature_detected!("fma") {
+                            _dispatcher = convolve_vertical_avx_row_f32_f64::<true>;
+                        } else {
+                            _dispatcher = convolve_vertical_avx_row_f32_f64::<false>;
+                        }
+                    }
+                }
+                let weights = filter_weights.cast::<f64>();
+                convolve_vertical_dispatch_f32(self, weights, destination, pool, _dispatcher);
+            }
+            WorkloadStrategy::PreferSpeed => {
+                #[allow(clippy::type_complexity)]
+                let mut _dispatcher: fn(
+                    usize,
+                    &FilterBounds,
+                    &[f32],
+                    &mut [f32],
+                    usize,
+                    &[f32],
+                ) = convolve_vertical_rgb_native_row_f32;
+                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+                {
+                    _dispatcher = convolve_vertical_rgb_neon_row_f32;
+                }
+                #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+                {
+                    if std::arch::is_x86_feature_detected!("sse4.1") {
+                        _dispatcher = convolve_vertical_rgb_sse_row_f32::<false>;
+                    }
+                }
+                #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+                {
+                    let has_fma = std::arch::is_x86_feature_detected!("fma");
+                    if std::arch::is_x86_feature_detected!("avx2") {
+                        _dispatcher = convolve_vertical_avx_row_f32::<false>;
+                        if has_fma {
+                            _dispatcher = convolve_vertical_avx_row_f32::<true>;
+                        }
+                    }
+                }
+                convolve_vertical_dispatch_f32(
+                    self,
+                    filter_weights,
+                    destination,
+                    pool,
+                    _dispatcher,
+                );
             }
         }
-        convolve_vertical_dispatch_f32(self, filter_weights, destination, pool, _dispatcher);
     }
 }
