@@ -46,7 +46,7 @@ pub(crate) fn convolve_column_lb_u16(
         let bounds_size = bounds.size;
 
         const PRECISION: i32 = 16;
-        const ROUNDING_CONST: i32 = (1 << (PRECISION - 1)) - 1;
+        const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
 
         let initial_store = vdupq_n_s32(ROUNDING_CONST);
 

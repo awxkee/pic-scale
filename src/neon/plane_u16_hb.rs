@@ -142,7 +142,7 @@ unsafe fn convolve_horizontal_plane_neon_rows_4_hb_impl(
     bit_depth: u32,
 ) {
     unsafe {
-        let init = vdupq_n_s32((1 << 5) - 1);
+        let init = vdupq_n_s32(1 << 5);
 
         let v_max_colors = (1u32 << bit_depth) - 1;
 
@@ -267,7 +267,7 @@ unsafe fn convolve_horizontal_plane_neon_u16_hb_impl(
         ) {
             let bounds_size = bounds.size;
             let mut jx = 0usize;
-            let mut store = vdupq_n_s32((1 << 5) - 1);
+            let mut store = vdupq_n_s32(1 << 5);
 
             while jx + 8 < bounds_size {
                 let bounds_start = bounds.start + jx;

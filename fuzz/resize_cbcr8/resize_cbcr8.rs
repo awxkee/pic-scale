@@ -29,17 +29,34 @@
 
 #![no_main]
 
+use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
-use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling};
+use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, WorkloadStrategy};
 
-fuzz_target!(|data: (u16, u16, u16, u16, bool)| {
+#[derive(Clone, Debug, Arbitrary)]
+pub struct SrcImage {
+    pub src_width: u16,
+    pub src_height: u16,
+    pub dst_width: u16,
+    pub dst_height: u16,
+    pub value: u16,
+    pub use_quality: bool,
+    pub premultiply_alpha: bool,
+}
+
+fuzz_target!(|data: SrcImage| {
     resize_cbcr8(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
-        data.3 as usize,
-        data.4,
+        data.src_width as usize,
+        data.src_height as usize,
+        data.dst_width as usize,
+        data.dst_height as usize,
+        data.premultiply_alpha,
         ResamplingFunction::Bilinear,
+        if data.use_quality {
+            WorkloadStrategy::PreferQuality
+        } else {
+            WorkloadStrategy::PreferSpeed
+        },
     )
 });
 
@@ -50,6 +67,7 @@ fn resize_cbcr8(
     dst_height: usize,
     mul_alpha: bool,
     sampler: ResamplingFunction,
+    workload_strategy: WorkloadStrategy,
 ) {
     if src_width == 0
         || src_width > 2000
@@ -69,7 +87,8 @@ fn resize_cbcr8(
 
     let store = ImageStore::<u8, 2>::from_slice(&mut src_data, src_width, src_height).unwrap();
     let mut target = ImageStoreMut::alloc(dst_width, dst_height);
-    let scaler = Scaler::new(sampler);
+    let mut scaler = Scaler::new(sampler);
+    scaler.set_workload_strategy(workload_strategy);
     if mul_alpha {
         scaler.resize_gray_alpha(&store, &mut target, true).unwrap();
     } else {

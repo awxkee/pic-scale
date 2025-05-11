@@ -135,7 +135,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_rows_4_lb_u16(
     unsafe {
         const CHANNELS: usize = 4;
         const PRECISION: i32 = 16;
-        const ROUNDING_CONST: i32 = (1 << (PRECISION - 1)) - 1;
+        const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
         let init = vdupq_n_s32(ROUNDING_CONST);
 
         let v_max_colors = vdup_n_u16((1 << bit_depth) - 1);
@@ -248,7 +248,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_u16_lb_row(
         let v_max_colors = vdup_n_u16((1 << bit_depth) - 1);
 
         const PRECISION: i32 = 16;
-        const ROUNDING_CONST: i32 = (1 << (PRECISION - 1)) - 1;
+        const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
 
         for ((dst, bounds), weights) in dst
             .chunks_exact_mut(CHANNELS)

@@ -18,7 +18,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let dimensions = img.dimensions();
     let src_bytes = img.as_bytes();
 
-    /*c.bench_function("Pic scale RGBA with alpha: Lanczos 3", |b| {
+    c.bench_function("Pic scale RGBA with alpha: Lanczos 3", |b| {
         let copied: Vec<u8> = Vec::from(src_bytes);
         b.iter(|| {
             let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
@@ -88,7 +88,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
             _ = scaler.resize_rgba(&store, &mut target, true);
         })
-    });*/
+    });
 
     let f32_image: Vec<f32> = src_bytes.iter().map(|&x| x as f32 / 255f32).collect();
 

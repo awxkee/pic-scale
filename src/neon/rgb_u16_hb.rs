@@ -154,7 +154,7 @@ unsafe fn convolve_horizontal_rgb_neon_rows_4_hb_impl(
 ) {
     unsafe {
         const CHANNELS: usize = 3;
-        let init = vdupq_n_s32((1 << 5) - 1);
+        let init = vdupq_n_s32(1 << 5);
 
         let v_max_colors = vdup_n_u16(((1u32 << bit_depth) - 1) as u16);
 
@@ -277,7 +277,7 @@ unsafe fn convolve_horizontal_rgb_neon_u16_hb_impl(
         {
             let bounds_size = bounds.size;
             let mut jx = 0usize;
-            let mut store = vdupq_n_s32((1 << 5) - 1);
+            let mut store = vdupq_n_s32(1 << 5);
 
             while jx + 4 < bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);

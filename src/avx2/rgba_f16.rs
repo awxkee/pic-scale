@@ -195,7 +195,7 @@ unsafe fn convolve_horizontal_rgba_avx_row_one_f16_impl<const FMA: bool>(
     unsafe {
         const CHANNELS: usize = 4;
         let mut filter_offset = 0usize;
-        let weights_ptr = filter_weights.weights.as_ptr();
+        let weights_ptr = &filter_weights.weights;
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);
@@ -203,7 +203,7 @@ unsafe fn convolve_horizontal_rgba_avx_row_one_f16_impl<const FMA: bool>(
             let mut store = _mm256_setzero_ps();
 
             while jx + 8 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
+                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                 let (weight0, weight1, weight2, weight3) = load_8_weights_group_4_avx!(ptr);
                 let filter_start = jx + bounds.start;
                 store = convolve_horizontal_parts_8_rgba_f16::<FMA>(
@@ -219,7 +219,7 @@ unsafe fn convolve_horizontal_rgba_avx_row_one_f16_impl<const FMA: bool>(
             }
 
             while jx + 4 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
+                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                 let (weight0, weight1) = load_4_weights_group_2_avx!(ptr);
                 let filter_start = jx + bounds.start;
                 store = convolve_horizontal_parts_4_rgba_f16::<FMA>(
@@ -233,9 +233,9 @@ unsafe fn convolve_horizontal_rgba_avx_row_one_f16_impl<const FMA: bool>(
             }
 
             while jx + 2 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = _mm_load1_ps(ptr);
-                let weight1 = _mm_load1_ps(ptr.add(1));
+                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
+                let weight0 = _mm_broadcast_ss(ptr.get_unchecked(0));
+                let weight1 = _mm_broadcast_ss(ptr.get_unchecked(1));
                 let weight = avx_combine_ps(weight0, weight1);
                 let filter_start = jx + bounds.start;
                 store = convolve_horizontal_parts_2_rgba_f16::<FMA>(
@@ -248,8 +248,8 @@ unsafe fn convolve_horizontal_rgba_avx_row_one_f16_impl<const FMA: bool>(
             }
 
             while jx < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = _mm256_set1_ps(ptr.read_unaligned());
+                let ptr = weights_ptr.get_unchecked(jx + filter_offset);
+                let weight0 = _mm256_set1_ps(*ptr);
                 let filter_start = jx + bounds.start;
                 store = convolve_horizontal_parts_one_rgba_f16::<FMA>(
                     filter_start,
@@ -369,7 +369,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_f16_impl<const FMA: bool>(
         const CHANNELS: usize = 4;
         let mut filter_offset = 0usize;
         let zeros = _mm256_setzero_ps();
-        let weights_ptr = filter_weights.weights.as_ptr();
+        let weights_ptr = &filter_weights.weights;
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);
@@ -380,7 +380,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_f16_impl<const FMA: bool>(
             let mut store_3 = zeros;
 
             while jx + 8 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
+                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                 let (weight0, weight1, weight2, weight3) = load_8_weights_group_4_avx!(ptr);
                 let filter_start = jx + bounds.start;
 
@@ -424,7 +424,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_f16_impl<const FMA: bool>(
             }
 
             while jx + 4 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
+                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                 let (weight0, weight1) = load_4_weights_group_2_avx!(ptr);
                 let filter_start = jx + bounds.start;
 
@@ -460,9 +460,9 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_f16_impl<const FMA: bool>(
             }
 
             while jx + 2 < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = _mm_load1_ps(ptr);
-                let weight1 = _mm_load1_ps(ptr.add(1));
+                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
+                let weight0 = _mm_broadcast_ss(ptr.get_unchecked(0));
+                let weight1 = _mm_broadcast_ss(ptr.get_unchecked(1));
                 let weight = avx_combine_ps(weight0, weight1);
                 let filter_start = jx + bounds.start;
                 store_0 = convolve_horizontal_parts_2_rgba_f16::<FMA>(
@@ -493,9 +493,9 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_f16_impl<const FMA: bool>(
             }
 
             while jx < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
+                let ptr = weights_ptr.get_unchecked(jx + filter_offset);
                 let filter_start = jx + bounds.start;
-                let weight0 = _mm256_set1_ps(ptr.read_unaligned());
+                let weight0 = _mm256_set1_ps(*ptr);
                 store_0 = convolve_horizontal_parts_one_rgba_f16::<FMA>(
                     filter_start,
                     src.as_ptr(),

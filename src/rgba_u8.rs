@@ -36,7 +36,7 @@ use crate::avx2::{
 };
 use crate::convolution::{ConvolutionOptions, HorizontalConvolutionPass, VerticalConvolutionPass};
 use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertical_dispatch_u8};
-use crate::filter_weights::{DefaultWeightsConverter, FilterBounds, FilterWeights};
+use crate::filter_weights::*;
 use crate::handler_provider::{
     handle_fixed_column_u8, handle_fixed_row_u8, handle_fixed_rows_4_u8,
 };
@@ -51,7 +51,23 @@ use crate::sse::{
 };
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 use crate::wasm32::wasm_vertical_neon_row;
+#[cfg(all(target_arch = "aarch64", feature = "nightly_i8mm"))]
+use num_traits::AsPrimitive;
 use rayon::ThreadPool;
+
+#[cfg(all(target_arch = "aarch64", feature = "nightly_i8mm"))]
+#[derive(Default)]
+pub(crate) struct DefaultWeightsConverterQ7 {}
+
+#[cfg(all(target_arch = "aarch64", feature = "nightly_i8mm"))]
+impl WeightsConverter<i8> for DefaultWeightsConverterQ7
+where
+    f64: AsPrimitive<i8>,
+{
+    fn prepare_weights(&self, weights: &FilterWeights<f32>) -> FilterWeights<i8> {
+        weights.numerical_approximation_q0_7(0)
+    }
+}
 
 impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
     #[allow(clippy::type_complexity)]
@@ -59,7 +75,7 @@ impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<u8, 4>,
-        _pool: &Option<ThreadPool>,
+        pool: &Option<ThreadPool>,
         _options: ConvolutionOptions,
     ) {
         let _scale_factor = self.width as f32 / destination.width as f32;
@@ -92,6 +108,22 @@ impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
                     {
                         _dispatcher_4_rows = Some(convolve_horizontal_rgba_neon_rows_4_u8);
                         _dispatcher_1_row = convolve_horizontal_rgba_neon_row;
+                    }
+                    #[cfg(feature = "nightly_i8mm")]
+                    if _scale_factor < 6.5 && std::arch::is_aarch64_feature_detected!("i8mm") {
+                        let _dispatcher_4_rows: Option<
+                            fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i8>),
+                        > = Some(convolve_horizontal_rgba_neon_rows_4_u8_dot);
+                        let _dispatcher_1_row = convolve_horizontal_rgba_neon_row_dot;
+                        return convolve_horizontal_dispatch_u8(
+                            self,
+                            filter_weights,
+                            destination,
+                            pool,
+                            _dispatcher_4_rows,
+                            _dispatcher_1_row,
+                            DefaultWeightsConverterQ7::default(),
+                        );
                     }
                 }
             }
@@ -150,7 +182,7 @@ impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
             self,
             filter_weights,
             destination,
-            _pool,
+            pool,
             _dispatcher_4_rows,
             _dispatcher_1_row,
             DefaultWeightsConverter::default(),

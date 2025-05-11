@@ -66,7 +66,7 @@ impl<const AR30_TYPE: usize, const AR30_ORDER: usize> ExecutionUnit<AR30_TYPE, A
             let total_width = dst.len() / 4;
 
             const PREC: i32 = 15;
-            const RND_CONST: i32 = (1 << (PREC - 1)) - 1;
+            const RND_CONST: i32 = 1 << (PREC - 1);
 
             while cx + 8 < total_width {
                 let v_max = _mm_set1_epi16(1023);

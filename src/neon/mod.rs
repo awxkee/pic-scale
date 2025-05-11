@@ -34,6 +34,8 @@ mod alpha_f32;
 mod alpha_u16;
 mod alpha_u8;
 mod ar30;
+#[cfg(feature = "nightly_i8mm")]
+mod cbcr8_dot;
 #[cfg(feature = "rdm")]
 mod cbcr8_rdm;
 mod check_alpha;
@@ -62,6 +64,8 @@ mod rgb_f32_f64;
 mod rgb_u16_hb;
 mod rgb_u16_lb;
 mod rgb_u8;
+#[cfg(feature = "nightly_i8mm")]
+mod rgb_u8_dot;
 #[cfg(feature = "rdm")]
 mod rgb_u8_sqrdml;
 #[cfg(feature = "nightly_f16")]
@@ -76,6 +80,8 @@ mod rgba_f32_f64;
 mod rgba_u16_hb;
 mod rgba_u16_lb;
 mod rgba_u8;
+#[cfg(feature = "nightly_i8mm")]
+mod rgba_u8_dot;
 #[cfg(feature = "rdm")]
 mod rgba_u8_rdm;
 mod utils;
@@ -110,6 +116,10 @@ pub(crate) use alpha_f32::neon_unpremultiply_alpha_rgba_f32;
 pub(crate) use alpha_u8::neon_premultiply_alpha_rgba;
 pub(crate) use alpha_u8::neon_unpremultiply_alpha_rgba;
 pub(crate) use alpha_u16::{neon_premultiply_alpha_rgba_u16, neon_unpremultiply_alpha_rgba_u16};
+#[cfg(feature = "nightly_i8mm")]
+pub(crate) use cbcr8_dot::{
+    convolve_horizontal_cbcr_neon_dot_row, convolve_horizontal_cbcr_neon_rows_dot_4_u8,
+};
 #[cfg(feature = "rdm")]
 pub(crate) use cbcr8_rdm::{
     convolve_horizontal_cbcr_neon_rdm_row, convolve_horizontal_cbcr_neon_rows_rdm_4_u8,
@@ -164,6 +174,10 @@ pub(crate) use rgb_u8::{
     convolve_horizontal_rgb_neon_row_one, convolve_horizontal_rgb_neon_row_one_q,
     convolve_horizontal_rgb_neon_rows_4, convolve_horizontal_rgb_neon_rows_4_q,
 };
+#[cfg(feature = "nightly_i8mm")]
+pub(crate) use rgb_u8_dot::{
+    convolve_horizontal_rgb_neon_row_one_dot, convolve_horizontal_rgb_neon_rows_4_dot,
+};
 #[cfg(feature = "rdm")]
 pub(crate) use rgb_u8_sqrdml::{
     convolve_horizontal_rgb_neon_rdm_row_one, convolve_horizontal_rgb_neon_rdm_rows_4,
@@ -196,6 +210,10 @@ pub(crate) use rgba_f32_f64::{
 pub(crate) use rgba_u8::{
     convolve_horizontal_rgba_neon_row, convolve_horizontal_rgba_neon_row_q,
     convolve_horizontal_rgba_neon_rows_4_u8, convolve_horizontal_rgba_neon_rows_4_u8_q,
+};
+#[cfg(feature = "nightly_i8mm")]
+pub(crate) use rgba_u8_dot::{
+    convolve_horizontal_rgba_neon_row_dot, convolve_horizontal_rgba_neon_rows_4_u8_dot,
 };
 #[cfg(feature = "rdm")]
 pub(crate) use rgba_u8_rdm::{
