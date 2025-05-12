@@ -144,7 +144,7 @@ unsafe fn convolve_horizontal_rgb_neon_rows_4_impl<const PRECISION: i32>(
 
         // (r0 g0 b0 r1) (g2 b2 r3 g3) (b3 r4 g4 b4) (r5 g5 b5 r6)
 
-        let rnd_const: i32 = (1 << (PRECISION - 1)) - 1;
+        let rnd_const: i32 = 1 << (PRECISION - 1);
 
         const CHANNELS: usize = 3;
         let init = i32x4_splat(rnd_const);
@@ -246,7 +246,7 @@ unsafe fn convolve_horizontal_rgb_neon_row_one_impl<const PRECISION: i32>(
         let shuf_table_1: [u8; 16] = [0, 1, 2, 255, 3, 4, 5, 255, 6, 7, 8, 255, 9, 10, 11, 255];
         let shuffle = v128_load(shuf_table_1.as_ptr() as *const _);
 
-        let rnd_const: i32 = (1 << (PRECISION - 1)) - 1;
+        let rnd_const: i32 = 1 << (PRECISION - 1);
 
         for ((dst, bounds), weights) in dst
             .chunks_exact_mut(CHANNELS)

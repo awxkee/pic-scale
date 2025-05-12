@@ -130,7 +130,7 @@ fn convolve_vertical_neon_row_full<const D: bool, const PRECISION: i32>(
     weight: &[i16],
 ) {
     let mut cx = 0usize;
-    let rnd_const: i32 = (1 << (PRECISION - 1)) - 1;
+    let rnd_const: i32 = 1 << (PRECISION - 1);
 
     unsafe {
         let iter_64 = dst.chunks_exact_mut(64);

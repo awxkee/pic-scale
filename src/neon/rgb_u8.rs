@@ -167,7 +167,7 @@ fn convolve_horizontal_rgb_neon_rows_4_impl<const D: bool, const PRECISION: i32>
 
         // (r0 g0 b0 r1) (g2 b2 r3 g3) (b3 r4 g4 b4) (r5 g5 b5 r6)
 
-        let rnd_const: i32 = (1 << (PRECISION - 1)) - 1;
+        let rnd_const: i32 = 1 << (PRECISION - 1);
 
         const CHANNELS: usize = 3;
         let init = vdupq_n_s32(rnd_const);
@@ -274,7 +274,7 @@ fn convolve_horizontal_rgb_neon_row_one_impl<const D: bool, const PRECISION: i32
         let shuffle_2 = vld1_u8(shuf_table_2.as_ptr());
         let shuffle = vcombine_u8(shuffle_1, shuffle_2);
 
-        let rnd_const: i32 = (1 << (PRECISION - 1)) - 1;
+        let rnd_const: i32 = 1i32 << (PRECISION - 1);
 
         for ((dst, bounds), weights) in dst
             .chunks_exact_mut(CHANNELS)

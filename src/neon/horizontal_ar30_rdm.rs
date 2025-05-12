@@ -208,7 +208,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
 
                 while jx + 8 < bounds_size {
                     let bounds_start = bounds.start + jx;
-                    let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                    let w_ptr = weights.get_unchecked(jx..);
                     let weights_set = vld1q_s16(w_ptr.as_ptr());
                     let w0 = vdup_laneq_s16::<0>(weights_set);
                     let w1 = vdup_laneq_s16::<1>(weights_set);
@@ -253,7 +253,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
 
                 while jx + 4 < bounds_size {
                     let bounds_start = bounds.start + jx;
-                    let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                    let w_ptr = weights.get_unchecked(jx..);
                     let weights = vld1_s16(w_ptr.as_ptr());
                     let w0 = vdup_lane_s16::<0>(weights);
                     let w1 = vdup_lane_s16::<1>(weights);
@@ -299,7 +299,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
                 }
 
                 while jx < bounds_size {
-                    let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                    let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
                     let weight0 = vld1_dup_s16(w_ptr.as_ptr());
                     store_0 = conv_horiz_rgba_1_u8_i16::<SCALE, AR_TYPE, AR_ORDER>(

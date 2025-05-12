@@ -12,11 +12,11 @@ use fast_image_resize::{
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
-    Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, ImageStoreScaling, LinearApproxScaler,
-    LinearScaler, Planar16ImageStore, Planar16ImageStoreMut, Planar8ImageStore,
-    Planar8ImageStoreMut, PlanarF32ImageStore, PlanarF32ImageStoreMut, ResamplingFunction,
-    Rgb8ImageStore, Rgb8ImageStoreMut, RgbF32ImageStore, RgbF32ImageStoreMut, Rgba16ImageStore,
-    Rgba16ImageStoreMut, Rgba8ImageStore, Rgba8ImageStoreMut, RgbaF32ImageStore,
+    Ar30ByteOrder, CbCr8ImageStore, CbCr8ImageStoreMut, ImageSize, ImageStore, ImageStoreMut,
+    ImageStoreScaling, LinearApproxScaler, LinearScaler, Planar16ImageStore, Planar16ImageStoreMut,
+    Planar8ImageStore, Planar8ImageStoreMut, PlanarF32ImageStore, PlanarF32ImageStoreMut,
+    ResamplingFunction, Rgb8ImageStore, Rgb8ImageStoreMut, RgbF32ImageStore, RgbF32ImageStoreMut,
+    Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore, Rgba8ImageStoreMut, RgbaF32ImageStore,
     RgbaF32ImageStoreMut, Scaler, Scaling, ScalingF32, ScalingU16, ThreadingPolicy,
     WorkloadStrategy,
 };
@@ -51,7 +51,7 @@ fn resize_plane(
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
+    let img = ImageReader::open("./assets/asset.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -59,14 +59,14 @@ fn main() {
     let tt = img.to_rgb8();
     tt.save("orig.png").unwrap();
     let dimensions = img.dimensions();
-    let transient = img.to_rgba8();
+    let transient = img.to_luma_alpha8();
     let mut bytes = Vec::from(transient.as_bytes());
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
 
     let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
-    scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
+    scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
     //
     // // let rgb_feature16 = transient
@@ -131,22 +131,22 @@ fn main() {
 
     let bytes32 = bytes
         .iter()
-        // .map(|&x| x)
+        .map(|&x| x)
         // .map(|&x| u16::from_ne_bytes([x, x]))
-        .map(|&x| x as f32 / 255.)
+        // .map(|&x| x as f32 / 255.)
         .collect::<Vec<_>>();
 
     let mut store =
-        RgbaF32ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize)
+        CbCr8ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
     store.bit_depth = 8;
-    let mut dst_store = RgbaF32ImageStoreMut::alloc_with_depth(
+    let mut dst_store = CbCr8ImageStoreMut::alloc_with_depth(
         dimensions.0 as usize / 2,
         dimensions.1 as usize / 2,
         16,
     );
     scaler
-        .resize_rgba_f32(&store, &mut dst_store, false)
+        .resize_gray_alpha(&store, &mut dst_store, false)
         .unwrap();
     //
     // let elapsed_time = start_time.elapsed();
@@ -198,9 +198,9 @@ fn main() {
     let dst = dst_store
         .as_bytes()
         .iter()
-        // .map(|&x| x)
+        .map(|&x| x)
         // .map(|&x| ((x >> 8) as u8).min(255))
-        .map(|&x| (x as f32 * 255.).round() as u8)
+        // .map(|&x| (x as f32 * 255.).round() as u8)
         .collect::<Vec<_>>();
 
     if dst_store.channels == 4 {
@@ -218,7 +218,7 @@ fn main() {
             &dst,
             dst_store.width as u32,
             dst_store.height as u32,
-            image::ColorType::Rgb8,
+            image::ColorType::La8,
         )
         .unwrap();
     }

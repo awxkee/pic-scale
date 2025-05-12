@@ -47,7 +47,7 @@ impl HorizontalConvolutionPass<u8, 2> for ImageStore<'_, u8, 2> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<u8, 2>,
-        _pool: &Option<ThreadPool>,
+        pool: &Option<ThreadPool>,
         _options: ConvolutionOptions,
     ) {
         let _scale_factor = self.width as f32 / destination.width as f32;
@@ -70,6 +70,27 @@ impl HorizontalConvolutionPass<u8, 2> for ImageStore<'_, u8, 2> {
                 _dispatcher_4_rows = Some(convolve_horizontal_cbcr_neon_rows_rdm_4_u8);
                 _dispatcher_1_row = convolve_horizontal_cbcr_neon_rdm_row;
             }
+            #[cfg(feature = "nightly_i8mm")]
+            if _scale_factor < 6.5 && std::arch::is_aarch64_feature_detected!("i8mm") {
+                use crate::neon::{
+                    convolve_horizontal_cbcr_neon_dot_row,
+                    convolve_horizontal_cbcr_neon_rows_dot_4_u8,
+                };
+                use crate::rgba_u8::DefaultWeightsConverterQ7;
+                let dispatcher_4_rows: Option<
+                    fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i8>),
+                > = Some(convolve_horizontal_cbcr_neon_rows_dot_4_u8);
+                let dispatcher_1_row = convolve_horizontal_cbcr_neon_dot_row;
+                return convolve_horizontal_dispatch_u8(
+                    self,
+                    filter_weights,
+                    destination,
+                    pool,
+                    dispatcher_4_rows,
+                    dispatcher_1_row,
+                    DefaultWeightsConverterQ7::default(),
+                );
+            }
         }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
@@ -89,7 +110,7 @@ impl HorizontalConvolutionPass<u8, 2> for ImageStore<'_, u8, 2> {
             self,
             filter_weights,
             destination,
-            _pool,
+            pool,
             _dispatcher_4_rows,
             _dispatcher_1_row,
             DefaultWeightsConverter::default(),

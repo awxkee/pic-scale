@@ -36,6 +36,8 @@ rdm = []
 avx = []
 # Allows to use x86/x86_64 SSE4.1 when available
 sse = []
+# Allows to use ARM i8mm when available
+nightly_i8mm = []
 
 [package.metadata.docs.rs]
 # To build locally:

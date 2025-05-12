@@ -140,7 +140,7 @@ unsafe fn sse_convolve_horizontal_rgba_rows_4_impl<const AR_TYPE: usize, const A
 ) {
     unsafe {
         const PRECISION: i32 = 15;
-        const ROUNDING: i32 = (1 << (PRECISION - 1)) - 1;
+        const ROUNDING: i32 = 1 << (PRECISION - 1);
 
         let init = _mm_set1_epi32(ROUNDING);
 
@@ -341,7 +341,7 @@ unsafe fn sse_convolve_horizontal_rgba_row_impl<const AR_TYPE: usize, const AR_O
 ) {
     unsafe {
         const PRECISION: i32 = 16;
-        const ROUNDING: i32 = (1 << (PRECISION - 1)) - 1;
+        const ROUNDING: i32 = 1 << (PRECISION - 1);
 
         let init = _mm_set1_epi32(ROUNDING);
 

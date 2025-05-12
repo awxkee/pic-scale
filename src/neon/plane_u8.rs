@@ -149,7 +149,7 @@ fn convolve_horizontal_plane_neon_rows_4_u8_impl<const D: bool, const PRECISION:
         let iter_row2 = row2_ref.iter_mut();
         let iter_row3 = row3_ref.iter_mut();
 
-        let rnd_const = (1 << (PRECISION - 1)) - 1;
+        let rnd_const = 1 << (PRECISION - 1);
 
         let base_val = {
             let j = vdupq_n_s32(0);
@@ -303,7 +303,7 @@ fn convolve_horizontal_plane_neon_row_impl<const D: bool, const PRECISION: i32>(
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        let rnd_const = (1 << (PRECISION - 1)) - 1;
+        let rnd_const = 1 << (PRECISION - 1);
         let base_val = {
             let j = vdupq_n_s32(0);
             vsetq_lane_s32::<0>(rnd_const, j)

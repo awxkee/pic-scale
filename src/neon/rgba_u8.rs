@@ -168,7 +168,7 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_impl<const D: bool, const PRECISION: 
 ) {
     unsafe {
         const CHANNELS: usize = 4;
-        let rnd_const: i32 = (1 << (PRECISION - 1)) - 1;
+        let rnd_const: i32 = 1 << (PRECISION - 1);
         let init = vdupq_n_s32(rnd_const);
 
         let (row0_ref, rest) = dst.split_at_mut(dst_stride);
@@ -302,7 +302,7 @@ fn convolve_horizontal_rgba_neon_row_impl<const D: bool, const PRECISION: i32>(
 ) {
     unsafe {
         const CHANNELS: usize = 4;
-        let rnd_const: i32 = (1 << (PRECISION - 1)) - 1;
+        let rnd_const: i32 = 1 << (PRECISION - 1);
 
         for ((dst, bounds), weights) in dst
             .chunks_exact_mut(CHANNELS)

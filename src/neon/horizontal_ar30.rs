@@ -122,7 +122,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
     ) {
         unsafe {
             const PRECISION: i32 = 16;
-            const ROUNDING: i32 = (1 << (PRECISION - 1)) - 1;
+            const ROUNDING: i32 = 1 << (PRECISION - 1);
 
             let init = vdupq_n_s32(ROUNDING);
 
@@ -164,7 +164,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
 
                 while jx + 8 < bounds_size {
                     let bounds_start = bounds.start + jx;
-                    let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                    let w_ptr = weights.get_unchecked(jx..);
                     let weights_set = vld1q_s16(w_ptr.as_ptr());
                     store_0 = conv_horiz_rgba_8_u8_i16::<AR_TYPE, AR_ORDER>(
                         bounds_start,
@@ -195,7 +195,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
 
                 while jx + 4 < bounds_size {
                     let bounds_start = bounds.start + jx;
-                    let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                    let w_ptr = weights.get_unchecked(jx..);
                     let weights = vld1_s16(w_ptr.as_ptr());
                     store_0 = conv_horiz_rgba_4_u8_i16::<AR_TYPE, AR_ORDER>(
                         bounds_start,
@@ -225,7 +225,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
                 }
 
                 while jx < bounds_size {
-                    let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                    let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
                     let weight0 = vld1_dup_s16(w_ptr.as_ptr());
                     store_0 = conv_horiz_rgba_1_u8_i16::<AR_TYPE, AR_ORDER>(
@@ -299,7 +299,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row1ExecutionUnit<AR_TYPE, AR_
     unsafe fn pass(&self, src: &[u8], dst: &mut [u8], filter_weights: &FilterWeights<i16>) {
         unsafe {
             const PRECISION: i32 = 16;
-            const ROUNDING: i32 = (1 << (PRECISION - 1)) - 1;
+            const ROUNDING: i32 = 1 << (PRECISION - 1);
 
             let init = vdupq_n_s32(ROUNDING);
 
@@ -324,7 +324,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row1ExecutionUnit<AR_TYPE, AR_
 
                 while jx + 8 < bounds_size {
                     let bounds_start = bounds.start + jx;
-                    let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                    let w_ptr = weights.get_unchecked(jx..);
                     let weights_set = vld1q_s16(w_ptr.as_ptr());
                     store_0 = conv_horiz_rgba_8_u8_i16::<AR_TYPE, AR_ORDER>(
                         bounds_start,
@@ -337,7 +337,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row1ExecutionUnit<AR_TYPE, AR_
 
                 while jx + 4 < bounds_size {
                     let bounds_start = bounds.start + jx;
-                    let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                    let w_ptr = weights.get_unchecked(jx..);
                     let weights = vld1_s16(w_ptr.as_ptr());
                     store_0 = conv_horiz_rgba_4_u8_i16::<AR_TYPE, AR_ORDER>(
                         bounds_start,
@@ -349,7 +349,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row1ExecutionUnit<AR_TYPE, AR_
                 }
 
                 while jx < bounds_size {
-                    let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                    let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
                     let weight0 = vld1_dup_s16(w_ptr.as_ptr());
                     store_0 = conv_horiz_rgba_1_u8_i16::<AR_TYPE, AR_ORDER>(

@@ -24,7 +24,7 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
       - run: rustup target add aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu i686-unknown-linux-gnu powerpc-unknown-linux-gnu riscv64gc-unknown-linux-gnu wasm32-unknown-unknown
       - run: RUSTFLAGS="-C target-feature=+neon,-fp16" cargo build --target aarch64-unknown-linux-gnu
-      - run: RUSTFLAGS="-C target-feature=+neon,+fp16" cargo +nightly build --target aarch64-unknown-linux-gnu --features nightly_f16
+      - run: RUSTFLAGS="-C target-feature=+neon,+fp16" cargo +nightly build --target aarch64-unknown-linux-gnu --features nightly_f16,nightly_i8mm
       - run: RUSTFLAGS="-C target-feature=+sse4.1" cargo build --target i686-unknown-linux-gnu
       - run: cargo build --target powerpc-unknown-linux-gnu
       - run: cargo build --target riscv64gc-unknown-linux-gnu
@@ -59,23 +59,50 @@ jobs:
       - run: cargo clippy --all-features -- -D warnings
       - run: RUSTFLAGS="-C target-feature=+simd128" cargo clippy --all-features --target wasm32-unknown-unknown -- -D warnings
 
-  tests:
-    name: Testing
+  tests_x86:
+    name: Testing x86
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
-    runs-on: ${{ matrix.os }}
+        os: [ avx, sse, "", nightly_f16 ]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
-      - run: cargo test
+      - run: cargo +nightly test --features "${{ matrix.feature }}"
+
+  tests_arm:
+    name: Testing ARM
+    strategy:
+      matrix:
+        os: [ "", rdm, nightly_i8mm, nightly_f16 ]
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo +nightly test --features "${{ matrix.feature }}"
 
   fuzz_rgba_8bit:
     name: Fuzzing 8bit
     runs-on: macos-latest
     strategy:
       matrix:
-        feature: [ rdm ]
+        feature: [ rdm, "" ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz run resize_rgba --features "${{ matrix.feature }}" -- -max_total_time=15
+      - run: cargo fuzz run resize_rgb --features "${{ matrix.feature }}" -- -max_total_time=15
+      - run: cargo fuzz run resize_cbcr8 --features "${{ matrix.feature }}" -- -max_total_time=15
+      - run: cargo fuzz run resize_plane --features "${{ matrix.feature }}" -- -max_total_time=15
+      - run: cargo fuzz run resize_rgba_u16 --features "${{ matrix.feature }}" -- -max_total_time=15
+
+  fuzz_nightly_arm:
+    name: Fuzzing 8bit
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        feature: [ nightly_i8mm ]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
@@ -83,15 +110,13 @@ jobs:
       - run: cargo fuzz run resize_rgba --features ${{ matrix.feature }} -- -max_total_time=15
       - run: cargo fuzz run resize_rgb --features ${{ matrix.feature }} -- -max_total_time=15
       - run: cargo fuzz run resize_cbcr8 --features ${{ matrix.feature }} -- -max_total_time=15
-      - run: cargo fuzz run resize_plane --features ${{ matrix.feature }} -- -max_total_time=15
-      - run: cargo fuzz run colorspaces --features ${{ matrix.feature }},colorspaces -- -max_total_time=10
 
   fuzz_rgba_8bit_x86_64:
     name: Fuzzing 8bit x86_64
     strategy:
       matrix:
         feature: [ sse, avx, "" ]
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
@@ -103,25 +128,12 @@ jobs:
 
   fuzz_rgba_8bit_x86_64_color_spaces:
     name: Fuzzing 8bit x86_64 ColorSpaces
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run colorspaces --features colorspaces -- -max_total_time=10
-
-  fuzz_rgba_8bit_no_rdm:
-    name: Fuzzing 8bit wo RDM
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
-      - run: cargo install cargo-fuzz
-      - run: cargo fuzz run resize_rgba --no-default-features -- -max_total_time=15
-      - run: cargo fuzz run resize_rgb --no-default-features -- -max_total_time=15
-      - run: cargo fuzz run resize_cbcr8 --no-default-features -- -max_total_time=15
-      - run: cargo fuzz run resize_plane --no-default-features -- -max_total_time=15
-      - run: cargo fuzz run resize_rgba_u16 -- -max_total_time=15
 
   fuzz_rgba_high_bit_arm:
     name: Fuzzing High bit-depth ARM

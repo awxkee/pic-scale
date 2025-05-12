@@ -185,7 +185,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
     ) {
         unsafe {
             const PRECISION: i32 = 15;
-            const ROUNDING: i32 = (1 << (PRECISION - 1)) - 1;
+            const ROUNDING: i32 = 1 << (PRECISION - 1);
 
             let init = _mm256_set1_epi32(ROUNDING);
 
@@ -405,7 +405,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row1ExecutionUnit<AR_TYPE, AR_
     unsafe fn pass(&self, src: &[u8], dst: &mut [u8], filter_weights: &FilterWeights<i16>) {
         unsafe {
             const PRECISION: i32 = 16;
-            const ROUNDING: i32 = (1 << (PRECISION - 1)) - 1;
+            const ROUNDING: i32 = 1 << (PRECISION - 1);
 
             let init = _mm_set1_epi32(ROUNDING);
 

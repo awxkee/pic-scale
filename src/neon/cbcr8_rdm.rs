@@ -115,12 +115,12 @@ unsafe fn convolve_horizontal_cbcr_neon_rows_4_u8_impl(
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
         let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        const COMPONENTS: usize = 2;
+        const CN: usize = 2;
 
-        let iter_row0 = row0_ref.chunks_exact_mut(COMPONENTS);
-        let iter_row1 = row1_ref.chunks_exact_mut(COMPONENTS);
-        let iter_row2 = row2_ref.chunks_exact_mut(COMPONENTS);
-        let iter_row3 = row3_ref.chunks_exact_mut(COMPONENTS);
+        let iter_row0 = row0_ref.chunks_exact_mut(CN);
+        let iter_row1 = row1_ref.chunks_exact_mut(CN);
+        let iter_row2 = row2_ref.chunks_exact_mut(CN);
+        let iter_row3 = row3_ref.chunks_exact_mut(CN);
 
         const PRECISION: i32 = 6;
         const ROUNDING_CONST: i16 = 1 << (PRECISION - 1);
@@ -171,7 +171,7 @@ unsafe fn convolve_horizontal_cbcr_neon_rows_4_u8_impl(
                     vreinterpretq_u8_s16(weights),
                     weights_shuffle1,
                 ));
-                let bounds_start = (bounds.start + jx) * COMPONENTS;
+                let bounds_start = (bounds.start + jx) * CN;
 
                 let src_ptr = src0.get_unchecked(bounds_start..);
                 store0 = accumulate_8_horiz(store0, src_ptr.as_ptr(), w0, w1);
@@ -194,7 +194,7 @@ unsafe fn convolve_horizontal_cbcr_neon_rows_4_u8_impl(
                     vreinterpretq_u8_s16(vcombine_s16(vld1_s16(w_ptr.as_ptr()), vdup_n_s16(0))),
                     weights_shuffle,
                 ));
-                let bounds_start = (bounds.start + jx) * COMPONENTS;
+                let bounds_start = (bounds.start + jx) * CN;
 
                 let src_ptr = src0.get_unchecked(bounds_start..);
                 store0 = accumulate_4_horiz(store0, src_ptr.as_ptr(), weights);
@@ -220,7 +220,7 @@ unsafe fn convolve_horizontal_cbcr_neon_rows_4_u8_impl(
                     )),
                     weights_shuffle,
                 ));
-                let bounds_start = (bounds.start + jx) * COMPONENTS;
+                let bounds_start = (bounds.start + jx) * CN;
 
                 let src_ptr = src0.get_unchecked(bounds_start..);
                 store0 = accumulate_1_horiz(store0, src_ptr.as_ptr(), weight);

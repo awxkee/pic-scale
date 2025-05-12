@@ -85,6 +85,27 @@ impl HorizontalConvolutionPass<u8, 3> for ImageStore<'_, u8, 3> {
                         _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rdm_rows_4);
                         _dispatcher_1_row = convolve_horizontal_rgb_neon_rdm_row_one;
                     }
+                    #[cfg(feature = "nightly_i8mm")]
+                    if _scale_factor < 6.5 && std::arch::is_aarch64_feature_detected!("i8mm") {
+                        use crate::neon::{
+                            convolve_horizontal_rgb_neon_row_one_dot,
+                            convolve_horizontal_rgb_neon_rows_4_dot,
+                        };
+                        use crate::rgba_u8::DefaultWeightsConverterQ7;
+                        let _dispatcher_4_rows: Option<
+                            fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i8>),
+                        > = Some(convolve_horizontal_rgb_neon_rows_4_dot);
+                        let _dispatcher_1_row = convolve_horizontal_rgb_neon_row_one_dot;
+                        return convolve_horizontal_dispatch_u8(
+                            self,
+                            filter_weights,
+                            destination,
+                            pool,
+                            _dispatcher_4_rows,
+                            _dispatcher_1_row,
+                            DefaultWeightsConverterQ7::default(),
+                        );
+                    }
                 }
             }
         }
