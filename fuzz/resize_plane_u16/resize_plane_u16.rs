@@ -29,16 +29,32 @@
 
 #![no_main]
 
+use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
-use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16};
+use pic_scale::{
+    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16, WorkloadStrategy,
+};
 
-fuzz_target!(|data: (u16, u16, u16, u16)| {
+#[derive(Clone, Debug, Arbitrary)]
+pub struct SrcImage {
+    pub src_width: u16,
+    pub src_height: u16,
+    pub dst_width: u16,
+    pub dst_height: u16,
+    pub value: u16,
+    pub use_quality: bool,
+    pub premultiply_alpha: bool,
+}
+
+fuzz_target!(|data: SrcImage| {
     resize_rgb(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
-        data.3 as usize,
+        data.src_width as usize,
+        data.src_height as usize,
+        data.dst_width as usize,
+        data.dst_width as usize,
         ResamplingFunction::Lanczos3,
+        data.use_quality,
+        data.value,
     )
 });
 
@@ -48,6 +64,8 @@ fn resize_rgb(
     dst_width: usize,
     dst_height: usize,
     sampler: ResamplingFunction,
+    use_quality: bool,
+    value: u16,
 ) {
     if src_width == 0
         || src_width > 2000
@@ -61,13 +79,19 @@ fn resize_rgb(
         return;
     }
 
-    let store = ImageStore::<u16, 1>::alloc(src_width, src_height);
+    let src_slice = vec![value.min(1023); src_width * src_height];
+    let store = ImageStore::<u16, 1>::borrow(&src_slice, src_width, src_height).unwrap();
     let mut target = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 10);
 
-    let scaler = Scaler::new(sampler);
+    let mut scaler = Scaler::new(sampler);
     scaler.resize_plane_u16(&store, &mut target).unwrap();
+    scaler.set_workload_strategy(if use_quality {
+        WorkloadStrategy::PreferQuality
+    } else {
+        WorkloadStrategy::PreferSpeed
+    });
 
-    let store = ImageStore::<u16, 1>::alloc(src_width, src_height);
+    let store = ImageStore::<u16, 1>::borrow(&src_slice, src_width, src_height).unwrap();
     let mut target16 = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
     scaler.resize_plane_u16(&store, &mut target16).unwrap();
 }

@@ -53,7 +53,7 @@ impl HorizontalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<u8, 1>,
-        _pool: &Option<ThreadPool>,
+        pool: &Option<ThreadPool>,
         _options: ConvolutionOptions,
     ) {
         let _scale_factor = self.height as f32 / destination.height as f32;
@@ -112,7 +112,7 @@ impl HorizontalConvolutionPass<u8, 1> for ImageStore<'_, u8, 1> {
             self,
             filter_weights,
             destination,
-            _pool,
+            pool,
             _dispatcher_4_rows,
             _dispatcher_1_row,
             DefaultWeightsConverter::default(),

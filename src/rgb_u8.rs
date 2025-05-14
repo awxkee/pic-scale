@@ -86,7 +86,7 @@ impl HorizontalConvolutionPass<u8, 3> for ImageStore<'_, u8, 3> {
                         _dispatcher_1_row = convolve_horizontal_rgb_neon_rdm_row_one;
                     }
                     #[cfg(feature = "nightly_i8mm")]
-                    if _scale_factor < 6.5 && std::arch::is_aarch64_feature_detected!("i8mm") {
+                    if _scale_factor < 5.5 && std::arch::is_aarch64_feature_detected!("i8mm") {
                         use crate::neon::{
                             convolve_horizontal_rgb_neon_row_one_dot,
                             convolve_horizontal_rgb_neon_rows_4_dot,

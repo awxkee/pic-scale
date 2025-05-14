@@ -38,10 +38,10 @@ impl HorizontalConvolutionPass<u16, 2> for ImageStore<'_, u16, 2> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<u16, 2>,
-        _pool: &Option<ThreadPool>,
+        pool: &Option<ThreadPool>,
         _: ConvolutionOptions,
     ) {
-        convolve_horizontal_dispatch_u16(self, filter_weights, destination, _pool);
+        convolve_horizontal_dispatch_u16(self, filter_weights, destination, pool);
     }
 }
 
