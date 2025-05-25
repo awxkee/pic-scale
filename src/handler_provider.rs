@@ -759,22 +759,22 @@ pub(crate) fn handle_fixed_column_u8(
     column_handler_fixed_point::<u8, i32>(dst_width, bounds, src, dst, src_stride, weight, 8);
 }
 
-pub(crate) fn handle_fixed_row_u8<const CHANNELS: usize>(
+pub(crate) fn handle_fixed_row_u8<const CN: usize>(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
 ) {
-    convolve_row_handler_fixed_point::<u8, i32, CHANNELS>(src, dst, filter_weights, 8);
+    convolve_row_handler_fixed_point::<u8, i32, CN>(src, dst, filter_weights, 8);
 }
 
-pub(crate) fn handle_fixed_rows_4_u8<const CHANNELS: usize>(
+pub(crate) fn handle_fixed_rows_4_u8<const CN: usize>(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
 ) {
-    convolve_row_handler_fixed_point_4::<u8, i32, CHANNELS>(
+    convolve_row_handler_fixed_point_4::<u8, i32, CN>(
         src,
         src_stride,
         dst,

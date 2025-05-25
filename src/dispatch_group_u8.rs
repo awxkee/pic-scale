@@ -35,10 +35,10 @@ use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use std::sync::Arc;
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn convolve_horizontal_dispatch_u8<V: Send + Sync, const CHANNELS: usize>(
-    image_store: &ImageStore<u8, CHANNELS>,
+pub(crate) fn convolve_horizontal_dispatch_u8<V: Send + Sync, const CN: usize>(
+    image_store: &ImageStore<u8, CN>,
     filter_weights: FilterWeights<f32>,
-    destination: &mut ImageStoreMut<u8, CHANNELS>,
+    destination: &mut ImageStoreMut<u8, CN>,
     pool: &Option<ThreadPool>,
     dispatcher_4_rows: Option<fn(&[u8], usize, &mut [u8], usize, &FilterWeights<V>)>,
     dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<V>),
@@ -99,10 +99,10 @@ pub(crate) fn convolve_horizontal_dispatch_u8<V: Send + Sync, const CHANNELS: us
 }
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn convolve_vertical_dispatch_u8<'a, V: Copy + Send + Sync, const COMPONENTS: usize>(
-    image_store: &ImageStore<u8, COMPONENTS>,
+pub(crate) fn convolve_vertical_dispatch_u8<'a, V: Copy + Send + Sync, const CN: usize>(
+    image_store: &ImageStore<u8, CN>,
     filter_weights: FilterWeights<f32>,
-    destination: &mut ImageStoreMut<'a, u8, COMPONENTS>,
+    destination: &mut ImageStoreMut<'a, u8, CN>,
     pool: &Option<ThreadPool>,
     dispatcher: fn(usize, &FilterBounds, &[u8], &mut [u8], usize, &[V]),
     weights_converter: impl WeightsConverter<V>,
@@ -112,47 +112,40 @@ pub(crate) fn convolve_vertical_dispatch_u8<'a, V: Copy + Send + Sync, const COM
 
     let dst_width = destination.width;
 
+    let approx = weights_converter.prepare_weights(&filter_weights);
+    let process_row = |y: usize, row: &mut [u8]| {
+        let bounds = filter_weights.bounds[y];
+        let filter_offset = y * filter_weights.aligned_size;
+        let weights = &approx.weights[filter_offset..];
+        let source_buffer = image_store.buffer.as_ref();
+
+        dispatcher(
+            dst_width,
+            &bounds,
+            source_buffer,
+            &mut row[..dst_width * CN],
+            src_stride,
+            weights,
+        );
+    };
+
     if let Some(pool) = pool {
-        let approx = weights_converter.prepare_weights(&filter_weights);
         pool.install(|| {
             let destination_image = destination.buffer.borrow_mut();
             destination_image
                 .par_chunks_exact_mut(dst_stride)
                 .enumerate()
                 .for_each(|(y, row)| {
-                    let bounds = filter_weights.bounds[y];
-                    let filter_offset = y * filter_weights.aligned_size;
-                    let weights = &approx.weights[filter_offset..];
-                    let source_buffer = image_store.buffer.as_ref();
-                    dispatcher(
-                        dst_width,
-                        &bounds,
-                        source_buffer,
-                        &mut row[..dst_width * COMPONENTS],
-                        src_stride,
-                        weights,
-                    );
+                    process_row(y, row);
                 });
         });
     } else {
         let destination_image = destination.buffer.borrow_mut();
-        let approx = weights_converter.prepare_weights(&filter_weights);
         destination_image
             .chunks_exact_mut(dst_stride)
             .enumerate()
             .for_each(|(y, row)| {
-                let bounds = filter_weights.bounds[y];
-                let filter_offset = y * filter_weights.aligned_size;
-                let weights = &approx.weights[filter_offset..];
-                let source_buffer = image_store.buffer.as_ref();
-                dispatcher(
-                    dst_width,
-                    &bounds,
-                    source_buffer,
-                    &mut row[..dst_width * COMPONENTS],
-                    src_stride,
-                    weights,
-                );
+                process_row(y, row);
             });
     }
 }

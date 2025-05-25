@@ -170,10 +170,10 @@ impl RowFactoryProducer for u16 {
 }
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn convolve_horizontal_dispatch_u16<const CHANNELS: usize>(
-    image_store: &ImageStore<u16, CHANNELS>,
+pub(crate) fn convolve_horizontal_dispatch_u16<const CN: usize>(
+    image_store: &ImageStore<u16, CN>,
     filter_weights: FilterWeights<f32>,
-    destination: &mut ImageStoreMut<u16, CHANNELS>,
+    destination: &mut ImageStoreMut<u16, CN>,
     pool: &Option<ThreadPool>,
 ) {
     let src = image_store.buffer.as_ref();
@@ -185,7 +185,7 @@ pub(crate) fn convolve_horizontal_dispatch_u16<const CHANNELS: usize>(
 
     if let Some(pool) = pool {
         pool.install(|| {
-            let handler = u16::make_handler::<CHANNELS>(&filter_weights, bit_depth);
+            let handler = u16::make_handler::<CN>(&filter_weights, bit_depth);
 
             dst.par_chunks_exact_mut(dst_stride * 4)
                 .zip(src.par_chunks_exact(src_stride * 4))
@@ -204,7 +204,7 @@ pub(crate) fn convolve_horizontal_dispatch_u16<const CHANNELS: usize>(
                 });
         });
     } else {
-        let handler = u16::make_handler::<CHANNELS>(&filter_weights, bit_depth);
+        let handler = u16::make_handler::<CN>(&filter_weights, bit_depth);
 
         dst.chunks_exact_mut(dst_stride * 4)
             .zip(src.chunks_exact(src_stride * 4))

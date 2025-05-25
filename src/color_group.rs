@@ -34,19 +34,19 @@ use std::ops::{Add, AddAssign, Mul, Shr, ShrAssign, Sub, SubAssign};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct ColorGroup<const COMPS: usize, J: Copy> {
+pub(crate) struct ColorGroup<const CN: usize, J: Copy> {
     pub(crate) r: J,
     pub(crate) g: J,
     pub(crate) b: J,
     pub(crate) a: J,
 }
 
-impl<const COMPS: usize, J> ColorGroup<COMPS, J>
+impl<const CN: usize, J> ColorGroup<CN, J>
 where
     J: Copy + Default,
 {
     #[inline(always)]
-    pub(crate) fn new() -> ColorGroup<COMPS, J> {
+    pub(crate) fn new() -> ColorGroup<CN, J> {
         ColorGroup {
             r: J::default(),
             g: J::default(),
@@ -56,12 +56,12 @@ where
     }
 
     #[inline(always)]
-    pub(crate) fn from_components(r: J, g: J, b: J, a: J) -> ColorGroup<COMPS, J> {
+    pub(crate) fn from_components(r: J, g: J, b: J, a: J) -> ColorGroup<CN, J> {
         ColorGroup { r, g, b, a }
     }
 
     #[inline(always)]
-    pub(crate) fn dup(v: J) -> ColorGroup<COMPS, J> {
+    pub(crate) fn dup(v: J) -> ColorGroup<CN, J> {
         ColorGroup {
             r: v,
             g: v,
@@ -71,7 +71,7 @@ where
     }
 }
 
-impl<const COMPS: usize, J> Mul<J> for ColorGroup<COMPS, J>
+impl<const CN: usize, J> Mul<J> for ColorGroup<CN, J>
 where
     J: Copy + Mul<Output = J> + Default + 'static,
 {
@@ -79,13 +79,13 @@ where
 
     #[inline(always)]
     fn mul(self, rhs: J) -> Self::Output {
-        if COMPS == 1 {
+        if CN == 1 {
             ColorGroup::from_components(self.r * rhs, self.g, self.b, self.a)
-        } else if COMPS == 2 {
+        } else if CN == 2 {
             ColorGroup::from_components(self.r * rhs, self.g * rhs, self.b, self.a)
-        } else if COMPS == 3 {
+        } else if CN == 3 {
             ColorGroup::from_components(self.r * rhs, self.g * rhs, self.b * rhs, self.a)
-        } else if COMPS == 4 {
+        } else if CN == 4 {
             ColorGroup::from_components(self.r * rhs, self.g * rhs, self.b * rhs, self.a * rhs)
         } else {
             unimplemented!();
@@ -93,39 +93,39 @@ where
     }
 }
 
-impl<const COMPS: usize, J> ColorGroup<COMPS, J>
+impl<const CN: usize, J> ColorGroup<CN, J>
 where
     J: Copy + Default + 'static,
 {
     #[inline(always)]
-    pub(crate) fn saturate_narrow<V>(&self, bit_depth: u32) -> ColorGroup<COMPS, V>
+    pub(crate) fn saturate_narrow<V>(&self, bit_depth: u32) -> ColorGroup<CN, V>
     where
         V: Copy + Default,
         J: SaturateNarrow<V>,
     {
-        if COMPS == 1 {
-            ColorGroup::<COMPS, V>::from_components(
+        if CN == 1 {
+            ColorGroup::<CN, V>::from_components(
                 self.r.saturate_narrow(bit_depth),
                 V::default(),
                 V::default(),
                 V::default(),
             )
-        } else if COMPS == 2 {
-            ColorGroup::<COMPS, V>::from_components(
+        } else if CN == 2 {
+            ColorGroup::<CN, V>::from_components(
                 self.r.saturate_narrow(bit_depth),
                 self.g.saturate_narrow(bit_depth),
                 V::default(),
                 V::default(),
             )
-        } else if COMPS == 3 {
-            ColorGroup::<COMPS, V>::from_components(
+        } else if CN == 3 {
+            ColorGroup::<CN, V>::from_components(
                 self.r.saturate_narrow(bit_depth),
                 self.g.saturate_narrow(bit_depth),
                 self.b.saturate_narrow(bit_depth),
                 V::default(),
             )
         } else {
-            ColorGroup::<COMPS, V>::from_components(
+            ColorGroup::<CN, V>::from_components(
                 self.r.saturate_narrow(bit_depth),
                 self.g.saturate_narrow(bit_depth),
                 self.b.saturate_narrow(bit_depth),
@@ -135,21 +135,21 @@ where
     }
 }
 
-impl<const COMPS: usize, J> Mul<ColorGroup<COMPS, J>> for ColorGroup<COMPS, J>
+impl<const CN: usize, J> Mul<ColorGroup<CN, J>> for ColorGroup<CN, J>
 where
     J: Copy + Mul<Output = J> + Default + 'static,
 {
     type Output = Self;
 
     #[inline(always)]
-    fn mul(self, rhs: ColorGroup<COMPS, J>) -> Self::Output {
-        if COMPS == 1 {
+    fn mul(self, rhs: ColorGroup<CN, J>) -> Self::Output {
+        if CN == 1 {
             ColorGroup::from_components(self.r * rhs.r, self.g, self.b, self.a)
-        } else if COMPS == 2 {
+        } else if CN == 2 {
             ColorGroup::from_components(self.r * rhs.r, self.g * rhs.g, self.b, self.a)
-        } else if COMPS == 3 {
+        } else if CN == 3 {
             ColorGroup::from_components(self.r * rhs.r, self.g * rhs.g, self.b * rhs.b, self.a)
-        } else if COMPS == 4 {
+        } else if CN == 4 {
             ColorGroup::from_components(
                 self.r * rhs.r,
                 self.g * rhs.g,
@@ -181,7 +181,7 @@ impl ColorGroup<4, i32> {
     }
 }
 
-impl<const COMPS: usize, J> Sub<J> for ColorGroup<COMPS, J>
+impl<const CN: usize, J> Sub<J> for ColorGroup<CN, J>
 where
     J: Copy + Sub<Output = J> + Default + 'static,
 {
@@ -189,13 +189,13 @@ where
 
     #[inline(always)]
     fn sub(self, rhs: J) -> Self::Output {
-        if COMPS == 1 {
+        if CN == 1 {
             ColorGroup::from_components(self.r - rhs, self.g, self.b, self.a)
-        } else if COMPS == 2 {
+        } else if CN == 2 {
             ColorGroup::from_components(self.r - rhs, self.g - rhs, self.b, self.a)
-        } else if COMPS == 3 {
+        } else if CN == 3 {
             ColorGroup::from_components(self.r - rhs, self.g - rhs, self.b - rhs, self.a)
-        } else if COMPS == 4 {
+        } else if CN == 4 {
             ColorGroup::from_components(self.r - rhs, self.g - rhs, self.b - rhs, self.a - rhs)
         } else {
             unimplemented!();
@@ -203,21 +203,21 @@ where
     }
 }
 
-impl<const COMPS: usize, J> Sub<ColorGroup<COMPS, J>> for ColorGroup<COMPS, J>
+impl<const CN: usize, J> Sub<ColorGroup<CN, J>> for ColorGroup<CN, J>
 where
     J: Copy + Sub<Output = J> + Default + 'static,
 {
     type Output = Self;
 
     #[inline(always)]
-    fn sub(self, rhs: ColorGroup<COMPS, J>) -> Self::Output {
-        if COMPS == 1 {
+    fn sub(self, rhs: ColorGroup<CN, J>) -> Self::Output {
+        if CN == 1 {
             ColorGroup::from_components(self.r - rhs.r, self.g, self.b, self.a)
-        } else if COMPS == 2 {
+        } else if CN == 2 {
             ColorGroup::from_components(self.r - rhs.r, self.g - rhs.g, self.b, self.a)
-        } else if COMPS == 3 {
+        } else if CN == 3 {
             ColorGroup::from_components(self.r - rhs.r, self.g - rhs.g, self.b - rhs.b, self.a)
-        } else if COMPS == 4 {
+        } else if CN == 4 {
             ColorGroup::from_components(
                 self.r - rhs.r,
                 self.g - rhs.g,
@@ -230,21 +230,21 @@ where
     }
 }
 
-impl<const COMPS: usize, J> Add<ColorGroup<COMPS, J>> for ColorGroup<COMPS, J>
+impl<const CN: usize, J> Add<ColorGroup<CN, J>> for ColorGroup<CN, J>
 where
     J: Copy + Add<Output = J> + Default + 'static,
 {
     type Output = Self;
 
     #[inline(always)]
-    fn add(self, rhs: ColorGroup<COMPS, J>) -> Self::Output {
-        if COMPS == 1 {
+    fn add(self, rhs: ColorGroup<CN, J>) -> Self::Output {
+        if CN == 1 {
             ColorGroup::from_components(self.r + rhs.r, self.g, self.b, self.a)
-        } else if COMPS == 2 {
+        } else if CN == 2 {
             ColorGroup::from_components(self.r + rhs.r, self.g + rhs.g, self.b, self.a)
-        } else if COMPS == 3 {
+        } else if CN == 3 {
             ColorGroup::from_components(self.r + rhs.r, self.g + rhs.g, self.b + rhs.b, self.a)
-        } else if COMPS == 4 {
+        } else if CN == 4 {
             ColorGroup::from_components(
                 self.r + rhs.r,
                 self.g + rhs.g,
@@ -257,7 +257,7 @@ where
     }
 }
 
-impl<const COMPS: usize, J> Add<J> for ColorGroup<COMPS, J>
+impl<const CN: usize, J> Add<J> for ColorGroup<CN, J>
 where
     J: Copy + Add<Output = J> + Default + 'static,
 {
@@ -265,13 +265,13 @@ where
 
     #[inline(always)]
     fn add(self, rhs: J) -> Self::Output {
-        if COMPS == 1 {
+        if CN == 1 {
             ColorGroup::from_components(self.r + rhs, self.g, self.b, self.a)
-        } else if COMPS == 2 {
+        } else if CN == 2 {
             ColorGroup::from_components(self.r + rhs, self.g + rhs, self.b, self.a)
-        } else if COMPS == 3 {
+        } else if CN == 3 {
             ColorGroup::from_components(self.r + rhs, self.g + rhs, self.b + rhs, self.a)
-        } else if COMPS == 4 {
+        } else if CN == 4 {
             ColorGroup::from_components(self.r + rhs, self.g + rhs, self.b + rhs, self.a + rhs)
         } else {
             unimplemented!("Not implemented.");
@@ -279,7 +279,7 @@ where
     }
 }
 
-impl<const COMPS: usize, J> Shr<J> for ColorGroup<COMPS, J>
+impl<const CN: usize, J> Shr<J> for ColorGroup<CN, J>
 where
     J: Copy + Shr<J, Output = J> + Default + 'static,
 {
@@ -287,13 +287,13 @@ where
 
     #[inline(always)]
     fn shr(self, rhs: J) -> Self::Output {
-        if COMPS == 1 {
+        if CN == 1 {
             ColorGroup::from_components(self.r >> rhs, self.g, self.b, self.a)
-        } else if COMPS == 2 {
+        } else if CN == 2 {
             ColorGroup::from_components(self.r >> rhs, self.g >> rhs, self.b, self.a)
-        } else if COMPS == 3 {
+        } else if CN == 3 {
             ColorGroup::from_components(self.r >> rhs, self.g >> rhs, self.b >> rhs, self.a)
-        } else if COMPS == 4 {
+        } else if CN == 4 {
             ColorGroup::from_components(self.r >> rhs, self.g >> rhs, self.b >> rhs, self.a >> rhs)
         } else {
             unimplemented!("Not implemented.");
@@ -301,22 +301,22 @@ where
     }
 }
 
-impl<const COMPS: usize, J> ShrAssign<J> for ColorGroup<COMPS, J>
+impl<const CN: usize, J> ShrAssign<J> for ColorGroup<CN, J>
 where
     J: Copy + ShrAssign<J> + Default + 'static,
 {
     #[inline(always)]
     fn shr_assign(&mut self, rhs: J) {
-        if COMPS == 1 {
+        if CN == 1 {
             self.r >>= rhs;
-        } else if COMPS == 2 {
+        } else if CN == 2 {
             self.r >>= rhs;
             self.g >>= rhs;
-        } else if COMPS == 3 {
+        } else if CN == 3 {
             self.r >>= rhs;
             self.g >>= rhs;
             self.b >>= rhs;
-        } else if COMPS == 4 {
+        } else if CN == 4 {
             self.r >>= rhs;
             self.g >>= rhs;
             self.b >>= rhs;
@@ -325,26 +325,26 @@ where
     }
 }
 
-impl<const COMPS: usize, J> MulAdd<ColorGroup<COMPS, J>, J> for ColorGroup<COMPS, J>
+impl<const CN: usize, J> MulAdd<ColorGroup<CN, J>, J> for ColorGroup<CN, J>
 where
     J: Copy + MulAdd<J, Output = J> + Default + 'static + Mul<J, Output = J> + Add<J, Output = J>,
 {
     type Output = Self;
 
     #[inline(always)]
-    fn mul_add(self, a: ColorGroup<COMPS, J>, b: J) -> Self::Output {
-        if COMPS == 1 {
+    fn mul_add(self, a: ColorGroup<CN, J>, b: J) -> Self::Output {
+        if CN == 1 {
             ColorGroup::from_components(mlaf(self.r, a.r, b), self.g, self.b, self.a)
-        } else if COMPS == 2 {
+        } else if CN == 2 {
             ColorGroup::from_components(mlaf(self.r, a.r, b), mlaf(self.g, a.g, b), self.b, self.a)
-        } else if COMPS == 3 {
+        } else if CN == 3 {
             ColorGroup::from_components(
                 mlaf(self.r, a.r, b),
                 mlaf(self.g, a.g, b),
                 mlaf(self.b, a.b, b),
                 self.a,
             )
-        } else if COMPS == 4 {
+        } else if CN == 4 {
             ColorGroup::from_components(
                 mlaf(self.r, a.r, b),
                 mlaf(self.g, a.g, b),
@@ -357,22 +357,22 @@ where
     }
 }
 
-impl<const COMPS: usize, J> AddAssign<ColorGroup<COMPS, J>> for ColorGroup<COMPS, J>
+impl<const CN: usize, J> AddAssign<ColorGroup<CN, J>> for ColorGroup<CN, J>
 where
     J: Copy + AddAssign,
 {
     #[inline(always)]
-    fn add_assign(&mut self, rhs: ColorGroup<COMPS, J>) {
-        if COMPS == 1 {
+    fn add_assign(&mut self, rhs: ColorGroup<CN, J>) {
+        if CN == 1 {
             self.r += rhs.r;
-        } else if COMPS == 2 {
+        } else if CN == 2 {
             self.r += rhs.r;
             self.g += rhs.g;
-        } else if COMPS == 3 {
+        } else if CN == 3 {
             self.r += rhs.r;
             self.g += rhs.g;
             self.b += rhs.b;
-        } else if COMPS == 4 {
+        } else if CN == 4 {
             self.r += rhs.r;
             self.g += rhs.g;
             self.b += rhs.b;
@@ -381,22 +381,22 @@ where
     }
 }
 
-impl<const COMPS: usize, J> SubAssign<ColorGroup<COMPS, J>> for ColorGroup<COMPS, J>
+impl<const CN: usize, J> SubAssign<ColorGroup<CN, J>> for ColorGroup<CN, J>
 where
     J: Copy + SubAssign,
 {
     #[inline(always)]
-    fn sub_assign(&mut self, rhs: ColorGroup<COMPS, J>) {
-        if COMPS == 1 {
+    fn sub_assign(&mut self, rhs: ColorGroup<CN, J>) {
+        if CN == 1 {
             self.r -= rhs.r;
-        } else if COMPS == 2 {
+        } else if CN == 2 {
             self.r -= rhs.r;
             self.g -= rhs.g;
-        } else if COMPS == 3 {
+        } else if CN == 3 {
             self.r -= rhs.r;
             self.g -= rhs.g;
             self.b -= rhs.b;
-        } else if COMPS == 4 {
+        } else if CN == 4 {
             self.r -= rhs.r;
             self.g -= rhs.g;
             self.b -= rhs.b;
@@ -405,7 +405,7 @@ where
     }
 }
 
-impl<const COMPS: usize, J> Default for ColorGroup<COMPS, J>
+impl<const CN: usize, J> Default for ColorGroup<CN, J>
 where
     J: Copy + FromPrimitive + Default,
 {

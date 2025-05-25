@@ -51,7 +51,7 @@ fn resize_plane(
 
 fn main() {
     // test_fast_image();
-    let img = ImageReader::open("./assets/asset.jpg")
+    let img = ImageReader::open("./assets/ycgco_8b_422_full.avif")
         .unwrap()
         .decode()
         .unwrap();
@@ -59,7 +59,7 @@ fn main() {
     let tt = img.to_rgb8();
     tt.save("orig.png").unwrap();
     let dimensions = img.dimensions();
-    let transient = img.to_luma_alpha8();
+    let transient = img.to_rgb8();
     let mut bytes = Vec::from(transient.as_bytes());
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
@@ -137,17 +137,14 @@ fn main() {
         .collect::<Vec<_>>();
 
     let mut store =
-        CbCr8ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize)
-            .unwrap();
+        Rgb8ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     store.bit_depth = 8;
-    let mut dst_store = CbCr8ImageStoreMut::alloc_with_depth(
+    let mut dst_store = Rgb8ImageStoreMut::alloc_with_depth(
         dimensions.0 as usize / 2,
         dimensions.1 as usize / 2,
         16,
     );
-    scaler
-        .resize_gray_alpha(&store, &mut dst_store, false)
-        .unwrap();
+    scaler.resize_rgb(&store, &mut dst_store).unwrap();
     //
     // let elapsed_time = start_time.elapsed();
     // // Print the elapsed time in milliseconds
@@ -218,7 +215,7 @@ fn main() {
             &dst,
             dst_store.width as u32,
             dst_store.height as u32,
-            image::ColorType::La8,
+            image::ColorType::Rgb8,
         )
         .unwrap();
     }

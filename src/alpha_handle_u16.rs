@@ -93,13 +93,13 @@ pub(crate) fn premultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], max_color
         let recip_max_colors = 1. / max_colors as f32;
         for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
             let a = src[3] as u32;
-            dst[0] =
-                (((src[0] as u32 * a) as f32 * recip_max_colors) as u32).min(max_colors) as u16;
-            dst[1] =
-                (((src[1] as u32 * a) as f32 * recip_max_colors) as u32).min(max_colors) as u16;
-            dst[2] =
-                (((src[2] as u32 * a) as f32 * recip_max_colors) as u32).min(max_colors) as u16;
-            dst[3] = (((a * a) as f32 * recip_max_colors) as u32).min(max_colors) as u16;
+            dst[0] = (((src[0] as u32 * a) as f32 * recip_max_colors).round() as u32)
+                .min(max_colors) as u16;
+            dst[1] = (((src[1] as u32 * a) as f32 * recip_max_colors).round() as u32)
+                .min(max_colors) as u16;
+            dst[2] = (((src[2] as u32 * a) as f32 * recip_max_colors).round() as u32)
+                .min(max_colors) as u16;
+            dst[3] = (((a * a) as f32 * recip_max_colors).round() as u32).min(max_colors) as u16;
         }
     }
 }
@@ -127,9 +127,9 @@ pub(crate) fn premultiply_alpha_gray_alpha_row(dst: &mut [u16], src: &[u16], max
         let recip_max_colors = 1. / max_colors as f32;
         for (dst, src) in dst.chunks_exact_mut(2).zip(src.chunks_exact(2)) {
             let a = src[1] as u32;
-            dst[0] =
-                (((src[0] as u32 * a) as f32 * recip_max_colors) as u32).min(max_colors) as u16;
-            dst[1] = (((a * a) as f32 * recip_max_colors) as u32).min(max_colors) as u16;
+            dst[0] = (((src[0] as u32 * a) as f32 * recip_max_colors).round() as u32)
+                .min(max_colors) as u16;
+            dst[1] = (((a * a) as f32 * recip_max_colors).round() as u32).min(max_colors) as u16;
         }
     }
 }

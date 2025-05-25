@@ -49,7 +49,7 @@ pub(crate) fn convolve_column_handler_floating_point_4<
         + Default
         + MixedStorage<T>,
     F: Copy + 'static + AsPrimitive<J>,
-    const CHANNELS: usize,
+    const CN: usize,
 >(
     src: &[T],
     src_stride: usize,
@@ -61,10 +61,10 @@ pub(crate) fn convolve_column_handler_floating_point_4<
 ) where
     i32: AsPrimitive<J>,
 {
-    let mut sums0 = ColorGroup::<CHANNELS, J>::dup(0.as_());
-    let mut sums1 = ColorGroup::<CHANNELS, J>::dup(0.as_());
-    let mut sums2 = ColorGroup::<CHANNELS, J>::dup(0.as_());
-    let mut sums3 = ColorGroup::<CHANNELS, J>::dup(0.as_());
+    let mut sums0 = ColorGroup::<CN, J>::dup(0.as_());
+    let mut sums1 = ColorGroup::<CN, J>::dup(0.as_());
+    let mut sums2 = ColorGroup::<CN, J>::dup(0.as_());
+    let mut sums3 = ColorGroup::<CN, J>::dup(0.as_());
 
     let v_start_px = x;
 
@@ -77,21 +77,17 @@ pub(crate) fn convolve_column_handler_floating_point_4<
         let weight1 = weights[1].as_();
         let offset0 = src_stride * bounds_start + v_start_px;
         let offset1 = src_stride * (bounds_start + 1) + v_start_px;
-        let src_ptr0 = &src[offset0..(offset0 + CHANNELS * 4)];
-        let src_ptr1 = &src[offset1..(offset1 + CHANNELS * 4)];
+        let src_ptr0 = &src[offset0..(offset0 + CN * 4)];
+        let src_ptr1 = &src[offset1..(offset1 + CN * 4)];
 
-        sums0 = (ldg_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
-            .mul_add(ldg_with_offset!(src_ptr1, CHANNELS, 0, J), weight1);
-        sums1 = (ldg_with_offset!(src_ptr0, CHANNELS, CHANNELS, J) * weight0)
-            .mul_add(ldg_with_offset!(src_ptr1, CHANNELS, CHANNELS, J), weight1);
-        sums2 = (ldg_with_offset!(src_ptr0, CHANNELS, CHANNELS * 2, J) * weight0).mul_add(
-            ldg_with_offset!(src_ptr1, CHANNELS, CHANNELS * 2, J),
-            weight1,
-        );
-        sums3 = (ldg_with_offset!(src_ptr0, CHANNELS, CHANNELS * 3, J) * weight0).mul_add(
-            ldg_with_offset!(src_ptr1, CHANNELS, CHANNELS * 3, J),
-            weight1,
-        );
+        sums0 = (ldg_with_offset!(src_ptr0, CN, 0, J) * weight0)
+            .mul_add(ldg_with_offset!(src_ptr1, CN, 0, J), weight1);
+        sums1 = (ldg_with_offset!(src_ptr0, CN, CN, J) * weight0)
+            .mul_add(ldg_with_offset!(src_ptr1, CN, CN, J), weight1);
+        sums2 = (ldg_with_offset!(src_ptr0, CN, CN * 2, J) * weight0)
+            .mul_add(ldg_with_offset!(src_ptr1, CN, CN * 2, J), weight1);
+        sums3 = (ldg_with_offset!(src_ptr0, CN, CN * 3, J) * weight0)
+            .mul_add(ldg_with_offset!(src_ptr1, CN, CN * 3, J), weight1);
     } else if bounds_size == 3 {
         let weights = &filter[0..3];
         let weight0 = weights[0].as_();
@@ -100,37 +96,25 @@ pub(crate) fn convolve_column_handler_floating_point_4<
         let offset0 = src_stride * bounds_start + v_start_px;
         let offset1 = src_stride * (bounds_start + 1) + v_start_px;
         let offset2 = src_stride * (bounds_start + 2) + v_start_px;
-        let src_ptr0 = &src[offset0..(offset0 + CHANNELS * 4)];
-        let src_ptr1 = &src[offset1..(offset1 + CHANNELS * 4)];
-        let src_ptr2 = &src[offset2..(offset2 + CHANNELS * 4)];
+        let src_ptr0 = &src[offset0..(offset0 + CN * 4)];
+        let src_ptr1 = &src[offset1..(offset1 + CN * 4)];
+        let src_ptr2 = &src[offset2..(offset2 + CN * 4)];
 
-        sums0 = (ldg_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
-            .mul_add(ldg_with_offset!(src_ptr1, CHANNELS, 0, J), weight1)
-            .mul_add(ldg_with_offset!(src_ptr2, CHANNELS, 0, J), weight2);
+        sums0 = (ldg_with_offset!(src_ptr0, CN, 0, J) * weight0)
+            .mul_add(ldg_with_offset!(src_ptr1, CN, 0, J), weight1)
+            .mul_add(ldg_with_offset!(src_ptr2, CN, 0, J), weight2);
 
-        sums1 = (ldg_with_offset!(src_ptr0, CHANNELS, CHANNELS, J) * weight0)
-            .mul_add(ldg_with_offset!(src_ptr1, CHANNELS, CHANNELS, J), weight1)
-            .mul_add(ldg_with_offset!(src_ptr2, CHANNELS, CHANNELS, J), weight2);
+        sums1 = (ldg_with_offset!(src_ptr0, CN, CN, J) * weight0)
+            .mul_add(ldg_with_offset!(src_ptr1, CN, CN, J), weight1)
+            .mul_add(ldg_with_offset!(src_ptr2, CN, CN, J), weight2);
 
-        sums2 = (ldg_with_offset!(src_ptr0, CHANNELS, CHANNELS * 2, J) * weight0)
-            .mul_add(
-                ldg_with_offset!(src_ptr1, CHANNELS, CHANNELS * 2, J),
-                weight1,
-            )
-            .mul_add(
-                ldg_with_offset!(src_ptr2, CHANNELS, CHANNELS * 2, J),
-                weight2,
-            );
+        sums2 = (ldg_with_offset!(src_ptr0, CN, CN * 2, J) * weight0)
+            .mul_add(ldg_with_offset!(src_ptr1, CN, CN * 2, J), weight1)
+            .mul_add(ldg_with_offset!(src_ptr2, CN, CN * 2, J), weight2);
 
-        sums3 = (ldg_with_offset!(src_ptr0, CHANNELS, CHANNELS * 3, J) * weight0)
-            .mul_add(
-                ldg_with_offset!(src_ptr1, CHANNELS, CHANNELS * 3, J),
-                weight1,
-            )
-            .mul_add(
-                ldg_with_offset!(src_ptr2, CHANNELS, CHANNELS * 3, J),
-                weight2,
-            );
+        sums3 = (ldg_with_offset!(src_ptr0, CN, CN * 3, J) * weight0)
+            .mul_add(ldg_with_offset!(src_ptr1, CN, CN * 3, J), weight1)
+            .mul_add(ldg_with_offset!(src_ptr2, CN, CN * 3, J), weight2);
     } else if bounds_size == 4 {
         let weights = &filter[0..4];
         let weight0 = weights[0].as_();
@@ -141,48 +125,30 @@ pub(crate) fn convolve_column_handler_floating_point_4<
         let offset1 = src_stride * (bounds_start + 1) + v_start_px;
         let offset2 = src_stride * (bounds_start + 2) + v_start_px;
         let offset3 = src_stride * (bounds_start + 3) + v_start_px;
-        let src_ptr0 = &src[offset0..(offset0 + CHANNELS * 4)];
-        let src_ptr1 = &src[offset1..(offset1 + CHANNELS * 4)];
-        let src_ptr2 = &src[offset2..(offset2 + CHANNELS * 4)];
-        let src_ptr3 = &src[offset3..(offset3 + CHANNELS * 4)];
+        let src_ptr0 = &src[offset0..(offset0 + CN * 4)];
+        let src_ptr1 = &src[offset1..(offset1 + CN * 4)];
+        let src_ptr2 = &src[offset2..(offset2 + CN * 4)];
+        let src_ptr3 = &src[offset3..(offset3 + CN * 4)];
 
-        sums0 = (ldg_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
-            .mul_add(ldg_with_offset!(src_ptr1, CHANNELS, 0, J), weight1)
-            .mul_add(ldg_with_offset!(src_ptr2, CHANNELS, 0, J), weight2)
-            .mul_add(ldg_with_offset!(src_ptr3, CHANNELS, 0, J), weight3);
+        sums0 = (ldg_with_offset!(src_ptr0, CN, 0, J) * weight0)
+            .mul_add(ldg_with_offset!(src_ptr1, CN, 0, J), weight1)
+            .mul_add(ldg_with_offset!(src_ptr2, CN, 0, J), weight2)
+            .mul_add(ldg_with_offset!(src_ptr3, CN, 0, J), weight3);
 
-        sums1 = (ldg_with_offset!(src_ptr0, CHANNELS, CHANNELS, J) * weight0)
-            .mul_add(ldg_with_offset!(src_ptr1, CHANNELS, CHANNELS, J), weight1)
-            .mul_add(ldg_with_offset!(src_ptr2, CHANNELS, CHANNELS, J), weight2)
-            .mul_add(ldg_with_offset!(src_ptr3, CHANNELS, CHANNELS, J), weight3);
+        sums1 = (ldg_with_offset!(src_ptr0, CN, CN, J) * weight0)
+            .mul_add(ldg_with_offset!(src_ptr1, CN, CN, J), weight1)
+            .mul_add(ldg_with_offset!(src_ptr2, CN, CN, J), weight2)
+            .mul_add(ldg_with_offset!(src_ptr3, CN, CN, J), weight3);
 
-        sums2 = (ldg_with_offset!(src_ptr0, CHANNELS, CHANNELS * 2, J) * weight0)
-            .mul_add(
-                ldg_with_offset!(src_ptr1, CHANNELS, CHANNELS * 2, J),
-                weight1,
-            )
-            .mul_add(
-                ldg_with_offset!(src_ptr2, CHANNELS, CHANNELS * 2, J),
-                weight2,
-            )
-            .mul_add(
-                ldg_with_offset!(src_ptr3, CHANNELS, CHANNELS * 2, J),
-                weight3,
-            );
+        sums2 = (ldg_with_offset!(src_ptr0, CN, CN * 2, J) * weight0)
+            .mul_add(ldg_with_offset!(src_ptr1, CN, CN * 2, J), weight1)
+            .mul_add(ldg_with_offset!(src_ptr2, CN, CN * 2, J), weight2)
+            .mul_add(ldg_with_offset!(src_ptr3, CN, CN * 2, J), weight3);
 
-        sums3 = (ldg_with_offset!(src_ptr0, CHANNELS, CHANNELS * 3, J) * weight0)
-            .mul_add(
-                ldg_with_offset!(src_ptr1, CHANNELS, CHANNELS * 3, J),
-                weight1,
-            )
-            .mul_add(
-                ldg_with_offset!(src_ptr2, CHANNELS, CHANNELS * 3, J),
-                weight2,
-            )
-            .mul_add(
-                ldg_with_offset!(src_ptr3, CHANNELS, CHANNELS * 3, J),
-                weight3,
-            );
+        sums3 = (ldg_with_offset!(src_ptr0, CN, CN * 3, J) * weight0)
+            .mul_add(ldg_with_offset!(src_ptr1, CN, CN * 3, J), weight1)
+            .mul_add(ldg_with_offset!(src_ptr2, CN, CN * 3, J), weight2)
+            .mul_add(ldg_with_offset!(src_ptr3, CN, CN * 3, J), weight3);
     } else if bounds_size == 6 {
         let weights = &filter[0..6];
         let weight0 = weights[0].as_();
@@ -197,81 +163,51 @@ pub(crate) fn convolve_column_handler_floating_point_4<
         let offset3 = src_stride * (bounds_start + 3) + v_start_px;
         let offset4 = src_stride * (bounds_start + 4) + v_start_px;
         let offset5 = src_stride * (bounds_start + 5) + v_start_px;
-        let src_ptr0 = &src[offset0..(offset0 + CHANNELS * 4)];
-        let src_ptr1 = &src[offset1..(offset1 + CHANNELS * 4)];
-        let src_ptr2 = &src[offset2..(offset2 + CHANNELS * 4)];
-        let src_ptr3 = &src[offset3..(offset3 + CHANNELS * 4)];
-        let src_ptr4 = &src[offset4..(offset4 + CHANNELS * 4)];
-        let src_ptr5 = &src[offset5..(offset5 + CHANNELS * 4)];
+        let src_ptr0 = &src[offset0..(offset0 + CN * 4)];
+        let src_ptr1 = &src[offset1..(offset1 + CN * 4)];
+        let src_ptr2 = &src[offset2..(offset2 + CN * 4)];
+        let src_ptr3 = &src[offset3..(offset3 + CN * 4)];
+        let src_ptr4 = &src[offset4..(offset4 + CN * 4)];
+        let src_ptr5 = &src[offset5..(offset5 + CN * 4)];
 
-        sums0 = (ldg_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
-            .mul_add(ldg_with_offset!(src_ptr1, CHANNELS, 0, J), weight1)
-            .mul_add(ldg_with_offset!(src_ptr2, CHANNELS, 0, J), weight2)
-            .mul_add(ldg_with_offset!(src_ptr3, CHANNELS, 0, J), weight3)
-            .mul_add(ldg_with_offset!(src_ptr4, CHANNELS, 0, J), weight4)
-            .mul_add(ldg_with_offset!(src_ptr5, CHANNELS, 0, J), weight5);
+        sums0 = (ldg_with_offset!(src_ptr0, CN, 0, J) * weight0)
+            .mul_add(ldg_with_offset!(src_ptr1, CN, 0, J), weight1)
+            .mul_add(ldg_with_offset!(src_ptr2, CN, 0, J), weight2)
+            .mul_add(ldg_with_offset!(src_ptr3, CN, 0, J), weight3)
+            .mul_add(ldg_with_offset!(src_ptr4, CN, 0, J), weight4)
+            .mul_add(ldg_with_offset!(src_ptr5, CN, 0, J), weight5);
 
-        sums1 = (ldg_with_offset!(src_ptr0, CHANNELS, CHANNELS, J) * weight0)
-            .mul_add(ldg_with_offset!(src_ptr1, CHANNELS, CHANNELS, J), weight1)
-            .mul_add(ldg_with_offset!(src_ptr2, CHANNELS, CHANNELS, J), weight2)
-            .mul_add(ldg_with_offset!(src_ptr3, CHANNELS, CHANNELS, J), weight3)
-            .mul_add(ldg_with_offset!(src_ptr4, CHANNELS, CHANNELS, J), weight4)
-            .mul_add(ldg_with_offset!(src_ptr5, CHANNELS, CHANNELS, J), weight5);
+        sums1 = (ldg_with_offset!(src_ptr0, CN, CN, J) * weight0)
+            .mul_add(ldg_with_offset!(src_ptr1, CN, CN, J), weight1)
+            .mul_add(ldg_with_offset!(src_ptr2, CN, CN, J), weight2)
+            .mul_add(ldg_with_offset!(src_ptr3, CN, CN, J), weight3)
+            .mul_add(ldg_with_offset!(src_ptr4, CN, CN, J), weight4)
+            .mul_add(ldg_with_offset!(src_ptr5, CN, CN, J), weight5);
 
-        sums2 = (ldg_with_offset!(src_ptr0, CHANNELS, CHANNELS * 2, J) * weight0)
-            .mul_add(
-                ldg_with_offset!(src_ptr1, CHANNELS, CHANNELS * 2, J),
-                weight1,
-            )
-            .mul_add(
-                ldg_with_offset!(src_ptr2, CHANNELS, CHANNELS * 2, J),
-                weight2,
-            )
-            .mul_add(
-                ldg_with_offset!(src_ptr3, CHANNELS, CHANNELS * 2, J),
-                weight3,
-            )
-            .mul_add(
-                ldg_with_offset!(src_ptr4, CHANNELS, CHANNELS * 2, J),
-                weight4,
-            )
-            .mul_add(
-                ldg_with_offset!(src_ptr5, CHANNELS, CHANNELS * 2, J),
-                weight5,
-            );
+        sums2 = (ldg_with_offset!(src_ptr0, CN, CN * 2, J) * weight0)
+            .mul_add(ldg_with_offset!(src_ptr1, CN, CN * 2, J), weight1)
+            .mul_add(ldg_with_offset!(src_ptr2, CN, CN * 2, J), weight2)
+            .mul_add(ldg_with_offset!(src_ptr3, CN, CN * 2, J), weight3)
+            .mul_add(ldg_with_offset!(src_ptr4, CN, CN * 2, J), weight4)
+            .mul_add(ldg_with_offset!(src_ptr5, CN, CN * 2, J), weight5);
 
-        sums3 = (ldg_with_offset!(src_ptr0, CHANNELS, CHANNELS * 3, J) * weight0)
-            .mul_add(
-                ldg_with_offset!(src_ptr1, CHANNELS, CHANNELS * 3, J),
-                weight1,
-            )
-            .mul_add(
-                ldg_with_offset!(src_ptr2, CHANNELS, CHANNELS * 3, J),
-                weight2,
-            )
-            .mul_add(
-                ldg_with_offset!(src_ptr3, CHANNELS, CHANNELS * 3, J),
-                weight3,
-            )
-            .mul_add(
-                ldg_with_offset!(src_ptr4, CHANNELS, CHANNELS * 3, J),
-                weight4,
-            )
-            .mul_add(
-                ldg_with_offset!(src_ptr5, CHANNELS, CHANNELS * 3, J),
-                weight5,
-            );
+        sums3 = (ldg_with_offset!(src_ptr0, CN, CN * 3, J) * weight0)
+            .mul_add(ldg_with_offset!(src_ptr1, CN, CN * 3, J), weight1)
+            .mul_add(ldg_with_offset!(src_ptr2, CN, CN * 3, J), weight2)
+            .mul_add(ldg_with_offset!(src_ptr3, CN, CN * 3, J), weight3)
+            .mul_add(ldg_with_offset!(src_ptr4, CN, CN * 3, J), weight4)
+            .mul_add(ldg_with_offset!(src_ptr5, CN, CN * 3, J), weight5);
     } else {
         for (j, &k_weight) in filter.iter().take(bounds.size).enumerate() {
             let py = bounds_start + j;
             let weight = k_weight.as_();
             let offset = src_stride * py + v_start_px;
-            let src_ptr = &src[offset..(offset + CHANNELS * 4)];
+            let src_ptr = &src[offset..(offset + CN * 4)];
 
-            let new_px0 = ldg_with_offset!(src_ptr, CHANNELS, 0, J);
-            let new_px1 = ldg_with_offset!(src_ptr, CHANNELS, CHANNELS, J);
-            let new_px2 = ldg_with_offset!(src_ptr, CHANNELS, CHANNELS * 2, J);
-            let new_px3 = ldg_with_offset!(src_ptr, CHANNELS, CHANNELS * 3, J);
+            let new_px0 = ldg_with_offset!(src_ptr, CN, 0, J);
+            let new_px1 = ldg_with_offset!(src_ptr, CN, CN, J);
+            let new_px2 = ldg_with_offset!(src_ptr, CN, CN * 2, J);
+            let new_px3 = ldg_with_offset!(src_ptr, CN, CN * 3, J);
 
             sums0 = sums0.mul_add(new_px0, weight);
             sums1 = sums1.mul_add(new_px1, weight);
@@ -280,27 +216,12 @@ pub(crate) fn convolve_column_handler_floating_point_4<
         }
     }
 
-    let v_dst = &mut dst[v_start_px..(v_start_px + CHANNELS * 4)];
+    let v_dst = &mut dst[v_start_px..(v_start_px + CN * 4)];
 
-    st_g_mixed!(sums0, &mut v_dst[..CHANNELS], CHANNELS, bit_depth);
-    st_g_mixed!(
-        sums1,
-        &mut v_dst[CHANNELS..CHANNELS * 2],
-        CHANNELS,
-        bit_depth
-    );
-    st_g_mixed!(
-        sums2,
-        &mut v_dst[CHANNELS * 2..CHANNELS * 3],
-        CHANNELS,
-        bit_depth
-    );
-    st_g_mixed!(
-        sums3,
-        &mut v_dst[CHANNELS * 3..CHANNELS * 4],
-        CHANNELS,
-        bit_depth
-    );
+    st_g_mixed!(sums0, &mut v_dst[..CN], CN, bit_depth);
+    st_g_mixed!(sums1, &mut v_dst[CN..CN * 2], CN, bit_depth);
+    st_g_mixed!(sums2, &mut v_dst[CN * 2..CN * 3], CN, bit_depth);
+    st_g_mixed!(sums3, &mut v_dst[CN * 3..CN * 4], CN, bit_depth);
 }
 
 #[inline(always)]
@@ -319,7 +240,7 @@ pub(crate) fn convolve_column_handler_floating_point<
         + MixedStorage<T>
         + Default,
     F: Copy + 'static + Float + AsPrimitive<J>,
-    const CHANNELS: usize,
+    const CN: usize,
 >(
     src: &[T],
     src_stride: usize,
@@ -331,7 +252,7 @@ pub(crate) fn convolve_column_handler_floating_point<
 ) where
     i32: AsPrimitive<J>,
 {
-    let mut sums0 = ColorGroup::<CHANNELS, J>::dup(0.as_());
+    let mut sums0 = ColorGroup::<CN, J>::dup(0.as_());
 
     let v_start_px = x;
 
@@ -344,11 +265,11 @@ pub(crate) fn convolve_column_handler_floating_point<
         let weight1 = weights[1].as_();
         let offset0 = src_stride * bounds_start + v_start_px;
         let offset1 = src_stride * (bounds_start + 1) + v_start_px;
-        let src_ptr0 = &src[offset0..(offset0 + CHANNELS)];
-        let src_ptr1 = &src[offset1..(offset1 + CHANNELS)];
+        let src_ptr0 = &src[offset0..(offset0 + CN)];
+        let src_ptr1 = &src[offset1..(offset1 + CN)];
 
-        sums0 = (ldg_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
-            .mul_add(ldg_with_offset!(src_ptr1, CHANNELS, 0, J), weight1);
+        sums0 = (ldg_with_offset!(src_ptr0, CN, 0, J) * weight0)
+            .mul_add(ldg_with_offset!(src_ptr1, CN, 0, J), weight1);
     } else if bounds_size == 3 {
         let weights = &filter[0..3];
         let weight0 = weights[0].as_();
@@ -357,13 +278,13 @@ pub(crate) fn convolve_column_handler_floating_point<
         let offset0 = src_stride * bounds_start + v_start_px;
         let offset1 = src_stride * (bounds_start + 1) + v_start_px;
         let offset2 = src_stride * (bounds_start + 2) + v_start_px;
-        let src_ptr0 = &src[offset0..(offset0 + CHANNELS)];
-        let src_ptr1 = &src[offset1..(offset1 + CHANNELS)];
-        let src_ptr2 = &src[offset2..(offset2 + CHANNELS)];
+        let src_ptr0 = &src[offset0..(offset0 + CN)];
+        let src_ptr1 = &src[offset1..(offset1 + CN)];
+        let src_ptr2 = &src[offset2..(offset2 + CN)];
 
-        sums0 = (ldg_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
-            .mul_add(ldg_with_offset!(src_ptr1, CHANNELS, 0, J), weight1)
-            .mul_add(ldg_with_offset!(src_ptr2, CHANNELS, 0, J), weight2);
+        sums0 = (ldg_with_offset!(src_ptr0, CN, 0, J) * weight0)
+            .mul_add(ldg_with_offset!(src_ptr1, CN, 0, J), weight1)
+            .mul_add(ldg_with_offset!(src_ptr2, CN, 0, J), weight2);
     } else if bounds_size == 4 {
         let weights = &filter[0..4];
         let weight0 = weights[0].as_();
@@ -374,15 +295,15 @@ pub(crate) fn convolve_column_handler_floating_point<
         let offset1 = src_stride * (bounds_start + 1) + v_start_px;
         let offset2 = src_stride * (bounds_start + 2) + v_start_px;
         let offset3 = src_stride * (bounds_start + 3) + v_start_px;
-        let src_ptr0 = &src[offset0..(offset0 + CHANNELS)];
-        let src_ptr1 = &src[offset1..(offset1 + CHANNELS)];
-        let src_ptr2 = &src[offset2..(offset2 + CHANNELS)];
-        let src_ptr3 = &src[offset3..(offset3 + CHANNELS)];
+        let src_ptr0 = &src[offset0..(offset0 + CN)];
+        let src_ptr1 = &src[offset1..(offset1 + CN)];
+        let src_ptr2 = &src[offset2..(offset2 + CN)];
+        let src_ptr3 = &src[offset3..(offset3 + CN)];
 
-        sums0 = (ldg_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
-            .mul_add(ldg_with_offset!(src_ptr1, CHANNELS, 0, J), weight1)
-            .mul_add(ldg_with_offset!(src_ptr2, CHANNELS, 0, J), weight2)
-            .mul_add(ldg_with_offset!(src_ptr3, CHANNELS, 0, J), weight3);
+        sums0 = (ldg_with_offset!(src_ptr0, CN, 0, J) * weight0)
+            .mul_add(ldg_with_offset!(src_ptr1, CN, 0, J), weight1)
+            .mul_add(ldg_with_offset!(src_ptr2, CN, 0, J), weight2)
+            .mul_add(ldg_with_offset!(src_ptr3, CN, 0, J), weight3);
     } else if bounds_size == 6 {
         let weights = &filter[0..6];
         let weight0 = weights[0].as_();
@@ -397,27 +318,27 @@ pub(crate) fn convolve_column_handler_floating_point<
         let offset3 = src_stride * (bounds_start + 3) + v_start_px;
         let offset4 = src_stride * (bounds_start + 4) + v_start_px;
         let offset5 = src_stride * (bounds_start + 5) + v_start_px;
-        let src_ptr0 = &src[offset0..(offset0 + CHANNELS)];
-        let src_ptr1 = &src[offset1..(offset1 + CHANNELS)];
-        let src_ptr2 = &src[offset2..(offset2 + CHANNELS)];
-        let src_ptr3 = &src[offset3..(offset3 + CHANNELS)];
-        let src_ptr4 = &src[offset4..(offset4 + CHANNELS)];
-        let src_ptr5 = &src[offset5..(offset5 + CHANNELS)];
+        let src_ptr0 = &src[offset0..(offset0 + CN)];
+        let src_ptr1 = &src[offset1..(offset1 + CN)];
+        let src_ptr2 = &src[offset2..(offset2 + CN)];
+        let src_ptr3 = &src[offset3..(offset3 + CN)];
+        let src_ptr4 = &src[offset4..(offset4 + CN)];
+        let src_ptr5 = &src[offset5..(offset5 + CN)];
 
-        sums0 = (ldg_with_offset!(src_ptr0, CHANNELS, 0, J) * weight0)
-            .mul_add(ldg_with_offset!(src_ptr1, CHANNELS, 0, J), weight1)
-            .mul_add(ldg_with_offset!(src_ptr2, CHANNELS, 0, J), weight2)
-            .mul_add(ldg_with_offset!(src_ptr3, CHANNELS, 0, J), weight3)
-            .mul_add(ldg_with_offset!(src_ptr4, CHANNELS, 0, J), weight4)
-            .mul_add(ldg_with_offset!(src_ptr5, CHANNELS, 0, J), weight5);
+        sums0 = (ldg_with_offset!(src_ptr0, CN, 0, J) * weight0)
+            .mul_add(ldg_with_offset!(src_ptr1, CN, 0, J), weight1)
+            .mul_add(ldg_with_offset!(src_ptr2, CN, 0, J), weight2)
+            .mul_add(ldg_with_offset!(src_ptr3, CN, 0, J), weight3)
+            .mul_add(ldg_with_offset!(src_ptr4, CN, 0, J), weight4)
+            .mul_add(ldg_with_offset!(src_ptr5, CN, 0, J), weight5);
     } else {
         for (j, &k_weight) in filter.iter().take(bounds_size).enumerate() {
             let py = bounds_start + j;
             let weight = k_weight.as_();
             let offset = src_stride * py + v_start_px;
-            let src_ptr = &src[offset..(offset + CHANNELS)];
+            let src_ptr = &src[offset..(offset + CN)];
 
-            let new_px0 = ld_g!(src_ptr, CHANNELS, J);
+            let new_px0 = ld_g!(src_ptr, CN, J);
 
             sums0 = sums0.mul_add(new_px0, weight);
         }
@@ -425,8 +346,8 @@ pub(crate) fn convolve_column_handler_floating_point<
 
     st_g_mixed!(
         sums0,
-        &mut dst[v_start_px..(v_start_px + CHANNELS)],
-        CHANNELS,
+        &mut dst[v_start_px..(v_start_px + CN)],
+        CN,
         bit_depth
     );
 }

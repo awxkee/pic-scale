@@ -36,10 +36,10 @@ use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn convolve_vertical_dispatch_f16<V: Copy + Send + Sync, const COMPONENTS: usize>(
-    image_store: &ImageStore<f16, COMPONENTS>,
+pub(crate) fn convolve_vertical_dispatch_f16<V: Copy + Send + Sync, const CN: usize>(
+    image_store: &ImageStore<f16, CN>,
     filter_weights: FilterWeights<f32>,
-    destination: &mut ImageStoreMut<f16, COMPONENTS>,
+    destination: &mut ImageStoreMut<f16, CN>,
     pool: &Option<ThreadPool>,
     dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[V]),
     weights_converter: impl WeightsConverter<V>,
@@ -67,7 +67,7 @@ pub(crate) fn convolve_vertical_dispatch_f16<V: Copy + Send + Sync, const COMPON
                         dst_width,
                         &bounds,
                         source_buffer,
-                        &mut row[..dst_width * COMPONENTS],
+                        &mut row[..dst_width * CN],
                         src_stride,
                         weights,
                     );
@@ -88,7 +88,7 @@ pub(crate) fn convolve_vertical_dispatch_f16<V: Copy + Send + Sync, const COMPON
                     dst_width,
                     &bounds,
                     source_buffer,
-                    &mut row[..dst_width * COMPONENTS],
+                    &mut row[..dst_width * CN],
                     src_stride,
                     weights,
                 );
@@ -97,10 +97,10 @@ pub(crate) fn convolve_vertical_dispatch_f16<V: Copy + Send + Sync, const COMPON
 }
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn convolve_horizontal_dispatch_f16<V: Copy + Send + Sync, const CHANNELS: usize>(
-    image_store: &ImageStore<f16, CHANNELS>,
+pub(crate) fn convolve_horizontal_dispatch_f16<V: Copy + Send + Sync, const CN: usize>(
+    image_store: &ImageStore<f16, CN>,
     filter_weights: FilterWeights<f32>,
-    destination: &mut ImageStoreMut<f16, CHANNELS>,
+    destination: &mut ImageStoreMut<f16, CN>,
     pool: &Option<ThreadPool>,
     dispatcher_4_rows: Option<
         fn(usize, usize, &FilterWeights<V>, &[f16], usize, &mut [f16], usize),
