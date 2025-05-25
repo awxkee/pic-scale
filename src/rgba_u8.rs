@@ -160,6 +160,7 @@ impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
         }
         #[cfg(all(feature = "nightly_avx512", target_arch = "x86_64"))]
         {
+            #[allow(clippy::incompatible_msrv)]
             if std::arch::is_x86_feature_detected!("avxvnni")
                 && _options.workload_strategy != crate::WorkloadStrategy::PreferSpeed
             {

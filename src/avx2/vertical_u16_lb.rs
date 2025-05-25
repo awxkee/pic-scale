@@ -44,6 +44,7 @@ pub(crate) fn convolve_column_lb_avx2_u16(
 ) {
     unsafe {
         #[cfg(feature = "nightly_avx512")]
+        #[allow(clippy::incompatible_msrv)]
         if std::arch::is_x86_feature_detected!("avxvnni") {
             convolve_column_lb_avx_u16_dot(bounds, src, dst, src_stride, weight, bit_depth);
             return;

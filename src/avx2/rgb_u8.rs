@@ -42,6 +42,7 @@ pub(crate) fn convolve_horizontal_rgb_avx_rows_4(
     unsafe {
         #[cfg(feature = "nightly_avx512")]
         {
+            #[allow(clippy::incompatible_msrv)]
             if std::arch::is_x86_feature_detected!("avxvnni") {
                 return convolve_horizontal_rgb_avx_rows_4_vnni(
                     src,
@@ -463,6 +464,7 @@ pub(crate) fn convolve_horizontal_rgb_avx_row_one(
     unsafe {
         #[cfg(feature = "nightly_avx512")]
         {
+            #[allow(clippy::incompatible_msrv)]
             if std::arch::is_x86_feature_detected!("avxvnni") {
                 return convolve_horizontal_rgb_avx_row_one_vnni(src, dst, filter_weights);
             }

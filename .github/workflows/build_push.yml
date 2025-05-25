@@ -43,6 +43,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - run: rustup component add clippy
       - run: cargo clippy -- -D warnings
 
   clippy_nightly:
