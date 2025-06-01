@@ -144,7 +144,7 @@ impl FilterWeights<f32> {
         )
     }
 
-    #[cfg(all(target_arch = "aarch64", feature = "nightly_i8mm"))]
+    #[allow(dead_code)]
     pub(crate) fn numerical_approximation_q0_7(&self, alignment: usize) -> FilterWeights<i8> {
         let align = if alignment != 0 {
             (self.kernel_size.div_ceil(alignment)) * alignment
