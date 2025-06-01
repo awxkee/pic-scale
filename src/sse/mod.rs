@@ -51,7 +51,6 @@ mod rgba_u16;
 mod rgba_u16_lb;
 mod rgba_u8;
 mod rgba_u8_lb;
-mod rgba_u8_q07;
 mod routines;
 mod u8_utils;
 mod utils;
@@ -107,9 +106,6 @@ pub(crate) use rgba_u8::{
 };
 pub(crate) use rgba_u8_lb::{
     convolve_horizontal_rgba_sse_rows_4_lb, convolve_horizontal_rgba_sse_rows_one_lb,
-};
-pub(crate) use rgba_u8_q07::{
-    convolve_horizontal_rgba_sse_rows_4_q07, convolve_horizontal_rgba_sse_rows_one_q07,
 };
 pub(crate) use rgba_u16::{
     convolve_horizontal_rgba_sse_rows_4_u16, convolve_horizontal_rgba_sse_u16_row,

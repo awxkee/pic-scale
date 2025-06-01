@@ -158,56 +158,6 @@ impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
                 _dispatcher_1_row = convolve_horizontal_rgba_avx_row_1;
             }
         }
-        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
-        {
-            if std::arch::is_x86_feature_detected!("avx2")
-                && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
-                && _scale_factor < 5.5
-            {
-                use crate::avx2::{
-                    convolve_horizontal_rgba_avx_rows_4_q07,
-                    convolve_horizontal_rgba_avx_rows_one_q07,
-                };
-                let _dispatcher_4_rows: Option<
-                    fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i8>),
-                > = Some(convolve_horizontal_rgba_avx_rows_4_q07);
-                let _dispatcher_1_row = convolve_horizontal_rgba_avx_rows_one_q07;
-                return convolve_horizontal_dispatch_u8(
-                    self,
-                    filter_weights,
-                    destination,
-                    pool,
-                    _dispatcher_4_rows,
-                    _dispatcher_1_row,
-                    DefaultWeightsConverterQ7::default(),
-                );
-            }
-        }
-        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
-        {
-            if std::arch::is_x86_feature_detected!("sse4.1")
-                && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
-                && _scale_factor < 5.5
-            {
-                use crate::sse::{
-                    convolve_horizontal_rgba_sse_rows_4_q07,
-                    convolve_horizontal_rgba_sse_rows_one_q07,
-                };
-                let _dispatcher_4_rows: Option<
-                    fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i8>),
-                > = Some(convolve_horizontal_rgba_sse_rows_4_q07);
-                let _dispatcher_1_row = convolve_horizontal_rgba_sse_rows_one_q07;
-                return convolve_horizontal_dispatch_u8(
-                    self,
-                    filter_weights,
-                    destination,
-                    pool,
-                    _dispatcher_4_rows,
-                    _dispatcher_1_row,
-                    DefaultWeightsConverterQ7::default(),
-                );
-            }
-        }
         #[cfg(all(feature = "nightly_avx512", target_arch = "x86_64"))]
         {
             #[allow(clippy::incompatible_msrv)]
@@ -302,6 +252,25 @@ impl VerticalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
                 }
             }
         }
+        // #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        // {
+        //     if std::arch::is_x86_feature_detected!("avx2")
+        //         && _scale_factor < 8.
+        //         && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
+        //     {
+        //         {
+        //             use crate::avx2::convolve_vertical_avx_row_q07;
+        //             return convolve_vertical_dispatch_u8(
+        //                 self,
+        //                 filter_weights,
+        //                 destination,
+        //                 pool,
+        //                 convolve_vertical_avx_row_q07,
+        //                 DefaultWeightsConverterQ7::default(),
+        //             );
+        //         }
+        //     }
+        // }
         #[cfg(all(feature = "nightly_avx512", target_arch = "x86_64"))]
         if std::arch::is_x86_feature_detected!("avx512bw")
             && _scale_factor < 8.
