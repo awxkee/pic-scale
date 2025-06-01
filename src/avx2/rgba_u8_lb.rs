@@ -119,14 +119,24 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_impl(
 
         let shuffle_weights = _mm_setr_epi8(0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3);
 
-        let distr_weights8_0 = _mm256_setr_epi8(
+        let distr_weights4_0 = _mm256_setr_epi8(
             0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3, 0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2,
             3, 2, 3,
         );
 
-        let distr_weights8_1 = _mm256_setr_epi8(
+        let distr_weights4_1 = _mm256_setr_epi8(
             4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6, 7, 6, 7, 4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6,
             7, 6, 7,
+        );
+
+        let distr_weights8_0 = _mm256_setr_epi8(
+            0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3, 4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6,
+            7, 6, 7,
+        );
+
+        let distr_weights8_1 = _mm256_setr_epi8(
+            8, 9, 8, 9, 8, 9, 8, 9, 10, 11, 10, 11, 10, 11, 10, 11, 12, 13, 12, 13, 12, 13, 12, 13,
+            14, 15, 14, 15, 14, 15, 14, 15,
         );
 
         let (row0_ref, rest) = dst.split_at_mut(dst_stride);
@@ -209,8 +219,8 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_impl(
                 let w0_3 = _mm_loadu_si64(w_ptr.as_ptr() as *const _);
                 let wz0 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(w0_3), w0_3);
 
-                let w0145 = _mm256_shuffle_epi8(wz0, distr_weights8_0);
-                let w2367 = _mm256_shuffle_epi8(wz0, distr_weights8_1);
+                let w0145 = _mm256_shuffle_epi8(wz0, distr_weights4_0);
+                let w2367 = _mm256_shuffle_epi8(wz0, distr_weights4_1);
 
                 let start_bounds = bounds.start + jx;
 

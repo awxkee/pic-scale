@@ -144,7 +144,7 @@ fn main() {
         dimensions.1 as usize / 4,
         16,
     );
-    scaler.resize_rgba(&store, &mut dst_store, false).unwrap();
+    scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
     //
     // let elapsed_time = start_time.elapsed();
     // // Print the elapsed time in milliseconds

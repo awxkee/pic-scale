@@ -50,7 +50,6 @@ mod rgba_u16;
 mod rgba_u16_lb;
 mod rgba_u8;
 mod rgba_u8_lb;
-mod rgba_u8_q07;
 mod routines;
 pub(crate) mod utils;
 mod vertical_ar30;
@@ -108,9 +107,6 @@ pub(crate) use rgba_f32_f64::{
 pub(crate) use rgba_u8::{convolve_horizontal_rgba_avx_row_1, convolve_horizontal_rgba_row_4};
 pub(crate) use rgba_u8_lb::{
     convolve_horizontal_rgba_avx_rows_4_lb, convolve_horizontal_rgba_avx_rows_one_lb,
-};
-pub(crate) use rgba_u8_q07::{
-    convolve_horizontal_rgba_avx_rows_4_q07, convolve_horizontal_rgba_avx_rows_one_q07,
 };
 pub(crate) use rgba_u16::{
     convolve_horizontal_rgba_avx_rows_4_u16_f, convolve_horizontal_rgba_avx_u16_row_f,
