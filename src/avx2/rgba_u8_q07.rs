@@ -242,10 +242,13 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_impl(
             store_0 = _mm256_permute4x64_epi64::<M>(store_0);
             store_1 = _mm256_permute4x64_epi64::<M>(store_1);
 
-            let store_16_8_0 = _mm_srai_epi16::<7>(_mm256_castsi256_si128(store_0));
-            let store_16_8_1 = _mm_srai_epi16::<7>(_mm256_extracti128_si256::<1>(store_0));
-            let store_16_8_2 = _mm_srai_epi16::<7>(_mm256_castsi256_si128(store_1));
-            let store_16_8_3 = _mm_srai_epi16::<7>(_mm256_extracti128_si256::<1>(store_1));
+            store_0 = _mm256_srai_epi16::<7>(store_0);
+            store_1 = _mm256_srai_epi16::<7>(store_1);
+
+            let store_16_8_0 = _mm256_castsi256_si128(store_0);
+            let store_16_8_1 = _mm256_extracti128_si256::<1>(store_0);
+            let store_16_8_2 = _mm256_castsi256_si128(store_1);
+            let store_16_8_3 = _mm256_extracti128_si256::<1>(store_1);
 
             _mm_storeu_si32(
                 chunk0.as_mut_ptr() as *mut _,
