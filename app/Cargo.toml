@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-image = { version = "0.25.6", features = ["default"] }
-pic-scale = { path = "..", features = ["nightly_f16", "rdm", "nightly_i8mm", "sse", "avx", "colorspaces"], default-features = false }
+image = { version = "0.25", features = ["default"] }
+pic-scale = { path = "..", features = ["nightly_f16", "rdm", "nightly_i8mm", "avx", "sse", "colorspaces"], default-features = false }
 fast_image_resize = { version = "5", features = [] }
-accelerate = {path = "accelerate/"}
+accelerate = { path = "accelerate/" }
 yuv = "0.8.3"
 libc = "0.2.169"
 
