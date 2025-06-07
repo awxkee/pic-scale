@@ -114,7 +114,7 @@ const fn make_unpremultiplication_table() -> [u8; 65536] {
     buf
 }
 
-static UNPREMULTIPLICATION_TABLE: [u8; 65536] = make_unpremultiplication_table();
+pub(crate) static UNPREMULTIPLICATION_TABLE: [u8; 65536] = make_unpremultiplication_table();
 
 #[inline]
 pub(crate) fn unpremultiply_alpha_rgba_row_impl(in_place: &mut [u8]) {

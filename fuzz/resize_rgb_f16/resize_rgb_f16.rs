@@ -29,23 +29,43 @@
 #![feature(f16)]
 #![no_main]
 
+use arbitrary::Arbitrary;
 use core::f16;
 use libfuzzer_sys::fuzz_target;
-use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, WorkloadStrategy};
+use pic_scale::{
+    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ThreadingPolicy,
+    WorkloadStrategy,
+};
 
-fuzz_target!(|data: (u16, u16, u16, u16, bool)| {
-    let strategy = if data.4 {
+#[derive(Clone, Debug, Arbitrary)]
+pub struct SrcImage {
+    pub src_width: u16,
+    pub src_height: u16,
+    pub dst_width: u16,
+    pub dst_height: u16,
+    pub value: u8,
+    pub use_quality: bool,
+    pub threading: bool,
+}
+
+fuzz_target!(|data: SrcImage| {
+    let strategy = if data.use_quality {
         WorkloadStrategy::PreferQuality
     } else {
         WorkloadStrategy::PreferSpeed
     };
     resize_rgb(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
-        data.3 as usize,
+        data.src_width as usize,
+        data.src_height as usize,
+        data.dst_width as usize,
+        data.dst_height as usize,
         ResamplingFunction::Lanczos3,
         strategy,
+        if data.threading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        },
     );
 });
 
@@ -56,6 +76,7 @@ fn resize_rgb(
     dst_height: usize,
     sampler: ResamplingFunction,
     workload_strategy: WorkloadStrategy,
+    threading_policy: ThreadingPolicy,
 ) {
     if src_width == 0
         || src_width > 2000
@@ -74,5 +95,6 @@ fn resize_rgb(
 
     let mut scaler = Scaler::new(sampler);
     scaler.set_workload_strategy(workload_strategy);
+    scaler.set_threading_policy(threading_policy);
     scaler.resize_rgb_f16(&store, &mut target).unwrap();
 }

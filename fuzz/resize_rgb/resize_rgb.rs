@@ -31,7 +31,10 @@
 
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
-use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, WorkloadStrategy};
+use pic_scale::{
+    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ThreadingPolicy,
+    WorkloadStrategy,
+};
 
 #[derive(Clone, Debug, Arbitrary)]
 pub struct SrcImage {
@@ -41,6 +44,7 @@ pub struct SrcImage {
     pub dst_height: u16,
     pub value: u8,
     pub use_quality: bool,
+    pub threading: bool,
 }
 
 fuzz_target!(|data: SrcImage| {
@@ -57,6 +61,11 @@ fuzz_target!(|data: SrcImage| {
         data.dst_height as usize,
         ResamplingFunction::Bilinear,
         quality,
+        if data.threading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        },
     )
 });
 
@@ -68,6 +77,7 @@ fn resize_rgb(
     dst_height: usize,
     sampler: ResamplingFunction,
     workload_strategy: WorkloadStrategy,
+    threading_policy: ThreadingPolicy,
 ) {
     if src_width == 0
         || src_width > 2000
@@ -86,6 +96,7 @@ fn resize_rgb(
     let store = ImageStore::<u8, 3>::from_slice(&mut src_data, src_width, src_height).unwrap();
     let mut target = ImageStoreMut::alloc(dst_width, dst_height);
     let mut scaler = Scaler::new(sampler);
+    scaler.set_threading_policy(threading_policy);
     scaler.set_workload_strategy(workload_strategy);
     scaler.resize_rgb(&store, &mut target).unwrap();
 }

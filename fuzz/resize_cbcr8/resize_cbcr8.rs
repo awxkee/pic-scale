@@ -31,7 +31,10 @@
 
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
-use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, WorkloadStrategy};
+use pic_scale::{
+    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ThreadingPolicy,
+    WorkloadStrategy,
+};
 
 #[derive(Clone, Debug, Arbitrary)]
 pub struct SrcImage {
@@ -42,6 +45,7 @@ pub struct SrcImage {
     pub value: u16,
     pub use_quality: bool,
     pub premultiply_alpha: bool,
+    pub threading: bool,
 }
 
 fuzz_target!(|data: SrcImage| {
@@ -57,6 +61,11 @@ fuzz_target!(|data: SrcImage| {
         } else {
             WorkloadStrategy::PreferSpeed
         },
+        if data.threading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        },
     )
 });
 
@@ -68,6 +77,7 @@ fn resize_cbcr8(
     mul_alpha: bool,
     sampler: ResamplingFunction,
     workload_strategy: WorkloadStrategy,
+    threading_policy: ThreadingPolicy,
 ) {
     if src_width == 0
         || src_width > 2000
@@ -88,6 +98,7 @@ fn resize_cbcr8(
     let store = ImageStore::<u8, 2>::from_slice(&mut src_data, src_width, src_height).unwrap();
     let mut target = ImageStoreMut::alloc(dst_width, dst_height);
     let mut scaler = Scaler::new(sampler);
+    scaler.set_threading_policy(threading_policy);
     scaler.set_workload_strategy(workload_strategy);
     if mul_alpha {
         scaler.resize_gray_alpha(&store, &mut target, true).unwrap();

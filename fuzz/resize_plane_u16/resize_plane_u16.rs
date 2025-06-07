@@ -32,7 +32,8 @@
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use pic_scale::{
-    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16, WorkloadStrategy,
+    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingU16, ThreadingPolicy,
+    WorkloadStrategy,
 };
 
 #[derive(Clone, Debug, Arbitrary)]
@@ -44,6 +45,7 @@ pub struct SrcImage {
     pub value: u16,
     pub use_quality: bool,
     pub premultiply_alpha: bool,
+    pub threading: bool,
 }
 
 fuzz_target!(|data: SrcImage| {
@@ -55,6 +57,11 @@ fuzz_target!(|data: SrcImage| {
         ResamplingFunction::Lanczos3,
         data.use_quality,
         data.value,
+        if data.threading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        },
     )
 });
 
@@ -66,6 +73,7 @@ fn resize_rgb(
     sampler: ResamplingFunction,
     use_quality: bool,
     value: u16,
+    threading_policy: ThreadingPolicy,
 ) {
     if src_width == 0
         || src_width > 2000
@@ -84,13 +92,14 @@ fn resize_rgb(
     let mut target = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 10);
 
     let mut scaler = Scaler::new(sampler);
-    scaler.resize_plane_u16(&store, &mut target).unwrap();
+    scaler.set_threading_policy(threading_policy);
     scaler.set_workload_strategy(if use_quality {
         WorkloadStrategy::PreferQuality
     } else {
         WorkloadStrategy::PreferSpeed
     });
 
+    scaler.resize_plane_u16(&store, &mut target).unwrap();
     let store = ImageStore::<u16, 1>::borrow(&src_slice, src_width, src_height).unwrap();
     let mut target16 = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
     scaler.resize_plane_u16(&store, &mut target16).unwrap();
