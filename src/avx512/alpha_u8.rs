@@ -28,9 +28,7 @@
  */
 use crate::WorkloadStrategy;
 use crate::avx512::utils::{avx512_deinterleave_rgba, avx512_div_by255, avx512_interleave_rgba};
-use rayon::ThreadPool;
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::{ParallelSlice, ParallelSliceMut};
+use novtb::{ParallelZonedIterator, TbSliceMut};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -121,27 +119,17 @@ pub(crate) fn avx512_premultiply_alpha_rgba(
     width: usize,
     _: usize,
     src_stride: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
     let executor: fn(&mut [u8], &[u8]) = |dst: &mut [u8], src: &[u8]| {
         avx_premultiply_alpha_rgba_impl_row(dst, src, AssociateAlphaDefault::default());
     };
 
-    if let Some(pool) = pool {
-        pool.install(|| {
-            dst.par_chunks_exact_mut(dst_stride)
-                .zip(src.par_chunks_exact(src_stride))
-                .for_each(|(dst, src)| {
-                    executor(&mut dst[..width * 4], &src[..width * 4]);
-                });
+    dst.tb_par_chunks_exact_mut(dst_stride)
+        .for_each_enumerated(pool, |y, dst| {
+            let src = &src[y * src_stride..(y + 1) * src_stride];
+            executor(&mut dst[..width * 4], &src[..width * 4]);
         });
-    } else {
-        dst.chunks_exact_mut(dst_stride)
-            .zip(src.chunks_exact(src_stride))
-            .for_each(|(dst, src)| {
-                executor(&mut dst[..width * 4], &src[..width * 4]);
-            });
-    }
 }
 
 trait DisassociateAlpha {
@@ -422,7 +410,7 @@ pub(crate) fn avx512_unpremultiply_alpha_rgba(
     width: usize,
     _: usize,
     stride: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
     _: WorkloadStrategy,
 ) {
     let has_vbmi = std::arch::is_x86_feature_detected!("avx512vbmi");
@@ -448,15 +436,9 @@ pub(crate) fn avx512_unpremultiply_alpha_rgba(
         }
     }
 
-    if let Some(pool) = pool {
-        pool.install(|| {
-            in_place.par_chunks_exact_mut(stride).for_each(|row| {
-                executor(&mut row[..width * 4]);
-            });
-        });
-    } else {
-        in_place.chunks_exact_mut(stride).for_each(|row| {
+    in_place
+        .tb_par_chunks_exact_mut(stride)
+        .for_each(pool, |row| {
             executor(&mut row[..width * 4]);
         });
-    }
 }

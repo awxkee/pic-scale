@@ -62,7 +62,6 @@ use crate::sse::{
     convolve_vertical_sse_row_f16,
 };
 use core::{f16, f32};
-use rayon::ThreadPool;
 
 fn convolve_horizontal_rgba_4_row_f16<const CHANNELS: usize>(
     _: usize,
@@ -113,7 +112,7 @@ impl HorizontalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 4>,
-        pool: &Option<ThreadPool>,
+        pool: &novtb::ThreadPool,
         _options: ConvolutionOptions,
     ) {
         #[allow(clippy::type_complexity)]
@@ -220,7 +219,7 @@ impl VerticalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 4>,
-        pool: &Option<ThreadPool>,
+        pool: &novtb::ThreadPool,
         _options: ConvolutionOptions,
     ) {
         #[allow(clippy::type_complexity)]
@@ -288,7 +287,7 @@ impl HorizontalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 3>,
-        pool: &Option<ThreadPool>,
+        pool: &novtb::ThreadPool,
         _options: ConvolutionOptions,
     ) {
         #[allow(clippy::type_complexity)]
@@ -366,7 +365,7 @@ impl VerticalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 3>,
-        pool: &Option<ThreadPool>,
+        pool: &novtb::ThreadPool,
         _options: ConvolutionOptions,
     ) {
         #[allow(clippy::type_complexity)]
@@ -434,7 +433,7 @@ impl HorizontalConvolutionPass<f16, 1> for ImageStore<'_, f16, 1> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 1>,
-        pool: &Option<ThreadPool>,
+        pool: &novtb::ThreadPool,
         _: ConvolutionOptions,
     ) {
         #[allow(clippy::type_complexity)]
@@ -460,7 +459,7 @@ impl VerticalConvolutionPass<f16, 1> for ImageStore<'_, f16, 1> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 1>,
-        pool: &Option<ThreadPool>,
+        pool: &novtb::ThreadPool,
         _options: ConvolutionOptions,
     ) {
         #[allow(clippy::type_complexity)]
@@ -528,7 +527,7 @@ impl HorizontalConvolutionPass<f16, 2> for ImageStore<'_, f16, 2> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 2>,
-        pool: &Option<ThreadPool>,
+        pool: &novtb::ThreadPool,
         _: ConvolutionOptions,
     ) {
         #[allow(clippy::type_complexity)]
@@ -554,7 +553,7 @@ impl VerticalConvolutionPass<f16, 2> for ImageStore<'_, f16, 2> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f16, 2>,
-        pool: &Option<ThreadPool>,
+        pool: &novtb::ThreadPool,
         _options: ConvolutionOptions,
     ) {
         #[allow(clippy::type_complexity)]

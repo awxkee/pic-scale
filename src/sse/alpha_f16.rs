@@ -31,9 +31,7 @@ use crate::alpha_handle_f16::{premultiply_pixel_f16_row, unpremultiply_pixel_f16
 use crate::sse::f16_utils::{_mm_cvtph_psx, _mm_cvtps_phx};
 use crate::sse::{sse_deinterleave_rgba_epi16, sse_interleave_rgba_epi16};
 use core::f16;
-use rayon::ThreadPool;
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::{ParallelSlice, ParallelSliceMut};
+use novtb::{ParallelZonedIterator, TbSliceMut};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -46,7 +44,7 @@ pub(crate) fn sse_premultiply_alpha_rgba_f16(
     src_stride: usize,
     width: usize,
     height: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
     unsafe {
         if std::arch::is_x86_feature_detected!("f16c") {
@@ -67,7 +65,7 @@ unsafe fn sse_premultiply_alpha_rgba_f16_regular(
     src_stride: usize,
     width: usize,
     height: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
     unsafe {
         sse_premultiply_alpha_rgba_f16_impl::<false>(
@@ -84,7 +82,7 @@ unsafe fn sse_premultiply_alpha_rgba_f16c(
     src_stride: usize,
     width: usize,
     height: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
     unsafe {
         sse_premultiply_alpha_rgba_f16_impl::<true>(
@@ -155,29 +153,16 @@ unsafe fn sse_premultiply_alpha_rgba_f16_impl<const F16C: bool>(
     src_stride: usize,
     width: usize,
     _: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
-    if let Some(pool) = pool {
-        pool.install(|| {
-            dst.par_chunks_exact_mut(dst_stride)
-                .zip(src.par_chunks_exact(src_stride))
-                .for_each(|(dst, src)| unsafe {
-                    sse_premultiply_alpha_rgba_row_f16_impl::<F16C>(
-                        &mut dst[..width * 4],
-                        &src[..width * 4],
-                    );
-                });
+    dst.tb_par_chunks_exact_mut(dst_stride)
+        .for_each_enumerated(pool, |y, dst| unsafe {
+            let src = &src[y * src_stride..(y + 1) * src_stride];
+            sse_premultiply_alpha_rgba_row_f16_impl::<F16C>(
+                &mut dst[..width * 4],
+                &src[..width * 4],
+            );
         });
-    } else {
-        dst.chunks_exact_mut(dst_stride)
-            .zip(src.chunks_exact(src_stride))
-            .for_each(|(dst, src)| unsafe {
-                sse_premultiply_alpha_rgba_row_f16_impl::<F16C>(
-                    &mut dst[..width * 4],
-                    &src[..width * 4],
-                );
-            });
-    }
 }
 
 pub(crate) fn sse_unpremultiply_alpha_rgba_f16(
@@ -185,7 +170,7 @@ pub(crate) fn sse_unpremultiply_alpha_rgba_f16(
     stride: usize,
     width: usize,
     height: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
     unsafe {
         if is_x86_feature_detected!("f16c") {
@@ -202,7 +187,7 @@ unsafe fn sse_unpremultiply_alpha_rgba_f16_regular(
     stride: usize,
     width: usize,
     height: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
     unsafe {
         sse_unpremultiply_alpha_rgba_f16_impl::<false>(in_place, stride, width, height, pool);
@@ -215,7 +200,7 @@ unsafe fn sse_unpremultiply_alpha_rgba_f16c(
     stride: usize,
     width: usize,
     height: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
     unsafe {
         sse_unpremultiply_alpha_rgba_f16_impl::<true>(in_place, stride, width, height, pool);
@@ -307,19 +292,11 @@ unsafe fn sse_unpremultiply_alpha_rgba_f16_impl<const F16C: bool>(
     stride: usize,
     width: usize,
     _: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
-    if let Some(pool) = pool {
-        pool.install(|| {
-            in_place
-                .par_chunks_exact_mut(stride)
-                .for_each(|row| unsafe {
-                    sse_unpremultiply_alpha_rgba_f16_row_impl::<F16C>(&mut row[..width * 4]);
-                });
-        });
-    } else {
-        in_place.chunks_exact_mut(stride).for_each(|row| unsafe {
+    in_place
+        .tb_par_chunks_exact_mut(stride)
+        .for_each(pool, |row| unsafe {
             sse_unpremultiply_alpha_rgba_f16_row_impl::<F16C>(&mut row[..width * 4]);
         });
-    }
 }

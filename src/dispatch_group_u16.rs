@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![allow(clippy::type_complexity)]
+
 use crate::ImageStore;
 use crate::convolution::ConvolutionOptions;
 use crate::filter_weights::{
@@ -38,9 +39,7 @@ use crate::handler_provider::{
 };
 use crate::image_store::ImageStoreMut;
 use crate::support::PRECISION;
-use rayon::ThreadPool;
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::{ParallelSlice, ParallelSliceMut};
+use novtb::{ParallelZonedIterator, TbSliceMut};
 
 trait HorizontalHandlerRow {
     fn handle_row_4(
@@ -174,7 +173,7 @@ pub(crate) fn convolve_horizontal_dispatch_u16<const CN: usize>(
     image_store: &ImageStore<u16, CN>,
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStoreMut<u16, CN>,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
     let src = image_store.buffer.as_ref();
     let dst_stride = destination.stride();
@@ -183,52 +182,30 @@ pub(crate) fn convolve_horizontal_dispatch_u16<const CN: usize>(
     let src_stride = image_store.stride();
     let bit_depth = destination.bit_depth;
 
-    if let Some(pool) = pool {
-        pool.install(|| {
-            let handler = u16::make_handler::<CN>(&filter_weights, bit_depth);
+    let handler = u16::make_handler::<CN>(&filter_weights, bit_depth);
 
-            dst.par_chunks_exact_mut(dst_stride * 4)
-                .zip(src.par_chunks_exact(src_stride * 4))
-                .for_each(|(dst, src)| {
-                    handler.handle_row_4(src, src_stride, dst, dst_stride, bit_depth as u32);
-                });
-
-            let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
-            let src_remainder = src.chunks_exact(src_stride * 4).remainder();
-
-            remainder
-                .par_chunks_exact_mut(dst_stride)
-                .zip(src_remainder.par_chunks_exact(src_stride))
-                .for_each(|(dst, src)| {
-                    handler.handle_row(src, dst, bit_depth as u32);
-                });
+    dst.tb_par_chunks_exact_mut(dst_stride * 4)
+        .for_each_enumerated(pool, |y, dst| {
+            let src = &src[y * src_stride * 4..(y + 1) * src_stride * 4];
+            handler.handle_row_4(src, src_stride, dst, dst_stride, bit_depth as u32);
         });
-    } else {
-        let handler = u16::make_handler::<CN>(&filter_weights, bit_depth);
 
-        dst.chunks_exact_mut(dst_stride * 4)
-            .zip(src.chunks_exact(src_stride * 4))
-            .for_each(|(dst, src)| {
-                handler.handle_row_4(src, src_stride, dst, dst_stride, bit_depth as u32);
-            });
+    let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
+    let src_remainder = src.chunks_exact(src_stride * 4).remainder();
 
-        let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
-        let src_remainder = src.chunks_exact(src_stride * 4).remainder();
-
-        remainder
-            .chunks_exact_mut(dst_stride)
-            .zip(src_remainder.chunks_exact(src_stride))
-            .for_each(|(dst, src)| {
-                handler.handle_row(src, dst, bit_depth as u32);
-            });
-    }
+    remainder
+        .tb_par_chunks_exact_mut(dst_stride)
+        .for_each_enumerated(pool, |y, dst| {
+            let src = &src_remainder[y * src_stride..(y + 1) * src_stride];
+            handler.handle_row(src, dst, bit_depth as u32);
+        });
 }
 
 pub(crate) fn convolve_vertical_dispatch_u16<const CN: usize>(
     image_store: &ImageStore<u16, CN>,
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStoreMut<'_, u16, CN>,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
     _options: ConvolutionOptions,
 ) {
     let src_stride = image_store.stride();
@@ -237,66 +214,12 @@ pub(crate) fn convolve_vertical_dispatch_u16<const CN: usize>(
 
     let dst_width = destination.width;
 
-    if let Some(pool) = pool {
-        pool.install(|| {
-            let destination_image = destination.buffer.borrow_mut();
-            if bit_depth > 12 {
-                #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
-                {
-                    if DefaultHighBitDepthHighHandlerNeon::is_available() {
-                        return execute_low_precision_row(
-                            true,
-                            image_store,
-                            &filter_weights,
-                            src_stride,
-                            dst_stride,
-                            bit_depth,
-                            dst_width,
-                            destination.buffer.borrow_mut(),
-                            DefaultHighBitDepthHighHandlerNeon::default(),
-                            WeightsConverterQ0_31::default(),
-                        );
-                    }
-                }
-                destination_image
-                    .par_chunks_exact_mut(dst_stride)
-                    .enumerate()
-                    .for_each(|(y, row)| {
-                        let bounds = filter_weights.bounds[y];
-                        let filter_offset = y * filter_weights.aligned_size;
-                        let weights = &filter_weights.weights[filter_offset..];
-                        let source_buffer = image_store.buffer.as_ref();
-                        u16::handle_floating_column(
-                            dst_width,
-                            &bounds,
-                            source_buffer,
-                            &mut row[..dst_width * CN],
-                            src_stride,
-                            weights,
-                            bit_depth as u32,
-                        );
-                    });
-            } else {
-                execute_low_precision_row(
-                    true,
-                    image_store,
-                    &filter_weights,
-                    src_stride,
-                    dst_stride,
-                    bit_depth,
-                    dst_width,
-                    destination_image,
-                    DefaultHighBitDepthLowerHandler::default(),
-                    DefaultWeightsConverter::default(),
-                );
-            }
-        });
-    } else if bit_depth > 12 {
+    let destination_image = destination.buffer.borrow_mut();
+    if bit_depth > 12 {
         #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
         {
             if DefaultHighBitDepthHighHandlerNeon::is_available() {
                 return execute_low_precision_row(
-                    false,
                     image_store,
                     &filter_weights,
                     src_stride,
@@ -306,14 +229,13 @@ pub(crate) fn convolve_vertical_dispatch_u16<const CN: usize>(
                     destination.buffer.borrow_mut(),
                     DefaultHighBitDepthHighHandlerNeon::default(),
                     WeightsConverterQ0_31::default(),
+                    pool,
                 );
             }
         }
-        let destination_image = destination.buffer.borrow_mut();
         destination_image
-            .chunks_exact_mut(dst_stride)
-            .enumerate()
-            .for_each(|(y, row)| {
+            .tb_par_chunks_exact_mut(dst_stride)
+            .for_each_enumerated(pool, |y, row| {
                 let bounds = filter_weights.bounds[y];
                 let filter_offset = y * filter_weights.aligned_size;
                 let weights = &filter_weights.weights[filter_offset..];
@@ -330,16 +252,16 @@ pub(crate) fn convolve_vertical_dispatch_u16<const CN: usize>(
             });
     } else {
         execute_low_precision_row(
-            false,
             image_store,
             &filter_weights,
             src_stride,
             dst_stride,
             bit_depth,
             dst_width,
-            destination.buffer.borrow_mut(),
+            destination_image,
             DefaultHighBitDepthLowerHandler::default(),
             DefaultWeightsConverter::default(),
+            pool,
         );
     }
 }
@@ -418,7 +340,6 @@ impl<const CN: usize> HandleVertical<i32, CN> for DefaultHighBitDepthHighHandler
 
 #[inline]
 fn execute_low_precision_row<W: Send + Sync, const CN: usize>(
-    is_parallel: bool,
     image_store: &ImageStore<u16, CN>,
     filter_weights: &FilterWeights<f32>,
     src_stride: usize,
@@ -428,45 +349,24 @@ fn execute_low_precision_row<W: Send + Sync, const CN: usize>(
     destination_image: &mut [u16],
     handler: impl HandleVertical<W, CN> + Sync + Send,
     weights: impl WeightsConverter<W>,
+    pool: &novtb::ThreadPool,
 ) {
     let approx = weights.prepare_weights(filter_weights);
-    if is_parallel {
-        destination_image
-            .par_chunks_exact_mut(dst_stride)
-            .enumerate()
-            .for_each(|(y, row)| {
-                let bounds = filter_weights.bounds[y];
-                let filter_offset = y * filter_weights.aligned_size;
-                let weights = &approx.weights[filter_offset..];
-                let source_buffer = image_store.buffer.as_ref();
-                handler.handle_fixed_column(
-                    dst_width,
-                    &bounds,
-                    source_buffer,
-                    &mut row[..dst_width * CN],
-                    src_stride,
-                    weights,
-                    bit_depth as u32,
-                );
-            });
-    } else {
-        destination_image
-            .chunks_exact_mut(dst_stride)
-            .enumerate()
-            .for_each(|(y, row)| {
-                let bounds = filter_weights.bounds[y];
-                let filter_offset = y * filter_weights.aligned_size;
-                let weights = &approx.weights[filter_offset..];
-                let source_buffer = image_store.buffer.as_ref();
-                handler.handle_fixed_column(
-                    dst_width,
-                    &bounds,
-                    source_buffer,
-                    &mut row[..dst_width * CN],
-                    src_stride,
-                    weights,
-                    bit_depth as u32,
-                );
-            });
-    }
+    destination_image
+        .tb_par_chunks_exact_mut(dst_stride)
+        .for_each_enumerated(pool, |y, row| {
+            let bounds = filter_weights.bounds[y];
+            let filter_offset = y * filter_weights.aligned_size;
+            let weights = &approx.weights[filter_offset..];
+            let source_buffer = image_store.buffer.as_ref();
+            handler.handle_fixed_column(
+                dst_width,
+                &bounds,
+                source_buffer,
+                &mut row[..dst_width * CN],
+                src_stride,
+                weights,
+                bit_depth as u32,
+            );
+        });
 }

@@ -29,9 +29,7 @@
 
 use crate::sse::alpha_u8::_mm_select_si128;
 use crate::sse::{sse_deinterleave_rgba_epi16, sse_interleave_rgba_epi16};
-use rayon::ThreadPool;
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::{ParallelSlice, ParallelSliceMut};
+use novtb::{ParallelZonedIterator, TbSliceMut};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -115,7 +113,7 @@ pub(crate) fn unpremultiply_alpha_sse_rgba_u16(
     width: usize,
     height: usize,
     bit_depth: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
     unsafe {
         unpremultiply_alpha_sse_rgba_u16_impl(in_place, stride, width, height, bit_depth, pool);
@@ -233,31 +231,17 @@ unsafe fn unpremultiply_alpha_sse_rgba_u16_impl(
     width: usize,
     _: usize,
     bit_depth: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
-    if let Some(pool) = pool {
-        pool.install(|| {
-            in_place
-                .par_chunks_exact_mut(stride)
-                .for_each(|row| unsafe {
-                    unpremultiply_alpha_sse_rgba_u16_row_impl(
-                        &mut row[..width * 4],
-                        bit_depth,
-                        DisassociateAlphaDefault::default(),
-                    );
-                });
+    in_place
+        .tb_par_chunks_exact_mut(stride)
+        .for_each(pool, |row| unsafe {
+            unpremultiply_alpha_sse_rgba_u16_row_impl(
+                &mut row[..width * 4],
+                bit_depth,
+                DisassociateAlphaDefault::default(),
+            );
         });
-    } else {
-        in_place
-            .par_chunks_exact_mut(stride)
-            .for_each(|row| unsafe {
-                unpremultiply_alpha_sse_rgba_u16_row_impl(
-                    &mut row[..width * 4],
-                    bit_depth,
-                    DisassociateAlphaDefault::default(),
-                );
-            });
-    }
 }
 
 #[inline(always)]
@@ -293,31 +277,17 @@ pub(crate) fn premultiply_alpha_sse_rgba_u16(
     _: usize,
     src_stride: usize,
     bit_depth: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
-    if let Some(pool) = pool {
-        pool.install(|| {
-            dst.par_chunks_exact_mut(dst_stride)
-                .zip(src.par_chunks_exact(src_stride))
-                .for_each(|(dst, src)| unsafe {
-                    premultiply_alpha_sse_rgba_u16_row_impl(
-                        &mut dst[..width * 4],
-                        &src[..width * 4],
-                        bit_depth,
-                    );
-                });
+    dst.tb_par_chunks_exact_mut(dst_stride)
+        .for_each_enumerated(pool, |y, dst| unsafe {
+            let src = &src[y * src_stride..(y + 1) * src_stride];
+            premultiply_alpha_sse_rgba_u16_row_impl(
+                &mut dst[..width * 4],
+                &src[..width * 4],
+                bit_depth,
+            );
         });
-    } else {
-        dst.chunks_exact_mut(dst_stride)
-            .zip(src.chunks_exact(src_stride))
-            .for_each(|(dst, src)| unsafe {
-                premultiply_alpha_sse_rgba_u16_row_impl(
-                    &mut dst[..width * 4],
-                    &src[..width * 4],
-                    bit_depth,
-                );
-            });
-    }
 }
 
 trait Sse41PremultiplyExecutor {

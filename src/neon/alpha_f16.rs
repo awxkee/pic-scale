@@ -29,9 +29,7 @@
 
 use crate::alpha_handle_f16::{premultiply_pixel_f16_row, unpremultiply_pixel_f16_row};
 use core::f16;
-use rayon::ThreadPool;
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::{ParallelSlice, ParallelSliceMut};
+use novtb::{ParallelZonedIterator, TbSliceMut};
 use std::arch::aarch64::*;
 
 unsafe fn neon_premultiply_alpha_rgba_row_f16(dst: &mut [f16], src: &[f16]) {
@@ -102,23 +100,13 @@ pub(crate) fn neon_premultiply_alpha_rgba_f16(
     src_stride: usize,
     width: usize,
     _: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
-    if let Some(pool) = pool {
-        pool.install(|| {
-            dst.par_chunks_exact_mut(dst_stride)
-                .zip(src.par_chunks_exact(src_stride))
-                .for_each(|(dst, src)| unsafe {
-                    neon_premultiply_alpha_rgba_row_f16(&mut dst[..width * 4], &src[..width * 4]);
-                });
+    dst.tb_par_chunks_exact_mut(dst_stride)
+        .for_each_enumerated(pool, |y, dst| unsafe {
+            let src = &src[y * src_stride..(y + 1) * src_stride];
+            neon_premultiply_alpha_rgba_row_f16(&mut dst[..width * 4], &src[..width * 4]);
         });
-    } else {
-        dst.chunks_exact_mut(dst_stride)
-            .zip(src.chunks_exact(src_stride))
-            .for_each(|(dst, src)| unsafe {
-                neon_premultiply_alpha_rgba_row_f16(&mut dst[..width * 4], &src[..width * 4]);
-            });
-    }
 }
 
 unsafe fn neon_unpremultiply_alpha_rgba_row_f16(in_place: &mut [f16]) {
@@ -204,19 +192,11 @@ pub(crate) fn neon_unpremultiply_alpha_rgba_f16(
     stride: usize,
     width: usize,
     _: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
-    if let Some(pool) = pool {
-        pool.install(|| {
-            in_place
-                .par_chunks_exact_mut(stride)
-                .for_each(|row| unsafe {
-                    neon_unpremultiply_alpha_rgba_row_f16(&mut row[..width * 4]);
-                });
-        });
-    } else {
-        in_place.chunks_exact_mut(stride).for_each(|row| unsafe {
+    in_place
+        .tb_par_chunks_exact_mut(stride)
+        .for_each(pool, |row| unsafe {
             neon_unpremultiply_alpha_rgba_row_f16(&mut row[..width * 4]);
         });
-    }
 }

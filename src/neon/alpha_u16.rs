@@ -26,9 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use rayon::ThreadPool;
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::{ParallelSlice, ParallelSliceMut};
+use novtb::{ParallelZonedIterator, TbSliceMut};
 use std::arch::aarch64::*;
 
 #[inline]
@@ -254,31 +252,17 @@ pub(crate) fn neon_premultiply_alpha_rgba_u16(
     _: usize,
     src_stride: usize,
     bit_depth: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
-    if let Some(pool) = pool {
-        pool.install(|| {
-            dst.par_chunks_exact_mut(dst_stride)
-                .zip(src.par_chunks_exact(src_stride))
-                .for_each(|(dst, src)| {
-                    neon_premultiply_alpha_rgba_row_u16(
-                        &mut dst[..width * 4],
-                        &src[..width * 4],
-                        bit_depth,
-                    );
-                });
+    dst.tb_par_chunks_exact_mut(dst_stride)
+        .for_each_enumerated(pool, |y, dst| {
+            let src = &src[y * src_stride..(y + 1) * src_stride];
+            neon_premultiply_alpha_rgba_row_u16(
+                &mut dst[..width * 4],
+                &src[..width * 4],
+                bit_depth,
+            );
         });
-    } else {
-        dst.chunks_exact_mut(dst_stride)
-            .zip(src.chunks_exact(src_stride))
-            .for_each(|(dst, src)| {
-                neon_premultiply_alpha_rgba_row_u16(
-                    &mut dst[..width * 4],
-                    &src[..width * 4],
-                    bit_depth,
-                );
-            });
-    }
 }
 
 #[inline]
@@ -424,17 +408,11 @@ pub(crate) fn neon_unpremultiply_alpha_rgba_u16(
     width: usize,
     _: usize,
     bit_depth: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
-    if let Some(pool) = pool.as_ref() {
-        pool.install(|| {
-            in_place.par_chunks_exact_mut(src_stride).for_each(|row| {
-                neon_unpremultiply_alpha_rgba_row_u16(&mut row[..width * 4], bit_depth);
-            });
-        });
-    } else {
-        in_place.chunks_exact_mut(src_stride).for_each(|row| {
+    in_place
+        .tb_par_chunks_exact_mut(src_stride)
+        .for_each(pool, |row| {
             neon_unpremultiply_alpha_rgba_row_u16(&mut row[..width * 4], bit_depth);
         });
-    }
 }

@@ -28,9 +28,7 @@
  */
 
 use crate::WorkloadStrategy;
-use rayon::ThreadPool;
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::{ParallelSlice, ParallelSliceMut};
+use novtb::{ParallelZonedIterator, TbSliceMut};
 use std::arch::aarch64::*;
 
 #[inline]
@@ -124,23 +122,13 @@ pub(crate) fn neon_premultiply_alpha_rgba(
     width: usize,
     _: usize,
     src_stride: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
-    if let Some(pool) = pool {
-        pool.install(|| {
-            dst.par_chunks_exact_mut(dst_stride)
-                .zip(src.par_chunks_exact(src_stride))
-                .for_each(|(dst, src)| unsafe {
-                    neon_premultiply_alpha_rgba_impl_row(&mut dst[..width * 4], &src[..width * 4]);
-                });
+    dst.tb_par_chunks_exact_mut(dst_stride)
+        .for_each_enumerated(pool, |y, dst| unsafe {
+            let src = &src[y * src_stride..(y + 1) * src_stride];
+            neon_premultiply_alpha_rgba_impl_row(&mut dst[..width * 4], &src[..width * 4]);
         });
-    } else {
-        dst.chunks_exact_mut(dst_stride)
-            .zip(src.chunks_exact(src_stride))
-            .for_each(|(dst, src)| unsafe {
-                neon_premultiply_alpha_rgba_impl_row(&mut dst[..width * 4], &src[..width * 4]);
-            });
-    }
 }
 
 trait DisassociateAlpha {
@@ -410,7 +398,7 @@ pub(crate) fn neon_unpremultiply_alpha_rgba(
     width: usize,
     _: usize,
     stride: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
     _strategy: WorkloadStrategy,
 ) {
     let mut _executor: unsafe fn(&mut [u8]) = neon_unpremultiply_alpha_rgba_impl_row;
@@ -422,17 +410,9 @@ pub(crate) fn neon_unpremultiply_alpha_rgba(
             _executor = neon_unpremultiply_alpha_rgba_impl_row_rdm;
         }
     }
-    if let Some(pool) = pool {
-        pool.install(|| {
-            in_place
-                .par_chunks_exact_mut(stride)
-                .for_each(|row| unsafe {
-                    _executor(&mut row[..width * 4]);
-                });
-        });
-    } else {
-        in_place.chunks_exact_mut(stride).for_each(|row| unsafe {
+    in_place
+        .tb_par_chunks_exact_mut(stride)
+        .for_each(pool, |row| unsafe {
             _executor(&mut row[..width * 4]);
         });
-    }
 }

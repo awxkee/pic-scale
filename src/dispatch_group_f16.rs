@@ -31,16 +31,14 @@ use crate::ImageStore;
 use crate::filter_weights::{FilterBounds, FilterWeights, WeightsConverter};
 use crate::image_store::ImageStoreMut;
 use core::f16;
-use rayon::ThreadPool;
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::{ParallelSlice, ParallelSliceMut};
+use novtb::{ParallelZonedIterator, TbSliceMut};
 
 #[allow(clippy::type_complexity)]
 pub(crate) fn convolve_vertical_dispatch_f16<V: Copy + Send + Sync, const CN: usize>(
     image_store: &ImageStore<f16, CN>,
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStoreMut<f16, CN>,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
     dispatcher: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[V]),
     weights_converter: impl WeightsConverter<V>,
 ) {
@@ -51,49 +49,24 @@ pub(crate) fn convolve_vertical_dispatch_f16<V: Copy + Send + Sync, const CN: us
 
     let dst_width = destination.width;
 
-    if let Some(pool) = pool {
-        pool.install(|| {
-            destination
-                .buffer
-                .borrow_mut()
-                .par_chunks_exact_mut(dst_stride)
-                .enumerate()
-                .for_each(|(y, row)| {
-                    let bounds = filter_weights.bounds[y];
-                    let filter_offset = y * filter_weights.aligned_size;
-                    let weights = &c_weights[filter_offset..];
-                    let source_buffer = image_store.buffer.as_ref();
-                    dispatcher(
-                        dst_width,
-                        &bounds,
-                        source_buffer,
-                        &mut row[..dst_width * CN],
-                        src_stride,
-                        weights,
-                    );
-                });
+    destination
+        .buffer
+        .borrow_mut()
+        .tb_par_chunks_exact_mut(dst_stride)
+        .for_each_enumerated(pool, |y, row| {
+            let bounds = filter_weights.bounds[y];
+            let filter_offset = y * filter_weights.aligned_size;
+            let weights = &c_weights[filter_offset..];
+            let source_buffer = image_store.buffer.as_ref();
+            dispatcher(
+                dst_width,
+                &bounds,
+                source_buffer,
+                &mut row[..dst_width * CN],
+                src_stride,
+                weights,
+            );
         });
-    } else {
-        destination
-            .buffer
-            .borrow_mut()
-            .chunks_exact_mut(dst_stride)
-            .enumerate()
-            .for_each(|(y, row)| {
-                let bounds = filter_weights.bounds[y];
-                let filter_offset = y * filter_weights.aligned_size;
-                let weights = &c_weights[filter_offset..];
-                let source_buffer = image_store.buffer.as_ref();
-                dispatcher(
-                    dst_width,
-                    &bounds,
-                    source_buffer,
-                    &mut row[..dst_width * CN],
-                    src_stride,
-                    weights,
-                );
-            });
-    }
 }
 
 #[allow(clippy::type_complexity)]
@@ -101,7 +74,7 @@ pub(crate) fn convolve_horizontal_dispatch_f16<V: Copy + Send + Sync, const CN: 
     image_store: &ImageStore<f16, CN>,
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStoreMut<f16, CN>,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
     dispatcher_4_rows: Option<
         fn(usize, usize, &FilterWeights<V>, &[f16], usize, &mut [f16], usize),
     >,
@@ -115,99 +88,48 @@ pub(crate) fn convolve_horizontal_dispatch_f16<V: Copy + Send + Sync, const CN: 
 
     let c_weights = weights_converter.prepare_weights(&filter_weights);
 
-    if let Some(pool) = pool {
-        pool.install(|| {
-            let mut processed_4 = false;
+    let mut processed_4 = false;
 
-            if let Some(dispatcher) = dispatcher_4_rows {
-                image_store
-                    .buffer
-                    .as_ref()
-                    .par_chunks_exact(src_stride * 4)
-                    .zip(
-                        destination
-                            .buffer
-                            .borrow_mut()
-                            .par_chunks_exact_mut(dst_stride * 4),
-                    )
-                    .for_each(|(src, dst)| {
-                        dispatcher(
-                            dst_width, src_width, &c_weights, src, src_stride, dst, dst_stride,
-                        );
-                    });
-                processed_4 = true;
-            }
+    if let Some(dispatcher) = dispatcher_4_rows {
+        let src = image_store.buffer.as_ref();
+        destination
+            .buffer
+            .borrow_mut()
+            .tb_par_chunks_exact_mut(dst_stride * 4)
+            .for_each_enumerated(pool, |y, dst| {
+                let src = &src[y * src_stride * 4..(y + 1) * src_stride * 4];
 
-            let left_src_rows = if processed_4 {
-                image_store
-                    .buffer
-                    .as_ref()
-                    .chunks_exact(src_stride * 4)
-                    .remainder()
-            } else {
-                image_store.buffer.as_ref()
-            };
-            let left_dst_rows = if processed_4 {
-                destination
-                    .buffer
-                    .borrow_mut()
-                    .chunks_exact_mut(dst_stride * 4)
-                    .into_remainder()
-            } else {
-                destination.buffer.borrow_mut()
-            };
-
-            left_src_rows
-                .par_chunks_exact(src_stride)
-                .zip(left_dst_rows.par_chunks_exact_mut(dst_stride))
-                .for_each(|(src, dst)| {
-                    dispatcher_row(dst_width, src_width, &c_weights, src, dst);
-                });
-        });
-    } else {
-        let mut processed_4 = false;
-        if let Some(dispatcher) = dispatcher_4_rows {
-            for (src, dst) in image_store
-                .buffer
-                .as_ref()
-                .chunks_exact(src_stride * 4)
-                .zip(
-                    destination
-                        .buffer
-                        .borrow_mut()
-                        .chunks_exact_mut(dst_stride * 4),
-                )
-            {
                 dispatcher(
                     dst_width, src_width, &c_weights, src, src_stride, dst, dst_stride,
                 );
-            }
-            processed_4 = true;
-        }
-
-        let left_src_rows = if processed_4 {
-            image_store
-                .buffer
-                .as_ref()
-                .chunks_exact(src_stride * 4)
-                .remainder()
-        } else {
-            image_store.buffer.as_ref()
-        };
-        let left_dst_rows = if processed_4 {
-            destination
-                .buffer
-                .borrow_mut()
-                .chunks_exact_mut(dst_stride * 4)
-                .into_remainder()
-        } else {
-            destination.buffer.borrow_mut()
-        };
-        for (src, dst) in left_src_rows
-            .chunks_exact(src_stride)
-            .zip(left_dst_rows.chunks_exact_mut(dst_stride))
-        {
-            dispatcher_row(dst_width, src_width, &c_weights, src, dst);
-        }
+            });
+        processed_4 = true;
     }
+
+    let left_src_rows = if processed_4 {
+        image_store
+            .buffer
+            .as_ref()
+            .chunks_exact(src_stride * 4)
+            .remainder()
+    } else {
+        image_store.buffer.as_ref()
+    };
+    let left_dst_rows = if processed_4 {
+        destination
+            .buffer
+            .borrow_mut()
+            .chunks_exact_mut(dst_stride * 4)
+            .into_remainder()
+    } else {
+        destination.buffer.borrow_mut()
+    };
+
+    left_dst_rows
+        .tb_par_chunks_exact_mut(dst_stride)
+        .for_each_enumerated(pool, |y, dst| {
+            let src = &left_src_rows[y * src_stride..(y + 1) * src_stride];
+
+            dispatcher_row(dst_width, src_width, &c_weights, src, dst);
+        });
 }
