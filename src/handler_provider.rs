@@ -172,7 +172,7 @@ where
     i32: AsPrimitive<J>,
     f32: AsPrimitive<J>,
 {
-    fn handle_row_4<const COMPONENTS: usize>(
+    fn handle_row_4<const CN: usize>(
         src: &[T],
         src_stride: usize,
         dst: &mut [T],
@@ -181,7 +181,7 @@ where
         bit_depth: u32,
     );
 
-    fn handle_row<const COMPONENTS: usize>(
+    fn handle_row<const CN: usize>(
         src: &[T],
         dst: &mut [T],
         filter_weights: &FilterWeights<F>,
@@ -191,13 +191,13 @@ where
 
 impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
     #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
-    fn handle_row<const COMPONENTS: usize>(
+    fn handle_row<const CN: usize>(
         src: &[u16],
         dst: &mut [u16],
         filter_weights: &FilterWeights<f32>,
         bit_depth: u32,
     ) {
-        convolve_row_handler_floating_point::<u16, f32, f32, COMPONENTS>(
+        convolve_row_handler_floating_point::<u16, f32, f32, CN>(
             src,
             dst,
             filter_weights,
@@ -206,7 +206,7 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    fn handle_row<const COMPONENTS: usize>(
+    fn handle_row<const CN: usize>(
         src: &[u16],
         dst: &mut [u16],
         filter_weights: &FilterWeights<f32>,
@@ -214,14 +214,14 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
     ) {
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         {
-            if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("avx2") {
+            if CN == 4 && std::arch::is_x86_feature_detected!("avx2") {
                 use crate::avx2::convolve_horizontal_rgba_avx_u16_row_f;
                 return convolve_horizontal_rgba_avx_u16_row_f(src, dst, filter_weights, bit_depth);
             }
         }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         {
-            if COMPONENTS == 1 && std::arch::is_x86_feature_detected!("avx2") {
+            if CN == 1 && std::arch::is_x86_feature_detected!("avx2") {
                 use crate::avx2::convolve_horizontal_plane_avx_u16_row_f;
                 return convolve_horizontal_plane_avx_u16_row_f(
                     src,
@@ -232,10 +232,10 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
             }
         }
         #[cfg(feature = "sse")]
-        if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("sse4.1") {
+        if CN == 4 && std::arch::is_x86_feature_detected!("sse4.1") {
             return convolve_horizontal_rgba_sse_u16_row(src, dst, filter_weights, bit_depth);
         }
-        convolve_row_handler_floating_point::<u16, f32, f32, COMPONENTS>(
+        convolve_row_handler_floating_point::<u16, f32, f32, CN>(
             src,
             dst,
             filter_weights,
@@ -244,7 +244,7 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
     }
 
     #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
-    fn handle_row_4<const COMPONENTS: usize>(
+    fn handle_row_4<const CN: usize>(
         src: &[u16],
         src_stride: usize,
         dst: &mut [u16],
@@ -252,7 +252,7 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
         filter_weights: &FilterWeights<f32>,
         bit_depth: u32,
     ) {
-        convolve_row_handler_floating_point_4::<u16, f32, f32, COMPONENTS>(
+        convolve_row_handler_floating_point_4::<u16, f32, f32, CN>(
             src,
             src_stride,
             dst,
@@ -263,7 +263,7 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    fn handle_row_4<const COMPONENTS: usize>(
+    fn handle_row_4<const CN: usize>(
         src: &[u16],
         src_stride: usize,
         dst: &mut [u16],
@@ -273,7 +273,7 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
     ) {
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         {
-            if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("avx2") {
+            if CN == 4 && std::arch::is_x86_feature_detected!("avx2") {
                 use crate::avx2::convolve_horizontal_rgba_avx_rows_4_u16_f;
                 return convolve_horizontal_rgba_avx_rows_4_u16_f(
                     src,
@@ -287,7 +287,7 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
         }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         {
-            if COMPONENTS == 1 && std::arch::is_x86_feature_detected!("avx2") {
+            if CN == 1 && std::arch::is_x86_feature_detected!("avx2") {
                 use crate::avx2::convolve_horizontal_plane_avx_rows_4_u16_f;
                 return convolve_horizontal_plane_avx_rows_4_u16_f(
                     src,
@@ -300,7 +300,7 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
             }
         }
         #[cfg(feature = "sse")]
-        if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("sse4.1") {
+        if CN == 4 && std::arch::is_x86_feature_detected!("sse4.1") {
             return convolve_horizontal_rgba_sse_rows_4_u16(
                 src,
                 src_stride,
@@ -310,7 +310,7 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
                 bit_depth,
             );
         }
-        convolve_row_handler_floating_point_4::<u16, f32, f32, COMPONENTS>(
+        convolve_row_handler_floating_point_4::<u16, f32, f32, CN>(
             src,
             src_stride,
             dst,
@@ -322,7 +322,7 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
 }
 
 pub(crate) trait ColumnHandlerFixedPoint<T> {
-    fn handle_fixed_column<J, const COMPONENTS: usize>(
+    fn handle_fixed_column<J, const CN: usize>(
         dst_width: usize,
         bounds: &FilterBounds,
         src: &[T],
@@ -344,7 +344,7 @@ pub(crate) trait ColumnHandlerFixedPoint<T> {
 }
 
 pub(crate) trait RowHandlerFixedPoint<T> {
-    fn handle_fixed_row_4<J, const COMPONENTS: usize>(
+    fn handle_fixed_row_4<J, const CN: usize>(
         src: &[T],
         src_stride: usize,
         dst: &mut [T],
@@ -364,7 +364,7 @@ pub(crate) trait RowHandlerFixedPoint<T> {
         i32: AsPrimitive<J>,
         i16: AsPrimitive<J>;
 
-    fn handle_fixed_row<J, const COMPONENTS: usize>(
+    fn handle_fixed_row<J, const CN: usize>(
         src: &[T],
         dst: &mut [T],
         filter_weights: &FilterWeights<i16>,
@@ -388,7 +388,7 @@ impl RowHandlerFixedPoint<u16> for u16 {
         all(target_arch = "aarch64", target_feature = "neon"),
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
-    fn handle_fixed_row_4<J, const COMPONENTS: usize>(
+    fn handle_fixed_row_4<J, const CN: usize>(
         src: &[u16],
         src_stride: usize,
         dst: &mut [u16],
@@ -408,7 +408,7 @@ impl RowHandlerFixedPoint<u16> for u16 {
         i16: AsPrimitive<J>,
         u16: AsPrimitive<J>,
     {
-        convolve_row_handler_fixed_point_4::<u16, J, COMPONENTS>(
+        convolve_row_handler_fixed_point_4::<u16, J, CN>(
             src,
             src_stride,
             dst,
@@ -419,7 +419,7 @@ impl RowHandlerFixedPoint<u16> for u16 {
     }
 
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-    fn handle_fixed_row_4<J, const COMPONENTS: usize>(
+    fn handle_fixed_row_4<J, const CN: usize>(
         src: &[u16],
         src_stride: usize,
         dst: &mut [u16],
@@ -439,7 +439,7 @@ impl RowHandlerFixedPoint<u16> for u16 {
         i16: AsPrimitive<J>,
         u16: AsPrimitive<J>,
     {
-        if COMPONENTS == 4 {
+        if CN == 4 {
             convolve_horizontal_rgba_neon_rows_4_lb_u16(
                 src,
                 src_stride,
@@ -448,7 +448,7 @@ impl RowHandlerFixedPoint<u16> for u16 {
                 filter_weights,
                 bit_depth,
             )
-        } else if COMPONENTS == 3 {
+        } else if CN == 3 {
             use crate::neon::convolve_horizontal_rgb_neon_rows_4_lb_u16;
             convolve_horizontal_rgb_neon_rows_4_lb_u16(
                 src,
@@ -458,7 +458,7 @@ impl RowHandlerFixedPoint<u16> for u16 {
                 filter_weights,
                 bit_depth,
             )
-        } else if COMPONENTS == 1 {
+        } else if CN == 1 {
             use crate::neon::convolve_horizontal_plane_neon_rows_4_lb_u16;
             convolve_horizontal_plane_neon_rows_4_lb_u16(
                 src,
@@ -469,7 +469,7 @@ impl RowHandlerFixedPoint<u16> for u16 {
                 bit_depth,
             )
         } else {
-            convolve_row_handler_fixed_point_4::<u16, J, COMPONENTS>(
+            convolve_row_handler_fixed_point_4::<u16, J, CN>(
                 src,
                 src_stride,
                 dst,
@@ -481,7 +481,7 @@ impl RowHandlerFixedPoint<u16> for u16 {
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    fn handle_fixed_row_4<J, const COMPONENTS: usize>(
+    fn handle_fixed_row_4<J, const CN: usize>(
         src: &[u16],
         src_stride: usize,
         dst: &mut [u16],
@@ -502,7 +502,7 @@ impl RowHandlerFixedPoint<u16> for u16 {
         u16: AsPrimitive<J>,
     {
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
-        if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("avx2") {
+        if CN == 4 && std::arch::is_x86_feature_detected!("avx2") {
             use crate::avx2::convolve_horizontal_rgba_avx_rows_4_u16;
             return convolve_horizontal_rgba_avx_rows_4_u16(
                 src,
@@ -514,7 +514,7 @@ impl RowHandlerFixedPoint<u16> for u16 {
             );
         }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
-        if COMPONENTS == 1 && std::arch::is_x86_feature_detected!("avx2") {
+        if CN == 1 && std::arch::is_x86_feature_detected!("avx2") {
             use crate::avx2::convolve_horizontal_plane_avx_rows_4_u16;
             return convolve_horizontal_plane_avx_rows_4_u16(
                 src,
@@ -526,7 +526,7 @@ impl RowHandlerFixedPoint<u16> for u16 {
             );
         }
         #[cfg(feature = "sse")]
-        if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("sse4.1") {
+        if CN == 4 && std::arch::is_x86_feature_detected!("sse4.1") {
             return convolve_horizontal_rgba_sse_rows_4_lb_u8(
                 src,
                 src_stride,
@@ -536,7 +536,7 @@ impl RowHandlerFixedPoint<u16> for u16 {
                 bit_depth,
             );
         }
-        convolve_row_handler_fixed_point_4::<u16, J, COMPONENTS>(
+        convolve_row_handler_fixed_point_4::<u16, J, CN>(
             src,
             src_stride,
             dst,
@@ -550,7 +550,7 @@ impl RowHandlerFixedPoint<u16> for u16 {
         all(target_arch = "aarch64", target_feature = "neon"),
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
-    fn handle_fixed_row<J, const COMPONENTS: usize>(
+    fn handle_fixed_row<J, const CN: usize>(
         src: &[u16],
         dst: &mut [u16],
         filter_weights: &FilterWeights<i16>,
@@ -568,11 +568,11 @@ impl RowHandlerFixedPoint<u16> for u16 {
         i16: AsPrimitive<J>,
         u16: AsPrimitive<J>,
     {
-        convolve_row_handler_fixed_point::<u16, J, COMPONENTS>(src, dst, filter_weights, bit_depth)
+        convolve_row_handler_fixed_point::<u16, J, CN>(src, dst, filter_weights, bit_depth)
     }
 
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-    fn handle_fixed_row<J, const COMPONENTS: usize>(
+    fn handle_fixed_row<J, const CN: usize>(
         src: &[u16],
         dst: &mut [u16],
         filter_weights: &FilterWeights<i16>,
@@ -590,26 +590,21 @@ impl RowHandlerFixedPoint<u16> for u16 {
         i16: AsPrimitive<J>,
         u16: AsPrimitive<J>,
     {
-        if COMPONENTS == 4 {
+        if CN == 4 {
             convolve_horizontal_rgba_neon_u16_lb_row(src, dst, filter_weights, bit_depth)
-        } else if COMPONENTS == 3 {
+        } else if CN == 3 {
             use crate::neon::convolve_horizontal_rgb_neon_u16_lb_row;
             convolve_horizontal_rgb_neon_u16_lb_row(src, dst, filter_weights, bit_depth)
-        } else if COMPONENTS == 1 {
+        } else if CN == 1 {
             use crate::neon::convolve_horizontal_plane_neon_u16_lb_row;
             convolve_horizontal_plane_neon_u16_lb_row(src, dst, filter_weights, bit_depth)
         } else {
-            convolve_row_handler_fixed_point::<u16, J, COMPONENTS>(
-                src,
-                dst,
-                filter_weights,
-                bit_depth,
-            )
+            convolve_row_handler_fixed_point::<u16, J, CN>(src, dst, filter_weights, bit_depth)
         }
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    fn handle_fixed_row<J, const COMPONENTS: usize>(
+    fn handle_fixed_row<J, const CN: usize>(
         src: &[u16],
         dst: &mut [u16],
         filter_weights: &FilterWeights<i16>,
@@ -628,20 +623,20 @@ impl RowHandlerFixedPoint<u16> for u16 {
         u16: AsPrimitive<J>,
     {
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
-        if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("avx2") {
+        if CN == 4 && std::arch::is_x86_feature_detected!("avx2") {
             use crate::avx2::convolve_horizontal_rgba_avx_u16lp_row;
             return convolve_horizontal_rgba_avx_u16lp_row(src, dst, filter_weights, bit_depth);
         }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
-        if COMPONENTS == 1 && std::arch::is_x86_feature_detected!("avx2") {
+        if CN == 1 && std::arch::is_x86_feature_detected!("avx2") {
             use crate::avx2::convolve_horizontal_plane_avx_u16lp_row;
             return convolve_horizontal_plane_avx_u16lp_row(src, dst, filter_weights, bit_depth);
         }
         #[cfg(feature = "sse")]
-        if COMPONENTS == 4 && std::arch::is_x86_feature_detected!("sse4.1") {
+        if CN == 4 && std::arch::is_x86_feature_detected!("sse4.1") {
             return convolve_horizontal_rgba_sse_u16_lb_row(src, dst, filter_weights, bit_depth);
         }
-        convolve_row_handler_fixed_point::<u16, J, COMPONENTS>(src, dst, filter_weights, bit_depth)
+        convolve_row_handler_fixed_point::<u16, J, CN>(src, dst, filter_weights, bit_depth)
     }
 }
 
@@ -650,7 +645,7 @@ impl ColumnHandlerFixedPoint<u16> for u16 {
         all(target_arch = "aarch64", target_feature = "neon"),
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
-    fn handle_fixed_column<J, const COMPONENTS: usize>(
+    fn handle_fixed_column<J, const CN: usize>(
         dst_width: usize,
         bounds: &FilterBounds,
         src: &[u16],
@@ -676,7 +671,7 @@ impl ColumnHandlerFixedPoint<u16> for u16 {
     }
 
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-    fn handle_fixed_column<J, const COMPONENTS: usize>(
+    fn handle_fixed_column<J, const CN: usize>(
         dst_width: usize,
         bounds: &FilterBounds,
         src: &[u16],
@@ -700,7 +695,7 @@ impl ColumnHandlerFixedPoint<u16> for u16 {
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    fn handle_fixed_column<J, const COMPONENTS: usize>(
+    fn handle_fixed_column<J, const CN: usize>(
         dst_width: usize,
         bounds: &FilterBounds,
         src: &[u16],

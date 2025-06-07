@@ -218,7 +218,9 @@ pub(crate) fn convolve_vertical_dispatch_u16<const CN: usize>(
     if bit_depth > 12 {
         #[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
         {
-            if DefaultHighBitDepthHighHandlerNeon::is_available() {
+            if DefaultHighBitDepthHighHandlerNeon::is_available()
+                && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
+            {
                 return execute_low_precision_row(
                     image_store,
                     &filter_weights,

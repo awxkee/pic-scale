@@ -32,7 +32,8 @@
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use pic_scale::{
-    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingF32, WorkloadStrategy,
+    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32, ThreadingPolicy,
+    WorkloadStrategy,
 };
 
 #[derive(Clone, Debug, Arbitrary)]
@@ -43,6 +44,7 @@ pub struct SrcImage {
     pub dst_height: u16,
     pub value: u16,
     pub use_quality: bool,
+    pub threading: bool,
 }
 
 fuzz_target!(|data: SrcImage| {
@@ -54,6 +56,11 @@ fuzz_target!(|data: SrcImage| {
         ResamplingFunction::Bilinear,
         data.value as f32 / 65535.,
         data.use_quality,
+        if data.threading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        },
     )
 });
 
@@ -65,6 +72,7 @@ fn resize_plane(
     sampler: ResamplingFunction,
     value: f32,
     use_quality: bool,
+    threading_policy: ThreadingPolicy,
 ) {
     if src_width == 0
         || src_width > 2000
@@ -89,5 +97,6 @@ fn resize_plane(
     } else {
         WorkloadStrategy::PreferSpeed
     });
+    scaler.set_threading_policy(threading_policy);
     scaler.resize_plane_f32(&store, &mut target).unwrap();
 }

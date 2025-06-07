@@ -32,7 +32,10 @@
 use arbitrary::Arbitrary;
 use core::f16;
 use libfuzzer_sys::fuzz_target;
-use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, WorkloadStrategy};
+use pic_scale::{
+    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ThreadingPolicy,
+    WorkloadStrategy,
+};
 
 #[derive(Clone, Debug, Arbitrary)]
 pub struct SrcImage {
@@ -43,6 +46,7 @@ pub struct SrcImage {
     pub value: u16,
     pub use_quality: bool,
     pub premultiply_alpha: bool,
+    pub threading: bool,
 }
 
 fuzz_target!(|data: SrcImage| {
@@ -58,6 +62,11 @@ fuzz_target!(|data: SrcImage| {
         data.dst_height as usize,
         ResamplingFunction::Bilinear,
         strategy,
+        if data.threading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        },
     );
 });
 
@@ -68,6 +77,7 @@ fn resize_cbcr16(
     dst_height: usize,
     sampler: ResamplingFunction,
     workload_strategy: WorkloadStrategy,
+    threading_policy: ThreadingPolicy,
 ) {
     if src_width == 0
         || src_width > 2000
@@ -86,5 +96,6 @@ fn resize_cbcr16(
 
     let mut scaler = Scaler::new(sampler);
     scaler.set_workload_strategy(workload_strategy);
+    scaler.set_threading_policy(threading_policy);
     scaler.resize_cbcr_f16(&store, &mut target).unwrap();
 }
