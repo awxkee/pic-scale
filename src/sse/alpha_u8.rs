@@ -29,9 +29,7 @@
 
 use crate::WorkloadStrategy;
 use crate::sse::{sse_deinterleave_rgba, sse_interleave_rgba};
-use rayon::ThreadPool;
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::{ParallelSlice, ParallelSliceMut};
+use novtb::{ParallelZonedIterator, TbSliceMut};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -124,7 +122,7 @@ pub(crate) fn sse_premultiply_alpha_rgba(
     width: usize,
     height: usize,
     src_stride: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
     unsafe {
         sse_premultiply_alpha_rgba_impl(dst, dst_stride, src, width, height, src_stride, pool);
@@ -247,31 +245,17 @@ unsafe fn sse_premultiply_alpha_rgba_impl(
     width: usize,
     _: usize,
     src_stride: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
-    if let Some(pool) = pool {
-        pool.install(|| {
-            dst.par_chunks_exact_mut(dst_stride)
-                .zip(src.par_chunks_exact(src_stride))
-                .for_each(|(dst, src)| unsafe {
-                    sse_premultiply_alpha_rgba_impl_row(
-                        &mut dst[..width * 4],
-                        &src[..width * 4],
-                        Sse41PremultiplyExecutor8Default::default(),
-                    );
-                });
+    dst.tb_par_chunks_exact_mut(dst_stride)
+        .for_each_enumerated(pool, |y, dst| unsafe {
+            let src = &src[y * src_stride..(y + 1) * src_stride];
+            sse_premultiply_alpha_rgba_impl_row(
+                &mut dst[..width * 4],
+                &src[..width * 4],
+                Sse41PremultiplyExecutor8Default::default(),
+            );
         });
-    } else {
-        dst.chunks_exact_mut(dst_stride)
-            .zip(src.chunks_exact(src_stride))
-            .for_each(|(dst, src)| unsafe {
-                sse_premultiply_alpha_rgba_impl_row(
-                    &mut dst[..width * 4],
-                    &src[..width * 4],
-                    Sse41PremultiplyExecutor8Default::default(),
-                );
-            });
-    }
 }
 
 pub(crate) fn sse_unpremultiply_alpha_rgba(
@@ -279,7 +263,7 @@ pub(crate) fn sse_unpremultiply_alpha_rgba(
     width: usize,
     height: usize,
     stride: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
     _: WorkloadStrategy,
 ) {
     unsafe {
@@ -364,25 +348,14 @@ unsafe fn sse_unpremultiply_alpha_rgba_impl(
     width: usize,
     _: usize,
     stride: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
-    if let Some(pool) = pool {
-        pool.install(|| {
-            in_place
-                .par_chunks_exact_mut(stride)
-                .for_each(|row| unsafe {
-                    sse_unpremultiply_alpha_rgba_impl_row(
-                        &mut row[..width * 4],
-                        DisassociateAlphaDefault::default(),
-                    );
-                });
-        });
-    } else {
-        in_place.chunks_exact_mut(stride).for_each(|row| unsafe {
+    in_place
+        .tb_par_chunks_exact_mut(stride)
+        .for_each(pool, |row| unsafe {
             sse_unpremultiply_alpha_rgba_impl_row(
                 &mut row[..width * 4],
                 DisassociateAlphaDefault::default(),
             );
         });
-    }
 }

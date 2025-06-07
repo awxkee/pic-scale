@@ -53,7 +53,6 @@ use crate::sse::{
 use crate::wasm32::wasm_vertical_neon_row;
 #[allow(dead_code)]
 use num_traits::AsPrimitive;
-use rayon::ThreadPool;
 
 #[allow(dead_code)]
 #[derive(Default)]
@@ -75,7 +74,7 @@ impl HorizontalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<u8, 4>,
-        pool: &Option<ThreadPool>,
+        pool: &novtb::ThreadPool,
         _options: ConvolutionOptions,
     ) {
         let _scale_factor = self.width as f32 / destination.width as f32;
@@ -196,7 +195,7 @@ impl VerticalConvolutionPass<u8, 4> for ImageStore<'_, u8, 4> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<u8, 4>,
-        pool: &Option<ThreadPool>,
+        pool: &novtb::ThreadPool,
         _options: ConvolutionOptions,
     ) {
         let _scale_factor = self.height as f32 / destination.height as f32;

@@ -27,7 +27,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use rayon::ThreadPool;
 use std::fmt::Debug;
 
 use crate::filter_weights::FilterWeights;
@@ -55,7 +54,7 @@ where
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<T, N>,
-        pool: &Option<ThreadPool>,
+        pool: &novtb::ThreadPool,
         options: ConvolutionOptions,
     );
 }
@@ -68,7 +67,7 @@ where
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<T, N>,
-        pool: &Option<ThreadPool>,
+        pool: &novtb::ThreadPool,
         options: ConvolutionOptions,
     );
 }

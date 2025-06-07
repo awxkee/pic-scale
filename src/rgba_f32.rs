@@ -45,7 +45,6 @@ use crate::rgb_f32::{convolve_vertical_rgb_native_row_f32, convolve_vertical_rgb
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::*;
 use crate::{ImageStore, WorkloadStrategy};
-use rayon::ThreadPool;
 
 impl HorizontalConvolutionPass<f32, 4> for ImageStore<'_, f32, 4> {
     #[allow(clippy::type_complexity)]
@@ -53,7 +52,7 @@ impl HorizontalConvolutionPass<f32, 4> for ImageStore<'_, f32, 4> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f32, 4>,
-        pool: &Option<ThreadPool>,
+        pool: &novtb::ThreadPool,
         options: ConvolutionOptions,
     ) {
         match options.workload_strategy {
@@ -147,7 +146,7 @@ impl VerticalConvolutionPass<f32, 4> for ImageStore<'_, f32, 4> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f32, 4>,
-        pool: &Option<ThreadPool>,
+        pool: &novtb::ThreadPool,
         options: ConvolutionOptions,
     ) {
         match options.workload_strategy {

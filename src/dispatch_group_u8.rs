@@ -29,17 +29,14 @@
 use crate::ImageStore;
 use crate::filter_weights::{FilterBounds, FilterWeights, WeightsConverter};
 use crate::image_store::ImageStoreMut;
-use rayon::ThreadPool;
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::{ParallelSlice, ParallelSliceMut};
-use std::sync::Arc;
+use novtb::{ParallelZonedIterator, TbSliceMut};
 
 #[allow(clippy::type_complexity)]
 pub(crate) fn convolve_horizontal_dispatch_u8<V: Send + Sync, const CN: usize>(
     image_store: &ImageStore<u8, CN>,
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStoreMut<u8, CN>,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
     dispatcher_4_rows: Option<fn(&[u8], usize, &mut [u8], usize, &FilterWeights<V>)>,
     dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<V>),
     weights_converter: impl WeightsConverter<V>,
@@ -54,48 +51,24 @@ pub(crate) fn convolve_horizontal_dispatch_u8<V: Send + Sync, const CN: usize>(
 
     let src_stride = image_store.stride();
 
-    if let Some(pool) = pool {
-        let arc_weights = Arc::new(approx_weights);
-        pool.install(|| {
-            let mut rem = dst;
-            let mut src_rem = src;
-            if let Some(dispatcher_4) = dispatcher_4_rows {
-                rem.par_chunks_exact_mut(dst_stride * 4)
-                    .zip(src_rem.par_chunks_exact(src_stride * 4))
-                    .for_each(|(dst, src)| {
-                        dispatcher_4(src, src_stride, dst, dst_stride, &arc_weights);
-                    });
-
-                rem = rem.chunks_exact_mut(dst_stride * 4).into_remainder();
-                src_rem = src_rem.chunks_exact(src_stride * 4).remainder();
-            }
-
-            rem.par_chunks_exact_mut(dst_stride)
-                .zip(src_rem.par_chunks_exact(src_stride))
-                .for_each(|(dst, src)| {
-                    dispatcher_1_row(src, dst, &arc_weights);
-                });
-        });
-    } else {
-        let mut rem = dst;
-        let mut src_rem = src;
-        if let Some(dispatcher_4) = dispatcher_4_rows {
-            rem.chunks_exact_mut(dst_stride * 4)
-                .zip(src_rem.chunks_exact(src_stride * 4))
-                .for_each(|(dst, src)| {
-                    dispatcher_4(src, src_stride, dst, dst_stride, &approx_weights);
-                });
-
-            rem = rem.chunks_exact_mut(dst_stride * 4).into_remainder();
-            src_rem = src_rem.chunks_exact(src_stride * 4).remainder();
-        }
-
-        rem.chunks_exact_mut(dst_stride)
-            .zip(src_rem.chunks_exact(src_stride))
-            .for_each(|(dst, src)| {
-                dispatcher_1_row(src, dst, &approx_weights);
+    let mut rem = dst;
+    let mut src_rem = src;
+    if let Some(dispatcher_4) = dispatcher_4_rows {
+        rem.tb_par_chunks_exact_mut(dst_stride * 4)
+            .for_each_enumerated(pool, |y, dst| {
+                let src = &src_rem[y * src_stride * 4..(y + 1) * src_stride * 4];
+                dispatcher_4(src, src_stride, dst, dst_stride, &approx_weights);
             });
+
+        rem = rem.chunks_exact_mut(dst_stride * 4).into_remainder();
+        src_rem = src_rem.chunks_exact(src_stride * 4).remainder();
     }
+
+    rem.tb_par_chunks_exact_mut(dst_stride)
+        .for_each_enumerated(pool, |y, dst| {
+            let src = &src_rem[y * src_stride..(y + 1) * src_stride];
+            dispatcher_1_row(src, dst, &approx_weights);
+        });
 }
 
 #[allow(clippy::type_complexity)]
@@ -103,7 +76,7 @@ pub(crate) fn convolve_vertical_dispatch_u8<'a, V: Copy + Send + Sync, const CN:
     image_store: &ImageStore<u8, CN>,
     filter_weights: FilterWeights<f32>,
     destination: &mut ImageStoreMut<'a, u8, CN>,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
     dispatcher: fn(usize, &FilterBounds, &[u8], &mut [u8], usize, &[V]),
     weights_converter: impl WeightsConverter<V>,
 ) {
@@ -129,23 +102,10 @@ pub(crate) fn convolve_vertical_dispatch_u8<'a, V: Copy + Send + Sync, const CN:
         );
     };
 
-    if let Some(pool) = pool {
-        pool.install(|| {
-            let destination_image = destination.buffer.borrow_mut();
-            destination_image
-                .par_chunks_exact_mut(dst_stride)
-                .enumerate()
-                .for_each(|(y, row)| {
-                    process_row(y, row);
-                });
+    let destination_image = destination.buffer.borrow_mut();
+    destination_image
+        .tb_par_chunks_exact_mut(dst_stride)
+        .for_each_enumerated(pool, |y, row| {
+            process_row(y, row);
         });
-    } else {
-        let destination_image = destination.buffer.borrow_mut();
-        destination_image
-            .chunks_exact_mut(dst_stride)
-            .enumerate()
-            .for_each(|(y, row)| {
-                process_row(y, row);
-            });
-    }
 }

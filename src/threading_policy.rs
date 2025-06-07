@@ -88,6 +88,14 @@ impl ThreadingPolicy {
             .ok()
     }
 
+    pub(crate) fn get_nova_pool(&self, for_size: ImageSize) -> novtb::ThreadPool {
+        if *self == ThreadingPolicy::Single {
+            return novtb::ThreadPool::new(1);
+        }
+        let thread_count = self.thread_count(for_size);
+        novtb::ThreadPool::new(thread_count)
+    }
+
     #[cfg(target_arch = "wasm32")]
     pub fn get_pool(&self, _: ImageSize) -> Option<ThreadPool> {
         None

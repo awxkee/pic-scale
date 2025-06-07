@@ -28,16 +28,14 @@
  *
  */
 #![forbid(unsafe_code)]
+
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::{avx_premultiply_alpha_rgba_u16, avx_unpremultiply_alpha_rgba_u16};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
 use crate::neon::{neon_premultiply_alpha_rgba_u16, neon_unpremultiply_alpha_rgba_u16};
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::{premultiply_alpha_sse_rgba_u16, unpremultiply_alpha_sse_rgba_u16};
-use rayon::ThreadPool;
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::ParallelSlice;
-use rayon::slice::ParallelSliceMut;
+use novtb::{ParallelZonedIterator, TbSliceMut};
 
 #[inline]
 /// Divides value by 1023 with rounding to nearest
@@ -178,28 +176,14 @@ fn premultiply_alpha_rgba_impl(
     _: usize,
     src_stride: usize,
     bit_depth: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
     let max_colors = (1 << bit_depth) - 1;
-    if let Some(pool) = pool {
-        pool.install(|| {
-            dst.par_chunks_exact_mut(dst_stride)
-                .zip(src.par_chunks_exact(src_stride))
-                .for_each(|(dst, src)| {
-                    premultiply_alpha_rgba_row(
-                        &mut dst[..width * 4],
-                        &src[..width * 4],
-                        max_colors,
-                    );
-                });
+    dst.tb_par_chunks_exact_mut(dst_stride)
+        .for_each_enumerated(pool, |y, dst| {
+            let src = &src[y * src_stride..(y + 1) * src_stride];
+            premultiply_alpha_rgba_row(&mut dst[..width * 4], &src[..width * 4], max_colors);
         });
-    } else {
-        dst.chunks_exact_mut(dst_stride)
-            .zip(src.chunks_exact(src_stride))
-            .for_each(|(dst, src)| {
-                premultiply_alpha_rgba_row(&mut dst[..width * 4], &src[..width * 4], max_colors);
-            });
-    }
 }
 
 fn premultiply_alpha_gray_alpha_impl(
@@ -210,32 +194,14 @@ fn premultiply_alpha_gray_alpha_impl(
     _: usize,
     src_stride: usize,
     bit_depth: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
     let max_colors = (1 << bit_depth) - 1;
-    if let Some(pool) = pool {
-        pool.install(|| {
-            dst.par_chunks_exact_mut(dst_stride)
-                .zip(src.par_chunks_exact(src_stride))
-                .for_each(|(dst, src)| {
-                    premultiply_alpha_gray_alpha_row(
-                        &mut dst[..width * 2],
-                        &src[..width * 2],
-                        max_colors,
-                    );
-                });
+    dst.tb_par_chunks_exact_mut(dst_stride)
+        .for_each_enumerated(pool, |y, dst| {
+            let src = &src[y * src_stride..(y + 1) * src_stride];
+            premultiply_alpha_gray_alpha_row(&mut dst[..width * 2], &src[..width * 2], max_colors);
         });
-    } else {
-        dst.chunks_exact_mut(dst_stride)
-            .zip(src.chunks_exact(src_stride))
-            .for_each(|(dst, src)| {
-                premultiply_alpha_gray_alpha_row(
-                    &mut dst[..width * 2],
-                    &src[..width * 2],
-                    max_colors,
-                );
-            });
-    }
 }
 
 fn unpremultiply_alpha_rgba_impl(
@@ -244,20 +210,14 @@ fn unpremultiply_alpha_rgba_impl(
     width: usize,
     _: usize,
     bit_depth: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
     let max_colors = (1 << bit_depth) - 1;
-    if let Some(pool) = pool {
-        pool.install(|| {
-            in_place.par_chunks_exact_mut(src_stride).for_each(|row| {
-                unpremultiply_alpha_rgba_row(&mut row[..width * 4], max_colors);
-            });
-        });
-    } else {
-        in_place.chunks_exact_mut(src_stride).for_each(|row| {
+    in_place
+        .tb_par_chunks_exact_mut(src_stride)
+        .for_each(pool, |row| {
             unpremultiply_alpha_rgba_row(&mut row[..width * 4], max_colors);
         });
-    }
 }
 
 fn unpremultiply_alpha_gray_alpha_impl(
@@ -266,20 +226,14 @@ fn unpremultiply_alpha_gray_alpha_impl(
     width: usize,
     _: usize,
     bit_depth: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
     let max_colors = (1 << bit_depth) - 1;
-    if let Some(pool) = pool {
-        pool.install(|| {
-            in_place.par_chunks_exact_mut(src_stride).for_each(|row| {
-                unpremultiply_alpha_gray_alpha_row(&mut row[..width * 2], max_colors);
-            });
-        });
-    } else {
-        in_place.chunks_exact_mut(src_stride).for_each(|row| {
+    in_place
+        .tb_par_chunks_exact_mut(src_stride)
+        .for_each(pool, |row| {
             unpremultiply_alpha_gray_alpha_row(&mut row[..width * 2], max_colors);
         });
-    }
 }
 
 pub(crate) fn premultiply_alpha_rgba_u16(
@@ -290,7 +244,7 @@ pub(crate) fn premultiply_alpha_rgba_u16(
     height: usize,
     src_stride: usize,
     bit_depth: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
     #[allow(clippy::type_complexity)]
     let mut _dispatcher: fn(
@@ -301,7 +255,7 @@ pub(crate) fn premultiply_alpha_rgba_u16(
         usize,
         usize,
         usize,
-        &Option<ThreadPool>,
+        &novtb::ThreadPool,
     ) = premultiply_alpha_rgba_impl;
     #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
     {
@@ -332,7 +286,7 @@ pub(crate) fn premultiply_alpha_gray_alpha_u16(
     height: usize,
     src_stride: usize,
     bit_depth: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
     #[allow(clippy::type_complexity)]
     let mut _dispatcher: fn(
@@ -343,7 +297,7 @@ pub(crate) fn premultiply_alpha_gray_alpha_u16(
         usize,
         usize,
         usize,
-        &Option<ThreadPool>,
+        &novtb::ThreadPool,
     ) = premultiply_alpha_gray_alpha_impl;
     _dispatcher(
         dst, dst_stride, src, width, height, src_stride, bit_depth, pool,
@@ -356,10 +310,10 @@ pub(crate) fn unpremultiply_alpha_rgba_u16(
     width: usize,
     height: usize,
     bit_depth: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
     #[allow(clippy::type_complexity)]
-    let mut _dispatcher: fn(&mut [u16], usize, usize, usize, usize, &Option<ThreadPool>) =
+    let mut _dispatcher: fn(&mut [u16], usize, usize, usize, usize, &novtb::ThreadPool) =
         unpremultiply_alpha_rgba_impl;
     #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
     {
@@ -386,10 +340,10 @@ pub(crate) fn unpremultiply_alpha_gray_alpha_u16(
     width: usize,
     height: usize,
     bit_depth: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
     #[allow(clippy::type_complexity)]
-    let mut _dispatcher: fn(&mut [u16], usize, usize, usize, usize, &Option<ThreadPool>) =
+    let mut _dispatcher: fn(&mut [u16], usize, usize, usize, usize, &novtb::ThreadPool) =
         unpremultiply_alpha_gray_alpha_impl;
     _dispatcher(in_place, src_stride, width, height, bit_depth, pool);
 }

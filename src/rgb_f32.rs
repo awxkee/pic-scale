@@ -39,7 +39,6 @@ use crate::image_store::{ImageStore, ImageStoreMut};
 use crate::neon::*;
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::*;
-use rayon::ThreadPool;
 
 pub(crate) fn convolve_vertical_rgb_native_row_f32(
     _: usize,
@@ -69,7 +68,7 @@ impl HorizontalConvolutionPass<f32, 3> for ImageStore<'_, f32, 3> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f32, 3>,
-        pool: &Option<ThreadPool>,
+        pool: &novtb::ThreadPool,
         options: ConvolutionOptions,
     ) {
         match options.workload_strategy {
@@ -174,7 +173,7 @@ impl VerticalConvolutionPass<f32, 3> for ImageStore<'_, f32, 3> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<f32, 3>,
-        pool: &Option<ThreadPool>,
+        pool: &novtb::ThreadPool,
         options: ConvolutionOptions,
     ) {
         match options.workload_strategy {

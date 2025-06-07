@@ -90,9 +90,9 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
         return Ok(());
     }
 
-    let pool = scaler
+    let nova_thread_pool = scaler
         .threading_policy
-        .get_pool(ImageSize::new(dst_size.width, dst_size.height));
+        .get_nova_pool(ImageSize::new(dst_size.width, dst_size.height));
 
     if scaler.function == ResamplingFunction::Nearest {
         resize_nearest::<u8, 4>(
@@ -102,7 +102,7 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
             dst,
             dst_stride,
             dst_size.height,
-            &pool,
+            &nova_thread_pool,
         );
         return Ok(());
     }
@@ -121,7 +121,7 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
             vertical_filters,
             dst,
             src_stride,
-            &pool,
+            &nova_thread_pool,
             src_size.width,
             options,
         );
@@ -136,7 +136,7 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
             vertical_filters,
             &mut target,
             src_size.width * 4,
-            &pool,
+            &nova_thread_pool,
             src_size.width,
             options,
         );
@@ -148,7 +148,7 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
             horizontal_filters,
             dst,
             dst_stride,
-            &pool,
+            &nova_thread_pool,
             options,
         );
     } else {
@@ -159,7 +159,7 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
             horizontal_filters,
             dst,
             dst_stride,
-            &pool,
+            &nova_thread_pool,
             options,
         );
     }

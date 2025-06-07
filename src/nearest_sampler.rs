@@ -27,9 +27,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
-use rayon::ThreadPool;
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::ParallelSliceMut;
+
+use novtb::{ParallelZonedIterator, TbSliceMut};
 
 pub(crate) fn resize_nearest<T: Copy + Send + Sync, const CHANNELS: usize>(
     src: &[T],
@@ -38,7 +37,7 @@ pub(crate) fn resize_nearest<T: Copy + Send + Sync, const CHANNELS: usize>(
     dst: &mut [T],
     dst_width: usize,
     dst_height: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
     let x_scale = src_width as f32 / dst_width as f32;
     let y_scale = src_height as f32 / dst_height as f32;
@@ -49,51 +48,24 @@ pub(crate) fn resize_nearest<T: Copy + Send + Sync, const CHANNELS: usize>(
     let dst_stride = dst_width * CHANNELS;
     let src_stride = src_width * CHANNELS;
 
-    if let Some(pool) = pool {
-        pool.install(|| {
-            dst.par_chunks_exact_mut(dst_stride)
-                .enumerate()
-                .for_each(|(y, dst_chunk)| {
-                    for (x, dst) in dst_chunk.chunks_exact_mut(CHANNELS).enumerate() {
-                        let src_x = ((x as f32 + 0.5f32) * x_scale - 0.5f32)
-                            .min(clip_width)
-                            .max(0f32) as usize;
-                        let src_y = ((y as f32 + 0.5f32) * y_scale - 0.5f32)
-                            .min(clip_height)
-                            .max(0f32) as usize;
-                        let src_offset_y = src_y * src_stride;
-                        let src_px = src_x * CHANNELS;
-                        let offset = src_offset_y + src_px;
+    dst.tb_par_chunks_exact_mut(dst_stride)
+        .for_each_enumerated(pool, |y, dst_chunk| {
+            for (x, dst) in dst_chunk.chunks_exact_mut(CHANNELS).enumerate() {
+                let src_x = ((x as f32 + 0.5f32) * x_scale - 0.5f32)
+                    .min(clip_width)
+                    .max(0f32) as usize;
+                let src_y = ((y as f32 + 0.5f32) * y_scale - 0.5f32)
+                    .min(clip_height)
+                    .max(0f32) as usize;
+                let src_offset_y = src_y * src_stride;
+                let src_px = src_x * CHANNELS;
+                let offset = src_offset_y + src_px;
 
-                        let src_slice = &src[offset..(offset + CHANNELS)];
+                let src_slice = &src[offset..(offset + CHANNELS)];
 
-                        for (src, dst) in src_slice.iter().zip(dst.iter_mut()) {
-                            *dst = *src;
-                        }
-                    }
-                });
-        });
-    } else {
-        dst.chunks_exact_mut(dst_stride)
-            .enumerate()
-            .for_each(|(y, dst_chunk)| {
-                for (x, dst) in dst_chunk.chunks_exact_mut(CHANNELS).enumerate() {
-                    let src_x = ((x as f32 + 0.5f32) * x_scale - 0.5f32)
-                        .min(clip_width)
-                        .max(0f32) as usize;
-                    let src_y = ((y as f32 + 0.5f32) * y_scale - 0.5f32)
-                        .min(clip_height)
-                        .max(0f32) as usize;
-                    let src_offset_y = src_y * src_stride;
-                    let src_px = src_x * CHANNELS;
-                    let offset = src_offset_y + src_px;
-
-                    let src_slice = &src[offset..(offset + CHANNELS)];
-
-                    for (src, dst) in src_slice.iter().zip(dst.iter_mut()) {
-                        *dst = *src;
-                    }
+                for (src, dst) in src_slice.iter().zip(dst.iter_mut()) {
+                    *dst = *src;
                 }
-            });
-    }
+            }
+        });
 }

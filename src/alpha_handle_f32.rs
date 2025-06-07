@@ -27,16 +27,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
+
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::{avx_premultiply_alpha_rgba_f32, avx_unpremultiply_alpha_rgba_f32};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
 use crate::neon::{neon_premultiply_alpha_rgba_f32, neon_unpremultiply_alpha_rgba_f32};
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::{sse_premultiply_alpha_rgba_f32, sse_unpremultiply_alpha_rgba_f32};
-use rayon::ThreadPool;
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::ParallelSlice;
-use rayon::slice::ParallelSliceMut;
+use novtb::{ParallelZonedIterator, TbSliceMut};
 
 pub(crate) fn unpremultiply_rgba_f32_row(in_place: &mut [f32]) {
     for dst in in_place.chunks_exact_mut(4) {
@@ -109,23 +107,13 @@ fn premultiply_alpha_rgba_impl_f32(
     src_stride: usize,
     width: usize,
     _: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
-    if let Some(pool) = pool {
-        pool.install(|| {
-            dst.par_chunks_exact_mut(dst_stride)
-                .zip(src.par_chunks_exact(src_stride))
-                .for_each(|(dst, src)| {
-                    premultiply_rgba_f32_row(&mut dst[..width * 4], &src[..width * 4]);
-                });
+    dst.tb_par_chunks_exact_mut(dst_stride)
+        .for_each_enumerated(pool, |y, dst| {
+            let src = &src[y * src_stride..(y + 1) * src_stride];
+            premultiply_rgba_f32_row(&mut dst[..width * 4], &src[..width * 4]);
         });
-    } else {
-        dst.chunks_exact_mut(dst_stride)
-            .zip(src.chunks_exact(src_stride))
-            .for_each(|(dst, src)| {
-                premultiply_rgba_f32_row(&mut dst[..width * 4], &src[..width * 4]);
-            });
-    }
 }
 
 fn premultiply_alpha_gray_alpha_impl_f32(
@@ -135,23 +123,13 @@ fn premultiply_alpha_gray_alpha_impl_f32(
     src_stride: usize,
     width: usize,
     _: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
-    if let Some(pool) = pool {
-        pool.install(|| {
-            dst.par_chunks_exact_mut(dst_stride)
-                .zip(src.par_chunks_exact(src_stride))
-                .for_each(|(dst, src)| {
-                    premultiply_gray_alpha_f32_row(&mut dst[..width * 2], &src[..width * 2]);
-                });
+    dst.tb_par_chunks_exact_mut(dst_stride)
+        .for_each_enumerated(pool, |y, dst| {
+            let src = &src[y * src_stride..(y + 1) * src_stride];
+            premultiply_gray_alpha_f32_row(&mut dst[..width * 2], &src[..width * 2]);
         });
-    } else {
-        dst.chunks_exact_mut(dst_stride)
-            .zip(src.chunks_exact(src_stride))
-            .for_each(|(dst, src)| {
-                premultiply_gray_alpha_f32_row(&mut dst[..width * 2], &src[..width * 2]);
-            });
-    }
 }
 
 fn unpremultiply_alpha_rgba_impl_f32(
@@ -159,19 +137,13 @@ fn unpremultiply_alpha_rgba_impl_f32(
     stride: usize,
     width: usize,
     _: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
-    if let Some(pool) = pool {
-        pool.install(|| {
-            in_place.par_chunks_exact_mut(stride).for_each(|row| {
-                unpremultiply_rgba_f32_row(&mut row[..width * 4]);
-            });
-        });
-    } else {
-        in_place.chunks_exact_mut(stride).for_each(|row| {
+    in_place
+        .tb_par_chunks_exact_mut(stride)
+        .for_each(pool, |row| {
             unpremultiply_rgba_f32_row(&mut row[..width * 4]);
         });
-    }
 }
 
 fn unpremultiply_alpha_gray_alpha_impl_f32(
@@ -179,19 +151,13 @@ fn unpremultiply_alpha_gray_alpha_impl_f32(
     stride: usize,
     width: usize,
     _: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
-    if let Some(pool) = pool {
-        pool.install(|| {
-            in_place.par_chunks_exact_mut(stride).for_each(|row| {
-                unpremultiply_gray_alpha_f32_row(&mut row[..width * 2]);
-            });
-        });
-    } else {
-        in_place.chunks_exact_mut(stride).for_each(|row| {
+    in_place
+        .tb_par_chunks_exact_mut(stride)
+        .for_each(pool, |row| {
             unpremultiply_gray_alpha_f32_row(&mut row[..width * 2]);
         });
-    }
 }
 
 pub(crate) fn premultiply_alpha_rgba_f32(
@@ -201,7 +167,7 @@ pub(crate) fn premultiply_alpha_rgba_f32(
     src_stride: usize,
     width: usize,
     height: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
     #[allow(clippy::type_complexity)]
     let mut _dispatcher: fn(
@@ -211,7 +177,7 @@ pub(crate) fn premultiply_alpha_rgba_f32(
         usize,
         usize,
         usize,
-        &Option<ThreadPool>,
+        &novtb::ThreadPool,
     ) = premultiply_alpha_rgba_impl_f32;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
@@ -239,7 +205,7 @@ pub(crate) fn premultiply_alpha_gray_alpha_f32(
     src_stride: usize,
     width: usize,
     height: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
     #[allow(clippy::type_complexity)]
     let mut _dispatcher: fn(
@@ -249,7 +215,7 @@ pub(crate) fn premultiply_alpha_gray_alpha_f32(
         usize,
         usize,
         usize,
-        &Option<ThreadPool>,
+        &novtb::ThreadPool,
     ) = premultiply_alpha_gray_alpha_impl_f32;
     _dispatcher(dst, dst_stride, src, src_stride, width, height, pool);
 }
@@ -259,9 +225,9 @@ pub(crate) fn unpremultiply_alpha_rgba_f32(
     stride: usize,
     width: usize,
     height: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
-    let mut _dispatcher: fn(&mut [f32], usize, usize, usize, &Option<ThreadPool>) =
+    let mut _dispatcher: fn(&mut [f32], usize, usize, usize, &novtb::ThreadPool) =
         unpremultiply_alpha_rgba_impl_f32;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
@@ -287,9 +253,9 @@ pub(crate) fn unpremultiply_alpha_gray_alpha_f32(
     stride: usize,
     width: usize,
     height: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
-    let mut _dispatcher: fn(&mut [f32], usize, usize, usize, &Option<ThreadPool>) =
+    let mut _dispatcher: fn(&mut [f32], usize, usize, usize, &novtb::ThreadPool) =
         unpremultiply_alpha_gray_alpha_impl_f32;
     _dispatcher(in_place, stride, width, height, pool);
 }

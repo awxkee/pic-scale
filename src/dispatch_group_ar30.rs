@@ -26,7 +26,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 use crate::convolution::ConvolutionOptions;
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::fixed_point_horizontal_ar30::{
@@ -34,9 +33,7 @@ use crate::fixed_point_horizontal_ar30::{
 };
 use crate::fixed_point_vertical_ar30::column_handler_fixed_point_ar30;
 use crate::support::PRECISION;
-use rayon::ThreadPool;
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::{ParallelSlice, ParallelSliceMut};
+use novtb::{ParallelZonedIterator, TbSliceMut};
 
 #[allow(clippy::type_complexity)]
 pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
@@ -45,48 +42,27 @@ pub(crate) fn convolve_horizontal_dispatch_ar30<const AR30_TYPE: usize, const AR
     filter_weights: FilterWeights<f32>,
     dst: &mut [u8],
     dst_stride: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
     _options: ConvolutionOptions,
 ) {
     let _dispatch4 = get_horizontal_dispatch4::<AR30_TYPE, AR30_ORDER>(_options);
     let _dispatch = get_horizontal_dispatch::<AR30_TYPE, AR30_ORDER>();
-    if let Some(pool) = pool {
-        pool.install(|| {
-            let approx = filter_weights.numerical_approximation_i16::<PRECISION>(0);
-            dst.par_chunks_exact_mut(dst_stride * 4)
-                .zip(src.par_chunks_exact(src_stride * 4))
-                .for_each(|(dst, src)| {
-                    _dispatch4(src, src_stride, dst, dst_stride, &approx);
-                });
-
-            let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
-            let src_remainder = src.chunks_exact(src_stride * 4).remainder();
-
-            remainder
-                .par_chunks_exact_mut(dst_stride)
-                .zip(src_remainder.par_chunks_exact(src_stride))
-                .for_each(|(dst, src)| {
-                    _dispatch(src, dst, &approx);
-                });
+    let approx = filter_weights.numerical_approximation_i16::<PRECISION>(0);
+    dst.tb_par_chunks_exact_mut(dst_stride * 4)
+        .for_each_enumerated(pool, |y, dst| {
+            let src = &src[y * src_stride * 4..(y + 1) * src_stride * 4];
+            _dispatch4(src, src_stride, dst, dst_stride, &approx);
         });
-    } else {
-        let approx = filter_weights.numerical_approximation_i16::<PRECISION>(0);
-        dst.chunks_exact_mut(dst_stride * 4)
-            .zip(src.chunks_exact(src_stride * 4))
-            .for_each(|(dst, src)| {
-                _dispatch4(src, src_stride, dst, dst_stride, &approx);
-            });
 
-        let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
-        let src_remainder = src.chunks_exact(src_stride * 4).remainder();
+    let remainder = dst.chunks_exact_mut(dst_stride * 4).into_remainder();
+    let src_remainder = src.chunks_exact(src_stride * 4).remainder();
 
-        remainder
-            .chunks_exact_mut(dst_stride)
-            .zip(src_remainder.chunks_exact(src_stride))
-            .for_each(|(dst, src)| {
-                _dispatch(src, dst, &approx);
-            });
-    }
+    remainder
+        .tb_par_chunks_exact_mut(dst_stride)
+        .for_each_enumerated(pool, |y, dst| {
+            let src = &src_remainder[y * src_stride..(y + 1) * src_stride];
+            _dispatch(src, dst, &approx);
+        });
 }
 
 fn get_horizontal_dispatch<const AR30_TYPE: usize, const AR30_ORDER: usize>()
@@ -166,38 +142,21 @@ pub(crate) fn convolve_vertical_dispatch_ar30<const AR30_TYPE: usize, const AR30
     filter_weights: FilterWeights<f32>,
     dst: &mut [u8],
     dst_stride: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
     width: usize,
     _options: ConvolutionOptions,
 ) {
     let _dispatch = get_vertical_dispatcher::<AR30_TYPE, AR30_ORDER>(_options);
 
-    if let Some(pool) = pool {
-        pool.install(|| {
-            let approx = filter_weights.numerical_approximation_i16::<PRECISION>(0);
-            dst.par_chunks_exact_mut(dst_stride)
-                .enumerate()
-                .for_each(|(y, row)| {
-                    let bounds = approx.bounds[y];
-                    let filter_offset = y * approx.aligned_size;
-                    let weights = &approx.weights[filter_offset..];
-                    let row = &mut row[..4 * width];
-                    _dispatch(&bounds, src, row, src_stride, weights);
-                });
+    let approx = filter_weights.numerical_approximation_i16::<PRECISION>(0);
+    dst.tb_par_chunks_exact_mut(dst_stride)
+        .for_each_enumerated(pool, |y, row| {
+            let bounds = approx.bounds[y];
+            let filter_offset = y * approx.aligned_size;
+            let weights = &approx.weights[filter_offset..];
+            let row = &mut row[..4 * width];
+            _dispatch(&bounds, src, row, src_stride, weights);
         });
-    } else {
-        let approx = filter_weights.numerical_approximation_i16::<PRECISION>(0);
-        dst.chunks_exact_mut(dst_stride)
-            .enumerate()
-            .for_each(|(y, row)| {
-                let bounds = approx.bounds[y];
-                let filter_offset = y * approx.aligned_size;
-                let weights = &approx.weights[filter_offset..];
-
-                let row = &mut row[..4 * width];
-                _dispatch(&bounds, src, row, src_stride, weights);
-            });
-    }
 }
 
 fn get_vertical_dispatcher<const AR30_TYPE: usize, const AR30_ORDER: usize>(

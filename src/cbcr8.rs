@@ -39,7 +39,6 @@ use crate::sse::{convolve_vertical_sse_row, convolve_vertical_sse_row_lp};
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 use crate::wasm32::wasm_vertical_neon_row;
 use crate::{ImageStore, ImageStoreMut};
-use rayon::ThreadPool;
 
 impl HorizontalConvolutionPass<u8, 2> for ImageStore<'_, u8, 2> {
     #[allow(clippy::type_complexity)]
@@ -47,7 +46,7 @@ impl HorizontalConvolutionPass<u8, 2> for ImageStore<'_, u8, 2> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<u8, 2>,
-        pool: &Option<ThreadPool>,
+        pool: &novtb::ThreadPool,
         _options: ConvolutionOptions,
     ) {
         let _scale_factor = self.width as f32 / destination.width as f32;
@@ -123,7 +122,7 @@ impl VerticalConvolutionPass<u8, 2> for ImageStore<'_, u8, 2> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<u8, 2>,
-        pool: &Option<ThreadPool>,
+        pool: &novtb::ThreadPool,
         _options: ConvolutionOptions,
     ) {
         let _scale_factor = self.height as f32 / destination.height as f32;

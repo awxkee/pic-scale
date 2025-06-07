@@ -45,7 +45,6 @@ use crate::{
     Rgb16ImageStore, RgbF32ImageStore, Rgba8ImageStore, Rgba16ImageStore, RgbaF32ImageStore,
 };
 use num_traits::{AsPrimitive, Float, Signed};
-use rayon::ThreadPool;
 use std::fmt::Debug;
 use std::ops::{AddAssign, MulAssign, Neg};
 
@@ -707,9 +706,9 @@ impl Scaler {
             return Ok(());
         }
 
-        let pool = self
+        let nova_thread_pool = self
             .threading_policy
-            .get_pool(ImageSize::new(new_size.width, new_size.height));
+            .get_nova_pool(ImageSize::new(new_size.width, new_size.height));
 
         if self.function == ResamplingFunction::Nearest {
             resize_nearest::<T, N>(
@@ -719,7 +718,7 @@ impl Scaler {
                 into.buffer.borrow_mut(),
                 new_size.width,
                 new_size.height,
-                &pool,
+                &nova_thread_pool,
             );
             return Ok(());
         }
@@ -739,7 +738,12 @@ impl Scaler {
             new_image_vertical.bit_depth = into.bit_depth;
             let vertical_filters = self.generate_weights(store.height, new_size.height);
             let options = ConvolutionOptions::new(self.workload_strategy);
-            store.convolve_vertical(vertical_filters, &mut new_image_vertical, &pool, options);
+            store.convolve_vertical(
+                vertical_filters,
+                &mut new_image_vertical,
+                &nova_thread_pool,
+                options,
+            );
 
             let new_immutable_store = ImageStore::<T, N> {
                 buffer: std::borrow::Cow::Owned(target_vertical),
@@ -751,18 +755,23 @@ impl Scaler {
             };
             let horizontal_filters = self.generate_weights(store.width, new_size.width);
             let options = ConvolutionOptions::new(self.workload_strategy);
-            new_immutable_store.convolve_horizontal(horizontal_filters, into, &pool, options);
+            new_immutable_store.convolve_horizontal(
+                horizontal_filters,
+                into,
+                &nova_thread_pool,
+                options,
+            );
             Ok(())
         } else if should_do_vertical {
             let vertical_filters = self.generate_weights(store.height, new_size.height);
             let options = ConvolutionOptions::new(self.workload_strategy);
-            store.convolve_vertical(vertical_filters, into, &pool, options);
+            store.convolve_vertical(vertical_filters, into, &nova_thread_pool, options);
             Ok(())
         } else {
             assert!(should_do_horizontal);
             let horizontal_filters = self.generate_weights(store.width, new_size.width);
             let options = ConvolutionOptions::new(self.workload_strategy);
-            store.convolve_horizontal(horizontal_filters, into, &pool, options);
+            store.convolve_horizontal(horizontal_filters, into, &nova_thread_pool, options);
             Ok(())
         }
     }
@@ -776,7 +785,7 @@ impl Scaler {
         store: &ImageStore<'a, T, N>,
         into: &mut ImageStoreMut<'a, T, N>,
         premultiply_alpha_requested: bool,
-        pool: &Option<ThreadPool>,
+        nova_thread_pool: &novtb::ThreadPool,
     ) -> Result<(), PicScaleError>
     where
         ImageStore<'a, T, N>:
@@ -801,7 +810,7 @@ impl Scaler {
                     src_store.height,
                 )?;
                 new_store.bit_depth = into.bit_depth;
-                src_store.premultiply_alpha(&mut new_store, pool);
+                src_store.premultiply_alpha(&mut new_store, nova_thread_pool);
                 src_store = std::borrow::Cow::Owned(ImageStore::<T, N> {
                     buffer: std::borrow::Cow::Owned(target_premultiplied),
                     channels: N,
@@ -824,7 +833,12 @@ impl Scaler {
         new_image_vertical.bit_depth = into.bit_depth;
         let vertical_filters = self.generate_weights(src_store.height, new_size.height);
         let options = ConvolutionOptions::new(self.workload_strategy);
-        src_store.convolve_vertical(vertical_filters, &mut new_image_vertical, pool, options);
+        src_store.convolve_vertical(
+            vertical_filters,
+            &mut new_image_vertical,
+            nova_thread_pool,
+            options,
+        );
 
         let new_immutable_store = ImageStore::<T, N> {
             buffer: std::borrow::Cow::Owned(target_vertical),
@@ -836,10 +850,15 @@ impl Scaler {
         };
         let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
         let options = ConvolutionOptions::new(self.workload_strategy);
-        new_immutable_store.convolve_horizontal(horizontal_filters, into, pool, options);
+        new_immutable_store.convolve_horizontal(
+            horizontal_filters,
+            into,
+            nova_thread_pool,
+            options,
+        );
 
         if premultiply_alpha_requested && has_alpha_premultiplied {
-            into.unpremultiply_alpha(pool, self.workload_strategy);
+            into.unpremultiply_alpha(nova_thread_pool, self.workload_strategy);
         }
 
         Ok(())
@@ -854,7 +873,7 @@ impl Scaler {
         store: &ImageStore<'a, T, N>,
         into: &mut ImageStoreMut<'a, T, N>,
         premultiply_alpha_requested: bool,
-        pool: &Option<ThreadPool>,
+        nova_thread_pool: &novtb::ThreadPool,
     ) -> Result<(), PicScaleError>
     where
         ImageStore<'a, T, N>:
@@ -878,7 +897,7 @@ impl Scaler {
                     src_store.height,
                 )?;
                 new_store.bit_depth = into.bit_depth;
-                src_store.premultiply_alpha(&mut new_store, pool);
+                src_store.premultiply_alpha(&mut new_store, nova_thread_pool);
                 src_store = std::borrow::Cow::Owned(ImageStore::<T, N> {
                     buffer: std::borrow::Cow::Owned(target_premultiplied),
                     channels: N,
@@ -893,10 +912,10 @@ impl Scaler {
 
         let vertical_filters = self.generate_weights(src_store.height, new_size.height);
         let options = ConvolutionOptions::new(self.workload_strategy);
-        src_store.convolve_vertical(vertical_filters, into, pool, options);
+        src_store.convolve_vertical(vertical_filters, into, nova_thread_pool, options);
 
         if premultiply_alpha_requested && has_alpha_premultiplied {
-            into.unpremultiply_alpha(pool, self.workload_strategy);
+            into.unpremultiply_alpha(nova_thread_pool, self.workload_strategy);
         }
 
         Ok(())
@@ -911,7 +930,7 @@ impl Scaler {
         store: &ImageStore<'a, T, N>,
         into: &mut ImageStoreMut<'a, T, N>,
         premultiply_alpha_requested: bool,
-        pool: &Option<ThreadPool>,
+        nova_thread_pool: &novtb::ThreadPool,
     ) -> Result<(), PicScaleError>
     where
         ImageStore<'a, T, N>:
@@ -935,7 +954,7 @@ impl Scaler {
                     src_store.height,
                 )?;
                 new_store.bit_depth = into.bit_depth;
-                src_store.premultiply_alpha(&mut new_store, pool);
+                src_store.premultiply_alpha(&mut new_store, nova_thread_pool);
                 src_store = std::borrow::Cow::Owned(ImageStore::<T, N> {
                     buffer: std::borrow::Cow::Owned(target_premultiplied),
                     channels: N,
@@ -950,10 +969,10 @@ impl Scaler {
 
         let horizontal_filters = self.generate_weights(src_store.width, new_size.width);
         let options = ConvolutionOptions::new(self.workload_strategy);
-        src_store.convolve_horizontal(horizontal_filters, into, pool, options);
+        src_store.convolve_horizontal(horizontal_filters, into, nova_thread_pool, options);
 
         if premultiply_alpha_requested && has_alpha_premultiplied {
-            into.unpremultiply_alpha(pool, self.workload_strategy);
+            into.unpremultiply_alpha(nova_thread_pool, self.workload_strategy);
         }
 
         Ok(())
@@ -998,9 +1017,9 @@ impl Scaler {
             return Ok(());
         }
 
-        let pool = self
+        let nova_thread_pool = self
             .threading_policy
-            .get_pool(ImageSize::new(new_size.width, new_size.height));
+            .get_nova_pool(ImageSize::new(new_size.width, new_size.height));
 
         if self.function == ResamplingFunction::Nearest {
             resize_nearest::<T, N>(
@@ -1010,7 +1029,7 @@ impl Scaler {
                 into.buffer.borrow_mut(),
                 new_size.width,
                 new_size.height,
-                &pool,
+                &nova_thread_pool,
             );
             return Ok(());
         }
@@ -1020,16 +1039,26 @@ impl Scaler {
         assert!(should_do_horizontal || should_do_vertical);
 
         if should_do_vertical && should_do_horizontal {
-            self.forward_resize_with_alpha(store, into, premultiply_alpha_requested, &pool)
+            self.forward_resize_with_alpha(
+                store,
+                into,
+                premultiply_alpha_requested,
+                &nova_thread_pool,
+            )
         } else if should_do_vertical {
-            self.forward_resize_vertical_with_alpha(store, into, premultiply_alpha_requested, &pool)
+            self.forward_resize_vertical_with_alpha(
+                store,
+                into,
+                premultiply_alpha_requested,
+                &nova_thread_pool,
+            )
         } else {
             assert!(should_do_horizontal);
             self.forward_resize_horizontal_with_alpha(
                 store,
                 into,
                 premultiply_alpha_requested,
-                &pool,
+                &nova_thread_pool,
             )
         }
     }

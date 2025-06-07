@@ -30,7 +30,6 @@ use crate::convolution::{ConvolutionOptions, HorizontalConvolutionPass, Vertical
 use crate::dispatch_group_u16::{convolve_horizontal_dispatch_u16, convolve_vertical_dispatch_u16};
 use crate::filter_weights::FilterWeights;
 use crate::{ImageStore, ImageStoreMut};
-use rayon::ThreadPool;
 
 impl HorizontalConvolutionPass<u16, 2> for ImageStore<'_, u16, 2> {
     #[allow(clippy::type_complexity)]
@@ -38,7 +37,7 @@ impl HorizontalConvolutionPass<u16, 2> for ImageStore<'_, u16, 2> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<u16, 2>,
-        pool: &Option<ThreadPool>,
+        pool: &novtb::ThreadPool,
         _: ConvolutionOptions,
     ) {
         convolve_horizontal_dispatch_u16(self, filter_weights, destination, pool);
@@ -50,7 +49,7 @@ impl VerticalConvolutionPass<u16, 2> for ImageStore<'_, u16, 2> {
         &self,
         filter_weights: FilterWeights<f32>,
         destination: &mut ImageStoreMut<u16, 2>,
-        pool: &Option<ThreadPool>,
+        pool: &novtb::ThreadPool,
         options: ConvolutionOptions,
     ) {
         convolve_vertical_dispatch_u16(self, filter_weights, destination, pool, options);

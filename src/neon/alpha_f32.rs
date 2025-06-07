@@ -28,10 +28,7 @@
  */
 
 use crate::alpha_handle_f32::{premultiply_rgba_f32_row, unpremultiply_rgba_f32_row};
-use rayon::ThreadPool;
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::ParallelSlice;
-use rayon::slice::ParallelSliceMut;
+use novtb::{ParallelZonedIterator, TbSliceMut};
 use std::arch::aarch64::*;
 
 macro_rules! unpremultiply_vec_f32 {
@@ -71,23 +68,13 @@ pub(crate) fn neon_premultiply_alpha_rgba_f32(
     src_stride: usize,
     width: usize,
     _: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
-    if let Some(pool) = pool {
-        pool.install(|| {
-            dst.par_chunks_exact_mut(dst_stride)
-                .zip(src.par_chunks_exact(src_stride))
-                .for_each(|(dst, src)| unsafe {
-                    neon_premultiply_alpha_rgba_row_f32(&mut dst[..width * 4], &src[..width * 4]);
-                });
+    dst.tb_par_chunks_exact_mut(dst_stride)
+        .for_each_enumerated(pool, |y, dst| unsafe {
+            let src = &src[y * src_stride..(y + 1) * src_stride];
+            neon_premultiply_alpha_rgba_row_f32(&mut dst[..width * 4], &src[..width * 4]);
         });
-    } else {
-        dst.chunks_exact_mut(dst_stride)
-            .zip(src.chunks_exact(src_stride))
-            .for_each(|(dst, src)| unsafe {
-                neon_premultiply_alpha_rgba_row_f32(&mut dst[..width * 4], &src[..width * 4]);
-            });
-    }
 }
 
 unsafe fn neon_unpremultiply_alpha_rgba_f32_row(in_place: &mut [f32]) {
@@ -115,19 +102,11 @@ pub(crate) fn neon_unpremultiply_alpha_rgba_f32(
     stride: usize,
     width: usize,
     _: usize,
-    pool: &Option<ThreadPool>,
+    pool: &novtb::ThreadPool,
 ) {
-    if let Some(pool) = pool {
-        pool.install(|| {
-            in_place
-                .par_chunks_exact_mut(stride)
-                .for_each(|row| unsafe {
-                    neon_unpremultiply_alpha_rgba_f32_row(&mut row[..width * 4]);
-                });
-        });
-    } else {
-        in_place.chunks_exact_mut(stride).for_each(|row| unsafe {
+    in_place
+        .tb_par_chunks_exact_mut(stride)
+        .for_each(pool, |row| unsafe {
             neon_unpremultiply_alpha_rgba_f32_row(&mut row[..width * 4]);
         });
-    }
 }
