@@ -28,7 +28,7 @@
  */
 #![deny(deprecated)]
 // #![deny(unreachable_code, unused)]
-#![allow(stable_features)]
+#![allow(stable_features, clippy::incompatible_msrv)]
 #![allow(clippy::too_many_arguments, clippy::manual_clamp)]
 #![cfg_attr(
     all(feature = "nightly_i8mm", target_arch = "aarch64"),
