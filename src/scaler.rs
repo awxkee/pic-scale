@@ -1586,6 +1586,27 @@ mod tests {
     }
 
     #[test]
+    fn check_rgb8_resizing_vertical_threading() {
+        let image_width = 255;
+        let image_height = 512;
+        const CN: usize = 3;
+        let mut image = vec![0u8; image_height * image_width * CN];
+        for dst in image.chunks_exact_mut(3) {
+            dst[0] = 124;
+            dst[1] = 41;
+            dst[2] = 99;
+        }
+        let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+        scaler.set_threading_policy(ThreadingPolicy::Adaptive);
+        let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
+        let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
+        scaler.resize_rgb(&src_store, &mut target_store).unwrap();
+        let target_data = target_store.buffer.borrow();
+
+        check_rgb16!(target_data, image_width, 85);
+    }
+
+    #[test]
     fn check_rgba10_resizing_vertical() {
         let image_width = 8;
         let image_height = 8;
@@ -1624,6 +1645,30 @@ mod tests {
         }
         let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
         scaler.set_threading_policy(ThreadingPolicy::Single);
+        let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
+        src_store.bit_depth = 10;
+        let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 10);
+        scaler
+            .resize_rgb_u16(&src_store, &mut target_store)
+            .unwrap();
+        let target_data = target_store.buffer.borrow();
+
+        check_rgb16!(target_data, image_width, 85);
+    }
+
+    #[test]
+    fn check_rgb10_resizing_vertical_adaptive() {
+        let image_width = 8;
+        let image_height = 4;
+        const CN: usize = 3;
+        let mut image = vec![0; image_height * image_width * CN];
+        for dst in image.chunks_exact_mut(3) {
+            dst[0] = 124;
+            dst[1] = 41;
+            dst[2] = 99;
+        }
+        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+        scaler.set_threading_policy(ThreadingPolicy::Adaptive);
         let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 10);
@@ -1685,6 +1730,31 @@ mod tests {
     }
 
     #[test]
+    fn check_rgba16_resizing_vertical_threading() {
+        let image_width = 8;
+        let image_height = 8;
+        const CN: usize = 4;
+        let mut image = vec![0u16; image_height * image_width * CN];
+        for dst in image.chunks_exact_mut(4) {
+            dst[0] = 124;
+            dst[1] = 41;
+            dst[2] = 99;
+            dst[3] = 255;
+        }
+        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+        scaler.set_threading_policy(ThreadingPolicy::Adaptive);
+        let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
+        src_store.bit_depth = 10;
+        let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 16);
+        scaler
+            .resize_rgba_u16(&src_store, &mut target_store, false)
+            .unwrap();
+        let target_data = target_store.buffer.borrow();
+
+        check_rgba8!(target_data, image_width, 180);
+    }
+
+    #[test]
     fn check_rgba8_nearest_vertical() {
         let image_width = 255;
         let image_height = 512;
@@ -1698,6 +1768,30 @@ mod tests {
         }
         let mut scaler = Scaler::new(ResamplingFunction::Nearest);
         scaler.set_threading_policy(ThreadingPolicy::Single);
+        let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
+        let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
+        scaler
+            .resize_rgba(&src_store, &mut target_store, false)
+            .unwrap();
+        let target_data = target_store.buffer.borrow();
+
+        check_rgba8!(target_data, image_width, 80);
+    }
+
+    #[test]
+    fn check_rgba8_nearest_vertical_threading() {
+        let image_width = 255;
+        let image_height = 512;
+        const CN: usize = 4;
+        let mut image = vec![0u8; image_height * image_width * CN];
+        for dst in image.chunks_exact_mut(4) {
+            dst[0] = 124;
+            dst[1] = 41;
+            dst[2] = 99;
+            dst[3] = 77;
+        }
+        let mut scaler = Scaler::new(ResamplingFunction::Nearest);
+        scaler.set_threading_policy(ThreadingPolicy::Adaptive);
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
         scaler
