@@ -63,7 +63,7 @@ use crate::sse::{
 };
 use core::{f16, f32};
 
-fn convolve_horizontal_rgba_4_row_f16<const CHANNELS: usize>(
+fn convolve_horizontal_rgba_4_row_f16<const CN: usize>(
     _: usize,
     _: usize,
     filter_weights: &FilterWeights<f32>,
@@ -74,7 +74,7 @@ fn convolve_horizontal_rgba_4_row_f16<const CHANNELS: usize>(
 ) {
     let transient_src = src.iter().map(|&x| x as f32).collect::<Vec<f32>>();
     let mut transient_dst = vec![0f32; dst.len()];
-    convolve_row_handler_floating_point_4::<f32, f32, f32, CHANNELS>(
+    convolve_row_handler_floating_point_4::<f32, f32, f32, CN>(
         &transient_src,
         src_stride,
         &mut transient_dst,

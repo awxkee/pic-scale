@@ -28,10 +28,13 @@
  */
 
 use crate::math::consts::ConstPI;
+use crate::math::sinc::Trigonometry;
 use num_traits::{AsPrimitive, Float, Signed};
 
 #[inline(always)]
-pub(crate) fn bohman<V: Copy + PartialEq + ConstPI + 'static + Signed + Float>(x: V) -> V
+pub(crate) fn bohman<V: Copy + PartialEq + ConstPI + 'static + Signed + Float + Trigonometry>(
+    x: V,
+) -> V
 where
     f32: AsPrimitive<V>,
 {
@@ -39,5 +42,6 @@ where
         return 0f32.as_();
     }
     let dx = V::const_pi() * x.abs();
-    (1.0f32.as_() - x.abs()) * dx.cos() + (1.0f32.as_() / V::const_pi()) * dx.sin()
+    let (dx_sin, dx_cos) = dx.f_sincos();
+    (1.0f32.as_() - x.abs()) * dx_cos + (1.0f32.as_() / V::const_pi()) * dx_sin
 }

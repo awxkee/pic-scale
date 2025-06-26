@@ -28,12 +28,13 @@
  */
 
 use crate::math::consts::ConstPI;
+use crate::math::sinc::Trigonometry;
 use num_traits::{AsPrimitive, Float, Signed};
 use std::ops::{Add, Div, Mul};
 
 #[inline(always)]
 pub(crate) fn hann<
-    V: Copy + ConstPI + Mul<Output = V> + Div<Output = V> + Signed + Float + 'static,
+    V: Copy + ConstPI + Mul<Output = V> + Div<Output = V> + Signed + Float + 'static + Trigonometry,
 >(
     x: V,
 ) -> V
@@ -47,14 +48,22 @@ where
     if x.abs() > length {
         return 0f32.as_();
     }
-    let r = (x * part).cos();
+    let r = (x * part).f_cos();
     let r = r * r;
     r * size_scale
 }
 
 #[inline(always)]
 pub(crate) fn hamming<
-    V: Copy + ConstPI + Mul<Output = V> + Div<Output = V> + Signed + Float + Add<Output = V> + 'static,
+    V: Copy
+        + ConstPI
+        + Mul<Output = V>
+        + Div<Output = V>
+        + Signed
+        + Float
+        + Add<Output = V>
+        + 'static
+        + Trigonometry,
 >(
     x: V,
 ) -> V
@@ -68,13 +77,21 @@ where
         0f32.as_()
     } else {
         let x = x * V::const_pi();
-        0.54f32.as_() + 0.46f32.as_() * x.cos()
+        0.54f32.as_() + 0.46f32.as_() * x.f_cos()
     }
 }
 
 #[inline(always)]
 pub(crate) fn hanning<
-    V: Copy + ConstPI + Mul<Output = V> + Div<Output = V> + Signed + Float + Add<Output = V> + 'static,
+    V: Copy
+        + ConstPI
+        + Mul<Output = V>
+        + Div<Output = V>
+        + Signed
+        + Float
+        + Add<Output = V>
+        + 'static
+        + Trigonometry,
 >(
     x: V,
 ) -> V
@@ -88,6 +105,6 @@ where
         0.0f32.as_()
     } else {
         let x = x * V::const_pi();
-        0.5f32.as_() + 0.5f32.as_() * x.cos()
+        0.5f32.as_() + 0.5f32.as_() * x.f_cos()
     }
 }

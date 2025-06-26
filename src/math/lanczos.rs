@@ -29,6 +29,7 @@
 #![allow(clippy::excessive_precision)]
 use crate::Jinc;
 use crate::math::consts::ConstPI;
+use crate::math::sinc::Trigonometry;
 use crate::sinc::sinc;
 use num_traits::{AsPrimitive, Float};
 use std::ops::Div;
@@ -110,7 +111,9 @@ where
 }
 
 #[inline(always)]
-pub fn lanczos_sinc<V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI>(
+pub fn lanczos_sinc<
+    V: Copy + PartialEq + Div<Output = V> + 'static + Trigonometry + Float + ConstPI,
+>(
     x: V,
     a: V,
 ) -> V
@@ -126,7 +129,11 @@ where
 }
 
 #[inline(always)]
-pub fn lanczos3<V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI>(x: V) -> V
+pub(crate) fn lanczos3<
+    V: Copy + PartialEq + Div<Output = V> + 'static + Float + Trigonometry + ConstPI,
+>(
+    x: V,
+) -> V
 where
     f32: AsPrimitive<V>,
     f64: AsPrimitive<V>,
@@ -135,7 +142,11 @@ where
 }
 
 #[inline(always)]
-pub fn lanczos4<V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI>(x: V) -> V
+pub(crate) fn lanczos4<
+    V: Copy + PartialEq + Div<Output = V> + 'static + Trigonometry + Float + ConstPI,
+>(
+    x: V,
+) -> V
 where
     f32: AsPrimitive<V>,
 {
@@ -143,7 +154,11 @@ where
 }
 
 #[inline(always)]
-pub fn lanczos6<V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI>(x: V) -> V
+pub(crate) fn lanczos6<
+    V: Copy + PartialEq + Div<Output = V> + 'static + Trigonometry + Float + ConstPI,
+>(
+    x: V,
+) -> V
 where
     f32: AsPrimitive<V>,
 {
@@ -151,7 +166,9 @@ where
 }
 
 #[inline(always)]
-pub fn lanczos2<V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI>(x: V) -> V
+pub fn lanczos2<V: Copy + PartialEq + Div<Output = V> + 'static + Trigonometry + Float + ConstPI>(
+    x: V,
+) -> V
 where
     f32: AsPrimitive<V>,
 {

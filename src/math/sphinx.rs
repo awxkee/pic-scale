@@ -28,10 +28,11 @@
  */
 
 use crate::math::consts::ConstPI;
+use crate::math::sinc::Trigonometry;
 use num_traits::{AsPrimitive, Float, Signed};
 
 #[inline(always)]
-pub(crate) fn sphinx<V: Copy + ConstPI + Signed + Float + 'static>(x: V) -> V
+pub(crate) fn sphinx<V: Copy + ConstPI + Signed + Float + 'static + Trigonometry>(x: V) -> V
 where
     f32: AsPrimitive<V>,
 {
@@ -39,5 +40,6 @@ where
         return 1f32.as_();
     }
     let x = x * V::const_pi();
-    3.0f32.as_() * (x.sin() - x * x.cos()) / (x * x * x)
+    let (x_sin, x_cos) = x.f_sincos();
+    3.0f32.as_() * (x_sin - x * x_cos) / (x * x * x)
 }

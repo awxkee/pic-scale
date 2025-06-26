@@ -29,11 +29,29 @@
 
 use crate::math::consts::ConstPI;
 use num_traits::{AsPrimitive, Float};
+use pxfm::f_expf;
 use std::ops::{Mul, MulAssign, Neg};
+
+pub(crate) trait Exponential {
+    fn f_exp(self) -> Self;
+}
+
+impl Exponential for f32 {
+    #[inline]
+    fn f_exp(self) -> Self {
+        f_expf(self)
+    }
+}
+
+impl Exponential for f64 {
+    fn f_exp(self) -> Self {
+        pxfm::f_exp(self)
+    }
+}
 
 #[inline(always)]
 pub(crate) fn gaussian<
-    V: ConstPI + Copy + Neg<Output = V> + Mul<Output = V> + MulAssign + 'static + Float,
+    V: ConstPI + Copy + Neg<Output = V> + Mul<Output = V> + MulAssign + 'static + Float + Exponential,
 >(
     x: V,
 ) -> V
@@ -44,5 +62,5 @@ where
     let pi = V::const_pi();
     let mut den = 2f32.as_() * sigma * sigma;
     den *= den;
-    (1f32.as_() / ((2f32.as_() * pi).sqrt() * sigma)) * (-x / den).exp()
+    (1f32.as_() / ((2f32.as_() * pi).sqrt() * sigma)) * (-x / den).f_exp()
 }
