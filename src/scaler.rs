@@ -34,6 +34,8 @@ use crate::image_size::ImageSize;
 use crate::image_store::{
     AssociateAlpha, CheckStoreDensity, ImageStore, ImageStoreMut, UnassociateAlpha,
 };
+use crate::math::gaussian::Exponential;
+use crate::math::sinc::Trigonometry;
 use crate::nearest_sampler::resize_nearest;
 use crate::pic_scale_error::PicScaleError;
 use crate::resize_ar30::resize_ar30_impl;
@@ -470,7 +472,9 @@ impl Scaler {
             + Jinc<T>
             + ConstSqrt2
             + Default
-            + AsPrimitive<i32>,
+            + AsPrimitive<i32>
+            + Trigonometry
+            + Exponential,
         f32: AsPrimitive<T>,
         f64: AsPrimitive<T>,
         i64: AsPrimitive<T>,

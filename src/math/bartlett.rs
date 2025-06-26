@@ -28,6 +28,7 @@
  */
 
 use crate::math::consts::ConstPI;
+use crate::math::sinc::Trigonometry;
 use num_traits::{AsPrimitive, Float};
 use std::ops::{Mul, Sub};
 
@@ -46,7 +47,7 @@ where
 
 #[inline(always)]
 pub(crate) fn bartlett_hann<
-    V: Copy + Sub<Output = V> + Mul<Output = V> + Float + ConstPI + 'static,
+    V: Copy + Sub<Output = V> + Mul<Output = V> + Float + ConstPI + 'static + Trigonometry,
 >(
     x: V,
 ) -> V
@@ -59,5 +60,5 @@ where
     }
     let l = 2.0f32.as_();
     let fac = (x / (l - 1.0f32.as_()) - 0.5f32.as_()).abs();
-    0.62f32.as_() - 0.4832.as_() * fac + 0.38f32.as_() * (2f32.as_() * V::const_pi() * fac).cos()
+    0.62f32.as_() - 0.4832.as_() * fac + 0.38f32.as_() * (2f32.as_() * V::const_pi() * fac).f_cos()
 }

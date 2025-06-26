@@ -27,17 +27,60 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use num_traits::{AsPrimitive, Float};
+use num_traits::AsPrimitive;
+use pxfm::{f_cosf, f_sincosf, f_sinf};
 use std::ops::Div;
 
+pub(crate) trait Trigonometry {
+    fn f_cos(self) -> Self;
+    fn f_sin(self) -> Self;
+    fn f_sincos(self) -> (Self, Self)
+    where
+        Self: Sized;
+}
+
+impl Trigonometry for f32 {
+    #[inline]
+    fn f_cos(self) -> Self {
+        f_cosf(self)
+    }
+
+    #[inline]
+    fn f_sin(self) -> Self {
+        f_sinf(self)
+    }
+
+    #[inline]
+    fn f_sincos(self) -> (Self, Self) {
+        f_sincosf(self)
+    }
+}
+
+impl Trigonometry for f64 {
+    #[inline]
+    fn f_cos(self) -> Self {
+        pxfm::f_cos(self)
+    }
+
+    #[inline]
+    fn f_sin(self) -> Self {
+        pxfm::f_sin(self)
+    }
+
+    #[inline]
+    fn f_sincos(self) -> (Self, Self) {
+        pxfm::f_sincos(self)
+    }
+}
+
 #[inline]
-pub fn sinc<V: Copy + PartialEq + Div<Output = V> + 'static + Float>(x: V) -> V
+pub(crate) fn sinc<V: Copy + PartialEq + Div<Output = V> + 'static + Trigonometry>(x: V) -> V
 where
     f32: AsPrimitive<V>,
 {
     if x == 0.0.as_() {
         1f32.as_()
     } else {
-        x.sin() / x
+        x.f_sin() / x
     }
 }

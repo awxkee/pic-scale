@@ -28,22 +28,29 @@
  */
 
 use crate::math::consts::ConstPI;
+use crate::math::sinc::Trigonometry;
 use crate::sinc::sinc;
 use num_traits::{AsPrimitive, Float};
 use std::ops::Mul;
 
 #[inline(always)]
-pub(crate) fn blackman_window<V: Copy + ConstPI + 'static + Mul<Output = V> + Float>(x: V) -> V
+pub(crate) fn blackman_window<
+    V: Copy + ConstPI + 'static + Mul<Output = V> + Float + Trigonometry,
+>(
+    x: V,
+) -> V
 where
     f32: AsPrimitive<V>,
 {
     let pi = V::const_pi();
-    0.42f32.as_() - 0.49656062f32.as_() * (2f32.as_() * pi * x).cos()
-        + 0.07684867f32.as_() * (4f32.as_() * pi * x).cos()
+    0.42f32.as_() - 0.49656062f32.as_() * (2f32.as_() * pi * x).f_cos()
+        + 0.07684867f32.as_() * (4f32.as_() * pi * x).f_cos()
 }
 
 #[inline(always)]
-pub(crate) fn blackman<V: Copy + ConstPI + 'static + Mul<Output = V> + Float>(x: V) -> V
+pub(crate) fn blackman<V: Copy + ConstPI + 'static + Mul<Output = V> + Trigonometry + Float>(
+    x: V,
+) -> V
 where
     f32: AsPrimitive<V>,
 {
