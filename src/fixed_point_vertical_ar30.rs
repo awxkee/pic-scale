@@ -61,7 +61,7 @@ pub(crate) fn convolve_column_handler_fip_db_ar30<
     let src_ptr = &src[offset..(offset + BUFFER_SIZE * 4)];
 
     for (dst, src) in direct_store.iter_mut().zip(src_ptr.chunks_exact(4)) {
-        *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
+        *dst = dst.trunc_add(&load_ar30_p!(src, AR30_TYPE, AR30_ORDER).trunc_mul(weight));
     }
 
     for (j, &k_weight) in filter.iter().take(bounds.size).skip(1).enumerate() {
@@ -72,7 +72,7 @@ pub(crate) fn convolve_column_handler_fip_db_ar30<
         let src_ptr = &src[offset..(offset + BUFFER_SIZE * 4)];
 
         for (dst, src) in direct_store.iter_mut().zip(src_ptr.chunks_exact(4)) {
-            *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
+            *dst = dst.trunc_add(&load_ar30_p!(src, AR30_TYPE, AR30_ORDER).trunc_mul(weight));
         }
     }
 
@@ -122,11 +122,11 @@ fn convolve_column_handler_fixed_point_direct_buffer_double<
     let src_ptr1 = &src[(offset + BUFFER_SIZE * 4)..(offset + BUFFER_SIZE * 2 * 4)];
 
     for (dst, src) in direct_store0.iter_mut().zip(src_ptr0.chunks_exact(4)) {
-        *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
+        *dst = dst.trunc_add(&load_ar30_p!(src, AR30_TYPE, AR30_ORDER).trunc_mul(weight));
     }
 
     for (dst, src) in direct_store1.iter_mut().zip(src_ptr1.chunks_exact(4)) {
-        *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
+        *dst = dst.trunc_add(&load_ar30_p!(src, AR30_TYPE, AR30_ORDER).trunc_mul(weight));
     }
 
     for (j, &k_weight) in filter.iter().take(bounds.size).skip(1).enumerate() {
@@ -138,10 +138,10 @@ fn convolve_column_handler_fixed_point_direct_buffer_double<
         let src_ptr1 = &src[(offset + BUFFER_SIZE * 4)..(offset + BUFFER_SIZE * 2 * 4)];
 
         for (dst, src) in direct_store0.iter_mut().zip(src_ptr0.chunks_exact(4)) {
-            *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
+            *dst = dst.trunc_add(&load_ar30_p!(src, AR30_TYPE, AR30_ORDER).trunc_mul(weight));
         }
         for (dst, src) in direct_store1.iter_mut().zip(src_ptr1.chunks_exact(4)) {
-            *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
+            *dst = dst.trunc_add(&load_ar30_p!(src, AR30_TYPE, AR30_ORDER).trunc_mul(weight));
         }
     }
 
@@ -210,19 +210,19 @@ fn convolve_column_handler_fixed_point_direct_buffer_four<
     let src_ptr3 = &src[(offset + BUFFER_SIZE * 3 * 4)..(offset + BUFFER_SIZE * 4 * 4)];
 
     for (dst, src) in direct_store0.iter_mut().zip(src_ptr0.chunks_exact(4)) {
-        *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
+        *dst = dst.trunc_add(&load_ar30_p!(src, AR30_TYPE, AR30_ORDER).trunc_mul(weight));
     }
 
     for (dst, src) in direct_store1.iter_mut().zip(src_ptr1.chunks_exact(4)) {
-        *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
+        *dst = dst.trunc_add(&load_ar30_p!(src, AR30_TYPE, AR30_ORDER).trunc_mul(weight));
     }
 
     for (dst, src) in direct_store2.iter_mut().zip(src_ptr2.chunks_exact(4)) {
-        *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
+        *dst = dst.trunc_add(&load_ar30_p!(src, AR30_TYPE, AR30_ORDER).trunc_mul(weight));
     }
 
     for (dst, src) in direct_store3.iter_mut().zip(src_ptr3.chunks_exact(4)) {
-        *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
+        *dst = dst.trunc_add(&load_ar30_p!(src, AR30_TYPE, AR30_ORDER).trunc_mul(weight));
     }
 
     for (j, &k_weight) in filter.iter().take(bounds.size).skip(1).enumerate() {
@@ -236,16 +236,16 @@ fn convolve_column_handler_fixed_point_direct_buffer_four<
         let src_ptr3 = &src[(offset + BUFFER_SIZE * 3 * 4)..(offset + BUFFER_SIZE * 4 * 4)];
 
         for (dst, src) in direct_store0.iter_mut().zip(src_ptr0.chunks_exact(4)) {
-            *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
+            *dst = dst.trunc_add(&load_ar30_p!(src, AR30_TYPE, AR30_ORDER).trunc_mul(weight));
         }
         for (dst, src) in direct_store1.iter_mut().zip(src_ptr1.chunks_exact(4)) {
-            *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
+            *dst = dst.trunc_add(&load_ar30_p!(src, AR30_TYPE, AR30_ORDER).trunc_mul(weight));
         }
         for (dst, src) in direct_store2.iter_mut().zip(src_ptr2.chunks_exact(4)) {
-            *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
+            *dst = dst.trunc_add(&load_ar30_p!(src, AR30_TYPE, AR30_ORDER).trunc_mul(weight));
         }
         for (dst, src) in direct_store3.iter_mut().zip(src_ptr3.chunks_exact(4)) {
-            *dst += load_ar30_p!(src, AR30_TYPE, AR30_ORDER) * weight;
+            *dst = dst.trunc_add(&load_ar30_p!(src, AR30_TYPE, AR30_ORDER).trunc_mul(weight));
         }
     }
 

@@ -87,7 +87,7 @@ fn resize_rgb(
         return;
     }
 
-    let src_slice = vec![value.min(1023); src_width * src_height];
+    let src_slice = vec![value; src_width * src_height];
     let store = ImageStore::<u16, 1>::borrow(&src_slice, src_width, src_height).unwrap();
     let mut target = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 10);
 

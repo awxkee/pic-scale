@@ -28,12 +28,11 @@
  */
 
 use num_traits::AsPrimitive;
-use pxfm::{f_cosf, f_sincosf, f_sinf};
+use pxfm::{f_cosf, f_sinc, f_sincf, f_sincosf};
 use std::ops::Div;
 
 pub(crate) trait Trigonometry {
     fn f_cos(self) -> Self;
-    fn f_sin(self) -> Self;
     fn f_sincos(self) -> (Self, Self)
     where
         Self: Sized;
@@ -43,11 +42,6 @@ impl Trigonometry for f32 {
     #[inline]
     fn f_cos(self) -> Self {
         f_cosf(self)
-    }
-
-    #[inline]
-    fn f_sin(self) -> Self {
-        f_sinf(self)
     }
 
     #[inline]
@@ -63,24 +57,32 @@ impl Trigonometry for f64 {
     }
 
     #[inline]
-    fn f_sin(self) -> Self {
-        pxfm::f_sin(self)
-    }
-
-    #[inline]
     fn f_sincos(self) -> (Self, Self) {
         pxfm::f_sincos(self)
     }
 }
 
+pub(crate) trait Sinc {
+    fn sinc(self) -> Self;
+}
+
+impl Sinc for f32 {
+    #[inline]
+    fn sinc(self) -> Self {
+        f_sincf(self)
+    }
+}
+
+impl Sinc for f64 {
+    fn sinc(self) -> Self {
+        f_sinc(self)
+    }
+}
+
 #[inline]
-pub(crate) fn sinc<V: Copy + PartialEq + Div<Output = V> + 'static + Trigonometry>(x: V) -> V
+pub(crate) fn sinc<V: Copy + PartialEq + Div<Output = V> + 'static + Sinc + Trigonometry>(x: V) -> V
 where
     f32: AsPrimitive<V>,
 {
-    if x == 0.0.as_() {
-        1f32.as_()
-    } else {
-        x.f_sin() / x
-    }
+    x.sinc()
 }

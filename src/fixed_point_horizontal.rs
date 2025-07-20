@@ -31,7 +31,7 @@ use crate::color_group::{ColorGroup, ld_g, ldg_with_offset, st_g};
 use crate::filter_weights::FilterWeights;
 use crate::saturate_narrow::SaturateNarrow;
 use crate::support::ROUNDING_CONST;
-use num_traits::AsPrimitive;
+use num_traits::{AsPrimitive, WrappingAdd, WrappingMul};
 use std::ops::{Add, AddAssign, Mul};
 
 #[inline(always)]
@@ -40,11 +40,12 @@ pub(crate) fn convolve_row_handler_fixed_point<
     J: Copy
         + 'static
         + AsPrimitive<T>
-        + Mul<Output = J>
+        + WrappingMul<Output = J>
         + AddAssign
         + SaturateNarrow<T>
         + Default
-        + Add<J, Output = J>,
+        + Add<J, Output = J>
+        + WrappingAdd<Output = J>,
     const CN: usize,
 >(
     src: &[T],
@@ -76,17 +77,19 @@ pub(crate) fn convolve_row_handler_fixed_point<
             let sliced_weights = &weights[0..2];
             let weight0 = sliced_weights[0].as_();
             let weight1 = sliced_weights[1].as_();
-            sums +=
-                ld_g!(src_ptr0, CN, J) * weight0 + ldg_with_offset!(src_ptr0, CN, CN, J) * weight1;
+            sums = sums
+                .trunc_add(&ld_g!(src_ptr0, CN, J).trunc_mul(weight0))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN, J).trunc_mul(weight1));
         } else if bounds_size == 3 {
             let src_ptr0 = &src[px..(px + 3 * CN)];
             let sliced_weights = &weights[0..3];
             let weight0 = sliced_weights[0].as_();
             let weight1 = sliced_weights[1].as_();
             let weight2 = sliced_weights[2].as_();
-            sums += ld_g!(src_ptr0, CN, J) * weight0
-                + ldg_with_offset!(src_ptr0, CN, CN, J) * weight1
-                + ldg_with_offset!(src_ptr0, CN, CN * 2, J) * weight2;
+            sums = sums
+                .trunc_add(&ld_g!(src_ptr0, CN, J).trunc_mul(weight0))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN, J).trunc_mul(weight1))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN * 2, J).trunc_mul(weight2));
         } else if bounds_size == 4 {
             let src_ptr0 = &src[px..(px + 4 * CN)];
             let sliced_weights = &weights[0..4];
@@ -94,10 +97,11 @@ pub(crate) fn convolve_row_handler_fixed_point<
             let weight1 = sliced_weights[1].as_();
             let weight2 = sliced_weights[2].as_();
             let weight3 = sliced_weights[3].as_();
-            sums += ld_g!(src_ptr0, CN, J) * weight0
-                + ldg_with_offset!(src_ptr0, CN, CN, J) * weight1
-                + ldg_with_offset!(src_ptr0, CN, CN * 2, J) * weight2
-                + ldg_with_offset!(src_ptr0, CN, CN * 3, J) * weight3;
+            sums = sums
+                .trunc_add(&ld_g!(src_ptr0, CN, J).trunc_mul(weight0))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN, J).trunc_mul(weight1))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN * 2, J).trunc_mul(weight2))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN * 3, J).trunc_mul(weight3));
         } else if bounds_size == 6 {
             let src_ptr0 = &src[px..(px + 6 * CN)];
 
@@ -108,12 +112,13 @@ pub(crate) fn convolve_row_handler_fixed_point<
             let weight3 = sliced_weights[3].as_();
             let weight4 = sliced_weights[4].as_();
             let weight5 = sliced_weights[5].as_();
-            sums += ld_g!(src_ptr0, CN, J) * weight0
-                + ldg_with_offset!(src_ptr0, CN, CN, J) * weight1
-                + ldg_with_offset!(src_ptr0, CN, CN * 2, J) * weight2
-                + ldg_with_offset!(src_ptr0, CN, CN * 3, J) * weight3
-                + ldg_with_offset!(src_ptr0, CN, CN * 4, J) * weight4
-                + ldg_with_offset!(src_ptr0, CN, CN * 5, J) * weight5;
+            sums = sums
+                .trunc_add(&ld_g!(src_ptr0, CN, J).trunc_mul(weight0))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN, J).trunc_mul(weight1))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN * 2, J).trunc_mul(weight2))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN * 3, J).trunc_mul(weight3))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN * 4, J).trunc_mul(weight4))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN * 5, J).trunc_mul(weight5));
         } else {
             let src_ptr0 = &src[px..(px + bounds_size * CN)];
             for (&k_weight, src) in weights
@@ -123,7 +128,7 @@ pub(crate) fn convolve_row_handler_fixed_point<
             {
                 let weight: J = k_weight.as_();
                 let new_px = ld_g!(src, CN, J);
-                sums += new_px * weight;
+                sums = sums.trunc_add(&new_px.trunc_mul(weight));
             }
         }
 
@@ -142,7 +147,9 @@ pub(crate) fn convolve_row_handler_fixed_point_4<
         + AddAssign
         + SaturateNarrow<T>
         + Default
-        + Add<J, Output = J>,
+        + Add<J, Output = J>
+        + WrappingMul<Output = J>
+        + WrappingAdd<Output = J>,
     const CN: usize,
 >(
     src: &[T],
@@ -194,14 +201,18 @@ pub(crate) fn convolve_row_handler_fixed_point_4<
             let sliced_weights = &weights[0..2];
             let weight0 = sliced_weights[0].as_();
             let weight1 = sliced_weights[1].as_();
-            sums0 +=
-                ld_g!(src_ptr0, CN, J) * weight0 + ldg_with_offset!(src_ptr0, CN, CN, J) * weight1;
-            sums1 +=
-                ld_g!(src_ptr1, CN, J) * weight0 + ldg_with_offset!(src_ptr1, CN, CN, J) * weight1;
-            sums2 +=
-                ld_g!(src_ptr2, CN, J) * weight0 + ldg_with_offset!(src_ptr2, CN, CN, J) * weight1;
-            sums3 +=
-                ld_g!(src_ptr3, CN, J) * weight0 + ldg_with_offset!(src_ptr3, CN, CN, J) * weight1;
+            sums0 = sums0
+                .trunc_add(&ld_g!(src_ptr0, CN, J).trunc_mul(weight0))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN, J).trunc_mul(weight1));
+            sums1 = sums1
+                .trunc_add(&ld_g!(src_ptr1, CN, J).trunc_mul(weight0))
+                .trunc_add(&ldg_with_offset!(src_ptr1, CN, CN, J).trunc_mul(weight1));
+            sums2 = sums2
+                .trunc_add(&ld_g!(src_ptr2, CN, J).trunc_mul(weight0))
+                .trunc_add(&ldg_with_offset!(src_ptr2, CN, CN, J).trunc_mul(weight1));
+            sums3 = sums3
+                .trunc_add(&ld_g!(src_ptr3, CN, J).trunc_mul(weight0))
+                .trunc_add(&ldg_with_offset!(src_ptr3, CN, CN, J).trunc_mul(weight1));
         } else if bounds_size == 3 {
             let src_ptr0 = &src[px..(px + 3 * CN)];
             let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 3 * CN)];
@@ -212,18 +223,22 @@ pub(crate) fn convolve_row_handler_fixed_point_4<
             let weight0 = sliced_weights[0].as_();
             let weight1 = sliced_weights[1].as_();
             let weight2 = sliced_weights[2].as_();
-            sums0 += ld_g!(src_ptr0, CN, J) * weight0
-                + ldg_with_offset!(src_ptr0, CN, CN, J) * weight1
-                + ldg_with_offset!(src_ptr0, CN, CN * 2, J) * weight2;
-            sums1 += ld_g!(src_ptr1, CN, J) * weight0
-                + ldg_with_offset!(src_ptr1, CN, CN, J) * weight1
-                + ldg_with_offset!(src_ptr1, CN, CN * 2, J) * weight2;
-            sums2 += ld_g!(src_ptr2, CN, J) * weight0
-                + ldg_with_offset!(src_ptr2, CN, CN, J) * weight1
-                + ldg_with_offset!(src_ptr2, CN, CN * 2, J) * weight2;
-            sums3 += ld_g!(src_ptr3, CN, J) * weight0
-                + ldg_with_offset!(src_ptr3, CN, CN, J) * weight1
-                + ldg_with_offset!(src_ptr3, CN, CN * 2, J) * weight2;
+            sums0 = sums0
+                .trunc_add(&ld_g!(src_ptr0, CN, J).trunc_mul(weight0))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN, J).trunc_mul(weight1))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN * 2, J).trunc_mul(weight2));
+            sums1 = sums1
+                .trunc_add(&ld_g!(src_ptr1, CN, J).trunc_mul(weight0))
+                .trunc_add(&ldg_with_offset!(src_ptr1, CN, CN, J).trunc_mul(weight1))
+                .trunc_add(&ldg_with_offset!(src_ptr1, CN, CN * 2, J).trunc_mul(weight2));
+            sums2 = sums2
+                .trunc_add(&ld_g!(src_ptr2, CN, J).trunc_mul(weight0))
+                .trunc_add(&ldg_with_offset!(src_ptr2, CN, CN, J).trunc_mul(weight1))
+                .trunc_add(&ldg_with_offset!(src_ptr2, CN, CN * 2, J).trunc_mul(weight2));
+            sums3 = sums3
+                .trunc_add(&ld_g!(src_ptr3, CN, J).trunc_mul(weight0))
+                .trunc_add(&ldg_with_offset!(src_ptr3, CN, CN, J).trunc_mul(weight1))
+                .trunc_add(&ldg_with_offset!(src_ptr3, CN, CN * 2, J).trunc_mul(weight2));
         } else if bounds_size == 4 {
             let src_ptr0 = &src[px..(px + 4 * CN)];
             let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 4 * CN)];
@@ -235,22 +250,26 @@ pub(crate) fn convolve_row_handler_fixed_point_4<
             let weight1 = sliced_weights[1].as_();
             let weight2 = sliced_weights[2].as_();
             let weight3 = sliced_weights[3].as_();
-            sums0 += ld_g!(src_ptr0, CN, J) * weight0
-                + ldg_with_offset!(src_ptr0, CN, CN, J) * weight1
-                + ldg_with_offset!(src_ptr0, CN, CN * 2, J) * weight2
-                + ldg_with_offset!(src_ptr0, CN, CN * 3, J) * weight3;
-            sums1 += ld_g!(src_ptr1, CN, J) * weight0
-                + ldg_with_offset!(src_ptr1, CN, CN, J) * weight1
-                + ldg_with_offset!(src_ptr1, CN, CN * 2, J) * weight2
-                + ldg_with_offset!(src_ptr1, CN, CN * 3, J) * weight3;
-            sums2 += ld_g!(src_ptr2, CN, J) * weight0
-                + ldg_with_offset!(src_ptr2, CN, CN, J) * weight1
-                + ldg_with_offset!(src_ptr2, CN, CN * 2, J) * weight2
-                + ldg_with_offset!(src_ptr2, CN, CN * 3, J) * weight3;
-            sums3 += ld_g!(src_ptr3, CN, J) * weight0
-                + ldg_with_offset!(src_ptr3, CN, CN, J) * weight1
-                + ldg_with_offset!(src_ptr3, CN, CN * 2, J) * weight2
-                + ldg_with_offset!(src_ptr3, CN, CN * 3, J) * weight3;
+            sums0 = sums0
+                .trunc_add(&ld_g!(src_ptr0, CN, J).trunc_mul(weight0))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN, J).trunc_mul(weight1))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN * 2, J).trunc_mul(weight2))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN * 3, J).trunc_mul(weight3));
+            sums1 = sums1
+                .trunc_add(&ld_g!(src_ptr1, CN, J).trunc_mul(weight0))
+                .trunc_add(&ldg_with_offset!(src_ptr1, CN, CN, J).trunc_mul(weight1))
+                .trunc_add(&ldg_with_offset!(src_ptr1, CN, CN * 2, J).trunc_mul(weight2))
+                .trunc_add(&ldg_with_offset!(src_ptr1, CN, CN * 3, J).trunc_mul(weight3));
+            sums2 = sums2
+                .trunc_add(&ld_g!(src_ptr2, CN, J).trunc_mul(weight0))
+                .trunc_add(&ldg_with_offset!(src_ptr2, CN, CN, J).trunc_mul(weight1))
+                .trunc_add(&ldg_with_offset!(src_ptr2, CN, CN * 2, J).trunc_mul(weight2))
+                .trunc_add(&ldg_with_offset!(src_ptr2, CN, CN * 3, J).trunc_mul(weight3));
+            sums3 = sums3
+                .trunc_add(&ld_g!(src_ptr3, CN, J).trunc_mul(weight0))
+                .trunc_add(&ldg_with_offset!(src_ptr3, CN, CN, J).trunc_mul(weight1))
+                .trunc_add(&ldg_with_offset!(src_ptr3, CN, CN * 2, J).trunc_mul(weight2))
+                .trunc_add(&ldg_with_offset!(src_ptr3, CN, CN * 3, J).trunc_mul(weight3));
         } else if bounds_size == 6 {
             let src_ptr0 = &src[px..(px + 6 * CN)];
             let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 6 * CN)];
@@ -264,30 +283,34 @@ pub(crate) fn convolve_row_handler_fixed_point_4<
             let weight3 = sliced_weights[3].as_();
             let weight4 = sliced_weights[4].as_();
             let weight5 = sliced_weights[5].as_();
-            sums0 += ld_g!(src_ptr0, CN, J) * weight0
-                + ldg_with_offset!(src_ptr0, CN, CN, J) * weight1
-                + ldg_with_offset!(src_ptr0, CN, CN * 2, J) * weight2
-                + ldg_with_offset!(src_ptr0, CN, CN * 3, J) * weight3
-                + ldg_with_offset!(src_ptr0, CN, CN * 4, J) * weight4
-                + ldg_with_offset!(src_ptr0, CN, CN * 5, J) * weight5;
-            sums1 += ld_g!(src_ptr1, CN, J) * weight0
-                + ldg_with_offset!(src_ptr1, CN, CN, J) * weight1
-                + ldg_with_offset!(src_ptr1, CN, CN * 2, J) * weight2
-                + ldg_with_offset!(src_ptr1, CN, CN * 3, J) * weight3
-                + ldg_with_offset!(src_ptr1, CN, CN * 4, J) * weight4
-                + ldg_with_offset!(src_ptr1, CN, CN * 5, J) * weight5;
-            sums2 += ld_g!(src_ptr2, CN, J) * weight0
-                + ldg_with_offset!(src_ptr2, CN, CN, J) * weight1
-                + ldg_with_offset!(src_ptr2, CN, CN * 2, J) * weight2
-                + ldg_with_offset!(src_ptr2, CN, CN * 3, J) * weight3
-                + ldg_with_offset!(src_ptr2, CN, CN * 4, J) * weight4
-                + ldg_with_offset!(src_ptr2, CN, CN * 5, J) * weight5;
-            sums3 += ld_g!(src_ptr3, CN, J) * weight0
-                + ldg_with_offset!(src_ptr3, CN, CN, J) * weight1
-                + ldg_with_offset!(src_ptr3, CN, CN * 2, J) * weight2
-                + ldg_with_offset!(src_ptr3, CN, CN * 3, J) * weight3
-                + ldg_with_offset!(src_ptr3, CN, CN * 4, J) * weight4
-                + ldg_with_offset!(src_ptr3, CN, CN * 5, J) * weight5;
+            sums0 = sums0
+                .trunc_add(&ld_g!(src_ptr0, CN, J).trunc_mul(weight0))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN, J).trunc_mul(weight1))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN * 2, J).trunc_mul(weight2))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN * 3, J).trunc_mul(weight3))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN * 4, J).trunc_mul(weight4))
+                .trunc_add(&ldg_with_offset!(src_ptr0, CN, CN * 5, J).trunc_mul(weight5));
+            sums1 = sums1
+                .trunc_add(&ld_g!(src_ptr1, CN, J).trunc_mul(weight0))
+                .trunc_add(&ldg_with_offset!(src_ptr1, CN, CN, J).trunc_mul(weight1))
+                .trunc_add(&ldg_with_offset!(src_ptr1, CN, CN * 2, J).trunc_mul(weight2))
+                .trunc_add(&ldg_with_offset!(src_ptr1, CN, CN * 3, J).trunc_mul(weight3))
+                .trunc_add(&ldg_with_offset!(src_ptr1, CN, CN * 4, J).trunc_mul(weight4))
+                .trunc_add(&ldg_with_offset!(src_ptr1, CN, CN * 5, J).trunc_mul(weight5));
+            sums2 = sums2
+                .trunc_add(&ld_g!(src_ptr2, CN, J).trunc_mul(weight0))
+                .trunc_add(&ldg_with_offset!(src_ptr2, CN, CN, J).trunc_mul(weight1))
+                .trunc_add(&ldg_with_offset!(src_ptr2, CN, CN * 2, J).trunc_mul(weight2))
+                .trunc_add(&ldg_with_offset!(src_ptr2, CN, CN * 3, J).trunc_mul(weight3))
+                .trunc_add(&ldg_with_offset!(src_ptr2, CN, CN * 4, J).trunc_mul(weight4))
+                .trunc_add(&ldg_with_offset!(src_ptr2, CN, CN * 5, J).trunc_mul(weight5));
+            sums3 = sums3
+                .trunc_add(&ld_g!(src_ptr3, CN, J).trunc_mul(weight0))
+                .trunc_add(&ldg_with_offset!(src_ptr3, CN, CN, J).trunc_mul(weight1))
+                .trunc_add(&ldg_with_offset!(src_ptr3, CN, CN * 2, J).trunc_mul(weight2))
+                .trunc_add(&ldg_with_offset!(src_ptr3, CN, CN * 3, J).trunc_mul(weight3))
+                .trunc_add(&ldg_with_offset!(src_ptr3, CN, CN * 4, J).trunc_mul(weight4))
+                .trunc_add(&ldg_with_offset!(src_ptr3, CN, CN * 5, J).trunc_mul(weight5));
         } else {
             let src_ptr0 = &src[px..(px + bounds_size * CN)];
             let src_ptr1 = &src[(px + src_stride)..(px + src_stride + bounds_size * CN)];
@@ -309,10 +332,10 @@ pub(crate) fn convolve_row_handler_fixed_point_4<
                 let new_px2 = ld_g!(src2, CN, J);
                 let new_px3 = ld_g!(src3, CN, J);
 
-                sums0 += new_px0 * weight;
-                sums1 += new_px1 * weight;
-                sums2 += new_px2 * weight;
-                sums3 += new_px3 * weight;
+                sums0 = sums0.trunc_add(&new_px0.trunc_mul(weight));
+                sums1 = sums1.trunc_add(&new_px1.trunc_mul(weight));
+                sums2 = sums2.trunc_add(&new_px2.trunc_mul(weight));
+                sums3 = sums3.trunc_add(&new_px3.trunc_mul(weight));
             }
         }
 

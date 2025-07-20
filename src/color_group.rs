@@ -29,7 +29,7 @@
 #![forbid(unsafe_code)]
 use crate::mlaf::mlaf;
 use crate::saturate_narrow::SaturateNarrow;
-use num_traits::{FromPrimitive, MulAdd};
+use num_traits::{FromPrimitive, MulAdd, WrappingAdd, WrappingMul};
 use std::ops::{Add, AddAssign, Mul, Shr, ShrAssign, Sub, SubAssign};
 
 #[repr(C)]
@@ -87,6 +87,76 @@ where
             ColorGroup::from_components(self.r * rhs, self.g * rhs, self.b * rhs, self.a)
         } else if CN == 4 {
             ColorGroup::from_components(self.r * rhs, self.g * rhs, self.b * rhs, self.a * rhs)
+        } else {
+            unimplemented!();
+        }
+    }
+}
+
+impl<const CN: usize, J> ColorGroup<CN, J>
+where
+    J: Copy + WrappingMul<Output = J> + Default + 'static,
+{
+    #[inline(always)]
+    pub(crate) fn trunc_mul(self, rhs: J) -> ColorGroup<CN, J> {
+        if CN == 1 {
+            ColorGroup::from_components(self.r.wrapping_mul(&rhs), self.g, self.b, self.a)
+        } else if CN == 2 {
+            ColorGroup::from_components(
+                self.r.wrapping_mul(&rhs),
+                self.g.wrapping_mul(&rhs),
+                self.b,
+                self.a,
+            )
+        } else if CN == 3 {
+            ColorGroup::from_components(
+                self.r.wrapping_mul(&rhs),
+                self.g.wrapping_mul(&rhs),
+                self.b.wrapping_mul(&rhs),
+                self.a,
+            )
+        } else if CN == 4 {
+            ColorGroup::from_components(
+                self.r.wrapping_mul(&rhs),
+                self.g.wrapping_mul(&rhs),
+                self.b.wrapping_mul(&rhs),
+                self.a.wrapping_mul(&rhs),
+            )
+        } else {
+            unimplemented!();
+        }
+    }
+}
+
+impl<const CN: usize, J> ColorGroup<CN, J>
+where
+    J: Copy + WrappingAdd<Output = J> + Default + 'static,
+{
+    #[inline(always)]
+    pub(crate) fn trunc_add(self, rhs: &ColorGroup<CN, J>) -> ColorGroup<CN, J> {
+        if CN == 1 {
+            ColorGroup::from_components(self.r.wrapping_add(&rhs.r), self.g, self.b, self.a)
+        } else if CN == 2 {
+            ColorGroup::from_components(
+                self.r.wrapping_add(&rhs.r),
+                self.g.wrapping_add(&rhs.g),
+                self.b,
+                self.a,
+            )
+        } else if CN == 3 {
+            ColorGroup::from_components(
+                self.r.wrapping_add(&rhs.r),
+                self.g.wrapping_add(&rhs.g),
+                self.b.wrapping_add(&rhs.b),
+                self.a,
+            )
+        } else if CN == 4 {
+            ColorGroup::from_components(
+                self.r.wrapping_add(&rhs.r),
+                self.g.wrapping_add(&rhs.g),
+                self.b.wrapping_add(&rhs.b),
+                self.a.wrapping_add(&rhs.a),
+            )
         } else {
             unimplemented!();
         }
