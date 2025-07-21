@@ -30,7 +30,7 @@
 use crate::filter_weights::FilterBounds;
 use crate::saturate_narrow::SaturateNarrow;
 use crate::support::ROUNDING_CONST;
-use num_traits::AsPrimitive;
+use num_traits::{AsPrimitive, WrappingAdd, WrappingMul};
 use std::ops::{AddAssign, Mul};
 
 pub(crate) trait RoundableAccumulator<T> {
@@ -53,7 +53,9 @@ pub(crate) fn convolve_column_handler_fixed_point_direct_buffer<
         + Mul<Output = J>
         + AddAssign
         + SaturateNarrow<T>
-        + RoundableAccumulator<J>,
+        + RoundableAccumulator<J>
+        + WrappingMul<Output = J>
+        + WrappingAdd<Output = J>,
     const BUFFER_SIZE: usize,
 >(
     src: &[T],
@@ -80,7 +82,7 @@ pub(crate) fn convolve_column_handler_fixed_point_direct_buffer<
     let src_ptr = &src[offset..(offset + BUFFER_SIZE)];
 
     for (dst, src) in direct_store.iter_mut().zip(src_ptr) {
-        *dst += src.as_() * weight;
+        *dst = dst.wrapping_add(&src.as_().wrapping_mul(&weight));
     }
 
     for (j, &k_weight) in filter.iter().take(bounds.size).skip(1).enumerate() {
@@ -91,7 +93,7 @@ pub(crate) fn convolve_column_handler_fixed_point_direct_buffer<
         let src_ptr = &src[offset..(offset + BUFFER_SIZE)];
 
         for (dst, src) in direct_store.iter_mut().zip(src_ptr.iter()) {
-            *dst += src.as_() * weight;
+            *dst = dst.wrapping_add(&src.as_().wrapping_mul(&weight));
         }
     }
 
@@ -113,7 +115,9 @@ pub(crate) fn convolve_column_handler_fixed_point_direct_buffer_double<
         + Mul<Output = J>
         + AddAssign
         + SaturateNarrow<T>
-        + RoundableAccumulator<J>,
+        + RoundableAccumulator<J>
+        + WrappingMul<Output = J>
+        + WrappingAdd<Output = J>,
     const BUFFER_SIZE: usize,
 >(
     src: &[T],
@@ -142,11 +146,11 @@ pub(crate) fn convolve_column_handler_fixed_point_direct_buffer_double<
     let src_ptr1 = &src[(offset + BUFFER_SIZE)..(offset + BUFFER_SIZE * 2)];
 
     for (dst, src) in direct_store0.iter_mut().zip(src_ptr0) {
-        *dst += src.as_() * weight;
+        *dst = dst.wrapping_add(&src.as_().wrapping_mul(&weight));
     }
 
     for (dst, src) in direct_store1.iter_mut().zip(src_ptr1) {
-        *dst += src.as_() * weight;
+        *dst = dst.wrapping_add(&src.as_().wrapping_mul(&weight));
     }
 
     for (j, &k_weight) in filter.iter().take(bounds.size).skip(1).enumerate() {
@@ -158,10 +162,10 @@ pub(crate) fn convolve_column_handler_fixed_point_direct_buffer_double<
         let src_ptr1 = &src[(offset + BUFFER_SIZE)..(offset + BUFFER_SIZE * 2)];
 
         for (dst, src) in direct_store0.iter_mut().zip(src_ptr0.iter()) {
-            *dst += src.as_() * weight;
+            *dst = dst.wrapping_add(&src.as_().wrapping_mul(&weight));
         }
         for (dst, src) in direct_store1.iter_mut().zip(src_ptr1.iter()) {
-            *dst += src.as_() * weight;
+            *dst = dst.wrapping_add(&src.as_().wrapping_mul(&weight));
         }
     }
 
@@ -188,7 +192,9 @@ pub(crate) fn convolve_column_handler_fixed_point_direct_buffer_four<
         + Mul<Output = J>
         + AddAssign
         + SaturateNarrow<T>
-        + RoundableAccumulator<J>,
+        + RoundableAccumulator<J>
+        + WrappingAdd<Output = J>
+        + WrappingMul<Output = J>,
     const BUFFER_SIZE: usize,
 >(
     src: &[T],
@@ -221,19 +227,19 @@ pub(crate) fn convolve_column_handler_fixed_point_direct_buffer_four<
     let src_ptr3 = &src[(offset + BUFFER_SIZE * 3)..(offset + BUFFER_SIZE * 4)];
 
     for (dst, src) in direct_store0.iter_mut().zip(src_ptr0) {
-        *dst += src.as_() * weight;
+        *dst = dst.wrapping_add(&src.as_().wrapping_mul(&weight));
     }
 
     for (dst, src) in direct_store1.iter_mut().zip(src_ptr1) {
-        *dst += src.as_() * weight;
+        *dst = dst.wrapping_add(&src.as_().wrapping_mul(&weight));
     }
 
     for (dst, src) in direct_store2.iter_mut().zip(src_ptr2) {
-        *dst += src.as_() * weight;
+        *dst = dst.wrapping_add(&src.as_().wrapping_mul(&weight));
     }
 
     for (dst, src) in direct_store3.iter_mut().zip(src_ptr3) {
-        *dst += src.as_() * weight;
+        *dst = dst.wrapping_add(&src.as_().wrapping_mul(&weight));
     }
 
     for (j, &k_weight) in filter.iter().take(bounds.size).skip(1).enumerate() {
@@ -247,16 +253,16 @@ pub(crate) fn convolve_column_handler_fixed_point_direct_buffer_four<
         let src_ptr3 = &src[(offset + BUFFER_SIZE * 3)..(offset + BUFFER_SIZE * 4)];
 
         for (dst, src) in direct_store0.iter_mut().zip(src_ptr0.iter()) {
-            *dst += src.as_() * weight;
+            *dst = dst.wrapping_add(&src.as_().wrapping_mul(&weight));
         }
         for (dst, src) in direct_store1.iter_mut().zip(src_ptr1.iter()) {
-            *dst += src.as_() * weight;
+            *dst = dst.wrapping_add(&src.as_().wrapping_mul(&weight));
         }
         for (dst, src) in direct_store2.iter_mut().zip(src_ptr2.iter()) {
-            *dst += src.as_() * weight;
+            *dst = dst.wrapping_add(&src.as_().wrapping_mul(&weight));
         }
         for (dst, src) in direct_store3.iter_mut().zip(src_ptr3.iter()) {
-            *dst += src.as_() * weight;
+            *dst = dst.wrapping_add(&src.as_().wrapping_mul(&weight));
         }
     }
 
@@ -292,7 +298,9 @@ pub(crate) fn column_handler_fixed_point<
         + Mul<Output = J>
         + AddAssign
         + SaturateNarrow<T>
-        + RoundableAccumulator<J>,
+        + RoundableAccumulator<J>
+        + WrappingMul<Output = J>
+        + WrappingAdd<Output = J>,
 >(
     _: usize,
     bounds: &FilterBounds,

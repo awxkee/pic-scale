@@ -28,7 +28,7 @@
  */
 
 use crate::math::consts::ConstPI;
-use crate::math::sinc::Trigonometry;
+use crate::math::sinc::{Sinc, Trigonometry};
 use crate::sinc::sinc;
 use num_traits::{AsPrimitive, Float};
 use std::ops::Mul;
@@ -48,7 +48,9 @@ where
 }
 
 #[inline(always)]
-pub(crate) fn blackman<V: Copy + ConstPI + 'static + Mul<Output = V> + Trigonometry + Float>(
+pub(crate) fn blackman<
+    V: Copy + ConstPI + 'static + Mul<Output = V> + Trigonometry + Float + Sinc,
+>(
     x: V,
 ) -> V
 where

@@ -32,12 +32,14 @@ pub trait ConstSqrt2 {
 }
 
 impl ConstSqrt2 for f32 {
+    #[inline]
     fn const_sqrt2() -> Self {
         std::f32::consts::SQRT_2
     }
 }
 
 impl ConstSqrt2 for f64 {
+    #[inline]
     fn const_sqrt2() -> Self {
         std::f64::consts::SQRT_2
     }
@@ -48,12 +50,14 @@ pub trait ConstPI {
 }
 
 impl ConstPI for f32 {
+    #[inline]
     fn const_pi() -> Self {
         std::f32::consts::PI
     }
 }
 
 impl ConstPI for f64 {
+    #[inline]
     fn const_pi() -> Self {
         std::f64::consts::PI
     }

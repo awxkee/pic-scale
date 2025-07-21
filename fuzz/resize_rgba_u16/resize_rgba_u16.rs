@@ -94,7 +94,7 @@ fn resize_rgba(
         return;
     }
 
-    let mut src_data = vec![data.min(1023); src_width * src_height * 4];
+    let mut src_data = vec![data; src_width * src_height * 4];
     src_data[0] = 255;
     src_data[3] = 17;
 
@@ -116,7 +116,8 @@ fn resize_rgba(
         .resize_rgba_u16(&store, &mut target, premultiply_alpha)
         .unwrap();
 
-    let store_ar30 = ImageStore::<u8, 4>::alloc(src_width, src_height);
+    let src_data2 = vec![data.min(255) as u8; src_width * src_height * 4];
+    let store_ar30 = ImageStore::<u8, 4>::borrow(&src_data2, src_width, src_height).unwrap();
     let mut target_ar30 = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 10);
     _ = scaler.resize_ar30(&store_ar30, &mut target_ar30, Ar30ByteOrder::Host);
 }

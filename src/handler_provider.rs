@@ -48,7 +48,7 @@ use crate::sse::{
     convolve_horizontal_rgba_sse_rows_4_u16, convolve_horizontal_rgba_sse_u16_lb_row,
     convolve_horizontal_rgba_sse_u16_row,
 };
-use num_traits::{AsPrimitive, Float, MulAdd};
+use num_traits::{AsPrimitive, Float, MulAdd, WrappingAdd, WrappingMul};
 use std::ops::{Add, AddAssign, Mul};
 
 pub(crate) trait ColumnHandlerFloatingPoint<T, J, F>
@@ -338,7 +338,9 @@ pub(crate) trait ColumnHandlerFixedPoint<T> {
             + Mul<Output = J>
             + AddAssign
             + SaturateNarrow<T>
-            + RoundableAccumulator<J>,
+            + RoundableAccumulator<J>
+            + WrappingAdd<Output = J>
+            + WrappingMul<Output = J>,
         i32: AsPrimitive<J>,
         i16: AsPrimitive<J>;
 }
@@ -360,7 +362,9 @@ pub(crate) trait RowHandlerFixedPoint<T> {
             + AddAssign
             + SaturateNarrow<T>
             + Default
-            + Add<J, Output = J>,
+            + Add<J, Output = J>
+            + WrappingMul<Output = J>
+            + WrappingAdd<Output = J>,
         i32: AsPrimitive<J>,
         i16: AsPrimitive<J>;
 
@@ -378,7 +382,9 @@ pub(crate) trait RowHandlerFixedPoint<T> {
             + AddAssign
             + SaturateNarrow<T>
             + Default
-            + Add<J, Output = J>,
+            + Add<J, Output = J>
+            + WrappingMul<Output = J>
+            + WrappingAdd<Output = J>,
         i32: AsPrimitive<J>,
         i16: AsPrimitive<J>;
 }
@@ -403,7 +409,9 @@ impl RowHandlerFixedPoint<u16> for u16 {
             + AddAssign
             + SaturateNarrow<u16>
             + Default
-            + Add<J, Output = J>,
+            + Add<J, Output = J>
+            + WrappingMul<Output = J>
+            + WrappingAdd<Output = J>,
         i32: AsPrimitive<J>,
         i16: AsPrimitive<J>,
         u16: AsPrimitive<J>,
@@ -434,7 +442,9 @@ impl RowHandlerFixedPoint<u16> for u16 {
             + AddAssign
             + SaturateNarrow<u16>
             + Default
-            + Add<J, Output = J>,
+            + Add<J, Output = J>
+            + WrappingMul<Output = J>
+            + WrappingAdd<Output = J>,
         i32: AsPrimitive<J>,
         i16: AsPrimitive<J>,
         u16: AsPrimitive<J>,
@@ -496,7 +506,9 @@ impl RowHandlerFixedPoint<u16> for u16 {
             + AddAssign
             + SaturateNarrow<u16>
             + Default
-            + Add<J, Output = J>,
+            + Add<J, Output = J>
+            + WrappingMul<Output = J>
+            + WrappingAdd<Output = J>,
         i32: AsPrimitive<J>,
         i16: AsPrimitive<J>,
         u16: AsPrimitive<J>,
@@ -563,7 +575,9 @@ impl RowHandlerFixedPoint<u16> for u16 {
             + AddAssign
             + SaturateNarrow<u16>
             + Default
-            + Add<J, Output = J>,
+            + Add<J, Output = J>
+            + WrappingAdd<Output = J>
+            + WrappingMul<Output = J>,
         i32: AsPrimitive<J>,
         i16: AsPrimitive<J>,
         u16: AsPrimitive<J>,
@@ -585,7 +599,9 @@ impl RowHandlerFixedPoint<u16> for u16 {
             + AddAssign
             + SaturateNarrow<u16>
             + Default
-            + Add<J, Output = J>,
+            + Add<J, Output = J>
+            + WrappingMul<Output = J>
+            + WrappingAdd<Output = J>,
         i32: AsPrimitive<J>,
         i16: AsPrimitive<J>,
         u16: AsPrimitive<J>,
@@ -617,7 +633,9 @@ impl RowHandlerFixedPoint<u16> for u16 {
             + AddAssign
             + SaturateNarrow<u16>
             + Default
-            + Add<J, Output = J>,
+            + Add<J, Output = J>
+            + WrappingAdd<Output = J>
+            + WrappingMul<Output = J>,
         i32: AsPrimitive<J>,
         i16: AsPrimitive<J>,
         u16: AsPrimitive<J>,
@@ -661,7 +679,9 @@ impl ColumnHandlerFixedPoint<u16> for u16 {
             + Mul<Output = J>
             + AddAssign
             + SaturateNarrow<u16>
-            + RoundableAccumulator<J>,
+            + RoundableAccumulator<J>
+            + WrappingAdd<Output = J>
+            + WrappingMul<Output = J>,
         i32: AsPrimitive<J>,
         i16: AsPrimitive<J>,
     {
@@ -711,7 +731,9 @@ impl ColumnHandlerFixedPoint<u16> for u16 {
             + Mul<Output = J>
             + AddAssign
             + SaturateNarrow<u16>
-            + RoundableAccumulator<J>,
+            + RoundableAccumulator<J>
+            + WrappingMul<Output = J>
+            + WrappingAdd<Output = J>,
         i32: AsPrimitive<J>,
         i16: AsPrimitive<J>,
     {

@@ -42,7 +42,7 @@ pub struct SrcImage {
     pub src_height: u16,
     pub dst_width: u16,
     pub dst_height: u16,
-    pub value: u8,
+    pub value: u16,
     pub use_quality: bool,
     pub threading: bool,
 }
@@ -54,6 +54,7 @@ fuzz_target!(|data: SrcImage| {
         WorkloadStrategy::PreferSpeed
     };
     resize_rgb(
+        data.value,
         data.src_width as usize,
         data.src_height as usize,
         data.dst_width as usize,
@@ -69,6 +70,7 @@ fuzz_target!(|data: SrcImage| {
 });
 
 fn resize_rgb(
+    value: u16,
     src_width: usize,
     src_height: usize,
     dst_width: usize,
@@ -89,7 +91,8 @@ fn resize_rgb(
         return;
     }
 
-    let store = ImageStore::<u16, 3>::alloc(src_width, src_height);
+    let src_slice = vec![value; src_width * src_height * 3];
+    let store = ImageStore::<u16, 3>::borrow(&src_slice, src_width, src_height).unwrap();
     let mut target = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 10);
 
     let mut scaler = Scaler::new(sampler);

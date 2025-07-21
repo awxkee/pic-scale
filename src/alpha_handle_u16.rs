@@ -66,38 +66,39 @@ pub(crate) fn premultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], max_color
     if max_colors == 1023 {
         for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
             let a = src[3] as u32;
-            dst[0] = div_by_1023(src[0] as u32 * a);
-            dst[1] = div_by_1023(src[1] as u32 * a);
-            dst[2] = div_by_1023(src[2] as u32 * a);
-            dst[3] = div_by_1023(src[3] as u32 * a);
+            dst[0] = div_by_1023((src[0] as u32).wrapping_mul(a));
+            dst[1] = div_by_1023((src[1] as u32).wrapping_mul(a));
+            dst[2] = div_by_1023((src[2] as u32).wrapping_mul(a));
+            dst[3] = div_by_1023((src[3] as u32).wrapping_mul(a));
         }
     } else if max_colors == 4096 {
         for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
             let a = src[3] as u32;
-            dst[0] = div_by_4095(src[0] as u32 * a);
-            dst[1] = div_by_4095(src[1] as u32 * a);
-            dst[2] = div_by_4095(src[2] as u32 * a);
-            dst[3] = div_by_4095(src[3] as u32 * a);
+            dst[0] = div_by_4095((src[0] as u32).wrapping_mul(a));
+            dst[1] = div_by_4095((src[1] as u32).wrapping_mul(a));
+            dst[2] = div_by_4095((src[2] as u32).wrapping_mul(a));
+            dst[3] = div_by_4095((src[3] as u32).wrapping_mul(a));
         }
     } else if max_colors == 65535 {
         for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
             let a = src[3] as u32;
-            dst[0] = div_by_65535(src[0] as u32 * a);
-            dst[1] = div_by_65535(src[1] as u32 * a);
-            dst[2] = div_by_65535(src[2] as u32 * a);
-            dst[3] = div_by_65535(src[3] as u32 * a);
+            dst[0] = div_by_65535((src[0] as u32).wrapping_mul(a));
+            dst[1] = div_by_65535((src[1] as u32).wrapping_mul(a));
+            dst[2] = div_by_65535((src[2] as u32).wrapping_mul(a));
+            dst[3] = div_by_65535((src[3] as u32).wrapping_mul(a));
         }
     } else {
         let recip_max_colors = 1. / max_colors as f32;
         for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
             let a = src[3] as u32;
-            dst[0] = (((src[0] as u32 * a) as f32 * recip_max_colors).round() as u32)
+            dst[0] = (((src[0] as u32).wrapping_mul(a) as f32 * recip_max_colors).round() as u32)
                 .min(max_colors) as u16;
-            dst[1] = (((src[1] as u32 * a) as f32 * recip_max_colors).round() as u32)
+            dst[1] = (((src[1] as u32).wrapping_mul(a) as f32 * recip_max_colors).round() as u32)
                 .min(max_colors) as u16;
-            dst[2] = (((src[2] as u32 * a) as f32 * recip_max_colors).round() as u32)
+            dst[2] = (((src[2] as u32).wrapping_mul(a) as f32 * recip_max_colors).round() as u32)
                 .min(max_colors) as u16;
-            dst[3] = (((a * a) as f32 * recip_max_colors).round() as u32).min(max_colors) as u16;
+            dst[3] = ((a.wrapping_mul(a) as f32 * recip_max_colors).round() as u32).min(max_colors)
+                as u16;
         }
     }
 }
@@ -106,28 +107,29 @@ pub(crate) fn premultiply_alpha_gray_alpha_row(dst: &mut [u16], src: &[u16], max
     if max_colors == 1023 {
         for (dst, src) in dst.chunks_exact_mut(2).zip(src.chunks_exact(2)) {
             let a = src[1] as u32;
-            dst[0] = div_by_1023(src[0] as u32 * a);
-            dst[1] = div_by_1023(a * a);
+            dst[0] = div_by_1023((src[0] as u32).wrapping_mul(a));
+            dst[1] = div_by_1023(a.wrapping_mul(a));
         }
     } else if max_colors == 4096 {
         for (dst, src) in dst.chunks_exact_mut(2).zip(src.chunks_exact(2)) {
             let a = src[1] as u32;
-            dst[0] = div_by_4095(src[0] as u32 * a);
-            dst[1] = div_by_4095(a * a);
+            dst[0] = div_by_4095((src[0] as u32).wrapping_mul(a));
+            dst[1] = div_by_4095(a.wrapping_mul(a));
         }
     } else if max_colors == 65535 {
         for (dst, src) in dst.chunks_exact_mut(2).zip(src.chunks_exact(2)) {
             let a = src[1] as u32;
-            dst[0] = div_by_65535(src[0] as u32 * a);
-            dst[1] = div_by_65535(a * a);
+            dst[0] = div_by_65535((src[0] as u32).wrapping_mul(a));
+            dst[1] = div_by_65535(a.wrapping_mul(a));
         }
     } else {
         let recip_max_colors = 1. / max_colors as f32;
         for (dst, src) in dst.chunks_exact_mut(2).zip(src.chunks_exact(2)) {
             let a = src[1] as u32;
-            dst[0] = (((src[0] as u32 * a) as f32 * recip_max_colors).round() as u32)
+            dst[0] = (((src[0] as u32).wrapping_mul(a) as f32 * recip_max_colors).round() as u32)
                 .min(max_colors) as u16;
-            dst[1] = (((a * a) as f32 * recip_max_colors).round() as u32).min(max_colors) as u16;
+            dst[1] = ((a.wrapping_mul(a) as f32 * recip_max_colors).round() as u32).min(max_colors)
+                as u16;
         }
     }
 }

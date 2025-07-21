@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use pxfm::f_j1;
+use pxfm::{f_j1, f_j1f};
 
 /// Bessel 1st order in f64
 #[inline]
@@ -40,10 +40,10 @@ pub fn jinc_f64(x: f64) -> f64 {
 /// Bessel 1st order in f32
 #[inline]
 pub fn jinc_f32(x: f32) -> f32 {
-    if x == 0f32 {
-        return 0f32;
+    if x == 0. {
+        return 0.;
     }
-    (f_j1(x as f64) / x as f64) as f32
+    f_j1f(x) / x
 }
 
 /// Bessel trait
@@ -52,12 +52,14 @@ pub trait Jinc<T> {
 }
 
 impl Jinc<f64> for f64 {
+    #[inline]
     fn jinc() -> fn(f64) -> f64 {
         jinc_f64
     }
 }
 
 impl Jinc<f32> for f32 {
+    #[inline]
     fn jinc() -> fn(f32) -> f32 {
         jinc_f32
     }
