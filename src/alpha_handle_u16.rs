@@ -41,16 +41,16 @@ use novtb::{ParallelZonedIterator, TbSliceMut};
 /// Divides value by 1023 with rounding to nearest
 pub(crate) fn div_by_1023(v: u32) -> u16 {
     let round = 1 << 9;
-    let v = v + round;
-    (((v >> 10) + v) >> 10) as u16
+    let v = v.wrapping_add(round);
+    (((v >> 10).wrapping_add(v)) >> 10) as u16
 }
 
 #[inline]
 /// Divides value by 4095 with rounding to nearest
 pub(crate) fn div_by_4095(v: u32) -> u16 {
     let round = 1 << 11;
-    let v = v + round;
-    (((v >> 12) + v) >> 12) as u16
+    let v = v.wrapping_add(round);
+    (((v >> 12).wrapping_add(v)) >> 12) as u16
 }
 
 #[inline]
