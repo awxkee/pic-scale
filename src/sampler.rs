@@ -45,6 +45,7 @@ use crate::lanczos::{
     lanczos6_jinc,
 };
 use crate::math::gaussian::Exponential;
+use crate::math::kaiser::BesselI0;
 use crate::math::sinc::{Sinc, Trigonometry};
 use crate::quadric::quadric;
 use crate::sinc::sinc;
@@ -282,7 +283,8 @@ impl ResamplingFunction {
             + ConstSqrt2
             + Trigonometry
             + Exponential
-            + Sinc,
+            + Sinc
+            + BesselI0,
         f32: AsPrimitive<T>,
         f64: AsPrimitive<T>,
         usize: AsPrimitive<T>,

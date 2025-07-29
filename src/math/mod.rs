@@ -29,7 +29,7 @@
 
 pub mod bartlett;
 pub mod bc_spline;
-mod bessel_order_one;
+mod jinc;
 pub mod bilinear;
 pub mod blackman;
 pub mod bohman;
@@ -46,5 +46,5 @@ pub mod sphinx;
 pub mod spline_n;
 pub mod welch;
 
-pub use bessel_order_one::*;
+pub use jinc::*;
 pub use consts::*;

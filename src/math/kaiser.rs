@@ -30,25 +30,22 @@
 use num_traits::{AsPrimitive, Float};
 use std::ops::{AddAssign, Div, Mul, MulAssign, Sub};
 
-#[inline(always)]
-pub(crate) fn bessel_i0<
-    V: Copy + Mul<Output = V> + Div<Output = V> + MulAssign + AddAssign + 'static + PartialOrd,
->(
-    x: V,
-) -> V
-where
-    f64: AsPrimitive<V>,
-{
-    let mut s = 1.0.as_();
-    let y = x * x / 4.0.as_();
-    let mut t = y;
-    let mut i: V = 2.0f64.as_();
-    while t > 1e-12.as_() {
-        s += t;
-        t *= y / (i * i);
-        i += 1f64.as_();
+pub(crate) trait BesselI0 {
+    fn bessel_i0(self) -> Self;
+}
+
+impl BesselI0 for f32 {
+    #[inline]
+    fn bessel_i0(self) -> Self {
+        pxfm::f_i0f(self)
     }
-    s
+}
+
+impl BesselI0 for f64 {
+    #[inline]
+    fn bessel_i0(self) -> Self {
+        pxfm::f_i0(self)
+    }
 }
 
 #[inline(always)]
@@ -61,7 +58,8 @@ pub(crate) fn kaiser<
         + 'static
         + PartialOrd
         + Sub<Output = V>
-        + Float,
+        + Float
+        + BesselI0,
 >(
     x: V,
 ) -> V
@@ -72,6 +70,6 @@ where
     if x > 1f32.as_() {
         return 0f32.as_();
     }
-    let i0a = 1.0f64.as_() / bessel_i0(6.33f64.as_());
-    bessel_i0(6.33f64.as_() * (1.0f64.as_() - x * x).sqrt()) * i0a
+    let i0a = 1.0f64.as_() / 6.33f64.as_().bessel_i0();
+    (6.33f64.as_() * (1.0f64.as_() - x * x).sqrt()).bessel_i0() * i0a
 }
