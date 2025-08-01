@@ -142,8 +142,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
-        with:
-          toolchain: nightly-2024-07-15
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run resize_rgba_u16 -- -max_total_time=15
       - run: cargo fuzz run resize_rgba_f16 -- -max_total_time=15
@@ -159,8 +157,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
-        with:
-          toolchain: nightly-2024-07-15
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run resize_rgba_u16 --features rdm -- -max_total_time=15
       - run: cargo fuzz run resize_rgb_u16 --features rdm -- -max_total_time=15
@@ -190,8 +186,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
-        with:
-          toolchain: nightly-2024-07-15
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run resize_rgba_f32 -- -max_total_time=15
       - run: cargo fuzz run resize_rgb_f32 -- -max_total_time=15
@@ -207,8 +201,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
-        with:
-          toolchain: nightly-2024-07-15
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run resize_rgba_f32 --features "${{ matrix.feature }}" -- -max_total_time=15
       - run: cargo fuzz run resize_rgb_f32 --features "${{ matrix.feature }}" -- -max_total_time=15
