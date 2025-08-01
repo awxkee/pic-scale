@@ -21,7 +21,7 @@ colorutils-rs = {version = "0.7", optional = true}
 num-traits = { version = "0.2", features = ["std"] }
 rayon = "1.10"
 novtb = "^0.1.6"
-pxfm = "^0.1.11"
+pxfm = "^0.1.12"
 
 [features]
 default = ["colorspaces", "rdm", "sse", "avx"]
