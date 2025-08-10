@@ -26,13 +26,24 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 use crate::math::consts::ConstPI;
+use crate::math::mla;
 use crate::math::sinc::Trigonometry;
-use num_traits::{AsPrimitive, Float, Signed};
+use num_traits::{AsPrimitive, Float, MulAdd, Signed};
+use std::ops::Add;
 
 #[inline(always)]
-pub(crate) fn bohman<V: Copy + PartialEq + ConstPI + 'static + Signed + Float + Trigonometry>(
+pub(crate) fn bohman<
+    V: Copy
+        + PartialEq
+        + ConstPI
+        + 'static
+        + Signed
+        + Float
+        + Trigonometry
+        + Add<V, Output = V>
+        + MulAdd<V, Output = V>,
+>(
     x: V,
 ) -> V
 where
@@ -41,7 +52,11 @@ where
     if x < (-1f32).as_() || x > 1f32.as_() {
         return 0f32.as_();
     }
-    let dx = V::const_pi() * x.abs();
-    let (dx_sin, dx_cos) = dx.f_sincos();
-    (1.0f32.as_() - x.abs()) * dx_cos + (1.0f32.as_() / V::const_pi()) * dx_sin
+    let dx = x.abs();
+    let (dx_sin, dx_cos) = dx.f_sincospi();
+    mla(
+        1.0f32.as_() - x.abs(),
+        dx_cos,
+        (1.0f32.as_() / V::const_pi()) * dx_sin,
+    )
 }

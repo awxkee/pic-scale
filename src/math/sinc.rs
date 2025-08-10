@@ -28,37 +28,41 @@
  */
 
 use num_traits::AsPrimitive;
-use pxfm::{f_cosf, f_sinc, f_sincf, f_sincosf};
+use pxfm::{f_sinc, f_sincf};
 use std::ops::Div;
 
 pub(crate) trait Trigonometry {
-    fn f_cos(self) -> Self;
-    fn f_sincos(self) -> (Self, Self)
+    fn f_cospi(self) -> Self;
+    fn f_sincospi(self) -> (Self, Self)
     where
         Self: Sized;
 }
 
 impl Trigonometry for f32 {
     #[inline]
-    fn f_cos(self) -> Self {
-        f_cosf(self)
+    fn f_cospi(self) -> Self {
+        pxfm::f_cospif(self)
     }
 
     #[inline]
-    fn f_sincos(self) -> (Self, Self) {
-        f_sincosf(self)
+    fn f_sincospi(self) -> (Self, Self)
+    where
+        Self: Sized,
+    {
+        pxfm::f_sincospif(self)
     }
 }
 
 impl Trigonometry for f64 {
-    #[inline]
-    fn f_cos(self) -> Self {
-        pxfm::f_cos(self)
+    fn f_cospi(self) -> Self {
+        pxfm::f_cospi(self)
     }
 
-    #[inline]
-    fn f_sincos(self) -> (Self, Self) {
-        pxfm::f_sincos(self)
+    fn f_sincospi(self) -> (Self, Self)
+    where
+        Self: Sized,
+    {
+        pxfm::f_sincospi(self)
     }
 }
 

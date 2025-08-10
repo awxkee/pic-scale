@@ -53,7 +53,7 @@ use crate::sphinx::sphinx;
 use crate::spline_n::{spline16, spline36, spline64};
 use crate::welch::welch;
 use crate::{ConstPI, ConstSqrt2, Jinc};
-use num_traits::{AsPrimitive, Float, Signed};
+use num_traits::{AsPrimitive, Float, MulAdd, Signed};
 use std::ops::{AddAssign, MulAssign, Neg};
 
 #[inline(always)]
@@ -284,7 +284,8 @@ impl ResamplingFunction {
             + Trigonometry
             + Exponential
             + Sinc
-            + BesselI0,
+            + BesselI0
+            + MulAdd<Output = T>,
         f32: AsPrimitive<T>,
         f64: AsPrimitive<T>,
         usize: AsPrimitive<T>,

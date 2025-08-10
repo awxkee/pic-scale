@@ -28,18 +28,22 @@
  */
 
 use crate::math::consts::ConstPI;
+use crate::math::mla;
 use crate::math::sinc::Trigonometry;
-use num_traits::{AsPrimitive, Float, Signed};
+use num_traits::{AsPrimitive, Float, MulAdd, Signed};
 
 #[inline(always)]
-pub(crate) fn sphinx<V: Copy + ConstPI + Signed + Float + 'static + Trigonometry>(x: V) -> V
+pub(crate) fn sphinx<
+    V: Copy + ConstPI + Signed + Float + 'static + Trigonometry + MulAdd<V, Output = V>,
+>(
+    x: V,
+) -> V
 where
     f32: AsPrimitive<V>,
 {
     if x.abs() < 1e-8.as_() {
         return 1f32.as_();
     }
-    let x = x * V::const_pi();
-    let (x_sin, x_cos) = x.f_sincos();
-    3.0f32.as_() * (x_sin - x * x_cos) / (x * x * x)
+    let (x_sin, x_cos) = x.f_sincospi();
+    3.0f32.as_() * mla(-x, x_cos, x_sin) / (x * x * x)
 }

@@ -27,11 +27,23 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use num_traits::AsPrimitive;
-use std::ops::{Mul, Sub};
+use crate::math::mla;
+use num_traits::{AsPrimitive, MulAdd};
+use std::ops::{Add, Mul, Neg, Sub};
 
 #[inline(always)]
-pub(crate) fn welch<V: Copy + PartialOrd + Mul<Output = V> + Sub<Output = V> + 'static>(x: V) -> V
+pub(crate) fn welch<
+    V: Copy
+        + PartialOrd
+        + Mul<Output = V>
+        + Sub<Output = V>
+        + 'static
+        + MulAdd<Output = V>
+        + Neg<Output = V>
+        + Add<V, Output = V>,
+>(
+    x: V,
+) -> V
 where
     f32: AsPrimitive<V>,
 {
@@ -40,6 +52,6 @@ where
     } else if x >= 1f32.as_() {
         0.0f32.as_()
     } else {
-        1f32.as_() - x * x
+        mla(-x, x, 1f32.as_())
     }
 }

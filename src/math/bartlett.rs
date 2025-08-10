@@ -28,12 +28,22 @@
  */
 
 use crate::math::consts::ConstPI;
+use crate::math::mla;
 use crate::math::sinc::Trigonometry;
-use num_traits::{AsPrimitive, Float};
-use std::ops::{Mul, Sub};
+use num_traits::{AsPrimitive, Float, MulAdd};
+use std::ops::{Add, Mul, Neg, Sub};
 
 #[inline(always)]
-pub(crate) fn bartlett<V: Copy + Sub<Output = V> + Mul<Output = V> + 'static + PartialOrd>(
+pub(crate) fn bartlett<
+    V: Copy
+        + Sub<Output = V>
+        + Mul<Output = V>
+        + 'static
+        + PartialOrd
+        + MulAdd<V, Output = V>
+        + Add<V, Output = V>
+        + Neg<Output = V>,
+>(
     x: V,
 ) -> V
 where
@@ -42,12 +52,20 @@ where
     if x >= 0f32.as_() && x <= 1f32.as_() {
         return 2f32.as_() * x;
     }
-    2f32.as_() - 2f32.as_() * x
+    mla(-2f32.as_(), x, 2f32.as_())
 }
 
 #[inline(always)]
 pub(crate) fn bartlett_hann<
-    V: Copy + Sub<Output = V> + Mul<Output = V> + Float + ConstPI + 'static + Trigonometry,
+    V: Copy
+        + Sub<Output = V>
+        + Mul<Output = V>
+        + Float
+        + ConstPI
+        + 'static
+        + Trigonometry
+        + Add<V, Output = V>
+        + MulAdd<V, Output = V>,
 >(
     x: V,
 ) -> V
@@ -60,5 +78,9 @@ where
     }
     let l = 2.0f32.as_();
     let fac = (x / (l - 1.0f32.as_()) - 0.5f32.as_()).abs();
-    0.62f32.as_() - 0.4832.as_() * fac + 0.38f32.as_() * (2f32.as_() * V::const_pi() * fac).f_cos()
+    mla(
+        0.38f32.as_(),
+        (2f32.as_() * fac).f_cospi(),
+        mla(-0.4832.as_(), fac, 0.62f32.as_()),
+    )
 }
