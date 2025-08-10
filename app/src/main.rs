@@ -63,7 +63,7 @@ fn main() {
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
 
-    let mut scaler = Scaler::new(ResamplingFunction::Kaiser);
+    let mut scaler = Scaler::new(ResamplingFunction::Sphinx);
     scaler.set_threading_policy(ThreadingPolicy::Adaptive);
     scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 

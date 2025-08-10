@@ -27,7 +27,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use num_traits::{AsPrimitive, Signed};
+use crate::math::mla;
+use num_traits::{AsPrimitive, MulAdd, Signed};
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
 #[inline(always)]
@@ -40,6 +41,7 @@ pub fn cubic_spline<
         + PartialOrd
         + PartialEq
         + Div<Output = V>
+        + MulAdd<V, Output = V>
         + 'static,
 >(
     d: V,
@@ -52,9 +54,9 @@ where
         x = -x;
     }
     if x < 1f32.as_() {
-        return (4f32.as_() + x * x * (3f32.as_() * x - 6f32.as_())) * (1f32.as_() / 6f32.as_());
+        return mla(x * x, mla(3f32.as_(), x, -6f32.as_()), 4f32.as_()) * (1f32.as_() / 6f32.as_());
     } else if x < 2f32.as_() {
-        return (8f32.as_() + x * ((-12f32).as_() + x * (6f32.as_() - x)))
+        return mla(x, mla(x, 6f32.as_() - x, (-12f32).as_()), 8f32.as_())
             * (1f32.as_() / 6f32.as_());
     }
     0f32.as_()
@@ -69,7 +71,8 @@ pub fn bicubic_spline<
         + 'static
         + Neg<Output = V>
         + Signed
-        + PartialOrd,
+        + PartialOrd
+        + MulAdd<V, Output = V>,
 >(
     d: V,
 ) -> V
@@ -85,7 +88,19 @@ where
     let floatd = modulo * modulo;
     let triplet = floatd * modulo;
     if modulo <= 1f32.as_() {
-        return (a + 2f32.as_()) * triplet - (a + 3f32.as_()) * floatd + 1f32.as_();
+        return mla(
+            a + 2f32.as_(),
+            triplet,
+            mla(-(a + 3f32.as_()), floatd, 1f32.as_()),
+        );
     }
-    a * triplet - 5f32.as_() * a * floatd + 8f32.as_() * a * modulo - 4f32.as_() * a
+    mla(
+        a,
+        triplet,
+        mla(
+            -5f32.as_(),
+            a,
+            mla(-4f32.as_(), a, mla(8f32.as_() * a, modulo, floatd)),
+        ),
+    )
 }

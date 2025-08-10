@@ -27,7 +27,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use num_traits::{AsPrimitive, Float};
+use crate::math::mla;
+use num_traits::{AsPrimitive, Float, MulAdd};
 use std::ops::{AddAssign, Div, Mul, MulAssign, Sub};
 
 pub(crate) trait BesselI0 {
@@ -59,7 +60,8 @@ pub(crate) fn kaiser<
         + PartialOrd
         + Sub<Output = V>
         + Float
-        + BesselI0,
+        + BesselI0
+        + MulAdd<Output = V>,
 >(
     x: V,
 ) -> V
@@ -71,5 +73,5 @@ where
         return 0f32.as_();
     }
     let i0a = 1.0f64.as_() / 6.33f64.as_().bessel_i0();
-    (6.33f64.as_() * (1.0f64.as_() - x * x).sqrt()).bessel_i0() * i0a
+    (6.33f64.as_() * mla(-x, x, 1.0f64.as_()).sqrt()).bessel_i0() * i0a
 }

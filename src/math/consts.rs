@@ -26,6 +26,8 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use num_traits::MulAdd;
+use std::ops::{Add, Mul};
 
 pub trait ConstSqrt2 {
     fn const_sqrt2() -> Self;
@@ -61,4 +63,36 @@ impl ConstPI for f64 {
     fn const_pi() -> Self {
         std::f64::consts::PI
     }
+}
+
+#[cfg(any(
+    all(
+        any(target_arch = "x86", target_arch = "x86_64"),
+        target_feature = "fma"
+    ),
+    all(target_arch = "aarch64", target_feature = "neon")
+))]
+#[inline(always)]
+pub(crate) fn mla<T: Copy + Mul<T, Output = T> + Add<T, Output = T> + MulAdd<T, Output = T>>(
+    a: T,
+    b: T,
+    acc: T,
+) -> T {
+    MulAdd::mul_add(a, b, acc)
+}
+
+#[inline(always)]
+#[cfg(not(any(
+    all(
+        any(target_arch = "x86", target_arch = "x86_64"),
+        target_feature = "fma"
+    ),
+    all(target_arch = "aarch64", target_feature = "neon")
+)))]
+pub(crate) fn mla<T: Copy + Mul<T, Output = T> + Add<T, Output = T> + MulAdd<T, Output = T>>(
+    a: T,
+    b: T,
+    acc: T,
+) -> T {
+    a * b + acc
 }

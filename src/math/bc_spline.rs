@@ -28,7 +28,8 @@
  */
 
 use crate::math::consts::ConstSqrt2;
-use num_traits::AsPrimitive;
+use crate::math::mla;
+use num_traits::{AsPrimitive, MulAdd};
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
 #[inline(always)]
@@ -41,7 +42,8 @@ pub fn bc_spline<
         + 'static
         + PartialEq
         + PartialOrd
-        + Neg<Output = V>,
+        + Neg<Output = V>
+        + MulAdd<Output = V>,
 >(
     d: V,
     b: V,
@@ -57,15 +59,15 @@ where
     let dp = x * x;
     let tp = dp * x;
     if x < 1f32.as_() {
-        return ((12f32.as_() - 9f32.as_() * b - 6f32.as_() * c) * tp
-            + ((-18f32).as_() + 12f32.as_() * b + 6f32.as_() * c) * dp
-            + (6f32.as_() - 2f32.as_() * b))
+        return (mla(-6f32.as_(), c, mla(-9f32.as_(), b, 12f32.as_())) * tp
+            + mla(6f32.as_(), c, mla(12f32.as_(), b, -18f32.as_())) * dp
+            + mla(-2f32.as_(), b, 6f32.as_()))
             * (1f32.as_() / 6f32.as_());
     } else if x < 2f32.as_() {
-        return ((-b - 6f32.as_() * c) * tp
-            + (6f32.as_() * b + 30f32.as_() * c) * dp
-            + ((-12f32).as_() * b - 48f32.as_() * c) * x
-            + (8f32.as_() * b + 24f32.as_() * c))
+        return (mla(-6f32.as_(), c, -b) * tp
+            + mla(6f32.as_(), b, 30f32.as_() * c) * dp
+            + mla((-12f32).as_(), b, -48f32.as_() * c) * x
+            + mla(8f32.as_(), b, 24f32.as_() * c))
             * (1f32.as_() / 6f32.as_());
     }
     0f32.as_()
@@ -81,7 +83,8 @@ pub fn hermite_spline<
         + 'static
         + PartialEq
         + PartialOrd
-        + Neg<Output = V>,
+        + Neg<Output = V>
+        + MulAdd<Output = V>,
 >(
     x: V,
 ) -> V
@@ -101,7 +104,8 @@ pub fn b_spline<
         + 'static
         + PartialEq
         + PartialOrd
-        + Neg<Output = V>,
+        + Neg<Output = V>
+        + MulAdd<Output = V>,
 >(
     x: V,
 ) -> V
@@ -121,7 +125,8 @@ pub fn mitchell_netravalli<
         + 'static
         + PartialEq
         + PartialOrd
-        + Neg<Output = V>,
+        + Neg<Output = V>
+        + MulAdd<Output = V>,
 >(
     x: V,
 ) -> V
@@ -141,7 +146,8 @@ pub fn catmull_rom<
         + 'static
         + PartialEq
         + PartialOrd
-        + Neg<Output = V>,
+        + Neg<Output = V>
+        + MulAdd<Output = V>,
 >(
     x: V,
 ) -> V
@@ -162,7 +168,8 @@ pub fn robidoux<
         + PartialEq
         + PartialOrd
         + Neg<Output = V>
-        + ConstSqrt2,
+        + ConstSqrt2
+        + MulAdd<Output = V>,
 >(
     x: V,
 ) -> V
@@ -171,8 +178,8 @@ where
 {
     bc_spline(
         x,
-        12f32.as_() / (19f32.as_() + 9f32.as_() * V::const_sqrt2()),
-        13f32.as_() / (58f32.as_() + 216f32.as_() * V::const_sqrt2()),
+        12f32.as_() / mla(9f32.as_(), V::const_sqrt2(), 19f32.as_()),
+        13f32.as_() / mla(216f32.as_(), V::const_sqrt2(), 58f32.as_()),
     )
 }
 
@@ -187,7 +194,8 @@ pub fn robidoux_sharp<
         + PartialEq
         + PartialOrd
         + Neg<Output = V>
-        + ConstSqrt2,
+        + ConstSqrt2
+        + MulAdd<Output = V>,
 >(
     x: V,
 ) -> V
@@ -196,7 +204,7 @@ where
 {
     bc_spline(
         x,
-        6f32.as_() / (13f32.as_() + 7f32.as_() * V::const_sqrt2()),
-        7f32.as_() / (2f32.as_() + 12f32.as_() * V::const_sqrt2()),
+        6f32.as_() / mla(7f32.as_(), V::const_sqrt2(), 13f32.as_()),
+        7f32.as_() / mla(12f32.as_(), V::const_sqrt2(), 2f32.as_()),
     )
 }

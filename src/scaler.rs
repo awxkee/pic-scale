@@ -47,7 +47,7 @@ use crate::{
     Planar8ImageStore, Planar16ImageStore, PlanarF32ImageStore, ResamplingFunction, Rgb8ImageStore,
     Rgb16ImageStore, RgbF32ImageStore, Rgba8ImageStore, Rgba16ImageStore, RgbaF32ImageStore,
 };
-use num_traits::{AsPrimitive, Float, Signed};
+use num_traits::{AsPrimitive, Float, MulAdd, Signed};
 use std::fmt::Debug;
 use std::ops::{AddAssign, MulAssign, Neg};
 
@@ -477,7 +477,8 @@ impl Scaler {
             + Trigonometry
             + Exponential
             + Sinc
-            + BesselI0,
+            + BesselI0
+            + MulAdd<Output = T>,
         f32: AsPrimitive<T>,
         f64: AsPrimitive<T>,
         i64: AsPrimitive<T>,

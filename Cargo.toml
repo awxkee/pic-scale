@@ -2,7 +2,7 @@ workspace = { members = ["app", "wasm", "fuzz", "app/accelerate"], exclude = ["p
 
 [package]
 name = "pic-scale"
-version = "0.6.7"
+version = "0.6.8"
 edition = "2024"
 description = "High performance image scaling"
 readme = "README.md"
@@ -21,7 +21,7 @@ colorutils-rs = {version = "0.7", optional = true}
 num-traits = { version = "0.2", features = ["std"] }
 rayon = "1.10"
 novtb = "^0.1.6"
-pxfm = "^0.1.12"
+pxfm = "^0.1.14"
 
 [features]
 default = ["colorspaces", "rdm", "sse", "avx"]

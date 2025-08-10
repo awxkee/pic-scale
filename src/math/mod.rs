@@ -29,7 +29,6 @@
 
 pub mod bartlett;
 pub mod bc_spline;
-mod jinc;
 pub mod bilinear;
 pub mod blackman;
 pub mod bohman;
@@ -37,6 +36,7 @@ mod consts;
 pub mod cubic;
 pub mod gaussian;
 pub mod hann;
+mod jinc;
 pub mod kaiser;
 pub mod lagrange;
 pub mod lanczos;
@@ -46,5 +46,5 @@ pub mod sphinx;
 pub mod spline_n;
 pub mod welch;
 
-pub use jinc::*;
 pub use consts::*;
+pub use jinc::*;

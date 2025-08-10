@@ -27,11 +27,22 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use num_traits::{AsPrimitive, Signed};
-use std::ops::{Mul, Sub};
+use crate::math::mla;
+use num_traits::{AsPrimitive, MulAdd, Signed};
+use std::ops::{Add, Mul, Neg, Sub};
 
 #[inline(always)]
-pub(crate) fn quadric<V: Copy + Mul<Output = V> + Signed + Sub<Output = V> + 'static + PartialOrd>(
+pub(crate) fn quadric<
+    V: Copy
+        + Mul<Output = V>
+        + Signed
+        + Sub<Output = V>
+        + 'static
+        + PartialOrd
+        + Add<V, Output = V>
+        + MulAdd<V, Output = V>
+        + Neg<Output = V>,
+>(
     x: V,
 ) -> V
 where
@@ -39,7 +50,7 @@ where
 {
     let x = x.abs();
     if x < 0.5f32.as_() {
-        return 0.75f32.as_() - x * x;
+        return mla(-x, x, 0.75f32.as_());
     } else if x < 1.5f32.as_() {
         let t = x - 1.5f32.as_();
         return 0.5f32.as_() * t * t;

@@ -28,8 +28,9 @@
  */
 
 use crate::math::consts::ConstPI;
+use crate::math::mla;
 use crate::math::sinc::Trigonometry;
-use num_traits::{AsPrimitive, Float, Signed};
+use num_traits::{AsPrimitive, Float, MulAdd, Signed};
 use std::ops::{Add, Div, Mul};
 
 #[inline(always)]
@@ -44,11 +45,10 @@ where
     let length = 2.0f32.as_();
     let size = length * 2f32.as_();
     let size_scale = 1f32.as_() / size;
-    let part = V::const_pi() / size;
     if x.abs() > length {
         return 0f32.as_();
     }
-    let r = (x * part).f_cos();
+    let r = (x * size_scale).f_cospi();
     let r = r * r;
     r * size_scale
 }
@@ -63,7 +63,8 @@ pub(crate) fn hamming<
         + Float
         + Add<Output = V>
         + 'static
-        + Trigonometry,
+        + Trigonometry
+        + MulAdd<V, Output = V>,
 >(
     x: V,
 ) -> V
@@ -76,8 +77,7 @@ where
     } else if x >= 1f32.as_() {
         0f32.as_()
     } else {
-        let x = x * V::const_pi();
-        0.54f32.as_() + 0.46f32.as_() * x.f_cos()
+        mla(0.46f32.as_(), x.f_cospi(), 0.54f32.as_())
     }
 }
 
@@ -91,7 +91,8 @@ pub(crate) fn hanning<
         + Float
         + Add<Output = V>
         + 'static
-        + Trigonometry,
+        + Trigonometry
+        + MulAdd<V, Output = V>,
 >(
     x: V,
 ) -> V
@@ -104,7 +105,6 @@ where
     } else if x >= 1.0f32.as_() {
         0.0f32.as_()
     } else {
-        let x = x * V::const_pi();
-        0.5f32.as_() + 0.5f32.as_() * x.f_cos()
+        mla(0.5f32.as_(), x.f_cospi(), 0.5f32.as_())
     }
 }
