@@ -38,8 +38,8 @@ unsafe fn conv_horiz_rgba_1_u16(
     store: int32x4_t,
 ) -> int32x4_t {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
         let vl0 = vreinterpret_u16_u32(vld1_lane_u32::<0>(
             src_ptr.as_ptr() as *const _,
             vdup_n_u32(0),
@@ -60,8 +60,8 @@ unsafe fn conv_horiz_rgba_2_u16(
     store: int32x4_t,
 ) -> int32x4_t {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let l1 = vld1_u16(src_ptr.as_ptr());
         let l2 = vld1_lane_u32::<0>(
@@ -85,8 +85,8 @@ unsafe fn conv_horiz_rgba_4_u16(
     store: int32x4_t,
 ) -> int32x4_t {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let part0 = vld1q_u16(src_ptr.as_ptr());
         let part1 = vld1_u16(src_ptr.get_unchecked(8..).as_ptr());
@@ -153,7 +153,7 @@ unsafe fn convolve_horizontal_rgb_neon_rows_4_hb_impl(
     bit_depth: u32,
 ) {
     unsafe {
-        const CHANNELS: usize = 3;
+        const CN: usize = 3;
         let init = vdupq_n_s32(1 << 5);
 
         let v_max_colors = vdup_n_u16(((1u32 << bit_depth) - 1) as u16);
@@ -162,10 +162,10 @@ unsafe fn convolve_horizontal_rgb_neon_rows_4_hb_impl(
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
         let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let iter_row0 = row0_ref.chunks_exact_mut(CHANNELS);
-        let iter_row1 = row1_ref.chunks_exact_mut(CHANNELS);
-        let iter_row2 = row2_ref.chunks_exact_mut(CHANNELS);
-        let iter_row3 = row3_ref.chunks_exact_mut(CHANNELS);
+        let iter_row0 = row0_ref.chunks_exact_mut(CN);
+        let iter_row1 = row1_ref.chunks_exact_mut(CN);
+        let iter_row2 = row2_ref.chunks_exact_mut(CN);
+        let iter_row3 = row3_ref.chunks_exact_mut(CN);
 
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
             .zip(iter_row1)

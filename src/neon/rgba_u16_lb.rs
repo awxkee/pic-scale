@@ -39,8 +39,8 @@ unsafe fn conv_horiz_rgba_1_u16(
     store: int32x4_t,
 ) -> int32x4_t {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
         let rgba_pixel = vld1_u16(src_ptr.as_ptr());
         let lo = vreinterpret_s16_u16(rgba_pixel);
         vqdmlal_s16(store, lo, w0)
@@ -57,8 +57,8 @@ unsafe fn conv_horiz_rgba_2_u16(
     store: int32x4_t,
 ) -> int32x4_t {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let rgb_pixel = vld1q_u16(src_ptr.as_ptr());
         let wide = vreinterpretq_s16_u16(rgb_pixel);
@@ -77,8 +77,8 @@ unsafe fn conv_horiz_rgba_4_u16(
     store: int32x4_t,
 ) -> int32x4_t {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let rgba_pixel = xvld1q_u16_x2(src_ptr.as_ptr());
 
@@ -101,8 +101,8 @@ unsafe fn conv_horiz_rgba_8_u16(
     store: int32x4_t,
 ) -> int32x4_t {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let rgba_pixel = xvld1q_u16_x4(src_ptr.as_ptr());
 
@@ -133,7 +133,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_rows_4_lb_u16(
     bit_depth: u32,
 ) {
     unsafe {
-        const CHANNELS: usize = 4;
+        const CN: usize = 4;
         const PRECISION: i32 = 16;
         const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
         let init = vdupq_n_s32(ROUNDING_CONST);
@@ -144,10 +144,10 @@ pub(crate) fn convolve_horizontal_rgba_neon_rows_4_lb_u16(
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
         let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let iter_row0 = row0_ref.chunks_exact_mut(CHANNELS);
-        let iter_row1 = row1_ref.chunks_exact_mut(CHANNELS);
-        let iter_row2 = row2_ref.chunks_exact_mut(CHANNELS);
-        let iter_row3 = row3_ref.chunks_exact_mut(CHANNELS);
+        let iter_row0 = row0_ref.chunks_exact_mut(CN);
+        let iter_row1 = row1_ref.chunks_exact_mut(CN);
+        let iter_row2 = row2_ref.chunks_exact_mut(CN);
+        let iter_row3 = row3_ref.chunks_exact_mut(CN);
 
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
             .zip(iter_row1)
@@ -243,7 +243,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_u16_lb_row(
     bit_depth: u32,
 ) {
     unsafe {
-        const CHANNELS: usize = 4;
+        const CN: usize = 4;
 
         let v_max_colors = vdup_n_u16((1 << bit_depth) - 1);
 
@@ -251,7 +251,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_u16_lb_row(
         const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
 
         for ((dst, bounds), weights) in dst
-            .chunks_exact_mut(CHANNELS)
+            .chunks_exact_mut(CN)
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights

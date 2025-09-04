@@ -43,8 +43,8 @@ unsafe fn conv_horiz_rgb_4(
     shuffle_hi: uint8x16_t,
 ) -> int16x8_t {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let px_lo = vld1_u8(src_ptr.as_ptr());
         let px_hi_part = vld1_lane_u32::<0>(
@@ -72,8 +72,8 @@ unsafe fn conv_horiz_rgb_2(
     shuffle: uint8x16_t,
 ) -> int16x8_t {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
         let mut rgb_pixel = vld1q_lane_u32::<0>(src_ptr.as_ptr() as *const u32, vdupq_n_u32(0));
         rgb_pixel = vreinterpretq_u32_u16(vld1q_lane_u16::<2>(
             src_ptr.get_unchecked(4..).as_ptr() as *const u16,
@@ -97,8 +97,8 @@ unsafe fn conv_hor_rgb_1(
     shuffle: uint8x16_t,
 ) -> int16x8_t {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
         let rgb_pixel = vshrq_n_u16::<2>(vreinterpretq_u16_u8(vqtbl1q_u8(
             load_3b_as_u8x16(src_ptr.as_ptr()),
             shuffle,
@@ -146,7 +146,7 @@ unsafe fn convolve_horizontal_rgb_neon_rdm_rows_4_impl(
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        const CHANNELS: usize = 3;
+        const CN: usize = 3;
 
         let shuf_table_lo: [u8; 16] = [0, 0, 1, 1, 2, 2, 255, 255, 3, 3, 4, 4, 5, 5, 255, 255];
         let shuffle_lo = vld1q_u8(shuf_table_lo.as_ptr());
@@ -175,10 +175,10 @@ unsafe fn convolve_horizontal_rgb_neon_rdm_rows_4_impl(
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
         let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let iter_row0 = row0_ref.chunks_exact_mut(CHANNELS);
-        let iter_row1 = row1_ref.chunks_exact_mut(CHANNELS);
-        let iter_row2 = row2_ref.chunks_exact_mut(CHANNELS);
-        let iter_row3 = row3_ref.chunks_exact_mut(CHANNELS);
+        let iter_row0 = row0_ref.chunks_exact_mut(CN);
+        let iter_row1 = row1_ref.chunks_exact_mut(CN);
+        let iter_row2 = row2_ref.chunks_exact_mut(CN);
+        let iter_row3 = row3_ref.chunks_exact_mut(CN);
 
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
             .zip(iter_row1)
@@ -267,7 +267,7 @@ unsafe fn convolve_horizontal_rgb_neon_row_rdm_one_impl(
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        const CHANNELS: usize = 3;
+        const CN: usize = 3;
 
         let shuf_table_lo: [u8; 16] = [0, 0, 1, 1, 2, 2, 255, 255, 3, 3, 4, 4, 5, 5, 255, 255];
         let shuffle_lo = vld1q_u8(shuf_table_lo.as_ptr());
@@ -294,7 +294,7 @@ unsafe fn convolve_horizontal_rgb_neon_row_rdm_one_impl(
         let v_base = vld1q_s16(base_values.as_ptr());
 
         for ((dst, bounds), weights) in dst
-            .chunks_exact_mut(CHANNELS)
+            .chunks_exact_mut(CN)
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights

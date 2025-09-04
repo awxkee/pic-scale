@@ -69,8 +69,8 @@ unsafe fn conv_horiz_rgba_2_u8_i16<const SCALE: i32>(
     store: int16x8_t,
 ) -> int16x8_t {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let rgb_pixel = vld1_u8(src_ptr.as_ptr());
         let wide = expand8_to_14(rgb_pixel);
@@ -88,8 +88,8 @@ unsafe fn conv_horiz_rgba_4_u8_i16<const SCALE: i32>(
     store: int16x8_t,
 ) -> int16x8_t {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let rgba_pixel = vld1q_u8(src_ptr.as_ptr());
 
@@ -155,7 +155,7 @@ unsafe fn convolve_horizontal_rgba_neon_rows_4_u8_i16_impl(
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        const CHANNELS: usize = 4;
+        const CN: usize = 4;
         const SCALE: i32 = 6;
         const ROUNDING: i16 = 1 << (SCALE - 1);
 
@@ -175,10 +175,10 @@ unsafe fn convolve_horizontal_rgba_neon_rows_4_u8_i16_impl(
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
         let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let iter_row0 = row0_ref.chunks_exact_mut(CHANNELS);
-        let iter_row1 = row1_ref.chunks_exact_mut(CHANNELS);
-        let iter_row2 = row2_ref.chunks_exact_mut(CHANNELS);
-        let iter_row3 = row3_ref.chunks_exact_mut(CHANNELS);
+        let iter_row0 = row0_ref.chunks_exact_mut(CN);
+        let iter_row1 = row1_ref.chunks_exact_mut(CN);
+        let iter_row2 = row2_ref.chunks_exact_mut(CN);
+        let iter_row3 = row3_ref.chunks_exact_mut(CN);
 
         let initial_val = vcombine_s16(vdup_n_s16(ROUNDING), vdup_n_s16(0));
 
@@ -348,7 +348,7 @@ unsafe fn convolve_horizontal_rgba_neon_row_i16_impl(
     unsafe {
         const SCALE: i32 = 6;
         const ROUNDING: i16 = 1 << (SCALE - 1);
-        const CHANNELS: usize = 4;
+        const CN: usize = 4;
 
         let weights_distribute: [u8; 16] = [0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3];
         let v_w_distribute0 = vld1q_u8(weights_distribute.as_ptr());
@@ -365,7 +365,7 @@ unsafe fn convolve_horizontal_rgba_neon_row_i16_impl(
         let initial_val = vcombine_s16(vdup_n_s16(ROUNDING), vdup_n_s16(0));
 
         for ((dst, bounds), weights) in dst
-            .chunks_exact_mut(CHANNELS)
+            .chunks_exact_mut(CN)
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights

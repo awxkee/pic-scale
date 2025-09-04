@@ -52,8 +52,8 @@ unsafe fn conv_horiz_4_rgb_f16(
     store: float16x4_t,
 ) -> float16x4_t {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
 
         let v0 = vld1q_u16(src_ptr as *const _);
         let v1 = vcombine_u16(vld1_u16(src_ptr as *const _), vdup_n_u16(0));
@@ -86,8 +86,8 @@ unsafe fn conv_horiz_2_rgb_f16(
     store: float16x4_t,
 ) -> float16x4_t {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
 
         let rgb_pixel = vld1_u16(src_ptr as *const _);
         let second_px = vreinterpret_u16_u32(vld1_lane_u32::<0>(
@@ -116,8 +116,8 @@ unsafe fn conv_horiz_1_rgb_f16(
     store: float16x4_t,
 ) -> float16x4_t {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
 
         let mut rgb_pixel_u =
             vreinterpret_u16_u32(vld1_lane_u32::<0>(src_ptr as *const _, vdup_n_u32(0)));
@@ -161,7 +161,7 @@ unsafe fn xconvolve_horizontal_rgb_neon_rows_4_f16_impl(
     dst_stride: usize,
 ) {
     unsafe {
-        const CHANNELS: usize = 3;
+        const CN: usize = 3;
         let mut filter_offset = 0usize;
 
         let weights_ptr = filter_weights.weights.as_ptr();
@@ -217,7 +217,7 @@ unsafe fn xconvolve_horizontal_rgb_neon_rows_4_f16_impl(
                 jx += 1;
             }
 
-            let px = x * CHANNELS;
+            let px = x * CN;
             let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
             write_rgb_f16!(store_0, dest_ptr);
 
@@ -262,7 +262,7 @@ unsafe fn xconvolve_horizontal_rgb_neon_row_one_f16_impl(
     dst: &mut [f16],
 ) {
     unsafe {
-        const CHANNELS: usize = 3;
+        const CN: usize = 3;
         let weights_ptr = filter_weights.weights.as_ptr();
         let mut filter_offset = 0usize;
 
@@ -296,7 +296,7 @@ unsafe fn xconvolve_horizontal_rgb_neon_row_one_f16_impl(
                 jx += 1;
             }
 
-            let px = x * CHANNELS;
+            let px = x * CN;
             let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
             write_rgb_f16!(store, dest_ptr);
 

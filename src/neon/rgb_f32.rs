@@ -42,8 +42,8 @@ macro_rules! write_rgb_f32 {
 
 macro_rules! conv_horiz_4_rgb_f32 {
     ($start_x: expr, $src: expr, $weights: expr, $store: expr) => {{
-        const COMPONENTS: usize = 3;
-        let src_ptr = $src.add($start_x * COMPONENTS);
+        const CN: usize = 3;
+        let src_ptr = $src.add($start_x * CN);
 
         let rgb_pixel_0 = vld1q_f32(src_ptr);
         let rgb_pixel_1 = vld1q_f32(src_ptr.add(3));
@@ -68,8 +68,8 @@ macro_rules! conv_horiz_4_rgb_f32 {
 
 macro_rules! conv_horiz_2_rgb_f32 {
     ($start_x: expr, $src: expr, $set: expr, $store: expr) => {{
-        const COMPONENTS: usize = 3;
-        let src_ptr = $src.add($start_x * COMPONENTS);
+        const CN: usize = 3;
+        let src_ptr = $src.add($start_x * CN);
 
         let mut rgb_pixel_0 = vld1q_f32(src_ptr);
         rgb_pixel_0 = vsetq_lane_f32::<3>(0., rgb_pixel_0);
@@ -91,8 +91,8 @@ macro_rules! conv_horiz_2_rgb_f32 {
 
 macro_rules! conv_horiz_1_rgb_f32 {
     ($start_x: expr, $src: expr, $weight: expr, $store: expr) => {{
-        const COMPONENTS: usize = 3;
-        let src_ptr = $src.add($start_x * COMPONENTS);
+        const CN: usize = 3;
+        let src_ptr = $src.add($start_x * CN);
 
         let transient: [f32; 4] = [
             src_ptr.read_unaligned(),
@@ -117,7 +117,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4_f32(
     dst_stride: usize,
 ) {
     unsafe {
-        const CHANNELS: usize = 3;
+        const CN: usize = 3;
         let mut filter_offset = 0usize;
 
         let zeros = vdupq_n_f32(0.);
@@ -174,7 +174,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4_f32(
                 jx += 1;
             }
 
-            let px = x * CHANNELS;
+            let px = x * CN;
             let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
             write_rgb_f32!(store_0, dest_ptr);
 
@@ -200,7 +200,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_row_one_f32(
     dst: &mut [f32],
 ) {
     unsafe {
-        const CHANNELS: usize = 3;
+        const CN: usize = 3;
         let weights_ptr = filter_weights.weights.as_ptr();
         let mut filter_offset = 0usize;
 
@@ -233,7 +233,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_row_one_f32(
                 jx += 1;
             }
 
-            let px = x * CHANNELS;
+            let px = x * CN;
             let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
             write_rgb_f32!(store, dest_ptr);
 
