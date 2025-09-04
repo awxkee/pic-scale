@@ -167,7 +167,7 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_impl<const D: bool, const PRECISION: 
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        const CHANNELS: usize = 4;
+        const CN: usize = 4;
         let rnd_const: i32 = 1 << (PRECISION - 1);
         let init = vdupq_n_s32(rnd_const);
 
@@ -175,10 +175,10 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_impl<const D: bool, const PRECISION: 
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
         let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let iter_row0 = row0_ref.chunks_exact_mut(CHANNELS);
-        let iter_row1 = row1_ref.chunks_exact_mut(CHANNELS);
-        let iter_row2 = row2_ref.chunks_exact_mut(CHANNELS);
-        let iter_row3 = row3_ref.chunks_exact_mut(CHANNELS);
+        let iter_row0 = row0_ref.chunks_exact_mut(CN);
+        let iter_row1 = row1_ref.chunks_exact_mut(CN);
+        let iter_row2 = row2_ref.chunks_exact_mut(CN);
+        let iter_row3 = row3_ref.chunks_exact_mut(CN);
 
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
             .zip(iter_row1)

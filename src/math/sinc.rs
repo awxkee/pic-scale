@@ -28,7 +28,6 @@
  */
 
 use num_traits::AsPrimitive;
-use pxfm::{f_sinc, f_sincf};
 use std::ops::Div;
 
 pub(crate) trait Trigonometry {
@@ -73,13 +72,13 @@ pub(crate) trait Sinc {
 impl Sinc for f32 {
     #[inline]
     fn sinc(self) -> Self {
-        f_sincf(self)
+        pxfm::f_sincpif(self)
     }
 }
 
 impl Sinc for f64 {
     fn sinc(self) -> Self {
-        f_sinc(self)
+        pxfm::f_sincpi(self)
     }
 }
 

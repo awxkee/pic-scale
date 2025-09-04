@@ -53,8 +53,8 @@ unsafe fn conv_horiz_4_rgb_f16(
     store: float32x4_t,
 ) -> float32x4_t {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
 
         let rgb_pixel_s = vld1q_u16(src_ptr as *const _);
         let rgb_pixel_n = vld1_u16(src_ptr.add(8) as *const _);
@@ -119,8 +119,8 @@ unsafe fn conv_horiz_1_rgb_f16(
     store: float32x4_t,
 ) -> float32x4_t {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
 
         let mut fq = vreinterpret_u16_u32(vld1_lane_u32::<0>(src_ptr as *const _, vdup_n_u32(0)));
         fq = vld1_lane_u16::<2>(src_ptr.add(2) as *const _, fq);
@@ -164,7 +164,7 @@ unsafe fn convolve_horizontal_rgb_neon_rows_4_f16_impl(
     dst_stride: usize,
 ) {
     unsafe {
-        const CHANNELS: usize = 3;
+        const CN: usize = 3;
         let mut filter_offset = 0usize;
 
         let zeros = vdupq_n_f32(0.);
@@ -222,7 +222,7 @@ unsafe fn convolve_horizontal_rgb_neon_rows_4_f16_impl(
                 jx += 1;
             }
 
-            let px = x * CHANNELS;
+            let px = x * CN;
             let dest_ptr = dst.get_unchecked_mut(px..);
             write_rgb_f16(store_0, dest_ptr);
 
@@ -259,7 +259,7 @@ unsafe fn convolve_horizontal_rgb_neon_row_one_f16_impl(
     dst: &mut [f16],
 ) {
     unsafe {
-        const CHANNELS: usize = 3;
+        const CN: usize = 3;
         let weights_ptr = filter_weights.weights.as_ptr();
         let mut filter_offset = 0usize;
 
@@ -293,7 +293,7 @@ unsafe fn convolve_horizontal_rgb_neon_row_one_f16_impl(
                 jx += 1;
             }
 
-            let px = x * CHANNELS;
+            let px = x * CN;
             let dest_ptr = dst.get_unchecked_mut(px..);
             write_rgb_f16(store, dest_ptr);
 

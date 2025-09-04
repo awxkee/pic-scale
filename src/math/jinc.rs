@@ -34,7 +34,7 @@ pub fn jinc_f64(x: f64) -> f64 {
     if x == 0f64 {
         return 0f64;
     }
-    f_j1(x) / x
+    f_j1(x * std::f64::consts::PI) / (x * std::f64::consts::PI)
 }
 
 /// Bessel 1st order in f32
@@ -43,7 +43,7 @@ pub fn jinc_f32(x: f32) -> f32 {
     if x == 0. {
         return 0.;
     }
-    f_j1f(x) / x
+    f_j1f(x * std::f32::consts::PI) / (x * std::f32::consts::PI)
 }
 
 /// Bessel trait

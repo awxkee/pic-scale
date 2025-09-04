@@ -266,7 +266,7 @@ fn convolve_horizontal_rgb_neon_row_one_impl<const D: bool, const PRECISION: i32
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        const CHANNELS: usize = 3;
+        const CN: usize = 3;
 
         let shuf_table_1: [u8; 8] = [0, 1, 2, 255, 3, 4, 5, 255];
         let shuffle_1 = vld1_u8(shuf_table_1.as_ptr());
@@ -277,7 +277,7 @@ fn convolve_horizontal_rgb_neon_row_one_impl<const D: bool, const PRECISION: i32
         let rnd_const: i32 = 1i32 << (PRECISION - 1);
 
         for ((dst, bounds), weights) in dst
-            .chunks_exact_mut(CHANNELS)
+            .chunks_exact_mut(CN)
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights
