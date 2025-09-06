@@ -31,8 +31,7 @@ use crate::math::mla;
 use num_traits::{AsPrimitive, MulAdd, Signed};
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
-#[inline(always)]
-pub fn cubic_spline<
+pub(crate) fn cubic_spline<
     V: Copy
         + Mul<Output = V>
         + Add<Output = V>
@@ -62,8 +61,7 @@ where
     0f32.as_()
 }
 
-#[inline(always)]
-pub fn bicubic_spline<
+pub(crate) fn bicubic_spline<
     V: Copy
         + Mul<Output = V>
         + Sub<Output = V>

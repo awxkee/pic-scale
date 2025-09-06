@@ -49,7 +49,6 @@ impl BesselI0 for f64 {
     }
 }
 
-#[inline(always)]
 pub(crate) fn kaiser<
     V: Copy
         + Mul<Output = V>

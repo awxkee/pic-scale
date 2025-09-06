@@ -30,7 +30,7 @@
 use num_traits::AsPrimitive;
 use std::ops::{Add, Div, Mul, MulAssign, Sub};
 
-#[inline(always)]
+#[inline]
 pub(crate) fn lagrange<
     V: Copy
         + PartialEq
@@ -63,7 +63,6 @@ where
     value
 }
 
-#[inline(always)]
 pub(crate) fn lagrange2<
     V: Copy
         + PartialEq
@@ -84,7 +83,6 @@ where
     lagrange(x, 2)
 }
 
-#[inline(always)]
 pub(crate) fn lagrange3<
     V: Copy
         + PartialEq

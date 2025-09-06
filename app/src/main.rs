@@ -63,7 +63,7 @@ fn main() {
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
 
-    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3Jinc);
+    let mut scaler = Scaler::new(ResamplingFunction::Hamming);
     scaler.set_threading_policy(ThreadingPolicy::Adaptive);
     scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
@@ -202,7 +202,7 @@ fn main() {
 
     if dst_store.channels == 4 {
         image::save_buffer(
-            "converted1.png",
+            "converted.png",
             &dst,
             dst_store.width as u32,
             dst_store.height as u32,
@@ -211,7 +211,7 @@ fn main() {
         .unwrap();
     } else {
         image::save_buffer(
-            "converted1.png",
+            "converted.png",
             &dst,
             dst_store.width as u32,
             dst_store.height as u32,

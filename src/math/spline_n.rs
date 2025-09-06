@@ -30,7 +30,6 @@
 use num_traits::AsPrimitive;
 use std::ops::{Add, Div, Mul, Sub};
 
-#[inline(always)]
 pub(crate) fn spline16<
     V: Copy
         + Div<Output = V>
@@ -56,7 +55,6 @@ where
     }
 }
 
-#[inline(always)]
 pub(crate) fn spline36<
     V: Copy
         + Div<Output = V>
@@ -89,7 +87,6 @@ where
     }
 }
 
-#[inline(always)]
 pub(crate) fn spline64<
     V: Copy
         + Div<Output = V>

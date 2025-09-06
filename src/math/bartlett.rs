@@ -33,7 +33,6 @@ use crate::math::sinc::Trigonometry;
 use num_traits::{AsPrimitive, Float, MulAdd};
 use std::ops::{Add, Mul, Neg, Sub};
 
-#[inline(always)]
 pub(crate) fn bartlett<
     V: Copy
         + Sub<Output = V>
@@ -55,7 +54,6 @@ where
     mla(-2f32.as_(), x, 2f32.as_())
 }
 
-#[inline(always)]
 pub(crate) fn bartlett_hann<
     V: Copy
         + Sub<Output = V>

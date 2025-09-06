@@ -31,7 +31,6 @@ use crate::math::mla;
 use num_traits::{AsPrimitive, MulAdd, Signed};
 use std::ops::{Add, Mul, Neg, Sub};
 
-#[inline(always)]
 pub(crate) fn quadric<
     V: Copy
         + Mul<Output = V>

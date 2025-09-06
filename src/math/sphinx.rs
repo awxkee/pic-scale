@@ -32,7 +32,6 @@ use crate::math::mla;
 use crate::math::sinc::Trigonometry;
 use num_traits::{AsPrimitive, Float, MulAdd, Signed};
 
-#[inline(always)]
 pub(crate) fn sphinx<
     V: Copy + ConstPI + Signed + Float + 'static + Trigonometry + MulAdd<V, Output = V>,
 >(

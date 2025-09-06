@@ -29,7 +29,6 @@
 
 use num_traits::{AsPrimitive, Signed};
 
-#[inline(always)]
 pub(crate) fn bilinear<V: Copy + Signed + 'static + PartialOrd>(x: V) -> V
 where
     f32: AsPrimitive<V>,

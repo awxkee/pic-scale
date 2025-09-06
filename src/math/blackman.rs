@@ -61,7 +61,6 @@ where
     )
 }
 
-#[inline(always)]
 pub(crate) fn blackman<
     V: Copy
         + ConstPI

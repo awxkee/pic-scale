@@ -32,8 +32,8 @@ use crate::math::mla;
 use num_traits::{AsPrimitive, MulAdd};
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
-#[inline(always)]
-pub fn bc_spline<
+#[inline]
+fn bc_spline<
     V: Copy
         + Add<Output = V>
         + Mul<Output = V>
@@ -73,8 +73,7 @@ where
     0f32.as_()
 }
 
-#[inline(always)]
-pub fn hermite_spline<
+pub(crate) fn hermite_spline<
     V: Copy
         + Add<Output = V>
         + Mul<Output = V>
@@ -94,8 +93,7 @@ where
     bc_spline(x, 0f32.as_(), 0f32.as_())
 }
 
-#[inline(always)]
-pub fn b_spline<
+pub(crate) fn b_spline<
     V: Copy
         + Add<Output = V>
         + Mul<Output = V>
@@ -115,8 +113,7 @@ where
     bc_spline(x, 1f32.as_(), 0f32.as_())
 }
 
-#[inline(always)]
-pub fn mitchell_netravalli<
+pub(crate) fn mitchell_netravalli<
     V: Copy
         + Add<Output = V>
         + Mul<Output = V>
@@ -136,8 +133,7 @@ where
     bc_spline(x, 1f32.as_() / 3f32.as_(), 1f32.as_() / 3f32.as_())
 }
 
-#[inline(always)]
-pub fn catmull_rom<
+pub(crate) fn catmull_rom<
     V: Copy
         + Add<Output = V>
         + Mul<Output = V>
@@ -157,8 +153,7 @@ where
     bc_spline(x, 0f32.as_(), 0.5f32.as_())
 }
 
-#[inline(always)]
-pub fn robidoux<
+pub(crate) fn robidoux<
     V: Copy
         + Add<Output = V>
         + Mul<Output = V>
@@ -183,8 +178,7 @@ where
     )
 }
 
-#[inline(always)]
-pub fn robidoux_sharp<
+pub(crate) fn robidoux_sharp<
     V: Copy
         + Add<Output = V>
         + Mul<Output = V>

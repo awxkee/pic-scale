@@ -26,41 +26,22 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use pxfm::{f_j1, f_j1f};
-
-/// Bessel 1st order in f64
-#[inline]
-pub fn jinc_f64(x: f64) -> f64 {
-    if x == 0f64 {
-        return 0f64;
-    }
-    f_j1(x * std::f64::consts::PI) / (x * std::f64::consts::PI)
-}
-
-/// Bessel 1st order in f32
-#[inline]
-pub fn jinc_f32(x: f32) -> f32 {
-    if x == 0. {
-        return 0.;
-    }
-    f_j1f(x * std::f32::consts::PI) / (x * std::f32::consts::PI)
-}
 
 /// Bessel trait
 pub trait Jinc<T> {
-    fn jinc() -> fn(T) -> T;
+    fn jinc(x: T) -> T;
 }
 
 impl Jinc<f64> for f64 {
     #[inline]
-    fn jinc() -> fn(f64) -> f64 {
-        jinc_f64
+    fn jinc(x: f64) -> f64 {
+        pxfm::f_jincpi(x)
     }
 }
 
 impl Jinc<f32> for f32 {
     #[inline]
-    fn jinc() -> fn(f32) -> f32 {
-        jinc_f32
+    fn jinc(x: f32) -> f32 {
+        pxfm::f_jincpif(x)
     }
 }

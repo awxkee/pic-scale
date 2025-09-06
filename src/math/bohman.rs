@@ -32,7 +32,6 @@ use crate::math::sinc::Trigonometry;
 use num_traits::{AsPrimitive, Float, MulAdd, Signed};
 use std::ops::Add;
 
-#[inline(always)]
 pub(crate) fn bohman<
     V: Copy
         + PartialEq
