@@ -33,7 +33,6 @@ use crate::math::sinc::Trigonometry;
 use num_traits::{AsPrimitive, Float, MulAdd, Signed};
 use std::ops::{Add, Div, Mul};
 
-#[inline(always)]
 pub(crate) fn hann<
     V: Copy + ConstPI + Mul<Output = V> + Div<Output = V> + Signed + Float + 'static + Trigonometry,
 >(
@@ -53,7 +52,6 @@ where
     r * size_scale
 }
 
-#[inline(always)]
 pub(crate) fn hamming<
     V: Copy
         + ConstPI
@@ -81,7 +79,6 @@ where
     }
 }
 
-#[inline(always)]
 pub(crate) fn hanning<
     V: Copy
         + ConstPI

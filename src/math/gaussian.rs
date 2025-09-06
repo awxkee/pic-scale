@@ -49,7 +49,6 @@ impl Exponential for f64 {
     }
 }
 
-#[inline(always)]
 pub(crate) fn gaussian<
     V: ConstPI + Copy + Neg<Output = V> + Mul<Output = V> + MulAssign + 'static + Float + Exponential,
 >(

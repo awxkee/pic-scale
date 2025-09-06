@@ -31,7 +31,6 @@ use crate::math::mla;
 use num_traits::{AsPrimitive, MulAdd};
 use std::ops::{Add, Mul, Neg, Sub};
 
-#[inline(always)]
 pub(crate) fn welch<
     V: Copy
         + PartialOrd

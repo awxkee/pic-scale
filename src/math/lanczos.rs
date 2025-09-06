@@ -34,7 +34,7 @@ use crate::sinc::sinc;
 use num_traits::{AsPrimitive, Float};
 use std::ops::Div;
 
-#[inline(always)]
+#[inline]
 pub fn lanczos_jinc<
     V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI + AsPrimitive<f64> + Jinc<V>,
 >(
@@ -50,15 +50,12 @@ where
         return 0f32.as_();
     }
     if x.abs() < a {
-        let jinc = V::jinc();
-        let d = V::const_pi() * x;
-        return jinc(d) * jinc(d * scale_a);
+        return V::jinc(x) * V::jinc(x * scale_a);
     }
     0f32.as_()
 }
 
-#[inline(always)]
-pub fn lanczos3_jinc<
+pub(crate) fn lanczos3_jinc<
     V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI + AsPrimitive<f64> + Jinc<V>,
 >(
     x: V,
@@ -70,8 +67,7 @@ where
     lanczos_jinc(x, 3f32.as_())
 }
 
-#[inline(always)]
-pub fn lanczos2_jinc<
+pub(crate) fn lanczos2_jinc<
     V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI + AsPrimitive<f64> + Jinc<V>,
 >(
     x: V,
@@ -83,8 +79,7 @@ where
     lanczos_jinc(x, 2f32.as_())
 }
 
-#[inline(always)]
-pub fn lanczos4_jinc<
+pub(crate) fn lanczos4_jinc<
     V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI + AsPrimitive<f64> + Jinc<V>,
 >(
     x: V,
@@ -96,8 +91,7 @@ where
     lanczos_jinc(x, 4f32.as_())
 }
 
-#[inline(always)]
-pub fn lanczos6_jinc<
+pub(crate) fn lanczos6_jinc<
     V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI + AsPrimitive<f64> + Jinc<V>,
 >(
     x: V,
@@ -110,8 +104,7 @@ where
     lanczos_jinc(x, A.as_())
 }
 
-#[inline(always)]
-pub fn lanczos_sinc<
+pub(crate) fn lanczos_sinc<
     V: Copy + PartialEq + Div<Output = V> + 'static + Trigonometry + Float + ConstPI + Sinc,
 >(
     x: V,
@@ -122,13 +115,11 @@ where
 {
     let scale_a: V = 1f32.as_() / a;
     if x.abs() < a {
-        let d = V::const_pi() * x;
-        return sinc(d) * sinc(d * scale_a);
+        return sinc(x) * sinc(x * scale_a);
     }
     0f32.as_()
 }
 
-#[inline(always)]
 pub(crate) fn lanczos3<
     V: Copy + PartialEq + Div<Output = V> + 'static + Float + Trigonometry + ConstPI + Sinc,
 >(
@@ -141,7 +132,6 @@ where
     lanczos_sinc(x, 3f32.as_())
 }
 
-#[inline(always)]
 pub(crate) fn lanczos4<
     V: Copy + PartialEq + Div<Output = V> + 'static + Trigonometry + Float + ConstPI + Sinc,
 >(
@@ -153,7 +143,6 @@ where
     lanczos_sinc(x, 4f32.as_())
 }
 
-#[inline(always)]
 pub(crate) fn lanczos6<
     V: Copy + PartialEq + Div<Output = V> + 'static + Trigonometry + Float + ConstPI + Sinc,
 >(
@@ -165,8 +154,7 @@ where
     lanczos_sinc(x, 6f32.as_())
 }
 
-#[inline(always)]
-pub fn lanczos2<
+pub(crate) fn lanczos2<
     V: Copy + PartialEq + Div<Output = V> + 'static + Trigonometry + Float + ConstPI + Sinc,
 >(
     x: V,
