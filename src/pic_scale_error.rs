@@ -49,6 +49,7 @@ pub enum PicScaleError {
     InvalidStride(usize, usize),
     UnsupportedBitDepth(usize),
     UnknownResizingFilter,
+    OutOfMemory(usize),
 }
 
 impl PicScaleError {
@@ -63,6 +64,7 @@ impl PicScaleError {
             PicScaleError::InvalidStride(_, _) => 5,
             PicScaleError::UnsupportedBitDepth(_) => 6,
             PicScaleError::UnknownResizingFilter => 7,
+            PicScaleError::OutOfMemory(_) => 8,
         }
     }
 }
@@ -96,8 +98,26 @@ impl Display for PicScaleError {
             PicScaleError::UnknownResizingFilter => {
                 f.write_str("Unknown resizing filter was requested")
             }
+            PicScaleError::OutOfMemory(capacity) => f.write_fmt(format_args!(
+                "There is no enough memory to allocate {capacity} bytes"
+            )),
         }
     }
 }
 
 impl Error for PicScaleError {}
+
+macro_rules! try_vec {
+    () => {
+        Vec::new()
+    };
+    ($elem:expr; $n:expr) => {{
+        let mut v = Vec::new();
+        v.try_reserve_exact($n)
+            .map_err(|_| crate::pic_scale_error::PicScaleError::OutOfMemory($n))?;
+        v.resize($n, $elem);
+        v
+    }};
+}
+
+pub(crate) use try_vec;

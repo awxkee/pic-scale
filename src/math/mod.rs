@@ -44,7 +44,9 @@ pub mod quadric;
 pub mod sinc;
 pub mod sphinx;
 pub mod spline_n;
+mod weights;
 pub mod welch;
 
-pub use consts::*;
-pub use jinc::*;
+pub(crate) use consts::*;
+pub(crate) use jinc::*;
+pub(crate) use weights::WeightsGenerator;

@@ -28,7 +28,7 @@
  */
 use colorutils_rs::{TransferFunction, oklab_to_rgb, oklab_to_rgba, rgb_to_oklab, rgba_to_oklab};
 
-use crate::pic_scale_error::PicScaleError;
+use crate::pic_scale_error::{PicScaleError, try_vec};
 use crate::scaler::ScalingF32;
 use crate::support::check_image_size_overflow;
 use crate::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
@@ -108,7 +108,7 @@ impl Scaling for OklabScaler {
 
         const CN: usize = 3;
 
-        let mut target_vertical = vec![f32::default(); store.width * store.height * CN];
+        let mut target_vertical = try_vec![f32::default(); store.width * store.height * CN];
 
         let mut lab_store =
             ImageStoreMut::<f32, CN>::from_slice(&mut target_vertical, store.width, store.height)?;
@@ -134,7 +134,7 @@ impl Scaling for OklabScaler {
             bit_depth: into.bit_depth,
         };
 
-        let mut new_store = ImageStoreMut::<f32, CN>::alloc(into.width, into.height);
+        let mut new_store = ImageStoreMut::<f32, CN>::try_alloc(into.width, into.height)?;
         self.scaler
             .resize_rgb_f32(&new_immutable_store, &mut new_store)?;
 
@@ -180,7 +180,7 @@ impl Scaling for OklabScaler {
 
         const CN: usize = 4;
 
-        let mut target_vertical = vec![f32::default(); store.width * store.height * CN];
+        let mut target_vertical = try_vec![f32::default(); store.width * store.height * CN];
 
         let mut lab_store =
             ImageStoreMut::<f32, CN>::from_slice(&mut target_vertical, store.width, store.height)?;
@@ -206,7 +206,7 @@ impl Scaling for OklabScaler {
             bit_depth: into.bit_depth,
         };
 
-        let mut new_store = ImageStoreMut::<f32, CN>::alloc(into.width, into.height);
+        let mut new_store = ImageStoreMut::<f32, CN>::try_alloc(into.width, into.height)?;
         self.scaler
             .resize_rgba_f32(&new_immutable_store, &mut new_store, premultiply_alpha)?;
 

@@ -31,6 +31,7 @@ use crate::convolution::ConvolutionOptions;
 use crate::dispatch_group_ar30::{
     convolve_horizontal_dispatch_ar30, convolve_vertical_dispatch_ar30,
 };
+use crate::math::WeightsGenerator;
 use crate::nearest_sampler::resize_nearest;
 use crate::pic_scale_error::PicScaleError;
 use crate::support::check_image_size_overflow;
@@ -114,7 +115,7 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     let options = ConvolutionOptions::new(scaler.workload_strategy);
 
     if should_do_vertical && !should_do_horizontal {
-        let vertical_filters = scaler.generate_weights(src_size.height, dst_size.height);
+        let vertical_filters = u8::make_weights(scaler.function, src_size.height, dst_size.height)?;
         convolve_vertical_dispatch_ar30::<AR30_TYPE, AR30_ORDER>(
             src,
             src_stride,
@@ -129,7 +130,7 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     } else if should_do_horizontal && should_do_vertical {
         let mut target = vec![0u8; src_size.width * dst_size.height * 4];
 
-        let vertical_filters = scaler.generate_weights(src_size.height, dst_size.height);
+        let vertical_filters = u8::make_weights(scaler.function, src_size.height, dst_size.height)?;
         convolve_vertical_dispatch_ar30::<AR30_TYPE, AR30_ORDER>(
             src,
             src_stride,
@@ -141,7 +142,7 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
             options,
         );
 
-        let horizontal_filters = scaler.generate_weights(src_size.width, dst_size.width);
+        let horizontal_filters = u8::make_weights(scaler.function, src_size.width, dst_size.width)?;
         convolve_horizontal_dispatch_ar30::<AR30_TYPE, AR30_ORDER>(
             &target,
             src_size.width * 4,
@@ -152,7 +153,7 @@ pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
             options,
         );
     } else {
-        let horizontal_filters = scaler.generate_weights(src_size.width, dst_size.width);
+        let horizontal_filters = u8::make_weights(scaler.function, src_size.width, dst_size.width)?;
         convolve_horizontal_dispatch_ar30::<AR30_TYPE, AR30_ORDER>(
             src,
             src_stride,
