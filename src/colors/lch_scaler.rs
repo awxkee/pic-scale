@@ -32,7 +32,7 @@ use colorutils_rs::{
     rgb_to_lch, rgba_to_lch_with_alpha,
 };
 
-use crate::pic_scale_error::PicScaleError;
+use crate::pic_scale_error::{PicScaleError, try_vec};
 use crate::scaler::ScalingF32;
 use crate::support::check_image_size_overflow;
 use crate::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
@@ -145,7 +145,7 @@ impl Scaling for LChScaler {
 
         const CN: usize = 3;
 
-        let mut target_vertical = vec![f32::default(); store.width * store.height * CN];
+        let mut target_vertical = try_vec![f32::default(); store.width * store.height * CN];
 
         let mut lab_store =
             ImageStoreMut::<f32, CN>::from_slice(&mut target_vertical, store.width, store.height)?;
@@ -172,7 +172,7 @@ impl Scaling for LChScaler {
             bit_depth: into.bit_depth,
         };
 
-        let mut new_store = ImageStoreMut::<f32, CN>::alloc(into.width, into.height);
+        let mut new_store = ImageStoreMut::<f32, CN>::try_alloc(into.width, into.height)?;
         self.scaler
             .resize_rgb_f32(&new_immutable_store, &mut new_store)?;
 
@@ -218,7 +218,7 @@ impl Scaling for LChScaler {
         }
 
         let lab_store = Self::rgba_to_lcha(store);
-        let mut new_target_store = ImageStoreMut::alloc(new_size.width, new_size.height);
+        let mut new_target_store = ImageStoreMut::try_alloc(new_size.width, new_size.height)?;
 
         self.scaler
             .resize_rgba_f32(&lab_store, &mut new_target_store, premultiply_alpha)?;

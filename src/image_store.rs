@@ -32,7 +32,7 @@ use crate::alpha_handle_f16::{premultiply_alpha_rgba_f16, unpremultiply_alpha_rg
 use crate::alpha_handle_f32::{premultiply_alpha_rgba_f32, unpremultiply_alpha_rgba_f32};
 use crate::alpha_handle_u8::{premultiply_alpha_rgba, unpremultiply_alpha_rgba};
 use crate::alpha_handle_u16::{premultiply_alpha_rgba_u16, unpremultiply_alpha_rgba_u16};
-use crate::pic_scale_error::{PicScaleBufferMismatch, PicScaleError};
+use crate::pic_scale_error::{PicScaleBufferMismatch, PicScaleError, try_vec};
 use crate::{ImageSize, WorkloadStrategy};
 #[cfg(feature = "nightly_f16")]
 use core::f16;
@@ -337,6 +337,24 @@ where
         }
     }
 
+    /// Tries to allocate new mutable image storage
+    ///
+    /// Always sets bit depth to `0`
+    pub fn try_alloc(
+        width: usize,
+        height: usize,
+    ) -> Result<ImageStoreMut<'a, T, N>, PicScaleError> {
+        let vc = try_vec![T::default(); width * N * height];
+        Ok(ImageStoreMut::<T, N> {
+            buffer: BufferStore::Owned(vc),
+            channels: N,
+            width,
+            height,
+            stride: width * N,
+            bit_depth: 0,
+        })
+    }
+
     /// Allocates new mutable image storage with required bit-depth
     pub fn alloc_with_depth(
         width: usize,
@@ -352,6 +370,23 @@ where
             stride: width * N,
             bit_depth,
         }
+    }
+
+    /// Tries to llocate new mutable image storage with required bit-depth
+    pub fn try_alloc_with_depth(
+        width: usize,
+        height: usize,
+        bit_depth: usize,
+    ) -> Result<ImageStoreMut<'a, T, N>, PicScaleError> {
+        let vc = try_vec![T::default(); width * N * height];
+        Ok(ImageStoreMut::<T, N> {
+            buffer: BufferStore::Owned(vc),
+            channels: N,
+            width,
+            height,
+            stride: width * N,
+            bit_depth,
+        })
     }
 }
 

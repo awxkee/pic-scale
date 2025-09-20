@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::pic_scale_error::PicScaleError;
+use crate::pic_scale_error::{PicScaleError, try_vec};
 use crate::scaler::{Scaling, ScalingF32};
 use crate::support::check_image_size_overflow;
 use crate::{
@@ -157,7 +157,7 @@ where
         return Ok(());
     }
 
-    let mut target_vertical = vec![f32::default(); store.width * store.height * CN];
+    let mut target_vertical = try_vec![f32::default(); store.width * store.height * CN];
 
     let mut linear_store =
         ImageStoreMut::<f32, CN>::from_slice(&mut target_vertical, store.width, store.height)?;
@@ -181,7 +181,8 @@ where
         bit_depth: 12,
     };
 
-    let mut new_store = ImageStoreMut::<f32, CN>::alloc_with_depth(into.width, into.height, 12);
+    let mut new_store =
+        ImageStoreMut::<f32, CN>::try_alloc_with_depth(into.width, into.height, 12)?;
 
     new_immutable_store.scale(
         &mut new_store,
@@ -230,7 +231,7 @@ where
         return Ok(());
     }
 
-    let mut target_vertical = vec![f32::default(); store.width * store.height * CN];
+    let mut target_vertical = try_vec![f32::default(); store.width * store.height * CN];
 
     let mut linear_store =
         ImageStoreMut::<f32, CN>::from_slice(&mut target_vertical, store.width, store.height)?;
@@ -254,7 +255,7 @@ where
         bit_depth: 16,
     };
 
-    let mut new_store = ImageStoreMut::<f32, CN>::alloc(into.width, into.height);
+    let mut new_store = ImageStoreMut::<f32, CN>::try_alloc(into.width, into.height)?;
 
     new_immutable_store.scale(
         &mut new_store,
@@ -334,7 +335,7 @@ impl Scaling for LinearScaler {
 
         const CN: usize = 2;
 
-        let mut target_vertical = vec![f32::default(); store.width * store.height * CN];
+        let mut target_vertical = try_vec![f32::default(); store.width * store.height * CN];
 
         let mut linear_store =
             ImageStoreMut::<f32, CN>::from_slice(&mut target_vertical, store.width, store.height)?;
@@ -359,7 +360,7 @@ impl Scaling for LinearScaler {
             bit_depth: 12,
         };
 
-        let mut new_store = ImageStoreMut::<f32, CN>::alloc(into.width, into.height);
+        let mut new_store = ImageStoreMut::<f32, CN>::try_alloc(into.width, into.height)?;
 
         self.scaler.resize_gray_alpha_f32(
             &new_immutable_store,
@@ -423,7 +424,7 @@ impl Scaling for LinearScaler {
 
         const CN: usize = 4;
 
-        let mut target_vertical = vec![f32::default(); store.width * store.height * CN];
+        let mut target_vertical = try_vec![f32::default(); store.width * store.height * CN];
 
         let mut linear_store =
             ImageStoreMut::<f32, CN>::from_slice(&mut target_vertical, store.width, store.height)?;
@@ -450,7 +451,7 @@ impl Scaling for LinearScaler {
             bit_depth: 12,
         };
 
-        let mut new_store = ImageStoreMut::<f32, CN>::alloc(into.width, into.height);
+        let mut new_store = ImageStoreMut::<f32, CN>::try_alloc(into.width, into.height)?;
 
         self.scaler
             .resize_rgba_f32(&new_immutable_store, &mut new_store, premultiply_alpha)?;
@@ -531,7 +532,7 @@ impl ScalingU16 for LinearScaler {
 
         const CN: usize = 2;
 
-        let mut target_vertical = vec![f32::default(); store.width * store.height * CN];
+        let mut target_vertical = try_vec![f32::default(); store.width * store.height * CN];
 
         let mut linear_store =
             ImageStoreMut::<f32, CN>::from_slice(&mut target_vertical, store.width, store.height)?;
@@ -560,7 +561,7 @@ impl ScalingU16 for LinearScaler {
             bit_depth: 16,
         };
 
-        let mut new_store = ImageStoreMut::<f32, CN>::alloc(into.width, into.height);
+        let mut new_store = ImageStoreMut::<f32, CN>::try_alloc(into.width, into.height)?;
 
         self.scaler.resize_gray_alpha_f32(
             &new_immutable_store,
@@ -627,7 +628,7 @@ impl ScalingU16 for LinearScaler {
 
         const CN: usize = 4;
 
-        let mut target_vertical = vec![f32::default(); store.width * store.height * CN];
+        let mut target_vertical = try_vec![f32::default(); store.width * store.height * CN];
 
         let mut linear_store =
             ImageStoreMut::<f32, CN>::from_slice(&mut target_vertical, store.width, store.height)?;
@@ -658,7 +659,7 @@ impl ScalingU16 for LinearScaler {
             bit_depth: 16,
         };
 
-        let mut new_store = ImageStoreMut::<f32, CN>::alloc(into.width, into.height);
+        let mut new_store = ImageStoreMut::<f32, CN>::try_alloc(into.width, into.height)?;
 
         self.scaler
             .resize_rgba_f32(&new_immutable_store, &mut new_store, premultiply_alpha)?;
