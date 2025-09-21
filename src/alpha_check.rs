@@ -83,7 +83,7 @@ pub(crate) fn has_non_constant_cap_alpha<
     V: Copy + PartialEq + BitXor<V, Output = V> + 'static + AsPrimitive<J> + 'static,
     J: Copy + AddAssign + Default + 'static + Eq + Ord,
     const ALPHA_CHANNEL_INDEX: usize,
-    const CHANNELS: usize,
+    const CN: usize,
 >(
     store: &[V],
     width: usize,
@@ -93,16 +93,16 @@ where
     i32: AsPrimitive<V>,
     u32: AsPrimitive<V> + AsPrimitive<J>,
 {
-    assert!(ALPHA_CHANNEL_INDEX < CHANNELS);
-    assert!(CHANNELS <= 4);
+    assert!(ALPHA_CHANNEL_INDEX < CN);
+    assert!(CN <= 4);
     if store.is_empty() {
         return false;
     }
     let first = store[ALPHA_CHANNEL_INDEX];
     let mut row_sums: J = 0u32.as_();
     for row in store.chunks_exact(stride) {
-        let row = &row[..width * CHANNELS];
-        for color in row.chunks_exact(CHANNELS) {
+        let row = &row[..width * CN];
+        for color in row.chunks_exact(CN) {
             row_sums += color[ALPHA_CHANNEL_INDEX].bitxor(first).as_();
         }
         if row_sums != 0.as_() {
@@ -116,21 +116,21 @@ where
 }
 
 /// Scans an `f32` image to check if alpha is not constant
-fn has_non_constant_cap_alpha_f32_impl<const ALPHA_CHANNEL_INDEX: usize, const CHANNELS: usize>(
+fn has_non_constant_cap_alpha_f32_impl<const ALPHA_CHANNEL_INDEX: usize, const CN: usize>(
     store: &[f32],
     width: usize,
     stride: usize,
 ) -> bool {
-    assert!(ALPHA_CHANNEL_INDEX < CHANNELS);
-    assert!(CHANNELS <= 4);
+    assert!(ALPHA_CHANNEL_INDEX < CN);
+    assert!(CN <= 4);
     if store.is_empty() {
         return false;
     }
     let first = store[ALPHA_CHANNEL_INDEX].to_bits();
     let mut row_sums: u64 = 0u64;
     for row in store.chunks_exact(stride) {
-        let row = &row[..width * CHANNELS];
-        for color in row.chunks_exact(CHANNELS) {
+        let row = &row[..width * CN];
+        for color in row.chunks_exact(CN) {
             row_sums += color[ALPHA_CHANNEL_INDEX].to_bits().bitxor(first) as u64;
         }
         if row_sums != 0 {

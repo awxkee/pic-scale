@@ -46,26 +46,26 @@ impl ConvolutionOptions {
     }
 }
 
-pub(crate) trait HorizontalConvolutionPass<T, const N: usize>
+pub(crate) trait HorizontalConvolutionPass<T, W, const N: usize>
 where
     T: Clone + Copy + Debug,
 {
     fn convolve_horizontal(
         &self,
-        filter_weights: FilterWeights<f32>,
+        filter_weights: FilterWeights<W>,
         destination: &mut ImageStoreMut<T, N>,
         pool: &novtb::ThreadPool,
         options: ConvolutionOptions,
     );
 }
 
-pub(crate) trait VerticalConvolutionPass<T, const N: usize>
+pub(crate) trait VerticalConvolutionPass<T, W, const N: usize>
 where
     T: Clone + Copy + Debug,
 {
     fn convolve_vertical(
         &self,
-        filter_weights: FilterWeights<f32>,
+        filter_weights: FilterWeights<W>,
         destination: &mut ImageStoreMut<T, N>,
         pool: &novtb::ThreadPool,
         options: ConvolutionOptions,

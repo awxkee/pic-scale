@@ -30,7 +30,7 @@
 
 use novtb::{ParallelZonedIterator, TbSliceMut};
 
-pub(crate) fn resize_nearest<T: Copy + Send + Sync, const CHANNELS: usize>(
+pub(crate) fn resize_nearest<T: Copy + Send + Sync, const N: usize>(
     src: &[T],
     src_width: usize,
     src_height: usize,
@@ -45,12 +45,12 @@ pub(crate) fn resize_nearest<T: Copy + Send + Sync, const CHANNELS: usize>(
     let clip_width = src_width as f32 - 1f32;
     let clip_height = src_height as f32 - 1f32;
 
-    let dst_stride = dst_width * CHANNELS;
-    let src_stride = src_width * CHANNELS;
+    let dst_stride = dst_width * N;
+    let src_stride = src_width * N;
 
     dst.tb_par_chunks_exact_mut(dst_stride)
         .for_each_enumerated(pool, |y, dst_chunk| {
-            for (x, dst) in dst_chunk.chunks_exact_mut(CHANNELS).enumerate() {
+            for (x, dst) in dst_chunk.chunks_exact_mut(N).enumerate() {
                 let src_x = ((x as f32 + 0.5f32) * x_scale - 0.5f32)
                     .min(clip_width)
                     .max(0f32) as usize;
@@ -58,10 +58,10 @@ pub(crate) fn resize_nearest<T: Copy + Send + Sync, const CHANNELS: usize>(
                     .min(clip_height)
                     .max(0f32) as usize;
                 let src_offset_y = src_y * src_stride;
-                let src_px = src_x * CHANNELS;
+                let src_px = src_x * N;
                 let offset = src_offset_y + src_px;
 
-                let src_slice = &src[offset..(offset + CHANNELS)];
+                let src_slice = &src[offset..(offset + N)];
 
                 for (src, dst) in src_slice.iter().zip(dst.iter_mut()) {
                     *dst = *src;

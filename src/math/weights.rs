@@ -74,6 +74,16 @@ impl WeightsGenerator<f32> for f32 {
     }
 }
 
+impl WeightsGenerator<f64> for f32 {
+    fn make_weights(
+        function: ResamplingFunction,
+        in_size: usize,
+        out_size: usize,
+    ) -> Result<FilterWeights<f64>, PicScaleError> {
+        generate_weights::<f64, f64>(function, in_size, out_size)
+    }
+}
+
 #[cfg(feature = "nightly_f16")]
 use core::f16;
 

@@ -107,7 +107,7 @@ fn convolve_horizontal_rgb_native_row_f16<const CHANNELS: usize>(
     }
 }
 
-impl HorizontalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
+impl HorizontalConvolutionPass<f16, f32, 4> for ImageStore<'_, f16, 4> {
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,
@@ -214,7 +214,7 @@ fn convolve_vertical_rgb_native_row_f16(
     }
 }
 
-impl VerticalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
+impl VerticalConvolutionPass<f16, f32, 4> for ImageStore<'_, f16, 4> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,
@@ -282,7 +282,7 @@ impl VerticalConvolutionPass<f16, 4> for ImageStore<'_, f16, 4> {
     }
 }
 
-impl HorizontalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
+impl HorizontalConvolutionPass<f16, f32, 3> for ImageStore<'_, f16, 3> {
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,
@@ -360,7 +360,7 @@ impl HorizontalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
     }
 }
 
-impl VerticalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
+impl VerticalConvolutionPass<f16, f32, 3> for ImageStore<'_, f16, 3> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,
@@ -428,7 +428,7 @@ impl VerticalConvolutionPass<f16, 3> for ImageStore<'_, f16, 3> {
     }
 }
 
-impl HorizontalConvolutionPass<f16, 1> for ImageStore<'_, f16, 1> {
+impl HorizontalConvolutionPass<f16, f32, 1> for ImageStore<'_, f16, 1> {
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,
@@ -454,7 +454,7 @@ impl HorizontalConvolutionPass<f16, 1> for ImageStore<'_, f16, 1> {
     }
 }
 
-impl VerticalConvolutionPass<f16, 1> for ImageStore<'_, f16, 1> {
+impl VerticalConvolutionPass<f16, f32, 1> for ImageStore<'_, f16, 1> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,
@@ -522,7 +522,7 @@ impl VerticalConvolutionPass<f16, 1> for ImageStore<'_, f16, 1> {
     }
 }
 
-impl HorizontalConvolutionPass<f16, 2> for ImageStore<'_, f16, 2> {
+impl HorizontalConvolutionPass<f16, f32, 2> for ImageStore<'_, f16, 2> {
     fn convolve_horizontal(
         &self,
         filter_weights: FilterWeights<f32>,
@@ -548,7 +548,7 @@ impl HorizontalConvolutionPass<f16, 2> for ImageStore<'_, f16, 2> {
     }
 }
 
-impl VerticalConvolutionPass<f16, 2> for ImageStore<'_, f16, 2> {
+impl VerticalConvolutionPass<f16, f32, 2> for ImageStore<'_, f16, 2> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,
