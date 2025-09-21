@@ -81,10 +81,9 @@ impl HorizontalConvolutionPass<f32, f64, 2> for ImageStore<'_, f32, 2> {
         > = Some(convolve_horizontal_4_row_f32_f64::<2>);
         let _dispatcher_row: fn(usize, usize, &FilterWeights<f64>, &[f32], &mut [f32]) =
             convolve_horizontal_native_row_f32_f64::<2>;
-        let weights = filter_weights.cast::<f64>();
         convolve_horizontal_dispatch_f32(
             self,
-            weights,
+            filter_weights,
             destination,
             pool,
             _dispatcher_4_rows,

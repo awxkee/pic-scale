@@ -206,7 +206,6 @@ impl VerticalConvolutionPass<f32, f64, 1> for ImageStore<'_, f32, 1> {
             use crate::neon::convolve_vertical_neon_row_f32_f64;
             _dispatcher = convolve_vertical_neon_row_f32_f64;
         }
-        let weights = filter_weights.cast::<f64>();
-        convolve_vertical_dispatch_f32(self, weights, destination, pool, _dispatcher);
+        convolve_vertical_dispatch_f32(self, filter_weights, destination, pool, _dispatcher);
     }
 }

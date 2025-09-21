@@ -34,6 +34,7 @@ pub mod blackman;
 pub mod bohman;
 mod consts;
 pub mod cubic;
+mod dd;
 pub mod gaussian;
 pub mod hann;
 mod jinc;

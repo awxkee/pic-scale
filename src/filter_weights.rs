@@ -69,20 +69,6 @@ impl<T> FilterWeights<T> {
             coeffs_size,
         }
     }
-
-    pub(crate) fn cast<F: 'static + Copy>(&self) -> FilterWeights<F>
-    where
-        T: AsPrimitive<F> + 'static + Copy,
-    {
-        FilterWeights {
-            weights: self.weights.iter().map(|&x| x.as_()).collect(),
-            bounds: self.bounds.clone(),
-            kernel_size: self.kernel_size,
-            aligned_size: self.aligned_size,
-            distinct_elements: self.distinct_elements,
-            coeffs_size: self.coeffs_size,
-        }
-    }
 }
 
 impl FilterWeights<f32> {

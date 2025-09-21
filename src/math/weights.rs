@@ -80,10 +80,11 @@ impl WeightsGenerator<f64> for f32 {
         in_size: usize,
         out_size: usize,
     ) -> Result<FilterWeights<f64>, PicScaleError> {
-        generate_weights::<f64, f64>(function, in_size, out_size)
+        generate_weights::<f64, DoubleDouble>(function, in_size, out_size)
     }
 }
 
+use crate::math::dd::DoubleDouble;
 #[cfg(feature = "nightly_f16")]
 use core::f16;
 

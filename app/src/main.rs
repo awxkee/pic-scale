@@ -65,86 +65,27 @@ fn main() {
 
     let mut scaler = Scaler::new(ResamplingFunction::Hamming);
     scaler.set_threading_policy(ThreadingPolicy::Adaptive);
-    scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
-
-    //
-    // // let rgb_feature16 = transient
-    // //     .iter()
-    // //     .map(|&x| (x as f32 / 255f32) as f16)
-    // //     .collect::<Vec<_>>();
-    //
-    // //
-    // store.bit_depth = 12;
-    //
-
-    // let mut src_ar = vec![0u8; dimensions.0 as usize * dimensions.1 as usize * 4];
-    //
-    // rgba8_to_ar30(
-    //     &mut src_ar,
-    //     dimensions.0 * 4,
-    //     Rgb30ByteOrder::Host,
-    //     &bytes,
-    //     dimensions.0 * 4,
-    //     dimensions.0,
-    //     dimensions.1,
-    // )
-    // .unwrap();
-    //
-    // let dst_size = ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2);
-    //
-    // let mut dst_ar = vec![0u8; dst_size.width as usize * dst_size.height as usize * 4];
-    //
-    // scaler
-    //     .resize_ar30(
-    //         &src_ar,
-    //         dimensions.0 as usize * 4,
-    //         ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-    //         &mut dst_ar,
-    //         dst_size.width * 4,
-    //         dst_size,
-    //         Ar30ByteOrder::Host,
-    //     )
-    //     .unwrap();
-    //
-    // let mut dst_bytes = vec![0u8; dst_size.width as usize * dst_size.height as usize * 3];
-    //
-    // ar30_to_rgb8(
-    //     &dst_ar,
-    //     dst_size.width as u32 * 4,
-    //     Rgb30ByteOrder::Host,
-    //     &mut dst_bytes,
-    //     dst_size.width as u32 * 3,
-    //     dst_size.width as u32,
-    //     dst_size.height as u32,
-    // )
-    // .unwrap();
-    //
-    // image::save_buffer(
-    //     "converted.png",
-    //     &dst_bytes,
-    //     dst_size.width as u32,
-    //     dst_size.height as u32,
-    //     image::ColorType::Rgb8,
-    // )
-    // .unwrap();
+    scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
 
     let bytes32 = bytes
         .iter()
-        .map(|&x| x)
+        // .map(|&x| x)
         // .map(|&x| u16::from_ne_bytes([x, x]))
-        // .map(|&x| x as f32 / 255.)
+        .map(|&x| x as f32 / 255.)
         .collect::<Vec<_>>();
 
     let mut store =
-        Rgba8ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize)
+        RgbaF32ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize)
             .unwrap();
     store.bit_depth = 8;
-    let mut dst_store = Rgba8ImageStoreMut::alloc_with_depth(
+    let mut dst_store = RgbaF32ImageStoreMut::alloc_with_depth(
         dimensions.0 as usize / 4,
         dimensions.1 as usize / 4,
         16,
     );
-    scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
+    scaler
+        .resize_rgba_f32(&store, &mut dst_store, true)
+        .unwrap();
     //
     // let elapsed_time = start_time.elapsed();
     // // Print the elapsed time in milliseconds
@@ -195,9 +136,9 @@ fn main() {
     let dst = dst_store
         .as_bytes()
         .iter()
-        .map(|&x| x)
+        // .map(|&x| x)
         // .map(|&x| ((x >> 8) as u8).min(255))
-        // .map(|&x| (x as f32 * 255.).round() as u8)
+        .map(|&x| (x as f32 * 255.).round() as u8)
         .collect::<Vec<_>>();
 
     if dst_store.channels == 4 {
