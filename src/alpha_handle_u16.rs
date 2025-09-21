@@ -31,6 +31,7 @@
 
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::{avx_premultiply_alpha_rgba_u16, avx_unpremultiply_alpha_rgba_u16};
+use crate::mixed_storage::CpuRound;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
 use crate::neon::{neon_premultiply_alpha_rgba_u16, neon_unpremultiply_alpha_rgba_u16};
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
@@ -91,14 +92,17 @@ pub(crate) fn premultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], max_color
         let recip_max_colors = 1. / max_colors as f32;
         for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
             let a = src[3] as u32;
-            dst[0] = (((src[0] as u32).wrapping_mul(a) as f32 * recip_max_colors).round() as u32)
+            dst[0] = (((src[0] as u32).wrapping_mul(a) as f32 * recip_max_colors).cpu_round()
+                as u32)
                 .min(max_colors) as u16;
-            dst[1] = (((src[1] as u32).wrapping_mul(a) as f32 * recip_max_colors).round() as u32)
+            dst[1] = (((src[1] as u32).wrapping_mul(a) as f32 * recip_max_colors).cpu_round()
+                as u32)
                 .min(max_colors) as u16;
-            dst[2] = (((src[2] as u32).wrapping_mul(a) as f32 * recip_max_colors).round() as u32)
+            dst[2] = (((src[2] as u32).wrapping_mul(a) as f32 * recip_max_colors).cpu_round()
+                as u32)
                 .min(max_colors) as u16;
-            dst[3] = ((a.wrapping_mul(a) as f32 * recip_max_colors).round() as u32).min(max_colors)
-                as u16;
+            dst[3] = ((a.wrapping_mul(a) as f32 * recip_max_colors).cpu_round() as u32)
+                .min(max_colors) as u16;
         }
     }
 }
@@ -126,10 +130,11 @@ pub(crate) fn premultiply_alpha_gray_alpha_row(dst: &mut [u16], src: &[u16], max
         let recip_max_colors = 1. / max_colors as f32;
         for (dst, src) in dst.chunks_exact_mut(2).zip(src.chunks_exact(2)) {
             let a = src[1] as u32;
-            dst[0] = (((src[0] as u32).wrapping_mul(a) as f32 * recip_max_colors).round() as u32)
+            dst[0] = (((src[0] as u32).wrapping_mul(a) as f32 * recip_max_colors).cpu_round()
+                as u32)
                 .min(max_colors) as u16;
-            dst[1] = ((a.wrapping_mul(a) as f32 * recip_max_colors).round() as u32).min(max_colors)
-                as u16;
+            dst[1] = ((a.wrapping_mul(a) as f32 * recip_max_colors).cpu_round() as u32)
+                .min(max_colors) as u16;
         }
     }
 }
@@ -140,16 +145,16 @@ pub(crate) fn unpremultiply_alpha_rgba_row(in_place: &mut [u16], max_colors: u32
         if a != 0 {
             let a_recip = 1. / a as f32;
             dst[0] = ((dst[0] as u32 * max_colors) as f32 * a_recip)
-                .round()
+                .cpu_round()
                 .min(max_colors as f32) as u16;
             dst[1] = ((dst[1] as u32 * max_colors) as f32 * a_recip)
-                .round()
+                .cpu_round()
                 .min(max_colors as f32) as u16;
             dst[2] = ((dst[2] as u32 * max_colors) as f32 * a_recip)
-                .round()
+                .cpu_round()
                 .min(max_colors as f32) as u16;
             dst[3] = ((a * max_colors) as f32 * a_recip)
-                .round()
+                .cpu_round()
                 .min(max_colors as f32) as u16;
         }
     }
@@ -161,10 +166,10 @@ pub(crate) fn unpremultiply_alpha_gray_alpha_row(in_place: &mut [u16], max_color
         if a != 0 {
             let a_recip = 1. / a as f32;
             dst[0] = ((dst[0] as u32 * max_colors) as f32 * a_recip)
-                .round()
+                .cpu_round()
                 .min(max_colors as f32) as u16;
             dst[1] = ((a * max_colors) as f32 * a_recip)
-                .round()
+                .cpu_round()
                 .min(max_colors as f32) as u16;
         }
     }

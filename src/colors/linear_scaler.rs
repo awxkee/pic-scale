@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+use crate::mixed_storage::CpuRound;
 use crate::pic_scale_error::{PicScaleError, try_vec};
 use crate::scaler::Scaling;
 use crate::support::check_image_size_overflow;
@@ -82,7 +83,7 @@ fn make_linearization(transfer_function: TransferFunction) -> Linearization {
 
     for (i, dst) in linearizing.iter_mut().enumerate() {
         *dst = (transfer_function.linearize(i as f32 / 255.) * max_lin_depth as f32)
-            .round()
+            .cpu_round()
             .min(max_lin_depth as f32) as u16;
     }
 
@@ -90,7 +91,7 @@ fn make_linearization(transfer_function: TransferFunction) -> Linearization {
 
     for (i, dst) in gamma.iter_mut().take(max_keep as usize).enumerate() {
         *dst = (transfer_function.gamma(i as f32 / max_lin_depth as f32) * 255.)
-            .round()
+            .cpu_round()
             .min(255.) as u8;
     }
 
@@ -114,13 +115,13 @@ fn make_linearization16(
 
     for (i, dst) in linearizing.iter_mut().take(keep_max as usize).enumerate() {
         *dst = (transfer_function.linearize(i as f32 / max_lin_depth as f32) * 65535.)
-            .round()
+            .cpu_round()
             .min(65535.) as u16;
     }
 
     for (i, dst) in gamma.iter_mut().enumerate() {
         *dst = (transfer_function.gamma(i as f32 / 65535.) * max_lin_depth as f32)
-            .round()
+            .cpu_round()
             .min(max_lin_depth as f32) as u16;
     }
 
@@ -549,7 +550,7 @@ impl ScalingU16 for LinearApproxScaler {
             .zip(linear_store.buffer.borrow_mut().chunks_exact_mut(2))
         {
             dst[0] = linearization.linearization[src[0] as usize];
-            dst[1] = (src[1] as f32 * a_f_scale).round().min(65535.) as u16;
+            dst[1] = (src[1] as f32 * a_f_scale).cpu_round().min(65535.) as u16;
         }
 
         let new_immutable_store = ImageStore::<u16, CN> {
@@ -575,7 +576,9 @@ impl ScalingU16 for LinearApproxScaler {
             .zip(into.buffer.borrow_mut().chunks_exact_mut(2))
         {
             dst[0] = linearization.gamma[src[0] as usize];
-            dst[1] = (src[1] as f32 * a_r_scale).round().min(max_bit_depth_value) as u16;
+            dst[1] = (src[1] as f32 * a_r_scale)
+                .cpu_round()
+                .min(max_bit_depth_value) as u16;
         }
 
         Ok(())
@@ -643,7 +646,7 @@ impl ScalingU16 for LinearApproxScaler {
             dst[0] = linearization.linearization[src[0] as usize];
             dst[1] = linearization.linearization[src[1] as usize];
             dst[2] = linearization.linearization[src[2] as usize];
-            dst[3] = (src[3] as f32 * a_f_scale).round().min(65535.) as u16;
+            dst[3] = (src[3] as f32 * a_f_scale).cpu_round().min(65535.) as u16;
         }
 
         let new_immutable_store = ImageStore::<u16, CN> {
@@ -671,7 +674,9 @@ impl ScalingU16 for LinearApproxScaler {
             dst[0] = linearization.gamma[src[0] as usize];
             dst[1] = linearization.gamma[src[1] as usize];
             dst[2] = linearization.gamma[src[2] as usize];
-            dst[3] = (src[3] as f32 * a_r_scale).round().min(max_bit_depth_value) as u16;
+            dst[3] = (src[3] as f32 * a_r_scale)
+                .cpu_round()
+                .min(max_bit_depth_value) as u16;
         }
 
         Ok(())

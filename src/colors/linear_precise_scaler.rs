@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+use crate::mixed_storage::CpuRound;
 use crate::pic_scale_error::{PicScaleError, try_vec};
 use crate::scaler::{Scaling, ScalingF32};
 use crate::support::check_image_size_overflow;
@@ -97,7 +98,7 @@ fn make_linearization16(
 
     for (i, dst) in gamma.iter_mut().enumerate() {
         *dst = (transfer_function.gamma(i as f32 / 262143.) * max_lin_depth as f32)
-            .round()
+            .cpu_round()
             .min(max_lin_depth as f32) as u16;
     }
 
@@ -117,7 +118,7 @@ fn make_linearization(transfer_function: TransferFunction) -> Linearization {
 
     for (i, dst) in gamma.iter_mut().enumerate() {
         *dst = (transfer_function.gamma(i as f32 / 65535.) * 255.)
-            .round()
+            .cpu_round()
             .min(255.) as u8;
     }
 
@@ -194,7 +195,7 @@ where
     )?;
 
     for (&src, dst) in new_store.as_bytes().iter().zip(into.buffer.borrow_mut()) {
-        let v = (src * 65535.).round().min(65535.).max(0.) as u16;
+        let v = (src * 65535.).cpu_round().min(65535.).max(0.) as u16;
         *dst = linearization.gamma[v as usize];
     }
 
@@ -267,7 +268,7 @@ where
     )?;
 
     for (&src, dst) in new_store.as_bytes().iter().zip(into.buffer.borrow_mut()) {
-        let v = ((src * 262143.).round().max(0.) as u32).min(262143);
+        let v = ((src * 262143.).cpu_round().max(0.) as u32).min(262143);
         *dst = linearization.gamma[v as usize];
     }
 
@@ -373,10 +374,10 @@ impl Scaling for LinearScaler {
             .chunks_exact(2)
             .zip(into.buffer.borrow_mut().chunks_exact_mut(2))
         {
-            let v0 = (src[0] * 65535.).round().min(65535.).max(0.) as u16;
+            let v0 = (src[0] * 65535.).cpu_round().min(65535.).max(0.) as u16;
 
             dst[0] = linearization.gamma[v0 as usize];
-            dst[1] = (src[1] * 255.).round().min(255.).max(0.) as u8;
+            dst[1] = (src[1] * 255.).cpu_round().min(255.).max(0.) as u8;
         }
 
         Ok(())
@@ -461,14 +462,14 @@ impl Scaling for LinearScaler {
             .chunks_exact(4)
             .zip(into.buffer.borrow_mut().chunks_exact_mut(4))
         {
-            let v0 = (src[0] * 65535.).round().min(65535.).max(0.) as u16;
-            let v1 = (src[1] * 65535.).round().min(65535.).max(0.) as u16;
-            let v2 = (src[2] * 65535.).round().min(65535.).max(0.) as u16;
+            let v0 = (src[0] * 65535.).cpu_round().min(65535.).max(0.) as u16;
+            let v1 = (src[1] * 65535.).cpu_round().min(65535.).max(0.) as u16;
+            let v2 = (src[2] * 65535.).cpu_round().min(65535.).max(0.) as u16;
 
             dst[0] = linearization.gamma[v0 as usize];
             dst[1] = linearization.gamma[v1 as usize];
             dst[2] = linearization.gamma[v2 as usize];
-            dst[3] = (src[3] * 255.).round().min(255.).max(0.) as u8;
+            dst[3] = (src[3] * 255.).cpu_round().min(255.).max(0.) as u8;
         }
 
         Ok(())
@@ -574,11 +575,11 @@ impl ScalingU16 for LinearScaler {
             .chunks_exact(2)
             .zip(into.buffer.borrow_mut().chunks_exact_mut(2))
         {
-            let v0 = ((src[0] * 262143.).round().max(0.) as u32).min(262143);
+            let v0 = ((src[0] * 262143.).cpu_round().max(0.) as u32).min(262143);
 
             dst[0] = linearization.gamma[v0 as usize];
             dst[1] = (src[1] * max_bit_depth_value)
-                .round()
+                .cpu_round()
                 .min(max_bit_depth_value)
                 .max(0.) as u16;
         }
@@ -669,15 +670,15 @@ impl ScalingU16 for LinearScaler {
             .chunks_exact(4)
             .zip(into.buffer.borrow_mut().chunks_exact_mut(4))
         {
-            let v0 = ((src[0] * 262143.).round().max(0.) as u32).min(262143);
-            let v1 = ((src[1] * 262143.).round().max(0.) as u32).min(262143);
-            let v2 = ((src[2] * 262143.).round().max(0.) as u32).min(262143);
+            let v0 = ((src[0] * 262143.).cpu_round().max(0.) as u32).min(262143);
+            let v1 = ((src[1] * 262143.).cpu_round().max(0.) as u32).min(262143);
+            let v2 = ((src[2] * 262143.).cpu_round().max(0.) as u32).min(262143);
 
             dst[0] = linearization.gamma[v0 as usize];
             dst[1] = linearization.gamma[v1 as usize];
             dst[2] = linearization.gamma[v2 as usize];
             dst[3] = (src[3] * max_bit_depth_value)
-                .round()
+                .cpu_round()
                 .min(max_bit_depth_value)
                 .max(0.) as u16;
         }
