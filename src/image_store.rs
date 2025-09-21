@@ -372,7 +372,7 @@ where
         }
     }
 
-    /// Tries to llocate new mutable image storage with required bit-depth
+    /// Tries to allocate new mutable image storage with required bit-depth
     pub fn try_alloc_with_depth(
         width: usize,
         height: usize,
