@@ -457,7 +457,8 @@ impl Scaler {
 impl Scaler {
     pub(crate) fn generic_resize<
         'a,
-        T: Clone + Copy + Debug + Send + Sync + Default + WeightsGenerator<f32> + 'static,
+        T: Clone + Copy + Debug + Send + Sync + Default + WeightsGenerator<W> + 'static,
+        W,
         const N: usize,
     >(
         &self,
@@ -465,7 +466,7 @@ impl Scaler {
         into: &mut ImageStoreMut<'a, T, N>,
     ) -> Result<(), PicScaleError>
     where
-        ImageStore<'a, T, N>: VerticalConvolutionPass<T, N> + HorizontalConvolutionPass<T, N>,
+        ImageStore<'a, T, N>: VerticalConvolutionPass<T, W, N> + HorizontalConvolutionPass<T, W, N>,
         ImageStoreMut<'a, T, N>: CheckStoreDensity,
     {
         let new_size = into.get_size();
@@ -564,7 +565,8 @@ impl Scaler {
 
     fn forward_resize_with_alpha<
         'a,
-        T: Clone + Copy + Debug + Send + Sync + Default + WeightsGenerator<f32> + 'static,
+        T: Clone + Copy + Debug + Send + Sync + Default + WeightsGenerator<W> + 'static,
+        W,
         const N: usize,
     >(
         &self,
@@ -574,8 +576,9 @@ impl Scaler {
         nova_thread_pool: &novtb::ThreadPool,
     ) -> Result<(), PicScaleError>
     where
-        ImageStore<'a, T, N>:
-            VerticalConvolutionPass<T, N> + HorizontalConvolutionPass<T, N> + AssociateAlpha<T, N>,
+        ImageStore<'a, T, N>: VerticalConvolutionPass<T, W, N>
+            + HorizontalConvolutionPass<T, W, N>
+            + AssociateAlpha<T, N>,
         ImageStoreMut<'a, T, N>: CheckStoreDensity + UnassociateAlpha<T, N>,
     {
         let new_size = into.get_size();
@@ -652,7 +655,8 @@ impl Scaler {
 
     fn forward_resize_vertical_with_alpha<
         'a,
-        T: Clone + Copy + Debug + Send + Sync + Default + WeightsGenerator<f32> + 'static,
+        T: Clone + Copy + Debug + Send + Sync + Default + WeightsGenerator<W> + 'static,
+        W,
         const N: usize,
     >(
         &self,
@@ -662,8 +666,9 @@ impl Scaler {
         nova_thread_pool: &novtb::ThreadPool,
     ) -> Result<(), PicScaleError>
     where
-        ImageStore<'a, T, N>:
-            VerticalConvolutionPass<T, N> + HorizontalConvolutionPass<T, N> + AssociateAlpha<T, N>,
+        ImageStore<'a, T, N>: VerticalConvolutionPass<T, W, N>
+            + HorizontalConvolutionPass<T, W, N>
+            + AssociateAlpha<T, N>,
         ImageStoreMut<'a, T, N>: CheckStoreDensity + UnassociateAlpha<T, N>,
     {
         let new_size = into.get_size();
@@ -709,7 +714,8 @@ impl Scaler {
 
     fn forward_resize_horizontal_with_alpha<
         'a,
-        T: Clone + Copy + Debug + Send + Sync + Default + WeightsGenerator<f32> + 'static,
+        T: Clone + Copy + Debug + Send + Sync + Default + WeightsGenerator<W> + 'static,
+        W,
         const N: usize,
     >(
         &self,
@@ -719,8 +725,9 @@ impl Scaler {
         nova_thread_pool: &novtb::ThreadPool,
     ) -> Result<(), PicScaleError>
     where
-        ImageStore<'a, T, N>:
-            VerticalConvolutionPass<T, N> + HorizontalConvolutionPass<T, N> + AssociateAlpha<T, N>,
+        ImageStore<'a, T, N>: VerticalConvolutionPass<T, W, N>
+            + HorizontalConvolutionPass<T, W, N>
+            + AssociateAlpha<T, N>,
         ImageStoreMut<'a, T, N>: CheckStoreDensity + UnassociateAlpha<T, N>,
     {
         let new_size = into.get_size();
@@ -766,7 +773,8 @@ impl Scaler {
 
     pub(crate) fn generic_resize_with_alpha<
         'a,
-        T: Clone + Copy + Debug + Send + Sync + Default + WeightsGenerator<f32> + 'static,
+        T: Clone + Copy + Debug + Send + Sync + Default + WeightsGenerator<W> + 'static,
+        W,
         const N: usize,
     >(
         &self,
@@ -775,8 +783,9 @@ impl Scaler {
         premultiply_alpha_requested: bool,
     ) -> Result<(), PicScaleError>
     where
-        ImageStore<'a, T, N>:
-            VerticalConvolutionPass<T, N> + HorizontalConvolutionPass<T, N> + AssociateAlpha<T, N>,
+        ImageStore<'a, T, N>: VerticalConvolutionPass<T, W, N>
+            + HorizontalConvolutionPass<T, W, N>
+            + AssociateAlpha<T, N>,
         ImageStoreMut<'a, T, N>: CheckStoreDensity + UnassociateAlpha<T, N>,
     {
         let new_size = into.get_size();
@@ -904,7 +913,10 @@ impl ScalingF32 for Scaler {
         store: &ImageStore<'a, f32, 1>,
         into: &mut ImageStoreMut<'a, f32, 1>,
     ) -> Result<(), PicScaleError> {
-        self.generic_resize(store, into)
+        match self.workload_strategy {
+            WorkloadStrategy::PreferQuality => self.generic_resize::<f32, f64, 1>(store, into),
+            WorkloadStrategy::PreferSpeed => self.generic_resize::<f32, f32, 1>(store, into),
+        }
     }
 
     fn resize_cbcr_f32<'a>(
@@ -912,7 +924,10 @@ impl ScalingF32 for Scaler {
         store: &ImageStore<'a, f32, 2>,
         into: &mut ImageStoreMut<'a, f32, 2>,
     ) -> Result<(), PicScaleError> {
-        self.generic_resize(store, into)
+        match self.workload_strategy {
+            WorkloadStrategy::PreferQuality => self.generic_resize::<f32, f64, 2>(store, into),
+            WorkloadStrategy::PreferSpeed => self.generic_resize::<f32, f32, 2>(store, into),
+        }
     }
 
     fn resize_gray_alpha_f32<'a>(
@@ -921,7 +936,14 @@ impl ScalingF32 for Scaler {
         into: &mut ImageStoreMut<'a, f32, 2>,
         premultiply_alpha: bool,
     ) -> Result<(), PicScaleError> {
-        self.generic_resize_with_alpha(store, into, premultiply_alpha)
+        match self.workload_strategy {
+            WorkloadStrategy::PreferQuality => {
+                self.generic_resize_with_alpha::<f32, f64, 2>(store, into, premultiply_alpha)
+            }
+            WorkloadStrategy::PreferSpeed => {
+                self.generic_resize_with_alpha::<f32, f32, 2>(store, into, premultiply_alpha)
+            }
+        }
     }
 
     fn resize_rgb_f32<'a>(
@@ -929,7 +951,10 @@ impl ScalingF32 for Scaler {
         store: &ImageStore<'a, f32, 3>,
         into: &mut ImageStoreMut<'a, f32, 3>,
     ) -> Result<(), PicScaleError> {
-        self.generic_resize(store, into)
+        match self.workload_strategy {
+            WorkloadStrategy::PreferQuality => self.generic_resize::<f32, f64, 3>(store, into),
+            WorkloadStrategy::PreferSpeed => self.generic_resize::<f32, f32, 3>(store, into),
+        }
     }
 
     fn resize_rgba_f32<'a>(
@@ -938,7 +963,14 @@ impl ScalingF32 for Scaler {
         into: &mut ImageStoreMut<'a, f32, 4>,
         premultiply_alpha: bool,
     ) -> Result<(), PicScaleError> {
-        self.generic_resize_with_alpha(store, into, premultiply_alpha)
+        match self.workload_strategy {
+            WorkloadStrategy::PreferQuality => {
+                self.generic_resize_with_alpha::<f32, f64, 4>(store, into, premultiply_alpha)
+            }
+            WorkloadStrategy::PreferSpeed => {
+                self.generic_resize_with_alpha::<f32, f32, 4>(store, into, premultiply_alpha)
+            }
+        }
     }
 }
 
@@ -1176,7 +1208,11 @@ macro_rules! def_image_scaling_alpha {
             ) -> Result<(), PicScaleError> {
                 let mut scaler = Scaler::new(options.resampling_function);
                 scaler.set_threading_policy(options.threading_policy);
-                scaler.generic_resize_with_alpha(self, store, options.premultiply_alpha)
+                scaler.generic_resize_with_alpha::<$fx_type, f32, $cn>(
+                    self,
+                    store,
+                    options.premultiply_alpha,
+                )
             }
         }
     };
@@ -1192,7 +1228,7 @@ macro_rules! def_image_scaling {
             ) -> Result<(), PicScaleError> {
                 let mut scaler = Scaler::new(options.resampling_function);
                 scaler.set_threading_policy(options.threading_policy);
-                scaler.generic_resize(self, store)
+                scaler.generic_resize::<$fx_type, f32, $cn>(self, store)
             }
         }
     };

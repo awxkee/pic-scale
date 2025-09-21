@@ -31,7 +31,7 @@ use crate::dispatch_group_u16::{convolve_horizontal_dispatch_u16, convolve_verti
 use crate::filter_weights::FilterWeights;
 use crate::{ImageStore, ImageStoreMut};
 
-impl HorizontalConvolutionPass<u16, 2> for ImageStore<'_, u16, 2> {
+impl HorizontalConvolutionPass<u16, f32, 2> for ImageStore<'_, u16, 2> {
     #[allow(clippy::type_complexity)]
     fn convolve_horizontal(
         &self,
@@ -44,7 +44,7 @@ impl HorizontalConvolutionPass<u16, 2> for ImageStore<'_, u16, 2> {
     }
 }
 
-impl VerticalConvolutionPass<u16, 2> for ImageStore<'_, u16, 2> {
+impl VerticalConvolutionPass<u16, f32, 2> for ImageStore<'_, u16, 2> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,

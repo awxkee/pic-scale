@@ -40,7 +40,7 @@ use crate::sse::{convolve_vertical_sse_row, convolve_vertical_sse_row_lp};
 use crate::wasm32::wasm_vertical_neon_row;
 use crate::{ImageStore, ImageStoreMut};
 
-impl HorizontalConvolutionPass<u8, 2> for ImageStore<'_, u8, 2> {
+impl HorizontalConvolutionPass<u8, f32, 2> for ImageStore<'_, u8, 2> {
     #[allow(clippy::type_complexity)]
     fn convolve_horizontal(
         &self,
@@ -117,7 +117,7 @@ impl HorizontalConvolutionPass<u8, 2> for ImageStore<'_, u8, 2> {
     }
 }
 
-impl VerticalConvolutionPass<u8, 2> for ImageStore<'_, u8, 2> {
+impl VerticalConvolutionPass<u8, f32, 2> for ImageStore<'_, u8, 2> {
     fn convolve_vertical(
         &self,
         filter_weights: FilterWeights<f32>,
