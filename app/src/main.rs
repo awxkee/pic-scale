@@ -52,7 +52,7 @@ fn resize_plane(
 fn main() {
     #[allow(overflowing_literals)]
     // test_fast_image();
-    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
+    let img = ImageReader::open("./assets/test_alpha.JPG")
         .unwrap()
         .decode()
         .unwrap();
@@ -63,29 +63,15 @@ fn main() {
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
 
-    let mut scaler = Scaler::new(ResamplingFunction::Hamming);
+    let mut scaler = Scaler::new(ResamplingFunction::CatmullRom);
     scaler.set_threading_policy(ThreadingPolicy::Adaptive);
-    scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
-
-    let bytes32 = bytes
-        .iter()
-        // .map(|&x| x)
-        // .map(|&x| u16::from_ne_bytes([x, x]))
-        .map(|&x| x as f32 / 255.)
-        .collect::<Vec<_>>();
+    scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
     let mut store =
-        RgbaF32ImageStore::from_slice(&bytes32, dimensions.0 as usize, dimensions.1 as usize)
-            .unwrap();
+        Rgba8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     store.bit_depth = 8;
-    let mut dst_store = RgbaF32ImageStoreMut::alloc_with_depth(
-        dimensions.0 as usize / 4,
-        dimensions.1 as usize / 4,
-        16,
-    );
-    scaler
-        .resize_rgba_f32(&store, &mut dst_store, true)
-        .unwrap();
+    let mut dst_store = Rgba8ImageStoreMut::alloc_with_depth(3240, 2160, 16);
+    scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
     //
     // let elapsed_time = start_time.elapsed();
     // // Print the elapsed time in milliseconds
@@ -136,9 +122,9 @@ fn main() {
     let dst = dst_store
         .as_bytes()
         .iter()
-        // .map(|&x| x)
+        .map(|&x| x)
         // .map(|&x| ((x >> 8) as u8).min(255))
-        .map(|&x| (x as f32 * 255.).round() as u8)
+        // .map(|&x| (x as f32 * 255.).round() as u8)
         .collect::<Vec<_>>();
 
     if dst_store.channels == 4 {
@@ -173,7 +159,7 @@ fn u8_to_u16(u8_buffer: &[u8]) -> &[u16] {
 }
 
 fn test_fast_image() {
-    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
+    let img = ImageReader::open("./assets/test_alpha.JPG")
         .unwrap()
         .decode()
         .unwrap();
@@ -192,7 +178,7 @@ fn test_fast_image() {
 
     let src_image = Image::from_vec_u8(dimensions.0, dimensions.1, vc, pixel_type).unwrap();
 
-    let mut dst_image = Image::new(dimensions.0, dimensions.1 / 2, pixel_type);
+    let mut dst_image = Image::new(3240, 2160, pixel_type);
 
     let mut resizer = Resizer::new();
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -208,7 +194,7 @@ fn test_fast_image() {
             &src_image,
             &mut dst_image,
             &ResizeOptions::new()
-                .resize_alg(ResizeAlg::Convolution(FilterType::Lanczos3))
+                .resize_alg(ResizeAlg::Convolution(FilterType::CatmullRom))
                 .use_alpha(true),
         )
         .unwrap();

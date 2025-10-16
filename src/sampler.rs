@@ -291,10 +291,10 @@ impl ResamplingFunction {
         usize: AsPrimitive<T>,
     {
         match self {
-            ResamplingFunction::Bilinear => ResamplingFilter::new(bilinear, 2f32, false),
+            ResamplingFunction::Bilinear => ResamplingFilter::new(bilinear, 1f32, false),
             ResamplingFunction::Nearest => {
                 // Just a stab for nearest
-                ResamplingFilter::new(bilinear, 2f32, false)
+                ResamplingFilter::new(bilinear, 1f32, false)
             }
             ResamplingFunction::Cubic => ResamplingFilter::new(cubic_spline, 2f32, false),
             ResamplingFunction::MitchellNetravalli => {
@@ -308,7 +308,7 @@ impl ResamplingFunction {
             ResamplingFunction::Bicubic => ResamplingFilter::new(bicubic_spline, 2f32, false),
             ResamplingFunction::Lanczos4 => ResamplingFilter::new(lanczos4, 4f32, false),
             ResamplingFunction::Lanczos2 => ResamplingFilter::new(lanczos2, 2f32, false),
-            ResamplingFunction::Hamming => ResamplingFilter::new(hamming, 2f32, false),
+            ResamplingFunction::Hamming => ResamplingFilter::new(hamming, 1f32, false),
             ResamplingFunction::Hanning => ResamplingFilter::new(hanning, 2f32, false),
             ResamplingFunction::EwaHanning => ResamplingFilter::new_with_window(
                 T::jinc,
@@ -321,7 +321,7 @@ impl ResamplingFunction {
             ResamplingFunction::EwaQuadric => ResamplingFilter::new(quadric, 2f32, true),
             ResamplingFunction::Gaussian => ResamplingFilter::new(gaussian, 2f32, false),
             ResamplingFunction::Sphinx => ResamplingFilter::new(sphinx, 2f32, false),
-            ResamplingFunction::Bartlett => ResamplingFilter::new(bartlett, 2f32, false),
+            ResamplingFunction::Bartlett => ResamplingFilter::new(bartlett, 1f32, false),
             ResamplingFunction::Robidoux => ResamplingFilter::new(robidoux, 2f32, false),
             ResamplingFunction::EwaRobidoux => ResamplingFilter::new(robidoux, 2f32, true),
             ResamplingFunction::RobidouxSharp => ResamplingFilter::new(robidoux_sharp, 2f32, false),
