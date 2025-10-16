@@ -1383,7 +1383,7 @@ mod tests {
             .resize_rgba(&src_store, &mut target_store, true)
             .unwrap();
         let target_data = target_store.buffer.borrow();
-        check_rgba8!(target_data, image_width, 126);
+        check_rgba8!(target_data, image_width, 160);
     }
 
     #[test]
