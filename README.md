@@ -93,55 +93,6 @@ For NEON `f16` feature use runtime detection, if CPU supports this feature then 
 
 Even when `half` feature activated but platform do not support or features not enabled for `f16` speed will be slow
 
-### Performance
-
-NEON test made on Apple M3 Pro.
-AVX2 test made on Premium Intel CPU Optimized 4 vCPU Digital Ocean instance.
-
-Example comparison with `fast-image-resize` time for downscale RGB 4928x3279 image in 4 times.
-
-| Lanczos3  |  AVX  | NEON  |
-|-----------|:-----:|:-----:|
-| pic-scale | 10.47 | 6.97  |
-| fir       | 15.62 | 21.74 |
-
-Example comparison time for downscale RGBA 4928x3279 image in 4 times with pre-multiplying alpha.
-
-| Lanczos3  |  AVX  | NEON  |
-|-----------|:-----:|:-----:|
-| pic-scale | 43.72 | 13.56 |
-| fir       | 62.31 | 33.32 |
-
-Example comparison time for downscale RGBA 4928x3279 image in 4 times without pre-multiplying alpha.
-
-| Lanczos3         |  AVX  | NEON  |
-|------------------|:-----:|:-----:|
-| pic-scale        | 11.13 | 7.76  |
-| fir              | 20.17 | 25.92 |
-| Apple Accelerate |   -   | 9.98  |
-
-Example comparison time for downscale RGBA 4928x3279 10 bit image in 4 times with pre-multiplying alpha.
-
-| Lanczos3         |  AVX   | NEON  |
-|------------------|:------:|:-----:|
-| pic-scale        | 85.34  | 22.68 |
-| fir              | 146.23 | 53.95 |
-
-RGBA 4928x3279 10 bit downscale 4 two times without pre-multiplying alpha
-
-| Lanczos3         |  AVX  | NEON  |
-|------------------|:-----:|:-----:|
-| pic-scale        | 19.15 | 8.91  |
-| fir              | 58.57 | 38.46 |
-| Apple Accelerate |   -   | 27.63 |
-
-Example comparison time for downscale RGB 4000x6000 10 bit image in 4 times using *NEON*.
-
-| Lanczos3  |  AVX  | NEON  |
-|-----------|:-----:|:-----:|
-| pic-scale | 25.68 | 15.56 |
-| fir       | 68.84 | 39.40 |
-
 #### Example in sRGB
 
 In common, you should not downsize an image in sRGB colorspace, however if speed is more preferable than more proper scale, then you may omit linearizing 

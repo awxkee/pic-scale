@@ -152,7 +152,7 @@ where
         true => scale.max(1f32.as_()),
         false => 1f32.as_(),
     };
-    let filter_base_size: T = resampling_filter.min_kernel_size.as_();
+    let filter_base_size: T = (resampling_filter.min_kernel_size as f64 * 2f64).as_();
     let resampling_function = resampling_filter.kernel;
 
     let is_area = resampling_filter.is_area && scale < 1.as_();
