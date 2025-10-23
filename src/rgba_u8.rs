@@ -144,17 +144,19 @@ impl HorizontalConvolutionPass<u8, f32, 4> for ImageStore<'_, u8, 4> {
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         {
             let has_avx = std::arch::is_x86_feature_detected!("avx2");
-            if (has_avx || _scale_factor < 8.)
-                && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
-            {
-                _dispatcher_4_rows = Some(convolve_horizontal_rgba_avx_rows_4_lb);
-                _dispatcher_1_row = convolve_horizontal_rgba_avx_rows_one_lb;
-            } else if has_avx {
-                use crate::avx2::{
-                    convolve_horizontal_rgba_avx_row_1, convolve_horizontal_rgba_row_4,
-                };
-                _dispatcher_4_rows = Some(convolve_horizontal_rgba_row_4);
-                _dispatcher_1_row = convolve_horizontal_rgba_avx_row_1;
+            if has_avx {
+                if _scale_factor < 8.
+                    && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
+                {
+                    _dispatcher_4_rows = Some(convolve_horizontal_rgba_avx_rows_4_lb);
+                    _dispatcher_1_row = convolve_horizontal_rgba_avx_rows_one_lb;
+                } else {
+                    use crate::avx2::{
+                        convolve_horizontal_rgba_avx_row_1, convolve_horizontal_rgba_row_4,
+                    };
+                    _dispatcher_4_rows = Some(convolve_horizontal_rgba_row_4);
+                    _dispatcher_1_row = convolve_horizontal_rgba_avx_row_1;
+                }
             }
         }
         #[cfg(all(feature = "nightly_avx512", target_arch = "x86_64"))]
