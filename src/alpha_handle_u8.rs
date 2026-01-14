@@ -51,7 +51,7 @@ pub(crate) fn premultiply_alpha_rgba_row_impl(dst: &mut [u8], src: &[u8]) {
         dst[0] = div_by_255(src[0] as u16 * a);
         dst[1] = div_by_255(src[1] as u16 * a);
         dst[2] = div_by_255(src[2] as u16 * a);
-        dst[3] = div_by_255(a * a);
+        dst[3] = div_by_255(255 * a);
     }
 }
 
@@ -59,7 +59,7 @@ pub(crate) fn premultiply_alpha_gray_alpha_row_impl(dst: &mut [u8], src: &[u8]) 
     for (dst, src) in dst.chunks_exact_mut(2).zip(src.chunks_exact(2)) {
         let a = src[1] as u16;
         dst[0] = div_by_255(src[0] as u16 * a);
-        dst[1] = div_by_255(a * a);
+        dst[1] = div_by_255(255 * a);
     }
 }
 
