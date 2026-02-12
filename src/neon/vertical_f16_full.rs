@@ -31,7 +31,8 @@ use crate::neon::utils::*;
 use core::f16;
 use std::arch::aarch64::*;
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "neon,fp16")]
 pub(crate) unsafe fn xconvolve_vertical_part_neon_8_f16<const USE_BLENDING: bool>(
     start_y: usize,
     start_x: usize,

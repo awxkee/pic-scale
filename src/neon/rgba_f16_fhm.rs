@@ -33,7 +33,8 @@ use core::f16;
 use std::arch::aarch64::*;
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "fp16,fhm")]
 unsafe fn conv_horiz_rgba_8_f16(
     start_x: usize,
     src: &[f16],
@@ -58,7 +59,8 @@ unsafe fn conv_horiz_rgba_8_f16(
 }
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "fp16,fhm")]
 unsafe fn conv_horiz_rgba_4_f16(
     start_x: usize,
     src: &[f16],
@@ -79,7 +81,8 @@ unsafe fn conv_horiz_rgba_4_f16(
 }
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "fp16,fhm")]
 unsafe fn conv_horiz_rgba_2_f32(
     start_x: usize,
     src: &[f16],
@@ -98,7 +101,8 @@ unsafe fn conv_horiz_rgba_2_f32(
 }
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "fp16,fhm")]
 unsafe fn conv_horiz_rgba_1_f16(
     start_x: usize,
     src: &[f16],

@@ -101,6 +101,7 @@ const fn make_unpremultiplication_table() -> [u8; 65536] {
     while alpha < 256 {
         let mut pixel = 0usize;
         while pixel < 256 {
+            #[allow(clippy::manual_checked_ops)]
             if alpha == 0 {
                 buf[alpha * 255 + pixel] = 0;
             } else {

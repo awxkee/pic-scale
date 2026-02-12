@@ -44,7 +44,8 @@ macro_rules! write_rgb_f16 {
 }
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "fp16")]
 unsafe fn conv_horiz_4_rgb_f16(
     start_x: usize,
     src: &[f16],
@@ -78,7 +79,8 @@ unsafe fn conv_horiz_4_rgb_f16(
 }
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "fp16")]
 unsafe fn conv_horiz_2_rgb_f16(
     start_x: usize,
     src: &[f16],
@@ -108,7 +110,8 @@ unsafe fn conv_horiz_2_rgb_f16(
 }
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "fp16")]
 unsafe fn conv_horiz_1_rgb_f16(
     start_x: usize,
     src: &[f16],
