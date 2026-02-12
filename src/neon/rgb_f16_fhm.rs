@@ -45,7 +45,8 @@ unsafe fn write_rgb_f16(store: float32x4_t, dest_ptr: &mut [f16]) {
 }
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "neon,fp16,fhm")]
 unsafe fn conv_horiz_4_rgb_f16(
     start_x: usize,
     src: &[f16],
@@ -81,7 +82,8 @@ unsafe fn conv_horiz_4_rgb_f16(
 }
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "neon,fp16,fhm")]
 unsafe fn conv_horiz_2_rgb_f16(
     start_x: usize,
     src: &[f16],
@@ -111,7 +113,8 @@ unsafe fn conv_horiz_2_rgb_f16(
 }
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "neon,fp16,fhm")]
 unsafe fn conv_horiz_1_rgb_f16(
     start_x: usize,
     src: &[f16],
@@ -153,7 +156,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4_f16_fhm(
     }
 }
 
-#[target_feature(enable = "fhm")]
+#[target_feature(enable = "fp16,fhm")]
 unsafe fn convolve_horizontal_rgb_neon_rows_4_f16_impl(
     dst_width: usize,
     _: usize,

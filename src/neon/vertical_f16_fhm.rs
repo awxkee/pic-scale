@@ -32,7 +32,8 @@ use crate::filter_weights::FilterBounds;
 use crate::neon::utils::{xvld1q_u16_x2, xvld1q_u16_x4};
 use core::f16;
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "fp16,fhm")]
 pub(crate) unsafe fn conv_vertical_part_neon_16_f16(
     start_y: usize,
     start_x: usize,
@@ -76,7 +77,8 @@ pub(crate) unsafe fn conv_vertical_part_neon_16_f16(
     }
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "fp16,fhm")]
 pub(crate) unsafe fn conv_vertical_part_neon_32_f16(
     start_y: usize,
     start_x: usize,
@@ -133,7 +135,8 @@ pub(crate) unsafe fn conv_vertical_part_neon_32_f16(
     }
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "fp16,fhm")]
 pub(crate) unsafe fn conv_vertical_part_neon_48_f16(
     start_y: usize,
     start_x: usize,
@@ -222,7 +225,8 @@ pub(crate) fn convolve_vertical_rgb_neon_row_f16_fhm(
     unsafe { convolve_vertical_rgb_neon_row_f16_impl(w0, bounds, src, dst, src_stride, weight_ptr) }
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "fp16,fhm")]
 unsafe fn convolve_vertical_part_neon_8_f16_fhm<const USE_BLENDING: bool>(
     start_y: usize,
     start_x: usize,

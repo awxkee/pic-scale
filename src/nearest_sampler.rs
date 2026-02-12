@@ -39,25 +39,25 @@ pub(crate) fn resize_nearest<T: Copy + Send + Sync, const N: usize>(
     dst_height: usize,
     pool: &novtb::ThreadPool,
 ) {
-    let x_scale = src_width as f32 / dst_width as f32;
-    let y_scale = src_height as f32 / dst_height as f32;
+    const SCALE: i32 = 32;
 
-    let clip_width = src_width as f32 - 1f32;
-    let clip_height = src_height as f32 - 1f32;
+    let k_x: u64 = ((src_width as u64) << SCALE) / dst_width as u64;
+    let k_y: u64 = ((src_height as u64) << SCALE) / dst_height as u64;
+    let k_x_half: u64 = k_x >> 1;
+    let k_y_half: u64 = k_y >> 1;
 
     let dst_stride = dst_width * N;
     let src_stride = src_width * N;
 
     dst.tb_par_chunks_exact_mut(dst_stride)
         .for_each_enumerated(pool, |y, dst_chunk| {
-            for (x, dst) in dst_chunk.chunks_exact_mut(N).enumerate() {
-                let src_x = ((x as f32 + 0.5f32) * x_scale - 0.5f32)
-                    .min(clip_width)
-                    .max(0f32) as usize;
-                let src_y = ((y as f32 + 0.5f32) * y_scale - 0.5f32)
-                    .min(clip_height)
-                    .max(0f32) as usize;
-                let src_offset_y = src_y * src_stride;
+            let src_y = ((y as u64 * k_y + k_y_half) >> SCALE) as usize;
+            let src_offset_y = src_y * src_stride;
+
+            let mut src_x_fixed = k_x_half;
+            for dst in dst_chunk.chunks_exact_mut(N) {
+                let src_x = (src_x_fixed >> SCALE) as usize;
+
                 let src_px = src_x * N;
                 let offset = src_offset_y + src_px;
 
@@ -66,6 +66,7 @@ pub(crate) fn resize_nearest<T: Copy + Send + Sync, const N: usize>(
                 for (src, dst) in src_slice.iter().zip(dst.iter_mut()) {
                     *dst = *src;
                 }
+                src_x_fixed += k_x;
             }
         });
 }
