@@ -35,6 +35,7 @@ use std::arch::aarch64::*;
 
 #[must_use]
 #[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn conv_horiz_rgba_1_u8_i16<
     const SCALE: i32,
     const AR_TYPE: usize,
@@ -54,7 +55,8 @@ unsafe fn conv_horiz_rgba_1_u8_i16<
 }
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn conv_horiz_rgba_8_u8_i16<
     const SCALE: i32,
     const AR_TYPE: usize,
@@ -92,6 +94,7 @@ unsafe fn conv_horiz_rgba_8_u8_i16<
 
 #[must_use]
 #[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn conv_horiz_rgba_4_u8_i16<
     const SCALE: i32,
     const AR_TYPE: usize,

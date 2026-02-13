@@ -31,7 +31,8 @@ use crate::neon::utils::{expand8_high_to_14, expand8_to_14};
 use std::arch::aarch64::*;
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn accumulate_8_horiz(
     store: int16x8_t,
     ptr: *const u8,
@@ -48,7 +49,8 @@ unsafe fn accumulate_8_horiz(
 }
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn accumulate_4_horiz(store: int16x8_t, ptr: *const u8, weights: int16x8_t) -> int16x8_t {
     unsafe {
         let pixel_colors = vld1_u8(ptr);
@@ -58,7 +60,8 @@ unsafe fn accumulate_4_horiz(store: int16x8_t, ptr: *const u8, weights: int16x8_
 }
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn accumulate_1_horiz(store: int16x8_t, ptr: *const u8, weights: int16x8_t) -> int16x8_t {
     unsafe {
         let pixel_colors =

@@ -31,7 +31,8 @@ use crate::neon::utils::{xvld1q_u16_x2, xvld1q_u16_x4};
 use std::arch::aarch64::*;
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn conv_horiz_rgba_1_u16(
     start_x: usize,
     src: &[u16],
@@ -48,7 +49,8 @@ unsafe fn conv_horiz_rgba_1_u16(
 }
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn conv_horiz_rgba_2_u16(
     start_x: usize,
     src: &[u16],
@@ -76,7 +78,8 @@ unsafe fn conv_horiz_rgba_2_u16(
 }
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn conv_horiz_rgba_4_u16(
     start_x: usize,
     src: &[u16],
@@ -116,7 +119,8 @@ unsafe fn conv_horiz_rgba_4_u16(
 }
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn conv_horiz_rgba_8_u16(
     start_x: usize,
     src: &[u16],

@@ -32,7 +32,8 @@ use crate::neon::utils::load_3b_as_u8x16;
 use std::arch::aarch64::*;
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn conv_horiz_rgb_4(
     start_x: usize,
     src: &[u8],
@@ -63,7 +64,8 @@ unsafe fn conv_horiz_rgb_4(
 }
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn conv_horiz_rgb_2(
     start_x: usize,
     src: &[u8],
@@ -88,7 +90,8 @@ unsafe fn conv_horiz_rgb_2(
 }
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn conv_hor_rgb_1(
     start_x: usize,
     src: &[u8],
