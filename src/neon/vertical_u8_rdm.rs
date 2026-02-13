@@ -51,41 +51,35 @@ pub(crate) fn convolve_vertical_neon_i16_precision(
 }
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn vdot<const SCALE: i32>(
     store0: int16x8_t,
     store1: int16x8_t,
     row: uint8x16_t,
     weight: int16x8_t,
 ) -> (int16x8_t, int16x8_t) {
-    unsafe {
-        let lo0 =
-            vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip1q_u8(row, row))));
-        let store0 = vqrdmlahq_s16(store0, lo0, weight);
-        let hi0 =
-            vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip2q_u8(row, row))));
-        let store1 = vqrdmlahq_s16(store1, hi0, weight);
-        (store0, store1)
-    }
+    let lo0 = vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip1q_u8(row, row))));
+    let store0 = vqrdmlahq_s16(store0, lo0, weight);
+    let hi0 = vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip2q_u8(row, row))));
+    let store1 = vqrdmlahq_s16(store1, hi0, weight);
+    (store0, store1)
 }
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn vdot_lane<const SCALE: i32, const LANE: i32>(
     store0: int16x8_t,
     store1: int16x8_t,
     row: uint8x16_t,
     weight: int16x4_t,
 ) -> (int16x8_t, int16x8_t) {
-    unsafe {
-        let lo0 =
-            vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip1q_u8(row, row))));
-        let store0 = vqrdmlahq_lane_s16::<LANE>(store0, lo0, weight);
-        let hi0 =
-            vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip2q_u8(row, row))));
-        let store1 = vqrdmlahq_lane_s16::<LANE>(store1, hi0, weight);
-        (store0, store1)
-    }
+    let lo0 = vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip1q_u8(row, row))));
+    let store0 = vqrdmlahq_lane_s16::<LANE>(store0, lo0, weight);
+    let hi0 = vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip2q_u8(row, row))));
+    let store1 = vqrdmlahq_lane_s16::<LANE>(store1, hi0, weight);
+    (store0, store1)
 }
 
 #[target_feature(enable = "rdm")]

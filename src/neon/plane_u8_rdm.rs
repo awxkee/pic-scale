@@ -32,7 +32,8 @@ use crate::neon::utils::{
 };
 use std::arch::aarch64::*;
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn accumulate_32_horiz(store: int16x8_t, ptr: *const u8, weights: int16x8x4_t) -> int16x8_t {
     unsafe {
         let pixel_colors = xvld1q_u8_x2(ptr);
@@ -47,7 +48,8 @@ unsafe fn accumulate_32_horiz(store: int16x8_t, ptr: *const u8, weights: int16x8
     }
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn accumulate_16_horiz(store: int16x8_t, ptr: *const u8, weights: int16x8x2_t) -> int16x8_t {
     unsafe {
         let pixel_colors = vld1q_u8(ptr);
@@ -58,7 +60,8 @@ unsafe fn accumulate_16_horiz(store: int16x8_t, ptr: *const u8, weights: int16x8
     }
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn accumulate_8_horiz(store: int16x8_t, ptr: *const u8, weights: int16x8_t) -> int16x8_t {
     unsafe {
         let pixel_colors = vld1_u8(ptr);
@@ -67,7 +70,8 @@ unsafe fn accumulate_8_horiz(store: int16x8_t, ptr: *const u8, weights: int16x8_
     }
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn accumulate_4_horiz(store: int16x8_t, ptr: *const u8, weights: int16x8_t) -> int16x8_t {
     unsafe {
         let pixel_colors =
@@ -77,7 +81,8 @@ unsafe fn accumulate_4_horiz(store: int16x8_t, ptr: *const u8, weights: int16x8_
     }
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn accumulate_1_horiz(store: int16x8_t, ptr: *const u8, weights: int16x8_t) -> int16x8_t {
     unsafe {
         let pixel_colors = vld1_lane_u8::<0>(ptr, vdup_n_u8(0));

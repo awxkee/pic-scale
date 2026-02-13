@@ -32,7 +32,8 @@ use crate::neon::utils::{expand8_high_to_14, expand8_to_14, load_4b_as_u8x8, xvl
 use std::arch::aarch64::*;
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn conv_horiz_rgba_8_u8_i16<const SCALE: i32>(
     start_x: usize,
     src: &[u8],
@@ -61,7 +62,8 @@ unsafe fn conv_horiz_rgba_8_u8_i16<const SCALE: i32>(
 }
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn conv_horiz_rgba_2_u8_i16<const SCALE: i32>(
     start_x: usize,
     src: &[u8],
@@ -79,7 +81,8 @@ unsafe fn conv_horiz_rgba_2_u8_i16<const SCALE: i32>(
     }
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn conv_horiz_rgba_4_u8_i16<const SCALE: i32>(
     start_x: usize,
     src: &[u8],
@@ -102,7 +105,8 @@ unsafe fn conv_horiz_rgba_4_u8_i16<const SCALE: i32>(
 }
 
 #[must_use]
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 unsafe fn conv_horiz_rgba_1_u8_i16<const SCALE: i32>(
     start_x: usize,
     src: &[u8],
