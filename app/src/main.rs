@@ -17,7 +17,7 @@ use pic_scale::{
     Planar8ImageStore, Planar8ImageStoreMut, PlanarF32ImageStore, PlanarF32ImageStoreMut,
     ResamplingFunction, Rgb8ImageStore, Rgb8ImageStoreMut, RgbF32ImageStore, RgbF32ImageStoreMut,
     Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore, Rgba8ImageStoreMut, RgbaF32ImageStore,
-    RgbaF32ImageStoreMut, Scaler, Scaling, ScalingF32, ScalingU16, ThreadingPolicy,
+    RgbaF32ImageStoreMut, Scaler, ThreadingPolicy,
     WorkloadStrategy,
 };
 use yuv::{ar30_to_rgb8, rgba8_to_ar30, Rgb30ByteOrder};

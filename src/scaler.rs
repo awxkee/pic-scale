@@ -58,226 +58,6 @@ pub struct Scaler {
     pub workload_strategy: WorkloadStrategy,
 }
 
-/// 8 bit-depth images scaling trait
-pub trait Scaling {
-    /// Sets threading policy
-    ///
-    /// Setting up threading policy, refer to [crate::ThreadingPolicy] for more info
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    /// use pic_scale::{ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
-    /// let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-    /// scaler.set_threading_policy(ThreadingPolicy::Adaptive);
-    /// ```
-    fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy);
-
-    /// Performs rescaling for planar image
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u8, 1>::alloc(50, 50);
-    ///  scaler.resize_plane(&src_store, &mut dst_store).unwrap();
-    /// ```
-    fn resize_plane<'a>(
-        &'a self,
-        store: &ImageStore<'a, u8, 1>,
-        into: &mut ImageStoreMut<'a, u8, 1>,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for CbCr8 ( or 2 interleaved channels )
-    ///
-    /// Scales 2 interleaved channels as CbCr8, optionally it could handle LumaAlpha images also
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u8, 2>::alloc(50, 50);
-    ///  scaler.resize_cbcr8(&src_store, &mut dst_store).unwrap();
-    /// ```
-    fn resize_cbcr8<'a>(
-        &'a self,
-        store: &ImageStore<'a, u8, 2>,
-        into: &mut ImageStoreMut<'a, u8, 2>,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for Gray Alpha ( or 2 interleaved channels with aloha )
-    ///
-    /// Scales 2 interleaved channels as Gray Alpha
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u8, 2>::alloc(50, 50);
-    ///  scaler.resize_gray_alpha(&src_store, &mut dst_store, true).unwrap();
-    /// ```
-    fn resize_gray_alpha<'a>(
-        &'a self,
-        store: &ImageStore<'a, u8, 2>,
-        into: &mut ImageStoreMut<'a, u8, 2>,
-        premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for RGB, channel order does not matter
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u8, 3>::alloc(50, 50);
-    ///  scaler.resize_rgb(&src_store, &mut dst_store).unwrap();
-    /// ```
-    fn resize_rgb<'a>(
-        &'a self,
-        store: &ImageStore<'a, u8, 3>,
-        into: &mut ImageStoreMut<'a, u8, 3>,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for RGBA
-    ///
-    /// This method may premultiply and un associate alpha if required.
-    /// Alpha position is always considered as last
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u8, 4>::alloc(50, 50);
-    ///  scaler.resize_rgba(&src_store, &mut dst_store, false).unwrap();
-    /// ```
-    fn resize_rgba<'a>(
-        &'a self,
-        store: &ImageStore<'a, u8, 4>,
-        into: &mut ImageStoreMut<'a, u8, 4>,
-        premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError>;
-}
-
-/// f32 images scaling trait
-pub trait ScalingF32 {
-    /// Performs rescaling planar f32 image
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<f32, 1>::alloc(50, 50);
-    ///  scaler.resize_plane_f32(&src_store, &mut dst_store).unwrap();
-    /// ```
-    fn resize_plane_f32<'a>(
-        &'a self,
-        store: &ImageStore<'a, f32, 1>,
-        into: &mut ImageStoreMut<'a, f32, 1>,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for CbCr f32 image
-    ///
-    /// Scales an interleaved CbCr f32. Also, could handle LumaAlpha images.
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<f32, 2>::alloc(50, 50);
-    ///  scaler.resize_cbcr_f32(&src_store, &mut dst_store).unwrap();
-    /// ```
-    fn resize_cbcr_f32<'a>(
-        &'a self,
-        store: &ImageStore<'a, f32, 2>,
-        into: &mut ImageStoreMut<'a, f32, 2>,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for Gray Alpha f32 image
-    ///
-    /// Scales an interleaved Gray and Alpha in f32.
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<f32, 2>::alloc(50, 50);
-    ///  scaler.resize_gray_alpha_f32(&src_store, &mut dst_store, true).unwrap();
-    /// ```
-    fn resize_gray_alpha_f32<'a>(
-        &'a self,
-        store: &ImageStore<'a, f32, 2>,
-        into: &mut ImageStoreMut<'a, f32, 2>,
-        premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for RGB f32
-    ///
-    /// Scales an image RGB f32, channel order does not matter
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<f32, 3>::alloc(50, 50);
-    ///  scaler.resize_rgb_f32(&src_store, &mut dst_store).unwrap();
-    /// ```
-    fn resize_rgb_f32<'a>(
-        &'a self,
-        store: &ImageStore<'a, f32, 3>,
-        into: &mut ImageStoreMut<'a, f32, 3>,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for RGBA f32
-    ///
-    /// Scales an image RGBA f32, alpha expected to be at last position if
-    /// alpha pre-multiplication is requested
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<f32, 4>::alloc(50, 50);
-    ///  scaler.resize_rgba_f32(&src_store, &mut dst_store, false).unwrap();
-    /// ```
-    fn resize_rgba_f32<'a>(
-        &'a self,
-        store: &ImageStore<'a, f32, 4>,
-        into: &mut ImageStoreMut<'a, f32, 4>,
-        premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError>;
-}
-
 /// Defines execution hint about preferred strategy
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Default)]
 pub enum WorkloadStrategy {
@@ -286,155 +66,6 @@ pub enum WorkloadStrategy {
     /// Prefers speed to quality
     #[default]
     PreferSpeed,
-}
-
-/// 8+ bit-depth images scaling trait
-pub trait ScalingU16 {
-    /// Performs rescaling for Planar u16
-    ///
-    /// Scales planar high bit-depth image stored in `u16` type.
-    /// To perform scaling image bit-depth should be set in target image,
-    /// source image expects to have the same one.
-    ///
-    /// # Arguments
-    /// `store` - original image store
-    /// `into` - target image store
-    ///
-    /// # Panic
-    /// Method panics if bit-depth < 1 or bit-depth > 16
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u16, 1>::alloc_with_depth(50, 50, 10);
-    ///  scaler.resize_plane_u16(&src_store, &mut dst_store).unwrap();
-    /// ```
-    fn resize_plane_u16<'a>(
-        &'a self,
-        store: &ImageStore<'a, u16, 1>,
-        into: &mut ImageStoreMut<'a, u16, 1>,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for CbCr16
-    ///
-    /// Scales CbCr high bit-depth interleaved image in `u16` type, optionally it could handle LumaAlpha images also
-    /// To perform scaling image bit-depth should be set in target image,
-    /// source image expects to have the same one.
-    /// Channel order does not matter.
-    ///
-    /// # Arguments
-    /// `store` - original image store
-    /// `into` - target image store
-    ///
-    /// # Panics
-    /// Method panics if bit-depth < 1 or bit-depth > 16
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u16, 2>::alloc_with_depth(50, 50, 10);
-    ///  scaler.resize_cbcr_u16(&src_store, &mut dst_store).unwrap();
-    /// ```
-    ///
-    fn resize_cbcr_u16<'a>(
-        &'a self,
-        store: &ImageStore<'a, u16, 2>,
-        into: &mut ImageStoreMut<'a, u16, 2>,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for Gray Alpha high bit-depth ( or 2 interleaved channels with aloha )
-    ///
-    /// Scales 2 interleaved channels as Gray Alpha
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingU16};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u16, 2>::alloc_with_depth(50, 50, 16);
-    ///  scaler.resize_gray_alpha16(&src_store, &mut dst_store, true).unwrap();
-    /// ```
-    fn resize_gray_alpha16<'a>(
-        &'a self,
-        store: &ImageStore<'a, u16, 2>,
-        into: &mut ImageStoreMut<'a, u16, 2>,
-        premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for RGB
-    ///
-    /// Scales RGB high bit-depth image stored in `u16` type.
-    /// To perform scaling image bit-depth should be set in target image,
-    /// source image expects to have the same one.
-    /// Channel order does not matter.
-    ///
-    /// # Arguments
-    /// `store` - original image store
-    /// `into` - target image store
-    ///
-    /// # Panics
-    /// Method panics if bit-depth < 1 or bit-depth > 16
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u16, 3>::alloc_with_depth(50, 50, 10);
-    ///  scaler.resize_rgb_u16(&src_store, &mut dst_store).unwrap();
-    /// ```
-    ///
-    fn resize_rgb_u16<'a>(
-        &'a self,
-        store: &ImageStore<'a, u16, 3>,
-        into: &mut ImageStoreMut<'a, u16, 3>,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for RGBA high bit-depth
-    ///
-    /// Scales RGB high bit-depth image stored in `u16` type.
-    /// To perform scaling image bit-depth should be set in target image,
-    /// source image expects to have the same one.
-    /// If pre-multiplication is requested alpha should be at last, otherwise
-    /// channel order does not matter.
-    ///
-    /// # Arguments
-    /// `store` - original image store
-    /// `into` - target image store
-    /// `premultiply_alpha` - flags is alpha is premultiplied
-    ///
-    /// # Panics
-    /// Method panics if bit-depth < 1 or bit-depth > 16
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u16, 4>::alloc_with_depth(50, 50, 10);
-    ///  scaler.resize_rgba_u16(&src_store, &mut dst_store, true).unwrap();
-    /// ```
-    ///
-    fn resize_rgba_u16<'a>(
-        &'a self,
-        store: &ImageStore<'a, u16, 4>,
-        into: &mut ImageStoreMut<'a, u16, 4>,
-        premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError>;
 }
 
 impl Scaler {
@@ -453,8 +84,9 @@ impl Scaler {
     /// Sets preferred workload strategy
     ///
     /// This is hint only, it may change something, or may not.
-    pub fn set_workload_strategy(&mut self, workload_strategy: WorkloadStrategy) {
+    pub fn set_workload_strategy(&mut self, workload_strategy: WorkloadStrategy) -> Self {
         self.workload_strategy = workload_strategy;
+        *self
     }
 }
 
@@ -656,7 +288,7 @@ impl Scaler {
         self.plan_generic_resize_with_alpha(source_size, target_size, bit_depth, premultiply_alpha)
     }
 
-    pub fn plan_plane_resampling_f32(
+    pub fn plan_planar_resampling_f32(
         &self,
         source_size: ImageSize,
         target_size: ImageSize,
@@ -723,8 +355,32 @@ impl Scaler {
         }
     }
 
-    pub fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy) {
+    pub fn plan_rgba_resampling_f32(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        premultiply_alpha: bool,
+    ) -> Result<Arc<dyn ResamplingPlan<f32, 4> + Send + Sync>, PicScaleError> {
+        match self.workload_strategy {
+            WorkloadStrategy::PreferQuality => self.plan_generic_resize_with_alpha::<f32, f64, 4>(
+                source_size,
+                target_size,
+                8,
+                premultiply_alpha,
+            ),
+            WorkloadStrategy::PreferSpeed => self.plan_generic_resize_with_alpha::<f32, f32, 4>(
+                source_size,
+                target_size,
+                8,
+                premultiply_alpha,
+            ),
+        }
+    }
+
+
+    pub fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy) -> Self {
         self.threading_policy = threading_policy;
+        *self
     }
 }
 
@@ -796,7 +452,7 @@ impl Scaler {
     /// `dst_image` - destination AR30 image
     /// `new_size` - New image size
     ///
-    pub fn plan_ar30_resample(
+    pub fn plan_ar30_resampling(
         &self,
         source_size: ImageSize,
         target_size: ImageSize,

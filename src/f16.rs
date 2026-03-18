@@ -38,10 +38,8 @@ use crate::convolution::{
     ConvolutionOptions, Filtering, HorizontalFilterPass, VerticalConvolutionPass,
 };
 #[cfg(all(target_arch = "aarch64", feature = "neon"))]
-use crate::filter_weights::{WeightFloat16Converter, WeightsConverter};
-use crate::filter_weights::{
-    FilterBounds, FilterWeights,
-};
+use crate::filter_weights::WeightsConverter;
+use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::floating_point_horizontal::{
     convolve_row_handler_floating_point, convolve_row_handler_floating_point_4,
 };
@@ -51,10 +49,6 @@ use crate::neon::{
     convolve_horizontal_rgb_neon_row_one_f16, convolve_horizontal_rgb_neon_rows_4_f16,
     convolve_horizontal_rgba_neon_row_one_f16, convolve_horizontal_rgba_neon_rows_4_f16,
     convolve_vertical_rgb_neon_row_f16,
-};
-#[cfg(all(target_arch = "aarch64", feature = "neon"))]
-use crate::neon::{
-    convolve_horizontal_rgba_neon_row_one_f16_fhm, convolve_horizontal_rgba_neon_rows_4_f16_fhm,
 };
 #[cfg(all(target_arch = "aarch64", feature = "neon",))]
 use crate::neon::{
@@ -69,7 +63,9 @@ use crate::sse::{
     convolve_horizontal_rgba_sse_row_one_f16, convolve_horizontal_rgba_sse_rows_4_f16,
     convolve_vertical_sse_row_f16,
 };
-use crate::{ImageStore, ThreadingPolicy};
+use crate::{
+    ImageSize, ImageStore, PicScaleError, ResamplingPlan, Scaler, ThreadingPolicy,
+};
 use core::{f16, f32};
 use std::sync::Arc;
 
@@ -606,5 +602,21 @@ impl VerticalConvolutionPass<f16, f32, 2> for ImageStore<'_, f16, 2> {
             filter_row: _dispatcher,
             threading_policy,
         })
+    }
+}
+
+impl Scaler {
+    pub fn plan_rgba_resampling_f16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        premultiply_alpha: bool,
+    ) -> Result<Arc<dyn ResamplingPlan<f16, 4> + Send + Sync>, PicScaleError> {
+        self.plan_generic_resize_with_alpha::<f16, f32, 4>(
+            source_size,
+            target_size,
+            8,
+            premultiply_alpha,
+        )
     }
 }

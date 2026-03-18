@@ -149,6 +149,5 @@ pub(crate) use math::*;
 pub use plan::ResamplingPlan;
 pub use sampler::*;
 pub use scaler::{ImageStoreScaling, Scaler, ScalingOptions, WorkloadStrategy};
-pub use scaler::{Scaling, ScalingF32, ScalingU16};
 pub use threading_policy::ThreadingPolicy;
 pub use validation::{PicScaleBufferMismatch, PicScaleError};

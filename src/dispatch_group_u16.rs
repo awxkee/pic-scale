@@ -64,7 +64,7 @@ impl RowFactoryProducer for u16 {
                 threading_policy,
             });
         }
-        #[cfg(all(target_arch = "aarch64", feature = "neon", feature = "rdm"))]
+        #[cfg(all(target_arch = "aarch64", feature = "rdm"))]
         {
             let has_rdm = std::arch::is_aarch64_feature_detected!("rdm");
             if has_rdm && CN == 4 {

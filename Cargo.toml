@@ -35,13 +35,13 @@ nightly_f16 = []
 # Allows to use ARM NEON when available
 neon = []
 # Allows to use ARM RDM when available
-rdm = []
+rdm = ["neon"]
 # Allows to use x86_64 AVX2 when available
 avx = []
 # Allows to use x86/x86_64 SSE4.1 when available
 sse = []
 # Allows to use ARM i8mm when available
-nightly_i8mm = []
+nightly_i8mm = ["neon"]
 
 [package.metadata.docs.rs]
 # To build locally:
