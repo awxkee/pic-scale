@@ -32,8 +32,7 @@
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use pic_scale::{
-    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ThreadingPolicy,
-    WorkloadStrategy,
+    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy, WorkloadStrategy,
 };
 
 #[derive(Clone, Debug, Arbitrary)]
@@ -95,8 +94,11 @@ fn resize_rgb(
 
     let store = ImageStore::<u8, 3>::from_slice(&mut src_data, src_width, src_height).unwrap();
     let mut target = ImageStoreMut::alloc(dst_width, dst_height);
-    let mut scaler = Scaler::new(sampler);
-    scaler.set_threading_policy(threading_policy);
-    scaler.set_workload_strategy(workload_strategy);
-    scaler.resize_rgb(&store, &mut target).unwrap();
+    let scaler = Scaler::new(sampler)
+        .set_threading_policy(threading_policy)
+        .set_workload_strategy(workload_strategy);
+    let planned = scaler
+        .plan_rgb_resampling(store.get_size(), target.get_size())
+        .unwrap();
+    planned.resample(&store, &mut target).unwrap();
 }

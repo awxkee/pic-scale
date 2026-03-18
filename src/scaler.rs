@@ -42,9 +42,9 @@ use crate::plan::{
 use crate::threading_policy::ThreadingPolicy;
 use crate::validation::PicScaleError;
 use crate::{
-    CbCr16ImageStore, CbCr8ImageStore, CbCrF32ImageStore, Planar16ImageStore, Planar8ImageStore,
-    PlanarF32ImageStore, ResamplingFunction, ResamplingPlan, Rgb16ImageStore, Rgb8ImageStore,
-    RgbF32ImageStore, Rgba16ImageStore, Rgba8ImageStore, RgbaF32ImageStore,
+    CbCr8ImageStore, CbCr16ImageStore, CbCrF32ImageStore, Planar8ImageStore, Planar16ImageStore,
+    PlanarF32ImageStore, ResamplingFunction, ResamplingPlan, Rgb8ImageStore, Rgb16ImageStore,
+    RgbF32ImageStore, Rgba8ImageStore, Rgba16ImageStore, RgbaF32ImageStore,
 };
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -213,7 +213,11 @@ impl Scaler {
         target_size: ImageSize,
         premultiply_alpha: bool,
     ) -> Result<Arc<dyn ResamplingPlan<u8, 2> + Send + Sync>, PicScaleError> {
-        self.plan_generic_resize_with_alpha(source_size, target_size, 8, premultiply_alpha)
+        if premultiply_alpha {
+            self.plan_generic_resize_with_alpha(source_size, target_size, 8, premultiply_alpha)
+        } else {
+            self.plan_generic_resize(source_size, target_size, 8)
+        }
     }
 
     pub fn plan_cbcr_resampling(
@@ -238,7 +242,11 @@ impl Scaler {
         target_size: ImageSize,
         premultiply_alpha: bool,
     ) -> Result<Arc<dyn ResamplingPlan<u8, 4> + Send + Sync>, PicScaleError> {
-        self.plan_generic_resize_with_alpha(source_size, target_size, 8, premultiply_alpha)
+        if premultiply_alpha {
+            self.plan_generic_resize_with_alpha(source_size, target_size, 8, premultiply_alpha)
+        } else {
+            self.plan_generic_resize(source_size, target_size, 8)
+        }
     }
 
     pub fn plan_planar_resampling16(
@@ -266,7 +274,16 @@ impl Scaler {
         premultiply_alpha: bool,
         bit_depth: usize,
     ) -> Result<Arc<dyn ResamplingPlan<u16, 2> + Send + Sync>, PicScaleError> {
-        self.plan_generic_resize_with_alpha(source_size, target_size, bit_depth, premultiply_alpha)
+        if premultiply_alpha {
+            self.plan_generic_resize_with_alpha(
+                source_size,
+                target_size,
+                bit_depth,
+                premultiply_alpha,
+            )
+        } else {
+            self.plan_cbcr_resampling16(source_size, target_size, bit_depth)
+        }
     }
 
     pub fn plan_rgb_resampling16(
@@ -285,7 +302,16 @@ impl Scaler {
         premultiply_alpha: bool,
         bit_depth: usize,
     ) -> Result<Arc<dyn ResamplingPlan<u16, 4> + Send + Sync>, PicScaleError> {
-        self.plan_generic_resize_with_alpha(source_size, target_size, bit_depth, premultiply_alpha)
+        if premultiply_alpha {
+            self.plan_generic_resize_with_alpha(
+                source_size,
+                target_size,
+                bit_depth,
+                premultiply_alpha,
+            )
+        } else {
+            self.plan_generic_resize(source_size, target_size, bit_depth)
+        }
     }
 
     pub fn plan_planar_resampling_f32(
@@ -324,19 +350,25 @@ impl Scaler {
         target_size: ImageSize,
         premultiply_alpha: bool,
     ) -> Result<Arc<dyn ResamplingPlan<f32, 2> + Send + Sync>, PicScaleError> {
-        match self.workload_strategy {
-            WorkloadStrategy::PreferQuality => self.plan_generic_resize_with_alpha::<f32, f64, 2>(
-                source_size,
-                target_size,
-                8,
-                premultiply_alpha,
-            ),
-            WorkloadStrategy::PreferSpeed => self.plan_generic_resize_with_alpha::<f32, f32, 2>(
-                source_size,
-                target_size,
-                8,
-                premultiply_alpha,
-            ),
+        if premultiply_alpha {
+            match self.workload_strategy {
+                WorkloadStrategy::PreferQuality => self
+                    .plan_generic_resize_with_alpha::<f32, f64, 2>(
+                        source_size,
+                        target_size,
+                        8,
+                        premultiply_alpha,
+                    ),
+                WorkloadStrategy::PreferSpeed => self
+                    .plan_generic_resize_with_alpha::<f32, f32, 2>(
+                        source_size,
+                        target_size,
+                        8,
+                        premultiply_alpha,
+                    ),
+            }
+        } else {
+            self.plan_cbcr_resampling_f32(source_size, target_size)
         }
     }
 
@@ -361,22 +393,34 @@ impl Scaler {
         target_size: ImageSize,
         premultiply_alpha: bool,
     ) -> Result<Arc<dyn ResamplingPlan<f32, 4> + Send + Sync>, PicScaleError> {
-        match self.workload_strategy {
-            WorkloadStrategy::PreferQuality => self.plan_generic_resize_with_alpha::<f32, f64, 4>(
-                source_size,
-                target_size,
-                8,
-                premultiply_alpha,
-            ),
-            WorkloadStrategy::PreferSpeed => self.plan_generic_resize_with_alpha::<f32, f32, 4>(
-                source_size,
-                target_size,
-                8,
-                premultiply_alpha,
-            ),
+        if premultiply_alpha {
+            match self.workload_strategy {
+                WorkloadStrategy::PreferQuality => self
+                    .plan_generic_resize_with_alpha::<f32, f64, 4>(
+                        source_size,
+                        target_size,
+                        8,
+                        premultiply_alpha,
+                    ),
+                WorkloadStrategy::PreferSpeed => self
+                    .plan_generic_resize_with_alpha::<f32, f32, 4>(
+                        source_size,
+                        target_size,
+                        8,
+                        premultiply_alpha,
+                    ),
+            }
+        } else {
+            match self.workload_strategy {
+                WorkloadStrategy::PreferQuality => {
+                    self.plan_generic_resize::<f32, f64, 4>(source_size, target_size, 8)
+                }
+                WorkloadStrategy::PreferSpeed => {
+                    self.plan_generic_resize::<f32, f32, 4>(source_size, target_size, 8)
+                }
+            }
         }
     }
-
 
     pub fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy) -> Self {
         self.threading_policy = threading_policy;
@@ -410,7 +454,7 @@ impl Scaler {
         };
         let q_vert_filters = DefaultWeightsConverter::default().prepare_weights(&vertical_filters);
         use crate::dispatch_group_ar30::{
-            get_horizontal_dispatch4_ar30, get_horizontal_dispatch_ar30,
+            get_horizontal_dispatch_ar30, get_horizontal_dispatch4_ar30,
             get_vertical_dispatcher_ar30,
         };
         let vertical_plan = Arc::new(VerticalFiltering {

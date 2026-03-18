@@ -32,8 +32,7 @@
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use pic_scale::{
-    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingU16, ThreadingPolicy,
-    WorkloadStrategy,
+    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy, WorkloadStrategy,
 };
 
 #[derive(Clone, Debug, Arbitrary)]
@@ -99,28 +98,34 @@ fn resize_cbcr16(
     target.buffer.borrow_mut()[0] = 16;
     target.buffer.borrow_mut()[1] = 17;
 
-    let mut scaler = Scaler::new(sampler);
-    scaler.set_workload_strategy(if use_quality {
-        WorkloadStrategy::PreferQuality
-    } else {
-        WorkloadStrategy::PreferSpeed
-    });
-    scaler.set_threading_policy(threading_policy);
-    if mul_alpha {
+    let scaler = Scaler::new(sampler)
+        .set_workload_strategy(if use_quality {
+            WorkloadStrategy::PreferQuality
+        } else {
+            WorkloadStrategy::PreferSpeed
+        })
+        .set_threading_policy(threading_policy);
+    let planner = if mul_alpha {
         scaler
-            .resize_gray_alpha16(&store, &mut target, true)
-            .unwrap();
+            .plan_gray_alpha_resampling16(store.get_size(), target.get_size(), true, 10)
+            .unwrap()
     } else {
-        scaler.resize_cbcr_u16(&store, &mut target).unwrap();
-    }
+        scaler
+            .plan_cbcr_resampling16(store.get_size(), target.get_size(), 10)
+            .unwrap()
+    };
+    planner.resample(&store, &mut target).unwrap();
 
     let store = ImageStore::<u16, 2>::borrow(&src_data, src_width, src_height).unwrap();
     let mut target16 = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
-    if mul_alpha {
+    let planner = if mul_alpha {
         scaler
-            .resize_gray_alpha16(&store, &mut target16, true)
-            .unwrap();
+            .plan_gray_alpha_resampling16(store.get_size(), target.get_size(), true, 16)
+            .unwrap()
     } else {
-        scaler.resize_cbcr_u16(&store, &mut target16).unwrap();
-    }
+        scaler
+            .plan_cbcr_resampling16(store.get_size(), target.get_size(), 16)
+            .unwrap()
+    };
+    planner.resample(&store, &mut target16).unwrap();
 }

@@ -32,8 +32,7 @@
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use pic_scale::{
-    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32, ThreadingPolicy,
-    WorkloadStrategy,
+    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy, WorkloadStrategy,
 };
 
 #[derive(Clone, Debug, Arbitrary)]
@@ -91,12 +90,15 @@ fn resize_plane(
     let store = ImageStore::<f32, 1>::from_slice(&mut src_data, src_width, src_height).unwrap();
     let mut target = ImageStoreMut::alloc(dst_width, dst_height);
 
-    let mut scaler = Scaler::new(sampler);
-    scaler.set_workload_strategy(if use_quality {
-        WorkloadStrategy::PreferQuality
-    } else {
-        WorkloadStrategy::PreferSpeed
-    });
-    scaler.set_threading_policy(threading_policy);
-    scaler.resize_plane_f32(&store, &mut target).unwrap();
+    let scaler = Scaler::new(sampler)
+        .set_workload_strategy(if use_quality {
+            WorkloadStrategy::PreferQuality
+        } else {
+            WorkloadStrategy::PreferSpeed
+        })
+        .set_threading_policy(threading_policy);
+    let planned = scaler
+        .plan_planar_resampling_f32(store.get_size(), target.get_size())
+        .unwrap();
+    planned.resample(&store, &mut target).unwrap();
 }

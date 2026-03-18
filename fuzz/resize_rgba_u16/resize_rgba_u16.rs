@@ -32,8 +32,8 @@
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use pic_scale::{
-    Ar30ByteOrder, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingU16,
-    ThreadingPolicy, WorkloadStrategy,
+    Ar30ByteOrder, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy,
+    WorkloadStrategy,
 };
 
 #[derive(Clone, Debug, Arbitrary)]
@@ -105,19 +105,23 @@ fn resize_rgba(
     let mut scaler = Scaler::new(sampler);
     scaler.set_workload_strategy(workload_strategy);
     scaler.set_threading_policy(threading_policy);
-    scaler
-        .resize_rgba_u16(&store, &mut target, premultiply_alpha)
+    let planned = scaler
+        .plan_rgba_resampling16(store.get_size(), target.get_size(), premultiply_alpha, 10)
         .unwrap();
+    planned.resample(&store, &mut target).unwrap();
 
     let mut target = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
 
     let store = ImageStore::<u16, 4>::borrow(&src_data, src_width, src_height).unwrap();
-    scaler
-        .resize_rgba_u16(&store, &mut target, premultiply_alpha)
+    let planned = scaler
+        .plan_rgba_resampling16(store.get_size(), target.get_size(), premultiply_alpha, 16)
         .unwrap();
-
+    planned.resample(&store, &mut target).unwrap();
     let src_data2 = vec![data.min(255) as u8; src_width * src_height * 4];
     let store_ar30 = ImageStore::<u8, 4>::borrow(&src_data2, src_width, src_height).unwrap();
     let mut target_ar30 = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 10);
-    _ = scaler.resize_ar30(&store_ar30, &mut target_ar30, Ar30ByteOrder::Host);
+    let planned = scaler
+        .plan_ar30_resampling(store.get_size(), target.get_size(), Ar30ByteOrder::Host)
+        .unwrap();
+    planned.resample(&store_ar30, &mut target_ar30).unwrap();
 }

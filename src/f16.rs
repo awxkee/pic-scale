@@ -63,9 +63,7 @@ use crate::sse::{
     convolve_horizontal_rgba_sse_row_one_f16, convolve_horizontal_rgba_sse_rows_4_f16,
     convolve_vertical_sse_row_f16,
 };
-use crate::{
-    ImageSize, ImageStore, PicScaleError, ResamplingPlan, Scaler, ThreadingPolicy,
-};
+use crate::{ImageSize, ImageStore, PicScaleError, ResamplingPlan, Scaler, ThreadingPolicy};
 use core::{f16, f32};
 use std::sync::Arc;
 
@@ -606,6 +604,30 @@ impl VerticalConvolutionPass<f16, f32, 2> for ImageStore<'_, f16, 2> {
 }
 
 impl Scaler {
+    pub fn plan_planar_resampling_f16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+    ) -> Result<Arc<dyn ResamplingPlan<f16, 1> + Send + Sync>, PicScaleError> {
+        self.plan_generic_resize::<f16, f32, 1>(source_size, target_size, 8)
+    }
+
+    pub fn plan_cbcr_resampling_f16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+    ) -> Result<Arc<dyn ResamplingPlan<f16, 2> + Send + Sync>, PicScaleError> {
+        self.plan_generic_resize::<f16, f32, 2>(source_size, target_size, 8)
+    }
+
+    pub fn plan_rgb_resampling_f16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+    ) -> Result<Arc<dyn ResamplingPlan<f16, 3> + Send + Sync>, PicScaleError> {
+        self.plan_generic_resize::<f16, f32, 3>(source_size, target_size, 8)
+    }
+
     pub fn plan_rgba_resampling_f16(
         &self,
         source_size: ImageSize,
