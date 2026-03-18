@@ -104,7 +104,7 @@ mod mlaf;
 mod nearest_sampler;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 mod neon;
-mod pic_scale_error;
+mod plan;
 mod plane_f32;
 mod plane_u16;
 mod plane_u8;
@@ -125,6 +125,7 @@ mod scaler_f16;
 mod sse;
 mod support;
 mod threading_policy;
+mod validation;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 mod wasm32;
 
@@ -151,8 +152,9 @@ pub use image_store::{
     RgbF16ImageStore, RgbF16ImageStoreMut, RgbaF16ImageStore, RgbaF16ImageStoreMut,
 };
 pub(crate) use math::*;
-pub use pic_scale_error::{PicScaleBufferMismatch, PicScaleError};
+pub use plan::ResamplingPlan;
 pub use sampler::*;
 pub use scaler::{ImageStoreScaling, Scaler, ScalingOptions, WorkloadStrategy};
 pub use scaler::{Scaling, ScalingF32, ScalingU16};
 pub use threading_policy::ThreadingPolicy;
+pub use validation::{PicScaleBufferMismatch, PicScaleError};

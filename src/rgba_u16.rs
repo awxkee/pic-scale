@@ -27,13 +27,20 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
-use crate::ImageStore;
-use crate::convolution::{ConvolutionOptions, HorizontalConvolutionPass, VerticalConvolutionPass};
-use crate::dispatch_group_u16::{convolve_horizontal_dispatch_u16, convolve_vertical_dispatch_u16};
+
+use crate::convolution::{
+    ConvolutionOptions, Filtering, HorizontalFilterPass, VerticalConvolutionPass,
+};
+use crate::dispatch_group_u16::{
+    RowFactoryProducer, convolve_horizontal_dispatch_u16, convolve_vertical_dispatch_u16,
+    vertical_plan_u16,
+};
 use crate::filter_weights::FilterWeights;
 use crate::image_store::ImageStoreMut;
+use crate::{ImageStore, ThreadingPolicy};
+use std::sync::Arc;
 
-impl HorizontalConvolutionPass<u16, f32, 4> for ImageStore<'_, u16, 4> {
+impl HorizontalFilterPass<u16, f32, 4> for ImageStore<'_, u16, 4> {
     #[allow(clippy::type_complexity)]
     fn convolve_horizontal(
         &self,
@@ -43,6 +50,14 @@ impl HorizontalConvolutionPass<u16, f32, 4> for ImageStore<'_, u16, 4> {
         _: ConvolutionOptions,
     ) {
         convolve_horizontal_dispatch_u16(self, filter_weights, destination, pool);
+    }
+
+    fn horizontal_plan(
+        filter_weights: FilterWeights<f32>,
+        threading_policy: ThreadingPolicy,
+        options: ConvolutionOptions,
+    ) -> Arc<dyn Filtering<u16, 4> + Send + Sync> {
+        u16::make_plan::<4>(&filter_weights, options.bit_depth, threading_policy)
     }
 }
 
@@ -55,5 +70,13 @@ impl VerticalConvolutionPass<u16, f32, 4> for ImageStore<'_, u16, 4> {
         options: ConvolutionOptions,
     ) {
         convolve_vertical_dispatch_u16(self, filter_weights, destination, pool, options);
+    }
+
+    fn vertical_plan(
+        filter_weights: FilterWeights<f32>,
+        threading_policy: ThreadingPolicy,
+        options: ConvolutionOptions,
+    ) -> Arc<dyn Filtering<u16, 4> + Send + Sync> {
+        vertical_plan_u16(filter_weights, threading_policy, options)
     }
 }

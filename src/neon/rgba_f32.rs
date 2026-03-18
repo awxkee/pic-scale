@@ -91,16 +91,17 @@ macro_rules! conv_horiz_rgba_1_f32 {
 }
 
 pub(crate) fn convolve_horizontal_rgba_neon_row_one(
-    dst_width: usize,
-    _: usize,
-    filter_weights: &FilterWeights<f32>,
     src: &[f32],
     dst: &mut [f32],
+    filter_weights: &FilterWeights<f32>,
+    _: u32,
 ) {
     unsafe {
         const CN: usize = 4;
         let mut filter_offset = 0usize;
         let weights_ptr = filter_weights.weights.as_ptr();
+
+        let dst_width = filter_weights.bounds.len();
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);
@@ -141,19 +142,20 @@ pub(crate) fn convolve_horizontal_rgba_neon_row_one(
 }
 
 pub(crate) fn convolve_horizontal_rgba_neon_rows_4(
-    dst_width: usize,
-    _: usize,
-    filter_weights: &FilterWeights<f32>,
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
     dst_stride: usize,
+    filter_weights: &FilterWeights<f32>,
+    _: u32,
 ) {
     unsafe {
         const CN: usize = 4;
         let mut filter_offset = 0usize;
         let zeros = vdupq_n_f32(0f32);
         let weights_ptr = filter_weights.weights.as_ptr();
+
+        let dst_width = filter_weights.bounds.len();
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);

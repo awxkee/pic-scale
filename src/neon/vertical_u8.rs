@@ -104,6 +104,7 @@ pub(crate) fn convolve_vertical_neon_i32_precision(
     dst: &mut [u8],
     src_stride: usize,
     weight: &[i16],
+    _: u32,
 ) {
     convolve_vertical_neon_row_full::<false, { crate::support::PRECISION }>(
         width, bounds, src, dst, src_stride, weight,
@@ -117,6 +118,7 @@ pub(crate) fn convolve_vertical_neon_i32_precision_d(
     dst: &mut [u8],
     src_stride: usize,
     weight: &[i16],
+    _: u32,
 ) {
     convolve_vertical_neon_row_full::<true, 16>(width, bounds, src, dst, src_stride, weight);
 }

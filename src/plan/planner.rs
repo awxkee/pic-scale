@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ * Copyright (c) Radzivon Bartoshyk 3/2026. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -26,15 +26,22 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#![forbid(unsafe_code)]
-pub(crate) const PRECISION: i32 = 15;
-pub(crate) const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
+use crate::{ImageSize, ImageStore, ImageStoreMut, PicScaleError};
 
-pub(crate) fn check_image_size_overflow(width: usize, height: usize, chan: usize) -> bool {
-    let (stride, is_overflowed) = (width as isize).overflowing_mul(chan as isize);
-    if is_overflowed {
-        return true;
-    }
-    let (_, is_overflowed) = (height as isize).overflowing_mul(stride);
-    is_overflowed
+pub trait ResamplingPlan<T: Copy, const N: usize> {
+    fn resample(
+        & self,
+        store: &ImageStore<'_, T, N>,
+        into: &mut ImageStoreMut<'_, T, N>,
+    ) -> Result<(), PicScaleError>;
+    fn resample_with_scratch(
+        &self,
+        store: &ImageStore<'_, T, N>,
+        into: &mut ImageStoreMut<'_, T, N>,
+        scratch: &mut [T],
+    ) -> Result<(), PicScaleError>;
+    fn alloc_scratch(&self) -> Vec<T>;
+    fn scratch_size(&self) -> usize;
+    fn get_target_size(&self) -> ImageSize;
+    fn get_source_size(&self) -> ImageSize;
 }

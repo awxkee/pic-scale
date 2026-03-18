@@ -135,36 +135,31 @@ unsafe fn conv_horiz_1_rgb_f16(
 }
 
 pub(crate) fn convolve_horizontal_rgb_neon_rows_4_f16_fhm(
-    dst_width: usize,
-    w: usize,
-    filter_weights: &FilterWeights<f16>,
     src: &[f16],
     src_stride: usize,
     dst: &mut [f16],
     dst_stride: usize,
+    filter_weights: &FilterWeights<f16>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_rgb_neon_rows_4_f16_impl(
-            dst_width,
-            w,
-            filter_weights,
             src,
-            src_stride,
-            dst,
             dst_stride,
+            dst,
+            src_stride,
+            filter_weights,
         )
     }
 }
 
 #[target_feature(enable = "fp16,fhm")]
 unsafe fn convolve_horizontal_rgb_neon_rows_4_f16_impl(
-    dst_width: usize,
-    _: usize,
-    filter_weights: &FilterWeights<f16>,
     src: &[f16],
     src_stride: usize,
     dst: &mut [f16],
     dst_stride: usize,
+    filter_weights: &FilterWeights<f16>,
 ) {
     unsafe {
         const CN: usize = 3;
@@ -173,6 +168,8 @@ unsafe fn convolve_horizontal_rgb_neon_rows_4_f16_impl(
         let zeros = vdupq_n_f32(0.);
 
         let weights_ptr = filter_weights.weights.as_ptr();
+
+        let dst_width = filter_weights.bounds.len();
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);
@@ -244,27 +241,26 @@ unsafe fn convolve_horizontal_rgb_neon_rows_4_f16_impl(
 }
 
 pub(crate) fn convolve_horizontal_rgb_neon_row_one_f16_fhm(
-    dst_width: usize,
-    w: usize,
-    filter_weights: &FilterWeights<f16>,
     src: &[f16],
     dst: &mut [f16],
+    filter_weights: &FilterWeights<f16>,
+    _: u32,
 ) {
-    unsafe { convolve_horizontal_rgb_neon_row_one_f16_impl(dst_width, w, filter_weights, src, dst) }
+    unsafe { convolve_horizontal_rgb_neon_row_one_f16_impl(src, dst, filter_weights) }
 }
 
 #[target_feature(enable = "fhm")]
 unsafe fn convolve_horizontal_rgb_neon_row_one_f16_impl(
-    dst_width: usize,
-    _: usize,
-    filter_weights: &FilterWeights<f16>,
     src: &[f16],
     dst: &mut [f16],
+    filter_weights: &FilterWeights<f16>,
 ) {
     unsafe {
         const CN: usize = 3;
         let weights_ptr = filter_weights.weights.as_ptr();
         let mut filter_offset = 0usize;
+
+        let dst_width = filter_weights.bounds.len();
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);

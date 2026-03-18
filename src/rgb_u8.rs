@@ -26,9 +26,12 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::ThreadingPolicy;
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::{convolve_vertical_avx_row, convolve_vertical_avx_row_lp};
-use crate::convolution::{ConvolutionOptions, HorizontalConvolutionPass, VerticalConvolutionPass};
+use crate::convolution::{
+    ConvolutionOptions, Filtering, HorizontalFilterPass, VerticalConvolutionPass,
+};
 use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertical_dispatch_u8};
 use crate::filter_weights::{DefaultWeightsConverter, FilterBounds, FilterWeights};
 use crate::handler_provider::{
@@ -37,6 +40,7 @@ use crate::handler_provider::{
 use crate::image_store::{ImageStore, ImageStoreMut};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::*;
+use crate::plan::{HorizontalFiltering, VerticalFiltering};
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::{
     convolve_horizontal_rgb_sse_row_one, convolve_horizontal_rgb_sse_rows_4,
@@ -44,8 +48,9 @@ use crate::sse::{
 };
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 use crate::wasm32::wasm_vertical_neon_row;
+use std::sync::Arc;
 
-impl HorizontalConvolutionPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
+impl HorizontalFilterPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
     #[allow(clippy::type_complexity)]
     fn convolve_horizontal(
         &self,
@@ -54,11 +59,18 @@ impl HorizontalConvolutionPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
         pool: &novtb::ThreadPool,
         _options: ConvolutionOptions,
     ) {
-        let _scale_factor = self.width as f32 / destination.width as f32;
+    }
+
+    fn horizontal_plan(
+        filter_weights: FilterWeights<f32>,
+        threading_policy: ThreadingPolicy,
+        _options: ConvolutionOptions,
+    ) -> Arc<dyn Filtering<u8, 3> + Send + Sync> {
+        let _scale_factor = _options.src_size.width as f32 / _options.dst_size.width as f32;
         let mut _dispatcher_4_rows: Option<
-            fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>),
+            fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>, u32),
         > = Some(handle_fixed_rows_4_u8::<3>);
-        let mut _dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i16>) =
+        let mut _dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i16>, u32) =
             handle_fixed_row_u8::<3>;
 
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -90,20 +102,17 @@ impl HorizontalConvolutionPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
                             convolve_horizontal_rgb_neon_row_one_dot,
                             convolve_horizontal_rgb_neon_rows_4_dot,
                         };
-                        use crate::rgba_u8::DefaultWeightsConverterQ7;
                         let _dispatcher_4_rows: Option<
-                            fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i8>),
+                            fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i8>, u32),
                         > = Some(convolve_horizontal_rgb_neon_rows_4_dot);
                         let _dispatcher_1_row = convolve_horizontal_rgb_neon_row_one_dot;
-                        return convolve_horizontal_dispatch_u8(
-                            self,
-                            filter_weights,
-                            destination,
-                            pool,
-                            _dispatcher_4_rows,
-                            _dispatcher_1_row,
-                            DefaultWeightsConverterQ7::default(),
-                        );
+                        let i_weights = filter_weights.numerical_approximation_q0_7(0);
+                        return Arc::new(HorizontalFiltering {
+                            filter_weights: i_weights,
+                            filter_4_rows: _dispatcher_4_rows,
+                            filter_row: _dispatcher_1_row,
+                            threading_policy,
+                        });
                     }
                 }
             }
@@ -133,15 +142,14 @@ impl HorizontalConvolutionPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
             _dispatcher_4_rows = Some(convolve_horizontal_rgb_wasm_rows_4);
             _dispatcher_1_row = convolve_horizontal_rgb_wasm_row_one;
         }
-        convolve_horizontal_dispatch_u8(
-            self,
-            filter_weights,
-            destination,
-            pool,
-            _dispatcher_4_rows,
-            _dispatcher_1_row,
-            DefaultWeightsConverter::default(),
-        );
+        use crate::support::PRECISION;
+        let i_weights = filter_weights.numerical_approximation::<i16, PRECISION>(0);
+        Arc::new(HorizontalFiltering {
+            filter_weights: i_weights,
+            filter_4_rows: _dispatcher_4_rows,
+            filter_row: _dispatcher_1_row,
+            threading_policy,
+        })
     }
 }
 
@@ -153,10 +161,24 @@ impl VerticalConvolutionPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
         pool: &novtb::ThreadPool,
         _options: ConvolutionOptions,
     ) {
-        let _scale_factor = self.height as f32 / destination.height as f32;
+    }
+
+    fn vertical_plan(
+        filter_weights: FilterWeights<f32>,
+        threading_policy: ThreadingPolicy,
+        _options: ConvolutionOptions,
+    ) -> Arc<dyn Filtering<u8, 3> + Send + Sync> {
+        let _scale_factor = _options.src_size.height as f32 / _options.dst_size.height as f32;
         #[allow(clippy::type_complexity)]
-        let mut _dispatcher: fn(usize, &FilterBounds, &[u8], &mut [u8], usize, &[i16]) =
-            handle_fixed_column_u8;
+        let mut _dispatcher: fn(
+            usize,
+            &FilterBounds,
+            &[u8],
+            &mut [u8],
+            usize,
+            &[i16],
+            u32,
+        ) = handle_fixed_column_u8;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             match _options.workload_strategy {
@@ -218,13 +240,12 @@ impl VerticalConvolutionPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
         {
             _dispatcher = wasm_vertical_neon_row;
         }
-        convolve_vertical_dispatch_u8(
-            self,
-            filter_weights,
-            destination,
-            pool,
-            _dispatcher,
-            DefaultWeightsConverter::default(),
-        );
+        use crate::support::PRECISION;
+        let i_weights = filter_weights.numerical_approximation::<i16, PRECISION>(0);
+        Arc::new(VerticalFiltering {
+            filter_weights: i_weights,
+            filter_row: _dispatcher,
+            threading_policy,
+        })
     }
 }

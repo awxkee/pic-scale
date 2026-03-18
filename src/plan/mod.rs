@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ * Copyright (c) Radzivon Bartoshyk 3/2026. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -26,15 +26,16 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#![forbid(unsafe_code)]
-pub(crate) const PRECISION: i32 = 15;
-pub(crate) const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
+mod alpha_plan;
+mod horizontal_filtering;
+mod nearest_plan;
+mod non_alpha_plan;
+mod planner;
+mod vertical_filtering;
 
-pub(crate) fn check_image_size_overflow(width: usize, height: usize, chan: usize) -> bool {
-    let (stride, is_overflowed) = (width as isize).overflowing_mul(chan as isize);
-    if is_overflowed {
-        return true;
-    }
-    let (_, is_overflowed) = (height as isize).overflowing_mul(stride);
-    is_overflowed
-}
+pub(crate) use alpha_plan::AlphaConvolvePlan;
+pub(crate) use horizontal_filtering::HorizontalFiltering;
+pub(crate) use nearest_plan::ResampleNearestPlan;
+pub(crate) use non_alpha_plan::NonAlphaConvolvePlan;
+pub use planner::ResamplingPlan;
+pub(crate) use vertical_filtering::VerticalFiltering;

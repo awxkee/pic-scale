@@ -32,16 +32,17 @@ use crate::neon::utils::{xvld1q_f32_x2, xvld1q_f32_x4};
 use std::arch::aarch64::*;
 
 pub(crate) fn convolve_horizontal_rgba_neon_row_one_f32_f64(
-    dst_width: usize,
-    _: usize,
-    filter_weights: &FilterWeights<f64>,
     src: &[f32],
     dst: &mut [f32],
+    filter_weights: &FilterWeights<f64>,
+    _: u32,
 ) {
     unsafe {
         const CN: usize = 4;
         let mut filter_offset = 0usize;
         let weights_ptr = filter_weights.weights.as_ptr();
+
+        let dst_width = filter_weights.bounds.len();
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);
@@ -110,19 +111,20 @@ pub(crate) fn convolve_horizontal_rgba_neon_row_one_f32_f64(
 }
 
 pub(crate) fn convolve_horizontal_rgba_neon_rows_4_f32_f64(
-    dst_width: usize,
-    _: usize,
-    filter_weights: &FilterWeights<f64>,
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
     dst_stride: usize,
+    filter_weights: &FilterWeights<f64>,
+    _: u32,
 ) {
     unsafe {
         const CN: usize = 4;
         let mut filter_offset = 0usize;
         let zeros = vdupq_n_f64(0.);
         let weights_ptr = filter_weights.weights.as_ptr();
+
+        let dst_width = filter_weights.bounds.len();
 
         let s_ptr_1 = src.get_unchecked(src_stride..);
         let s_ptr_2 = src.get_unchecked(src_stride * 2..);

@@ -52,7 +52,7 @@ fn resize_plane(
 fn main() {
     #[allow(overflowing_literals)]
     // test_fast_image();
-    let img = ImageReader::open("./assets/test_alpha.JPG")
+    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -63,15 +63,24 @@ fn main() {
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
 
-    let mut scaler = Scaler::new(ResamplingFunction::Nearest);
+    let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
     scaler.set_threading_policy(ThreadingPolicy::Adaptive);
     scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
+
+    let resizing_plan = scaler
+        .plan_rgba_resampling(
+            ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+            ImageSize::new(1920, 1080),
+            true,
+        )
+        .unwrap();
 
     let mut store =
         Rgba8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     store.bit_depth = 8;
-    let mut dst_store = Rgba8ImageStoreMut::alloc_with_depth(3240, 2160, 16);
-    scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
+    let mut dst_store = Rgba8ImageStoreMut::alloc_with_depth(1920, 1080, 8);
+    resizing_plan.resample(&store, &mut dst_store).unwrap();
+    // scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
     //
     // let elapsed_time = start_time.elapsed();
     // // Print the elapsed time in milliseconds

@@ -32,7 +32,8 @@ use crate::alpha_handle_f16::{premultiply_alpha_rgba_f16, unpremultiply_alpha_rg
 use crate::alpha_handle_f32::{premultiply_alpha_rgba_f32, unpremultiply_alpha_rgba_f32};
 use crate::alpha_handle_u8::{premultiply_alpha_rgba, unpremultiply_alpha_rgba};
 use crate::alpha_handle_u16::{premultiply_alpha_rgba_u16, unpremultiply_alpha_rgba_u16};
-use crate::pic_scale_error::{PicScaleBufferMismatch, PicScaleError, try_vec};
+use crate::support::check_image_size_overflow;
+use crate::validation::{PicScaleBufferMismatch, PicScaleError, try_vec};
 use crate::{ImageSize, WorkloadStrategy};
 #[cfg(feature = "nightly_f16")]
 use core::f16;
@@ -47,10 +48,10 @@ use std::fmt::Debug;
 /// ImageStore<u8, 4> - represents RGBA
 /// ImageStore<u8, 3> - represents RGB
 /// ImageStore<f32, 3> - represents RGB in f32 and etc
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ImageStore<'a, T, const N: usize>
 where
-    T: Clone + Copy + Debug,
+    [T]: ToOwned<Owned = Vec<T>>,
 {
     pub buffer: std::borrow::Cow<'a, [T]>,
     /// Channels in the image
@@ -74,11 +75,7 @@ where
 /// ImageStore<u8, 4> - represents RGBA
 /// ImageStore<u8, 3> - represents RGB
 /// ImageStore<f32, 3> - represents RGB in f32 and etc
-#[derive(Debug)]
-pub struct ImageStoreMut<'a, T, const N: usize>
-where
-    T: Clone + Copy + Debug,
-{
+pub struct ImageStoreMut<'a, T, const N: usize> {
     pub buffer: BufferStore<'a, T>,
     /// Channels in the image
     pub channels: usize,
@@ -97,13 +94,12 @@ pub(crate) trait CheckStoreDensity {
 }
 
 /// Structure for mutable target buffer
-#[derive(Debug)]
-pub enum BufferStore<'a, T: Copy + Debug> {
+pub enum BufferStore<'a, T> {
     Borrowed(&'a mut [T]),
     Owned(Vec<T>),
 }
 
-impl<T: Copy + Debug> BufferStore<'_, T> {
+impl<T> BufferStore<'_, T> {
     #[allow(clippy::should_implement_trait)]
     /// Borrowing immutable slice
     pub fn borrow(&self) -> &[T] {
@@ -218,12 +214,12 @@ impl<const N: usize> CheckStoreDensity for ImageStoreMut<'_, u16, N> {
     }
 }
 
-impl<T, const N: usize> ImageStoreMut<'_, T, N>
-where
-    T: Clone + Copy + Debug + Default,
-{
+impl<T, const N: usize> ImageStoreMut<'_, T, N> {
     pub(crate) fn validate(&self) -> Result<(), PicScaleError> {
         let expected_size = self.stride() * self.height;
+        if self.width == 0 || self.height == 0 {
+            return Err(PicScaleError::ZeroImageDimensions);
+        }
         if self.buffer.borrow().len() != self.stride() * self.height {
             return Err(PicScaleError::BufferMismatch(PicScaleBufferMismatch {
                 expected: expected_size,
@@ -236,16 +232,22 @@ where
         if self.stride < self.width * N {
             return Err(PicScaleError::InvalidStride(self.width * N, self.stride));
         }
+        if check_image_size_overflow(self.width, self.height, self.channels) {
+            return Err(PicScaleError::SourceImageIsTooLarge);
+        }
         Ok(())
     }
 }
 
 impl<T, const N: usize> ImageStore<'_, T, N>
 where
-    T: Clone + Copy + Debug + Default,
+    [T]: ToOwned<Owned = Vec<T>>,
 {
     pub(crate) fn validate(&self) -> Result<(), PicScaleError> {
         let expected_size = self.stride() * self.height;
+        if self.width == 0 || self.height == 0 {
+            return Err(PicScaleError::ZeroImageDimensions);
+        }
         if self.buffer.as_ref().len() != self.stride() * self.height {
             return Err(PicScaleError::BufferMismatch(PicScaleBufferMismatch {
                 expected: expected_size,
@@ -258,6 +260,10 @@ where
         if self.stride < self.width * N {
             return Err(PicScaleError::InvalidStride(self.width * N, self.stride));
         }
+        if check_image_size_overflow(self.width, self.height, self.channels) {
+            return Err(PicScaleError::DestinationImageIsTooLarge);
+        }
+
         Ok(())
     }
 }
@@ -390,10 +396,7 @@ where
     }
 }
 
-impl<T, const N: usize> ImageStoreMut<'_, T, N>
-where
-    T: Clone + Copy + Debug,
-{
+impl<T, const N: usize> ImageStoreMut<'_, T, N> {
     /// Returns safe stride
     ///
     /// If stride set to 0 then returns `width * N`
@@ -408,7 +411,7 @@ where
 
 impl<T, const N: usize> ImageStore<'_, T, N>
 where
-    T: Clone + Copy + Debug,
+    [T]: ToOwned<Owned = Vec<T>>,
 {
     /// Returns safe stride
     ///
@@ -551,7 +554,7 @@ where
     /// Performs deep copy into a new immutable image
     pub fn to_immutable(&self) -> ImageStore<'_, T, N> {
         ImageStore::<T, N> {
-            buffer: std::borrow::Cow::Owned(self.buffer.borrow().to_owned()),
+            buffer: std::borrow::Cow::Borrowed(self.buffer.borrow()),
             channels: N,
             width: self.width,
             height: self.height,

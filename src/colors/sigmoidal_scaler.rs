@@ -27,9 +27,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::pic_scale_error::{PicScaleError, try_vec};
 use crate::scaler::ScalingF32;
 use crate::support::check_image_size_overflow;
+use crate::validation::{PicScaleError, try_vec};
 use crate::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
 use colorutils_rs::{rgb_to_sigmoidal, rgba_to_sigmoidal, sigmoidal_to_rgb, sigmoidal_to_rgba};
 

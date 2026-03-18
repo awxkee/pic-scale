@@ -31,15 +31,16 @@ use crate::filter_weights::FilterWeights;
 use std::arch::aarch64::*;
 
 pub(crate) fn convolve_horizontal_plane_neon_row_one_f32_f64(
-    dst_width: usize,
-    _: usize,
-    filter_weights: &FilterWeights<f64>,
     src: &[f32],
     dst: &mut [f32],
+    filter_weights: &FilterWeights<f64>,
+    _: u32,
 ) {
     unsafe {
         let mut filter_offset = 0usize;
         let weights_ptr = filter_weights.weights.as_ptr();
+
+        let dst_width = filter_weights.bounds.len();
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);
@@ -86,18 +87,19 @@ pub(crate) fn convolve_horizontal_plane_neon_row_one_f32_f64(
 }
 
 pub(crate) fn convolve_horizontal_plane_neon_rows_4_f32_f64(
-    dst_width: usize,
-    _: usize,
-    filter_weights: &FilterWeights<f64>,
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
     dst_stride: usize,
+    filter_weights: &FilterWeights<f64>,
+    _: u32,
 ) {
     unsafe {
         let mut filter_offset = 0usize;
         let zeros = vdupq_n_f64(0.);
         let weights_ptr = filter_weights.weights.as_ptr();
+
+        let dst_width = filter_weights.bounds.len();
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);

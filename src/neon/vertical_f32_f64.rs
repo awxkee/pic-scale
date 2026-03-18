@@ -199,6 +199,7 @@ pub(crate) fn convolve_vertical_neon_row_f32_f64(
     dst: &mut [f32],
     src_stride: usize,
     weight_ptr: &[f64],
+    _: u32,
 ) {
     let mut cx = 0usize;
     let dst_width = dst.len();

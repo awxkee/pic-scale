@@ -32,9 +32,9 @@ use colorutils_rs::{
     rgb_to_lch, rgba_to_lch_with_alpha,
 };
 
-use crate::pic_scale_error::{PicScaleError, try_vec};
 use crate::scaler::ScalingF32;
 use crate::support::check_image_size_overflow;
+use crate::validation::{PicScaleError, try_vec};
 use crate::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
 
 #[derive(Debug, Copy, Clone)]

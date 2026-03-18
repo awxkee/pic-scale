@@ -196,6 +196,7 @@ pub(crate) fn xconvolve_vertical_rgb_neon_row_f16(
     dst: &mut [f16],
     src_stride: usize,
     weight_ptr: &[f32],
+    _: u32,
 ) {
     unsafe {
         xconvolve_vertical_rgb_neon_row_f16_impl(width, bounds, src, dst, src_stride, weight_ptr);

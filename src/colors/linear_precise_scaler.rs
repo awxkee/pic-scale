@@ -28,9 +28,9 @@
  */
 
 use crate::mixed_storage::CpuRound;
-use crate::pic_scale_error::{PicScaleError, try_vec};
 use crate::scaler::{Scaling, ScalingF32};
 use crate::support::check_image_size_overflow;
+use crate::validation::{PicScaleError, try_vec};
 use crate::{
     ImageStore, ImageStoreMut, ImageStoreScaling, ResamplingFunction, Scaler, ScalingOptions,
     ScalingU16, ThreadingPolicy,

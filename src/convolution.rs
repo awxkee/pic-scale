@@ -27,26 +27,33 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use std::fmt::Debug;
-
 use crate::filter_weights::FilterWeights;
 use crate::image_store::ImageStoreMut;
 use crate::scaler::WorkloadStrategy;
+use crate::{ImageSize, ImageStore, ThreadingPolicy};
+use std::fmt::Debug;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq)]
 pub(crate) struct ConvolutionOptions {
     pub(crate) workload_strategy: WorkloadStrategy,
+    pub(crate) bit_depth: usize,
+    pub(crate) src_size: ImageSize,
+    pub(crate) dst_size: ImageSize,
 }
 
 impl ConvolutionOptions {
     pub(crate) fn new(strategy: WorkloadStrategy) -> Self {
         Self {
             workload_strategy: strategy,
+            bit_depth: 0,
+            src_size: ImageSize::new(0, 0),
+            dst_size: ImageSize::new(0, 0),
         }
     }
 }
 
-pub(crate) trait HorizontalConvolutionPass<T, W, const N: usize>
+pub(crate) trait HorizontalFilterPass<T, W, const N: usize>
 where
     T: Clone + Copy + Debug,
 {
@@ -57,6 +64,11 @@ where
         pool: &novtb::ThreadPool,
         options: ConvolutionOptions,
     );
+    fn horizontal_plan(
+        filter_weights: FilterWeights<W>,
+        threading_policy: ThreadingPolicy,
+        options: ConvolutionOptions,
+    ) -> Arc<dyn Filtering<T, N> + Send + Sync>;
 }
 
 pub(crate) trait VerticalConvolutionPass<T, W, const N: usize>
@@ -70,4 +82,16 @@ where
         pool: &novtb::ThreadPool,
         options: ConvolutionOptions,
     );
+    fn vertical_plan(
+        filter_weights: FilterWeights<W>,
+        threading_policy: ThreadingPolicy,
+        options: ConvolutionOptions,
+    ) -> Arc<dyn Filtering<T, N> + Send + Sync>;
+}
+
+pub(crate) trait Filtering<T, const N: usize>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
+    fn filter(&self, source: &ImageStore<'_, T, N>, destination: &mut ImageStoreMut<T, N>);
 }

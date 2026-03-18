@@ -44,6 +44,7 @@ pub(crate) fn convolve_vertical_neon_i16_precision(
     dst: &mut [u8],
     src_stride: usize,
     weight: &[i16],
+    _: u32,
 ) {
     unsafe {
         convolve_vertical_neon_row_upper(width, bounds, src, dst, src_stride, weight);

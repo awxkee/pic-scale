@@ -97,6 +97,7 @@ pub(crate) fn convolve_horizontal_plane_neon_rows_rdm_4_u8(
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_plane_neon_rows_4_u8_impl(
@@ -286,6 +287,7 @@ pub fn convolve_horizontal_plane_neon_rdm_row(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_plane_neon_rdm_row_impl(src, dst, filter_weights);

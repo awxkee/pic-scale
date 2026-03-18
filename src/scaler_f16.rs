@@ -28,8 +28,8 @@
  */
 #![forbid(unsafe_code)]
 use crate::image_store::ImageStoreMut;
-use crate::pic_scale_error::PicScaleError;
 use crate::scaler::ScalingOptions;
+use crate::validation::PicScaleError;
 use crate::{
     CbCrF16ImageStore, ImageStore, ImageStoreScaling, PlanarF16ImageStore, RgbF16ImageStore,
     RgbaF16ImageStore, Scaler, Scaling,

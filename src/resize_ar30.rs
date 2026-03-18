@@ -33,8 +33,8 @@ use crate::dispatch_group_ar30::{
 };
 use crate::math::WeightsGenerator;
 use crate::nearest_sampler::resize_nearest;
-use crate::pic_scale_error::PicScaleError;
 use crate::support::check_image_size_overflow;
+use crate::validation::PicScaleError;
 use crate::{ImageSize, PicScaleBufferMismatch, ResamplingFunction, Scaler};
 
 pub(crate) fn resize_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(

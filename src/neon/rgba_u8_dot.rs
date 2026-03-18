@@ -46,6 +46,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_rows_4_u8_dot(
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i8>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_rgba_neon_rows_4_u8_impl_dot(
@@ -219,6 +220,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_row_dot(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i8>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_rgba_neon_row_impl(src, dst, filter_weights);
