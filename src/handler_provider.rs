@@ -737,7 +737,7 @@ impl ColumnHandlerFixedPoint<u16> for u16 {
         i32: AsPrimitive<J>,
         i16: AsPrimitive<J>,
     {
-        #[cfg(all(target_arch = "x86_64", feature = "nightly_avx512"))]
+        #[cfg(all(target_arch = "x86_64", feature = "avx512"))]
         if std::arch::is_x86_feature_detected!("avx512bw") {
             use crate::avx512::convolve_column_lb_avx512_u16;
             return convolve_column_lb_avx512_u16(

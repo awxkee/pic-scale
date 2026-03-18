@@ -1,7 +1,7 @@
 extern crate wee_alloc;
 use image::{DynamicImage, EncodableLayout, GenericImageView, ImageBuffer, ImageReader};
 use js_sys::Uint8Array;
-use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
+use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy};
 use std::io::Cursor;
 use std::panic;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -33,8 +33,8 @@ pub fn process(image: Uint8Array) -> Uint8Array {
     let transient = img.to_rgb8();
     let mut bytes = Vec::from(transient.as_bytes());
 
-    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-    scaler.set_threading_policy(ThreadingPolicy::Single);
+    let mut scaler =
+        Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
 
     let store =
         ImageStore::<u8, 3>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize)
@@ -43,7 +43,10 @@ pub fn process(image: Uint8Array) -> Uint8Array {
     let mut target_store =
         ImageStoreMut::<u8, 3>::alloc(dimensions.0 as usize / 3, dimensions.1 as usize / 3);
 
-    scaler.resize_rgb(&store, &mut target_store).unwrap();
+    let planned = scaler
+        .plan_rgb_resampling(store.get_size(), target_store.get_size())
+        .unwrap();
+    planned.resample(&store, &mut target_store).unwrap();
 
     let dst: Vec<u8> = target_store.buffer.borrow().to_vec();
 

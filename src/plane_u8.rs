@@ -183,7 +183,7 @@ impl VerticalConvolutionPass<u8, f32, 1> for ImageStore<'_, u8, 1> {
                 }
             }
         }
-        #[cfg(all(feature = "nightly_avx512", target_arch = "x86_64"))]
+        #[cfg(all(feature = "avx512", target_arch = "x86_64"))]
         if std::arch::is_x86_feature_detected!("avx512bw")
             && _scale_factor < 8.
             && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed

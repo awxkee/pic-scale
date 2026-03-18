@@ -701,13 +701,14 @@ mod tests {
             dst[2] = 99;
             dst[3] = 77;
         }
-        let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let scaler =
+            Scaler::new(ResamplingFunction::Bilinear).set_threading_policy(ThreadingPolicy::Single);
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
-        scaler
-            .resize_rgba(&src_store, &mut target_store, false)
+        let planned = scaler
+            .plan_rgba_resampling(src_store.get_size(), target_store.get_size(), false)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
         check_rgba8!(target_data, image_width, 34);
     }
@@ -729,9 +730,10 @@ mod tests {
         scaler.set_threading_policy(ThreadingPolicy::Single);
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width / 2, image_height / 2);
-        scaler
-            .resize_rgba(&src_store, &mut target_store, false)
+        let planned = scaler
+            .plan_rgba_resampling(src_store.get_size(), target_store.get_size(), false)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
         check_rgba8!(target_data, image_width, 34);
     }
@@ -749,13 +751,14 @@ mod tests {
             dst[3] = 77;
         }
         image[3] = 78;
-        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let scaler =
+            Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width / 2, image_height / 2);
-        scaler
-            .resize_rgba(&src_store, &mut target_store, true)
+        let planned = scaler
+            .plan_rgba_resampling(src_store.get_size(), target_store.get_size(), true)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
         check_rgba8!(target_data, image_width, 160);
     }
@@ -775,7 +778,10 @@ mod tests {
         scaler.set_threading_policy(ThreadingPolicy::Single);
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
-        scaler.resize_rgb(&src_store, &mut target_store).unwrap();
+        let planned = scaler
+            .plan_rgb_resampling(src_store.get_size(), target_store.get_size())
+            .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
 
         check_rgb16!(target_data, image_width, 85);
@@ -796,7 +802,10 @@ mod tests {
         scaler.set_threading_policy(ThreadingPolicy::Adaptive);
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
-        scaler.resize_rgb(&src_store, &mut target_store).unwrap();
+        let planned = scaler
+            .plan_rgb_resampling(src_store.get_size(), target_store.get_size())
+            .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
 
         check_rgb16!(target_data, image_width, 85);
@@ -820,9 +829,10 @@ mod tests {
         let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 10);
-        scaler
-            .resize_rgba_u16(&src_store, &mut target_store, false)
+        let planned = scaler
+            .plan_rgba_resampling16(src_store.get_size(), target_store.get_size(), true, 10)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
 
         check_rgba8!(target_data, image_width, 60);
@@ -844,9 +854,10 @@ mod tests {
         let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 10);
-        scaler
-            .resize_rgb_u16(&src_store, &mut target_store)
+        let planned = scaler
+            .plan_rgb_resampling16(src_store.get_size(), target_store.get_size(), 10)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
 
         check_rgb16!(target_data, image_width, 85);
@@ -868,9 +879,10 @@ mod tests {
         let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 10);
-        scaler
-            .resize_rgb_u16(&src_store, &mut target_store)
+        let planned = scaler
+            .plan_rgb_resampling16(src_store.get_size(), target_store.get_size(), 10)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
 
         check_rgb16!(target_data, image_width, 85);
@@ -892,9 +904,10 @@ mod tests {
         let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 16);
-        scaler
-            .resize_rgb_u16(&src_store, &mut target_store)
+        let planned = scaler
+            .plan_rgb_resampling16(src_store.get_size(), target_store.get_size(), 16)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
 
         check_rgb16!(target_data, image_width, 100);
@@ -917,9 +930,10 @@ mod tests {
         let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 16);
-        scaler
-            .resize_rgba_u16(&src_store, &mut target_store, false)
+        let planned = scaler
+            .plan_rgb_resampling16(src_store.get_size(), target_store.get_size(), 16)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
 
         check_rgba8!(target_data, image_width, 180);
@@ -942,9 +956,10 @@ mod tests {
         let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 16);
-        scaler
-            .resize_rgba_u16(&src_store, &mut target_store, false)
+        let planned = scaler
+            .plan_rgba_resampling16(src_store.get_size(), target_store.get_size(), false, 16)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
 
         check_rgba8!(target_data, image_width, 180);
@@ -966,9 +981,10 @@ mod tests {
         scaler.set_threading_policy(ThreadingPolicy::Single);
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
-        scaler
-            .resize_rgba(&src_store, &mut target_store, false)
+        let planned = scaler
+            .plan_rgba_resampling(src_store.get_size(), target_store.get_size(), false)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
 
         check_rgba8!(target_data, image_width, 80);
@@ -990,9 +1006,10 @@ mod tests {
         scaler.set_threading_policy(ThreadingPolicy::Adaptive);
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
-        scaler
-            .resize_rgba(&src_store, &mut target_store, false)
+        let planned = scaler
+            .plan_rgba_resampling(src_store.get_size(), target_store.get_size(), false)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
 
         check_rgba8!(target_data, image_width, 80);

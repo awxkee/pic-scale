@@ -28,17 +28,15 @@
  */
 #![allow(clippy::type_complexity)]
 
+use crate::ThreadingPolicy;
 use crate::convolution::{ConvolutionOptions, Filtering};
-use crate::filter_weights::{
-    DefaultWeightsConverter, FilterWeights, WeightsConverter,
-};
+use crate::filter_weights::{DefaultWeightsConverter, FilterWeights, WeightsConverter};
 use crate::handler_provider::{
     ColumnHandlerFixedPoint, ColumnHandlerFloatingPoint, RowHandlerFixedPoint,
     RowHandlerFloatingPoint,
 };
 use crate::plan::{HorizontalFiltering, VerticalFiltering};
 use crate::support::PRECISION;
-use crate::ThreadingPolicy;
 use std::sync::Arc;
 
 pub(crate) trait RowFactoryProducer {
@@ -150,7 +148,6 @@ pub(crate) fn vertical_plan_u16<const CN: usize>(
         })
     }
 }
-
 
 #[cfg(all(target_arch = "aarch64", feature = "neon", feature = "rdm"))]
 #[derive(Default)]

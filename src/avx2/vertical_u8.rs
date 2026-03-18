@@ -38,10 +38,10 @@ pub(crate) fn convolve_vertical_avx_row(
     dst: &mut [u8],
     src_stride: usize,
     weights: &[i16],
+    _: u32,
 ) {
     unsafe {
-        #[cfg(feature = "nightly_avx512")]
-        #[allow(clippy::incompatible_msrv)]
+        #[cfg(feature = "avx512")]
         if std::arch::is_x86_feature_detected!("avxvnni") {
             return convolve_vertical_avx_row_dot(dst_width, bounds, src, dst, src_stride, weights);
         }
@@ -65,7 +65,7 @@ unsafe fn convolve_vertical_avx_row_reg(
     }
 }
 
-#[cfg(feature = "nightly_avx512")]
+#[cfg(feature = "avx512")]
 #[target_feature(enable = "avx2", enable = "avxvnni")]
 /// This inlining is required to activate all features for runtime dispatch
 unsafe fn convolve_vertical_avx_row_dot(

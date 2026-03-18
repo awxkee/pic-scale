@@ -32,29 +32,16 @@ use crate::filter_weights::FilterWeights;
 use std::arch::x86_64::*;
 
 pub(crate) fn convolve_hor_plane_avx_row_one_f32_f64<const FMA: bool>(
-    dst_width: usize,
-    src_width: usize,
-    filter_weights: &FilterWeights<f64>,
     src: &[f32],
     dst: &mut [f32],
+    filter_weights: &FilterWeights<f64>,
+    _: u32,
 ) {
     unsafe {
         if FMA {
-            convolve_hor_plane_avx_row_one_fma_f32_f64(
-                dst_width,
-                src_width,
-                filter_weights,
-                src,
-                dst,
-            );
+            convolve_hor_plane_avx_row_one_fma_f32_f64(filter_weights, src, dst);
         } else {
-            convolve_hor_plane_avx_row_one_regular_f32_f64(
-                dst_width,
-                src_width,
-                filter_weights,
-                src,
-                dst,
-            );
+            convolve_hor_plane_avx_row_one_regular_f32_f64(filter_weights, src, dst);
         }
     }
 }
@@ -62,30 +49,26 @@ pub(crate) fn convolve_hor_plane_avx_row_one_f32_f64<const FMA: bool>(
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch.
 unsafe fn convolve_hor_plane_avx_row_one_regular_f32_f64(
-    dst_width: usize,
-    src_width: usize,
     filter_weights: &FilterWeights<f64>,
     src: &[f32],
     dst: &mut [f32],
 ) {
     unsafe {
         let unit = Row1ExecutorUnit::<false>::default();
-        unit.pass(dst_width, src_width, filter_weights, src, dst);
+        unit.pass(filter_weights, src, dst);
     }
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
 unsafe fn convolve_hor_plane_avx_row_one_fma_f32_f64(
-    dst_width: usize,
-    src_width: usize,
     filter_weights: &FilterWeights<f64>,
     src: &[f32],
     dst: &mut [f32],
 ) {
     unsafe {
         let unit = Row1ExecutorUnit::<true>::default();
-        unit.pass(dst_width, src_width, filter_weights, src, dst);
+        unit.pass(filter_weights, src, dst);
     }
 }
 
@@ -94,17 +77,12 @@ struct Row1ExecutorUnit<const FMA: bool> {}
 
 impl<const FMA: bool> Row1ExecutorUnit<FMA> {
     #[inline(always)]
-    unsafe fn pass(
-        &self,
-        dst_width: usize,
-        _: usize,
-        filter_weights: &FilterWeights<f64>,
-        src: &[f32],
-        dst: &mut [f32],
-    ) {
+    unsafe fn pass(&self, filter_weights: &FilterWeights<f64>, src: &[f32], dst: &mut [f32]) {
         unsafe {
             let mut filter_offset = 0usize;
             let weights_ptr = &filter_weights.weights;
+
+            let dst_width = filter_weights.bounds.len();
 
             for x in 0..dst_width {
                 let bounds = filter_weights.bounds.get_unchecked(x);
@@ -155,19 +133,16 @@ impl<const FMA: bool> Row1ExecutorUnit<FMA> {
     }
 }
 pub(crate) fn convolve_hor_plane_avx_rows_4_f32_f64<const FMA: bool>(
-    dst_width: usize,
-    src_width: usize,
-    filter_weights: &FilterWeights<f64>,
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
     dst_stride: usize,
+    filter_weights: &FilterWeights<f64>,
+    _: u32,
 ) {
     unsafe {
         if FMA {
             convolve_horizontal_plane_avx_rows_4_fma_f32_f64(
-                dst_width,
-                src_width,
                 filter_weights,
                 src,
                 src_stride,
@@ -176,8 +151,6 @@ pub(crate) fn convolve_hor_plane_avx_rows_4_f32_f64<const FMA: bool>(
             );
         } else {
             convolve_horizontal_plane_avx_rows_4_regular_f32_f64(
-                dst_width,
-                src_width,
                 filter_weights,
                 src,
                 src_stride,
@@ -191,8 +164,6 @@ pub(crate) fn convolve_hor_plane_avx_rows_4_f32_f64<const FMA: bool>(
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch.
 unsafe fn convolve_horizontal_plane_avx_rows_4_regular_f32_f64(
-    dst_width: usize,
-    src_width: usize,
     filter_weights: &FilterWeights<f64>,
     src: &[f32],
     src_stride: usize,
@@ -201,23 +172,13 @@ unsafe fn convolve_horizontal_plane_avx_rows_4_regular_f32_f64(
 ) {
     unsafe {
         let unit = Row4ExecutionUnit::<false>::default();
-        unit.pass(
-            dst_width,
-            src_width,
-            filter_weights,
-            src,
-            src_stride,
-            dst,
-            dst_stride,
-        );
+        unit.pass(filter_weights, src, src_stride, dst, dst_stride);
     }
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
 unsafe fn convolve_horizontal_plane_avx_rows_4_fma_f32_f64(
-    dst_width: usize,
-    src_width: usize,
     filter_weights: &FilterWeights<f64>,
     src: &[f32],
     src_stride: usize,
@@ -226,15 +187,7 @@ unsafe fn convolve_horizontal_plane_avx_rows_4_fma_f32_f64(
 ) {
     unsafe {
         let unit = Row4ExecutionUnit::<true>::default();
-        unit.pass(
-            dst_width,
-            src_width,
-            filter_weights,
-            src,
-            src_stride,
-            dst,
-            dst_stride,
-        );
+        unit.pass(filter_weights, src, src_stride, dst, dst_stride);
     }
 }
 
@@ -245,8 +198,6 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
     #[inline(always)]
     unsafe fn pass(
         &self,
-        dst_width: usize,
-        _: usize,
         filter_weights: &FilterWeights<f64>,
         src: &[f32],
         src_stride: usize,
@@ -256,6 +207,8 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
         unsafe {
             let mut filter_offset = 0usize;
             let weights_ptr = &filter_weights.weights;
+
+            let dst_width = filter_weights.bounds.len();
 
             for x in 0..dst_width {
                 let bounds = filter_weights.bounds.get_unchecked(x);

@@ -180,7 +180,7 @@ pub(crate) fn premultiply_alpha_rgba(
             _dispatcher = avx_premultiply_alpha_rgba;
         }
     }
-    #[cfg(all(feature = "nightly_avx512", target_arch = "x86_64"))]
+    #[cfg(all(feature = "avx512", target_arch = "x86_64"))]
     if std::arch::is_x86_feature_detected!("avx512f")
         && std::arch::is_x86_feature_detected!("avx512bw")
     {
@@ -235,7 +235,7 @@ pub(crate) fn unpremultiply_alpha_rgba(
             _dispatcher = avx_unpremultiply_alpha_rgba;
         }
     }
-    #[cfg(all(feature = "nightly_avx512", target_arch = "x86_64"))]
+    #[cfg(all(feature = "avx512", target_arch = "x86_64"))]
     if std::arch::is_x86_feature_detected!("avx512f")
         && std::arch::is_x86_feature_detected!("avx512bw")
     {

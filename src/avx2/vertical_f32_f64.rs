@@ -38,6 +38,7 @@ pub(crate) fn convolve_vertical_avx_row_f32_f64<const FMA: bool>(
     dst: &mut [f32],
     src_stride: usize,
     weights: &[f64],
+    _: u32,
 ) {
     unsafe {
         if FMA {

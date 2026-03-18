@@ -13,12 +13,11 @@ use fast_image_resize::{
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
     Ar30ByteOrder, CbCr8ImageStore, CbCr8ImageStoreMut, ImageSize, ImageStore, ImageStoreMut,
-    ImageStoreScaling, Planar16ImageStore, Planar16ImageStoreMut,
-    Planar8ImageStore, Planar8ImageStoreMut, PlanarF32ImageStore, PlanarF32ImageStoreMut,
-    ResamplingFunction, Rgb8ImageStore, Rgb8ImageStoreMut, RgbF32ImageStore, RgbF32ImageStoreMut,
-    Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore, Rgba8ImageStoreMut, RgbaF32ImageStore,
-    RgbaF32ImageStoreMut, Scaler, ThreadingPolicy,
-    WorkloadStrategy,
+    ImageStoreScaling, Planar16ImageStore, Planar16ImageStoreMut, Planar8ImageStore,
+    Planar8ImageStoreMut, PlanarF32ImageStore, PlanarF32ImageStoreMut, ResamplingFunction,
+    Rgb8ImageStore, Rgb8ImageStoreMut, RgbF32ImageStore, RgbF32ImageStoreMut, Rgba16ImageStore,
+    Rgba16ImageStoreMut, Rgba8ImageStore, Rgba8ImageStoreMut, RgbaF32ImageStore,
+    RgbaF32ImageStoreMut, Scaler, ThreadingPolicy, WorkloadStrategy,
 };
 use yuv::{ar30_to_rgb8, rgba8_to_ar30, Rgb30ByteOrder};
 

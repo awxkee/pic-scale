@@ -207,6 +207,7 @@ pub(crate) fn convolve_vertical_sse_row_f16<const F16C: bool, const FMA: bool>(
     dst: &mut [f16],
     src_stride: usize,
     weight_ptr: &[f32],
+    _: u32,
 ) {
     unsafe {
         if F16C {
@@ -225,7 +226,7 @@ pub(crate) fn convolve_vertical_sse_row_f16<const F16C: bool, const FMA: bool>(
 /// This inlining is required to activate all features for runtime dispatch.
 ///
 /// Crate has a safe fallback for f16c conversion even it is not supported.
-unsafe fn convolve_vertical_sse_row_f16_regular(
+fn convolve_vertical_sse_row_f16_regular(
     width: usize,
     bounds: &FilterBounds,
     src: &[f16],
@@ -233,18 +234,16 @@ unsafe fn convolve_vertical_sse_row_f16_regular(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    unsafe {
-        convolve_vertical_sse_row_f16_impl::<false, false>(
-            width, bounds, src, dst, src_stride, weight_ptr,
-        );
-    }
+    convolve_vertical_sse_row_f16_impl::<false, false>(
+        width, bounds, src, dst, src_stride, weight_ptr,
+    );
 }
 
 #[target_feature(enable = "sse4.1", enable = "f16c", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
 ///
 /// Crate has a safe fallback for f16c conversion even it is not supported.
-unsafe fn convolve_vertical_sse_row_f16c_fma(
+fn convolve_vertical_sse_row_f16c_fma(
     width: usize,
     bounds: &FilterBounds,
     src: &[f16],
@@ -252,18 +251,16 @@ unsafe fn convolve_vertical_sse_row_f16c_fma(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    unsafe {
-        convolve_vertical_sse_row_f16_impl::<true, true>(
-            width, bounds, src, dst, src_stride, weight_ptr,
-        );
-    }
+    convolve_vertical_sse_row_f16_impl::<true, true>(
+        width, bounds, src, dst, src_stride, weight_ptr,
+    );
 }
 
 #[target_feature(enable = "sse4.1", enable = "f16c")]
 /// This inlining is required to activate all features for runtime dispatch.
 ///
 /// Crate has a safe fallback for f16c conversion even it is not supported.
-unsafe fn convolve_vertical_sse_row_f16c(
+fn convolve_vertical_sse_row_f16c(
     width: usize,
     bounds: &FilterBounds,
     src: &[f16],
@@ -271,15 +268,13 @@ unsafe fn convolve_vertical_sse_row_f16c(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    unsafe {
-        convolve_vertical_sse_row_f16_impl::<false, true>(
-            width, bounds, src, dst, src_stride, weight_ptr,
-        );
-    }
+    convolve_vertical_sse_row_f16_impl::<false, true>(
+        width, bounds, src, dst, src_stride, weight_ptr,
+    );
 }
 
 #[inline(always)]
-unsafe fn convolve_vertical_sse_row_f16_impl<const FMA: bool, const F16C: bool>(
+fn convolve_vertical_sse_row_f16_impl<const FMA: bool, const F16C: bool>(
     _: usize,
     bounds: &FilterBounds,
     src: &[f16],

@@ -683,7 +683,7 @@ impl AssociateAlpha<u8, 4> for ImageStore<'_, u8, 4> {
         use crate::alpha_check::has_non_constant_cap_alpha_rgba8;
         #[cfg(feature = "sse")]
         use crate::sse::sse_has_non_constant_cap_alpha_rgba8;
-        #[cfg(all(target_arch = "x86_64", feature = "nightly_avx512"))]
+        #[cfg(all(target_arch = "x86_64", feature = "avx512"))]
         if std::arch::is_x86_feature_detected!("avx512bw") {
             use crate::avx512::avx512_has_non_constant_cap_alpha_rgba8;
             return avx512_has_non_constant_cap_alpha_rgba8(

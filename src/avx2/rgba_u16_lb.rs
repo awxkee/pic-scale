@@ -109,7 +109,7 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_4_u16(
     bit_depth: u32,
 ) {
     unsafe {
-        #[cfg(feature = "nightly_avx512")]
+        #[cfg(feature = "avx512")]
         #[allow(clippy::incompatible_msrv)]
         if std::arch::is_x86_feature_detected!("avxvnni") {
             return convolve_horizontal_rgba_avx_rows_4_lb_vn(
@@ -132,7 +132,7 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_4_u16(
     }
 }
 
-#[cfg(feature = "nightly_avx512")]
+#[cfg(feature = "avx512")]
 #[target_feature(enable = "avxvnni", enable = "avx2")]
 unsafe fn convolve_horizontal_rgba_avx_rows_4_lb_vn(
     src: &[u16],
@@ -442,7 +442,7 @@ pub(crate) fn convolve_horizontal_rgba_avx_u16lp_row(
     bit_depth: u32,
 ) {
     unsafe {
-        #[cfg(feature = "nightly_avx512")]
+        #[cfg(feature = "avx512")]
         #[allow(clippy::incompatible_msrv)]
         if std::arch::is_x86_feature_detected!("avxvnni") {
             return convolve_horizontal_rgba_avx_u16_row_vn(src, dst, filter_weights, bit_depth);
@@ -451,7 +451,7 @@ pub(crate) fn convolve_horizontal_rgba_avx_u16lp_row(
     }
 }
 
-#[cfg(feature = "nightly_avx512")]
+#[cfg(feature = "avx512")]
 #[target_feature(enable = "avxvnni", enable = "avx2")]
 unsafe fn convolve_horizontal_rgba_avx_u16_row_vn(
     src: &[u16],

@@ -102,77 +102,42 @@ macro_rules! conv_horiz_plane_1_f32_avx {
 }
 
 pub(crate) fn convolve_horizontal_plane_avx_row_one_f32<const FMA: bool>(
-    dst_width: usize,
-    src_width: usize,
-    filter_weights: &FilterWeights<f32>,
     src: &[f32],
     dst: &mut [f32],
+    filter_weights: &FilterWeights<f32>,
+    _: u32,
 ) {
     unsafe {
         if FMA {
-            convolve_horizontal_plane_avx_row_one_fma(
-                dst_width,
-                src_width,
-                filter_weights,
-                src,
-                dst,
-            );
+            convolve_horizontal_plane_avx_row_one_fma(filter_weights, src, dst);
         } else {
-            convolve_horizontal_plane_avx_row_one_regular(
-                dst_width,
-                src_width,
-                filter_weights,
-                src,
-                dst,
-            );
+            convolve_horizontal_plane_avx_row_one_regular(filter_weights, src, dst);
         }
     }
 }
 
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_plane_avx_row_one_regular(
-    dst_width: usize,
-    src_width: usize,
+fn convolve_horizontal_plane_avx_row_one_regular(
     filter_weights: &FilterWeights<f32>,
     src: &[f32],
     dst: &mut [f32],
 ) {
-    unsafe {
-        convolve_horizontal_plane_avx_row_one_impl::<false>(
-            dst_width,
-            src_width,
-            filter_weights,
-            src,
-            dst,
-        );
-    }
+    convolve_horizontal_plane_avx_row_one_impl::<false>(filter_weights, src, dst);
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_plane_avx_row_one_fma(
-    dst_width: usize,
-    src_width: usize,
+fn convolve_horizontal_plane_avx_row_one_fma(
     filter_weights: &FilterWeights<f32>,
     src: &[f32],
     dst: &mut [f32],
 ) {
-    unsafe {
-        convolve_horizontal_plane_avx_row_one_impl::<true>(
-            dst_width,
-            src_width,
-            filter_weights,
-            src,
-            dst,
-        );
-    }
+    convolve_horizontal_plane_avx_row_one_impl::<true>(filter_weights, src, dst);
 }
 
 #[inline(always)]
-unsafe fn convolve_horizontal_plane_avx_row_one_impl<const FMA: bool>(
-    dst_width: usize,
-    _: usize,
+fn convolve_horizontal_plane_avx_row_one_impl<const FMA: bool>(
     filter_weights: &FilterWeights<f32>,
     src: &[f32],
     dst: &mut [f32],
@@ -180,6 +145,8 @@ unsafe fn convolve_horizontal_plane_avx_row_one_impl<const FMA: bool>(
     unsafe {
         let mut filter_offset = 0usize;
         let weights_ptr = &filter_weights.weights;
+
+        let dst_width = filter_weights.bounds.len();
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);
@@ -222,19 +189,16 @@ unsafe fn convolve_horizontal_plane_avx_row_one_impl<const FMA: bool>(
 }
 
 pub(crate) fn convolve_horizontal_plane_avx_rows_4_f32<const FMA: bool>(
-    dst_width: usize,
-    src_width: usize,
-    filter_weights: &FilterWeights<f32>,
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
     dst_stride: usize,
+    filter_weights: &FilterWeights<f32>,
+    _: u32,
 ) {
     unsafe {
         if FMA {
             convolve_horizontal_plane_avx_rows_4_fma(
-                dst_width,
-                src_width,
                 filter_weights,
                 src,
                 src_stride,
@@ -243,8 +207,6 @@ pub(crate) fn convolve_horizontal_plane_avx_rows_4_f32<const FMA: bool>(
             );
         } else {
             convolve_horizontal_plane_avx_rows_4_regular(
-                dst_width,
-                src_width,
                 filter_weights,
                 src,
                 src_stride,
@@ -257,56 +219,42 @@ pub(crate) fn convolve_horizontal_plane_avx_rows_4_f32<const FMA: bool>(
 
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_plane_avx_rows_4_regular(
-    dst_width: usize,
-    src_width: usize,
+fn convolve_horizontal_plane_avx_rows_4_regular(
     filter_weights: &FilterWeights<f32>,
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
     dst_stride: usize,
 ) {
-    unsafe {
-        convolve_horizontal_plane_avx_rows_4_impl::<false>(
-            dst_width,
-            src_width,
-            filter_weights,
-            src,
-            src_stride,
-            dst,
-            dst_stride,
-        );
-    }
+    convolve_horizontal_plane_avx_rows_4_impl::<false>(
+        filter_weights,
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+    );
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_plane_avx_rows_4_fma(
-    dst_width: usize,
-    src_width: usize,
+fn convolve_horizontal_plane_avx_rows_4_fma(
     filter_weights: &FilterWeights<f32>,
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
     dst_stride: usize,
 ) {
-    unsafe {
-        convolve_horizontal_plane_avx_rows_4_impl::<true>(
-            dst_width,
-            src_width,
-            filter_weights,
-            src,
-            src_stride,
-            dst,
-            dst_stride,
-        );
-    }
+    convolve_horizontal_plane_avx_rows_4_impl::<true>(
+        filter_weights,
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+    );
 }
 
 #[inline(always)]
-unsafe fn convolve_horizontal_plane_avx_rows_4_impl<const FMA: bool>(
-    dst_width: usize,
-    _: usize,
+fn convolve_horizontal_plane_avx_rows_4_impl<const FMA: bool>(
     filter_weights: &FilterWeights<f32>,
     src: &[f32],
     src_stride: usize,
@@ -318,6 +266,8 @@ unsafe fn convolve_horizontal_plane_avx_rows_4_impl<const FMA: bool>(
         let weights_ptr = &filter_weights.weights;
 
         use crate::avx2::utils::_mm256_prefer_fma_ps;
+
+        let dst_width = filter_weights.bounds.len();
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);

@@ -37,6 +37,7 @@ pub(crate) fn convolve_vertical_avx_row_lp(
     dst: &mut [u8],
     src_stride: usize,
     weights: &[i16],
+    _: u32,
 ) {
     unsafe {
         convolve_vertical_avx2_row_impl(dst_width, bounds, src, dst, src_stride, weights);

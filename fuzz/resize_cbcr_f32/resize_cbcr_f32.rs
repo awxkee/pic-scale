@@ -95,13 +95,11 @@ fn resize_cbcr_f32(
     let store = ImageStore::<f32, 2>::from_slice(&mut src_data, src_width, src_height).unwrap();
     let mut target = ImageStoreMut::alloc(dst_width, dst_height);
 
-    let scaler = Scaler::new(sampler);
-    scaler.set_workload_strategy(if use_quality {
+    let scaler = Scaler::new(sampler).set_workload_strategy(if use_quality {
         WorkloadStrategy::PreferQuality
     } else {
         WorkloadStrategy::PreferSpeed
-    });
-    scaler.set_threading_policy(threading_policy);
+    }).set_threading_policy(threading_policy);
     let planner = if mul_alpha {
         scaler
             .plan_gray_alpha_resampling_f32(store.get_size(), target.get_size(), true)

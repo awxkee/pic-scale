@@ -35,24 +35,8 @@
     feature(stdarch_neon_i8mm)
 )]
 #![cfg_attr(
-    all(feature = "nightly_avx512", target_arch = "x86_64"),
-    feature(cfg_version)
-)]
-#![cfg_attr(
-    all(feature = "nightly_avx512", target_arch = "x86_64"),
-    feature(avx512_target_feature)
-)]
-#![cfg_attr(
-    all(feature = "nightly_avx512", target_arch = "x86_64"),
-    feature(stdarch_x86_avx512)
-)]
-#![cfg_attr(
     all(feature = "nightly_avx512fp16", target_arch = "x86_64"),
     feature(stdarch_x86_avx512_f16)
-)]
-#![cfg_attr(
-    all(feature = "nightly_avx512", target_arch = "x86_64"),
-    feature(x86_amx_intrinsics)
 )]
 #![cfg_attr(feature = "nightly_f16", feature(f16))]
 #![cfg_attr(
@@ -70,7 +54,7 @@ mod alpha_handle_u8;
 mod ar30;
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 mod avx2;
-#[cfg(all(target_arch = "x86_64", feature = "nightly_avx512"))]
+#[cfg(all(target_arch = "x86_64", feature = "avx512"))]
 mod avx512;
 mod cbcr16;
 mod cbcr8;

@@ -349,13 +349,13 @@ pub(crate) unsafe fn avx2_pack_u32(s_1: __m256i, s_2: __m256i) -> __m256i {
 
 #[inline(always)]
 #[allow(dead_code)]
-pub(crate) unsafe fn avx_combine_ps(lo: __m128, hi: __m128) -> __m256 {
+pub(crate) fn avx_combine_ps(lo: __m128, hi: __m128) -> __m256 {
     unsafe { _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(lo), hi) }
 }
 
 #[inline(always)]
 #[allow(dead_code)]
-pub(crate) unsafe fn avx_combine_epi(lo: __m128i, hi: __m128i) -> __m256i {
+pub(crate) fn avx_combine_epi(lo: __m128i, hi: __m128i) -> __m256i {
     unsafe {
         _mm256_castps_si256(_mm256_insertf128_ps::<1>(
             _mm256_castps128_ps256(_mm_castsi128_ps(lo)),
@@ -409,7 +409,7 @@ pub(crate) unsafe fn _mm256_dot16_avx_epi32<const HAS_DOT: bool>(
     c: __m256i,
 ) -> __m256i {
     unsafe {
-        #[cfg(feature = "nightly_avx512")]
+        #[cfg(feature = "avx512")]
         {
             if HAS_DOT {
                 _mm256_dpwssd_avx_epi32(a, b, c)
@@ -417,7 +417,7 @@ pub(crate) unsafe fn _mm256_dot16_avx_epi32<const HAS_DOT: bool>(
                 _mm256_add_epi32(a, _mm256_madd_epi16(b, c))
             }
         }
-        #[cfg(not(feature = "nightly_avx512"))]
+        #[cfg(not(feature = "avx512"))]
         {
             _mm256_add_epi32(a, _mm256_madd_epi16(b, c))
         }
@@ -432,7 +432,7 @@ pub(crate) unsafe fn _mm_dot16_avx_epi32<const HAS_DOT: bool>(
     c: __m128i,
 ) -> __m128i {
     unsafe {
-        #[cfg(feature = "nightly_avx512")]
+        #[cfg(feature = "avx512")]
         {
             if HAS_DOT {
                 _mm_dpwssd_avx_epi32(a, b, c)
@@ -440,7 +440,7 @@ pub(crate) unsafe fn _mm_dot16_avx_epi32<const HAS_DOT: bool>(
                 _mm_add_epi32(a, _mm_madd_epi16(b, c))
             }
         }
-        #[cfg(not(feature = "nightly_avx512"))]
+        #[cfg(not(feature = "avx512"))]
         {
             _mm_add_epi32(a, _mm_madd_epi16(b, c))
         }
@@ -455,13 +455,13 @@ pub(crate) unsafe fn _mm_udot8_epi16<const DOT: bool>(
     c: __m128i,
 ) -> __m128i {
     unsafe {
-        #[cfg(feature = "nightly_avx512")]
+        #[cfg(feature = "avx512")]
         if DOT {
             _mm_dpbusd_avx_epi32(a, b, c)
         } else {
             _mm_adds_epi16(a, _mm_maddubs_epi16(b, c))
         }
-        #[cfg(not(feature = "nightly_avx512"))]
+        #[cfg(not(feature = "avx512"))]
         {
             _mm_adds_epi16(a, _mm_maddubs_epi16(b, c))
         }

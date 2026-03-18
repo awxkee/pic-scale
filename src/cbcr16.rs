@@ -29,10 +29,7 @@
 use crate::convolution::{
     ConvolutionOptions, Filtering, HorizontalFilterPass, VerticalConvolutionPass,
 };
-use crate::dispatch_group_u16::{
-    vertical_plan_u16,
-    RowFactoryProducer,
-};
+use crate::dispatch_group_u16::{RowFactoryProducer, vertical_plan_u16};
 use crate::filter_weights::FilterWeights;
 use crate::{ImageStore, ThreadingPolicy};
 use std::sync::Arc;

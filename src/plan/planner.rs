@@ -30,7 +30,7 @@ use crate::{ImageSize, ImageStore, ImageStoreMut, PicScaleError};
 
 pub trait ResamplingPlan<T: Copy, const N: usize> {
     fn resample(
-        & self,
+        &self,
         store: &ImageStore<'_, T, N>,
         into: &mut ImageStoreMut<'_, T, N>,
     ) -> Result<(), PicScaleError>;

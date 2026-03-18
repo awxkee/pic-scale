@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::ThreadingPolicy;
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::{convolve_vertical_avx_row, convolve_vertical_avx_row_lp};
 use crate::convolution::{
@@ -46,7 +47,6 @@ use crate::sse::{
 };
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 use crate::wasm32::wasm_vertical_neon_row;
-use crate::ThreadingPolicy;
 use std::sync::Arc;
 
 impl HorizontalFilterPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
@@ -208,7 +208,7 @@ impl VerticalConvolutionPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
                 }
             }
         }
-        #[cfg(all(feature = "nightly_avx512", target_arch = "x86_64"))]
+        #[cfg(all(feature = "avx512", target_arch = "x86_64"))]
         if std::arch::is_x86_feature_detected!("avx512bw")
             && _scale_factor < 8.
             && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
