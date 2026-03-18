@@ -299,11 +299,13 @@ fn convolve_column_handler_fixed_point_direct_buffer_four<
 }
 
 pub(crate) fn column_handler_fixed_point_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
+    _: usize,
     bounds: &FilterBounds,
     src: &[u8],
     dst: &mut [u8],
     src_stride: usize,
     weight: &[i16],
+    _: u32,
 ) {
     let mut cx = 0usize;
 

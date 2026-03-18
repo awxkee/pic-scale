@@ -81,11 +81,7 @@ mod colors;
 mod convolution;
 mod convolve_naive_f32;
 mod dispatch_group_ar30;
-#[cfg(feature = "nightly_f16")]
-mod dispatch_group_f16;
-mod dispatch_group_f32;
 mod dispatch_group_u16;
-mod dispatch_group_u8;
 #[cfg(feature = "nightly_f16")]
 mod f16;
 mod filter_weights;
@@ -101,14 +97,12 @@ mod image_store;
 mod math;
 mod mixed_storage;
 mod mlaf;
-mod nearest_sampler;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 mod neon;
 mod plan;
 mod plane_f32;
 mod plane_u16;
 mod plane_u8;
-mod resize_ar30;
 mod rgb_f32;
 mod rgb_u16;
 mod rgb_u8;

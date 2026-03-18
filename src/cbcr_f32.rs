@@ -26,7 +26,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::ThreadingPolicy;
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::convolve_vertical_avx_row_f32;
 use crate::convolution::{
@@ -36,28 +35,18 @@ use crate::convolve_naive_f32::{
     convolve_horizontal_4_row_f32_f64, convolve_horizontal_native_row_f32,
     convolve_horizontal_native_row_f32_f64, convolve_horizontal_rgba_4_row_f32,
 };
-use crate::dispatch_group_f32::{convolve_horizontal_dispatch_f32, convolve_vertical_dispatch_f32};
 use crate::filter_weights::{FilterBounds, FilterWeights};
-use crate::image_store::{ImageStore, ImageStoreMut};
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::image_store::ImageStore;
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::neon::*;
 use crate::plan::{HorizontalFiltering, VerticalFiltering};
 use crate::rgb_f32::{convolve_vertical_rgb_native_row_f32, convolve_vertical_rgb_native_row_f64};
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::*;
+use crate::ThreadingPolicy;
 use std::sync::Arc;
 
 impl HorizontalFilterPass<f32, f32, 2> for ImageStore<'_, f32, 2> {
-    #[allow(clippy::type_complexity)]
-    fn convolve_horizontal(
-        &self,
-        filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStoreMut<f32, 2>,
-        pool: &novtb::ThreadPool,
-        _: ConvolutionOptions,
-    ) {
-    }
-
     fn horizontal_plan(
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
@@ -78,16 +67,6 @@ impl HorizontalFilterPass<f32, f32, 2> for ImageStore<'_, f32, 2> {
 }
 
 impl HorizontalFilterPass<f32, f64, 2> for ImageStore<'_, f32, 2> {
-    #[allow(clippy::type_complexity)]
-    fn convolve_horizontal(
-        &self,
-        filter_weights: FilterWeights<f64>,
-        destination: &mut ImageStoreMut<f32, 2>,
-        pool: &novtb::ThreadPool,
-        _: ConvolutionOptions,
-    ) {
-    }
-
     fn horizontal_plan(
         filter_weights: FilterWeights<f64>,
         threading_policy: ThreadingPolicy,
@@ -108,19 +87,10 @@ impl HorizontalFilterPass<f32, f64, 2> for ImageStore<'_, f32, 2> {
 }
 
 impl VerticalConvolutionPass<f32, f32, 2> for ImageStore<'_, f32, 2> {
-    fn convolve_vertical(
-        &self,
-        filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStoreMut<f32, 2>,
-        pool: &novtb::ThreadPool,
-        _: ConvolutionOptions,
-    ) {
-    }
-
     fn vertical_plan(
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
-        options: ConvolutionOptions,
+        _: ConvolutionOptions,
     ) -> Arc<dyn Filtering<f32, 2> + Send + Sync> {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(
@@ -132,7 +102,7 @@ impl VerticalConvolutionPass<f32, f32, 2> for ImageStore<'_, f32, 2> {
             &[f32],
             u32,
         ) = convolve_vertical_rgb_native_row_f32;
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             _dispatcher = convolve_vertical_rgb_neon_row_f32;
         }
@@ -161,15 +131,6 @@ impl VerticalConvolutionPass<f32, f32, 2> for ImageStore<'_, f32, 2> {
 }
 
 impl VerticalConvolutionPass<f32, f64, 2> for ImageStore<'_, f32, 2> {
-    fn convolve_vertical(
-        &self,
-        filter_weights: FilterWeights<f64>,
-        destination: &mut ImageStoreMut<f32, 2>,
-        pool: &novtb::ThreadPool,
-        _: ConvolutionOptions,
-    ) {
-    }
-
     fn vertical_plan(
         filter_weights: FilterWeights<f64>,
         threading_policy: ThreadingPolicy,
@@ -185,7 +146,7 @@ impl VerticalConvolutionPass<f32, f64, 2> for ImageStore<'_, f32, 2> {
             &[f64],
             u32,
         ) = convolve_vertical_rgb_native_row_f64;
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             use crate::neon::convolve_vertical_neon_row_f32_f64;
             _dispatcher = convolve_vertical_neon_row_f32_f64;

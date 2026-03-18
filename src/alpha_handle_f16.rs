@@ -29,9 +29,9 @@
 #![forbid(unsafe_code)]
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::{avx_premultiply_alpha_rgba_f16, avx_unpremultiply_alpha_rgba_f16};
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::neon::{neon_premultiply_alpha_rgba_f16, neon_unpremultiply_alpha_rgba_f16};
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::neon::{neon_premultiply_alpha_rgba_f16_full, neon_unpremultiply_alpha_rgba_f16_full};
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::{sse_premultiply_alpha_rgba_f16, sse_unpremultiply_alpha_rgba_f16};
@@ -125,7 +125,7 @@ pub(crate) fn premultiply_alpha_rgba_f16(
         usize,
         &novtb::ThreadPool,
     ) = premultiply_alpha_rgba_impl_f16;
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     {
         _dispatcher = neon_premultiply_alpha_rgba_f16;
         if std::arch::is_aarch64_feature_detected!("fp16") {
@@ -158,7 +158,7 @@ pub(crate) fn unpremultiply_alpha_rgba_f16(
 ) {
     let mut _dispatcher: fn(&mut [f16], usize, usize, usize, &novtb::ThreadPool) =
         unpremultiply_alpha_rgba_impl_f16;
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     {
         _dispatcher = neon_unpremultiply_alpha_rgba_f16;
         if std::arch::is_aarch64_feature_detected!("fp16") {

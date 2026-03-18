@@ -32,7 +32,7 @@
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::{avx_premultiply_alpha_rgba_u16, avx_unpremultiply_alpha_rgba_u16};
 use crate::mixed_storage::CpuRound;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
+#[cfg(all(target_arch = "aarch64", feature = "neon",))]
 use crate::neon::{neon_premultiply_alpha_rgba_u16, neon_unpremultiply_alpha_rgba_u16};
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::{premultiply_alpha_sse_rgba_u16, unpremultiply_alpha_sse_rgba_u16};
@@ -264,7 +264,7 @@ pub(crate) fn premultiply_alpha_rgba_u16(
             _dispatcher = avx_premultiply_alpha_rgba_u16;
         }
     }
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     {
         _dispatcher = neon_premultiply_alpha_rgba_u16;
     }
@@ -322,7 +322,7 @@ pub(crate) fn unpremultiply_alpha_rgba_u16(
             _dispatcher = avx_unpremultiply_alpha_rgba_u16;
         }
     }
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     {
         _dispatcher = neon_unpremultiply_alpha_rgba_u16;
     }

@@ -26,19 +26,17 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::ThreadingPolicy;
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::{convolve_vertical_avx_row, convolve_vertical_avx_row_lp};
 use crate::convolution::{
     ConvolutionOptions, Filtering, HorizontalFilterPass, VerticalConvolutionPass,
 };
-use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertical_dispatch_u8};
-use crate::filter_weights::{DefaultWeightsConverter, FilterBounds, FilterWeights};
+use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::handler_provider::{
     handle_fixed_column_u8, handle_fixed_row_u8, handle_fixed_rows_4_u8,
 };
-use crate::image_store::{ImageStore, ImageStoreMut};
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::image_store::ImageStore;
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::neon::*;
 use crate::plan::{HorizontalFiltering, VerticalFiltering};
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
@@ -48,19 +46,10 @@ use crate::sse::{
 };
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 use crate::wasm32::wasm_vertical_neon_row;
+use crate::ThreadingPolicy;
 use std::sync::Arc;
 
 impl HorizontalFilterPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
-    #[allow(clippy::type_complexity)]
-    fn convolve_horizontal(
-        &self,
-        filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStoreMut<u8, 3>,
-        pool: &novtb::ThreadPool,
-        _options: ConvolutionOptions,
-    ) {
-    }
-
     fn horizontal_plan(
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
@@ -73,7 +62,7 @@ impl HorizontalFilterPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
         let mut _dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i16>, u32) =
             handle_fixed_row_u8::<3>;
 
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             match _options.workload_strategy {
                 crate::WorkloadStrategy::PreferQuality => {
@@ -154,15 +143,6 @@ impl HorizontalFilterPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
 }
 
 impl VerticalConvolutionPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
-    fn convolve_vertical(
-        &self,
-        filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStoreMut<u8, 3>,
-        pool: &novtb::ThreadPool,
-        _options: ConvolutionOptions,
-    ) {
-    }
-
     fn vertical_plan(
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
@@ -179,7 +159,7 @@ impl VerticalConvolutionPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
             &[i16],
             u32,
         ) = handle_fixed_column_u8;
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             match _options.workload_strategy {
                 crate::WorkloadStrategy::PreferQuality => {

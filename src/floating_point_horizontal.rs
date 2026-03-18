@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::color_group::{ColorGroup, ld_g, ldg_with_offset, st_g_mixed};
+use crate::color_group::{ld_g, st_g_mixed, ColorGroup};
 use crate::filter_weights::FilterWeights;
 use crate::mixed_storage::MixedStorage;
 use num_traits::{AsPrimitive, Float, MulAdd};
@@ -69,67 +69,18 @@ pub(crate) fn convolve_row_handler_floating_point<
         let mut sums = ColorGroup::<CN, J>::dup(0.as_());
 
         let start_x = bounds.start;
-        let bounds_size = bounds.size;
 
         let px = start_x * CN;
 
-        if bounds_size == 2 {
-            let src_ptr0 = &src[px..(px + 2 * CN)];
-
-            let sliced_weights = &weights[0..2];
-            let weight0 = sliced_weights[0].as_();
-            let weight1 = sliced_weights[1].as_();
-            sums = (ld_g!(src_ptr0, CN, J) * weight0)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN, J), weight1);
-        } else if bounds_size == 3 {
-            let src_ptr0 = &src[px..(px + 3 * CN)];
-
-            let sliced_weights = &weights[0..3];
-            let weight0 = sliced_weights[0].as_();
-            let weight1 = sliced_weights[1].as_();
-            let weight2 = sliced_weights[2].as_();
-            sums = (ld_g!(src_ptr0, CN, J) * weight0)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN, J), weight1)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN * 2, J), weight2);
-        } else if bounds_size == 4 {
-            let src_ptr0 = &src[px..(px + 4 * CN)];
-
-            let sliced_weights = &weights[0..4];
-            let weight0 = sliced_weights[0].as_();
-            let weight1 = sliced_weights[1].as_();
-            let weight2 = sliced_weights[2].as_();
-            let weight3 = sliced_weights[3].as_();
-            sums = (ld_g!(src_ptr0, CN, J) * weight0)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN, J), weight1)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN * 2, J), weight2)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN * 3, J), weight3);
-        } else if bounds_size == 6 {
-            let src_ptr0 = &src[px..(px + 6 * CN)];
-
-            let sliced_weights = &weights[0..6];
-            let weight0 = sliced_weights[0].as_();
-            let weight1 = sliced_weights[1].as_();
-            let weight2 = sliced_weights[2].as_();
-            let weight3 = sliced_weights[3].as_();
-            let weight4 = sliced_weights[4].as_();
-            let weight5 = sliced_weights[5].as_();
-            sums = (ld_g!(src_ptr0, CN, J) * weight0)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN, J), weight1)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN * 2, J), weight2)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN * 3, J), weight3)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN * 4, J), weight4)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN * 5, J), weight5);
-        } else {
-            let src_ptr0 = &src[px..(px + bounds.size * CN)];
-            for (&k_weight, src) in weights
-                .iter()
-                .zip(src_ptr0.chunks_exact(CN))
-                .take(bounds.size)
-            {
-                let weight: J = k_weight.as_();
-                let new_px = ld_g!(src, CN, J);
-                sums = sums.mul_add(new_px, weight);
-            }
+        let src_ptr0 = &src[px..(px + bounds.size * CN)];
+        for (&k_weight, src) in weights
+            .iter()
+            .zip(src_ptr0.chunks_exact(CN))
+            .take(bounds.size)
+        {
+            let weight: J = k_weight.as_();
+            let new_px = ld_g!(src, CN, J);
+            sums = sums.mul_add(new_px, weight);
         }
 
         st_g_mixed!(sums, chunk, CN, bit_depth);
@@ -190,137 +141,31 @@ pub(crate) fn convolve_row_handler_floating_point_4<
 
         let start_x = bounds.start;
         let px = start_x * CN;
-        let bounds_size = bounds.size;
 
-        if bounds_size == 2 {
-            let src_ptr0 = &src[px..(px + 2 * CN)];
-            let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 2 * CN)];
-            let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + 2 * CN)];
-            let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + 2 * CN)];
+        let src_ptr0 = &src[px..(px + bounds.size * CN)];
+        let src_ptr1 = &src[(px + src_stride)..(px + src_stride + bounds.size * CN)];
+        let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + bounds.size * CN)];
+        let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + bounds.size * CN)];
 
-            let sliced_weights = &weights[0..2];
-            let weight0 = sliced_weights[0].as_();
-            let weight1 = sliced_weights[1].as_();
-            sums0 = (ld_g!(src_ptr0, CN, J) * weight0)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN, J), weight1);
-            sums1 = (ld_g!(src_ptr1, CN, J) * weight0)
-                .mul_add(ldg_with_offset!(src_ptr1, CN, CN, J), weight1);
-            sums2 = (ld_g!(src_ptr2, CN, J) * weight0)
-                .mul_add(ldg_with_offset!(src_ptr2, CN, CN, J), weight1);
-            sums3 = (ld_g!(src_ptr3, CN, J) * weight0)
-                .mul_add(ldg_with_offset!(src_ptr3, CN, CN, J), weight1);
-        } else if bounds_size == 3 {
-            let src_ptr0 = &src[px..(px + 3 * CN)];
-            let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 3 * CN)];
-            let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + 3 * CN)];
-            let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + 3 * CN)];
+        for ((((&k_weight, src0), src1), src2), src3) in weights
+            .iter()
+            .zip(src_ptr0.chunks_exact(CN))
+            .zip(src_ptr1.chunks_exact(CN))
+            .zip(src_ptr2.chunks_exact(CN))
+            .zip(src_ptr3.chunks_exact(CN))
+            .take(bounds.size)
+        {
+            let weight: J = k_weight.as_();
 
-            let sliced_weights = &weights[0..3];
-            let weight0 = sliced_weights[0].as_();
-            let weight1 = sliced_weights[1].as_();
-            let weight2 = sliced_weights[2].as_();
-            sums0 = (ld_g!(src_ptr0, CN, J) * weight0)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN, J), weight1)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN * 2, J), weight2);
-            sums1 = (ld_g!(src_ptr1, CN, J) * weight0)
-                .mul_add(ldg_with_offset!(src_ptr1, CN, CN, J), weight1)
-                .mul_add(ldg_with_offset!(src_ptr1, CN, CN * 2, J), weight2);
-            sums2 = (ld_g!(src_ptr2, CN, J) * weight0)
-                .mul_add(ldg_with_offset!(src_ptr2, CN, CN, J), weight1)
-                .mul_add(ldg_with_offset!(src_ptr2, CN, CN * 2, J), weight2);
-            sums3 = (ld_g!(src_ptr3, CN, J) * weight0)
-                .mul_add(ldg_with_offset!(src_ptr3, CN, CN, J), weight1)
-                .mul_add(ldg_with_offset!(src_ptr3, CN, CN * 2, J), weight2);
-        } else if bounds_size == 4 {
-            let src_ptr0 = &src[px..(px + 4 * CN)];
-            let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 4 * CN)];
-            let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + 4 * CN)];
-            let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + 4 * CN)];
+            let new_px0 = ld_g!(src0, CN, J);
+            let new_px1 = ld_g!(src1, CN, J);
+            let new_px2 = ld_g!(src2, CN, J);
+            let new_px3 = ld_g!(src3, CN, J);
 
-            let sliced_weights = &weights[0..4];
-            let weight0 = sliced_weights[0].as_();
-            let weight1 = sliced_weights[1].as_();
-            let weight2 = sliced_weights[2].as_();
-            let weight3 = sliced_weights[3].as_();
-            sums0 = (ld_g!(src_ptr0, CN, J) * weight0)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN, J), weight1)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN * 2, J), weight2)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN * 3, J), weight3);
-            sums1 = (ld_g!(src_ptr1, CN, J) * weight0)
-                .mul_add(ldg_with_offset!(src_ptr1, CN, CN, J), weight1)
-                .mul_add(ldg_with_offset!(src_ptr1, CN, CN * 2, J), weight2)
-                .mul_add(ldg_with_offset!(src_ptr1, CN, CN * 3, J), weight3);
-            sums2 = (ld_g!(src_ptr2, CN, J) * weight0)
-                .mul_add(ldg_with_offset!(src_ptr2, CN, CN, J), weight1)
-                .mul_add(ldg_with_offset!(src_ptr2, CN, CN * 2, J), weight2)
-                .mul_add(ldg_with_offset!(src_ptr2, CN, CN * 3, J), weight3);
-            sums3 = (ld_g!(src_ptr3, CN, J) * weight0)
-                .mul_add(ldg_with_offset!(src_ptr3, CN, CN, J), weight1)
-                .mul_add(ldg_with_offset!(src_ptr3, CN, CN * 2, J), weight2)
-                .mul_add(ldg_with_offset!(src_ptr3, CN, CN * 3, J), weight3);
-        } else if bounds_size == 6 {
-            let src_ptr0 = &src[px..(px + 6 * CN)];
-            let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 6 * CN)];
-            let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + 6 * CN)];
-            let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + 6 * CN)];
-
-            let sliced_weights = &weights[0..6];
-            let weight0 = sliced_weights[0].as_();
-            let weight1 = sliced_weights[1].as_();
-            let weight2 = sliced_weights[2].as_();
-            let weight3 = sliced_weights[3].as_();
-            let weight4 = sliced_weights[4].as_();
-            let weight5 = sliced_weights[5].as_();
-            sums0 = (ld_g!(src_ptr0, CN, J) * weight0)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN, J), weight1)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN * 2, J), weight2)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN * 3, J), weight3)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN * 4, J), weight4)
-                .mul_add(ldg_with_offset!(src_ptr0, CN, CN * 5, J), weight5);
-            sums1 = (ld_g!(src_ptr1, CN, J) * weight0)
-                .mul_add(ldg_with_offset!(src_ptr1, CN, CN, J), weight1)
-                .mul_add(ldg_with_offset!(src_ptr1, CN, CN * 2, J), weight2)
-                .mul_add(ldg_with_offset!(src_ptr1, CN, CN * 3, J), weight3)
-                .mul_add(ldg_with_offset!(src_ptr1, CN, CN * 4, J), weight4)
-                .mul_add(ldg_with_offset!(src_ptr1, CN, CN * 5, J), weight5);
-            sums2 = (ld_g!(src_ptr2, CN, J) * weight0)
-                .mul_add(ldg_with_offset!(src_ptr2, CN, CN, J), weight1)
-                .mul_add(ldg_with_offset!(src_ptr2, CN, CN * 2, J), weight2)
-                .mul_add(ldg_with_offset!(src_ptr2, CN, CN * 3, J), weight3)
-                .mul_add(ldg_with_offset!(src_ptr2, CN, CN * 4, J), weight4)
-                .mul_add(ldg_with_offset!(src_ptr2, CN, CN * 5, J), weight5);
-            sums3 = (ld_g!(src_ptr3, CN, J) * weight0)
-                .mul_add(ldg_with_offset!(src_ptr3, CN, CN, J), weight1)
-                .mul_add(ldg_with_offset!(src_ptr3, CN, CN * 2, J), weight2)
-                .mul_add(ldg_with_offset!(src_ptr3, CN, CN * 3, J), weight3)
-                .mul_add(ldg_with_offset!(src_ptr3, CN, CN * 4, J), weight4)
-                .mul_add(ldg_with_offset!(src_ptr3, CN, CN * 5, J), weight5);
-        } else {
-            let src_ptr0 = &src[px..(px + bounds.size * CN)];
-            let src_ptr1 = &src[(px + src_stride)..(px + src_stride + bounds.size * CN)];
-            let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + bounds.size * CN)];
-            let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + bounds.size * CN)];
-
-            for ((((&k_weight, src0), src1), src2), src3) in weights
-                .iter()
-                .zip(src_ptr0.chunks_exact(CN))
-                .zip(src_ptr1.chunks_exact(CN))
-                .zip(src_ptr2.chunks_exact(CN))
-                .zip(src_ptr3.chunks_exact(CN))
-                .take(bounds.size)
-            {
-                let weight: J = k_weight.as_();
-
-                let new_px0 = ld_g!(src0, CN, J);
-                let new_px1 = ld_g!(src1, CN, J);
-                let new_px2 = ld_g!(src2, CN, J);
-                let new_px3 = ld_g!(src3, CN, J);
-
-                sums0 = sums0.mul_add(new_px0, weight);
-                sums1 = sums1.mul_add(new_px1, weight);
-                sums2 = sums2.mul_add(new_px2, weight);
-                sums3 = sums3.mul_add(new_px3, weight);
-            }
+            sums0 = sums0.mul_add(new_px0, weight);
+            sums1 = sums1.mul_add(new_px1, weight);
+            sums2 = sums2.mul_add(new_px2, weight);
+            sums3 = sums3.mul_add(new_px3, weight);
         }
 
         st_g_mixed!(sums0, chunk0, CN, bit_depth);

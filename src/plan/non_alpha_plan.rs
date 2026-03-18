@@ -27,24 +27,22 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::convolution::Filtering;
-use crate::image_store::{CheckStoreDensity, UnassociateAlpha};
+use crate::image_store::CheckStoreDensity;
 use crate::validation::{validate_scratch, validate_sizes};
-use crate::{ImageSize, ImageStore, ImageStoreMut, PicScaleError, ResamplingPlan, ThreadingPolicy};
-use num_traits::Zero;
+use crate::{ImageSize, ImageStore, ImageStoreMut, PicScaleError, ResamplingPlan};
 use std::fmt::Debug;
 use std::sync::Arc;
 
 pub(crate) struct NonAlphaConvolvePlan<T: Send + Sync, const N: usize> {
     pub(crate) source_size: ImageSize,
     pub(crate) target_size: ImageSize,
-    pub(crate) threading_policy: ThreadingPolicy,
     pub(crate) horizontal_filter: Arc<dyn Filtering<T, N> + Send + Sync>,
     pub(crate) vertical_filter: Arc<dyn Filtering<T, N> + Send + Sync>,
     pub(crate) should_do_horizontal: bool,
     pub(crate) should_do_vertical: bool,
 }
 
-impl<T: Copy + Send + Sync + Clone + Debug + Zero, const N: usize> ResamplingPlan<T, N>
+impl<T: Copy + Send + Sync + Clone + Debug + Default, const N: usize> ResamplingPlan<T, N>
     for NonAlphaConvolvePlan<T, N>
 where
     for<'a> ImageStoreMut<'a, T, N>: CheckStoreDensity,
@@ -89,7 +87,7 @@ where
 
     fn alloc_scratch(&self) -> Vec<T> {
         if self.should_do_horizontal && self.should_do_vertical {
-            vec![T::zero(); self.scratch_size()]
+            vec![T::default(); self.scratch_size()]
         } else {
             vec![]
         }

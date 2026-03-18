@@ -32,26 +32,14 @@ use crate::convolution::{
     ConvolutionOptions, Filtering, HorizontalFilterPass, VerticalConvolutionPass,
 };
 use crate::dispatch_group_u16::{
-    RowFactoryProducer, convolve_horizontal_dispatch_u16, convolve_vertical_dispatch_u16,
     vertical_plan_u16,
+    RowFactoryProducer,
 };
 use crate::filter_weights::FilterWeights;
-use crate::image_store::ImageStoreMut;
 use crate::{ImageStore, ThreadingPolicy};
 use std::sync::Arc;
 
 impl HorizontalFilterPass<u16, f32, 4> for ImageStore<'_, u16, 4> {
-    #[allow(clippy::type_complexity)]
-    fn convolve_horizontal(
-        &self,
-        filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStoreMut<u16, 4>,
-        pool: &novtb::ThreadPool,
-        _: ConvolutionOptions,
-    ) {
-        convolve_horizontal_dispatch_u16(self, filter_weights, destination, pool);
-    }
-
     fn horizontal_plan(
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
@@ -62,16 +50,6 @@ impl HorizontalFilterPass<u16, f32, 4> for ImageStore<'_, u16, 4> {
 }
 
 impl VerticalConvolutionPass<u16, f32, 4> for ImageStore<'_, u16, 4> {
-    fn convolve_vertical(
-        &self,
-        filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStoreMut<u16, 4>,
-        pool: &novtb::ThreadPool,
-        options: ConvolutionOptions,
-    ) {
-        convolve_vertical_dispatch_u16(self, filter_weights, destination, pool, options);
-    }
-
     fn vertical_plan(
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,

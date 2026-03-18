@@ -34,7 +34,6 @@ use crate::{
     ImageSize, ImageStore, ImageStoreMut, PicScaleError, ResamplingPlan, ThreadingPolicy,
     WorkloadStrategy,
 };
-use num_traits::Zero;
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -49,7 +48,7 @@ pub(crate) struct AlphaConvolvePlan<T: Send + Sync, const N: usize> {
     pub(crate) workload_strategy: WorkloadStrategy,
 }
 
-impl<T: Copy + Send + Sync + Clone + Debug + Zero + 'static, const N: usize> ResamplingPlan<T, N>
+impl<T: Copy + Send + Sync + Clone + Debug + Default + 'static, const N: usize> ResamplingPlan<T, N>
     for AlphaConvolvePlan<T, N>
 where
     for<'a> ImageStore<'a, T, N>: AssociateAlpha<T, N>,
@@ -139,7 +138,7 @@ where
 
     fn alloc_scratch(&self) -> Vec<T> {
         if self.should_do_horizontal && self.should_do_vertical {
-            vec![T::zero(); self.scratch_size()]
+            vec![T::default(); self.scratch_size()]
         } else {
             vec![]
         }

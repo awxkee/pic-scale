@@ -36,7 +36,7 @@ use crate::floating_point_horizontal::{
 };
 use crate::floating_point_vertical::column_handler_floating_point;
 use crate::mixed_storage::MixedStorage;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::neon::{
     convolve_column_lb_u16, convolve_column_u16, convolve_horizontal_rgba_neon_rows_4_lb_u16,
     convolve_horizontal_rgba_neon_u16_lb_row,
@@ -95,7 +95,7 @@ macro_rules! default_floating_column_handler {
 }
 
 #[cfg(not(any(
-    all(target_arch = "aarch64", target_feature = "neon"),
+    all(target_arch = "aarch64", feature = "neon"),
     any(target_arch = "x86_64", target_arch = "x86")
 )))]
 impl ColumnHandlerFloatingPoint<u16, f32, f32> for u16 {
@@ -114,7 +114,7 @@ impl ColumnHandlerFloatingPoint<u16, f32, f32> for u16 {
     }
 }
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 impl ColumnHandlerFloatingPoint<u16, f32, f32> for u16 {
     fn handle_floating_column(
         dst_width: usize,
@@ -391,7 +391,7 @@ pub(crate) trait RowHandlerFixedPoint<T> {
 
 impl RowHandlerFixedPoint<u16> for u16 {
     #[cfg(not(any(
-        all(target_arch = "aarch64", target_feature = "neon"),
+        all(target_arch = "aarch64", feature = "neon"),
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
     fn handle_fixed_row_4<J, const CN: usize>(
@@ -426,7 +426,7 @@ impl RowHandlerFixedPoint<u16> for u16 {
         )
     }
 
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     fn handle_fixed_row_4<J, const CN: usize>(
         src: &[u16],
         src_stride: usize,
@@ -559,7 +559,7 @@ impl RowHandlerFixedPoint<u16> for u16 {
     }
 
     #[cfg(not(any(
-        all(target_arch = "aarch64", target_feature = "neon"),
+        all(target_arch = "aarch64", feature = "neon"),
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
     fn handle_fixed_row<J, const CN: usize>(
@@ -585,7 +585,7 @@ impl RowHandlerFixedPoint<u16> for u16 {
         convolve_row_handler_fixed_point::<u16, J, CN>(src, dst, filter_weights, bit_depth)
     }
 
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     fn handle_fixed_row<J, const CN: usize>(
         src: &[u16],
         dst: &mut [u16],
@@ -660,7 +660,7 @@ impl RowHandlerFixedPoint<u16> for u16 {
 
 impl ColumnHandlerFixedPoint<u16> for u16 {
     #[cfg(not(any(
-        all(target_arch = "aarch64", target_feature = "neon"),
+        all(target_arch = "aarch64", feature = "neon"),
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
     fn handle_fixed_column<J, const CN: usize>(
@@ -690,7 +690,7 @@ impl ColumnHandlerFixedPoint<u16> for u16 {
         );
     }
 
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     fn handle_fixed_column<J, const CN: usize>(
         dst_width: usize,
         bounds: &FilterBounds,

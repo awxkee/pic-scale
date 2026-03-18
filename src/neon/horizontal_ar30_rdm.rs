@@ -136,6 +136,7 @@ pub(crate) fn neon_convolve_horizontal_rgba_rows_4_ar30_rdm<
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         let unit = Row4ExecutionUnit::<AR_TYPE, AR_ORDER>::default();

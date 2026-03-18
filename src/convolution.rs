@@ -42,28 +42,10 @@ pub(crate) struct ConvolutionOptions {
     pub(crate) dst_size: ImageSize,
 }
 
-impl ConvolutionOptions {
-    pub(crate) fn new(strategy: WorkloadStrategy) -> Self {
-        Self {
-            workload_strategy: strategy,
-            bit_depth: 0,
-            src_size: ImageSize::new(0, 0),
-            dst_size: ImageSize::new(0, 0),
-        }
-    }
-}
-
 pub(crate) trait HorizontalFilterPass<T, W, const N: usize>
 where
     T: Clone + Copy + Debug,
 {
-    fn convolve_horizontal(
-        &self,
-        filter_weights: FilterWeights<W>,
-        destination: &mut ImageStoreMut<T, N>,
-        pool: &novtb::ThreadPool,
-        options: ConvolutionOptions,
-    );
     fn horizontal_plan(
         filter_weights: FilterWeights<W>,
         threading_policy: ThreadingPolicy,
@@ -75,13 +57,6 @@ pub(crate) trait VerticalConvolutionPass<T, W, const N: usize>
 where
     T: Clone + Copy + Debug,
 {
-    fn convolve_vertical(
-        &self,
-        filter_weights: FilterWeights<W>,
-        destination: &mut ImageStoreMut<T, N>,
-        pool: &novtb::ThreadPool,
-        options: ConvolutionOptions,
-    );
     fn vertical_plan(
         filter_weights: FilterWeights<W>,
         threading_policy: ThreadingPolicy,

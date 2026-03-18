@@ -31,13 +31,11 @@ use crate::avx2::{convolve_vertical_avx_row, convolve_vertical_avx_row_lp};
 use crate::convolution::{
     ConvolutionOptions, Filtering, HorizontalFilterPass, VerticalConvolutionPass,
 };
-use crate::dispatch_group_u8::{convolve_horizontal_dispatch_u8, convolve_vertical_dispatch_u8};
-use crate::filter_weights::{DefaultWeightsConverter, FilterBounds, FilterWeights};
+use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::handler_provider::{
     handle_fixed_column_u8, handle_fixed_row_u8, handle_fixed_rows_4_u8,
 };
-use crate::image_store::ImageStoreMut;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
+#[cfg(all(target_arch = "aarch64", feature = "neon",))]
 use crate::neon::{convolve_horizontal_plane_neon_row, convolve_horizontal_plane_neon_rows_4_u8};
 use crate::plan::{HorizontalFiltering, VerticalFiltering};
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
@@ -51,16 +49,6 @@ use crate::{ImageStore, ThreadingPolicy};
 use std::sync::Arc;
 
 impl HorizontalFilterPass<u8, f32, 1> for ImageStore<'_, u8, 1> {
-    #[allow(clippy::type_complexity)]
-    fn convolve_horizontal(
-        &self,
-        filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStoreMut<u8, 1>,
-        pool: &novtb::ThreadPool,
-        _options: ConvolutionOptions,
-    ) {
-    }
-
     fn horizontal_plan(
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
@@ -72,7 +60,7 @@ impl HorizontalFilterPass<u8, f32, 1> for ImageStore<'_, u8, 1> {
         > = Some(handle_fixed_rows_4_u8::<1>);
         let mut _dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i16>, u32) =
             handle_fixed_row_u8::<1>;
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             match _options.workload_strategy {
                 crate::WorkloadStrategy::PreferQuality => {
@@ -130,15 +118,6 @@ impl HorizontalFilterPass<u8, f32, 1> for ImageStore<'_, u8, 1> {
 }
 
 impl VerticalConvolutionPass<u8, f32, 1> for ImageStore<'_, u8, 1> {
-    fn convolve_vertical(
-        &self,
-        filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStoreMut<u8, 1>,
-        pool: &novtb::ThreadPool,
-        _options: ConvolutionOptions,
-    ) {
-    }
-
     fn vertical_plan(
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
@@ -155,7 +134,7 @@ impl VerticalConvolutionPass<u8, f32, 1> for ImageStore<'_, u8, 1> {
             &[i16],
             u32,
         ) = handle_fixed_column_u8;
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             match _options.workload_strategy {
                 crate::WorkloadStrategy::PreferQuality => {

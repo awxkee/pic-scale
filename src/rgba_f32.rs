@@ -38,10 +38,8 @@ use crate::convolve_naive_f32::{
     convolve_horizontal_4_row_f32_f64, convolve_horizontal_native_row_f32,
     convolve_horizontal_native_row_f32_f64, convolve_horizontal_rgba_4_row_f32,
 };
-use crate::dispatch_group_f32::{convolve_horizontal_dispatch_f32, convolve_vertical_dispatch_f32};
 use crate::filter_weights::*;
-use crate::image_store::ImageStoreMut;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::neon::*;
 use crate::plan::{HorizontalFiltering, VerticalFiltering};
 use crate::rgb_f32::{convolve_vertical_rgb_native_row_f32, convolve_vertical_rgb_native_row_f64};
@@ -51,16 +49,6 @@ use crate::{ImageStore, ThreadingPolicy};
 use std::sync::Arc;
 
 impl HorizontalFilterPass<f32, f32, 4> for ImageStore<'_, f32, 4> {
-    #[allow(clippy::type_complexity)]
-    fn convolve_horizontal(
-        &self,
-        filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStoreMut<f32, 4>,
-        pool: &novtb::ThreadPool,
-        _: ConvolutionOptions,
-    ) {
-    }
-
     fn horizontal_plan(
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
@@ -71,7 +59,7 @@ impl HorizontalFilterPass<f32, f32, 4> for ImageStore<'_, f32, 4> {
         > = Some(convolve_horizontal_rgba_4_row_f32::<4>);
         let mut _dispatcher_row: fn(&[f32], &mut [f32], &FilterWeights<f32>, u32) =
             convolve_horizontal_native_row_f32::<4>;
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             _dispatcher_4_rows = Some(convolve_horizontal_rgba_neon_rows_4);
             _dispatcher_row = convolve_horizontal_rgba_neon_row_one;
@@ -104,16 +92,6 @@ impl HorizontalFilterPass<f32, f32, 4> for ImageStore<'_, f32, 4> {
 }
 
 impl HorizontalFilterPass<f32, f64, 4> for ImageStore<'_, f32, 4> {
-    #[allow(clippy::type_complexity)]
-    fn convolve_horizontal(
-        &self,
-        filter_weights: FilterWeights<f64>,
-        destination: &mut ImageStoreMut<f32, 4>,
-        pool: &novtb::ThreadPool,
-        _: ConvolutionOptions,
-    ) {
-    }
-
     fn horizontal_plan(
         filter_weights: FilterWeights<f64>,
         threading_policy: ThreadingPolicy,
@@ -124,7 +102,7 @@ impl HorizontalFilterPass<f32, f64, 4> for ImageStore<'_, f32, 4> {
         > = Some(convolve_horizontal_4_row_f32_f64::<4>);
         let mut _dispatcher_row: fn(&[f32], &mut [f32], &FilterWeights<f64>, u32) =
             convolve_horizontal_native_row_f32_f64::<4>;
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             use crate::neon::{
                 convolve_horizontal_rgba_neon_row_one_f32_f64,
@@ -158,19 +136,10 @@ impl HorizontalFilterPass<f32, f64, 4> for ImageStore<'_, f32, 4> {
 }
 
 impl VerticalConvolutionPass<f32, f32, 4> for ImageStore<'_, f32, 4> {
-    fn convolve_vertical(
-        &self,
-        filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStoreMut<f32, 4>,
-        pool: &novtb::ThreadPool,
-        _: ConvolutionOptions,
-    ) {
-    }
-
     fn vertical_plan(
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
-        options: ConvolutionOptions,
+        _: ConvolutionOptions,
     ) -> Arc<dyn Filtering<f32, 4> + Send + Sync> {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(
@@ -182,7 +151,7 @@ impl VerticalConvolutionPass<f32, f32, 4> for ImageStore<'_, f32, 4> {
             &[f32],
             u32,
         ) = convolve_vertical_rgb_native_row_f32;
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             _dispatcher = convolve_vertical_rgb_neon_row_f32;
         }
@@ -211,19 +180,10 @@ impl VerticalConvolutionPass<f32, f32, 4> for ImageStore<'_, f32, 4> {
 }
 
 impl VerticalConvolutionPass<f32, f64, 4> for ImageStore<'_, f32, 4> {
-    fn convolve_vertical(
-        &self,
-        filter_weights: FilterWeights<f64>,
-        destination: &mut ImageStoreMut<f32, 4>,
-        pool: &novtb::ThreadPool,
-        _: ConvolutionOptions,
-    ) {
-    }
-
     fn vertical_plan(
         filter_weights: FilterWeights<f64>,
         threading_policy: ThreadingPolicy,
-        options: ConvolutionOptions,
+        _: ConvolutionOptions,
     ) -> Arc<dyn Filtering<f32, 4> + Send + Sync> {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(
@@ -235,7 +195,7 @@ impl VerticalConvolutionPass<f32, f64, 4> for ImageStore<'_, f32, 4> {
             &[f64],
             u32,
         ) = convolve_vertical_rgb_native_row_f64;
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             use crate::neon::convolve_vertical_neon_row_f32_f64;
             _dispatcher = convolve_vertical_neon_row_f32_f64;

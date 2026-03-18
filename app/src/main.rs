@@ -13,7 +13,7 @@ use fast_image_resize::{
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
     Ar30ByteOrder, CbCr8ImageStore, CbCr8ImageStoreMut, ImageSize, ImageStore, ImageStoreMut,
-    ImageStoreScaling, LinearApproxScaler, LinearScaler, Planar16ImageStore, Planar16ImageStoreMut,
+    ImageStoreScaling, Planar16ImageStore, Planar16ImageStoreMut,
     Planar8ImageStore, Planar8ImageStoreMut, PlanarF32ImageStore, PlanarF32ImageStoreMut,
     ResamplingFunction, Rgb8ImageStore, Rgb8ImageStoreMut, RgbF32ImageStore, RgbF32ImageStoreMut,
     Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore, Rgba8ImageStoreMut, RgbaF32ImageStore,
@@ -21,33 +21,6 @@ use pic_scale::{
     WorkloadStrategy,
 };
 use yuv::{ar30_to_rgb8, rgba8_to_ar30, Rgb30ByteOrder};
-
-fn resize_plane(
-    src_width: usize,
-    src_height: usize,
-    dst_width: usize,
-    dst_height: usize,
-    sampler: ResamplingFunction,
-) {
-    if src_width == 0
-        || src_width > 2000
-        || src_height == 0
-        || src_height > 2000
-        || dst_width == 0
-        || dst_width > 512
-        || dst_height == 0
-        || dst_height > 512
-    {
-        return;
-    }
-
-    let mut src_data = vec![15u8; src_width * src_height * 1];
-
-    let store = ImageStore::<u8, 1>::from_slice(&mut src_data, src_width, src_height).unwrap();
-    let mut dst_store = ImageStoreMut::<u8, 1>::alloc(src_width / 2, src_height / 2);
-    let scaler = Scaler::new(sampler);
-    _ = scaler.resize_plane(&store, &mut dst_store).unwrap();
-}
 
 fn main() {
     #[allow(overflowing_literals)]
@@ -190,7 +163,7 @@ fn test_fast_image() {
     let mut dst_image = Image::new(3240, 2160, pixel_type);
 
     let mut resizer = Resizer::new();
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     unsafe {
         resizer.set_cpu_extensions(CpuExtensions::Neon);
     }

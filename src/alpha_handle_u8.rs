@@ -31,7 +31,7 @@
 use crate::WorkloadStrategy;
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::{avx_premultiply_alpha_rgba, avx_unpremultiply_alpha_rgba};
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::neon::{neon_premultiply_alpha_rgba, neon_unpremultiply_alpha_rgba};
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::*;
@@ -164,7 +164,7 @@ pub(crate) fn premultiply_alpha_rgba(
     #[allow(clippy::type_complexity)]
     let mut _dispatcher: fn(&mut [u8], usize, &[u8], usize, usize, usize, &novtb::ThreadPool) =
         premultiply_alpha_rgba_impl;
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     {
         _dispatcher = neon_premultiply_alpha_rgba;
     }
@@ -219,7 +219,7 @@ pub(crate) fn unpremultiply_alpha_rgba(
 ) {
     let mut _dispatcher: fn(&mut [u8], usize, usize, usize, &novtb::ThreadPool, WorkloadStrategy) =
         unpremultiply_alpha_rgba_impl;
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     {
         _dispatcher = neon_unpremultiply_alpha_rgba;
     }
