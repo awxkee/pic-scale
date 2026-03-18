@@ -84,6 +84,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4_dot(
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i8>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_rgb_neon_rows_4_impl(src, src_stride, dst, dst_stride, filter_weights);
@@ -91,7 +92,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4_dot(
 }
 
 #[target_feature(enable = "i8mm")]
-unsafe fn convolve_horizontal_rgb_neon_rows_4_impl(
+fn convolve_horizontal_rgb_neon_rows_4_impl(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -141,7 +142,7 @@ unsafe fn convolve_horizontal_rgb_neon_rows_4_impl(
             let src2 = src1.get_unchecked(src_stride..);
             let src3 = src2.get_unchecked(src_stride..);
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
                 let mut v_weight = vreinterpretq_s8_s32(vld1q_lane_s32::<0>(
@@ -161,7 +162,7 @@ unsafe fn convolve_horizontal_rgb_neon_rows_4_impl(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let v_weight = vqtbl1q_s8(
@@ -206,6 +207,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_row_one_dot(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i8>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_rgb_neon_row_one_impl_dot(src, dst, filter_weights);
@@ -213,7 +215,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_row_one_dot(
 }
 
 #[target_feature(enable = "i8mm")]
-unsafe fn convolve_horizontal_rgb_neon_row_one_impl_dot(
+fn convolve_horizontal_rgb_neon_row_one_impl_dot(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i8>,
@@ -242,7 +244,7 @@ unsafe fn convolve_horizontal_rgb_neon_row_one_impl_dot(
             let mut jx = 0usize;
             let mut store = vdupq_n_s32(rnd_const);
 
-            while jx + 4 < bounds_size {
+            while jx + 4 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
                 let mut v_weight = vreinterpretq_s8_s32(vld1q_lane_s32::<0>(
@@ -257,7 +259,7 @@ unsafe fn convolve_horizontal_rgb_neon_row_one_impl_dot(
                 jx += 4;
             }
 
-            while jx + 2 < bounds_size {
+            while jx + 2 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let v_weight = vqtbl1q_s8(

@@ -32,7 +32,7 @@ use crate::filter_weights::FilterWeights;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-unsafe fn convolve_horizontal_parts_one_rgba_sse(
+fn convolve_horizontal_parts_one_rgba_sse(
     start_x: usize,
     src: &[u8],
     weight0: __m128i,
@@ -56,6 +56,7 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_4_lb(
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_rgba_avx_rows_4_impl(src, src_stride, dst, dst_stride, filter_weights);
@@ -63,7 +64,7 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_4_lb(
 }
 
 #[inline(always)]
-unsafe fn hdot4(store: __m256i, v0: __m256i, w01: __m256i, w23: __m256i) -> __m256i {
+fn hdot4(store: __m256i, v0: __m256i, w01: __m256i, w23: __m256i) -> __m256i {
     unsafe {
         let lo0 = _mm256_srli_epi16::<2>(_mm256_unpacklo_epi8(v0, v0));
         let hi0 = _mm256_srli_epi16::<2>(_mm256_unpackhi_epi8(v0, v0));
@@ -74,7 +75,7 @@ unsafe fn hdot4(store: __m256i, v0: __m256i, w01: __m256i, w23: __m256i) -> __m2
 }
 
 #[inline(always)]
-unsafe fn hdot2(store: __m256i, v: __m256i, w0123: __m256i) -> __m256i {
+fn hdot2(store: __m256i, v: __m256i, w0123: __m256i) -> __m256i {
     unsafe {
         let lo = _mm256_srli_epi16::<2>(_mm256_unpacklo_epi8(v, v));
         _mm256_add_epi16(store, _mm256_mulhrs_epi16(lo, w0123))
@@ -82,7 +83,7 @@ unsafe fn hdot2(store: __m256i, v: __m256i, w0123: __m256i) -> __m256i {
 }
 
 #[inline(always)]
-unsafe fn hdot(store: __m128i, v: __m128i, w01: __m128i) -> __m128i {
+fn hdot(store: __m128i, v: __m128i, w01: __m128i) -> __m128i {
     unsafe {
         let lo = _mm_srli_epi16::<2>(_mm_unpacklo_epi8(v, v));
         _mm_add_epi16(store, _mm_mulhrs_epi16(lo, w01))
@@ -90,7 +91,7 @@ unsafe fn hdot(store: __m128i, v: __m128i, w01: __m128i) -> __m128i {
 }
 
 #[inline(always)]
-unsafe fn _mm_add_hi_lo_epi16(v: __m128i) -> __m128i {
+fn _mm_add_hi_lo_epi16(v: __m128i) -> __m128i {
     unsafe {
         let p = _mm_unpackhi_epi64(v, v);
         _mm_add_epi16(v, p)
@@ -99,7 +100,7 @@ unsafe fn _mm_add_hi_lo_epi16(v: __m128i) -> __m128i {
 
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_rgba_avx_rows_4_impl(
+fn convolve_horizontal_rgba_avx_rows_4_impl(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -213,7 +214,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_impl(
                 _mm256_permute2x128_si256::<0x31>(store_2, store_3),
             );
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
 
                 let w0_3 = _mm_loadu_si64(w_ptr.as_ptr() as *const _);
@@ -258,7 +259,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_impl(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
 
@@ -368,6 +369,7 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_one_lb(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_rgba_avx_rows_one_impl(src, dst, filter_weights);
@@ -376,7 +378,7 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_one_lb(
 
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
+fn convolve_horizontal_rgba_avx_rows_one_impl(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
@@ -421,7 +423,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
             let mut jx = 0usize;
             let mut store = vld;
 
-            while jx + 8 < bounds.size {
+            while jx + 8 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
 
                 let w0_7 = _mm_loadu_si128(w_ptr.as_ptr() as *const _);
@@ -441,7 +443,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
                 jx += 8;
             }
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
 
@@ -469,7 +471,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
                 _mm256_extracti128_si256::<1>(store),
             );
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
 

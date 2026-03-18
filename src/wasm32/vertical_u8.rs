@@ -264,23 +264,21 @@ unsafe fn consume_u8_1(
     }
 }
 
-#[inline]
-pub fn wasm_vertical_neon_row(
+pub(crate) fn wasm_vertical_neon_row(
     dst_width: usize,
     bounds: &FilterBounds,
     src: &[u8],
     dst: &mut [u8],
     src_stride: usize,
     weight: &[i16],
+    _: u32,
 ) {
-    unsafe {
-        convolve_vertical_neon_row_impl(dst_width, bounds, src, dst, src_stride, weight);
-    }
+    convolve_vertical_neon_row_impl(dst_width, bounds, src, dst, src_stride, weight);
 }
 
 #[inline]
 #[target_feature(enable = "simd128")]
-unsafe fn convolve_vertical_neon_row_impl(
+fn convolve_vertical_neon_row_impl(
     _: usize,
     bounds: &FilterBounds,
     src: &[u8],

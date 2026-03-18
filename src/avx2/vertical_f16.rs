@@ -32,7 +32,7 @@ use core::f16;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-unsafe fn convolve_vertical_part_avx_f16<const FMA: bool>(
+fn convolve_vertical_part_avx_f16<const FMA: bool>(
     start_y: usize,
     start_x: usize,
     src: &[f16],
@@ -73,7 +73,7 @@ unsafe fn convolve_vertical_part_avx_f16<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn convolve_vertical_part_avx_4_f16<const FMA: bool>(
+fn convolve_vertical_part_avx_4_f16<const FMA: bool>(
     start_y: usize,
     start_x: usize,
     src: &[f16],
@@ -108,7 +108,7 @@ unsafe fn convolve_vertical_part_avx_4_f16<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn convolve_vertical_part_avx_32_f16<const FMA: bool>(
+fn convolve_vertical_part_avx_32_f16<const FMA: bool>(
     start_y: usize,
     start_x: usize,
     src: &[f16],
@@ -165,7 +165,7 @@ unsafe fn convolve_vertical_part_avx_32_f16<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn convolve_vertical_part_avx_16_f16<const FMA: bool>(
+fn convolve_vertical_part_avx_16_f16<const FMA: bool>(
     start_y: usize,
     start_x: usize,
     src: &[f16],
@@ -214,6 +214,7 @@ pub(crate) fn convolve_vertical_avx_row_f16<const FMA: bool>(
     dst: &mut [f16],
     src_stride: usize,
     weight_ptr: &[f32],
+    _: u32,
 ) {
     unsafe {
         if FMA {
@@ -226,7 +227,7 @@ pub(crate) fn convolve_vertical_avx_row_f16<const FMA: bool>(
 
 #[target_feature(enable = "avx2", enable = "f16c")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_vertical_avx_row_f16_regular(
+fn convolve_vertical_avx_row_f16_regular(
     width: usize,
     bounds: &FilterBounds,
     src: &[f16],
@@ -234,16 +235,12 @@ unsafe fn convolve_vertical_avx_row_f16_regular(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    unsafe {
-        convolve_vertical_avx_row_f16_impl::<false>(
-            width, bounds, src, dst, src_stride, weight_ptr,
-        );
-    }
+    convolve_vertical_avx_row_f16_impl::<false>(width, bounds, src, dst, src_stride, weight_ptr);
 }
 
 #[target_feature(enable = "avx2", enable = "fma", enable = "f16c")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_vertical_avx_row_f16_fma(
+fn convolve_vertical_avx_row_f16_fma(
     width: usize,
     bounds: &FilterBounds,
     src: &[f16],
@@ -251,13 +248,11 @@ unsafe fn convolve_vertical_avx_row_f16_fma(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    unsafe {
-        convolve_vertical_avx_row_f16_impl::<true>(width, bounds, src, dst, src_stride, weight_ptr);
-    }
+    convolve_vertical_avx_row_f16_impl::<true>(width, bounds, src, dst, src_stride, weight_ptr);
 }
 
 #[inline(always)]
-unsafe fn convolve_vertical_avx_row_f16_impl<const FMA: bool>(
+fn convolve_vertical_avx_row_f16_impl<const FMA: bool>(
     _: usize,
     bounds: &FilterBounds,
     src: &[f16],
@@ -265,64 +260,62 @@ unsafe fn convolve_vertical_avx_row_f16_impl<const FMA: bool>(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    unsafe {
-        let mut cx = 0usize;
-        let dst_width = dst.len();
+    let mut cx = 0usize;
+    let dst_width = dst.len();
 
-        while cx + 32 < dst_width {
-            convolve_vertical_part_avx_32_f16::<FMA>(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
+    while cx + 32 < dst_width {
+        convolve_vertical_part_avx_32_f16::<FMA>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+        );
 
-            cx += 32;
-        }
+        cx += 32;
+    }
 
-        while cx + 16 < dst_width {
-            convolve_vertical_part_avx_16_f16::<FMA>(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
+    while cx + 16 < dst_width {
+        convolve_vertical_part_avx_16_f16::<FMA>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+        );
 
-            cx += 16;
-        }
+        cx += 16;
+    }
 
-        while cx + 4 < dst_width {
-            convolve_vertical_part_avx_4_f16::<FMA>(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
+    while cx + 4 < dst_width {
+        convolve_vertical_part_avx_4_f16::<FMA>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+        );
 
-            cx += 4;
-        }
+        cx += 4;
+    }
 
-        while cx < dst_width {
-            convolve_vertical_part_avx_f16::<FMA>(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
+    while cx < dst_width {
+        convolve_vertical_part_avx_f16::<FMA>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+        );
 
-            cx += 1;
-        }
+        cx += 1;
     }
 }

@@ -1,10 +1,12 @@
-#![feature(avx512_target_feature)]
 #![feature(f16)]
+mod acc;
 mod merge;
 mod split;
+mod fuzzer_explore;
 
 use std::time::Instant;
 
+use crate::acc::resize_with_accelerate;
 use core::f16;
 use fast_image_resize::images::Image;
 use fast_image_resize::{
@@ -17,42 +19,22 @@ use pic_scale::{
     Planar8ImageStore, Planar8ImageStoreMut, PlanarF32ImageStore, PlanarF32ImageStoreMut,
     ResamplingFunction, Rgb8ImageStore, Rgb8ImageStoreMut, RgbF32ImageStore, RgbF32ImageStoreMut,
     Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore, Rgba8ImageStoreMut, RgbaF32ImageStore,
-    RgbaF32ImageStoreMut, Scaler, Scaling, ScalingF32, ScalingU16, ThreadingPolicy,
-    WorkloadStrategy,
+    RgbaF32ImageStoreMut, Scaler, ThreadingPolicy, WorkloadStrategy,
 };
 use yuv::{ar30_to_rgb8, rgba8_to_ar30, Rgb30ByteOrder};
-
-fn resize_plane(
-    src_width: usize,
-    src_height: usize,
-    dst_width: usize,
-    dst_height: usize,
-    sampler: ResamplingFunction,
-) {
-    if src_width == 0
-        || src_width > 2000
-        || src_height == 0
-        || src_height > 2000
-        || dst_width == 0
-        || dst_width > 512
-        || dst_height == 0
-        || dst_height > 512
-    {
-        return;
-    }
-
-    let mut src_data = vec![15u8; src_width * src_height * 1];
-
-    let store = ImageStore::<u8, 1>::from_slice(&mut src_data, src_width, src_height).unwrap();
-    let mut dst_store = ImageStoreMut::<u8, 1>::alloc(src_width / 2, src_height / 2);
-    let scaler = Scaler::new(sampler);
-    _ = scaler.resize_plane(&store, &mut dst_store).unwrap();
-}
+use crate::fuzzer_explore::resize_rgba;
 
 fn main() {
+    resize_rgba(   0, 1,
+                   256,
+                   79,
+                   256,
+                   ResamplingFunction::Bilinear,
+                   false,
+    );
     #[allow(overflowing_literals)]
     // test_fast_image();
-    let img = ImageReader::open("./assets/test_alpha.JPG")
+    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -63,15 +45,29 @@ fn main() {
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
 
-    let mut scaler = Scaler::new(ResamplingFunction::Nearest);
-    scaler.set_threading_policy(ThreadingPolicy::Adaptive);
-    scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
+    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    scaler.set_threading_policy(ThreadingPolicy::Single);
+    // scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
+
+    let resizing_plan = scaler
+        .plan_rgba_resampling(
+            ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+            ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+            false,
+        )
+        .unwrap();
 
     let mut store =
         Rgba8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     store.bit_depth = 8;
-    let mut dst_store = Rgba8ImageStoreMut::alloc_with_depth(3240, 2160, 16);
-    scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
+    let mut dst_store = Rgba8ImageStoreMut::alloc_with_depth(
+        dimensions.0 as usize / 4,
+        dimensions.1 as usize / 4,
+        8,
+    );
+    // resize_with_accelerate(& store, &mut dst_store);
+    resizing_plan.resample(&store, &mut dst_store).unwrap();
+    // scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
     //
     // let elapsed_time = start_time.elapsed();
     // // Print the elapsed time in milliseconds
@@ -181,7 +177,7 @@ fn test_fast_image() {
     let mut dst_image = Image::new(3240, 2160, pixel_type);
 
     let mut resizer = Resizer::new();
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64"))]
     unsafe {
         resizer.set_cpu_extensions(CpuExtensions::Neon);
     }

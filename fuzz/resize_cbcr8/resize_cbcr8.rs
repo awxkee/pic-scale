@@ -32,8 +32,7 @@
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use pic_scale::{
-    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ThreadingPolicy,
-    WorkloadStrategy,
+    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy, WorkloadStrategy,
 };
 
 #[derive(Clone, Debug, Arbitrary)]
@@ -97,12 +96,17 @@ fn resize_cbcr8(
 
     let store = ImageStore::<u8, 2>::from_slice(&mut src_data, src_width, src_height).unwrap();
     let mut target = ImageStoreMut::alloc(dst_width, dst_height);
-    let mut scaler = Scaler::new(sampler);
-    scaler.set_threading_policy(threading_policy);
-    scaler.set_workload_strategy(workload_strategy);
-    if mul_alpha {
-        scaler.resize_gray_alpha(&store, &mut target, true).unwrap();
+    let scaler = Scaler::new(sampler)
+        .set_threading_policy(threading_policy)
+        .set_workload_strategy(workload_strategy);
+    let planner = if mul_alpha {
+        scaler
+            .plan_gray_alpha_resampling(store.size(), target.size(), true)
+            .unwrap()
     } else {
-        scaler.resize_cbcr8(&store, &mut target).unwrap();
-    }
+        scaler
+            .plan_cbcr_resampling(store.size(), target.size())
+            .unwrap()
+    };
+    planner.resample(&store, &mut target).unwrap();
 }

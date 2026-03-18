@@ -28,23 +28,27 @@
  */
 #![forbid(unsafe_code)]
 use crate::ar30::{Ar30ByteOrder, Rgb30};
-use crate::convolution::{ConvolutionOptions, HorizontalConvolutionPass, VerticalConvolutionPass};
+use crate::convolution::{ConvolutionOptions, HorizontalFilterPass, VerticalConvolutionPass};
+use crate::filter_weights::{DefaultWeightsConverter, WeightsConverter};
 use crate::image_size::ImageSize;
 use crate::image_store::{
     AssociateAlpha, CheckStoreDensity, ImageStore, ImageStoreMut, UnassociateAlpha,
 };
 use crate::math::WeightsGenerator;
-use crate::nearest_sampler::resize_nearest;
-use crate::pic_scale_error::{PicScaleError, try_vec};
-use crate::resize_ar30::resize_ar30_impl;
-use crate::support::check_image_size_overflow;
+use crate::plan::{
+    AlphaConvolvePlan, HorizontalFiltering, NonAlphaConvolvePlan, ResampleNearestPlan, Resampling,
+    TrampolineFiltering, VerticalFiltering,
+};
 use crate::threading_policy::ThreadingPolicy;
+use crate::validation::PicScaleError;
 use crate::{
     CbCr8ImageStore, CbCr16ImageStore, CbCrF32ImageStore, Planar8ImageStore, Planar16ImageStore,
-    PlanarF32ImageStore, ResamplingFunction, Rgb8ImageStore, Rgb16ImageStore, RgbF32ImageStore,
-    Rgba8ImageStore, Rgba16ImageStore, RgbaF32ImageStore,
+    PlanarF32ImageStore, ResamplingFunction, ResamplingPlan, Rgb8ImageStore, Rgb16ImageStore,
+    RgbF32ImageStore, Rgba8ImageStore, Rgba16ImageStore, RgbaF32ImageStore,
 };
 use std::fmt::Debug;
+use std::marker::PhantomData;
+use std::sync::Arc;
 
 #[derive(Debug, Copy, Clone)]
 /// Represents base scaling structure
@@ -52,226 +56,6 @@ pub struct Scaler {
     pub(crate) function: ResamplingFunction,
     pub(crate) threading_policy: ThreadingPolicy,
     pub workload_strategy: WorkloadStrategy,
-}
-
-/// 8 bit-depth images scaling trait
-pub trait Scaling {
-    /// Sets threading policy
-    ///
-    /// Setting up threading policy, refer to [crate::ThreadingPolicy] for more info
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    /// use pic_scale::{ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
-    /// let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-    /// scaler.set_threading_policy(ThreadingPolicy::Adaptive);
-    /// ```
-    fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy);
-
-    /// Performs rescaling for planar image
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u8, 1>::alloc(50, 50);
-    ///  scaler.resize_plane(&src_store, &mut dst_store).unwrap();
-    /// ```
-    fn resize_plane<'a>(
-        &'a self,
-        store: &ImageStore<'a, u8, 1>,
-        into: &mut ImageStoreMut<'a, u8, 1>,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for CbCr8 ( or 2 interleaved channels )
-    ///
-    /// Scales 2 interleaved channels as CbCr8, optionally it could handle LumaAlpha images also
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u8, 2>::alloc(50, 50);
-    ///  scaler.resize_cbcr8(&src_store, &mut dst_store).unwrap();
-    /// ```
-    fn resize_cbcr8<'a>(
-        &'a self,
-        store: &ImageStore<'a, u8, 2>,
-        into: &mut ImageStoreMut<'a, u8, 2>,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for Gray Alpha ( or 2 interleaved channels with aloha )
-    ///
-    /// Scales 2 interleaved channels as Gray Alpha
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u8, 2>::alloc(50, 50);
-    ///  scaler.resize_gray_alpha(&src_store, &mut dst_store, true).unwrap();
-    /// ```
-    fn resize_gray_alpha<'a>(
-        &'a self,
-        store: &ImageStore<'a, u8, 2>,
-        into: &mut ImageStoreMut<'a, u8, 2>,
-        premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for RGB, channel order does not matter
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u8, 3>::alloc(50, 50);
-    ///  scaler.resize_rgb(&src_store, &mut dst_store).unwrap();
-    /// ```
-    fn resize_rgb<'a>(
-        &'a self,
-        store: &ImageStore<'a, u8, 3>,
-        into: &mut ImageStoreMut<'a, u8, 3>,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for RGBA
-    ///
-    /// This method may premultiply and un associate alpha if required.
-    /// Alpha position is always considered as last
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u8, 4>::alloc(50, 50);
-    ///  scaler.resize_rgba(&src_store, &mut dst_store, false).unwrap();
-    /// ```
-    fn resize_rgba<'a>(
-        &'a self,
-        store: &ImageStore<'a, u8, 4>,
-        into: &mut ImageStoreMut<'a, u8, 4>,
-        premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError>;
-}
-
-/// f32 images scaling trait
-pub trait ScalingF32 {
-    /// Performs rescaling planar f32 image
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<f32, 1>::alloc(50, 50);
-    ///  scaler.resize_plane_f32(&src_store, &mut dst_store).unwrap();
-    /// ```
-    fn resize_plane_f32<'a>(
-        &'a self,
-        store: &ImageStore<'a, f32, 1>,
-        into: &mut ImageStoreMut<'a, f32, 1>,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for CbCr f32 image
-    ///
-    /// Scales an interleaved CbCr f32. Also, could handle LumaAlpha images.
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<f32, 2>::alloc(50, 50);
-    ///  scaler.resize_cbcr_f32(&src_store, &mut dst_store).unwrap();
-    /// ```
-    fn resize_cbcr_f32<'a>(
-        &'a self,
-        store: &ImageStore<'a, f32, 2>,
-        into: &mut ImageStoreMut<'a, f32, 2>,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for Gray Alpha f32 image
-    ///
-    /// Scales an interleaved Gray and Alpha in f32.
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<f32, 2>::alloc(50, 50);
-    ///  scaler.resize_gray_alpha_f32(&src_store, &mut dst_store, true).unwrap();
-    /// ```
-    fn resize_gray_alpha_f32<'a>(
-        &'a self,
-        store: &ImageStore<'a, f32, 2>,
-        into: &mut ImageStoreMut<'a, f32, 2>,
-        premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for RGB f32
-    ///
-    /// Scales an image RGB f32, channel order does not matter
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<f32, 3>::alloc(50, 50);
-    ///  scaler.resize_rgb_f32(&src_store, &mut dst_store).unwrap();
-    /// ```
-    fn resize_rgb_f32<'a>(
-        &'a self,
-        store: &ImageStore<'a, f32, 3>,
-        into: &mut ImageStoreMut<'a, f32, 3>,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for RGBA f32
-    ///
-    /// Scales an image RGBA f32, alpha expected to be at last position if
-    /// alpha pre-multiplication is requested
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<f32, 4>::alloc(50, 50);
-    ///  scaler.resize_rgba_f32(&src_store, &mut dst_store, false).unwrap();
-    /// ```
-    fn resize_rgba_f32<'a>(
-        &'a self,
-        store: &ImageStore<'a, f32, 4>,
-        into: &mut ImageStoreMut<'a, f32, 4>,
-        premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError>;
 }
 
 /// Defines execution hint about preferred strategy
@@ -282,155 +66,6 @@ pub enum WorkloadStrategy {
     /// Prefers speed to quality
     #[default]
     PreferSpeed,
-}
-
-/// 8+ bit-depth images scaling trait
-pub trait ScalingU16 {
-    /// Performs rescaling for Planar u16
-    ///
-    /// Scales planar high bit-depth image stored in `u16` type.
-    /// To perform scaling image bit-depth should be set in target image,
-    /// source image expects to have the same one.
-    ///
-    /// # Arguments
-    /// `store` - original image store
-    /// `into` - target image store
-    ///
-    /// # Panic
-    /// Method panics if bit-depth < 1 or bit-depth > 16
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u16, 1>::alloc_with_depth(50, 50, 10);
-    ///  scaler.resize_plane_u16(&src_store, &mut dst_store).unwrap();
-    /// ```
-    fn resize_plane_u16<'a>(
-        &'a self,
-        store: &ImageStore<'a, u16, 1>,
-        into: &mut ImageStoreMut<'a, u16, 1>,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for CbCr16
-    ///
-    /// Scales CbCr high bit-depth interleaved image in `u16` type, optionally it could handle LumaAlpha images also
-    /// To perform scaling image bit-depth should be set in target image,
-    /// source image expects to have the same one.
-    /// Channel order does not matter.
-    ///
-    /// # Arguments
-    /// `store` - original image store
-    /// `into` - target image store
-    ///
-    /// # Panics
-    /// Method panics if bit-depth < 1 or bit-depth > 16
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u16, 2>::alloc_with_depth(50, 50, 10);
-    ///  scaler.resize_cbcr_u16(&src_store, &mut dst_store).unwrap();
-    /// ```
-    ///
-    fn resize_cbcr_u16<'a>(
-        &'a self,
-        store: &ImageStore<'a, u16, 2>,
-        into: &mut ImageStoreMut<'a, u16, 2>,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for Gray Alpha high bit-depth ( or 2 interleaved channels with aloha )
-    ///
-    /// Scales 2 interleaved channels as Gray Alpha
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingU16};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u16, 2>::alloc_with_depth(50, 50, 16);
-    ///  scaler.resize_gray_alpha16(&src_store, &mut dst_store, true).unwrap();
-    /// ```
-    fn resize_gray_alpha16<'a>(
-        &'a self,
-        store: &ImageStore<'a, u16, 2>,
-        into: &mut ImageStoreMut<'a, u16, 2>,
-        premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for RGB
-    ///
-    /// Scales RGB high bit-depth image stored in `u16` type.
-    /// To perform scaling image bit-depth should be set in target image,
-    /// source image expects to have the same one.
-    /// Channel order does not matter.
-    ///
-    /// # Arguments
-    /// `store` - original image store
-    /// `into` - target image store
-    ///
-    /// # Panics
-    /// Method panics if bit-depth < 1 or bit-depth > 16
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u16, 3>::alloc_with_depth(50, 50, 10);
-    ///  scaler.resize_rgb_u16(&src_store, &mut dst_store).unwrap();
-    /// ```
-    ///
-    fn resize_rgb_u16<'a>(
-        &'a self,
-        store: &ImageStore<'a, u16, 3>,
-        into: &mut ImageStoreMut<'a, u16, 3>,
-    ) -> Result<(), PicScaleError>;
-
-    /// Performs rescaling for RGBA high bit-depth
-    ///
-    /// Scales RGB high bit-depth image stored in `u16` type.
-    /// To perform scaling image bit-depth should be set in target image,
-    /// source image expects to have the same one.
-    /// If pre-multiplication is requested alpha should be at last, otherwise
-    /// channel order does not matter.
-    ///
-    /// # Arguments
-    /// `store` - original image store
-    /// `into` - target image store
-    /// `premultiply_alpha` - flags is alpha is premultiplied
-    ///
-    /// # Panics
-    /// Method panics if bit-depth < 1 or bit-depth > 16
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u16, 4>::alloc_with_depth(50, 50, 10);
-    ///  scaler.resize_rgba_u16(&src_store, &mut dst_store, true).unwrap();
-    /// ```
-    ///
-    fn resize_rgba_u16<'a>(
-        &'a self,
-        store: &ImageStore<'a, u16, 4>,
-        into: &mut ImageStoreMut<'a, u16, 4>,
-        premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError>;
 }
 
 impl Scaler {
@@ -449,731 +84,819 @@ impl Scaler {
     /// Sets preferred workload strategy
     ///
     /// This is hint only, it may change something, or may not.
-    pub fn set_workload_strategy(&mut self, workload_strategy: WorkloadStrategy) {
+    pub fn set_workload_strategy(&mut self, workload_strategy: WorkloadStrategy) -> Self {
         self.workload_strategy = workload_strategy;
+        *self
     }
 }
 
 impl Scaler {
-    pub(crate) fn generic_resize<
-        'a,
+    pub(crate) fn plan_generic_resize<
         T: Clone + Copy + Debug + Send + Sync + Default + WeightsGenerator<W> + 'static,
         W,
         const N: usize,
     >(
         &self,
-        store: &ImageStore<'a, T, N>,
-        into: &mut ImageStoreMut<'a, T, N>,
-    ) -> Result<(), PicScaleError>
+        source_size: ImageSize,
+        destination_size: ImageSize,
+        bit_depth: usize,
+    ) -> Result<Arc<Resampling<T, N>>, PicScaleError>
     where
-        ImageStore<'a, T, N>: VerticalConvolutionPass<T, W, N> + HorizontalConvolutionPass<T, W, N>,
-        ImageStoreMut<'a, T, N>: CheckStoreDensity,
+        for<'a> ImageStore<'a, T, N>:
+            VerticalConvolutionPass<T, W, N> + HorizontalFilterPass<T, W, N>,
+        for<'a> ImageStoreMut<'a, T, N>: CheckStoreDensity,
     {
-        let new_size = into.get_size();
-        into.validate()?;
-        store.validate()?;
-        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
-            return Err(PicScaleError::ZeroImageDimensions);
-        }
-
-        if check_image_size_overflow(store.width, store.height, store.channels) {
-            return Err(PicScaleError::SourceImageIsTooLarge);
-        }
-
-        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
-            return Err(PicScaleError::DestinationImageIsTooLarge);
-        }
-
-        if into.should_have_bit_depth() && !(1..=16).contains(&into.bit_depth) {
-            return Err(PicScaleError::UnsupportedBitDepth(into.bit_depth));
-        }
-
-        if store.width == new_size.width && store.height == new_size.height {
-            store.copied_to_mut(into);
-            return Ok(());
-        }
-
-        let nova_thread_pool = self
-            .threading_policy
-            .get_nova_pool(ImageSize::new(new_size.width, new_size.height));
-
         if self.function == ResamplingFunction::Nearest {
-            resize_nearest::<T, N>(
-                store.buffer.as_ref(),
-                store.width,
-                store.height,
-                into.buffer.borrow_mut(),
-                new_size.width,
-                new_size.height,
-                &nova_thread_pool,
-            );
-            return Ok(());
+            return Ok(Arc::new(ResampleNearestPlan {
+                source_size,
+                target_size: destination_size,
+                threading_policy: self.threading_policy,
+                _phantom_data: PhantomData,
+            }));
         }
-
-        let should_do_horizontal = store.width != new_size.width;
-        let should_do_vertical = store.height != new_size.height;
-        assert!(should_do_horizontal || should_do_vertical);
-
-        if should_do_vertical && should_do_horizontal {
-            let mut target_vertical = try_vec![T::default(); store.width * new_size.height * N];
-
-            let mut new_image_vertical = ImageStoreMut::<T, N>::from_slice(
-                &mut target_vertical,
-                store.width,
-                new_size.height,
-            )?;
-            new_image_vertical.bit_depth = into.bit_depth;
-            let vertical_filters = T::make_weights(self.function, store.height, new_size.height)?;
-            let options = ConvolutionOptions::new(self.workload_strategy);
-            store.convolve_vertical(
-                vertical_filters,
-                &mut new_image_vertical,
-                &nova_thread_pool,
-                options,
-            );
-
-            let new_immutable_store = ImageStore::<T, N> {
-                buffer: std::borrow::Cow::Owned(target_vertical),
-                channels: N,
-                width: store.width,
-                height: new_size.height,
-                stride: store.width * N,
-                bit_depth: into.bit_depth,
-            };
-            let horizontal_filters = T::make_weights(self.function, store.width, new_size.width)?;
-            let options = ConvolutionOptions::new(self.workload_strategy);
-            new_immutable_store.convolve_horizontal(
-                horizontal_filters,
-                into,
-                &nova_thread_pool,
-                options,
-            );
-            Ok(())
-        } else if should_do_vertical {
-            let vertical_filters = T::make_weights(self.function, store.height, new_size.height)?;
-            let options = ConvolutionOptions::new(self.workload_strategy);
-            store.convolve_vertical(vertical_filters, into, &nova_thread_pool, options);
-            Ok(())
-        } else {
-            assert!(should_do_horizontal);
-            let horizontal_filters = T::make_weights(self.function, store.width, new_size.width)?;
-            let options = ConvolutionOptions::new(self.workload_strategy);
-            store.convolve_horizontal(horizontal_filters, into, &nova_thread_pool, options);
-            Ok(())
-        }
-    }
-
-    fn forward_resize_with_alpha<
-        'a,
-        T: Clone + Copy + Debug + Send + Sync + Default + WeightsGenerator<W> + 'static,
-        W,
-        const N: usize,
-    >(
-        &self,
-        store: &ImageStore<'a, T, N>,
-        into: &mut ImageStoreMut<'a, T, N>,
-        premultiply_alpha_requested: bool,
-        nova_thread_pool: &novtb::ThreadPool,
-    ) -> Result<(), PicScaleError>
-    where
-        ImageStore<'a, T, N>: VerticalConvolutionPass<T, W, N>
-            + HorizontalConvolutionPass<T, W, N>
-            + AssociateAlpha<T, N>,
-        ImageStoreMut<'a, T, N>: CheckStoreDensity + UnassociateAlpha<T, N>,
-    {
-        let new_size = into.get_size();
-        let mut src_store: std::borrow::Cow<'_, ImageStore<'_, T, N>> =
-            std::borrow::Cow::Borrowed(store);
-
-        let mut has_alpha_premultiplied = true;
-
-        if premultiply_alpha_requested {
-            let is_alpha_premultiplication_reasonable =
-                src_store.is_alpha_premultiplication_needed();
-            if is_alpha_premultiplication_reasonable {
-                let mut target_premultiplied =
-                    try_vec![T::default(); src_store.width * src_store.height * N];
-                let mut new_store = ImageStoreMut::<T, N>::from_slice(
-                    &mut target_premultiplied,
-                    src_store.width,
-                    src_store.height,
-                )?;
-                new_store.bit_depth = into.bit_depth;
-                src_store.premultiply_alpha(&mut new_store, nova_thread_pool);
-                src_store = std::borrow::Cow::Owned(ImageStore::<T, N> {
-                    buffer: std::borrow::Cow::Owned(target_premultiplied),
-                    channels: N,
-                    width: src_store.width,
-                    height: src_store.height,
-                    stride: src_store.width * N,
-                    bit_depth: into.bit_depth,
-                });
-                has_alpha_premultiplied = true;
-            }
-        }
-
-        let mut target_vertical = try_vec![T::default(); src_store.width * new_size.height * N];
-
-        let mut new_image_vertical = ImageStoreMut::<T, N>::from_slice(
-            &mut target_vertical,
-            src_store.width,
-            new_size.height,
-        )?;
-        new_image_vertical.bit_depth = into.bit_depth;
-        let vertical_filters = T::make_weights(self.function, src_store.height, new_size.height)?;
-        let options = ConvolutionOptions::new(self.workload_strategy);
-        src_store.convolve_vertical(
-            vertical_filters,
-            &mut new_image_vertical,
-            nova_thread_pool,
-            options,
-        );
-
-        let new_immutable_store = ImageStore::<T, N> {
-            buffer: std::borrow::Cow::Owned(target_vertical),
-            channels: N,
-            width: src_store.width,
-            height: new_size.height,
-            stride: src_store.width * N,
-            bit_depth: into.bit_depth,
+        let vertical_filters =
+            T::make_weights(self.function, source_size.height, destination_size.height)?;
+        let horizontal_filters =
+            T::make_weights(self.function, source_size.width, destination_size.width)?;
+        let options = ConvolutionOptions {
+            workload_strategy: self.workload_strategy,
+            bit_depth,
+            src_size: source_size,
+            dst_size: destination_size,
         };
-        let horizontal_filters = T::make_weights(self.function, src_store.width, new_size.width)?;
-        let options = ConvolutionOptions::new(self.workload_strategy);
-        new_immutable_store.convolve_horizontal(
-            horizontal_filters,
-            into,
-            nova_thread_pool,
-            options,
-        );
+        let vertical_plan =
+            ImageStore::<T, N>::vertical_plan(vertical_filters, self.threading_policy, options);
+        let horizontal_plan =
+            ImageStore::<T, N>::horizontal_plan(horizontal_filters, self.threading_policy, options);
 
-        if premultiply_alpha_requested && has_alpha_premultiplied {
-            into.unpremultiply_alpha(nova_thread_pool, self.workload_strategy);
-        }
+        let should_do_horizontal = source_size.width != destination_size.width;
+        let should_do_vertical = source_size.height != destination_size.height;
 
-        Ok(())
+        let trampoline_filter = Arc::new(TrampolineFiltering {
+            horizontal_filter: horizontal_plan.clone(),
+            vertical_filter: vertical_plan.clone(),
+            source_size,
+            target_size: destination_size,
+        });
+
+        Ok(Arc::new(NonAlphaConvolvePlan {
+            source_size,
+            target_size: destination_size,
+            horizontal_filter: horizontal_plan,
+            vertical_filter: vertical_plan,
+            trampoline_filter,
+            should_do_vertical,
+            should_do_horizontal,
+            threading_policy: self.threading_policy,
+        }))
     }
 
-    fn forward_resize_vertical_with_alpha<
-        'a,
+    pub(crate) fn plan_generic_resize_with_alpha<
         T: Clone + Copy + Debug + Send + Sync + Default + WeightsGenerator<W> + 'static,
         W,
         const N: usize,
     >(
         &self,
-        store: &ImageStore<'a, T, N>,
-        into: &mut ImageStoreMut<'a, T, N>,
-        premultiply_alpha_requested: bool,
-        nova_thread_pool: &novtb::ThreadPool,
-    ) -> Result<(), PicScaleError>
+        source_size: ImageSize,
+        destination_size: ImageSize,
+        bit_depth: usize,
+        needs_alpha_premultiplication: bool,
+    ) -> Result<Arc<Resampling<T, N>>, PicScaleError>
     where
-        ImageStore<'a, T, N>: VerticalConvolutionPass<T, W, N>
-            + HorizontalConvolutionPass<T, W, N>
-            + AssociateAlpha<T, N>,
-        ImageStoreMut<'a, T, N>: CheckStoreDensity + UnassociateAlpha<T, N>,
+        for<'a> ImageStore<'a, T, N>:
+            VerticalConvolutionPass<T, W, N> + HorizontalFilterPass<T, W, N> + AssociateAlpha<T, N>,
+        for<'a> ImageStoreMut<'a, T, N>: CheckStoreDensity + UnassociateAlpha<T, N>,
     {
-        let new_size = into.get_size();
-        let mut src_store = std::borrow::Cow::Borrowed(store);
-
-        let mut has_alpha_premultiplied = true;
-
-        if premultiply_alpha_requested {
-            let is_alpha_premultiplication_reasonable =
-                src_store.is_alpha_premultiplication_needed();
-            if is_alpha_premultiplication_reasonable {
-                let mut target_premultiplied =
-                    try_vec![T::default(); src_store.width * src_store.height * N];
-                let mut new_store = ImageStoreMut::<T, N>::from_slice(
-                    &mut target_premultiplied,
-                    src_store.width,
-                    src_store.height,
-                )?;
-                new_store.bit_depth = into.bit_depth;
-                src_store.premultiply_alpha(&mut new_store, nova_thread_pool);
-                src_store = std::borrow::Cow::Owned(ImageStore::<T, N> {
-                    buffer: std::borrow::Cow::Owned(target_premultiplied),
-                    channels: N,
-                    width: src_store.width,
-                    height: src_store.height,
-                    stride: src_store.width * N,
-                    bit_depth: into.bit_depth,
-                });
-                has_alpha_premultiplied = true;
-            }
-        }
-
-        let vertical_filters = T::make_weights(self.function, src_store.height, new_size.height)?;
-        let options = ConvolutionOptions::new(self.workload_strategy);
-        src_store.convolve_vertical(vertical_filters, into, nova_thread_pool, options);
-
-        if premultiply_alpha_requested && has_alpha_premultiplied {
-            into.unpremultiply_alpha(nova_thread_pool, self.workload_strategy);
-        }
-
-        Ok(())
-    }
-
-    fn forward_resize_horizontal_with_alpha<
-        'a,
-        T: Clone + Copy + Debug + Send + Sync + Default + WeightsGenerator<W> + 'static,
-        W,
-        const N: usize,
-    >(
-        &self,
-        store: &ImageStore<'a, T, N>,
-        into: &mut ImageStoreMut<'a, T, N>,
-        premultiply_alpha_requested: bool,
-        nova_thread_pool: &novtb::ThreadPool,
-    ) -> Result<(), PicScaleError>
-    where
-        ImageStore<'a, T, N>: VerticalConvolutionPass<T, W, N>
-            + HorizontalConvolutionPass<T, W, N>
-            + AssociateAlpha<T, N>,
-        ImageStoreMut<'a, T, N>: CheckStoreDensity + UnassociateAlpha<T, N>,
-    {
-        let new_size = into.get_size();
-        let mut src_store = std::borrow::Cow::Borrowed(store);
-
-        let mut has_alpha_premultiplied = true;
-
-        if premultiply_alpha_requested {
-            let is_alpha_premultiplication_reasonable =
-                src_store.is_alpha_premultiplication_needed();
-            if is_alpha_premultiplication_reasonable {
-                let mut target_premultiplied =
-                    try_vec![T::default(); src_store.width * src_store.height * N];
-                let mut new_store = ImageStoreMut::<T, N>::from_slice(
-                    &mut target_premultiplied,
-                    src_store.width,
-                    src_store.height,
-                )?;
-                new_store.bit_depth = into.bit_depth;
-                src_store.premultiply_alpha(&mut new_store, nova_thread_pool);
-                src_store = std::borrow::Cow::Owned(ImageStore::<T, N> {
-                    buffer: std::borrow::Cow::Owned(target_premultiplied),
-                    channels: N,
-                    width: src_store.width,
-                    height: src_store.height,
-                    stride: src_store.width * N,
-                    bit_depth: into.bit_depth,
-                });
-                has_alpha_premultiplied = true;
-            }
-        }
-
-        let horizontal_filters = T::make_weights(self.function, src_store.width, new_size.width)?;
-        let options = ConvolutionOptions::new(self.workload_strategy);
-        src_store.convolve_horizontal(horizontal_filters, into, nova_thread_pool, options);
-
-        if premultiply_alpha_requested && has_alpha_premultiplied {
-            into.unpremultiply_alpha(nova_thread_pool, self.workload_strategy);
-        }
-
-        Ok(())
-    }
-
-    pub(crate) fn generic_resize_with_alpha<
-        'a,
-        T: Clone + Copy + Debug + Send + Sync + Default + WeightsGenerator<W> + 'static,
-        W,
-        const N: usize,
-    >(
-        &self,
-        store: &ImageStore<'a, T, N>,
-        into: &mut ImageStoreMut<'a, T, N>,
-        premultiply_alpha_requested: bool,
-    ) -> Result<(), PicScaleError>
-    where
-        ImageStore<'a, T, N>: VerticalConvolutionPass<T, W, N>
-            + HorizontalConvolutionPass<T, W, N>
-            + AssociateAlpha<T, N>,
-        ImageStoreMut<'a, T, N>: CheckStoreDensity + UnassociateAlpha<T, N>,
-    {
-        let new_size = into.get_size();
-        into.validate()?;
-        store.validate()?;
-        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
-            return Err(PicScaleError::ZeroImageDimensions);
-        }
-
-        if check_image_size_overflow(store.width, store.height, store.channels) {
-            return Err(PicScaleError::SourceImageIsTooLarge);
-        }
-
-        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
-            return Err(PicScaleError::DestinationImageIsTooLarge);
-        }
-
-        if into.should_have_bit_depth() && !(1..=16).contains(&into.bit_depth) {
-            return Err(PicScaleError::UnsupportedBitDepth(into.bit_depth));
-        }
-
-        if store.width == new_size.width && store.height == new_size.height {
-            store.copied_to_mut(into);
-            return Ok(());
-        }
-
-        let nova_thread_pool = self
-            .threading_policy
-            .get_nova_pool(ImageSize::new(new_size.width, new_size.height));
-
         if self.function == ResamplingFunction::Nearest {
-            resize_nearest::<T, N>(
-                store.buffer.as_ref(),
-                store.width,
-                store.height,
-                into.buffer.borrow_mut(),
-                new_size.width,
-                new_size.height,
-                &nova_thread_pool,
-            );
-            return Ok(());
+            return Ok(Arc::new(ResampleNearestPlan {
+                source_size,
+                target_size: destination_size,
+                threading_policy: self.threading_policy,
+                _phantom_data: PhantomData,
+            }));
         }
+        if !needs_alpha_premultiplication {
+            return self.plan_generic_resize(source_size, destination_size, bit_depth);
+        }
+        let vertical_filters =
+            T::make_weights(self.function, source_size.height, destination_size.height)?;
+        let horizontal_filters =
+            T::make_weights(self.function, source_size.width, destination_size.width)?;
+        let options = ConvolutionOptions {
+            workload_strategy: self.workload_strategy,
+            bit_depth,
+            src_size: source_size,
+            dst_size: destination_size,
+        };
+        let vertical_plan =
+            ImageStore::<T, N>::vertical_plan(vertical_filters, self.threading_policy, options);
+        let horizontal_plan =
+            ImageStore::<T, N>::horizontal_plan(horizontal_filters, self.threading_policy, options);
 
-        let should_do_horizontal = store.width != new_size.width;
-        let should_do_vertical = store.height != new_size.height;
-        assert!(should_do_horizontal || should_do_vertical);
+        let should_do_horizontal = source_size.width != destination_size.width;
+        let should_do_vertical = source_size.height != destination_size.height;
 
-        if should_do_vertical && should_do_horizontal {
-            self.forward_resize_with_alpha(
-                store,
-                into,
-                premultiply_alpha_requested,
-                &nova_thread_pool,
-            )
-        } else if should_do_vertical {
-            self.forward_resize_vertical_with_alpha(
-                store,
-                into,
-                premultiply_alpha_requested,
-                &nova_thread_pool,
+        let trampoline_filter = Arc::new(TrampolineFiltering {
+            horizontal_filter: horizontal_plan.clone(),
+            vertical_filter: vertical_plan.clone(),
+            source_size,
+            target_size: destination_size,
+        });
+
+        Ok(Arc::new(AlphaConvolvePlan {
+            source_size,
+            target_size: destination_size,
+            threading_policy: self.threading_policy,
+            horizontal_filter: horizontal_plan,
+            vertical_filter: vertical_plan,
+            trampoline_filter,
+            should_do_vertical,
+            should_do_horizontal,
+            workload_strategy: self.workload_strategy,
+        }))
+    }
+
+    /// Creates a resampling plan for a single-channel (planar/grayscale) `u8` image.
+    ///
+    /// The returned [`Arc<Resampling<u8, 1>>`] can be executed repeatedly against images
+    /// of `source_size` to produce output of `target_size` without recomputing filter weights.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_planar_resampling(source_size, target_size)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
+    pub fn plan_planar_resampling(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+    ) -> Result<Arc<Resampling<u8, 1>>, PicScaleError> {
+        self.plan_generic_resize(source_size, target_size, 8)
+    }
+
+    /// Creates a resampling plan for a two-channel grayscale + alpha (`GA`) `u8` image.
+    ///
+    /// When `premultiply_alpha` is `true` the alpha channel is pre-multiplied into the gray
+    /// channel before resampling and un-multiplied afterward.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `premultiply_alpha` — Whether to premultiply alpha before resampling.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// // Resample with alpha-aware filtering to avoid dark fringing
+    /// let plan = scaler.plan_gray_alpha_resampling(source_size, target_size, true)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
+    pub fn plan_gray_alpha_resampling(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        premultiply_alpha: bool,
+    ) -> Result<Arc<Resampling<u8, 2>>, PicScaleError> {
+        if premultiply_alpha {
+            self.plan_generic_resize_with_alpha(source_size, target_size, 8, premultiply_alpha)
+        } else {
+            self.plan_generic_resize(source_size, target_size, 8)
+        }
+    }
+
+    /// Creates a resampling plan for a two-channel chroma (`CbCr`) `u8` image.
+    ///
+    /// Intended for the chroma planes of YCbCr images (e.g. the `Cb`/`Cr` planes in
+    /// 4:2:0 or 4:2:2 video), where both channels are treated as independent signals
+    /// with no alpha relationship. For the luma plane use [`plan_planar_resampling`].
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input chroma plane.
+    /// - `target_size` — Desired dimensions of the output chroma plane.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_cbcr_resampling(source_size, target_size)?;
+    /// plan.resample(&cbcr_store, &mut target_cbcr_store)?;
+    /// ```
+    pub fn plan_cbcr_resampling(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+    ) -> Result<Arc<Resampling<u8, 2>>, PicScaleError> {
+        self.plan_generic_resize(source_size, target_size, 8)
+    }
+
+    /// Creates a resampling plan for a three-channel RGB `u8` image.
+    ///
+    /// The returned [`Arc<Resampling<u8, 3>>`] encodes all filter weights for scaling
+    /// from `source_size` to `target_size` and can be reused across many frames without
+    /// recomputation.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_rgb_resampling(source_size, target_size)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
+    pub fn plan_rgb_resampling(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+    ) -> Result<Arc<Resampling<u8, 3>>, PicScaleError> {
+        self.plan_generic_resize(source_size, target_size, 8)
+    }
+
+    /// Creates a resampling plan for a four-channel RGBA `u8` image.
+    ///
+    /// When `premultiply_alpha` is `true` the RGB channels are pre-multiplied by alpha
+    /// before resampling and un-multiplied afterward.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `premultiply_alpha` — Whether to premultiply alpha before resampling.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// // Resample a sprite sheet with correct alpha blending
+    /// let plan = scaler.plan_rgba_resampling(source_size, target_size, true)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
+    pub fn plan_rgba_resampling(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        premultiply_alpha: bool,
+    ) -> Result<Arc<Resampling<u8, 4>>, PicScaleError> {
+        if premultiply_alpha {
+            self.plan_generic_resize_with_alpha(source_size, target_size, 8, premultiply_alpha)
+        } else {
+            self.plan_generic_resize(source_size, target_size, 8)
+        }
+    }
+
+    /// Creates a resampling plan for a single-channel (planar/grayscale) `u16` image.
+    ///
+    /// The 16-bit variant of [`plan_planar_resampling`], suitable for high-bit-depth
+    /// grayscale content such as HDR images or luma planes from 10/12-bit video.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `bit_depth` — Effective bit depth of the pixel data (e.g. `10`, `12`, or `16`).
+    ///   Must not exceed `16`.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_planar_resampling16(source_size, target_size, 12)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
+    pub fn plan_planar_resampling16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        bit_depth: usize,
+    ) -> Result<Arc<Resampling<u16, 1>>, PicScaleError> {
+        self.plan_generic_resize(source_size, target_size, bit_depth)
+    }
+
+    /// Creates a resampling plan for a two-channel chroma (`CbCr`) `u16` image.
+    ///
+    /// The 16-bit variant of [`plan_cbcr_resampling`], intended for high-bit-depth chroma
+    /// planes of YCbCr content (e.g. 10-bit 4:2:0 or 4:2:2 video). Both channels are
+    /// treated as independent signals with no alpha relationship.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input chroma plane.
+    /// - `target_size` — Desired dimensions of the output chroma plane.
+    /// - `bit_depth` — Effective bit depth of the pixel data (e.g. `10`, `12`, or `16`).
+    ///   Must not exceed `16`.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_cbcr_resampling16(source_size, target_size, 10)?;
+    /// plan.resample(&cbcr_store, &mut target_cbcr_store)?;
+    /// ```
+    pub fn plan_cbcr_resampling16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        bit_depth: usize,
+    ) -> Result<Arc<Resampling<u16, 2>>, PicScaleError> {
+        self.plan_generic_resize(source_size, target_size, bit_depth)
+    }
+
+    /// Creates a resampling plan for a two-channel grayscale + alpha (`GA`) `u16` image.
+    ///
+    /// The 16-bit variant of [`plan_gray_alpha_resampling`]. When `premultiply_alpha` is
+    /// `true` the gray channel is pre-multiplied by alpha before resampling and
+    /// un-multiplied afterward.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `premultiply_alpha` — Whether to premultiply alpha before resampling.
+    /// - `bit_depth` — Effective bit depth of the pixel data (e.g. `10`, `12`, or `16`).
+    ///   Must not exceed `16`.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_gray_alpha_resampling16(source_size, target_size, true, 16)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
+    pub fn plan_gray_alpha_resampling16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        premultiply_alpha: bool,
+        bit_depth: usize,
+    ) -> Result<Arc<Resampling<u16, 2>>, PicScaleError> {
+        if premultiply_alpha {
+            self.plan_generic_resize_with_alpha(
+                source_size,
+                target_size,
+                bit_depth,
+                premultiply_alpha,
             )
         } else {
-            assert!(should_do_horizontal);
-            self.forward_resize_horizontal_with_alpha(
-                store,
-                into,
-                premultiply_alpha_requested,
-                &nova_thread_pool,
+            self.plan_cbcr_resampling16(source_size, target_size, bit_depth)
+        }
+    }
+
+    /// Creates a resampling plan for a three-channel RGB `u16` image.
+    ///
+    /// The 16-bit variant of [`plan_rgb_resampling`], suitable for high-bit-depth color
+    /// images such as 10/12-bit HDR or wide-gamut content. All three channels are
+    /// resampled independently with no alpha relationship.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `bit_depth` — Effective bit depth of the pixel data (e.g. `10`, `12`, or `16`).
+    ///   Must not exceed `16`.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_rgb_resampling16(source_size, target_size, 12)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
+    pub fn plan_rgb_resampling16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        bit_depth: usize,
+    ) -> Result<Arc<Resampling<u16, 3>>, PicScaleError> {
+        self.plan_generic_resize(source_size, target_size, bit_depth)
+    }
+
+    /// Creates a resampling plan for a four-channel RGBA `u16` image.
+    ///
+    /// The 16-bit variant of [`plan_rgba_resampling`]. When `premultiply_alpha` is `true`
+    /// the RGB channels are pre-multiplied by alpha before resampling and un-multiplied
+    /// afterward.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `premultiply_alpha` — Whether to premultiply alpha before resampling.
+    /// - `bit_depth` — Effective bit depth of the pixel data (e.g. `10`, `12`, or `16`).
+    ///   Must not exceed `16`.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_rgba_resampling16(source_size, target_size, true, 10)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
+    pub fn plan_rgba_resampling16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        premultiply_alpha: bool,
+        bit_depth: usize,
+    ) -> Result<Arc<Resampling<u16, 4>>, PicScaleError> {
+        if premultiply_alpha {
+            self.plan_generic_resize_with_alpha(
+                source_size,
+                target_size,
+                bit_depth,
+                premultiply_alpha,
             )
+        } else {
+            self.plan_generic_resize(source_size, target_size, bit_depth)
         }
     }
-}
 
-impl Scaling for Scaler {
-    fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy) {
+    /// Creates a resampling plan for a single-channel (planar/grayscale) `f32` image.
+    ///
+    /// The `f32` variant of [`plan_planar_resampling`], suitable for HDR or linear-light
+    /// grayscale content where full floating-point precision is required.
+    ///
+    /// The internal accumulator precision is selected automatically based on the scaler's
+    /// [`WorkloadStrategy`]:
+    /// - [`PreferQuality`](WorkloadStrategy::PreferQuality) — accumulates in `f64` for
+    ///   maximum numerical accuracy.
+    /// - [`PreferSpeed`](WorkloadStrategy::PreferSpeed) — accumulates in `f32` for
+    ///   faster throughput at a small precision cost.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_planar_resampling_f32(source_size, target_size)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
+    pub fn plan_planar_resampling_f32(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+    ) -> Result<Arc<Resampling<f32, 1>>, PicScaleError> {
+        match self.workload_strategy {
+            WorkloadStrategy::PreferQuality => {
+                self.plan_generic_resize::<f32, f64, 1>(source_size, target_size, 8)
+            }
+            WorkloadStrategy::PreferSpeed => {
+                self.plan_generic_resize::<f32, f32, 1>(source_size, target_size, 8)
+            }
+        }
+    }
+
+    /// Creates a resampling plan for a two-channel chroma (`CbCr`) `f32` image.
+    ///
+    /// The `f32` variant of [`plan_cbcr_resampling`], intended for floating-point chroma
+    /// planes of YCbCr content. Both channels are treated as independent signals with no
+    /// alpha relationship.
+    ///
+    /// The internal accumulator precision is selected automatically based on the scaler's
+    /// [`WorkloadStrategy`]:
+    /// - [`PreferQuality`](WorkloadStrategy::PreferQuality) — accumulates in `f64` for
+    ///   maximum numerical accuracy.
+    /// - [`PreferSpeed`](WorkloadStrategy::PreferSpeed) — accumulates in `f32` for
+    ///   faster throughput at a small precision cost.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input chroma plane.
+    /// - `target_size` — Desired dimensions of the output chroma plane.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_cbcr_resampling_f32(source_size, target_size)?;
+    /// plan.resample(&cbcr_store, &mut target_cbcr_store)?;
+    /// ```
+    pub fn plan_cbcr_resampling_f32(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+    ) -> Result<Arc<dyn ResamplingPlan<f32, 2> + Send + Sync>, PicScaleError> {
+        match self.workload_strategy {
+            WorkloadStrategy::PreferQuality => {
+                self.plan_generic_resize::<f32, f64, 2>(source_size, target_size, 8)
+            }
+            WorkloadStrategy::PreferSpeed => {
+                self.plan_generic_resize::<f32, f32, 2>(source_size, target_size, 8)
+            }
+        }
+    }
+
+    /// Creates a resampling plan for a two-channel grayscale + alpha (`GA`) `f32` image.
+    ///
+    /// The `f32` variant of [`plan_gray_alpha_resampling`]. When `premultiply_alpha` is
+    /// `true` the gray channel is pre-multiplied by alpha before resampling and
+    /// un-multiplied afterward, preventing dark fringing around transparent edges.
+    /// Set it to `false` if the image uses straight alpha or the channels should be
+    /// filtered independently.
+    ///
+    /// The internal accumulator precision is selected automatically based on the scaler's
+    /// [`WorkloadStrategy`]:
+    /// - [`PreferQuality`](WorkloadStrategy::PreferQuality) — accumulates in `f64` for
+    ///   maximum numerical accuracy.
+    /// - [`PreferSpeed`](WorkloadStrategy::PreferSpeed) — accumulates in `f32` for
+    ///   faster throughput at a small precision cost.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `premultiply_alpha` — Whether to premultiply alpha before resampling.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_gray_alpha_resampling_f32(source_size, target_size, true)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
+    pub fn plan_gray_alpha_resampling_f32(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        premultiply_alpha: bool,
+    ) -> Result<Arc<Resampling<f32, 2>>, PicScaleError> {
+        if premultiply_alpha {
+            match self.workload_strategy {
+                WorkloadStrategy::PreferQuality => self
+                    .plan_generic_resize_with_alpha::<f32, f64, 2>(
+                        source_size,
+                        target_size,
+                        8,
+                        premultiply_alpha,
+                    ),
+                WorkloadStrategy::PreferSpeed => self
+                    .plan_generic_resize_with_alpha::<f32, f32, 2>(
+                        source_size,
+                        target_size,
+                        8,
+                        premultiply_alpha,
+                    ),
+            }
+        } else {
+            self.plan_cbcr_resampling_f32(source_size, target_size)
+        }
+    }
+
+    /// Creates a resampling plan for a three-channel RGB `f32` image.
+    ///
+    /// The `f32` variant of [`plan_rgb_resampling`], suitable for HDR or linear-light
+    /// color images where full floating-point precision is required. All three channels
+    /// are resampled independently with no alpha relationship.
+    ///
+    /// The internal accumulator precision is selected automatically based on the scaler's
+    /// [`WorkloadStrategy`]:
+    /// - [`PreferQuality`](WorkloadStrategy::PreferQuality) — accumulates in `f64` for
+    ///   maximum numerical accuracy.
+    /// - [`PreferSpeed`](WorkloadStrategy::PreferSpeed) — accumulates in `f32` for
+    ///   faster throughput at a small precision cost.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_rgb_resampling_f32(source_size, target_size)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
+    pub fn plan_rgb_resampling_f32(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+    ) -> Result<Arc<Resampling<f32, 3>>, PicScaleError> {
+        match self.workload_strategy {
+            WorkloadStrategy::PreferQuality => {
+                self.plan_generic_resize::<f32, f64, 3>(source_size, target_size, 8)
+            }
+            WorkloadStrategy::PreferSpeed => {
+                self.plan_generic_resize::<f32, f32, 3>(source_size, target_size, 8)
+            }
+        }
+    }
+
+    /// Creates a resampling plan for a four-channel RGBA `f32` image.
+    ///
+    /// The `f32` variant of [`plan_rgba_resampling`]. When `premultiply_alpha` is `true`
+    /// the RGB channels are pre-multiplied by alpha before resampling and un-multiplied
+    /// afterward, preventing dark halos around semi-transparent edges. Set it to `false`
+    /// if the image uses straight alpha or the channels should be filtered independently.
+    ///
+    /// The internal accumulator precision is selected automatically based on the scaler's
+    /// [`WorkloadStrategy`]:
+    /// - [`PreferQuality`](WorkloadStrategy::PreferQuality) — accumulates in `f64` for
+    ///   maximum numerical accuracy.
+    /// - [`PreferSpeed`](WorkloadStrategy::PreferSpeed) — accumulates in `f32` for
+    ///   faster throughput at a small precision cost.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `premultiply_alpha` — Whether to premultiply alpha before resampling.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_rgba_resampling_f32(source_size, target_size, true)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
+    pub fn plan_rgba_resampling_f32(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        premultiply_alpha: bool,
+    ) -> Result<Arc<Resampling<f32, 4>>, PicScaleError> {
+        if premultiply_alpha {
+            match self.workload_strategy {
+                WorkloadStrategy::PreferQuality => self
+                    .plan_generic_resize_with_alpha::<f32, f64, 4>(
+                        source_size,
+                        target_size,
+                        8,
+                        premultiply_alpha,
+                    ),
+                WorkloadStrategy::PreferSpeed => self
+                    .plan_generic_resize_with_alpha::<f32, f32, 4>(
+                        source_size,
+                        target_size,
+                        8,
+                        premultiply_alpha,
+                    ),
+            }
+        } else {
+            match self.workload_strategy {
+                WorkloadStrategy::PreferQuality => {
+                    self.plan_generic_resize::<f32, f64, 4>(source_size, target_size, 8)
+                }
+                WorkloadStrategy::PreferSpeed => {
+                    self.plan_generic_resize::<f32, f32, 4>(source_size, target_size, 8)
+                }
+            }
+        }
+    }
+
+    pub fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy) -> Self {
         self.threading_policy = threading_policy;
-    }
-
-    fn resize_plane<'a>(
-        &'a self,
-        store: &ImageStore<'a, u8, 1>,
-        into: &mut ImageStoreMut<'a, u8, 1>,
-    ) -> Result<(), PicScaleError> {
-        self.generic_resize(store, into)
-    }
-
-    fn resize_cbcr8<'a>(
-        &'a self,
-        store: &ImageStore<'a, u8, 2>,
-        into: &mut ImageStoreMut<'a, u8, 2>,
-    ) -> Result<(), PicScaleError> {
-        self.generic_resize(store, into)
-    }
-
-    fn resize_gray_alpha<'a>(
-        &'a self,
-        store: &ImageStore<'a, u8, 2>,
-        into: &mut ImageStoreMut<'a, u8, 2>,
-        premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError> {
-        self.generic_resize_with_alpha(store, into, premultiply_alpha)
-    }
-
-    fn resize_rgb<'a>(
-        &'a self,
-        store: &ImageStore<'a, u8, 3>,
-        into: &mut ImageStoreMut<'a, u8, 3>,
-    ) -> Result<(), PicScaleError> {
-        self.generic_resize(store, into)
-    }
-
-    fn resize_rgba<'a>(
-        &'a self,
-        store: &ImageStore<'a, u8, 4>,
-        into: &mut ImageStoreMut<'a, u8, 4>,
-        premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError> {
-        self.generic_resize_with_alpha(store, into, premultiply_alpha)
-    }
-}
-
-impl ScalingF32 for Scaler {
-    fn resize_plane_f32<'a>(
-        &'a self,
-        store: &ImageStore<'a, f32, 1>,
-        into: &mut ImageStoreMut<'a, f32, 1>,
-    ) -> Result<(), PicScaleError> {
-        match self.workload_strategy {
-            WorkloadStrategy::PreferQuality => self.generic_resize::<f32, f64, 1>(store, into),
-            WorkloadStrategy::PreferSpeed => self.generic_resize::<f32, f32, 1>(store, into),
-        }
-    }
-
-    fn resize_cbcr_f32<'a>(
-        &'a self,
-        store: &ImageStore<'a, f32, 2>,
-        into: &mut ImageStoreMut<'a, f32, 2>,
-    ) -> Result<(), PicScaleError> {
-        match self.workload_strategy {
-            WorkloadStrategy::PreferQuality => self.generic_resize::<f32, f64, 2>(store, into),
-            WorkloadStrategy::PreferSpeed => self.generic_resize::<f32, f32, 2>(store, into),
-        }
-    }
-
-    fn resize_gray_alpha_f32<'a>(
-        &'a self,
-        store: &ImageStore<'a, f32, 2>,
-        into: &mut ImageStoreMut<'a, f32, 2>,
-        premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError> {
-        match self.workload_strategy {
-            WorkloadStrategy::PreferQuality => {
-                self.generic_resize_with_alpha::<f32, f64, 2>(store, into, premultiply_alpha)
-            }
-            WorkloadStrategy::PreferSpeed => {
-                self.generic_resize_with_alpha::<f32, f32, 2>(store, into, premultiply_alpha)
-            }
-        }
-    }
-
-    fn resize_rgb_f32<'a>(
-        &'a self,
-        store: &ImageStore<'a, f32, 3>,
-        into: &mut ImageStoreMut<'a, f32, 3>,
-    ) -> Result<(), PicScaleError> {
-        match self.workload_strategy {
-            WorkloadStrategy::PreferQuality => self.generic_resize::<f32, f64, 3>(store, into),
-            WorkloadStrategy::PreferSpeed => self.generic_resize::<f32, f32, 3>(store, into),
-        }
-    }
-
-    fn resize_rgba_f32<'a>(
-        &'a self,
-        store: &ImageStore<'a, f32, 4>,
-        into: &mut ImageStoreMut<'a, f32, 4>,
-        premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError> {
-        match self.workload_strategy {
-            WorkloadStrategy::PreferQuality => {
-                self.generic_resize_with_alpha::<f32, f64, 4>(store, into, premultiply_alpha)
-            }
-            WorkloadStrategy::PreferSpeed => {
-                self.generic_resize_with_alpha::<f32, f32, 4>(store, into, premultiply_alpha)
-            }
-        }
-    }
-}
-
-impl ScalingU16 for Scaler {
-    /// Performs rescaling for RGB
-    ///
-    /// Scales RGB high bit-depth image stored in `u16` type.
-    /// To perform scaling image bit-depth should be set in target image,
-    /// source image expects to have the same one.
-    /// Channel order does not matter.
-    ///
-    /// # Arguments
-    /// `store` - original image store
-    /// `into` - target image store
-    ///
-    /// # Panics
-    /// Method panics if bit-depth < 1 or bit-depth > 16
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u16, 3>::alloc_with_depth(50, 50, 10);
-    ///  scaler.resize_rgb_u16(&src_store, &mut dst_store).unwrap();
-    /// ```
-    ///
-    fn resize_rgb_u16<'a>(
-        &'a self,
-        store: &ImageStore<'a, u16, 3>,
-        into: &mut ImageStoreMut<'a, u16, 3>,
-    ) -> Result<(), PicScaleError> {
-        self.generic_resize(store, into)
-    }
-
-    fn resize_cbcr_u16<'a>(
-        &'a self,
-        store: &ImageStore<'a, u16, 2>,
-        into: &mut ImageStoreMut<'a, u16, 2>,
-    ) -> Result<(), PicScaleError> {
-        self.generic_resize(store, into)
-    }
-
-    fn resize_gray_alpha16<'a>(
-        &'a self,
-        store: &ImageStore<'a, u16, 2>,
-        into: &mut ImageStoreMut<'a, u16, 2>,
-        premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError> {
-        self.generic_resize_with_alpha(store, into, premultiply_alpha)
-    }
-
-    /// Resizes u16 image
-    ///
-    /// # Arguments
-    /// `store` - original image store
-    /// `into` - target image store
-    /// `premultiply_alpha` - flags is alpha is premultiplied
-    ///
-    /// # Panics
-    /// Method panics if bit -depth < 1 or bit-depth > 16
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u16, 4>::alloc_with_depth(50, 50, 10);
-    ///  scaler.resize_rgba_u16(&src_store, &mut dst_store, true).unwrap();
-    /// ```
-    ///
-    fn resize_rgba_u16<'a>(
-        &'a self,
-        store: &ImageStore<'a, u16, 4>,
-        into: &mut ImageStoreMut<'a, u16, 4>,
-        premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError> {
-        self.generic_resize_with_alpha(store, into, premultiply_alpha)
-    }
-
-    /// Performs rescaling for Planar u16
-    ///
-    /// Scales planar high bit-depth image stored in `u16` type.
-    /// To perform scaling image bit-depth should be set in target image,
-    /// source image expects to have the same one.
-    ///
-    /// # Arguments
-    /// `store` - original image store
-    /// `into` - target image store
-    ///
-    /// # Panic
-    /// Method panics if bit-depth < 1 or bit-depth > 16
-    ///
-    /// # Example
-    ///
-    /// #[no_build]
-    /// ```rust
-    ///  use pic_scale::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ScalingU16};
-    ///  let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-    ///  let src_store = ImageStore::alloc(100, 100);
-    ///  let mut dst_store = ImageStoreMut::<u16, 1>::alloc_with_depth(50, 50, 10);
-    ///  scaler.resize_plane_u16(&src_store, &mut dst_store).unwrap();
-    /// ```
-    fn resize_plane_u16<'a>(
-        &'a self,
-        store: &ImageStore<'a, u16, 1>,
-        into: &mut ImageStoreMut<'a, u16, 1>,
-    ) -> Result<(), PicScaleError> {
-        self.generic_resize(store, into)
+        *self
     }
 }
 
 impl Scaler {
-    /// Resizes RGBA2101010 image
+    pub(crate) fn plan_resize_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
+        &self,
+        source_size: ImageSize,
+        destination_size: ImageSize,
+    ) -> Result<Arc<Resampling<u8, 4>>, PicScaleError> {
+        if self.function == ResamplingFunction::Nearest {
+            return Ok(Arc::new(ResampleNearestPlan {
+                source_size,
+                target_size: destination_size,
+                threading_policy: self.threading_policy,
+                _phantom_data: PhantomData,
+            }));
+        }
+        let vertical_filters =
+            u8::make_weights(self.function, source_size.height, destination_size.height)?;
+        let horizontal_filters =
+            u8::make_weights(self.function, source_size.width, destination_size.width)?;
+        let options = ConvolutionOptions {
+            workload_strategy: self.workload_strategy,
+            bit_depth: 10,
+            src_size: source_size,
+            dst_size: destination_size,
+        };
+        let q_vert_filters = DefaultWeightsConverter::default().prepare_weights(&vertical_filters);
+        use crate::dispatch_group_ar30::{
+            get_horizontal_dispatch_ar30, get_horizontal_dispatch4_ar30,
+            get_vertical_dispatcher_ar30,
+        };
+        let vertical_plan = Arc::new(VerticalFiltering {
+            filter_weights: q_vert_filters,
+            threading_policy: self.threading_policy,
+            filter_row: get_vertical_dispatcher_ar30::<AR30_TYPE, AR30_ORDER>(options),
+        });
+
+        let hor_dispatch4 = get_horizontal_dispatch4_ar30::<AR30_TYPE, AR30_ORDER>(options);
+        let hor_dispatch = get_horizontal_dispatch_ar30::<AR30_TYPE, AR30_ORDER>();
+        let q_hor_filters = DefaultWeightsConverter::default().prepare_weights(&horizontal_filters);
+
+        let horizontal_plan = Arc::new(HorizontalFiltering {
+            filter_weights: q_hor_filters,
+            threading_policy: self.threading_policy,
+            filter_4_rows: Some(hor_dispatch4),
+            filter_row: hor_dispatch,
+        });
+
+        let should_do_horizontal = source_size.width != destination_size.width;
+        let should_do_vertical = source_size.height != destination_size.height;
+
+        let trampoline_filter = Arc::new(TrampolineFiltering {
+            horizontal_filter: horizontal_plan.clone(),
+            vertical_filter: vertical_plan.clone(),
+            source_size,
+            target_size: destination_size,
+        });
+
+        Ok(Arc::new(NonAlphaConvolvePlan {
+            source_size,
+            target_size: destination_size,
+            horizontal_filter: horizontal_plan,
+            vertical_filter: vertical_plan,
+            trampoline_filter,
+            should_do_vertical,
+            should_do_horizontal,
+            threading_policy: self.threading_policy,
+        }))
+    }
+
+    /// Creates a resampling plan for an AR30 (`RGBA2101010`) packed 10-bit image.
     ///
-    /// This method ignores alpha scaling.
+    /// AR30 stores each pixel as a 32-bit word with 10 bits per RGB channel and a
+    /// 2-bit alpha.
+    ///
+    /// The `order` argument controls the byte layout of the packed word:
+    /// - [`Ar30ByteOrder::Host`] — native endianness of the current platform.
+    /// - [`Ar30ByteOrder::Network`] — big-endian (network) byte order.
     ///
     /// # Arguments
-    /// `src_image` - source AR30 image
-    /// `dst_image` - destination AR30 image
-    /// `new_size` - New image size
     ///
-    pub fn resize_ar30(
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `order` — Byte order of the packed AR30 words.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_ar30_resampling(source_size, target_size, Ar30ByteOrder::Host)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
+    pub fn plan_ar30_resampling(
         &self,
-        src_image: &ImageStore<u8, 4>,
-        dst_image: &mut ImageStoreMut<u8, 4>,
+        source_size: ImageSize,
+        target_size: ImageSize,
         order: Ar30ByteOrder,
-    ) -> Result<(), PicScaleError> {
-        src_image.validate()?;
-        dst_image.validate()?;
-        let dst_size = dst_image.get_size();
-        let dst_stride = dst_image.stride();
+    ) -> Result<Arc<Resampling<u8, 4>>, PicScaleError> {
         match order {
-            Ar30ByteOrder::Host => {
-                resize_ar30_impl::<{ Rgb30::Ar30 as usize }, { Ar30ByteOrder::Host as usize }>(
-                    src_image.as_bytes(),
-                    src_image.stride,
-                    src_image.get_size(),
-                    dst_image.buffer.borrow_mut(),
-                    dst_stride,
-                    dst_size,
-                    self,
-                )
-            }
-            Ar30ByteOrder::Network => {
-                resize_ar30_impl::<{ Rgb30::Ar30 as usize }, { Ar30ByteOrder::Network as usize }>(
-                    src_image.as_bytes(),
-                    src_image.stride,
-                    src_image.get_size(),
-                    dst_image.buffer.borrow_mut(),
-                    dst_stride,
-                    dst_size,
-                    self,
-                )
-            }
+            Ar30ByteOrder::Host => self
+                .plan_resize_ar30::<{ Rgb30::Ar30 as usize }, { Ar30ByteOrder::Host as usize }>(
+                    source_size,
+                    target_size,
+                ),
+            Ar30ByteOrder::Network => self
+                .plan_resize_ar30::<{ Rgb30::Ar30 as usize }, { Ar30ByteOrder::Network as usize }>(
+                    source_size,
+                    target_size,
+                ),
         }
     }
 
-    /// Resizes RGBA1010102 image
+    /// Creates a resampling plan for an RA30 (`RGBA1010102`) packed 10-bit image.
     ///
-    /// This method ignores alpha scaling.
+    /// RA30 stores each pixel as a 32-bit word with 10 bits per RGB channel and a
+    /// 2-bit alpha in the least-significant position.
+    ///
+    /// The `order` argument controls the byte layout of the packed word:
+    /// - [`Ar30ByteOrder::Host`] — native endianness of the current platform.
+    /// - [`Ar30ByteOrder::Network`] — big-endian (network) byte order.
     ///
     /// # Arguments
-    /// `src_image` - source RA30 image
-    /// `dst_image` - destination RA30 image
     ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `order` — Byte order of the packed RA30 words.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.resize_ra30(source_size, target_size, Ar30ByteOrder::Host)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
     pub fn resize_ra30(
         &self,
-        src_image: &ImageStore<u8, 4>,
-        dst_image: &mut ImageStoreMut<u8, 4>,
+        source_size: ImageSize,
+        target_size: ImageSize,
         order: Ar30ByteOrder,
-    ) -> Result<(), PicScaleError> {
-        src_image.validate()?;
-        dst_image.validate()?;
-        let dst_size = dst_image.get_size();
-        let dst_stride = dst_image.stride();
+    ) -> Result<Arc<Resampling<u8, 4>>, PicScaleError> {
         match order {
-            Ar30ByteOrder::Host => {
-                resize_ar30_impl::<{ Rgb30::Ra30 as usize }, { Ar30ByteOrder::Host as usize }>(
-                    src_image.as_bytes(),
-                    src_image.stride,
-                    src_image.get_size(),
-                    dst_image.buffer.borrow_mut(),
-                    dst_stride,
-                    dst_size,
-                    self,
-                )
-            }
-            Ar30ByteOrder::Network => {
-                resize_ar30_impl::<{ Rgb30::Ra30 as usize }, { Ar30ByteOrder::Network as usize }>(
-                    src_image.as_bytes(),
-                    src_image.stride,
-                    src_image.get_size(),
-                    dst_image.buffer.borrow_mut(),
-                    dst_stride,
-                    dst_size,
-                    self,
-                )
-            }
+            Ar30ByteOrder::Host => self
+                .plan_resize_ar30::<{ Rgb30::Ra30 as usize }, { Ar30ByteOrder::Host as usize }>(
+                    source_size,
+                    target_size,
+                ),
+            Ar30ByteOrder::Network => self
+                .plan_resize_ar30::<{ Rgb30::Ra30 as usize }, { Ar30ByteOrder::Network as usize }>(
+                    source_size,
+                    target_size,
+                ),
         }
     }
 }
@@ -1206,13 +929,15 @@ macro_rules! def_image_scaling_alpha {
                 store: &mut ImageStoreMut<'b, $fx_type, $cn>,
                 options: ScalingOptions,
             ) -> Result<(), PicScaleError> {
-                let mut scaler = Scaler::new(options.resampling_function);
-                scaler.set_threading_policy(options.threading_policy);
-                scaler.generic_resize_with_alpha::<$fx_type, f32, $cn>(
-                    self,
-                    store,
+                let scaler = Scaler::new(options.resampling_function)
+                    .set_threading_policy(options.threading_policy);
+                let plan = scaler.plan_generic_resize_with_alpha::<$fx_type, f32, $cn>(
+                    self.size(),
+                    store.size(),
+                    store.bit_depth,
                     options.premultiply_alpha,
-                )
+                )?;
+                plan.resample(self, store)
             }
         }
     };
@@ -1226,9 +951,14 @@ macro_rules! def_image_scaling {
                 store: &mut ImageStoreMut<'b, $fx_type, $cn>,
                 options: ScalingOptions,
             ) -> Result<(), PicScaleError> {
-                let mut scaler = Scaler::new(options.resampling_function);
-                scaler.set_threading_policy(options.threading_policy);
-                scaler.generic_resize::<$fx_type, f32, $cn>(self, store)
+                let scaler = Scaler::new(options.resampling_function)
+                    .set_threading_policy(options.threading_policy);
+                let plan = scaler.plan_generic_resize::<$fx_type, f32, $cn>(
+                    self.size(),
+                    store.size(),
+                    store.bit_depth,
+                )?;
+                plan.resample(self, store)
             }
         }
     };
@@ -1327,13 +1057,14 @@ mod tests {
             dst[2] = 99;
             dst[3] = 77;
         }
-        let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let scaler =
+            Scaler::new(ResamplingFunction::Bilinear).set_threading_policy(ThreadingPolicy::Single);
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
-        scaler
-            .resize_rgba(&src_store, &mut target_store, false)
+        let planned = scaler
+            .plan_rgba_resampling(src_store.size(), target_store.size(), false)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
         check_rgba8!(target_data, image_width, 34);
     }
@@ -1355,9 +1086,10 @@ mod tests {
         scaler.set_threading_policy(ThreadingPolicy::Single);
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width / 2, image_height / 2);
-        scaler
-            .resize_rgba(&src_store, &mut target_store, false)
+        let planned = scaler
+            .plan_rgba_resampling(src_store.size(), target_store.size(), false)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
         check_rgba8!(target_data, image_width, 34);
     }
@@ -1375,13 +1107,14 @@ mod tests {
             dst[3] = 77;
         }
         image[3] = 78;
-        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let scaler =
+            Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width / 2, image_height / 2);
-        scaler
-            .resize_rgba(&src_store, &mut target_store, true)
+        let planned = scaler
+            .plan_rgba_resampling(src_store.size(), target_store.size(), true)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
         check_rgba8!(target_data, image_width, 160);
     }
@@ -1401,7 +1134,10 @@ mod tests {
         scaler.set_threading_policy(ThreadingPolicy::Single);
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
-        scaler.resize_rgb(&src_store, &mut target_store).unwrap();
+        let planned = scaler
+            .plan_rgb_resampling(src_store.size(), target_store.size())
+            .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
 
         check_rgb16!(target_data, image_width, 85);
@@ -1422,7 +1158,10 @@ mod tests {
         scaler.set_threading_policy(ThreadingPolicy::Adaptive);
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
-        scaler.resize_rgb(&src_store, &mut target_store).unwrap();
+        let planned = scaler
+            .plan_rgb_resampling(src_store.size(), target_store.size())
+            .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
 
         check_rgb16!(target_data, image_width, 85);
@@ -1446,9 +1185,10 @@ mod tests {
         let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 10);
-        scaler
-            .resize_rgba_u16(&src_store, &mut target_store, false)
+        let planned = scaler
+            .plan_rgba_resampling16(src_store.size(), target_store.size(), true, 10)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
 
         check_rgba8!(target_data, image_width, 60);
@@ -1470,9 +1210,10 @@ mod tests {
         let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 10);
-        scaler
-            .resize_rgb_u16(&src_store, &mut target_store)
+        let planned = scaler
+            .plan_rgb_resampling16(src_store.size(), target_store.size(), 10)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
 
         check_rgb16!(target_data, image_width, 85);
@@ -1494,9 +1235,10 @@ mod tests {
         let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 10);
-        scaler
-            .resize_rgb_u16(&src_store, &mut target_store)
+        let planned = scaler
+            .plan_rgb_resampling16(src_store.size(), target_store.size(), 10)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
 
         check_rgb16!(target_data, image_width, 85);
@@ -1518,9 +1260,10 @@ mod tests {
         let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 16);
-        scaler
-            .resize_rgb_u16(&src_store, &mut target_store)
+        let planned = scaler
+            .plan_rgb_resampling16(src_store.size(), target_store.size(), 16)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
 
         check_rgb16!(target_data, image_width, 100);
@@ -1543,9 +1286,10 @@ mod tests {
         let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 16);
-        scaler
-            .resize_rgba_u16(&src_store, &mut target_store, false)
+        let planned = scaler
+            .plan_rgba_resampling16(src_store.size(), target_store.size(), false, 16)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
 
         check_rgba8!(target_data, image_width, 180);
@@ -1568,9 +1312,10 @@ mod tests {
         let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 16);
-        scaler
-            .resize_rgba_u16(&src_store, &mut target_store, false)
+        let planned = scaler
+            .plan_rgba_resampling16(src_store.size(), target_store.size(), false, 16)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
 
         check_rgba8!(target_data, image_width, 180);
@@ -1592,9 +1337,10 @@ mod tests {
         scaler.set_threading_policy(ThreadingPolicy::Single);
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
-        scaler
-            .resize_rgba(&src_store, &mut target_store, false)
+        let planned = scaler
+            .plan_rgba_resampling(src_store.size(), target_store.size(), false)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
 
         check_rgba8!(target_data, image_width, 80);
@@ -1616,9 +1362,10 @@ mod tests {
         scaler.set_threading_policy(ThreadingPolicy::Adaptive);
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
-        scaler
-            .resize_rgba(&src_store, &mut target_store, false)
+        let planned = scaler
+            .plan_rgba_resampling(src_store.size(), target_store.size(), false)
             .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
 
         check_rgba8!(target_data, image_width, 80);

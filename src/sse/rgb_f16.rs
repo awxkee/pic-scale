@@ -151,111 +151,60 @@ unsafe fn convolve_horizontal_parts_one_rgb_f16<const F16C: bool, const FMA: boo
 }
 
 pub(crate) fn convolve_horizontal_rgb_sse_row_one_f16<const F16C: bool, const FMA: bool>(
-    dst_width: usize,
-    src_width: usize,
-    filter_weights: &FilterWeights<f32>,
     src: &[f16],
     dst: &mut [f16],
+    filter_weights: &FilterWeights<f32>,
+    _: u32,
 ) {
     unsafe {
         if F16C {
             if FMA {
-                convolve_horizontal_rgb_sse_row_one_f16c_fma(
-                    dst_width,
-                    src_width,
-                    filter_weights,
-                    src,
-                    dst,
-                );
+                convolve_horizontal_rgb_sse_row_one_f16c_fma(filter_weights, src, dst);
             } else {
-                convolve_horizontal_rgb_sse_row_one_f16c(
-                    dst_width,
-                    src_width,
-                    filter_weights,
-                    src,
-                    dst,
-                );
+                convolve_horizontal_rgb_sse_row_one_f16c(filter_weights, src, dst);
             }
         } else {
-            convolve_horizontal_rgb_sse_row_one_f16_regular(
-                dst_width,
-                src_width,
-                filter_weights,
-                src,
-                dst,
-            );
+            convolve_horizontal_rgb_sse_row_one_f16_regular(filter_weights, src, dst);
         }
     }
 }
 
 #[target_feature(enable = "sse4.1")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_horizontal_rgb_sse_row_one_f16_regular(
-    dst_width: usize,
-    src_width: usize,
+fn convolve_horizontal_rgb_sse_row_one_f16_regular(
     filter_weights: &FilterWeights<f32>,
     src: &[f16],
     dst: &mut [f16],
 ) {
-    unsafe {
-        convolve_horizontal_rgb_sse_row_one_f16_impl::<false, false>(
-            dst_width,
-            src_width,
-            filter_weights,
-            src,
-            dst,
-        );
-    }
+    convolve_horizontal_rgb_sse_row_one_f16_impl::<false, false>(filter_weights, src, dst);
 }
 
 #[target_feature(enable = "sse4.1", enable = "f16c")]
 /// This inlining is required to activate all features for runtime dispatch.
 ///
 /// Crate has a safe fallback for f16 conversion even it is not supported.
-unsafe fn convolve_horizontal_rgb_sse_row_one_f16c(
-    dst_width: usize,
-    src_width: usize,
+fn convolve_horizontal_rgb_sse_row_one_f16c(
     filter_weights: &FilterWeights<f32>,
     src: &[f16],
     dst: &mut [f16],
 ) {
-    unsafe {
-        convolve_horizontal_rgb_sse_row_one_f16_impl::<true, false>(
-            dst_width,
-            src_width,
-            filter_weights,
-            src,
-            dst,
-        );
-    }
+    convolve_horizontal_rgb_sse_row_one_f16_impl::<true, false>(filter_weights, src, dst);
 }
 
 #[target_feature(enable = "sse4.1", enable = "f16c", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
 ///
 /// Crate has a safe fallback for f16 conversion even it is not supported.
-unsafe fn convolve_horizontal_rgb_sse_row_one_f16c_fma(
-    dst_width: usize,
-    src_width: usize,
+fn convolve_horizontal_rgb_sse_row_one_f16c_fma(
     filter_weights: &FilterWeights<f32>,
     src: &[f16],
     dst: &mut [f16],
 ) {
-    unsafe {
-        convolve_horizontal_rgb_sse_row_one_f16_impl::<true, true>(
-            dst_width,
-            src_width,
-            filter_weights,
-            src,
-            dst,
-        );
-    }
+    convolve_horizontal_rgb_sse_row_one_f16_impl::<true, true>(filter_weights, src, dst);
 }
 
-#[inline]
-unsafe fn convolve_horizontal_rgb_sse_row_one_f16_impl<const F16C: bool, const FMA: bool>(
-    dst_width: usize,
-    _: usize,
+#[inline(always)]
+fn convolve_horizontal_rgb_sse_row_one_f16_impl<const F16C: bool, const FMA: bool>(
     filter_weights: &FilterWeights<f32>,
     src: &[f16],
     dst: &mut [f16],
@@ -264,6 +213,8 @@ unsafe fn convolve_horizontal_rgb_sse_row_one_f16_impl<const F16C: bool, const F
         const CHANNELS: usize = 3;
         let mut filter_offset = 0usize;
         let weights_ptr = filter_weights.weights.as_ptr();
+
+        let dst_width = filter_weights.bounds.len();
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);
@@ -334,20 +285,17 @@ unsafe fn convolve_horizontal_rgb_sse_row_one_f16_impl<const F16C: bool, const F
 }
 
 pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f16<const F16C: bool, const FMA: bool>(
-    dst_width: usize,
-    src_width: usize,
-    filter_weights: &FilterWeights<f32>,
     src: &[f16],
     src_stride: usize,
     dst: &mut [f16],
     dst_stride: usize,
+    filter_weights: &FilterWeights<f32>,
+    _: u32,
 ) {
     unsafe {
         if F16C {
             if FMA {
                 convolve_horizontal_rgb_sse_rows_4_f16c_fma(
-                    dst_width,
-                    src_width,
                     filter_weights,
                     src,
                     src_stride,
@@ -356,8 +304,6 @@ pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f16<const F16C: bool, const FMA
                 );
             } else {
                 convolve_horizontal_rgb_sse_rows_4_f16c(
-                    dst_width,
-                    src_width,
                     filter_weights,
                     src,
                     src_stride,
@@ -367,8 +313,6 @@ pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f16<const F16C: bool, const FMA
             }
         } else {
             convolve_horizontal_rgb_sse_rows_4_f16_regular(
-                dst_width,
-                src_width,
                 filter_weights,
                 src,
                 src_stride,
@@ -381,84 +325,64 @@ pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f16<const F16C: bool, const FMA
 
 #[target_feature(enable = "sse4.1")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_rgb_sse_rows_4_f16_regular(
-    dst_width: usize,
-    src_width: usize,
+fn convolve_horizontal_rgb_sse_rows_4_f16_regular(
     filter_weights: &FilterWeights<f32>,
     src: &[f16],
     src_stride: usize,
     dst: &mut [f16],
     dst_stride: usize,
 ) {
-    unsafe {
-        convolve_horizontal_rgb_sse_rows_4_f16_impl::<false, false>(
-            dst_width,
-            src_width,
-            filter_weights,
-            src,
-            src_stride,
-            dst,
-            dst_stride,
-        );
-    }
+    convolve_horizontal_rgb_sse_rows_4_f16_impl::<false, false>(
+        filter_weights,
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+    );
 }
 
 #[target_feature(enable = "sse4.1", enable = "f16c")]
 /// This inlining is required to activate all features for runtime dispatch.
 ///
 /// Crate has a safe fallback for f16 conversion even it is not supported.
-unsafe fn convolve_horizontal_rgb_sse_rows_4_f16c(
-    dst_width: usize,
-    src_width: usize,
+fn convolve_horizontal_rgb_sse_rows_4_f16c(
     filter_weights: &FilterWeights<f32>,
     src: &[f16],
     src_stride: usize,
     dst: &mut [f16],
     dst_stride: usize,
 ) {
-    unsafe {
-        convolve_horizontal_rgb_sse_rows_4_f16_impl::<true, false>(
-            dst_width,
-            src_width,
-            filter_weights,
-            src,
-            src_stride,
-            dst,
-            dst_stride,
-        );
-    }
+    convolve_horizontal_rgb_sse_rows_4_f16_impl::<true, false>(
+        filter_weights,
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+    );
 }
 
 #[target_feature(enable = "sse4.1", enable = "f16c", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
 ///
 /// Crate has a safe fallback for f16 conversion even it is not supported.
-unsafe fn convolve_horizontal_rgb_sse_rows_4_f16c_fma(
-    dst_width: usize,
-    src_width: usize,
+fn convolve_horizontal_rgb_sse_rows_4_f16c_fma(
     filter_weights: &FilterWeights<f32>,
     src: &[f16],
     src_stride: usize,
     dst: &mut [f16],
     dst_stride: usize,
 ) {
-    unsafe {
-        convolve_horizontal_rgb_sse_rows_4_f16_impl::<true, true>(
-            dst_width,
-            src_width,
-            filter_weights,
-            src,
-            src_stride,
-            dst,
-            dst_stride,
-        );
-    }
+    convolve_horizontal_rgb_sse_rows_4_f16_impl::<true, true>(
+        filter_weights,
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+    );
 }
 
 #[inline(always)]
-unsafe fn convolve_horizontal_rgb_sse_rows_4_f16_impl<const F16C: bool, const FMA: bool>(
-    dst_width: usize,
-    _: usize,
+fn convolve_horizontal_rgb_sse_rows_4_f16_impl<const F16C: bool, const FMA: bool>(
     filter_weights: &FilterWeights<f32>,
     src: &[f16],
     src_stride: usize,
@@ -470,6 +394,8 @@ unsafe fn convolve_horizontal_rgb_sse_rows_4_f16_impl<const F16C: bool, const FM
         let mut filter_offset = 0usize;
         let zeros = _mm_setzero_ps();
         let weights_ptr = filter_weights.weights.as_ptr();
+
+        let dst_width = filter_weights.bounds.len();
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);

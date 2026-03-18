@@ -179,7 +179,7 @@ struct Avx2DisassociateAlpha {}
 
 impl Avx2DisassociateAlpha {
     #[inline(always)]
-    unsafe fn avx2_unpremultiply_row(&self, x: __m256i, a: __m256i) -> __m256i {
+    fn avx2_unpremultiply_row(&self, x: __m256i, a: __m256i) -> __m256i {
         unsafe {
             let zeros = _mm256_setzero_si256();
             let lo = _mm256_unpacklo_epi8(x, zeros);
@@ -264,7 +264,7 @@ impl Avx2DisassociateAlpha {
     }
 
     #[inline(always)]
-    unsafe fn disassociate_work<const FMA: bool>(&self, in_place: &mut [u8]) {
+    fn disassociate_work<const FMA: bool>(&self, in_place: &mut [u8]) {
         unsafe {
             let mut rem = in_place;
 
@@ -290,17 +290,13 @@ impl Avx2DisassociateAlpha {
     }
 
     #[target_feature(enable = "avx2")]
-    unsafe fn disassociate_avx2(&self, in_place: &mut [u8]) {
-        unsafe {
-            self.disassociate_work::<false>(in_place);
-        }
+    fn disassociate_avx2(&self, in_place: &mut [u8]) {
+        self.disassociate_work::<false>(in_place);
     }
 
     #[target_feature(enable = "avx2", enable = "fma")]
-    unsafe fn disassociate_fma(&self, in_place: &mut [u8]) {
-        unsafe {
-            self.disassociate_work::<true>(in_place);
-        }
+    fn disassociate_fma(&self, in_place: &mut [u8]) {
+        self.disassociate_work::<true>(in_place);
     }
 }
 
@@ -318,17 +314,14 @@ impl DisassociateAlpha for Avx2DisassociateAlpha {
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn avx_unpremultiply_alpha_rgba_impl_row(
-    in_place: &mut [u8],
-    executor: impl DisassociateAlpha,
-) {
+fn avx_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8], executor: impl DisassociateAlpha) {
     unsafe {
         executor.disassociate(in_place);
     }
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn avx_unpremultiply_alpha_rgba_impl(
+fn avx_unpremultiply_alpha_rgba_impl(
     in_place: &mut [u8],
     width: usize,
     _: usize,
@@ -337,7 +330,7 @@ unsafe fn avx_unpremultiply_alpha_rgba_impl(
 ) {
     in_place
         .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| unsafe {
+        .for_each(pool, |row| {
             avx_unpremultiply_alpha_rgba_impl_row(
                 &mut row[..width * 4],
                 Avx2DisassociateAlpha::default(),

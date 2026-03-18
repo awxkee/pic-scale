@@ -485,22 +485,6 @@ where
     }
 }
 
-macro_rules! ld_ar30 {
-    ($store: expr, $ar_type: expr, $ar_order: ty) => {{
-        let ar_type: crate::ar30::Rgb30 = $ar_type.into();
-        let read_bits = u32::from_ne_bytes([$store[0], $store[1], $store[2], $store[3]]);
-        let unpacked = ar_type.unpack::<$ar_order>(read_bits);
-        ColorGroup::<4, i32> {
-            r: unpacked.0 as i32,
-            g: unpacked.1 as i32,
-            b: unpacked.2 as i32,
-            a: unpacked.3 as i32,
-        }
-    }};
-}
-
-pub(crate) use ld_ar30;
-
 macro_rules! load_ar30_p {
     ($store: expr, $ar_type: expr, $ar_order: ty) => {{
         let ar_type: crate::ar30::Rgb30 = $ar_type.into();
@@ -516,24 +500,6 @@ macro_rules! load_ar30_p {
 }
 
 pub(crate) use load_ar30_p;
-
-macro_rules! ld_ar30_with_offset {
-    ($store: expr, $ar_type: expr, $ar_order: ty, $offset: expr) => {{
-        let ar_type: crate::ar30::Rgb30 = $ar_type.into();
-        let cn = $offset * 4;
-        let read_bits =
-            u32::from_ne_bytes([$store[cn], $store[cn + 1], $store[cn + 2], $store[cn + 3]]);
-        let unpacked = ar_type.unpack::<$ar_order>(read_bits);
-        ColorGroup::<4, i32> {
-            r: unpacked.0 as i32,
-            g: unpacked.1 as i32,
-            b: unpacked.2 as i32,
-            a: unpacked.3 as i32,
-        }
-    }};
-}
-
-pub(crate) use ld_ar30_with_offset;
 
 macro_rules! ld_g {
     ($store: expr, $channels: expr, $vtype: ty) => {{

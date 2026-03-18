@@ -122,21 +122,16 @@ unsafe fn conv_horiz_rgba_1_f16(
 }
 
 pub(crate) fn convolve_horizontal_rgba_neon_row_one_f16_fhm(
-    dst_width: usize,
-    w: usize,
-    filter_weights: &FilterWeights<f16>,
     src: &[f16],
     dst: &mut [f16],
+    filter_weights: &FilterWeights<f16>,
+    _: u32,
 ) {
-    unsafe {
-        convolve_horizontal_rgba_neon_row_one_f16_impl(dst_width, w, filter_weights, src, dst)
-    }
+    unsafe { convolve_horizontal_rgba_neon_row_one_f16_impl(filter_weights, src, dst) }
 }
 
 #[target_feature(enable = "fhm")]
 unsafe fn convolve_horizontal_rgba_neon_row_one_f16_impl(
-    dst_width: usize,
-    _: usize,
     filter_weights: &FilterWeights<f16>,
     src: &[f16],
     dst: &mut [f16],
@@ -145,6 +140,8 @@ unsafe fn convolve_horizontal_rgba_neon_row_one_f16_impl(
         const CN: usize = 4;
         let mut filter_offset = 0usize;
         let weights_ptr = filter_weights.weights.as_ptr();
+
+        let dst_width = filter_weights.bounds.len();
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);
@@ -186,18 +183,15 @@ unsafe fn convolve_horizontal_rgba_neon_row_one_f16_impl(
 }
 
 pub(crate) fn convolve_horizontal_rgba_neon_rows_4_f16_fhm(
-    dst_width: usize,
-    w: usize,
-    filter_weights: &FilterWeights<f16>,
     src: &[f16],
     src_stride: usize,
     dst: &mut [f16],
     dst_stride: usize,
+    filter_weights: &FilterWeights<f16>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_rgba_neon_rows_4_f16_impl(
-            dst_width,
-            w,
             filter_weights,
             src,
             src_stride,
@@ -209,8 +203,6 @@ pub(crate) fn convolve_horizontal_rgba_neon_rows_4_f16_fhm(
 
 #[target_feature(enable = "fhm")]
 unsafe fn convolve_horizontal_rgba_neon_rows_4_f16_impl(
-    dst_width: usize,
-    _: usize,
     filter_weights: &FilterWeights<f16>,
     src: &[f16],
     src_stride: usize,
@@ -222,6 +214,8 @@ unsafe fn convolve_horizontal_rgba_neon_rows_4_f16_impl(
         let mut filter_offset = 0usize;
         let zeros = vdupq_n_f32(0f32);
         let weights_ptr = filter_weights.weights.as_ptr();
+
+        let dst_width = filter_weights.bounds.len();
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);

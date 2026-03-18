@@ -118,6 +118,7 @@ pub(crate) fn sse_convolve_horizontal_rgba_rows_4_ar30<
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         sse_convolve_horizontal_rgba_rows_4_impl::<AR_TYPE, AR_ORDER>(
@@ -327,6 +328,7 @@ pub(crate) fn sse_convolve_horizontal_rgba_rows_ar30<
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         sse_convolve_horizontal_rgba_row_impl::<AR_TYPE, AR_ORDER>(src, dst, filter_weights);

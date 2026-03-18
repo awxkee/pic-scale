@@ -38,10 +38,10 @@ pub(crate) fn convolve_vertical_avx_row(
     dst: &mut [u8],
     src_stride: usize,
     weights: &[i16],
+    _: u32,
 ) {
     unsafe {
-        #[cfg(feature = "nightly_avx512")]
-        #[allow(clippy::incompatible_msrv)]
+        #[cfg(feature = "avx512")]
         if std::arch::is_x86_feature_detected!("avxvnni") {
             return convolve_vertical_avx_row_dot(dst_width, bounds, src, dst, src_stride, weights);
         }
@@ -51,7 +51,7 @@ pub(crate) fn convolve_vertical_avx_row(
 
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_vertical_avx_row_reg(
+fn convolve_vertical_avx_row_reg(
     _ignored: usize,
     bounds: &FilterBounds,
     src: &[u8],
@@ -59,16 +59,14 @@ unsafe fn convolve_vertical_avx_row_reg(
     src_stride: usize,
     weights: &[i16],
 ) {
-    unsafe {
-        let unit = ExecutionUnit::<false>::default();
-        unit.pass(_ignored, bounds, src, dst, src_stride, weights);
-    }
+    let unit = ExecutionUnit::<false>::default();
+    unit.pass(_ignored, bounds, src, dst, src_stride, weights);
 }
 
-#[cfg(feature = "nightly_avx512")]
+#[cfg(feature = "avx512")]
 #[target_feature(enable = "avx2", enable = "avxvnni")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_vertical_avx_row_dot(
+fn convolve_vertical_avx_row_dot(
     _ignored: usize,
     bounds: &FilterBounds,
     src: &[u8],
@@ -76,10 +74,8 @@ unsafe fn convolve_vertical_avx_row_dot(
     src_stride: usize,
     weights: &[i16],
 ) {
-    unsafe {
-        let unit = ExecutionUnit::<true>::default();
-        unit.pass(_ignored, bounds, src, dst, src_stride, weights);
-    }
+    let unit = ExecutionUnit::<true>::default();
+    unit.pass(_ignored, bounds, src, dst, src_stride, weights);
 }
 
 #[derive(Copy, Clone, Default)]
@@ -87,7 +83,7 @@ struct ExecutionUnit<const HAS_DOT: bool> {}
 
 impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
     #[inline(always)]
-    unsafe fn dot_prod(
+    fn dot_prod(
         store_0: __m256i,
         store_1: __m256i,
         store_2: __m256i,
@@ -113,7 +109,7 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
     }
 
     #[inline(always)]
-    unsafe fn convolve_vertical_part_avx_64(
+    fn convolve_vertical_part_avx_64(
         &self,
         start_y: usize,
         start_x: usize,
@@ -226,7 +222,7 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
     }
 
     #[inline(always)]
-    unsafe fn convolve_vertical_part_avx(
+    fn convolve_vertical_part_avx(
         &self,
         start_y: usize,
         start_x: usize,
@@ -244,66 +240,14 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
 
             let px = start_x;
 
-            let bounds_size = bounds.size;
+            for j in 0..bounds.size {
+                let py = start_y + j;
+                let weight = *filter.get_unchecked(j);
+                let v_weight = _mm256_set1_epi16(weight);
+                let src_ptr = src.get_unchecked(src_stride * py + px);
+                let item_row = _mm256_setr_epi32(*src_ptr as i32, 0, 0, 0, 0, 0, 0, 0);
 
-            if bounds_size == 2 {
-                let py = start_y;
-                let weight = filter.get_unchecked(0..2);
-                let v_weight0 = _mm256_set1_epi16(weight[0]);
-                let v_weight1 = _mm256_set1_epi16(weight[1]);
-                let src_ptr0 = src.get_unchecked(src_stride * py + px);
-                let src_ptr1 = src.get_unchecked(src_stride * (py + 1) + px);
-                let item_row0 = _mm256_insert_epi8::<0>(_mm256_setzero_si256(), *src_ptr0 as i8);
-                let item_row1 = _mm256_insert_epi8::<0>(_mm256_setzero_si256(), *src_ptr1 as i8);
-
-                store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row0, v_weight0);
-                store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row1, v_weight1);
-            } else if bounds_size == 3 {
-                let py = start_y;
-                let weight = filter.get_unchecked(0..3);
-                let v_weight0 = _mm256_set1_epi16(weight[0]);
-                let v_weight1 = _mm256_set1_epi16(weight[1]);
-                let v_weight2 = _mm256_set1_epi16(weight[2]);
-                let src_ptr0 = src.get_unchecked(src_stride * py + px);
-                let src_ptr1 = src.get_unchecked(src_stride * (py + 1) + px);
-                let src_ptr2 = src.get_unchecked(src_stride * (py + 2) + px);
-                let item_row0 = _mm256_insert_epi8::<0>(_mm256_setzero_si256(), *src_ptr0 as i8);
-                let item_row1 = _mm256_insert_epi8::<0>(_mm256_setzero_si256(), *src_ptr1 as i8);
-                let item_row2 = _mm256_insert_epi8::<0>(_mm256_setzero_si256(), *src_ptr2 as i8);
-
-                store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row0, v_weight0);
-                store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row1, v_weight1);
-                store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row2, v_weight2);
-            } else if bounds_size == 4 {
-                let py = start_y;
-                let weight = filter.get_unchecked(0..4);
-                let v_weight0 = _mm256_set1_epi16(weight[0]);
-                let v_weight1 = _mm256_set1_epi16(weight[1]);
-                let v_weight2 = _mm256_set1_epi16(weight[2]);
-                let v_weight3 = _mm256_set1_epi16(weight[3]);
-                let src_ptr0 = src.get_unchecked(src_stride * py + px);
-                let src_ptr1 = src.get_unchecked(src_stride * (py + 1) + px);
-                let src_ptr2 = src.get_unchecked(src_stride * (py + 2) + px);
-                let src_ptr3 = src.get_unchecked(src_stride * (py + 3) + px);
-                let item_row0 = _mm256_insert_epi8::<0>(_mm256_setzero_si256(), *src_ptr0 as i8);
-                let item_row1 = _mm256_insert_epi8::<0>(_mm256_setzero_si256(), *src_ptr1 as i8);
-                let item_row2 = _mm256_insert_epi8::<0>(_mm256_setzero_si256(), *src_ptr2 as i8);
-                let item_row3 = _mm256_insert_epi8::<0>(_mm256_setzero_si256(), *src_ptr3 as i8);
-
-                store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row0, v_weight0);
-                store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row1, v_weight1);
-                store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row2, v_weight2);
-                store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row3, v_weight3);
-            } else {
-                for j in 0..bounds.size {
-                    let py = start_y + j;
-                    let weight = *filter.get_unchecked(j);
-                    let v_weight = _mm256_set1_epi16(weight);
-                    let src_ptr = src.get_unchecked(src_stride * py + px);
-                    let item_row = _mm256_setr_epi32(*src_ptr as i32, 0, 0, 0, 0, 0, 0, 0);
-
-                    store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row, v_weight);
-                }
+                store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, item_row, v_weight);
             }
 
             let low_16 = _mm256_packus_epi32(_mm256_srai_epi32::<PRECISION>(store_0), zeros);
@@ -316,7 +260,7 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
     }
 
     #[inline(always)]
-    unsafe fn convolve_vertical_part_avx_32(
+    fn convolve_vertical_part_avx_32(
         &self,
         start_y: usize,
         start_x: usize,
@@ -364,7 +308,7 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
     }
 
     #[inline(always)]
-    unsafe fn convolve_vertical_part_8_avx(
+    fn convolve_vertical_part_8_avx(
         &self,
         start_y: usize,
         start_x: usize,
@@ -414,7 +358,7 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
 
     #[inline(always)]
     /// This inlining is required to activate all features for runtime dispatch
-    unsafe fn pass(
+    fn pass(
         &self,
         _: usize,
         bounds: &FilterBounds,
@@ -427,65 +371,57 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
         let total_width = dst.len();
 
         while cx + 64 < total_width {
-            unsafe {
-                self.convolve_vertical_part_avx_64(
-                    bounds.start,
-                    cx,
-                    src,
-                    src_stride,
-                    dst,
-                    weights,
-                    bounds,
-                );
-            }
+            self.convolve_vertical_part_avx_64(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weights,
+                bounds,
+            );
 
             cx += 64;
         }
 
         while cx + 32 < total_width {
-            unsafe {
-                self.convolve_vertical_part_avx_32(
-                    bounds.start,
-                    cx,
-                    src,
-                    src_stride,
-                    dst,
-                    weights,
-                    bounds,
-                );
-            }
+            self.convolve_vertical_part_avx_32(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weights,
+                bounds,
+            );
 
             cx += 32;
         }
 
         while cx + 8 < total_width {
-            unsafe {
-                self.convolve_vertical_part_8_avx(
-                    bounds.start,
-                    cx,
-                    src,
-                    src_stride,
-                    dst,
-                    weights,
-                    bounds,
-                );
-            }
+            self.convolve_vertical_part_8_avx(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weights,
+                bounds,
+            );
 
             cx += 8;
         }
 
         while cx < total_width {
-            unsafe {
-                self.convolve_vertical_part_avx(
-                    bounds.start,
-                    cx,
-                    src,
-                    src_stride,
-                    dst,
-                    weights,
-                    bounds,
-                );
-            }
+            self.convolve_vertical_part_avx(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weights,
+                bounds,
+            );
 
             cx += 1;
         }

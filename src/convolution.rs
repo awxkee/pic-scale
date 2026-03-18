@@ -27,47 +27,85 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use std::fmt::Debug;
-
 use crate::filter_weights::FilterWeights;
 use crate::image_store::ImageStoreMut;
 use crate::scaler::WorkloadStrategy;
+use crate::{ImageSize, ImageStore, ThreadingPolicy};
+use std::fmt::Debug;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq)]
 pub(crate) struct ConvolutionOptions {
     pub(crate) workload_strategy: WorkloadStrategy,
+    pub(crate) bit_depth: usize,
+    pub(crate) src_size: ImageSize,
+    pub(crate) dst_size: ImageSize,
 }
 
-impl ConvolutionOptions {
-    pub(crate) fn new(strategy: WorkloadStrategy) -> Self {
-        Self {
-            workload_strategy: strategy,
-        }
-    }
-}
-
-pub(crate) trait HorizontalConvolutionPass<T, W, const N: usize>
+pub(crate) trait HorizontalFilterPass<T, W, const N: usize>
 where
     T: Clone + Copy + Debug,
 {
-    fn convolve_horizontal(
-        &self,
+    fn horizontal_plan(
         filter_weights: FilterWeights<W>,
-        destination: &mut ImageStoreMut<T, N>,
-        pool: &novtb::ThreadPool,
+        threading_policy: ThreadingPolicy,
         options: ConvolutionOptions,
-    );
+    ) -> Arc<dyn RowFilter<T, N> + Send + Sync>;
 }
 
 pub(crate) trait VerticalConvolutionPass<T, W, const N: usize>
 where
     T: Clone + Copy + Debug,
 {
-    fn convolve_vertical(
-        &self,
+    fn vertical_plan(
         filter_weights: FilterWeights<W>,
-        destination: &mut ImageStoreMut<T, N>,
-        pool: &novtb::ThreadPool,
+        threading_policy: ThreadingPolicy,
         options: ConvolutionOptions,
+    ) -> Arc<dyn ColumnFilter<T, N> + Send + Sync>;
+}
+
+pub(crate) trait RowFilter<T, const N: usize>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
+    fn filter(&self, source: &ImageStore<'_, T, N>, destination: &mut ImageStoreMut<T, N>);
+    fn can_do_4_rows(&self) -> bool;
+    fn run_on_4_rows(
+        &self,
+        src: &[T],
+        src_stride: usize,
+        dst: &mut [T],
+        dst_stride: usize,
+        bit_depth: u32,
     );
+    fn run_on_row(&self, src: &[T], dst: &mut [T], bit_depth: u32);
+}
+
+pub(crate) trait ColumnFilter<T, const N: usize>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
+    fn filter(&self, source: &ImageStore<'_, T, N>, destination: &mut ImageStoreMut<T, N>);
+    fn run_on_row(
+        &self,
+        src: &[T],
+        dst: &mut [T],
+        dst_width: usize,
+        src_stride: usize,
+        row: usize,
+        bit_depth: u32,
+    );
+}
+
+pub(crate) trait TrampolineFilter<T, const N: usize>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
+    fn filter(
+        &self,
+        source: &ImageStore<'_, T, N>,
+        destination: &mut ImageStoreMut<T, N>,
+        scratch: &mut [T],
+    );
+    fn scratch_size(&self) -> usize;
 }

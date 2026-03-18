@@ -1,8 +1,8 @@
-workspace = { members = ["app", "wasm", "fuzz", "app/accelerate"], exclude = ["picscale"] }
+workspace = { members = ["app", "wasm", "app/accelerate", "fuzz"], exclude = ["picscale"] }
 
 [package]
 name = "pic-scale"
-version = "0.6.15"
+version = "0.7.0"
 edition = "2024"
 description = "High performance image scaling"
 readme = "README.md"
@@ -14,7 +14,7 @@ categories = ["multimedia::images", "multimedia::video"]
 homepage = "https://github.com/awxkee/pic-scale"
 repository = "https://github.com/awxkee/pic-scale"
 exclude = ["*.jpg", "/assets", "*.png", "*.sh", "/assets/*"]
-rust-version = "1.85.0"
+rust-version = "1.89.0"
 
 [dependencies]
 colorutils-rs = { version = "0.7", optional = true }
@@ -24,22 +24,24 @@ novtb = "^0.1.6"
 pxfm = "^0.1.23"
 
 [features]
-default = ["colorspaces", "rdm", "sse", "avx"]
+default = ["neon", "rdm", "sse", "avx"]
 colorspaces = ["dep:colorutils-rs"]
 # Allows to use x86_64 AVX-512 when available
-nightly_avx512 = []
+avx512 = []
 # Allows to use x86_64 AVX-512FP16 when available
-nightly_avx512fp16 = ["nightly_avx512"]
+nightly_avx512fp16 = ["avx512"]
 # Allows to scale nightly `f16` type
 nightly_f16 = []
+# Allows to use ARM NEON when available
+neon = []
 # Allows to use ARM RDM when available
-rdm = []
+rdm = ["neon"]
 # Allows to use x86_64 AVX2 when available
 avx = []
 # Allows to use x86/x86_64 SSE4.1 when available
 sse = []
 # Allows to use ARM i8mm when available
-nightly_i8mm = []
+nightly_i8mm = ["neon"]
 
 [package.metadata.docs.rs]
 # To build locally:

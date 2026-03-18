@@ -107,6 +107,7 @@ pub(crate) fn convolve_horizontal_plane_sse_rows_hrs_4_u8(
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_plane_sse_rows_hrs_4_u8_impl(
@@ -261,6 +262,7 @@ pub(crate) fn convolve_horizontal_plane_sse_row_hrs(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_plane_sse_row_hrs_impl(src, dst, filter_weights);

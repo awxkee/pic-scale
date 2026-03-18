@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::ImageSize;
 use std::error::Error;
 use std::fmt::Display;
 
@@ -50,6 +51,18 @@ pub enum PicScaleError {
     UnsupportedBitDepth(usize),
     UnknownResizingFilter,
     OutOfMemory(usize),
+    InvalidScratchSize {
+        expected: usize,
+        size: usize,
+    },
+    InvalidSourceSize {
+        expected: ImageSize,
+        size: ImageSize,
+    },
+    InvalidDestinationSize {
+        expected: ImageSize,
+        size: ImageSize,
+    },
 }
 
 impl PicScaleError {
@@ -65,6 +78,9 @@ impl PicScaleError {
             PicScaleError::UnsupportedBitDepth(_) => 6,
             PicScaleError::UnknownResizingFilter => 7,
             PicScaleError::OutOfMemory(_) => 8,
+            PicScaleError::InvalidScratchSize { .. } => 9,
+            PicScaleError::InvalidSourceSize { .. } => 10,
+            PicScaleError::InvalidDestinationSize { .. } => 11,
         }
     }
 }
@@ -101,6 +117,17 @@ impl Display for PicScaleError {
             PicScaleError::OutOfMemory(capacity) => f.write_fmt(format_args!(
                 "There is no enough memory to allocate {capacity} bytes"
             )),
+            PicScaleError::InvalidScratchSize { expected, size } => f.write_fmt(format_args!(
+                "Scratch size must be at least {expected} bytes, but received {size}",
+            )),
+            PicScaleError::InvalidSourceSize { expected, size } => f.write_fmt(format_args!(
+                "Source size must be at least {:?} bytes, but received {:?}",
+                expected, size
+            )),
+            PicScaleError::InvalidDestinationSize { expected, size } => f.write_fmt(format_args!(
+                "Destination size must be at least {:?} bytes, but received {:?}",
+                expected, size
+            )),
         }
     }
 }
@@ -114,10 +141,49 @@ macro_rules! try_vec {
     ($elem:expr; $n:expr) => {{
         let mut v = Vec::new();
         v.try_reserve_exact($n)
-            .map_err(|_| crate::pic_scale_error::PicScaleError::OutOfMemory($n))?;
+            .map_err(|_| crate::validation::PicScaleError::OutOfMemory($n))?;
         v.resize($n, $elem);
         v
     }};
 }
 
 pub(crate) use try_vec;
+
+macro_rules! validate_scratch {
+    ($scratch: expr, $required_size: expr) => {{
+        if $scratch.len() < $required_size {
+            return Err(PicScaleError::InvalidScratchSize {
+                expected: $required_size,
+                size: $scratch.len(),
+            });
+        }
+        &mut $scratch[..$required_size]
+    }};
+}
+
+pub(crate) use validate_scratch;
+
+macro_rules! validate_sizes {
+    ($store: expr, $into: expr, $src_size: expr, $dst_size: expr) => {{
+        $into.validate()?;
+        $store.validate()?;
+        if $store.width != $src_size.width && $store.height != $src_size.height {
+            return Err(PicScaleError::InvalidSourceSize {
+                expected: $src_size,
+                size: $store.size(),
+            });
+        }
+        if $into.width != $dst_size.width && $into.height != $dst_size.height {
+            return Err(PicScaleError::InvalidDestinationSize {
+                expected: $src_size,
+                size: $store.size(),
+            });
+        }
+        if $store.width == $into.width && $store.height == $into.height {
+            $store.copied_to_mut($into);
+            return Ok(());
+        }
+    }};
+}
+
+pub(crate) use validate_sizes;

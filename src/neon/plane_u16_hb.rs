@@ -32,12 +32,7 @@ use std::arch::aarch64::*;
 #[must_use]
 #[inline]
 #[target_feature(enable = "rdm")]
-unsafe fn conv_horiz_1_u16(
-    start_x: usize,
-    src: &[u16],
-    w0: int32x4_t,
-    store: int32x4_t,
-) -> int32x4_t {
+fn conv_horiz_1_u16(start_x: usize, src: &[u16], w0: int32x4_t, store: int32x4_t) -> int32x4_t {
     unsafe {
         const CN: usize = 1;
         let src_ptr = src.get_unchecked((start_x * CN)..);
@@ -50,12 +45,7 @@ unsafe fn conv_horiz_1_u16(
 #[must_use]
 #[inline]
 #[target_feature(enable = "rdm")]
-unsafe fn conv_horiz_2_u16(
-    start_x: usize,
-    src: &[u16],
-    w0: int32x4_t,
-    store: int32x4_t,
-) -> int32x4_t {
+fn conv_horiz_2_u16(start_x: usize, src: &[u16], w0: int32x4_t, store: int32x4_t) -> int32x4_t {
     unsafe {
         const CN: usize = 1;
         let src_ptr = src.get_unchecked((start_x * CN)..);
@@ -72,7 +62,7 @@ unsafe fn conv_horiz_2_u16(
 #[must_use]
 #[inline]
 #[target_feature(enable = "rdm")]
-unsafe fn conv_horiz_4_u16(
+fn conv_horiz_4_u16(
     start_x: usize,
     src: &[u16],
     weights: int32x4_t,
@@ -91,7 +81,7 @@ unsafe fn conv_horiz_4_u16(
 #[must_use]
 #[inline]
 #[target_feature(enable = "rdm")]
-unsafe fn conv_horiz_8_u16(
+fn conv_horiz_8_u16(
     start_x: usize,
     src: &[u16],
     weights: (int32x4_t, int32x4_t),
@@ -137,7 +127,7 @@ pub(crate) fn convolve_horizontal_plane_neon_rows_4_hb_u16(
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn convolve_horizontal_plane_neon_rows_4_hb_impl(
+fn convolve_horizontal_plane_neon_rows_4_hb_impl(
     src: &[u16],
     src_stride: usize,
     dst: &mut [u16],
@@ -183,7 +173,7 @@ unsafe fn convolve_horizontal_plane_neon_rows_4_hb_impl(
             let src2 = src1.get_unchecked(src_stride..);
             let src3 = src2.get_unchecked(src_stride..);
 
-            while jx + 8 < bounds_size {
+            while jx + 8 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights_set = (
@@ -197,7 +187,7 @@ unsafe fn convolve_horizontal_plane_neon_rows_4_hb_impl(
                 jx += 8;
             }
 
-            while jx + 4 < bounds_size {
+            while jx + 4 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1q_s32(w_ptr.as_ptr());
@@ -208,7 +198,7 @@ unsafe fn convolve_horizontal_plane_neon_rows_4_hb_impl(
                 jx += 4;
             }
 
-            while jx + 2 < bounds_size {
+            while jx + 2 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let w0 = vcombine_s32(vld1_s32(w_ptr.as_ptr()), vdup_n_s32(0));
@@ -255,7 +245,7 @@ pub(crate) fn convolve_horizontal_plane_neon_u16_hb_row(
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn convolve_horizontal_plane_neon_u16_hb_impl(
+fn convolve_horizontal_plane_neon_u16_hb_impl(
     src: &[u16],
     dst: &mut [u16],
     filter_weights: &FilterWeights<i32>,
@@ -273,7 +263,7 @@ unsafe fn convolve_horizontal_plane_neon_u16_hb_impl(
             let mut jx = 0usize;
             let mut store = vdupq_n_s32(1 << 5);
 
-            while jx + 8 < bounds_size {
+            while jx + 8 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights_set = (
@@ -284,7 +274,7 @@ unsafe fn convolve_horizontal_plane_neon_u16_hb_impl(
                 jx += 8;
             }
 
-            while jx + 4 < bounds_size {
+            while jx + 4 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1q_s32(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
@@ -292,7 +282,7 @@ unsafe fn convolve_horizontal_plane_neon_u16_hb_impl(
                 jx += 4;
             }
 
-            while jx + 2 < bounds_size {
+            while jx + 2 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let w0 = vcombine_s32(vld1_s32(w_ptr.as_ptr()), vdup_n_s32(0));

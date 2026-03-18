@@ -501,6 +501,7 @@ pub(crate) fn convolve_vertical_sse_row(
     dst: &mut [u8],
     src_stride: usize,
     weights: &[i16],
+    _: u32,
 ) {
     unsafe {
         convolve_vertical_sse_row_impl(dst_width, bounds, src, dst, src_stride, weights);

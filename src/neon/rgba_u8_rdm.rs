@@ -34,7 +34,7 @@ use std::arch::aarch64::*;
 #[must_use]
 #[inline]
 #[target_feature(enable = "rdm")]
-unsafe fn conv_horiz_rgba_8_u8_i16<const SCALE: i32>(
+fn conv_horiz_rgba_8_u8_i16<const SCALE: i32>(
     start_x: usize,
     src: &[u8],
     w0: int16x8_t,
@@ -64,7 +64,7 @@ unsafe fn conv_horiz_rgba_8_u8_i16<const SCALE: i32>(
 #[must_use]
 #[inline]
 #[target_feature(enable = "rdm")]
-unsafe fn conv_horiz_rgba_2_u8_i16<const SCALE: i32>(
+fn conv_horiz_rgba_2_u8_i16<const SCALE: i32>(
     start_x: usize,
     src: &[u8],
     weights: int16x8_t,
@@ -83,7 +83,7 @@ unsafe fn conv_horiz_rgba_2_u8_i16<const SCALE: i32>(
 
 #[inline]
 #[target_feature(enable = "rdm")]
-unsafe fn conv_horiz_rgba_4_u8_i16<const SCALE: i32>(
+fn conv_horiz_rgba_4_u8_i16<const SCALE: i32>(
     start_x: usize,
     src: &[u8],
     w0: int16x8_t,
@@ -107,7 +107,7 @@ unsafe fn conv_horiz_rgba_4_u8_i16<const SCALE: i32>(
 #[must_use]
 #[inline]
 #[target_feature(enable = "rdm")]
-unsafe fn conv_horiz_rgba_1_u8_i16<const SCALE: i32>(
+fn conv_horiz_rgba_1_u8_i16<const SCALE: i32>(
     start_x: usize,
     src: &[u8],
     w0: int16x4_t,
@@ -134,6 +134,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_rows_4_u8_i16(
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_rgba_neon_rows_4_u8_i16_impl(
@@ -151,7 +152,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_rows_4_u8_i16(
 /// # Safety
 /// - Check `rdm` availability before the call.
 #[target_feature(enable = "rdm")]
-unsafe fn convolve_horizontal_rgba_neon_rows_4_u8_i16_impl(
+fn convolve_horizontal_rgba_neon_rows_4_u8_i16_impl(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -337,6 +338,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_row_i16(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_rgba_neon_row_i16_impl(src, dst, filter_weights);

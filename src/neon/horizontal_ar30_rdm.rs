@@ -36,11 +36,7 @@ use std::arch::aarch64::*;
 #[must_use]
 #[inline]
 #[target_feature(enable = "rdm")]
-unsafe fn conv_horiz_rgba_1_u8_i16<
-    const SCALE: i32,
-    const AR_TYPE: usize,
-    const AR_ORDER: usize,
->(
+fn conv_horiz_rgba_1_u8_i16<const SCALE: i32, const AR_TYPE: usize, const AR_ORDER: usize>(
     start_x: usize,
     src: &[u8],
     w0: int16x4_t,
@@ -57,11 +53,7 @@ unsafe fn conv_horiz_rgba_1_u8_i16<
 #[must_use]
 #[inline]
 #[target_feature(enable = "rdm")]
-unsafe fn conv_horiz_rgba_8_u8_i16<
-    const SCALE: i32,
-    const AR_TYPE: usize,
-    const AR_ORDER: usize,
->(
+fn conv_horiz_rgba_8_u8_i16<const SCALE: i32, const AR_TYPE: usize, const AR_ORDER: usize>(
     start_x: usize,
     src: &[u8],
     set1: (int16x4_t, int16x4_t, int16x4_t, int16x4_t),
@@ -95,11 +87,7 @@ unsafe fn conv_horiz_rgba_8_u8_i16<
 #[must_use]
 #[inline]
 #[target_feature(enable = "rdm")]
-unsafe fn conv_horiz_rgba_4_u8_i16<
-    const SCALE: i32,
-    const AR_TYPE: usize,
-    const AR_ORDER: usize,
->(
+fn conv_horiz_rgba_4_u8_i16<const SCALE: i32, const AR_TYPE: usize, const AR_ORDER: usize>(
     start_x: usize,
     src: &[u8],
     w0: int16x4_t,
@@ -136,6 +124,7 @@ pub(crate) fn neon_convolve_horizontal_rgba_rows_4_ar30_rdm<
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         let unit = Row4ExecutionUnit::<AR_TYPE, AR_ORDER>::default();
@@ -148,7 +137,7 @@ struct Row4ExecutionUnit<const AR_TYPE: usize, const AR_ORDER: usize> {}
 
 impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_ORDER> {
     #[target_feature(enable = "rdm")]
-    unsafe fn pass(
+    fn pass(
         &self,
         src: &[u8],
         src_stride: usize,

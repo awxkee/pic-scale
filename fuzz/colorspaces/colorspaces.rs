@@ -31,10 +31,11 @@
 
 use libfuzzer_sys::fuzz_target;
 use pic_scale::{
-    ImageStore, ImageStoreMut, JzazbzScaler, LChScaler, LabScaler, LinearApproxScaler,
-    LinearScaler, LuvScaler, OklabScaler, ResamplingFunction, Scaling, ScalingU16, SigmoidalScaler,
-    TransferFunction, XYZScaler,
+    ImageSize, ImageStore, ImageStoreMut, JzazbzScaler, LChScaler, LabScaler, LinearApproxScaler,
+    LinearScaler, LuvScaler, OklabScaler, PicScaleError, Resampling, ResamplingFunction,
+    ResamplingPlan, SigmoidalScaler, TransferFunction, XYZScaler,
 };
+use std::sync::Arc;
 
 fuzz_target!(|data: (u16, u16, u16, u16, u8, bool)| {
     resize_rgba(
@@ -75,6 +76,65 @@ fuzz_target!(|data: (u16, u16, u16, u16, u8, bool)| {
     );
 });
 
+enum Scaler {
+    Jzazbz(JzazbzScaler),
+    Lab(LabScaler),
+    LCh(LChScaler),
+    Linear(LinearScaler),
+    LinearApprox(LinearApproxScaler),
+    Luv(LuvScaler),
+    Oklab(OklabScaler),
+    Sigmoidal(SigmoidalScaler),
+    XYZ(XYZScaler),
+}
+
+impl Scaler {
+    fn plan_rgba(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        premultiply_alpha: bool,
+    ) -> Result<Arc<Resampling<u8, 4>>, PicScaleError> {
+        match self {
+            Scaler::Jzazbz(s) => {
+                s.plan_rgba_resampling(source_size, target_size, premultiply_alpha)
+            }
+            Scaler::Lab(s) => s.plan_rgba_resampling(source_size, target_size, premultiply_alpha),
+            Scaler::LCh(s) => s.plan_rgba_resampling(source_size, target_size, premultiply_alpha),
+            Scaler::Linear(s) => {
+                s.plan_rgba_resampling(source_size, target_size, premultiply_alpha)
+            }
+            Scaler::LinearApprox(s) => {
+                s.plan_rgba_resampling(source_size, target_size, premultiply_alpha)
+            }
+            Scaler::Luv(s) => s.plan_rgba_resampling(source_size, target_size, premultiply_alpha),
+            Scaler::Oklab(s) => s.plan_rgba_resampling(source_size, target_size, premultiply_alpha),
+            Scaler::Sigmoidal(s) => {
+                s.plan_rgba_resampling(source_size, target_size, premultiply_alpha)
+            }
+            Scaler::XYZ(s) => s.plan_rgba_resampling(source_size, target_size, premultiply_alpha),
+        }
+    }
+
+    fn plan_rgb(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+    ) -> Result<Arc<Resampling<u8, 3>>, PicScaleError> {
+        match self {
+            Scaler::Jzazbz(s) => s.plan_rgb_resampling(source_size, target_size),
+            Scaler::Lab(s) => s.plan_rgb_resampling(source_size, target_size),
+            Scaler::LCh(s) => s.plan_rgb_resampling(source_size, target_size),
+            Scaler::Linear(s) => s.plan_rgb_resampling(source_size, target_size),
+            Scaler::LinearApprox(s) => s.plan_rgb_resampling(source_size, target_size),
+            Scaler::Luv(s) => s.plan_rgb_resampling(source_size, target_size),
+            Scaler::Oklab(s) => s.plan_rgb_resampling(source_size, target_size),
+            Scaler::Sigmoidal(s) => s.plan_rgb_resampling(source_size, target_size),
+            Scaler::XYZ(s) => s.plan_rgb_resampling(source_size, target_size),
+        }
+    }
+}
+
 fn resize_rgba(
     data: u8,
     src_width: usize,
@@ -96,34 +156,139 @@ fn resize_rgba(
         return;
     }
 
-    let scalers: Vec<Box<dyn Scaling>> = vec![
-        Box::new(JzazbzScaler::new(sampler, 203f32, TransferFunction::Srgb)),
-        Box::new(LabScaler::new(sampler)),
-        Box::new(LChScaler::new(sampler)),
-        Box::new(LinearScaler::new(sampler)),
-        Box::new(LinearApproxScaler::new(sampler)),
-        Box::new(LuvScaler::new(sampler)),
-        Box::new(OklabScaler::new(sampler, TransferFunction::Srgb)),
-        Box::new(SigmoidalScaler::new(sampler)),
-        Box::new(XYZScaler::new(sampler)),
+    let scalers = vec![
+        Scaler::Jzazbz(JzazbzScaler::new(sampler, 203f32, TransferFunction::Srgb)),
+        Scaler::Lab(LabScaler::new(sampler)),
+        Scaler::LCh(LChScaler::new(sampler)),
+        Scaler::Linear(LinearScaler::new(sampler)),
+        Scaler::LinearApprox(LinearApproxScaler::new(sampler)),
+        Scaler::Luv(LuvScaler::new(sampler)),
+        Scaler::Oklab(OklabScaler::new(sampler, TransferFunction::Srgb)),
+        Scaler::Sigmoidal(SigmoidalScaler::new(sampler)),
+        Scaler::XYZ(XYZScaler::new(sampler)),
     ];
 
-    for scaler in scalers {
+    let source_size = ImageSize::new(src_width, src_height);
+    let target_size = ImageSize::new(dst_width, dst_height);
+
+    for scaler in &scalers {
         if mul_alpha {
+            let plan = scaler.plan_rgba(source_size, target_size, true).unwrap();
             let mut src_data_rgba = vec![data; src_width * src_height * 4];
             src_data_rgba[3] = 18;
-            let store_rgba =
+            let store =
                 ImageStore::<u8, 4>::from_slice(&mut src_data_rgba, src_width, src_height).unwrap();
-            let mut target_store_rgba = ImageStoreMut::alloc(dst_width, dst_height);
-            scaler
-                .resize_rgba(&store_rgba, &mut target_store_rgba, true)
-                .unwrap();
+            let mut target_store = ImageStoreMut::alloc(dst_width, dst_height);
+            plan.resample(&store, &mut target_store).unwrap();
         } else {
+            let plan = scaler.plan_rgb(source_size, target_size).unwrap();
             let mut src_data_rgb = vec![data; src_width * src_height * 3];
             let store =
                 ImageStore::<u8, 3>::from_slice(&mut src_data_rgb, src_width, src_height).unwrap();
             let mut target_store = ImageStoreMut::alloc(dst_width, dst_height);
-            scaler.resize_rgb(&store, &mut target_store).unwrap();
+            plan.resample(&store, &mut target_store).unwrap();
+        }
+    }
+}
+
+enum LinearScalers {
+    Lin(LinearScaler),
+    App(LinearApproxScaler),
+}
+
+impl LinearScalers {
+    fn plan_rgba(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        premultiply_alpha: bool,
+    ) -> Result<Arc<Resampling<u8, 4>>, PicScaleError> {
+        match self {
+            LinearScalers::Lin(s) => {
+                s.plan_rgba_resampling(source_size, target_size, premultiply_alpha)
+            }
+            LinearScalers::App(s) => {
+                s.plan_rgba_resampling(source_size, target_size, premultiply_alpha)
+            }
+        }
+    }
+
+    fn plan_gray_alpha(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        premultiply_alpha: bool,
+    ) -> Result<Arc<Resampling<u8, 2>>, PicScaleError> {
+        match self {
+            LinearScalers::Lin(s) => {
+                s.plan_gray_alpha_resampling(source_size, target_size, premultiply_alpha)
+            }
+            LinearScalers::App(s) => {
+                s.plan_gray_alpha_resampling(source_size, target_size, premultiply_alpha)
+            }
+        }
+    }
+
+    fn plan_gray_alpha16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        premultiply_alpha: bool,
+        bit_depth: usize,
+    ) -> Result<Arc<Resampling<u16, 2>>, PicScaleError> {
+        match self {
+            LinearScalers::Lin(s) => s.plan_gray_alpha_resampling16(
+                source_size,
+                target_size,
+                premultiply_alpha,
+                bit_depth,
+            ),
+            LinearScalers::App(s) => s.plan_gray_alpha_resampling16(
+                source_size,
+                target_size,
+                premultiply_alpha,
+                bit_depth,
+            ),
+        }
+    }
+
+    fn plan_rgb(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+    ) -> Result<Arc<Resampling<u8, 3>>, PicScaleError> {
+        match self {
+            LinearScalers::Lin(s) => s.plan_rgb_resampling(source_size, target_size),
+            LinearScalers::App(s) => s.plan_rgb_resampling(source_size, target_size),
+        }
+    }
+
+    fn plan_rgba16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        premultiply_alpha: bool,
+        bit_depth: usize,
+    ) -> Result<Arc<Resampling<u16, 4>>, PicScaleError> {
+        match self {
+            LinearScalers::Lin(s) => {
+                s.plan_rgba_resampling16(source_size, target_size, premultiply_alpha, bit_depth)
+            }
+            LinearScalers::App(s) => {
+                s.plan_rgba_resampling16(source_size, target_size, premultiply_alpha, bit_depth)
+            }
+        }
+    }
+
+    fn plan_rgb16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        bit_depth: usize,
+    ) -> Result<Arc<Resampling<u16, 3>>, PicScaleError> {
+        match self {
+            LinearScalers::Lin(s) => s.plan_rgb_resampling16(source_size, target_size, bit_depth),
+            LinearScalers::App(s) => s.plan_rgb_resampling16(source_size, target_size, bit_depth),
         }
     }
 }
@@ -149,9 +314,9 @@ fn resize_rgba16(
         return;
     }
 
-    let scalers: Vec<Box<dyn ScalingU16>> = vec![
-        Box::new(LinearScaler::new(sampler)),
-        Box::new(LinearApproxScaler::new(sampler)),
+    let scalers: Vec<LinearScalers> = vec![
+        LinearScalers::Lin(LinearScaler::new(sampler)),
+        LinearScalers::App(LinearApproxScaler::new(sampler)),
     ];
 
     for scaler in scalers {
@@ -162,15 +327,19 @@ fn resize_rgba16(
                 ImageStore::<u16, 4>::from_slice(&mut src_data_rgba, src_width, src_height)
                     .unwrap();
             let mut target_store_rgba = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
-            scaler
-                .resize_rgba_u16(&store_rgba, &mut target_store_rgba, true)
+            let plan = scaler
+                .plan_rgba16(store_rgba.size(), target_store_rgba.size(), true, 16)
                 .unwrap();
+            plan.resample(&store_rgba, &mut target_store_rgba).unwrap();
         } else {
             let mut src_data_rgb = vec![data as u16; src_width * src_height * 3];
             let store =
                 ImageStore::<u16, 3>::from_slice(&mut src_data_rgb, src_width, src_height).unwrap();
             let mut target_store = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
-            scaler.resize_rgb_u16(&store, &mut target_store).unwrap();
+            let plan = scaler
+                .plan_rgb16(store.size(), target_store.size(), 16)
+                .unwrap();
+            plan.resample(&store, &mut target_store).unwrap();
         }
     }
 }
@@ -196,9 +365,9 @@ fn resize_cbcr(
         return;
     }
 
-    let scalers: Vec<Box<dyn Scaling>> = vec![
-        Box::new(LinearScaler::new(sampler)),
-        Box::new(LinearApproxScaler::new(sampler)),
+    let scalers: Vec<LinearScalers> = vec![
+        LinearScalers::Lin(LinearScaler::new(sampler)),
+        LinearScalers::App(LinearApproxScaler::new(sampler)),
     ];
 
     for scaler in scalers {
@@ -207,9 +376,10 @@ fn resize_cbcr(
         let store_rgba =
             ImageStore::<u8, 2>::from_slice(&mut src_data_rgba, src_width, src_height).unwrap();
         let mut target_store_rgba = ImageStoreMut::alloc(dst_width, dst_height);
-        scaler
-            .resize_gray_alpha(&store_rgba, &mut target_store_rgba, mul_alpha)
+        let plan = scaler
+            .plan_gray_alpha(store_rgba.size(), target_store_rgba.size(), mul_alpha)
             .unwrap();
+        plan.resample(&store_rgba, &mut target_store_rgba).unwrap();
     }
 }
 
@@ -234,9 +404,9 @@ fn resize_cbcr16(
         return;
     }
 
-    let scalers: Vec<Box<dyn ScalingU16>> = vec![
-        Box::new(LinearScaler::new(sampler)),
-        Box::new(LinearApproxScaler::new(sampler)),
+    let scalers: Vec<LinearScalers> = vec![
+        LinearScalers::Lin(LinearScaler::new(sampler)),
+        LinearScalers::App(LinearApproxScaler::new(sampler)),
     ];
 
     for scaler in scalers {
@@ -246,8 +416,9 @@ fn resize_cbcr16(
             ImageStore::<u16, 2>::from_slice(&mut src_data_rgba, src_width, src_height).unwrap();
         store_rgba.bit_depth = 16;
         let mut target_store_rgba = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
-        scaler
-            .resize_gray_alpha16(&store_rgba, &mut target_store_rgba, mul_alpha)
+        let plan = scaler
+            .plan_gray_alpha16(store_rgba.size(), target_store_rgba.size(), mul_alpha, 16)
             .unwrap();
+        plan.resample(&store_rgba, &mut target_store_rgba).unwrap();
     }
 }

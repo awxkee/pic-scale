@@ -26,32 +26,30 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::convolution::{ConvolutionOptions, HorizontalConvolutionPass, VerticalConvolutionPass};
-use crate::dispatch_group_u16::{convolve_horizontal_dispatch_u16, convolve_vertical_dispatch_u16};
+use crate::convolution::{
+    ColumnFilter, ConvolutionOptions, HorizontalFilterPass, RowFilter, VerticalConvolutionPass,
+};
+use crate::dispatch_group_u16::{RowFactoryProducer, vertical_plan_u16};
 use crate::filter_weights::FilterWeights;
-use crate::{ImageStore, ImageStoreMut};
+use crate::{ImageStore, ThreadingPolicy};
+use std::sync::Arc;
 
-impl HorizontalConvolutionPass<u16, f32, 2> for ImageStore<'_, u16, 2> {
-    #[allow(clippy::type_complexity)]
-    fn convolve_horizontal(
-        &self,
+impl HorizontalFilterPass<u16, f32, 2> for ImageStore<'_, u16, 2> {
+    fn horizontal_plan(
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStoreMut<u16, 2>,
-        pool: &novtb::ThreadPool,
-        _: ConvolutionOptions,
-    ) {
-        convolve_horizontal_dispatch_u16(self, filter_weights, destination, pool);
+        threading_policy: ThreadingPolicy,
+        options: ConvolutionOptions,
+    ) -> Arc<dyn RowFilter<u16, 2> + Send + Sync> {
+        u16::make_plan::<2>(&filter_weights, options.bit_depth, threading_policy)
     }
 }
 
 impl VerticalConvolutionPass<u16, f32, 2> for ImageStore<'_, u16, 2> {
-    fn convolve_vertical(
-        &self,
+    fn vertical_plan(
         filter_weights: FilterWeights<f32>,
-        destination: &mut ImageStoreMut<u16, 2>,
-        pool: &novtb::ThreadPool,
+        threading_policy: ThreadingPolicy,
         options: ConvolutionOptions,
-    ) {
-        convolve_vertical_dispatch_u16(self, filter_weights, destination, pool, options);
+    ) -> Arc<dyn ColumnFilter<u16, 2> + Send + Sync> {
+        vertical_plan_u16(filter_weights, threading_policy, options)
     }
 }

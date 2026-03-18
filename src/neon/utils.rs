@@ -31,7 +31,7 @@ use std::arch::aarch64::*;
 
 #[inline(always)]
 #[cfg(feature = "rdm")]
-pub(crate) unsafe fn expand8_to_14(row: uint8x8_t) -> int16x8_t {
+pub(crate) fn expand8_to_14(row: uint8x8_t) -> int16x8_t {
     unsafe {
         let row = vcombine_u8(row, row);
         vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip1q_u8(row, row))))
@@ -40,25 +40,13 @@ pub(crate) unsafe fn expand8_to_14(row: uint8x8_t) -> int16x8_t {
 
 #[inline(always)]
 #[cfg(feature = "rdm")]
-pub(crate) unsafe fn expand8_high_to_14(row: uint8x16_t) -> int16x8_t {
+pub(crate) fn expand8_high_to_14(row: uint8x16_t) -> int16x8_t {
     unsafe { vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip2q_u8(row, row)))) }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn xvld1q_u8_x2(ptr: *const u8) -> uint8x16x2_t {
     unsafe { uint8x16x2_t(vld1q_u8(ptr), vld1q_u8(ptr.add(16))) }
-}
-
-#[inline(always)]
-pub(crate) unsafe fn xvld1q_u8_x4(ptr: *const u8) -> uint8x16x4_t {
-    unsafe {
-        uint8x16x4_t(
-            vld1q_u8(ptr),
-            vld1q_u8(ptr.add(16)),
-            vld1q_u8(ptr.add(32)),
-            vld1q_u8(ptr.add(48)),
-        )
-    }
 }
 
 #[inline(always)]
@@ -104,21 +92,7 @@ pub(crate) unsafe fn xvst1q_u8_x2(ptr: *mut u8, b: uint8x16x2_t) {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn xvst1q_u8_x4(ptr: *mut u8, b: uint8x16x4_t) {
-    unsafe {
-        vst1q_u8(ptr, b.0);
-        vst1q_u8(ptr.add(16), b.1);
-        vst1q_u8(ptr.add(32), b.2);
-        vst1q_u8(ptr.add(48), b.3);
-    }
-}
-
-#[inline(always)]
-pub(crate) unsafe fn prefer_vfmaq_f32(
-    a: float32x4_t,
-    b: float32x4_t,
-    c: float32x4_t,
-) -> float32x4_t {
+pub(crate) fn prefer_vfmaq_f32(a: float32x4_t, b: float32x4_t, c: float32x4_t) -> float32x4_t {
     unsafe {
         #[cfg(target_arch = "aarch64")]
         {
@@ -150,7 +124,7 @@ pub unsafe fn xvst1q_f32_x2(a: *mut f32, b: float32x4x2_t) {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn prefer_vfmaq_laneq_f32<const LANE: i32>(
+pub(crate) fn prefer_vfmaq_laneq_f32<const LANE: i32>(
     a: float32x4_t,
     b: float32x4_t,
     c: float32x4_t,
@@ -159,7 +133,7 @@ pub(crate) unsafe fn prefer_vfmaq_laneq_f32<const LANE: i32>(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn prefer_vfmaq_lane_f32<const LANE: i32>(
+pub(crate) fn prefer_vfmaq_lane_f32<const LANE: i32>(
     a: float32x4_t,
     b: float32x4_t,
     c: float32x2_t,
@@ -221,7 +195,7 @@ pub(crate) unsafe fn xvld1q_s16_x4(a: *const i16) -> int16x8x4_t {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vxmlal_high_lane_s16<const D: bool, const LANE: i32>(
+pub(crate) fn vxmlal_high_lane_s16<const D: bool, const LANE: i32>(
     a: int32x4_t,
     b: int16x8_t,
     c: int16x4_t,
@@ -236,7 +210,7 @@ pub(crate) unsafe fn vxmlal_high_lane_s16<const D: bool, const LANE: i32>(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vxmlal_lane_s16<const D: bool, const LANE: i32>(
+pub(crate) fn vxmlal_lane_s16<const D: bool, const LANE: i32>(
     a: int32x4_t,
     b: int16x4_t,
     c: int16x4_t,
@@ -251,11 +225,7 @@ pub(crate) unsafe fn vxmlal_lane_s16<const D: bool, const LANE: i32>(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vxmlal_s16<const D: bool>(
-    a: int32x4_t,
-    b: int16x4_t,
-    c: int16x4_t,
-) -> int32x4_t {
+pub(crate) fn vxmlal_s16<const D: bool>(a: int32x4_t, b: int16x4_t, c: int16x4_t) -> int32x4_t {
     unsafe {
         if D {
             vqdmlal_s16(a, b, c)
@@ -266,7 +236,7 @@ pub(crate) unsafe fn vxmlal_s16<const D: bool>(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vxmlal_high_s16<const D: bool>(
+pub(crate) fn vxmlal_high_s16<const D: bool>(
     a: int32x4_t,
     b: int16x8_t,
     c: int16x8_t,
@@ -281,7 +251,7 @@ pub(crate) unsafe fn vxmlal_high_s16<const D: bool>(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vxmlal_high_laneq_s16<const D: bool, const LANE: i32>(
+pub(crate) fn vxmlal_high_laneq_s16<const D: bool, const LANE: i32>(
     a: int32x4_t,
     b: int16x8_t,
     c: int16x8_t,
@@ -296,7 +266,7 @@ pub(crate) unsafe fn vxmlal_high_laneq_s16<const D: bool, const LANE: i32>(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vxmlal_laneq_s16<const D: bool, const LANE: i32>(
+pub(crate) fn vxmlal_laneq_s16<const D: bool, const LANE: i32>(
     a: int32x4_t,
     b: int16x4_t,
     c: int16x8_t,

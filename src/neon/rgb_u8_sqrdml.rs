@@ -34,7 +34,7 @@ use std::arch::aarch64::*;
 #[must_use]
 #[inline]
 #[target_feature(enable = "rdm")]
-unsafe fn conv_horiz_rgb_4(
+fn conv_horiz_rgb_4(
     start_x: usize,
     src: &[u8],
     w0: int16x8_t,
@@ -66,7 +66,7 @@ unsafe fn conv_horiz_rgb_4(
 #[must_use]
 #[inline]
 #[target_feature(enable = "rdm")]
-unsafe fn conv_horiz_rgb_2(
+fn conv_horiz_rgb_2(
     start_x: usize,
     src: &[u8],
     weights: int16x8_t,
@@ -92,7 +92,7 @@ unsafe fn conv_horiz_rgb_2(
 #[must_use]
 #[inline]
 #[target_feature(enable = "rdm")]
-unsafe fn conv_hor_rgb_1(
+fn conv_hor_rgb_1(
     start_x: usize,
     src: &[u8],
     w0: int16x8_t,
@@ -128,6 +128,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_rdm_rows_4(
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_rgb_neon_rdm_rows_4_impl(
@@ -141,7 +142,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_rdm_rows_4(
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn convolve_horizontal_rgb_neon_rdm_rows_4_impl(
+fn convolve_horizontal_rgb_neon_rdm_rows_4_impl(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -205,7 +206,7 @@ unsafe fn convolve_horizontal_rgb_neon_rdm_rows_4_impl(
             let src2 = src1.get_unchecked(src_stride..);
             let src3 = src2.get_unchecked(src_stride..);
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = vcombine_s16(vld1_s16(w_ptr.as_ptr()), vdup_n_s16(0));
@@ -222,7 +223,7 @@ unsafe fn convolve_horizontal_rgb_neon_rdm_rows_4_impl(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bnds = bounds.start + jx;
                 let ld_w = vld1q_dup_s32(w_ptr.as_ptr() as *const _);
@@ -257,6 +258,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_rdm_row_one(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_rgb_neon_row_rdm_one_impl(src, dst, filter_weights);
@@ -264,7 +266,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_rdm_row_one(
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn convolve_horizontal_rgb_neon_row_rdm_one_impl(
+fn convolve_horizontal_rgb_neon_row_rdm_one_impl(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
@@ -310,7 +312,7 @@ unsafe fn convolve_horizontal_rgb_neon_row_rdm_one_impl(
             let mut jx = 0usize;
             let mut store = v_base;
 
-            while jx + 4 < bounds_size {
+            while jx + 4 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = vcombine_s16(vld1_s16(w_ptr.as_ptr()), vdup_n_s16(0));
@@ -320,7 +322,7 @@ unsafe fn convolve_horizontal_rgb_neon_row_rdm_one_impl(
                 jx += 4;
             }
 
-            while jx + 2 < bounds_size {
+            while jx + 2 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let ld_w = vld1q_dup_s32(w_ptr.as_ptr() as *const _);

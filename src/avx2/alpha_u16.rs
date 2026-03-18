@@ -34,7 +34,7 @@ use novtb::{ParallelZonedIterator, TbSliceMut};
 use std::arch::x86_64::*;
 
 #[inline(always)]
-unsafe fn _mm256_scale_by_alpha(px: __m256i, low_low_a: __m256, low_high_a: __m256) -> __m256i {
+fn _mm256_scale_by_alpha(px: __m256i, low_low_a: __m256, low_high_a: __m256) -> __m256i {
     unsafe {
         let zeros = _mm256_setzero_si256();
         let ls = _mm256_unpacklo_epi16(px, zeros);
@@ -55,7 +55,7 @@ unsafe fn _mm256_scale_by_alpha(px: __m256i, low_low_a: __m256, low_high_a: __m2
 
 /// Exact division by 1023 with rounding to nearest
 #[inline(always)]
-pub(crate) unsafe fn _mm256_div_by_1023_epi32(v: __m256i) -> __m256i {
+pub(crate) fn _mm256_div_by_1023_epi32(v: __m256i) -> __m256i {
     unsafe {
         const DIVIDING_BY: i32 = 10;
         let addition = _mm256_set1_epi32(1 << (DIVIDING_BY - 1));
@@ -66,7 +66,7 @@ pub(crate) unsafe fn _mm256_div_by_1023_epi32(v: __m256i) -> __m256i {
 
 /// Exact division by 4095 with rounding to nearest
 #[inline(always)]
-pub(crate) unsafe fn _mm256_div_by_4095_epi32(v: __m256i) -> __m256i {
+pub(crate) fn _mm256_div_by_4095_epi32(v: __m256i) -> __m256i {
     unsafe {
         const DIVIDING_BY: i32 = 12;
         let addition = _mm256_set1_epi32(1 << (DIVIDING_BY - 1));
@@ -77,7 +77,7 @@ pub(crate) unsafe fn _mm256_div_by_4095_epi32(v: __m256i) -> __m256i {
 
 /// Exact division by 65535 with rounding to nearest
 #[inline(always)]
-pub(crate) unsafe fn _mm256_div_by_65535_epi32(v: __m256i) -> __m256i {
+pub(crate) fn _mm256_div_by_65535_epi32(v: __m256i) -> __m256i {
     unsafe {
         const DIVIDING_BY: i32 = 16;
         let addition = _mm256_set1_epi32(1 << (DIVIDING_BY - 1));
@@ -87,15 +87,13 @@ pub(crate) unsafe fn _mm256_div_by_65535_epi32(v: __m256i) -> __m256i {
 }
 
 #[inline(always)]
-unsafe fn _mm256_div_by_epi32<const BIT_DEPTH: usize>(v: __m256i) -> __m256i {
-    unsafe {
-        if BIT_DEPTH == 10 {
-            _mm256_div_by_1023_epi32(v)
-        } else if BIT_DEPTH == 12 {
-            _mm256_div_by_4095_epi32(v)
-        } else {
-            _mm256_div_by_65535_epi32(v)
-        }
+fn _mm256_div_by_epi32<const BIT_DEPTH: usize>(v: __m256i) -> __m256i {
+    if BIT_DEPTH == 10 {
+        _mm256_div_by_1023_epi32(v)
+    } else if BIT_DEPTH == 12 {
+        _mm256_div_by_4095_epi32(v)
+    } else {
+        _mm256_div_by_65535_epi32(v)
     }
 }
 
@@ -125,7 +123,7 @@ struct Avx2PremultiplyExecutorDefault<const BIT_DEPTH: usize> {}
 
 impl<const BIT_DEPTH: usize> Avx2PremultiplyExecutorDefault<BIT_DEPTH> {
     #[inline(always)]
-    unsafe fn premultiply_chunk(&self, dst: &mut [u16], src: &[u16]) {
+    fn premultiply_chunk(&self, dst: &mut [u16], src: &[u16]) {
         unsafe {
             let src_ptr = src.as_ptr();
             let lane0 = _mm256_loadu_si256(src_ptr as *const __m256i);
@@ -307,37 +305,35 @@ impl Avx2PremultiplyExecutor for Avx2PremultiplyExecutorAnyBit {
 
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn avx_premultiply_alpha_rgba_u16_row(dst: &mut [u16], src: &[u16], bit_depth: usize) {
-    unsafe {
-        if bit_depth == 10 {
-            avx_pa_dispatch(
-                dst,
-                src,
-                bit_depth,
-                Avx2PremultiplyExecutorDefault::<10>::default(),
-            );
-        } else if bit_depth == 12 {
-            avx_pa_dispatch(
-                dst,
-                src,
-                bit_depth,
-                Avx2PremultiplyExecutorDefault::<12>::default(),
-            );
-        } else {
-            avx_pa_dispatch(
-                dst,
-                src,
-                bit_depth,
-                Avx2PremultiplyExecutorAnyBit::default(),
-            );
-        };
-    }
+fn avx_premultiply_alpha_rgba_u16_row(dst: &mut [u16], src: &[u16], bit_depth: usize) {
+    if bit_depth == 10 {
+        avx_pa_dispatch(
+            dst,
+            src,
+            bit_depth,
+            Avx2PremultiplyExecutorDefault::<10>::default(),
+        );
+    } else if bit_depth == 12 {
+        avx_pa_dispatch(
+            dst,
+            src,
+            bit_depth,
+            Avx2PremultiplyExecutorDefault::<12>::default(),
+        );
+    } else {
+        avx_pa_dispatch(
+            dst,
+            src,
+            bit_depth,
+            Avx2PremultiplyExecutorAnyBit::default(),
+        );
+    };
 }
 
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch
 #[inline]
-unsafe fn avx_pa_dispatch(
+fn avx_pa_dispatch(
     dst: &mut [u16],
     src: &[u16],
     bit_depth: usize,
@@ -349,7 +345,7 @@ unsafe fn avx_pa_dispatch(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn avx_premultiply_alpha_rgba_u16_impl(
+fn avx_premultiply_alpha_rgba_u16_impl(
     dst: &mut [u16],
     dst_stride: usize,
     src: &[u16],
@@ -360,7 +356,7 @@ unsafe fn avx_premultiply_alpha_rgba_u16_impl(
     pool: &novtb::ThreadPool,
 ) {
     dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| unsafe {
+        .for_each_enumerated(pool, |y, dst| {
             let src = &src[y * src_stride..(y + 1) * src_stride];
             avx_premultiply_alpha_rgba_u16_row(&mut dst[..width * 4], &src[..width * 4], bit_depth);
         });
@@ -381,7 +377,7 @@ pub(crate) fn avx_unpremultiply_alpha_rgba_u16(
 
 /// This inlining is required to activate all features for runtime dispatch
 #[inline(always)]
-unsafe fn avx_unpremultiply_alpha_rgba_u16_row_impl(in_place: &mut [u16], bit_depth: usize) {
+fn avx_unpremultiply_alpha_rgba_u16_row_impl(in_place: &mut [u16], bit_depth: usize) {
     unsafe {
         let max_colors = (1u32 << bit_depth) - 1;
 
@@ -489,14 +485,12 @@ unsafe fn avx_unpremultiply_alpha_rgba_u16_row_impl(in_place: &mut [u16], bit_de
 
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn avx_unpremultiply_alpha_rgba_u16_row_avx(in_place: &mut [u16], bit_depth: usize) {
-    unsafe {
-        avx_unpremultiply_alpha_rgba_u16_row_impl(in_place, bit_depth);
-    }
+fn avx_unpremultiply_alpha_rgba_u16_row_avx(in_place: &mut [u16], bit_depth: usize) {
+    avx_unpremultiply_alpha_rgba_u16_row_impl(in_place, bit_depth);
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn avx_unpremultiply_alpha_rgba_u16_impl(
+fn avx_unpremultiply_alpha_rgba_u16_impl(
     in_place: &mut [u16],
     stride: usize,
     width: usize,
@@ -508,7 +502,7 @@ unsafe fn avx_unpremultiply_alpha_rgba_u16_impl(
 
     in_place
         .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| unsafe {
+        .for_each(pool, |row| {
             dispatch(&mut row[..width * 4], bit_depth);
         });
 }
