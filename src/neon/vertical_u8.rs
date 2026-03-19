@@ -181,7 +181,7 @@ fn convolve_32_items<const D: bool, const PRECISION: i32>(
     bounds: &FilterBounds,
     src: &[u8],
     src_stride: usize,
-    weight: &[i16],
+    weights: &[i16],
     cx: usize,
 ) -> usize {
     let rnd_const: i32 = 1 << (PRECISION - 1);
@@ -204,7 +204,7 @@ fn convolve_32_items<const D: bool, const PRECISION: i32>(
 
         while j + 4 <= bounds.size {
             let py = bounds.start + j;
-            let weights = unsafe { vld1_s16(weight.get_unchecked(j..).as_ptr()) };
+            let weights = unsafe { vld1_s16(weights.get_unchecked(j..).as_ptr()) };
             let src_ptr = unsafe { src.get_unchecked((src_stride * py + px)..) };
             let items0 = unsafe { xvld1q_u8_x2(src_ptr.as_ptr()) };
             let items1 = unsafe { xvld1q_u8_x2(src_ptr.get_unchecked(src_stride..).as_ptr()) };
@@ -242,9 +242,38 @@ fn convolve_32_items<const D: bool, const PRECISION: i32>(
             j += 4;
         }
 
+        while j + 2 <= bounds.size {
+            let py = bounds.start + j;
+            let weights = unsafe {
+                vreinterpret_s16_u32(vld1_lane_u32::<0>(
+                    weights.get_unchecked(j..).as_ptr().cast(),
+                    vdup_n_u32(0),
+                ))
+            };
+            let src_ptr = unsafe { src.get_unchecked((src_stride * py + px)..) };
+            let items0 = unsafe { xvld1q_u8_x2(src_ptr.as_ptr()) };
+            let items1 = unsafe { xvld1q_u8_x2(src_ptr.get_unchecked(src_stride..).as_ptr()) };
+
+            (store_0, store_1, store_2, store_3) = accumulate_4_into_lane::<D, 0>(
+                items0.0, store_0, store_1, store_2, store_3, weights,
+            );
+            (store_4, store_5, store_6, store_7) = accumulate_4_into_lane::<D, 0>(
+                items0.1, store_4, store_5, store_6, store_7, weights,
+            );
+
+            (store_0, store_1, store_2, store_3) = accumulate_4_into_lane::<D, 1>(
+                items1.0, store_0, store_1, store_2, store_3, weights,
+            );
+            (store_4, store_5, store_6, store_7) = accumulate_4_into_lane::<D, 1>(
+                items1.1, store_4, store_5, store_6, store_7, weights,
+            );
+
+            j += 2;
+        }
+
         for j in j..bounds.size {
             let py = bounds.start + j;
-            let weight = unsafe { weight.get_unchecked(j..) };
+            let weight = unsafe { weights.get_unchecked(j..) };
             let v_weight = unsafe { vld1q_dup_s16(weight.as_ptr()) };
             let src_ptr = unsafe { src.get_unchecked((src_stride * py + px)..) };
             let items = unsafe { xvld1q_u8_x2(src_ptr.as_ptr()) };

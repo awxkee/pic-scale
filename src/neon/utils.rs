@@ -50,18 +50,6 @@ pub(crate) unsafe fn xvld1q_u8_x2(ptr: *const u8) -> uint8x16x2_t {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn xvld1q_u8_x4(ptr: *const u8) -> uint8x16x4_t {
-    unsafe {
-        uint8x16x4_t(
-            vld1q_u8(ptr),
-            vld1q_u8(ptr.add(16)),
-            vld1q_u8(ptr.add(32)),
-            vld1q_u8(ptr.add(48)),
-        )
-    }
-}
-
-#[inline(always)]
 pub(crate) unsafe fn xvld1q_u16_x4(a: *const u16) -> uint16x8x4_t {
     unsafe {
         uint16x8x4_t(
@@ -146,7 +134,7 @@ pub unsafe fn xvst1q_f32_x2(a: *mut f32, b: float32x4x2_t) {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn prefer_vfmaq_laneq_f32<const LANE: i32>(
+pub(crate) fn prefer_vfmaq_laneq_f32<const LANE: i32>(
     a: float32x4_t,
     b: float32x4_t,
     c: float32x4_t,
@@ -155,7 +143,7 @@ pub(crate) unsafe fn prefer_vfmaq_laneq_f32<const LANE: i32>(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn prefer_vfmaq_lane_f32<const LANE: i32>(
+pub(crate) fn prefer_vfmaq_lane_f32<const LANE: i32>(
     a: float32x4_t,
     b: float32x4_t,
     c: float32x2_t,

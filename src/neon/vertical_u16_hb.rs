@@ -29,7 +29,6 @@
 use crate::filter_weights::FilterBounds;
 use std::arch::aarch64::*;
 
-#[inline(always)]
 pub(crate) fn convolve_column_hb_u16(
     w: usize,
     bounds: &FilterBounds,
@@ -43,7 +42,7 @@ pub(crate) fn convolve_column_hb_u16(
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn convolve_column_hb_impl(
+fn convolve_column_hb_impl(
     _: usize,
     bounds: &FilterBounds,
     src: &[u16],
@@ -74,281 +73,35 @@ unsafe fn convolve_column_hb_impl(
 
             let v_dx = v_px + x * 16;
 
-            if bounds_size == 2 {
-                let weights = weight.get_unchecked(0..2);
-                let mut v_weight = vld1_dup_s32(weights.as_ptr());
-                v_weight = vld1_lane_s32::<1>(weights.as_ptr().add(1), v_weight);
+            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
+                let py = bounds.start + j;
+                let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
 
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
+                let v_weight = vdupq_n_s32(k_weight);
 
-                let item_row0 = vld1q_u16(src_ptr0.as_ptr());
-                let item_row1 = vld1q_u16(src_ptr0.as_ptr().add(8));
+                let item_row0 = vld1q_u16(src_ptr.as_ptr());
+                let item_row1 = vld1q_u16(src_ptr.as_ptr().add(8));
 
-                store0 = vqrdmlahq_lane_s32::<0>(
+                store0 = vqrdmlahq_s32(
                     store0,
                     vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row0))),
                     v_weight,
                 );
-                store1 = vqrdmlahq_lane_s32::<0>(
+                store1 = vqrdmlahq_s32(
                     store1,
                     vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row0)),
                     v_weight,
                 );
-                store2 = vqrdmlahq_lane_s32::<0>(
+                store2 = vqrdmlahq_s32(
                     store2,
                     vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row1))),
                     v_weight,
                 );
-                store3 = vqrdmlahq_lane_s32::<0>(
+                store3 = vqrdmlahq_s32(
                     store3,
                     vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row1)),
                     v_weight,
                 );
-
-                let item_row10 = vld1q_u16(src_ptr1.as_ptr());
-                let item_row11 = vld1q_u16(src_ptr1.as_ptr().add(8));
-
-                store0 = vqrdmlahq_lane_s32::<1>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row10))),
-                    v_weight,
-                );
-                store1 = vqrdmlahq_lane_s32::<1>(
-                    store1,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row10)),
-                    v_weight,
-                );
-                store2 = vqrdmlahq_lane_s32::<1>(
-                    store2,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row11))),
-                    v_weight,
-                );
-                store3 = vqrdmlahq_lane_s32::<1>(
-                    store3,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row11)),
-                    v_weight,
-                );
-            } else if bounds_size == 3 {
-                let weights = weight.get_unchecked(0..3);
-                let mut v_weight = vld1q_dup_s32(weights.as_ptr());
-                v_weight = vld1q_lane_s32::<1>(weights.as_ptr().add(1), v_weight);
-                v_weight = vld1q_lane_s32::<2>(weights.as_ptr().add(2), v_weight);
-
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
-
-                let item_row0 = vld1q_u16(src_ptr0.as_ptr());
-                let item_row1 = vld1q_u16(src_ptr0.as_ptr().add(8));
-
-                store0 = vqrdmlahq_laneq_s32::<0>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row0))),
-                    v_weight,
-                );
-                store1 = vqrdmlahq_laneq_s32::<0>(
-                    store1,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row0)),
-                    v_weight,
-                );
-                store2 = vqrdmlahq_laneq_s32::<0>(
-                    store2,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row1))),
-                    v_weight,
-                );
-                store3 = vqrdmlahq_laneq_s32::<0>(
-                    store3,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row1)),
-                    v_weight,
-                );
-
-                let item_row10 = vld1q_u16(src_ptr1.as_ptr());
-                let item_row11 = vld1q_u16(src_ptr1.as_ptr().add(8));
-
-                store0 = vqrdmlahq_laneq_s32::<1>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row10))),
-                    v_weight,
-                );
-                store1 = vqrdmlahq_laneq_s32::<1>(
-                    store1,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row10)),
-                    v_weight,
-                );
-                store2 = vqrdmlahq_laneq_s32::<1>(
-                    store2,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row11))),
-                    v_weight,
-                );
-                store3 = vqrdmlahq_laneq_s32::<1>(
-                    store3,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row11)),
-                    v_weight,
-                );
-
-                let item_row20 = vld1q_u16(src_ptr2.as_ptr());
-                let item_row21 = vld1q_u16(src_ptr2.as_ptr().add(8));
-
-                store0 = vqrdmlahq_laneq_s32::<2>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row20))),
-                    v_weight,
-                );
-                store1 = vqrdmlahq_laneq_s32::<2>(
-                    store1,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row20)),
-                    v_weight,
-                );
-                store2 = vqrdmlahq_laneq_s32::<2>(
-                    store2,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row21))),
-                    v_weight,
-                );
-                store3 = vqrdmlahq_laneq_s32::<2>(
-                    store3,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row21)),
-                    v_weight,
-                );
-            } else if bounds_size == 4 {
-                let weights = weight.get_unchecked(0..4);
-
-                let v_weight = vld1q_s32(weights.as_ptr());
-
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
-                let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + v_dx)..);
-
-                let item_row0 = vld1q_u16(src_ptr0.as_ptr());
-                let item_row1 = vld1q_u16(src_ptr0.as_ptr().add(8));
-
-                store0 = vqrdmlahq_laneq_s32::<0>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row0))),
-                    v_weight,
-                );
-                store1 = vqrdmlahq_laneq_s32::<0>(
-                    store1,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row0)),
-                    v_weight,
-                );
-                store2 = vqrdmlahq_laneq_s32::<0>(
-                    store2,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row1))),
-                    v_weight,
-                );
-                store3 = vqrdmlahq_laneq_s32::<0>(
-                    store3,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row1)),
-                    v_weight,
-                );
-
-                let item_row10 = vld1q_u16(src_ptr1.as_ptr());
-                let item_row11 = vld1q_u16(src_ptr1.as_ptr().add(8));
-
-                store0 = vqrdmlahq_laneq_s32::<1>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row10))),
-                    v_weight,
-                );
-                store1 = vqrdmlahq_laneq_s32::<1>(
-                    store1,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row10)),
-                    v_weight,
-                );
-                store2 = vqrdmlahq_laneq_s32::<1>(
-                    store2,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row11))),
-                    v_weight,
-                );
-                store3 = vqrdmlahq_laneq_s32::<1>(
-                    store3,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row11)),
-                    v_weight,
-                );
-
-                let item_row20 = vld1q_u16(src_ptr2.as_ptr());
-                let item_row21 = vld1q_u16(src_ptr2.as_ptr().add(8));
-
-                store0 = vqrdmlahq_laneq_s32::<2>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row20))),
-                    v_weight,
-                );
-                store1 = vqrdmlahq_laneq_s32::<2>(
-                    store1,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row20)),
-                    v_weight,
-                );
-                store2 = vqrdmlahq_laneq_s32::<2>(
-                    store2,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row21))),
-                    v_weight,
-                );
-                store3 = vqrdmlahq_laneq_s32::<2>(
-                    store3,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row21)),
-                    v_weight,
-                );
-
-                let item_row30 = vld1q_u16(src_ptr3.as_ptr());
-                let item_row31 = vld1q_u16(src_ptr3.as_ptr().add(8));
-
-                store0 = vqrdmlahq_laneq_s32::<3>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row30))),
-                    v_weight,
-                );
-                store1 = vqrdmlahq_laneq_s32::<3>(
-                    store1,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row30)),
-                    v_weight,
-                );
-                store2 = vqrdmlahq_laneq_s32::<3>(
-                    store2,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row31))),
-                    v_weight,
-                );
-                store3 = vqrdmlahq_laneq_s32::<3>(
-                    store3,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row31)),
-                    v_weight,
-                );
-            } else {
-                for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
-                    let py = bounds.start + j;
-                    let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
-
-                    let v_weight = vdupq_n_s32(k_weight);
-
-                    let item_row0 = vld1q_u16(src_ptr.as_ptr());
-                    let item_row1 = vld1q_u16(src_ptr.as_ptr().add(8));
-
-                    store0 = vqrdmlahq_s32(
-                        store0,
-                        vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row0))),
-                        v_weight,
-                    );
-                    store1 = vqrdmlahq_s32(
-                        store1,
-                        vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row0)),
-                        v_weight,
-                    );
-                    store2 = vqrdmlahq_s32(
-                        store2,
-                        vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row1))),
-                        v_weight,
-                    );
-                    store3 = vqrdmlahq_s32(
-                        store3,
-                        vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row1)),
-                        v_weight,
-                    );
-                }
             }
 
             let store0 = vqshrun_n_s32::<6>(store0);
@@ -376,170 +129,24 @@ unsafe fn convolve_column_hb_impl(
 
             let v_dx = v_px + x * 8;
 
-            if bounds_size == 2 {
-                let weights = weight.get_unchecked(0..2);
-                let mut v_weight = vld1_dup_s32(weights.as_ptr());
-                v_weight = vld1_lane_s32::<1>(weights.as_ptr().add(1), v_weight);
+            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
+                let py = bounds.start + j;
+                let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
 
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
+                let v_weight = vdupq_n_s32(k_weight);
 
-                let item_row0 = vld1q_u16(src_ptr0.as_ptr());
+                let item_row = vld1q_u16(src_ptr.as_ptr());
 
-                store0 = vqrdmlahq_lane_s32::<0>(
+                store0 = vqrdmlahq_s32(
                     store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row0))),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row))),
                     v_weight,
                 );
-                store1 = vqrdmlahq_lane_s32::<0>(
+                store1 = vqrdmlahq_s32(
                     store1,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row0)),
+                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row)),
                     v_weight,
                 );
-
-                let item_row1 = vld1q_u16(src_ptr1.as_ptr());
-
-                store0 = vqrdmlahq_lane_s32::<1>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row1))),
-                    v_weight,
-                );
-                store1 = vqrdmlahq_lane_s32::<1>(
-                    store1,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row1)),
-                    v_weight,
-                );
-            } else if bounds_size == 3 {
-                let weights = weight.get_unchecked(0..3);
-                let mut v_weight = vld1q_dup_s32(weights.as_ptr());
-                v_weight = vld1q_lane_s32::<1>(weights.as_ptr().add(1), v_weight);
-                v_weight = vld1q_lane_s32::<2>(weights.as_ptr().add(2), v_weight);
-
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
-
-                let item_row0 = vld1q_u16(src_ptr0.as_ptr());
-
-                store0 = vqrdmlahq_laneq_s32::<0>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row0))),
-                    v_weight,
-                );
-                store1 = vqrdmlahq_laneq_s32::<0>(
-                    store1,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row0)),
-                    v_weight,
-                );
-
-                let item_row1 = vld1q_u16(src_ptr1.as_ptr());
-
-                store0 = vqrdmlahq_laneq_s32::<1>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row1))),
-                    v_weight,
-                );
-                store1 = vqrdmlahq_laneq_s32::<1>(
-                    store1,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row1)),
-                    v_weight,
-                );
-
-                let item_row2 = vld1q_u16(src_ptr2.as_ptr());
-
-                store0 = vqrdmlahq_laneq_s32::<2>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row2))),
-                    v_weight,
-                );
-                store1 = vqrdmlahq_laneq_s32::<2>(
-                    store1,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row2)),
-                    v_weight,
-                );
-            } else if bounds_size == 4 {
-                let weights = weight.get_unchecked(0..4);
-                let v_weight = vld1q_s32(weights.as_ptr());
-
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
-                let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + v_dx)..);
-
-                let item_row0 = vld1q_u16(src_ptr0.as_ptr());
-
-                store0 = vqrdmlahq_laneq_s32::<0>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row0))),
-                    v_weight,
-                );
-                store1 = vqrdmlahq_laneq_s32::<0>(
-                    store1,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row0)),
-                    v_weight,
-                );
-
-                let item_row1 = vld1q_u16(src_ptr1.as_ptr());
-
-                store0 = vqrdmlahq_laneq_s32::<1>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row1))),
-                    v_weight,
-                );
-                store1 = vqrdmlahq_laneq_s32::<1>(
-                    store1,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row1)),
-                    v_weight,
-                );
-
-                let item_row2 = vld1q_u16(src_ptr2.as_ptr());
-
-                store0 = vqrdmlahq_laneq_s32::<2>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row2))),
-                    v_weight,
-                );
-                store1 = vqrdmlahq_laneq_s32::<2>(
-                    store1,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row2)),
-                    v_weight,
-                );
-
-                let item_row3 = vld1q_u16(src_ptr3.as_ptr());
-
-                store0 = vqrdmlahq_laneq_s32::<3>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row3))),
-                    v_weight,
-                );
-                store1 = vqrdmlahq_laneq_s32::<3>(
-                    store1,
-                    vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row3)),
-                    v_weight,
-                );
-            } else {
-                for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
-                    let py = bounds.start + j;
-                    let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
-
-                    let v_weight = vdupq_n_s32(k_weight);
-
-                    let item_row = vld1q_u16(src_ptr.as_ptr());
-
-                    store0 = vqrdmlahq_s32(
-                        store0,
-                        vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(item_row))),
-                        v_weight,
-                    );
-                    store1 = vqrdmlahq_s32(
-                        store1,
-                        vreinterpretq_s32_u32(vshll_high_n_u16::<6>(item_row)),
-                        v_weight,
-                    );
-                }
             }
 
             let item = vminq_u16(
@@ -561,111 +168,19 @@ unsafe fn convolve_column_hb_impl(
 
             let v_dx = v_cx + x * 4;
 
-            if bounds_size == 2 {
-                let weights = weight.get_unchecked(0..2);
-                let mut v_weight = vld1_dup_s32(weights.as_ptr());
-                v_weight = vld1_lane_s32::<1>(weights.as_ptr().add(1), v_weight);
+            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
+                let py = bounds.start + j;
+                let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
 
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
+                let v_weight = vdupq_n_s32(k_weight);
 
-                let item_row0 = vld1_u16(src_ptr0.as_ptr());
-                store0 = vqrdmlahq_lane_s32::<0>(
+                let item_row = vld1_u16(src_ptr.as_ptr());
+
+                store0 = vqrdmlahq_s32(
                     store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(item_row0)),
+                    vreinterpretq_s32_u32(vshll_n_u16::<6>(item_row)),
                     v_weight,
                 );
-
-                let item_row1 = vld1_u16(src_ptr1.as_ptr());
-                store0 = vqrdmlahq_lane_s32::<1>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(item_row1)),
-                    v_weight,
-                );
-            } else if bounds_size == 3 {
-                let weights = weight.get_unchecked(0..3);
-                let mut v_weight = vld1q_dup_s32(weights.as_ptr());
-                v_weight = vld1q_lane_s32::<1>(weights.as_ptr().add(1), v_weight);
-                v_weight = vld1q_lane_s32::<2>(weights.as_ptr().add(2), v_weight);
-
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
-
-                let item_row0 = vld1_u16(src_ptr0.as_ptr());
-                store0 = vqrdmlahq_laneq_s32::<0>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(item_row0)),
-                    v_weight,
-                );
-
-                let item_row1 = vld1_u16(src_ptr1.as_ptr());
-                store0 = vqrdmlahq_laneq_s32::<1>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(item_row1)),
-                    v_weight,
-                );
-
-                let item_row2 = vld1_u16(src_ptr2.as_ptr());
-                store0 = vqrdmlahq_laneq_s32::<2>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(item_row2)),
-                    v_weight,
-                );
-            } else if bounds_size == 4 {
-                let weights = weight.get_unchecked(0..4);
-                let v_weight = vld1q_s32(weights.as_ptr());
-
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
-                let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + v_dx)..);
-
-                let item_row0 = vld1_u16(src_ptr0.as_ptr());
-                store0 = vqrdmlahq_laneq_s32::<0>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(item_row0)),
-                    v_weight,
-                );
-
-                let item_row1 = vld1_u16(src_ptr1.as_ptr());
-                store0 = vqrdmlahq_laneq_s32::<1>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(item_row1)),
-                    v_weight,
-                );
-
-                let item_row2 = vld1_u16(src_ptr2.as_ptr());
-                store0 = vqrdmlahq_laneq_s32::<2>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(item_row2)),
-                    v_weight,
-                );
-
-                let item_row3 = vld1_u16(src_ptr3.as_ptr());
-                store0 = vqrdmlahq_laneq_s32::<3>(
-                    store0,
-                    vreinterpretq_s32_u32(vshll_n_u16::<6>(item_row3)),
-                    v_weight,
-                );
-            } else {
-                for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
-                    let py = bounds.start + j;
-                    let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
-
-                    let v_weight = vdupq_n_s32(k_weight);
-
-                    let item_row = vld1_u16(src_ptr.as_ptr());
-
-                    store0 = vqrdmlahq_s32(
-                        store0,
-                        vreinterpretq_s32_u32(vshll_n_u16::<6>(item_row)),
-                        v_weight,
-                    );
-                }
             }
 
             let u_store0 = vmin_u16(vqshrun_n_s32::<6>(store0), vget_low_u16(v_max_colors));
@@ -683,65 +198,12 @@ unsafe fn convolve_column_hb_impl(
 
             let v_px = a_px + x;
 
-            if bounds_size == 2 {
-                let weights = weight.get_unchecked(0..2);
-                let weight0 = weights[0];
-                let weight1 = weights[1];
+            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
+                let py = bounds.start + j;
+                let offset = src_stride * py + v_px;
+                let src_ptr = src.get_unchecked(offset);
 
-                let py = bounds.start;
-                let offset0 = src_stride * py + v_px;
-                let src_ptr0 = *src.get_unchecked(offset0);
-                let offset1 = src_stride * (py + 1) + v_px;
-                let src_ptr1 = *src.get_unchecked(offset1);
-
-                store0 += src_ptr0 as i64 * weight0 as i64;
-                store0 += src_ptr1 as i64 * weight1 as i64;
-            } else if bounds_size == 3 {
-                let weights = weight.get_unchecked(0..3);
-                let weight0 = weights[0];
-                let weight1 = weights[1];
-                let weight2 = weights[2];
-
-                let py = bounds.start;
-                let offset0 = src_stride * py + v_px;
-                let src_ptr0 = *src.get_unchecked(offset0);
-                let offset1 = src_stride * (py + 1) + v_px;
-                let src_ptr1 = *src.get_unchecked(offset1);
-                let offset2 = src_stride * (py + 2) + v_px;
-                let src_ptr2 = *src.get_unchecked(offset2);
-
-                store0 += src_ptr0 as i64 * weight0 as i64;
-                store0 += src_ptr1 as i64 * weight1 as i64;
-                store0 += src_ptr2 as i64 * weight2 as i64;
-            } else if bounds_size == 4 {
-                let weights = weight.get_unchecked(0..4);
-                let weight0 = weights[0];
-                let weight1 = weights[1];
-                let weight2 = weights[2];
-                let weight3 = weights[3];
-
-                let py = bounds.start;
-                let offset0 = src_stride * py + v_px;
-                let src_ptr0 = *src.get_unchecked(offset0);
-                let offset1 = src_stride * (py + 1) + v_px;
-                let src_ptr1 = *src.get_unchecked(offset1);
-                let offset2 = src_stride * (py + 2) + v_px;
-                let src_ptr2 = *src.get_unchecked(offset2);
-                let offset3 = src_stride * (py + 3) + v_px;
-                let src_ptr3 = *src.get_unchecked(offset3);
-
-                store0 += src_ptr0 as i64 * weight0 as i64;
-                store0 += src_ptr1 as i64 * weight1 as i64;
-                store0 += src_ptr2 as i64 * weight2 as i64;
-                store0 += src_ptr3 as i64 * weight3 as i64;
-            } else {
-                for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
-                    let py = bounds.start + j;
-                    let offset = src_stride * py + v_px;
-                    let src_ptr = src.get_unchecked(offset);
-
-                    store0 += *src_ptr as i64 * k_weight as i64;
-                }
+                store0 += *src_ptr as i64 * k_weight as i64;
             }
 
             const R: i64 = (1 << 30) - 1;

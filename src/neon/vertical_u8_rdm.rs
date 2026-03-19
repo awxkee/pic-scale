@@ -145,7 +145,7 @@ fn convolve_32_items(
     bounds: &FilterBounds,
     src: &[u8],
     src_stride: usize,
-    weight: &[i16],
+    weights: &[i16],
     cx: usize,
 ) -> usize {
     let mut cx = cx;
@@ -167,7 +167,7 @@ fn convolve_32_items(
 
         while j + 4 <= bounds.size {
             let py = bounds.start + j;
-            let weight = unsafe { vld1_s16(weight.get_unchecked(j..).as_ptr()) };
+            let weight = unsafe { vld1_s16(weights.get_unchecked(j..).as_ptr()) };
             let src_ptr = unsafe { src.get_unchecked((src_stride * py + px)..) };
 
             let items0 = unsafe { xvld1q_u8_x2(src_ptr.as_ptr()) };
@@ -190,9 +190,31 @@ fn convolve_32_items(
             j += 4;
         }
 
+        while j + 2 <= bounds.size {
+            let py = bounds.start + j;
+            let weight = unsafe {
+                vreinterpret_s16_u32(vld1_lane_u32::<0>(
+                    weights.get_unchecked(j..).as_ptr().cast(),
+                    vdup_n_u32(0),
+                ))
+            };
+            let src_ptr = unsafe { src.get_unchecked((src_stride * py + px)..) };
+
+            let items0 = unsafe { xvld1q_u8_x2(src_ptr.as_ptr()) };
+            let items1 = unsafe { xvld1q_u8_x2(src_ptr.get_unchecked(src_stride..).as_ptr()) };
+
+            (store_0, store_1) = vdot_lane::<SCALE, 0>(store_0, store_1, items0.0, weight);
+            (store_2, store_3) = vdot_lane::<SCALE, 0>(store_2, store_3, items0.1, weight);
+
+            (store_0, store_1) = vdot_lane::<SCALE, 1>(store_0, store_1, items1.0, weight);
+            (store_2, store_3) = vdot_lane::<SCALE, 1>(store_2, store_3, items1.1, weight);
+
+            j += 2;
+        }
+
         for j in j..bounds.size {
             let py = bounds.start + j;
-            let weight = unsafe { weight.get_unchecked(j..) };
+            let weight = unsafe { weights.get_unchecked(j..) };
             let v_weight = unsafe { vld1q_dup_s16(weight.as_ptr()) };
             let src_ptr = unsafe { src.get_unchecked((src_stride * py + px)..) };
             let items = unsafe { xvld1q_u8_x2(src_ptr.as_ptr()) };

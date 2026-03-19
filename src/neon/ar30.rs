@@ -30,12 +30,12 @@ use crate::ar30::Rgb30;
 use std::arch::aarch64::*;
 
 #[inline(always)]
-pub(crate) unsafe fn vrev128_u32(v: uint32x4_t) -> uint32x4_t {
+pub(crate) fn vrev128_u32(v: uint32x4_t) -> uint32x4_t {
     unsafe { vreinterpretq_u32_u8(vrev32q_u8(vreinterpretq_u8_u32(v))) }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vunzips_3_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
+pub(crate) fn vunzips_3_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: uint32x4_t,
 ) -> int16x4x4_t {
     unsafe {
@@ -138,7 +138,7 @@ pub(crate) unsafe fn vunzips_3_ar30<const AR30_TYPE: usize, const AR30_ORDER: us
 // }
 
 #[inline(always)]
-pub(crate) unsafe fn vunzip_3_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
+pub(crate) fn vunzip_3_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: uint32x4x2_t,
 ) -> int16x8x3_t {
     unsafe {
@@ -319,7 +319,7 @@ pub(crate) unsafe fn vunzips_4_ar30_separate<const AR30_TYPE: usize, const AR30_
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vzip_4_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
+pub(crate) fn vzip_4_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: int16x8x4_t,
 ) -> uint32x4x2_t {
     unsafe {
