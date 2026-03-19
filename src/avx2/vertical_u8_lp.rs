@@ -404,16 +404,7 @@ fn convolve_vertical_avx2_row_impl(
 
     let mut rem = dst;
 
-    if bounds.size == 12 {
-        cx = process_chunk_32_unrolled::<12>(
-            rem.as_chunks_mut::<32>().0,
-            bounds,
-            src,
-            src_stride,
-            weights,
-            cx,
-        );
-    } else if bounds.size == 10 {
+    if bounds.size == 10 {
         cx = process_chunk_32_unrolled::<10>(
             rem.as_chunks_mut::<32>().0,
             bounds,
