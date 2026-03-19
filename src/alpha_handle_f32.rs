@@ -37,7 +37,7 @@ use crate::sse::{sse_premultiply_alpha_rgba_f32, sse_unpremultiply_alpha_rgba_f3
 use novtb::{ParallelZonedIterator, TbSliceMut};
 
 pub(crate) fn unpremultiply_rgba_f32_row(in_place: &mut [f32]) {
-    for dst in in_place.chunks_exact_mut(4) {
+    for dst in in_place.as_chunks_mut::<4>().0.iter_mut() {
         let mut r = dst[0];
         let mut g = dst[1];
         let mut b = dst[2];
@@ -60,7 +60,7 @@ pub(crate) fn unpremultiply_rgba_f32_row(in_place: &mut [f32]) {
 }
 
 pub(crate) fn unpremultiply_gray_alpha_f32_row(in_place: &mut [f32]) {
-    for dst in in_place.chunks_exact_mut(2) {
+    for dst in in_place.as_chunks_mut::<2>().0.iter_mut() {
         let mut r = dst[0];
         let a = dst[1];
         if a != 0. {
@@ -75,7 +75,12 @@ pub(crate) fn unpremultiply_gray_alpha_f32_row(in_place: &mut [f32]) {
 }
 
 pub(crate) fn premultiply_rgba_f32_row(dst: &mut [f32], src: &[f32]) {
-    for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+    for (dst, src) in dst
+        .as_chunks_mut::<4>()
+        .0
+        .iter_mut()
+        .zip(src.as_chunks::<4>().0.iter())
+    {
         let mut r = src[0];
         let mut g = src[1];
         let mut b = src[2];
@@ -91,7 +96,12 @@ pub(crate) fn premultiply_rgba_f32_row(dst: &mut [f32], src: &[f32]) {
 }
 
 pub(crate) fn premultiply_gray_alpha_f32_row(dst: &mut [f32], src: &[f32]) {
-    for (dst, src) in dst.chunks_exact_mut(2).zip(src.chunks_exact(2)) {
+    for (dst, src) in dst
+        .as_chunks_mut::<2>()
+        .0
+        .iter_mut()
+        .zip(src.as_chunks::<2>().0.iter())
+    {
         let mut r = src[0];
         let a = src[1];
         r *= a;

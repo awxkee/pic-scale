@@ -41,6 +41,23 @@ use std::sync::Arc;
 /// Implements `f16` type support
 #[cfg_attr(docsrs, doc(cfg(feature = "nightly_f16")))]
 impl Scaler {
+    /// Creates a resampling plan for a single-channel (planar/grayscale) `f16` image.
+    ///
+    /// The `f16` variant of [`plan_planar_resampling`], suitable for half-precision
+    /// grayscale content such as HDR render targets or compressed texture data.
+    /// Filter weights are accumulated in `f32` to avoid precision loss during convolution.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_planar_resampling_f16(source_size, target_size)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
     pub fn plan_planar_resampling_f16(
         &self,
         source_size: ImageSize,
@@ -49,6 +66,24 @@ impl Scaler {
         self.plan_generic_resize::<f16, f32, 1>(source_size, target_size, 8)
     }
 
+    /// Creates a resampling plan for a two-channel chroma (`CbCr`) `f16` image.
+    ///
+    /// The `f16` variant of [`plan_cbcr_resampling`], intended for half-precision chroma
+    /// planes of YCbCr content. Both channels are treated as independent signals with no
+    /// alpha relationship. Filter weights are accumulated in `f32` to avoid precision
+    /// loss during convolution.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input chroma plane.
+    /// - `target_size` — Desired dimensions of the output chroma plane.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_cbcr_resampling_f16(source_size, target_size)?;
+    /// plan.resample(&cbcr_store, &mut target_cbcr_store)?;
+    /// ```
     pub fn plan_cbcr_resampling_f16(
         &self,
         source_size: ImageSize,
@@ -57,6 +92,24 @@ impl Scaler {
         self.plan_generic_resize::<f16, f32, 2>(source_size, target_size, 8)
     }
 
+    /// Creates a resampling plan for a three-channel RGB `f16` image.
+    ///
+    /// The `f16` variant of [`plan_rgb_resampling`], suitable for half-precision color
+    /// images such as HDR render targets or OpenEXR content. All three channels are
+    /// resampled independently with no alpha relationship. Filter weights are accumulated
+    /// in `f32` to avoid precision loss during convolution.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_rgb_resampling_f16(source_size, target_size)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
     pub fn plan_rgb_resampling_f16(
         &self,
         source_size: ImageSize,
@@ -65,6 +118,24 @@ impl Scaler {
         self.plan_generic_resize::<f16, f32, 3>(source_size, target_size, 8)
     }
 
+    /// Creates a resampling plan for a four-channel RGBA `f16` image.
+    ///
+    /// The `f16` variant of [`plan_rgba_resampling`]. Alpha premultiplication is always
+    /// applied — RGB channels are pre-multiplied by alpha before resampling and
+    /// un-multiplied afterward — regardless of the `premultiply_alpha` flag.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `premultiply_alpha` — Whether to premultiply alpha before resampling.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_rgba_resampling_f16(source_size, target_size, true)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
     pub fn plan_rgba_resampling_f16(
         &self,
         source_size: ImageSize,

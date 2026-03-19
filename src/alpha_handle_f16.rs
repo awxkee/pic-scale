@@ -40,7 +40,7 @@ use novtb::{ParallelZonedIterator, TbSliceMut};
 
 #[inline]
 pub(crate) fn unpremultiply_pixel_f16_row(in_place: &mut [f16]) {
-    for dst in in_place.chunks_exact_mut(4) {
+    for dst in in_place.as_chunks_mut::<4>().0.iter_mut() {
         let mut r = dst[0] as f32;
         let mut g = dst[1] as f32;
         let mut b = dst[2] as f32;
@@ -63,7 +63,12 @@ pub(crate) fn unpremultiply_pixel_f16_row(in_place: &mut [f16]) {
 
 #[inline]
 pub(crate) fn premultiply_pixel_f16_row(dst: &mut [f16], src: &[f16]) {
-    for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+    for (dst, src) in dst
+        .as_chunks_mut::<4>()
+        .0
+        .iter_mut()
+        .zip(src.as_chunks::<4>().0.iter())
+    {
         let mut r = src[0] as f32;
         let mut g = src[1] as f32;
         let mut b = src[2] as f32;

@@ -199,6 +199,21 @@ impl Scaler {
         }))
     }
 
+    /// Creates a resampling plan for a single-channel (planar/grayscale) `u8` image.
+    ///
+    /// The returned [`Arc<Resampling<u8, 1>>`] can be executed repeatedly against images
+    /// of `source_size` to produce output of `target_size` without recomputing filter weights.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_planar_resampling(source_size, target_size)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
     pub fn plan_planar_resampling(
         &self,
         source_size: ImageSize,
@@ -207,6 +222,24 @@ impl Scaler {
         self.plan_generic_resize(source_size, target_size, 8)
     }
 
+    /// Creates a resampling plan for a two-channel grayscale + alpha (`GA`) `u8` image.
+    ///
+    /// When `premultiply_alpha` is `true` the alpha channel is pre-multiplied into the gray
+    /// channel before resampling and un-multiplied afterward.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `premultiply_alpha` — Whether to premultiply alpha before resampling.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// // Resample with alpha-aware filtering to avoid dark fringing
+    /// let plan = scaler.plan_gray_alpha_resampling(source_size, target_size, true)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
     pub fn plan_gray_alpha_resampling(
         &self,
         source_size: ImageSize,
@@ -220,6 +253,23 @@ impl Scaler {
         }
     }
 
+    /// Creates a resampling plan for a two-channel chroma (`CbCr`) `u8` image.
+    ///
+    /// Intended for the chroma planes of YCbCr images (e.g. the `Cb`/`Cr` planes in
+    /// 4:2:0 or 4:2:2 video), where both channels are treated as independent signals
+    /// with no alpha relationship. For the luma plane use [`plan_planar_resampling`].
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input chroma plane.
+    /// - `target_size` — Desired dimensions of the output chroma plane.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_cbcr_resampling(source_size, target_size)?;
+    /// plan.resample(&cbcr_store, &mut target_cbcr_store)?;
+    /// ```
     pub fn plan_cbcr_resampling(
         &self,
         source_size: ImageSize,
@@ -228,6 +278,23 @@ impl Scaler {
         self.plan_generic_resize(source_size, target_size, 8)
     }
 
+    /// Creates a resampling plan for a three-channel RGB `u8` image.
+    ///
+    /// The returned [`Arc<Resampling<u8, 3>>`] encodes all filter weights for scaling
+    /// from `source_size` to `target_size` and can be reused across many frames without
+    /// recomputation.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_rgb_resampling(source_size, target_size)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
     pub fn plan_rgb_resampling(
         &self,
         source_size: ImageSize,
@@ -236,6 +303,24 @@ impl Scaler {
         self.plan_generic_resize(source_size, target_size, 8)
     }
 
+    /// Creates a resampling plan for a four-channel RGBA `u8` image.
+    ///
+    /// When `premultiply_alpha` is `true` the RGB channels are pre-multiplied by alpha
+    /// before resampling and un-multiplied afterward.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `premultiply_alpha` — Whether to premultiply alpha before resampling.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// // Resample a sprite sheet with correct alpha blending
+    /// let plan = scaler.plan_rgba_resampling(source_size, target_size, true)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
     pub fn plan_rgba_resampling(
         &self,
         source_size: ImageSize,
@@ -249,6 +334,24 @@ impl Scaler {
         }
     }
 
+    /// Creates a resampling plan for a single-channel (planar/grayscale) `u16` image.
+    ///
+    /// The 16-bit variant of [`plan_planar_resampling`], suitable for high-bit-depth
+    /// grayscale content such as HDR images or luma planes from 10/12-bit video.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `bit_depth` — Effective bit depth of the pixel data (e.g. `10`, `12`, or `16`).
+    ///   Must not exceed `16`.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_planar_resampling16(source_size, target_size, 12)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
     pub fn plan_planar_resampling16(
         &self,
         source_size: ImageSize,
@@ -258,6 +361,25 @@ impl Scaler {
         self.plan_generic_resize(source_size, target_size, bit_depth)
     }
 
+    /// Creates a resampling plan for a two-channel chroma (`CbCr`) `u16` image.
+    ///
+    /// The 16-bit variant of [`plan_cbcr_resampling`], intended for high-bit-depth chroma
+    /// planes of YCbCr content (e.g. 10-bit 4:2:0 or 4:2:2 video). Both channels are
+    /// treated as independent signals with no alpha relationship.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input chroma plane.
+    /// - `target_size` — Desired dimensions of the output chroma plane.
+    /// - `bit_depth` — Effective bit depth of the pixel data (e.g. `10`, `12`, or `16`).
+    ///   Must not exceed `16`.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_cbcr_resampling16(source_size, target_size, 10)?;
+    /// plan.resample(&cbcr_store, &mut target_cbcr_store)?;
+    /// ```
     pub fn plan_cbcr_resampling16(
         &self,
         source_size: ImageSize,
@@ -267,6 +389,26 @@ impl Scaler {
         self.plan_generic_resize(source_size, target_size, bit_depth)
     }
 
+    /// Creates a resampling plan for a two-channel grayscale + alpha (`GA`) `u16` image.
+    ///
+    /// The 16-bit variant of [`plan_gray_alpha_resampling`]. When `premultiply_alpha` is
+    /// `true` the gray channel is pre-multiplied by alpha before resampling and
+    /// un-multiplied afterward.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `premultiply_alpha` — Whether to premultiply alpha before resampling.
+    /// - `bit_depth` — Effective bit depth of the pixel data (e.g. `10`, `12`, or `16`).
+    ///   Must not exceed `16`.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_gray_alpha_resampling16(source_size, target_size, true, 16)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
     pub fn plan_gray_alpha_resampling16(
         &self,
         source_size: ImageSize,
@@ -286,6 +428,25 @@ impl Scaler {
         }
     }
 
+    /// Creates a resampling plan for a three-channel RGB `u16` image.
+    ///
+    /// The 16-bit variant of [`plan_rgb_resampling`], suitable for high-bit-depth color
+    /// images such as 10/12-bit HDR or wide-gamut content. All three channels are
+    /// resampled independently with no alpha relationship.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `bit_depth` — Effective bit depth of the pixel data (e.g. `10`, `12`, or `16`).
+    ///   Must not exceed `16`.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_rgb_resampling16(source_size, target_size, 12)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
     pub fn plan_rgb_resampling16(
         &self,
         source_size: ImageSize,
@@ -295,6 +456,26 @@ impl Scaler {
         self.plan_generic_resize(source_size, target_size, bit_depth)
     }
 
+    /// Creates a resampling plan for a four-channel RGBA `u16` image.
+    ///
+    /// The 16-bit variant of [`plan_rgba_resampling`]. When `premultiply_alpha` is `true`
+    /// the RGB channels are pre-multiplied by alpha before resampling and un-multiplied
+    /// afterward.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `premultiply_alpha` — Whether to premultiply alpha before resampling.
+    /// - `bit_depth` — Effective bit depth of the pixel data (e.g. `10`, `12`, or `16`).
+    ///   Must not exceed `16`.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_rgba_resampling16(source_size, target_size, true, 10)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
     pub fn plan_rgba_resampling16(
         &self,
         source_size: ImageSize,
@@ -314,6 +495,29 @@ impl Scaler {
         }
     }
 
+    /// Creates a resampling plan for a single-channel (planar/grayscale) `f32` image.
+    ///
+    /// The `f32` variant of [`plan_planar_resampling`], suitable for HDR or linear-light
+    /// grayscale content where full floating-point precision is required.
+    ///
+    /// The internal accumulator precision is selected automatically based on the scaler's
+    /// [`WorkloadStrategy`]:
+    /// - [`PreferQuality`](WorkloadStrategy::PreferQuality) — accumulates in `f64` for
+    ///   maximum numerical accuracy.
+    /// - [`PreferSpeed`](WorkloadStrategy::PreferSpeed) — accumulates in `f32` for
+    ///   faster throughput at a small precision cost.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_planar_resampling_f32(source_size, target_size)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
     pub fn plan_planar_resampling_f32(
         &self,
         source_size: ImageSize,
@@ -329,6 +533,30 @@ impl Scaler {
         }
     }
 
+    /// Creates a resampling plan for a two-channel chroma (`CbCr`) `f32` image.
+    ///
+    /// The `f32` variant of [`plan_cbcr_resampling`], intended for floating-point chroma
+    /// planes of YCbCr content. Both channels are treated as independent signals with no
+    /// alpha relationship.
+    ///
+    /// The internal accumulator precision is selected automatically based on the scaler's
+    /// [`WorkloadStrategy`]:
+    /// - [`PreferQuality`](WorkloadStrategy::PreferQuality) — accumulates in `f64` for
+    ///   maximum numerical accuracy.
+    /// - [`PreferSpeed`](WorkloadStrategy::PreferSpeed) — accumulates in `f32` for
+    ///   faster throughput at a small precision cost.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input chroma plane.
+    /// - `target_size` — Desired dimensions of the output chroma plane.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_cbcr_resampling_f32(source_size, target_size)?;
+    /// plan.resample(&cbcr_store, &mut target_cbcr_store)?;
+    /// ```
     pub fn plan_cbcr_resampling_f32(
         &self,
         source_size: ImageSize,
@@ -344,6 +572,33 @@ impl Scaler {
         }
     }
 
+    /// Creates a resampling plan for a two-channel grayscale + alpha (`GA`) `f32` image.
+    ///
+    /// The `f32` variant of [`plan_gray_alpha_resampling`]. When `premultiply_alpha` is
+    /// `true` the gray channel is pre-multiplied by alpha before resampling and
+    /// un-multiplied afterward, preventing dark fringing around transparent edges.
+    /// Set it to `false` if the image uses straight alpha or the channels should be
+    /// filtered independently.
+    ///
+    /// The internal accumulator precision is selected automatically based on the scaler's
+    /// [`WorkloadStrategy`]:
+    /// - [`PreferQuality`](WorkloadStrategy::PreferQuality) — accumulates in `f64` for
+    ///   maximum numerical accuracy.
+    /// - [`PreferSpeed`](WorkloadStrategy::PreferSpeed) — accumulates in `f32` for
+    ///   faster throughput at a small precision cost.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `premultiply_alpha` — Whether to premultiply alpha before resampling.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_gray_alpha_resampling_f32(source_size, target_size, true)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
     pub fn plan_gray_alpha_resampling_f32(
         &self,
         source_size: ImageSize,
@@ -372,6 +627,30 @@ impl Scaler {
         }
     }
 
+    /// Creates a resampling plan for a three-channel RGB `f32` image.
+    ///
+    /// The `f32` variant of [`plan_rgb_resampling`], suitable for HDR or linear-light
+    /// color images where full floating-point precision is required. All three channels
+    /// are resampled independently with no alpha relationship.
+    ///
+    /// The internal accumulator precision is selected automatically based on the scaler's
+    /// [`WorkloadStrategy`]:
+    /// - [`PreferQuality`](WorkloadStrategy::PreferQuality) — accumulates in `f64` for
+    ///   maximum numerical accuracy.
+    /// - [`PreferSpeed`](WorkloadStrategy::PreferSpeed) — accumulates in `f32` for
+    ///   faster throughput at a small precision cost.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_rgb_resampling_f32(source_size, target_size)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
     pub fn plan_rgb_resampling_f32(
         &self,
         source_size: ImageSize,
@@ -387,6 +666,32 @@ impl Scaler {
         }
     }
 
+    /// Creates a resampling plan for a four-channel RGBA `f32` image.
+    ///
+    /// The `f32` variant of [`plan_rgba_resampling`]. When `premultiply_alpha` is `true`
+    /// the RGB channels are pre-multiplied by alpha before resampling and un-multiplied
+    /// afterward, preventing dark halos around semi-transparent edges. Set it to `false`
+    /// if the image uses straight alpha or the channels should be filtered independently.
+    ///
+    /// The internal accumulator precision is selected automatically based on the scaler's
+    /// [`WorkloadStrategy`]:
+    /// - [`PreferQuality`](WorkloadStrategy::PreferQuality) — accumulates in `f64` for
+    ///   maximum numerical accuracy.
+    /// - [`PreferSpeed`](WorkloadStrategy::PreferSpeed) — accumulates in `f32` for
+    ///   faster throughput at a small precision cost.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `premultiply_alpha` — Whether to premultiply alpha before resampling.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_rgba_resampling_f32(source_size, target_size, true)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
     pub fn plan_rgba_resampling_f32(
         &self,
         source_size: ImageSize,
@@ -487,15 +792,27 @@ impl Scaler {
         }))
     }
 
-    /// Resizes RGBA2101010 image
+    /// Creates a resampling plan for an AR30 (`RGBA2101010`) packed 10-bit image.
     ///
-    /// This method ignores alpha scaling.
+    /// AR30 stores each pixel as a 32-bit word with 10 bits per RGB channel and a
+    /// 2-bit alpha.
+    ///
+    /// The `order` argument controls the byte layout of the packed word:
+    /// - [`Ar30ByteOrder::Host`] — native endianness of the current platform.
+    /// - [`Ar30ByteOrder::Network`] — big-endian (network) byte order.
     ///
     /// # Arguments
-    /// `src_image` - source AR30 image
-    /// `dst_image` - destination AR30 image
-    /// `new_size` - New image size
     ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `order` — Byte order of the packed AR30 words.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_ar30_resampling(source_size, target_size, Ar30ByteOrder::Host)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
     pub fn plan_ar30_resampling(
         &self,
         source_size: ImageSize,
@@ -516,14 +833,27 @@ impl Scaler {
         }
     }
 
-    /// Resizes RGBA1010102 image
+    /// Creates a resampling plan for an RA30 (`RGBA1010102`) packed 10-bit image.
     ///
-    /// This method ignores alpha scaling.
+    /// RA30 stores each pixel as a 32-bit word with 10 bits per RGB channel and a
+    /// 2-bit alpha in the least-significant position.
+    ///
+    /// The `order` argument controls the byte layout of the packed word:
+    /// - [`Ar30ByteOrder::Host`] — native endianness of the current platform.
+    /// - [`Ar30ByteOrder::Network`] — big-endian (network) byte order.
     ///
     /// # Arguments
-    /// `src_image` - source RA30 image
-    /// `dst_image` - destination RA30 image
     ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `order` — Byte order of the packed RA30 words.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.resize_ra30(source_size, target_size, Ar30ByteOrder::Host)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
     pub fn resize_ra30(
         &self,
         source_size: ImageSize,

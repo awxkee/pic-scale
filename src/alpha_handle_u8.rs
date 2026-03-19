@@ -46,7 +46,12 @@ pub(crate) fn div_by_255(v: u16) -> u8 {
 }
 
 pub(crate) fn premultiply_alpha_rgba_row_impl(dst: &mut [u8], src: &[u8]) {
-    for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+    for (dst, src) in dst
+        .as_chunks_mut::<4>()
+        .0
+        .iter_mut()
+        .zip(src.as_chunks::<4>().0.iter())
+    {
         let a = src[3] as u16;
         dst[0] = div_by_255(src[0] as u16 * a);
         dst[1] = div_by_255(src[1] as u16 * a);
@@ -56,7 +61,12 @@ pub(crate) fn premultiply_alpha_rgba_row_impl(dst: &mut [u8], src: &[u8]) {
 }
 
 pub(crate) fn premultiply_alpha_gray_alpha_row_impl(dst: &mut [u8], src: &[u8]) {
-    for (dst, src) in dst.chunks_exact_mut(2).zip(src.chunks_exact(2)) {
+    for (dst, src) in dst
+        .as_chunks_mut::<2>()
+        .0
+        .iter_mut()
+        .zip(src.as_chunks::<2>().0.iter())
+    {
         let a = src[1] as u16;
         dst[0] = div_by_255(src[0] as u16 * a);
         dst[1] = div_by_255(255 * a);
@@ -119,7 +129,7 @@ pub(crate) static UNPREMULTIPLICATION_TABLE: [u8; 65536] = make_unpremultiplicat
 
 #[inline]
 pub(crate) fn unpremultiply_alpha_rgba_row_impl(in_place: &mut [u8]) {
-    for dst in in_place.chunks_exact_mut(4) {
+    for dst in in_place.as_chunks_mut::<4>().0.iter_mut() {
         let a = dst[3];
         let z = a as u16 * 255;
         dst[0] = UNPREMULTIPLICATION_TABLE[(z + dst[0] as u16) as usize];
@@ -130,7 +140,7 @@ pub(crate) fn unpremultiply_alpha_rgba_row_impl(in_place: &mut [u8]) {
 
 #[inline]
 pub(crate) fn unpremultiply_alpha_gray_alpha_row_impl(in_place: &mut [u8]) {
-    for dst in in_place.chunks_exact_mut(2) {
+    for dst in in_place.as_chunks_mut::<2>().0.iter_mut() {
         let a = dst[1];
         let z = a as u16 * 255;
         dst[0] = UNPREMULTIPLICATION_TABLE[(z + dst[0] as u16) as usize];

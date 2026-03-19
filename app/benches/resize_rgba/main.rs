@@ -2,7 +2,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use fast_image_resize::images::Image;
 use fast_image_resize::FilterType::Lanczos3;
-use fast_image_resize::{CpuExtensions, FilterType, PixelType, ResizeAlg, ResizeOptions, Resizer};
+use fast_image_resize::{FilterType, PixelType, ResizeAlg, ResizeOptions, Resizer};
 use image::{GenericImageView, ImageReader};
 use pic_scale::{
     Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, Rgba8ImageStore,
