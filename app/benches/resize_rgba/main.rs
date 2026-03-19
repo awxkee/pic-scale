@@ -120,10 +120,10 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("Fast image resize RGBA8 with alpha: Lanczos 3", |b| {
         let mut vc = Vec::from(img.as_bytes());
+        let pixel_type: PixelType = PixelType::U8x4;
+        let src_image =
+            Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
         b.iter(|| {
-            let pixel_type: PixelType = PixelType::U8x4;
-            let src_image =
-                Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
             let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
 
             let mut resizer = Resizer::new();
@@ -149,10 +149,10 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("Fast image resize RGBA8 with alpha: Bilinear", |b| {
         let mut vc = Vec::from(img.as_bytes());
+        let pixel_type: PixelType = PixelType::U8x4;
+        let src_image =
+            Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
         b.iter(|| {
-            let pixel_type: PixelType = PixelType::U8x4;
-            let src_image =
-                Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
             let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
 
             let mut resizer = Resizer::new();
@@ -266,10 +266,10 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("Fast image resize RGBA without alpha: Lanczos 3", |b| {
         let mut vc = Vec::from(img.as_bytes());
+        let pixel_type: PixelType = PixelType::U8x4;
+        let src_image =
+            Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
         b.iter(|| {
-            let pixel_type: PixelType = PixelType::U8x4;
-            let src_image =
-                Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
             let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
 
             let mut resizer = Resizer::new();
@@ -350,10 +350,10 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             .flat_map(|&x| x.to_ne_bytes())
             .collect::<Vec<u8>>();
         let mut vc = Vec::from(packed_f32);
+        let pixel_type: PixelType = PixelType::F32x4;
+        let src_image =
+            Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
         b.iter(|| {
-            let pixel_type: PixelType = PixelType::F32x4;
-            let src_image =
-                Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
             let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
 
             let mut resizer = Resizer::new();
@@ -421,10 +421,10 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 .flat_map(|x| x)
                 .collect::<Vec<_>>(),
         );
+        let pixel_type: PixelType = PixelType::U16x4;
+        let src_image =
+            Image::from_slice_u8(dimensions.0, dimensions.1, &mut copied, pixel_type).unwrap();
         b.iter(|| {
-            let pixel_type: PixelType = PixelType::U16x4;
-            let src_image =
-                Image::from_slice_u8(dimensions.0, dimensions.1, &mut copied, pixel_type).unwrap();
             let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
 
             let mut resizer = Resizer::new();
@@ -528,10 +528,10 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 .flat_map(|x| x)
                 .collect::<Vec<_>>(),
         );
+        let pixel_type: PixelType = PixelType::U16x4;
+        let src_image =
+            Image::from_slice_u8(dimensions.0, dimensions.1, &mut copied, pixel_type).unwrap();
         b.iter(|| {
-            let pixel_type: PixelType = PixelType::U16x4;
-            let src_image =
-                Image::from_slice_u8(dimensions.0, dimensions.1, &mut copied, pixel_type).unwrap();
             let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
 
             let mut resizer = Resizer::new();
