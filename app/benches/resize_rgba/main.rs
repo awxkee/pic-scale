@@ -34,9 +34,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             )
             .unwrap();
         let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
         b.iter(|| {
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
             resampler
                 .resample_with_scratch(&store, &mut target, &mut scratch)
                 .unwrap();
@@ -59,9 +58,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             )
             .unwrap();
         let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
         b.iter(|| {
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
             resampler
                 .resample_with_scratch(&store, &mut target, &mut scratch)
                 .unwrap();
@@ -84,9 +82,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             )
             .unwrap();
         let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
         b.iter(|| {
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
             resampler
                 .resample_with_scratch(&store, &mut target, &mut scratch)
                 .unwrap();
@@ -109,9 +106,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             )
             .unwrap();
         let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
         b.iter(|| {
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
             resampler
                 .resample_with_scratch(&store, &mut target, &mut scratch)
                 .unwrap();
@@ -123,9 +119,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         let pixel_type: PixelType = PixelType::U8x4;
         let src_image =
             Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
+        let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
         b.iter(|| {
-            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
-
             let mut resizer = Resizer::new();
             #[cfg(all(target_arch = "aarch64"))]
             unsafe {
@@ -152,9 +147,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         let pixel_type: PixelType = PixelType::U8x4;
         let src_image =
             Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
+        let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
         b.iter(|| {
-            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
-
             let mut resizer = Resizer::new();
             #[cfg(all(target_arch = "aarch64"))]
             unsafe {
@@ -191,9 +185,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             )
             .unwrap();
         let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
         b.iter(|| {
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
             resampler
                 .resample_with_scratch(&store, &mut target, &mut scratch)
                 .unwrap();
@@ -216,9 +209,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             )
             .unwrap();
         let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
         b.iter(|| {
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
             resampler
                 .resample_with_scratch(&store, &mut target, &mut scratch)
                 .unwrap();
@@ -229,10 +221,10 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("Apple Accelerate RGBA: Lanczos 3", |b| {
         let copied: Vec<u8> = Vec::from(src_bytes);
         use accelerate::{kvImageDoNotTile, vImageScale_ARGB8888, vImage_Buffer};
-        b.iter(|| {
-            let mut target =
-                ImageStoreMut::<u8, 4>::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+        let mut target =
+            ImageStoreMut::<u8, 4>::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
 
+        b.iter(|| {
             let src_buffer = vImage_Buffer {
                 data: copied.as_ptr() as *mut libc::c_void,
                 width: dimensions.0 as usize,
@@ -269,9 +261,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         let pixel_type: PixelType = PixelType::U8x4;
         let src_image =
             Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
+        let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
         b.iter(|| {
-            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
-
             let mut resizer = Resizer::new();
             #[cfg(all(target_arch = "aarch64"))]
             unsafe {
@@ -310,9 +301,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             )
             .unwrap();
         let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
         b.iter(|| {
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
             resampler
                 .resample_with_scratch(&store, &mut target, &mut scratch)
                 .unwrap();
@@ -335,9 +325,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             )
             .unwrap();
         let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
         b.iter(|| {
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
             resampler
                 .resample_with_scratch(&store, &mut target, &mut scratch)
                 .unwrap();
@@ -353,9 +342,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         let pixel_type: PixelType = PixelType::F32x4;
         let src_image =
             Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
+        let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
         b.iter(|| {
-            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
-
             let mut resizer = Resizer::new();
             #[cfg(all(target_arch = "aarch64"))]
             unsafe {
@@ -401,12 +389,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             )
             .unwrap();
         let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc_with_depth(
+            dimensions.0 as usize / 4,
+            dimensions.1 as usize / 4,
+            10,
+        );
         b.iter(|| {
-            let mut target = ImageStoreMut::alloc_with_depth(
-                dimensions.0 as usize / 4,
-                dimensions.1 as usize / 4,
-                10,
-            );
             resampler
                 .resample_with_scratch(&store, &mut target, &mut scratch)
                 .unwrap();
@@ -424,9 +412,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         let pixel_type: PixelType = PixelType::U16x4;
         let src_image =
             Image::from_slice_u8(dimensions.0, dimensions.1, &mut copied, pixel_type).unwrap();
-        b.iter(|| {
-            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
+        let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
 
+        b.iter(|| {
             let mut resizer = Resizer::new();
             #[cfg(all(target_arch = "aarch64"))]
             unsafe {
@@ -472,12 +460,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             )
             .unwrap();
         let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc_with_depth(
+            dimensions.0 as usize / 4,
+            dimensions.1 as usize / 4,
+            16,
+        );
         b.iter(|| {
-            let mut target = ImageStoreMut::alloc_with_depth(
-                dimensions.0 as usize / 4,
-                dimensions.1 as usize / 4,
-                16,
-            );
             resampler
                 .resample_with_scratch(&store, &mut target, &mut scratch)
                 .unwrap();
@@ -508,12 +496,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             )
             .unwrap();
         let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc_with_depth(
+            dimensions.0 as usize / 4,
+            dimensions.1 as usize / 4,
+            10,
+        );
         b.iter(|| {
-            let mut target = ImageStoreMut::alloc_with_depth(
-                dimensions.0 as usize / 4,
-                dimensions.1 as usize / 4,
-                10,
-            );
             resampler
                 .resample_with_scratch(&store, &mut target, &mut scratch)
                 .unwrap();
@@ -531,9 +519,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         let pixel_type: PixelType = PixelType::U16x4;
         let src_image =
             Image::from_slice_u8(dimensions.0, dimensions.1, &mut copied, pixel_type).unwrap();
-        b.iter(|| {
-            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
+        let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
 
+        b.iter(|| {
             let mut resizer = Resizer::new();
             #[cfg(all(target_arch = "aarch64"))]
             unsafe {
@@ -564,12 +552,10 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 .collect::<Vec<_>>(),
         );
         use accelerate::{kvImageDoNotTile, vImageScale_ARGB16U, vImage_Buffer};
-        b.iter(|| {
-            let mut target = ImageStoreMut::<u16, 4>::alloc(
-                dimensions.0 as usize / 4,
-                dimensions.1 as usize / 4,
-            );
+        let mut target =
+            ImageStoreMut::<u16, 4>::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
 
+        b.iter(|| {
             let src_buffer = vImage_Buffer {
                 data: copied.as_ptr() as *mut libc::c_void,
                 width: dimensions.0 as usize,
@@ -619,9 +605,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             )
             .unwrap();
         let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
         b.iter(|| {
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
             resampler
                 .resample_with_scratch(&store, &mut target, &mut scratch)
                 .unwrap();
@@ -632,12 +617,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("Apple Accelerate RGBAF16: Lanczos 3", |b| {
         let copied: Vec<f16> = vec![0.; src_bytes.len()];
         use accelerate::{kvImageDoNotTile, vImageScale_ARGB16F, vImage_Buffer};
+        let mut target =
+            ImageStoreMut::<f16, 4>::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
         b.iter(|| {
-            let mut target = ImageStoreMut::<f16, 4>::alloc(
-                dimensions.0 as usize / 4,
-                dimensions.1 as usize / 4,
-            );
-
             let src_buffer = vImage_Buffer {
                 data: copied.as_ptr() as *mut libc::c_void,
                 width: dimensions.0 as usize,
