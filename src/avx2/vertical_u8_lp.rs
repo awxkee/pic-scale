@@ -118,6 +118,24 @@ fn process_chunk_32(
             j += 4;
         }
 
+        while j + 2 <= bounds_size {
+            let py = bounds.start + j;
+            let weights = unsafe { _mm_loadu_si32(weights.get_unchecked(j..).as_ptr().cast()) };
+            let w0 = _mm256_broadcastw_epi16(weights); // elem 0
+            let w1 = _mm256_broadcastw_epi16(_mm_srli_si128::<2>(weights)); // elem 1 (shift by 2 bytes)
+
+            let v_offset = src_stride * py + px;
+            let src_ptr = unsafe { src.get_unchecked(v_offset..) };
+            let item_row0 = unsafe { _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i) };
+            let item_row1 = unsafe {
+                _mm256_loadu_si256(src.get_unchecked(src_stride..).as_ptr() as *const __m256i)
+            };
+
+            (store0, store1) = m256dot!(store0, store1, item_row0, w0);
+            (store0, store1) = m256dot!(store0, store1, item_row1, w1);
+            j += 2;
+        }
+
         for j in j..bounds_size {
             let py = bounds.start + j;
             let weight = unsafe { weights.get_unchecked(j) };
@@ -261,7 +279,37 @@ fn process_chunk_16(
             j += 4;
         }
 
-        for j in 0..bounds_size {
+        while j + 2 <= bounds_size {
+            let py = bounds.start + j;
+            let weights = unsafe { _mm_loadu_si32(weights.get_unchecked(j..).as_ptr().cast()) };
+            let w0 = _mm256_broadcastw_epi16(weights); // elem 0
+            let w1 = _mm256_broadcastw_epi16(_mm_srli_si128::<2>(weights)); // elem 1 (shift by 2 bytes)
+
+            let v_offset = src_stride * py + px;
+            let src_ptr = unsafe { src.get_unchecked(v_offset..) };
+            let mut item_row = _mm256_permute4x64_epi64::<0x50>(_mm256_castsi128_si256(unsafe {
+                _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i)
+            }));
+            let mut item_row1 = _mm256_permute4x64_epi64::<0x50>(_mm256_castsi128_si256(unsafe {
+                _mm_loadu_si128(src_ptr.get_unchecked(src_stride..).as_ptr() as *const __m128i)
+            }));
+            item_row = _mm256_unpacklo_epi8(item_row, item_row);
+            item_row1 = _mm256_unpacklo_epi8(item_row1, item_row1);
+
+            store0 = _mm256_add_epi16(
+                store0,
+                _mm256_mulhrs_epi16(_mm256_srli_epi16::<2>(item_row), w0),
+            );
+
+            store0 = _mm256_add_epi16(
+                store0,
+                _mm256_mulhrs_epi16(_mm256_srli_epi16::<2>(item_row1), w1),
+            );
+
+            j += 2;
+        }
+
+        for j in j..bounds_size {
             let py = bounds.start + j;
             let weight = unsafe { weights.get_unchecked(j) };
             let v_weight = _mm256_set1_epi16(*weight);
