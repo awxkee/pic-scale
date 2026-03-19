@@ -51,7 +51,7 @@ pub(crate) fn convolve_vertical_avx_row_f32_f64<const FMA: bool>(
 
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_vertical_avx_row_f32_f64_regular(
+fn convolve_vertical_avx_row_f32_f64_regular(
     width: usize,
     bounds: &FilterBounds,
     src: &[f32],
@@ -59,15 +59,13 @@ unsafe fn convolve_vertical_avx_row_f32_f64_regular(
     src_stride: usize,
     weights: &[f64],
 ) {
-    unsafe {
-        let unit = ExecutionUnit::<false>::default();
-        unit.pass(width, bounds, src, dst, src_stride, weights);
-    }
+    let unit = ExecutionUnit::<false>::default();
+    unit.pass(width, bounds, src, dst, src_stride, weights);
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_vertical_avx_row_f32_f64_fma(
+fn convolve_vertical_avx_row_f32_f64_fma(
     width: usize,
     bounds: &FilterBounds,
     src: &[f32],
@@ -75,10 +73,8 @@ unsafe fn convolve_vertical_avx_row_f32_f64_fma(
     src_stride: usize,
     weights: &[f64],
 ) {
-    unsafe {
-        let unit = ExecutionUnit::<true>::default();
-        unit.pass(width, bounds, src, dst, src_stride, weights);
-    }
+    let unit = ExecutionUnit::<true>::default();
+    unit.pass(width, bounds, src, dst, src_stride, weights);
 }
 
 #[derive(Copy, Clone, Default)]
@@ -86,7 +82,7 @@ struct ExecutionUnit<const FMA: bool> {}
 
 impl<const FMA: bool> ExecutionUnit<FMA> {
     #[inline(always)]
-    unsafe fn convolve_vertical_part_avx_8_f32(
+    fn convolve_vertical_part_avx_8_f32(
         &self,
         start_y: usize,
         start_x: usize,
@@ -133,7 +129,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
     }
 
     #[inline(always)]
-    unsafe fn convolve_vertical_part_avx_16_f32(
+    fn convolve_vertical_part_avx_16_f32(
         &self,
         start_y: usize,
         start_x: usize,
@@ -201,7 +197,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
     }
 
     #[inline(always)]
-    unsafe fn convolve_vertical_part_avx_f32(
+    fn convolve_vertical_part_avx_f32(
         &self,
         start_y: usize,
         start_x: usize,
@@ -233,7 +229,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
     }
 
     #[inline(always)]
-    unsafe fn pass(
+    fn pass(
         &self,
         _: usize,
         bounds: &FilterBounds,

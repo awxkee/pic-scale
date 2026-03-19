@@ -52,7 +52,7 @@ pub(crate) fn convolve_column_avx_u16(
 
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_column_lb_u16_def(
+fn convolve_column_lb_u16_def(
     bounds: &FilterBounds,
     src: &[u16],
     dst: &mut [u16],
@@ -67,7 +67,7 @@ unsafe fn convolve_column_lb_u16_def(
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_column_lb_u16_fma(
+fn convolve_column_lb_u16_fma(
     bounds: &FilterBounds,
     src: &[u16],
     dst: &mut [u16],
@@ -81,7 +81,7 @@ unsafe fn convolve_column_lb_u16_fma(
 }
 
 #[inline(always)]
-unsafe fn convolve_column_lb_u16_impl<const FMA: bool>(
+fn convolve_column_lb_u16_impl<const FMA: bool>(
     bounds: &FilterBounds,
     src: &[u16],
     dst: &mut [u16],
@@ -251,129 +251,19 @@ unsafe fn convolve_column_lb_u16_impl<const FMA: bool>(
 
             let v_dx = v_cx + x * 4;
 
-            if bounds_size == 2 {
-                let weights = weight.get_unchecked(0..2);
-                let weight0 = weights[0];
-                let weight1 = weights[1];
+            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
+                let py = bounds.start + j;
+                let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
 
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
+                let v_weight = _mm_set1_ps(k_weight);
 
-                let v_weight0 = _mm_set1_ps(weight0);
-                let v_weight1 = _mm_set1_ps(weight1);
-
-                let item_row0 = _mm_loadu_si64(src_ptr0.as_ptr() as *const u8);
-                let item_row1 = _mm_loadu_si64(src_ptr1.as_ptr() as *const u8);
+                let item_row = _mm_loadu_si64(src_ptr.as_ptr() as *const u8);
 
                 store0 = _mm_prefer_fma_ps::<FMA>(
                     store0,
-                    _mm_cvtepi32_ps(_mm_unpacklo_epi16(item_row0, zeros)),
-                    v_weight0,
+                    _mm_cvtepi32_ps(_mm_unpacklo_epi16(item_row, zeros)),
+                    v_weight,
                 );
-
-                store0 = _mm_prefer_fma_ps::<FMA>(
-                    store0,
-                    _mm_cvtepi32_ps(_mm_unpacklo_epi16(item_row1, zeros)),
-                    v_weight1,
-                );
-            } else if bounds_size == 3 {
-                let weights = weight.get_unchecked(0..3);
-                let weight0 = weights[0];
-                let weight1 = weights[1];
-                let weight2 = weights[2];
-
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
-
-                let v_weight0 = _mm_set1_ps(weight0);
-                let v_weight1 = _mm_set1_ps(weight1);
-                let v_weight2 = _mm_set1_ps(weight2);
-
-                let item_row0 = _mm_loadu_si64(src_ptr0.as_ptr() as *const u8);
-                let item_row1 = _mm_loadu_si64(src_ptr1.as_ptr() as *const u8);
-                let item_row2 = _mm_loadu_si64(src_ptr2.as_ptr() as *const u8);
-
-                store0 = _mm_prefer_fma_ps::<FMA>(
-                    store0,
-                    _mm_cvtepi32_ps(_mm_unpacklo_epi16(item_row0, zeros)),
-                    v_weight0,
-                );
-
-                store0 = _mm_prefer_fma_ps::<FMA>(
-                    store0,
-                    _mm_cvtepi32_ps(_mm_unpacklo_epi16(item_row1, zeros)),
-                    v_weight1,
-                );
-
-                store0 = _mm_prefer_fma_ps::<FMA>(
-                    store0,
-                    _mm_cvtepi32_ps(_mm_unpacklo_epi16(item_row2, zeros)),
-                    v_weight2,
-                );
-            } else if bounds_size == 4 {
-                let weights = weight.get_unchecked(0..4);
-                let weight0 = weights[0];
-                let weight1 = weights[1];
-                let weight2 = weights[2];
-                let weight3 = weights[3];
-
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
-                let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + v_dx)..);
-
-                let v_weight0 = _mm_set1_ps(weight0);
-                let v_weight1 = _mm_set1_ps(weight1);
-                let v_weight2 = _mm_set1_ps(weight2);
-                let v_weight3 = _mm_set1_ps(weight3);
-
-                let item_row0 = _mm_loadu_si64(src_ptr0.as_ptr() as *const u8);
-                let item_row1 = _mm_loadu_si64(src_ptr1.as_ptr() as *const u8);
-                let item_row2 = _mm_loadu_si64(src_ptr2.as_ptr() as *const u8);
-                let item_row3 = _mm_loadu_si64(src_ptr3.as_ptr() as *const u8);
-
-                store0 = _mm_prefer_fma_ps::<FMA>(
-                    store0,
-                    _mm_cvtepi32_ps(_mm_unpacklo_epi16(item_row0, zeros)),
-                    v_weight0,
-                );
-
-                store0 = _mm_prefer_fma_ps::<FMA>(
-                    store0,
-                    _mm_cvtepi32_ps(_mm_unpacklo_epi16(item_row1, zeros)),
-                    v_weight1,
-                );
-
-                store0 = _mm_prefer_fma_ps::<FMA>(
-                    store0,
-                    _mm_cvtepi32_ps(_mm_unpacklo_epi16(item_row2, zeros)),
-                    v_weight2,
-                );
-
-                store0 = _mm_prefer_fma_ps::<FMA>(
-                    store0,
-                    _mm_cvtepi32_ps(_mm_unpacklo_epi16(item_row3, zeros)),
-                    v_weight3,
-                );
-            } else {
-                for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
-                    let py = bounds.start + j;
-                    let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
-
-                    let v_weight = _mm_set1_ps(k_weight);
-
-                    let item_row = _mm_loadu_si64(src_ptr.as_ptr() as *const u8);
-
-                    store0 = _mm_prefer_fma_ps::<FMA>(
-                        store0,
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(item_row, zeros)),
-                        v_weight,
-                    );
-                }
             }
 
             let v_st = _mm_cvtps_epi32(store0);
@@ -396,65 +286,12 @@ unsafe fn convolve_column_lb_u16_impl<const FMA: bool>(
 
             let v_px = a_px + x;
 
-            if bounds_size == 2 {
-                let weights = weight.get_unchecked(0..2);
-                let weight0 = weights[0];
-                let weight1 = weights[1];
+            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
+                let py = bounds.start + j;
+                let offset = src_stride * py + v_px;
+                let src_ptr = src.get_unchecked(offset);
 
-                let py = bounds.start;
-                let offset0 = src_stride * py + v_px;
-                let src_ptr0 = src.get_unchecked(offset0..(offset0 + 1));
-                let offset1 = src_stride * (py + 1) + v_px;
-                let src_ptr1 = src.get_unchecked(offset1..(offset1 + 1));
-
-                store0 = mlaf(store0, src_ptr0[0] as f32, weight0);
-                store0 = mlaf(store0, src_ptr1[0] as f32, weight1);
-            } else if bounds_size == 3 {
-                let weights = weight.get_unchecked(0..3);
-                let weight0 = weights[0];
-                let weight1 = weights[1];
-                let weight2 = weights[2];
-
-                let py = bounds.start;
-                let offset0 = src_stride * py + v_px;
-                let src_ptr0 = src.get_unchecked(offset0..(offset0 + 1));
-                let offset1 = src_stride * (py + 1) + v_px;
-                let src_ptr1 = src.get_unchecked(offset1..(offset1 + 1));
-                let offset2 = src_stride * (py + 2) + v_px;
-                let src_ptr2 = src.get_unchecked(offset2..(offset2 + 1));
-
-                store0 = mlaf(store0, src_ptr0[0] as f32, weight0);
-                store0 = mlaf(store0, src_ptr1[0] as f32, weight1);
-                store0 = mlaf(store0, src_ptr2[0] as f32, weight2);
-            } else if bounds_size == 4 {
-                let weights = weight.get_unchecked(0..4);
-                let weight0 = weights[0];
-                let weight1 = weights[1];
-                let weight2 = weights[2];
-                let weight3 = weights[3];
-
-                let py = bounds.start;
-                let offset0 = src_stride * py + v_px;
-                let src_ptr0 = src.get_unchecked(offset0..(offset0 + 1));
-                let offset1 = src_stride * (py + 1) + v_px;
-                let src_ptr1 = src.get_unchecked(offset1..(offset1 + 1));
-                let offset2 = src_stride * (py + 2) + v_px;
-                let src_ptr2 = src.get_unchecked(offset2..(offset2 + 1));
-                let offset3 = src_stride * (py + 3) + v_px;
-                let src_ptr3 = src.get_unchecked(offset3..(offset3 + 1));
-
-                store0 = mlaf(store0, src_ptr0[0] as f32, weight0);
-                store0 = mlaf(store0, src_ptr1[0] as f32, weight1);
-                store0 = mlaf(store0, src_ptr2[0] as f32, weight2);
-                store0 = mlaf(store0, src_ptr3[0] as f32, weight3);
-            } else {
-                for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
-                    let py = bounds.start + j;
-                    let offset = src_stride * py + v_px;
-                    let src_ptr = src.get_unchecked(offset);
-
-                    store0 = mlaf(store0, *src_ptr as f32, k_weight);
-                }
+                store0 = mlaf(store0, *src_ptr as f32, k_weight);
             }
 
             *dst = store0.round().max(0.).min(max_colors as f32) as u16;

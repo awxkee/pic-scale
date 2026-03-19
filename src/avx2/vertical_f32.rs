@@ -300,64 +300,62 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         src_stride: usize,
         weight_ptr: &[f32],
     ) {
-        unsafe {
-            let mut cx = 0usize;
-            let dst_width = dst.len();
+        let mut cx = 0usize;
+        let dst_width = dst.len();
 
-            while cx + 32 < dst_width {
-                self.convolve_vertical_part_avx_32_f32(
-                    bounds.start,
-                    cx,
-                    src,
-                    src_stride,
-                    dst,
-                    weight_ptr,
-                    bounds,
-                );
+        while cx + 32 < dst_width {
+            self.convolve_vertical_part_avx_32_f32(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weight_ptr,
+                bounds,
+            );
 
-                cx += 32;
-            }
+            cx += 32;
+        }
 
-            while cx + 16 < dst_width {
-                self.convolve_vertical_part_avx_16_f32(
-                    bounds.start,
-                    cx,
-                    src,
-                    src_stride,
-                    dst,
-                    weight_ptr,
-                    bounds,
-                );
+        while cx + 16 < dst_width {
+            self.convolve_vertical_part_avx_16_f32(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weight_ptr,
+                bounds,
+            );
 
-                cx += 16;
-            }
+            cx += 16;
+        }
 
-            while cx + 8 < dst_width {
-                self.convolve_vertical_part_avx_8_f32(
-                    bounds.start,
-                    cx,
-                    src,
-                    src_stride,
-                    dst,
-                    weight_ptr,
-                    bounds,
-                );
+        while cx + 8 < dst_width {
+            self.convolve_vertical_part_avx_8_f32(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weight_ptr,
+                bounds,
+            );
 
-                cx += 8;
-            }
+            cx += 8;
+        }
 
-            while cx < dst_width {
-                self.convolve_vertical_part_avx_f32(
-                    bounds.start,
-                    cx,
-                    src,
-                    src_stride,
-                    dst,
-                    weight_ptr,
-                    bounds,
-                );
-                cx += 1;
-            }
+        while cx < dst_width {
+            self.convolve_vertical_part_avx_f32(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weight_ptr,
+                bounds,
+            );
+            cx += 1;
         }
     }
 }

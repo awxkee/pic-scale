@@ -158,7 +158,7 @@ fn process_chunk_32_unrolled<const BOUNDS: usize>(
 
     let mut cx = cx;
 
-    let weights: [__m256i; 12] = std::array::from_fn(|x| _mm256_set1_epi16(weights[x]));
+    let weights: [__m256i; BOUNDS] = std::array::from_fn(|x| _mm256_set1_epi16(weights[x]));
 
     for dst in chunks {
         let mut store0 = _mm256_set1_epi16(ROUNDING);

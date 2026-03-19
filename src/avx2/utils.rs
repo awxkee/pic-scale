@@ -484,7 +484,7 @@ pub(crate) unsafe fn _mm256_prefer_fma_ps<const FMA: bool>(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_prefer_fma_ps<const FMA: bool>(a: __m128, b: __m128, c: __m128) -> __m128 {
+pub(crate) fn _mm_prefer_fma_ps<const FMA: bool>(a: __m128, b: __m128, c: __m128) -> __m128 {
     unsafe {
         if FMA {
             _mm_fmadd_ps(b, c, a)
@@ -495,11 +495,7 @@ pub(crate) unsafe fn _mm_prefer_fma_ps<const FMA: bool>(a: __m128, b: __m128, c:
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_prefer_fma_pd<const FMA: bool>(
-    a: __m128d,
-    b: __m128d,
-    c: __m128d,
-) -> __m128d {
+pub(crate) fn _mm_prefer_fma_pd<const FMA: bool>(a: __m128d, b: __m128d, c: __m128d) -> __m128d {
     unsafe {
         if FMA {
             _mm_fmadd_pd(b, c, a)

@@ -44,7 +44,6 @@ pub(crate) fn convolve_column_lb_avx2_u16(
 ) {
     unsafe {
         #[cfg(feature = "avx512")]
-        #[allow(clippy::incompatible_msrv)]
         if std::arch::is_x86_feature_detected!("avxvnni") {
             convolve_column_lb_avx_u16_dot(bounds, src, dst, src_stride, weight, bit_depth);
             return;
@@ -56,7 +55,7 @@ pub(crate) fn convolve_column_lb_avx2_u16(
 #[cfg(feature = "avx512")]
 #[inline]
 #[target_feature(enable = "avx2", enable = "avxvnni")]
-unsafe fn convolve_column_lb_avx_u16_dot(
+fn convolve_column_lb_avx_u16_dot(
     bounds: &FilterBounds,
     src: &[u16],
     dst: &mut [u16],
@@ -71,7 +70,7 @@ unsafe fn convolve_column_lb_avx_u16_dot(
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn convolve_column_lb_avx_u16_reg(
+fn convolve_column_lb_avx_u16_reg(
     bounds: &FilterBounds,
     src: &[u16],
     dst: &mut [u16],
@@ -85,7 +84,7 @@ unsafe fn convolve_column_lb_avx_u16_reg(
 }
 
 #[inline(always)]
-unsafe fn convolve_column_lb_avx_u16_impl<const HAS_DOT: bool>(
+fn convolve_column_lb_avx_u16_impl<const HAS_DOT: bool>(
     bounds: &FilterBounds,
     src: &[u16],
     dst: &mut [u16],
@@ -256,117 +255,19 @@ unsafe fn convolve_column_lb_avx_u16_impl<const HAS_DOT: bool>(
 
             let v_dx = v_cx + x * 4;
 
-            if bounds_size == 2 {
-                let weights = weight.get_unchecked(0..2);
+            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
+                let py = bounds.start + j;
+                let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
 
-                let v_weight0 = _mm_set1_epi16(weights[0]);
-                let v_weight1 = _mm_set1_epi16(weights[1]);
+                let v_weight = _mm_set1_epi16(k_weight);
 
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
+                let item_row = _mm_loadu_si64(src_ptr.as_ptr() as *const u8);
 
-                let item_row0 = _mm_loadu_si64(src_ptr0.as_ptr() as *const u8);
                 store0 = _mm_dot16_avx_epi32::<HAS_DOT>(
                     store0,
-                    _mm_unpacklo_epi16(item_row0, zeros),
-                    v_weight0,
+                    _mm_unpacklo_epi16(item_row, zeros),
+                    v_weight,
                 );
-
-                let item_row1 = _mm_loadu_si64(src_ptr1.as_ptr() as *const u8);
-                store0 = _mm_dot16_avx_epi32::<HAS_DOT>(
-                    store0,
-                    _mm_unpacklo_epi16(item_row1, zeros),
-                    v_weight1,
-                );
-            } else if bounds_size == 3 {
-                let weights = weight.get_unchecked(0..3);
-
-                let v_weight0 = _mm_set1_epi16(weights[0]);
-                let v_weight1 = _mm_set1_epi16(weights[1]);
-                let v_weight2 = _mm_set1_epi16(weights[2]);
-
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
-
-                let item_row0 = _mm_loadu_si64(src_ptr0.as_ptr() as *const u8);
-                store0 = _mm_dot16_avx_epi32::<HAS_DOT>(
-                    store0,
-                    _mm_unpacklo_epi16(item_row0, zeros),
-                    v_weight0,
-                );
-
-                let item_row1 = _mm_loadu_si64(src_ptr1.as_ptr() as *const u8);
-                store0 = _mm_dot16_avx_epi32::<HAS_DOT>(
-                    store0,
-                    _mm_unpacklo_epi16(item_row1, zeros),
-                    v_weight1,
-                );
-
-                let item_row2 = _mm_loadu_si64(src_ptr2.as_ptr() as *const u8);
-                store0 = _mm_dot16_avx_epi32::<HAS_DOT>(
-                    store0,
-                    _mm_unpacklo_epi16(item_row2, zeros),
-                    v_weight2,
-                );
-            } else if bounds_size == 4 {
-                let weights = weight.get_unchecked(0..4);
-
-                let v_weight0 = _mm_set1_epi16(weights[0]);
-                let v_weight1 = _mm_set1_epi16(weights[1]);
-                let v_weight2 = _mm_set1_epi16(weights[2]);
-                let v_weight3 = _mm_set1_epi16(weights[3]);
-
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
-                let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + v_dx)..);
-
-                let item_row0 = _mm_loadu_si64(src_ptr0.as_ptr() as *const u8);
-                store0 = _mm_dot16_avx_epi32::<HAS_DOT>(
-                    store0,
-                    _mm_unpacklo_epi16(item_row0, zeros),
-                    v_weight0,
-                );
-
-                let item_row1 = _mm_loadu_si64(src_ptr1.as_ptr() as *const u8);
-                store0 = _mm_dot16_avx_epi32::<HAS_DOT>(
-                    store0,
-                    _mm_unpacklo_epi16(item_row1, zeros),
-                    v_weight1,
-                );
-
-                let item_row2 = _mm_loadu_si64(src_ptr2.as_ptr() as *const u8);
-                store0 = _mm_dot16_avx_epi32::<HAS_DOT>(
-                    store0,
-                    _mm_unpacklo_epi16(item_row2, zeros),
-                    v_weight2,
-                );
-
-                let item_row3 = _mm_loadu_si64(src_ptr3.as_ptr() as *const u8);
-                store0 = _mm_dot16_avx_epi32::<HAS_DOT>(
-                    store0,
-                    _mm_unpacklo_epi16(item_row3, zeros),
-                    v_weight3,
-                );
-            } else {
-                for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
-                    let py = bounds.start + j;
-                    let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
-
-                    let v_weight = _mm_set1_epi16(k_weight);
-
-                    let item_row = _mm_loadu_si64(src_ptr.as_ptr() as *const u8);
-
-                    store0 = _mm_dot16_avx_epi32::<HAS_DOT>(
-                        store0,
-                        _mm_unpacklo_epi16(item_row, zeros),
-                        v_weight,
-                    );
-                }
             }
 
             let v_st = _mm_srai_epi32::<PRECISION>(store0);
@@ -386,65 +287,12 @@ unsafe fn convolve_column_lb_avx_u16_impl<const HAS_DOT: bool>(
 
             let v_px = a_px + x;
 
-            if bounds_size == 2 {
-                let weights = weight.get_unchecked(0..2);
-                let weight0 = weights[0];
-                let weight1 = weights[1];
+            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
+                let py = bounds.start + j;
+                let offset = src_stride * py + v_px;
+                let src_ptr = src.get_unchecked(offset);
 
-                let py = bounds.start;
-                let offset0 = src_stride * py + v_px;
-                let src_ptr0 = *src.get_unchecked(offset0);
-                let offset1 = src_stride * (py + 1) + v_px;
-                let src_ptr1 = *src.get_unchecked(offset1);
-
-                store0 = store0.wrapping_add((src_ptr0 as i32).wrapping_mul(weight0 as i32));
-                store0 = store0.wrapping_add((src_ptr1 as i32).wrapping_mul(weight1 as i32));
-            } else if bounds_size == 3 {
-                let weights = weight.get_unchecked(0..3);
-                let weight0 = weights[0];
-                let weight1 = weights[1];
-                let weight2 = weights[2];
-
-                let py = bounds.start;
-                let offset0 = src_stride * py + v_px;
-                let src_ptr0 = *src.get_unchecked(offset0);
-                let offset1 = src_stride * (py + 1) + v_px;
-                let src_ptr1 = *src.get_unchecked(offset1);
-                let offset2 = src_stride * (py + 2) + v_px;
-                let src_ptr2 = *src.get_unchecked(offset2);
-
-                store0 = store0.wrapping_add((src_ptr0 as i32).wrapping_mul(weight0 as i32));
-                store0 = store0.wrapping_add((src_ptr1 as i32).wrapping_mul(weight1 as i32));
-                store0 = store0.wrapping_add((src_ptr2 as i32).wrapping_mul(weight2 as i32));
-            } else if bounds_size == 4 {
-                let weights = weight.get_unchecked(0..4);
-                let weight0 = weights[0];
-                let weight1 = weights[1];
-                let weight2 = weights[2];
-                let weight3 = weights[3];
-
-                let py = bounds.start;
-                let offset0 = src_stride * py + v_px;
-                let src_ptr0 = *src.get_unchecked(offset0);
-                let offset1 = src_stride * (py + 1) + v_px;
-                let src_ptr1 = *src.get_unchecked(offset1);
-                let offset2 = src_stride * (py + 2) + v_px;
-                let src_ptr2 = *src.get_unchecked(offset2);
-                let offset3 = src_stride * (py + 3) + v_px;
-                let src_ptr3 = *src.get_unchecked(offset3);
-
-                store0 = store0.wrapping_add((src_ptr0 as i32).wrapping_mul(weight0 as i32));
-                store0 = store0.wrapping_add((src_ptr1 as i32).wrapping_mul(weight1 as i32));
-                store0 = store0.wrapping_add((src_ptr2 as i32).wrapping_mul(weight2 as i32));
-                store0 = store0.wrapping_add((src_ptr3 as i32).wrapping_mul(weight3 as i32));
-            } else {
-                for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
-                    let py = bounds.start + j;
-                    let offset = src_stride * py + v_px;
-                    let src_ptr = src.get_unchecked(offset);
-
-                    store0 = store0.wrapping_add((*src_ptr as i32).wrapping_mul(k_weight as i32));
-                }
+                store0 = store0.wrapping_add((*src_ptr as i32).wrapping_mul(k_weight as i32));
             }
 
             *dst = (store0 >> PRECISION).max(0).min(max_colors as i32) as u16;
