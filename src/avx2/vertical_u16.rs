@@ -115,7 +115,7 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
                 let v_weight = _mm256_set1_ps(k_weight);
 
                 let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
-                let item_row1 = _mm256_loadu_si256(src_ptr.as_ptr().add(16) as *const __m256i);
+                let item_row1 = _mm256_loadu_si256(src_ptr.get_unchecked(16..).as_ptr() as *const __m256i);
 
                 store0 = _mm256_prefer_fma_ps::<FMA>(
                     store0,
@@ -148,7 +148,7 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
             let item1 = _mm256_min_epu16(_mm256_packus_epi32(v_st2, v_st3), v_cap_colors);
 
             _mm256_storeu_si256(dst.as_mut_ptr() as *mut __m256i, item0);
-            _mm256_storeu_si256(dst.as_mut_ptr().add(16) as *mut __m256i, item1);
+            _mm256_storeu_si256(dst.get_unchecked_mut(16..).as_mut_ptr() as *mut __m256i, item1);
 
             cx = v_dx;
         }
