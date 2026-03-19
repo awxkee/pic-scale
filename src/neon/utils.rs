@@ -92,16 +92,6 @@ pub(crate) unsafe fn xvst1q_u8_x2(ptr: *mut u8, b: uint8x16x2_t) {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn xvst1q_u8_x4(ptr: *mut u8, b: uint8x16x4_t) {
-    unsafe {
-        vst1q_u8(ptr, b.0);
-        vst1q_u8(ptr.add(16), b.1);
-        vst1q_u8(ptr.add(32), b.2);
-        vst1q_u8(ptr.add(48), b.3);
-    }
-}
-
-#[inline(always)]
 pub(crate) fn prefer_vfmaq_f32(a: float32x4_t, b: float32x4_t, c: float32x4_t) -> float32x4_t {
     unsafe {
         #[cfg(target_arch = "aarch64")]

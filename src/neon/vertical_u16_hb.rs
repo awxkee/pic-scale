@@ -80,7 +80,7 @@ fn convolve_column_hb_impl(
                 let v_weight = vdupq_n_s32(k_weight);
 
                 let item_row0 = vld1q_u16(src_ptr.as_ptr());
-                let item_row1 = vld1q_u16(src_ptr.as_ptr().add(8));
+                let item_row1 = vld1q_u16(src_ptr.get_unchecked(8..).as_ptr());
 
                 store0 = vqrdmlahq_s32(
                     store0,
@@ -113,7 +113,7 @@ fn convolve_column_hb_impl(
             let item1 = vminq_u16(vcombine_u16(store2, store3), v_max_colors);
 
             vst1q_u16(dst.as_mut_ptr(), item0);
-            vst1q_u16(dst.as_mut_ptr().add(8), item1);
+            vst1q_u16(dst.get_unchecked_mut(8..).as_mut_ptr(), item1);
 
             cx = v_dx;
         }
