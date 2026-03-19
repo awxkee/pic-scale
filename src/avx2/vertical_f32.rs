@@ -102,7 +102,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
 
             let mut j = 0usize;
 
-            while j + 4 < bounds.size {
+            while j + 4 <= bounds.size {
                 let py = start_y + j;
                 let weights = _mm_loadu_ps(filter.get_unchecked(j..).as_ptr());
 

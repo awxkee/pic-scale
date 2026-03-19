@@ -98,6 +98,45 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
 
             let px = start_x;
 
+            let mut j = 0usize;
+
+            while j + 2 <= bounds.size {
+                let py = start_y + j;
+                let weights = _mm_loadu_pd(filter.get_unchecked(j..).as_ptr());
+                let xw0 = _mm_shuffle_pd::<0>(weights, weights);
+                let xw1 = _mm_shuffle_pd::<0b11>(weights, weights);
+                let w0 = _mm256_setr_m128d(xw0, xw0);
+                let w1 = _mm256_setr_m128d(xw1, xw1);
+                let src_ptr = src.get_unchecked(src_stride * py + px..);
+                let item_row_0 = _mm256_loadu_ps(src_ptr.as_ptr());
+
+                store_0 = _mm256_fma_pd::<FMA>(
+                    store_0,
+                    _mm256_cvtps_pd(_mm256_castps256_ps128(item_row_0)),
+                    w0,
+                );
+                store_1 = _mm256_fma_pd::<FMA>(
+                    store_1,
+                    _mm256_cvtps_pd(_mm256_extractf128_ps::<1>(item_row_0)),
+                    w0,
+                );
+
+                let item_row_0 = _mm256_loadu_ps(src_ptr.get_unchecked(src_stride..).as_ptr());
+
+                store_0 = _mm256_fma_pd::<FMA>(
+                    store_0,
+                    _mm256_cvtps_pd(_mm256_castps256_ps128(item_row_0)),
+                    w1,
+                );
+                store_1 = _mm256_fma_pd::<FMA>(
+                    store_1,
+                    _mm256_cvtps_pd(_mm256_extractf128_ps::<1>(item_row_0)),
+                    w1,
+                );
+
+                j += 2;
+            }
+
             for j in 0..bounds.size {
                 let py = start_y + j;
                 let weight = filter.get_unchecked(j);

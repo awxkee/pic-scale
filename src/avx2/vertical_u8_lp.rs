@@ -90,7 +90,7 @@ fn process_chunk_32(
 
         let mut j = 0usize;
 
-        while j + 4 < bounds_size {
+        while j + 4 <= bounds_size {
             let py = bounds.start + j;
             let weights = unsafe { _mm_loadu_si64(weights.get_unchecked(j..).as_ptr().cast()) };
             let w0 = _mm256_broadcastw_epi16(weights); // elem 0
@@ -213,7 +213,7 @@ fn process_chunk_16(
 
         let mut j = 0usize;
 
-        while j + 4 < bounds_size {
+        while j + 4 <= bounds_size {
             let py = bounds.start + j;
             let weights = unsafe { _mm_loadu_si64(weights.get_unchecked(j..).as_ptr().cast()) };
             let w0 = _mm256_broadcastw_epi16(weights); // elem 0

@@ -30,7 +30,7 @@
 use std::arch::x86_64::*;
 
 #[inline(always)]
-pub(crate) unsafe fn _mm256_fma_pd<const FMA: bool>(a: __m256d, b: __m256d, c: __m256d) -> __m256d {
+pub(crate) fn _mm256_fma_pd<const FMA: bool>(a: __m256d, b: __m256d, c: __m256d) -> __m256d {
     unsafe {
         if FMA {
             _mm256_fmadd_pd(b, c, a)
