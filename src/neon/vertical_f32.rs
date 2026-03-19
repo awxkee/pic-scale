@@ -104,7 +104,6 @@ macro_rules! conv_vertical_part_neon_32_f32 {
     }};
 }
 
-#[inline(always)]
 fn conv_vertical_part_neon_48_f32(
     start_y: usize,
     start_x: usize,
@@ -169,7 +168,6 @@ fn conv_vertical_part_neon_48_f32(
     }
 }
 
-#[inline(always)]
 fn convolve_vertical_part_neon_8_f32(
     start_y: usize,
     start_x: usize,
@@ -234,7 +232,6 @@ fn convolve_vertical_part_neon_4_f32(
     }
 }
 
-#[inline(always)]
 fn convolve_vertical_part_neon_1_f32(
     start_y: usize,
     start_x: usize,
@@ -295,49 +292,43 @@ pub(crate) fn convolve_vertical_rgb_neon_row_f32(
     }
 
     while cx + 8 < dst_width {
-        unsafe {
-            convolve_vertical_part_neon_8_f32(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
-        }
+        convolve_vertical_part_neon_8_f32(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+        );
 
         cx += 8;
     }
 
     while cx + 4 < dst_width {
-        unsafe {
-            convolve_vertical_part_neon_4_f32(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
-        }
+        convolve_vertical_part_neon_4_f32(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+        );
 
         cx += 4;
     }
 
     while cx < dst_width {
-        unsafe {
-            convolve_vertical_part_neon_1_f32(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
-        }
+        convolve_vertical_part_neon_1_f32(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+        );
         cx += 1;
     }
 }
