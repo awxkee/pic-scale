@@ -28,7 +28,9 @@
  */
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::convolve_vertical_avx_row_f32;
-use crate::convolution::{ConvolutionOptions, RowFilter, HorizontalFilterPass, VerticalConvolutionPass, ColumnFilter};
+use crate::convolution::{
+    ColumnFilter, ConvolutionOptions, HorizontalFilterPass, RowFilter, VerticalConvolutionPass,
+};
 use crate::convolve_naive_f32::*;
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::floating_point_vertical::column_handler_floating_point;

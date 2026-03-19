@@ -31,7 +31,9 @@ use crate::avx2::{
     convolve_horizontal_rgba_avx_row_one_f32, convolve_horizontal_rgba_avx_rows_4_f32,
     convolve_vertical_avx_row_f32,
 };
-use crate::convolution::{ConvolutionOptions, RowFilter, HorizontalFilterPass, VerticalConvolutionPass, ColumnFilter};
+use crate::convolution::{
+    ColumnFilter, ConvolutionOptions, HorizontalFilterPass, RowFilter, VerticalConvolutionPass,
+};
 use crate::convolve_naive_f32::{
     convolve_horizontal_4_row_f32_f64, convolve_horizontal_native_row_f32,
     convolve_horizontal_native_row_f32_f64, convolve_horizontal_rgba_4_row_f32,

@@ -42,7 +42,7 @@ fn main() {
         .plan_rgba_resampling(
             ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
             ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
-            true,
+            false,
         )
         .unwrap();
 

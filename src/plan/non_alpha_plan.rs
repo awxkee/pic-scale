@@ -26,10 +26,10 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::convolution::{ColumnFilter, RowFilter};
+use crate::convolution::{ColumnFilter, RowFilter, TrampolineFilter};
 use crate::image_store::CheckStoreDensity;
 use crate::validation::{validate_scratch, validate_sizes};
-use crate::{ImageSize, ImageStore, ImageStoreMut, PicScaleError, ResamplingPlan};
+use crate::{ImageSize, ImageStore, ImageStoreMut, PicScaleError, ResamplingPlan, ThreadingPolicy};
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -38,6 +38,8 @@ pub(crate) struct NonAlphaConvolvePlan<T: Send + Sync, const N: usize> {
     pub(crate) target_size: ImageSize,
     pub(crate) horizontal_filter: Arc<dyn RowFilter<T, N> + Send + Sync>,
     pub(crate) vertical_filter: Arc<dyn ColumnFilter<T, N> + Send + Sync>,
+    pub(crate) trampoline_filter: Arc<dyn TrampolineFilter<T, N> + Send + Sync>,
+    pub(crate) threading_policy: ThreadingPolicy,
     pub(crate) should_do_horizontal: bool,
     pub(crate) should_do_vertical: bool,
 }
@@ -68,12 +70,19 @@ where
             return Err(PicScaleError::UnsupportedBitDepth(into.bit_depth));
         }
         if self.should_do_vertical && self.should_do_horizontal {
-            let mut new_image_vertical =
-                ImageStoreMut::<T, N>::from_slice(scratch, store.width, self.target_size.height)?;
-            new_image_vertical.bit_depth = into.bit_depth;
-            self.vertical_filter.filter(store, &mut new_image_vertical);
-            let new_immutable_store = new_image_vertical.to_immutable();
-            self.horizontal_filter.filter(&new_immutable_store, into);
+            if self.threading_policy == ThreadingPolicy::Single {
+                self.trampoline_filter.filter(store, into, scratch);
+            } else {
+                let mut new_image_vertical = ImageStoreMut::<T, N>::from_slice(
+                    scratch,
+                    store.width,
+                    self.target_size.height,
+                )?;
+                new_image_vertical.bit_depth = into.bit_depth;
+                self.vertical_filter.filter(store, &mut new_image_vertical);
+                let new_immutable_store = new_image_vertical.to_immutable();
+                self.horizontal_filter.filter(&new_immutable_store, into);
+            }
             Ok(())
         } else if self.should_do_vertical {
             self.vertical_filter.filter(store, into);
@@ -95,7 +104,11 @@ where
 
     fn scratch_size(&self) -> usize {
         if self.should_do_horizontal && self.should_do_vertical {
-            self.source_size.width * self.target_size.height * N
+            if self.threading_policy == ThreadingPolicy::Single {
+                self.trampoline_filter.scratch_size()
+            } else {
+                self.source_size.width * self.target_size.height * N
+            }
         } else {
             0
         }

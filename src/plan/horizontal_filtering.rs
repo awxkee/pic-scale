@@ -112,4 +112,37 @@ where
                 one_row_filter(src, dst, &self.filter_weights, destination.bit_depth as u32);
             });
     }
+
+    fn can_do_4_rows(&self) -> bool {
+        self.filter_4_rows.is_some()
+    }
+
+    fn run_on_4_rows(
+        &self,
+        src: &[T],
+        src_stride: usize,
+        dst: &mut [T],
+        dst_stride: usize,
+        bit_depth: u32,
+    ) {
+        if let Some(dispatcher) = self.filter_4_rows {
+            dispatcher(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                &self.filter_weights,
+                bit_depth,
+            );
+        } else {
+            unreachable!(
+                "4 rows filter was called where it's not implemented, this is an internal configuration error"
+            );
+        }
+    }
+
+    fn run_on_row(&self, src: &[T], dst: &mut [T], bit_depth: u32) {
+        let one_row_filter = self.filter_row;
+        one_row_filter(src, dst, &self.filter_weights, bit_depth);
+    }
 }

@@ -31,6 +31,7 @@ mod horizontal_filtering;
 mod nearest_plan;
 mod non_alpha_plan;
 mod planner;
+mod trampoline_filtering;
 mod vertical_filtering;
 
 pub(crate) use alpha_plan::AlphaConvolvePlan;
@@ -38,4 +39,5 @@ pub(crate) use horizontal_filtering::HorizontalFiltering;
 pub(crate) use nearest_plan::ResampleNearestPlan;
 pub(crate) use non_alpha_plan::NonAlphaConvolvePlan;
 pub use planner::{Resampling, ResamplingPlan};
+pub(crate) use trampoline_filtering::TrampolineFiltering;
 pub(crate) use vertical_filtering::VerticalFiltering;

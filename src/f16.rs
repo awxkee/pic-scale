@@ -34,7 +34,9 @@ use crate::avx2::{
     convolve_horizontal_rgba_avx_row_one_f16, convolve_horizontal_rgba_avx_rows_4_f16,
     convolve_vertical_avx_row_f16,
 };
-use crate::convolution::{ConvolutionOptions, RowFilter, HorizontalFilterPass, VerticalConvolutionPass, ColumnFilter};
+use crate::convolution::{
+    ColumnFilter, ConvolutionOptions, HorizontalFilterPass, RowFilter, VerticalConvolutionPass,
+};
 #[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::filter_weights::WeightsConverter;
 use crate::filter_weights::{FilterBounds, FilterWeights};

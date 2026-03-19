@@ -28,7 +28,9 @@
  */
 #![forbid(unsafe_code)]
 
-use crate::convolution::{ConvolutionOptions, RowFilter, HorizontalFilterPass, VerticalConvolutionPass, ColumnFilter};
+use crate::convolution::{
+    ColumnFilter, ConvolutionOptions, HorizontalFilterPass, RowFilter, VerticalConvolutionPass,
+};
 use crate::dispatch_group_u16::{RowFactoryProducer, vertical_plan_u16};
 use crate::filter_weights::FilterWeights;
 use crate::{ImageStore, ThreadingPolicy};

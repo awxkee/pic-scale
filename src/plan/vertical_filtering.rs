@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::convolution::{ColumnFilter, RowFilter};
+use crate::convolution::ColumnFilter;
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::{ImageSize, ImageStore, ImageStoreMut, ThreadingPolicy};
 use novtb::{ParallelZonedIterator, TbSliceMut};
@@ -37,7 +37,8 @@ pub(crate) struct VerticalFiltering<T, F, const N: usize> {
     pub(crate) threading_policy: ThreadingPolicy,
 }
 
-impl<T: Send + Sync, F: Send + Sync, const N: usize> ColumnFilter<T, N> for VerticalFiltering<T, F, N>
+impl<T: Send + Sync, F: Send + Sync, const N: usize> ColumnFilter<T, N>
+    for VerticalFiltering<T, F, N>
 where
     [T]: ToOwned<Owned = Vec<T>>,
 {
@@ -71,5 +72,29 @@ where
                     destination.bit_depth as u32,
                 );
             });
+    }
+
+    fn run_on_row(
+        &self,
+        src: &[T],
+        dst: &mut [T],
+        dst_width: usize,
+        src_stride: usize,
+        y: usize,
+        bit_depth: u32,
+    ) {
+        let bounds = self.filter_weights.bounds[y];
+        let filter_offset = y * self.filter_weights.aligned_size;
+        let weights = &self.filter_weights.weights[filter_offset..];
+        let row_filter = self.filter_row;
+        row_filter(
+            dst_width,
+            &bounds,
+            src,
+            &mut dst[..dst_width * N],
+            src_stride,
+            weights,
+            bit_depth,
+        );
     }
 }

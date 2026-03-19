@@ -33,7 +33,9 @@ use crate::avx2::{
     convolve_horizontal_rgba_avx_rows_4_lb, convolve_horizontal_rgba_avx_rows_one_lb,
     convolve_vertical_avx_row, convolve_vertical_avx_row_lp,
 };
-use crate::convolution::{ConvolutionOptions, RowFilter, HorizontalFilterPass, VerticalConvolutionPass, ColumnFilter};
+use crate::convolution::{
+    ColumnFilter, ConvolutionOptions, HorizontalFilterPass, RowFilter, VerticalConvolutionPass,
+};
 use crate::filter_weights::*;
 use crate::handler_provider::{
     handle_fixed_column_u8, handle_fixed_row_u8, handle_fixed_rows_4_u8,

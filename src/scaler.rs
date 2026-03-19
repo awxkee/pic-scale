@@ -37,7 +37,7 @@ use crate::image_store::{
 use crate::math::WeightsGenerator;
 use crate::plan::{
     AlphaConvolvePlan, HorizontalFiltering, NonAlphaConvolvePlan, ResampleNearestPlan, Resampling,
-    VerticalFiltering,
+    TrampolineFiltering, VerticalFiltering,
 };
 use crate::threading_policy::ThreadingPolicy;
 use crate::validation::PicScaleError;
@@ -132,13 +132,22 @@ impl Scaler {
         let should_do_horizontal = source_size.width != destination_size.width;
         let should_do_vertical = source_size.height != destination_size.height;
 
+        let trampoline_filter = Arc::new(TrampolineFiltering {
+            horizontal_filter: horizontal_plan.clone(),
+            vertical_filter: vertical_plan.clone(),
+            source_size,
+            target_size: destination_size,
+        });
+
         Ok(Arc::new(NonAlphaConvolvePlan {
             source_size,
             target_size: destination_size,
             horizontal_filter: horizontal_plan,
             vertical_filter: vertical_plan,
+            trampoline_filter,
             should_do_vertical,
             should_do_horizontal,
+            threading_policy: self.threading_policy,
         }))
     }
 
@@ -187,12 +196,20 @@ impl Scaler {
         let should_do_horizontal = source_size.width != destination_size.width;
         let should_do_vertical = source_size.height != destination_size.height;
 
+        let trampoline_filter = Arc::new(TrampolineFiltering {
+            horizontal_filter: horizontal_plan.clone(),
+            vertical_filter: vertical_plan.clone(),
+            source_size,
+            target_size: destination_size,
+        });
+
         Ok(Arc::new(AlphaConvolvePlan {
             source_size,
             target_size: destination_size,
             threading_policy: self.threading_policy,
             horizontal_filter: horizontal_plan,
             vertical_filter: vertical_plan,
+            trampoline_filter,
             should_do_vertical,
             should_do_horizontal,
             workload_strategy: self.workload_strategy,
@@ -782,13 +799,22 @@ impl Scaler {
         let should_do_horizontal = source_size.width != destination_size.width;
         let should_do_vertical = source_size.height != destination_size.height;
 
+        let trampoline_filter = Arc::new(TrampolineFiltering {
+            horizontal_filter: horizontal_plan.clone(),
+            vertical_filter: vertical_plan.clone(),
+            source_size,
+            target_size: destination_size,
+        });
+
         Ok(Arc::new(NonAlphaConvolvePlan {
             source_size,
             target_size: destination_size,
             horizontal_filter: horizontal_plan,
             vertical_filter: vertical_plan,
+            trampoline_filter,
             should_do_vertical,
             should_do_horizontal,
+            threading_policy: self.threading_policy,
         }))
     }
 
