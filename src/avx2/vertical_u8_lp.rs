@@ -225,6 +225,36 @@ fn process_chunk_32(
 
         let px = cx;
 
+        let mut j = 0usize;
+
+        while j + 4 < bounds_size {
+            let py = bounds.start + j;
+            let weights = unsafe { _mm_loadu_si64(weights.get_unchecked(j..).as_ptr().cast()) };
+            let w0 = _mm256_broadcastw_epi16(weights); // elem 0
+            let w1 = _mm256_broadcastw_epi16(_mm_srli_si128::<2>(weights)); // elem 1 (shift by 2 bytes)
+            let w2 = _mm256_broadcastw_epi16(_mm_srli_si128::<4>(weights)); // elem 2
+            let w3 = _mm256_broadcastw_epi16(_mm_srli_si128::<6>(weights)); // elem 2
+
+            let v_offset = src_stride * py + px;
+            let src_ptr = unsafe { src.get_unchecked(v_offset..) };
+            let item_row0 = unsafe { _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i) };
+            let item_row1 = unsafe {
+                _mm256_loadu_si256(src.get_unchecked(src_stride..).as_ptr() as *const __m256i)
+            };
+            let item_row2 = unsafe {
+                _mm256_loadu_si256(src.get_unchecked(src_stride * 2..).as_ptr() as *const __m256i)
+            };
+            let item_row3 = unsafe {
+                _mm256_loadu_si256(src.get_unchecked(src_stride * 3..).as_ptr() as *const __m256i)
+            };
+
+            (store0, store1) = m256dot!(store0, store1, item_row0, w0);
+            (store0, store1) = m256dot!(store0, store1, item_row1, w1);
+            (store0, store1) = m256dot!(store0, store1, item_row2, w2);
+            (store0, store1) = m256dot!(store0, store1, item_row3, w3);
+            j += 4;
+        }
+
         for j in 0..bounds_size {
             let py = bounds.start + j;
             let weight = unsafe { weights.get_unchecked(j) };
