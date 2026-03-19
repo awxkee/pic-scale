@@ -77,30 +77,26 @@ fn convolve_column_lb_u16_fma(
 }
 
 #[inline(always)]
-fn convolve_column_lb_u16_impl<const FMA: bool>(
+fn convolve_32_items<const FMA: bool>(
+    chunks: &mut [[u16; 32]],
     bounds: &FilterBounds,
     src: &[u16],
-    dst: &mut [u16],
     src_stride: usize,
-    weight: &[f32],
+    weights: &[f32],
     bit_depth: u32,
-) {
+    cx: usize,
+) -> usize {
+    let max_colors = (1i32 << bit_depth) - 1;
+    let mut cx = cx;
+
     unsafe {
-        let max_colors = (1i32 << bit_depth) - 1;
-        let mut cx = 0usize;
-
         let bounds_size = bounds.size;
-
-        let zeros_ps = _mm_setzero_ps();
-        let zeros = _mm_setzero_si128();
 
         let v_cap_colors = _mm256_set1_epi16((max_colors as u16) as i16);
 
         let v_px = cx;
 
-        let iter32 = dst.chunks_exact_mut(32);
-
-        for (x, dst) in iter32.enumerate() {
+        for (x, dst) in chunks.iter_mut().enumerate() {
             let mut store0 = _mm256_setzero_ps();
             let mut store1 = _mm256_setzero_ps();
             let mut store2 = _mm256_setzero_ps();
@@ -108,7 +104,208 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
 
             let v_dx = v_px + x * 32;
 
-            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
+            let mut j = 0usize;
+
+            while j + 4 <= bounds.size {
+                let py = bounds.start + j;
+                let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
+
+                let weights = _mm_loadu_ps(weights.get_unchecked(j..).as_ptr());
+
+                let xw0 = _mm_shuffle_ps::<{ shuffle(0, 0, 0, 0) }>(weights, weights);
+                let xw1 = _mm_shuffle_ps::<{ shuffle(1, 1, 1, 1) }>(weights, weights);
+                let xw2 = _mm_shuffle_ps::<{ shuffle(2, 2, 2, 2) }>(weights, weights);
+                let xw3 = _mm_shuffle_ps::<{ shuffle(3, 3, 3, 3) }>(weights, weights);
+
+                let w0 = _mm256_setr_m128(xw0, xw0);
+                let w1 = _mm256_setr_m128(xw1, xw1);
+                let w2 = _mm256_setr_m128(xw2, xw2);
+                let w3 = _mm256_setr_m128(xw3, xw3);
+
+                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
+                let item_row1 =
+                    _mm256_loadu_si256(src_ptr.get_unchecked(16..).as_ptr() as *const __m256i);
+
+                store0 = _mm256_prefer_fma_ps::<FMA>(
+                    store0,
+                    _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(item_row0, _mm256_setzero_si256())),
+                    w0,
+                );
+                store1 = _mm256_prefer_fma_ps::<FMA>(
+                    store1,
+                    _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(item_row0, _mm256_setzero_si256())),
+                    w0,
+                );
+                store2 = _mm256_prefer_fma_ps::<FMA>(
+                    store2,
+                    _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(item_row1, _mm256_setzero_si256())),
+                    w0,
+                );
+                store3 = _mm256_prefer_fma_ps::<FMA>(
+                    store3,
+                    _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(item_row1, _mm256_setzero_si256())),
+                    w0,
+                );
+
+                let item_row0 = _mm256_loadu_si256(
+                    src_ptr.get_unchecked(src_stride..).as_ptr() as *const __m256i
+                );
+                let item_row1 = _mm256_loadu_si256(
+                    src_ptr.get_unchecked(src_stride + 16..).as_ptr() as *const __m256i,
+                );
+
+                store0 = _mm256_prefer_fma_ps::<FMA>(
+                    store0,
+                    _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(item_row0, _mm256_setzero_si256())),
+                    w1,
+                );
+                store1 = _mm256_prefer_fma_ps::<FMA>(
+                    store1,
+                    _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(item_row0, _mm256_setzero_si256())),
+                    w1,
+                );
+                store2 = _mm256_prefer_fma_ps::<FMA>(
+                    store2,
+                    _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(item_row1, _mm256_setzero_si256())),
+                    w1,
+                );
+                store3 = _mm256_prefer_fma_ps::<FMA>(
+                    store3,
+                    _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(item_row1, _mm256_setzero_si256())),
+                    w1,
+                );
+
+                let item_row0 = _mm256_loadu_si256(
+                    src_ptr.get_unchecked(src_stride * 2..).as_ptr() as *const __m256i,
+                );
+                let item_row1 = _mm256_loadu_si256(
+                    src_ptr.get_unchecked(src_stride * 2 + 16..).as_ptr() as *const __m256i,
+                );
+
+                store0 = _mm256_prefer_fma_ps::<FMA>(
+                    store0,
+                    _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(item_row0, _mm256_setzero_si256())),
+                    w2,
+                );
+                store1 = _mm256_prefer_fma_ps::<FMA>(
+                    store1,
+                    _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(item_row0, _mm256_setzero_si256())),
+                    w2,
+                );
+                store2 = _mm256_prefer_fma_ps::<FMA>(
+                    store2,
+                    _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(item_row1, _mm256_setzero_si256())),
+                    w2,
+                );
+                store3 = _mm256_prefer_fma_ps::<FMA>(
+                    store3,
+                    _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(item_row1, _mm256_setzero_si256())),
+                    w2,
+                );
+
+                let item_row0 = _mm256_loadu_si256(
+                    src_ptr.get_unchecked(src_stride * 3..).as_ptr() as *const __m256i,
+                );
+                let item_row1 = _mm256_loadu_si256(
+                    src_ptr.get_unchecked(src_stride * 3 + 16..).as_ptr() as *const __m256i,
+                );
+
+                store0 = _mm256_prefer_fma_ps::<FMA>(
+                    store0,
+                    _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(item_row0, _mm256_setzero_si256())),
+                    w3,
+                );
+                store1 = _mm256_prefer_fma_ps::<FMA>(
+                    store1,
+                    _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(item_row0, _mm256_setzero_si256())),
+                    w3,
+                );
+                store2 = _mm256_prefer_fma_ps::<FMA>(
+                    store2,
+                    _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(item_row1, _mm256_setzero_si256())),
+                    w3,
+                );
+                store3 = _mm256_prefer_fma_ps::<FMA>(
+                    store3,
+                    _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(item_row1, _mm256_setzero_si256())),
+                    w3,
+                );
+
+                j += 4;
+            }
+
+            while j + 2 <= bounds.size {
+                let py = bounds.start + j;
+                let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
+
+                let weights =
+                    _mm_castsi128_ps(_mm_loadu_epi64(weights.get_unchecked(j..).as_ptr().cast()));
+
+                let xw0 = _mm_shuffle_ps::<{ shuffle(0, 0, 0, 0) }>(weights, weights);
+                let xw1 = _mm_shuffle_ps::<{ shuffle(1, 1, 1, 1) }>(weights, weights);
+
+                let w0 = _mm256_setr_m128(xw0, xw0);
+                let w1 = _mm256_setr_m128(xw1, xw1);
+
+                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
+                let item_row1 =
+                    _mm256_loadu_si256(src_ptr.get_unchecked(16..).as_ptr() as *const __m256i);
+
+                store0 = _mm256_prefer_fma_ps::<FMA>(
+                    store0,
+                    _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(item_row0, _mm256_setzero_si256())),
+                    w0,
+                );
+                store1 = _mm256_prefer_fma_ps::<FMA>(
+                    store1,
+                    _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(item_row0, _mm256_setzero_si256())),
+                    w0,
+                );
+                store2 = _mm256_prefer_fma_ps::<FMA>(
+                    store2,
+                    _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(item_row1, _mm256_setzero_si256())),
+                    w0,
+                );
+                store3 = _mm256_prefer_fma_ps::<FMA>(
+                    store3,
+                    _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(item_row1, _mm256_setzero_si256())),
+                    w0,
+                );
+
+                let item_row0 = _mm256_loadu_si256(
+                    src_ptr.get_unchecked(src_stride..).as_ptr() as *const __m256i
+                );
+                let item_row1 = _mm256_loadu_si256(
+                    src_ptr.get_unchecked(src_stride + 16..).as_ptr() as *const __m256i,
+                );
+
+                store0 = _mm256_prefer_fma_ps::<FMA>(
+                    store0,
+                    _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(item_row0, _mm256_setzero_si256())),
+                    w1,
+                );
+                store1 = _mm256_prefer_fma_ps::<FMA>(
+                    store1,
+                    _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(item_row0, _mm256_setzero_si256())),
+                    w1,
+                );
+                store2 = _mm256_prefer_fma_ps::<FMA>(
+                    store2,
+                    _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(item_row1, _mm256_setzero_si256())),
+                    w1,
+                );
+                store3 = _mm256_prefer_fma_ps::<FMA>(
+                    store3,
+                    _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(item_row1, _mm256_setzero_si256())),
+                    w1,
+                );
+
+                j += 2;
+            }
+
+            let weights = &weights[j..bounds_size];
+
+            for (j, &k_weight) in weights.iter().take(bounds_size).enumerate() {
                 let py = bounds.start + j;
                 let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
 
@@ -156,6 +353,39 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
 
             cx = v_dx;
         }
+        cx
+    }
+}
+
+#[inline(always)]
+fn convolve_column_lb_u16_impl<const FMA: bool>(
+    bounds: &FilterBounds,
+    src: &[u16],
+    dst: &mut [u16],
+    src_stride: usize,
+    weight: &[f32],
+    bit_depth: u32,
+) {
+    unsafe {
+        let max_colors = (1i32 << bit_depth) - 1;
+        let mut cx = 0usize;
+
+        let bounds_size = bounds.size;
+
+        let zeros_ps = _mm_setzero_ps();
+        let zeros = _mm_setzero_si128();
+
+        let v_cap_colors = _mm256_set1_epi16((max_colors as u16) as i16);
+
+        cx = convolve_32_items::<FMA>(
+            dst.as_chunks_mut::<32>().0,
+            bounds,
+            src,
+            src_stride,
+            weight,
+            bit_depth,
+            cx,
+        );
 
         let tail32 = dst.chunks_exact_mut(32).into_remainder();
         let iter16 = tail32.chunks_exact_mut(16);

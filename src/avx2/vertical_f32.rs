@@ -167,6 +167,42 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 j += 4;
             }
 
+            while j + 2 <= bounds.size {
+                let py = start_y + j;
+                let weights =
+                    _mm_castsi128_ps(_mm_loadu_epi64(filter.get_unchecked(j..).as_ptr().cast()));
+
+                let xw0 = _mm_shuffle_ps::<{ shuffle(0, 0, 0, 0) }>(weights, weights);
+                let xw1 = _mm_shuffle_ps::<{ shuffle(1, 1, 1, 1) }>(weights, weights);
+
+                let w0 = _mm256_setr_m128(xw0, xw0);
+                let w1 = _mm256_setr_m128(xw1, xw1);
+
+                let src_ptr = src.get_unchecked(src_stride * py + px..);
+
+                let item_row_0 = _mm256_loadu_ps(src_ptr.as_ptr());
+                let item_row_1 = _mm256_loadu_ps(src_ptr.get_unchecked(8..).as_ptr());
+                let item_row_2 = _mm256_loadu_ps(src_ptr.get_unchecked(16..).as_ptr());
+                let item_row_3 = _mm256_loadu_ps(src_ptr.get_unchecked(24..).as_ptr());
+
+                store_0 = _mm256_fma_ps::<FMA>(store_0, item_row_0, w0);
+                store_1 = _mm256_fma_ps::<FMA>(store_1, item_row_1, w0);
+                store_2 = _mm256_fma_ps::<FMA>(store_2, item_row_2, w0);
+                store_3 = _mm256_fma_ps::<FMA>(store_3, item_row_3, w0);
+
+                let item_row_0 = _mm256_loadu_ps(src_ptr.get_unchecked(src_stride..).as_ptr());
+                let item_row_1 = _mm256_loadu_ps(src_ptr.get_unchecked(src_stride + 8..).as_ptr());
+                let item_row_2 = _mm256_loadu_ps(src_ptr.get_unchecked(src_stride + 16..).as_ptr());
+                let item_row_3 = _mm256_loadu_ps(src_ptr.get_unchecked(src_stride + 24..).as_ptr());
+
+                store_0 = _mm256_fma_ps::<FMA>(store_0, item_row_0, w1);
+                store_1 = _mm256_fma_ps::<FMA>(store_1, item_row_1, w1);
+                store_2 = _mm256_fma_ps::<FMA>(store_2, item_row_2, w1);
+                store_3 = _mm256_fma_ps::<FMA>(store_3, item_row_3, w1);
+
+                j += 2;
+            }
+
             for j in j..bounds.size {
                 let py = start_y + j;
                 let weight = filter.get_unchecked(j);
