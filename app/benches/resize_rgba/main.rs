@@ -466,7 +466,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             .plan_rgba_resampling16(
                 store.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
-                true,
+                false,
                 16,
             )
             .unwrap();
@@ -614,7 +614,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             .plan_rgba_resampling_f16(
                 store.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
-                true,
+                false,
             )
             .unwrap();
         let mut scratch = resampler.alloc_scratch();
