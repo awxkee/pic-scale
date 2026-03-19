@@ -225,8 +225,11 @@ fn convolve_column_lb_32<const HAS_DOT: bool>(
                 j += 4;
             }
 
-            for (j, &k_weight) in weights.iter().take(bounds_size).enumerate() {
-                let py = bounds.start + j;
+            let weights = &weights[j..bounds_size];
+            let sj = j + bounds.start;
+
+            for (j, &k_weight) in weights.iter().enumerate() {
+                let py = sj + j;
                 let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
 
                 let v_weight = _mm256_set1_epi16(k_weight);
