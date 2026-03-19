@@ -52,7 +52,7 @@ pub(crate) unsafe fn _mm_fma_pd<const FMA: bool>(a: __m128d, b: __m128d, c: __m1
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm256_fma_ps<const FMA: bool>(a: __m256, b: __m256, c: __m256) -> __m256 {
+pub(crate) fn _mm256_fma_ps<const FMA: bool>(a: __m256, b: __m256, c: __m256) -> __m256 {
     unsafe {
         if FMA {
             _mm256_fma_psx(a, b, c)
@@ -63,7 +63,7 @@ pub(crate) unsafe fn _mm256_fma_ps<const FMA: bool>(a: __m256, b: __m256, c: __m
 }
 
 #[inline(always)]
-unsafe fn _mm256_fma_psx(a: __m256, b: __m256, c: __m256) -> __m256 {
+fn _mm256_fma_psx(a: __m256, b: __m256, c: __m256) -> __m256 {
     unsafe { _mm256_fmadd_ps(b, c, a) }
 }
 

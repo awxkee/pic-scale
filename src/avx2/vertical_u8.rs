@@ -312,7 +312,7 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
     }
 
     #[inline(always)]
-    unsafe fn convolve_vertical_part_avx_32(
+    fn convolve_vertical_part_avx_32(
         &self,
         start_y: usize,
         start_x: usize,
@@ -423,33 +423,29 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
         let total_width = dst.len();
 
         while cx + 64 < total_width {
-            unsafe {
-                self.convolve_vertical_part_avx_64(
-                    bounds.start,
-                    cx,
-                    src,
-                    src_stride,
-                    dst,
-                    weights,
-                    bounds,
-                );
-            }
+            self.convolve_vertical_part_avx_64(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weights,
+                bounds,
+            );
 
             cx += 64;
         }
 
         while cx + 32 < total_width {
-            unsafe {
-                self.convolve_vertical_part_avx_32(
-                    bounds.start,
-                    cx,
-                    src,
-                    src_stride,
-                    dst,
-                    weights,
-                    bounds,
-                );
-            }
+            self.convolve_vertical_part_avx_32(
+                bounds.start,
+                cx,
+                src,
+                src_stride,
+                dst,
+                weights,
+                bounds,
+            );
 
             cx += 32;
         }

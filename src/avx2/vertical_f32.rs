@@ -27,11 +27,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::avx2::utils::{_mm_prefer_fma_ps, _mm256_fma_ps};
+use crate::avx2::utils::{_mm_prefer_fma_ps, _mm256_fma_ps, shuffle};
 use crate::filter_weights::FilterBounds;
 use std::arch::x86_64::*;
 
-#[inline]
 pub(crate) fn convolve_vertical_avx_row_f32<const FMA: bool>(
     width: usize,
     bounds: &FilterBounds,
@@ -52,7 +51,7 @@ pub(crate) fn convolve_vertical_avx_row_f32<const FMA: bool>(
 
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_vertical_avx_row_f32_regular(
+fn convolve_vertical_avx_row_f32_regular(
     width: usize,
     bounds: &FilterBounds,
     src: &[f32],
@@ -60,15 +59,13 @@ unsafe fn convolve_vertical_avx_row_f32_regular(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    unsafe {
-        let unit = ExecutionUnit::<false>::default();
-        unit.pass(width, bounds, src, dst, src_stride, weight_ptr);
-    }
+    let unit = ExecutionUnit::<false>::default();
+    unit.pass(width, bounds, src, dst, src_stride, weight_ptr);
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_vertical_avx_row_f32_fma(
+fn convolve_vertical_avx_row_f32_fma(
     width: usize,
     bounds: &FilterBounds,
     src: &[f32],
@@ -76,10 +73,8 @@ unsafe fn convolve_vertical_avx_row_f32_fma(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    unsafe {
-        let unit = ExecutionUnit::<true>::default();
-        unit.pass(width, bounds, src, dst, src_stride, weight_ptr);
-    }
+    let unit = ExecutionUnit::<true>::default();
+    unit.pass(width, bounds, src, dst, src_stride, weight_ptr);
 }
 
 #[derive(Copy, Clone, Default)]
@@ -87,7 +82,7 @@ struct ExecutionUnit<const FMA: bool> {}
 
 impl<const FMA: bool> ExecutionUnit<FMA> {
     #[inline(always)]
-    unsafe fn convolve_vertical_part_avx_32_f32(
+    fn convolve_vertical_part_avx_32_f32(
         &self,
         start_y: usize,
         start_x: usize,
@@ -105,7 +100,74 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
 
             let px = start_x;
 
-            for j in 0..bounds.size {
+            let mut j = 0usize;
+
+            while j + 4 < bounds.size {
+                let py = start_y + j;
+                let weights = _mm_loadu_ps(filter.get_unchecked(j..).as_ptr());
+
+                let xw0 = _mm_shuffle_ps::<{ shuffle(0, 0, 0, 0) }>(weights, weights);
+                let xw1 = _mm_shuffle_ps::<{ shuffle(1, 1, 1, 1) }>(weights, weights);
+                let xw2 = _mm_shuffle_ps::<{ shuffle(2, 2, 2, 2) }>(weights, weights);
+                let xw3 = _mm_shuffle_ps::<{ shuffle(3, 3, 3, 3) }>(weights, weights);
+
+                let w0 = _mm256_setr_m128(xw0, xw0);
+                let w1 = _mm256_setr_m128(xw1, xw1);
+                let w2 = _mm256_setr_m128(xw2, xw2);
+                let w3 = _mm256_setr_m128(xw3, xw3);
+
+                let src_ptr = src.get_unchecked(src_stride * py + px..);
+
+                let item_row_0 = _mm256_loadu_ps(src_ptr.as_ptr());
+                let item_row_1 = _mm256_loadu_ps(src_ptr.get_unchecked(8..).as_ptr());
+                let item_row_2 = _mm256_loadu_ps(src_ptr.get_unchecked(16..).as_ptr());
+                let item_row_3 = _mm256_loadu_ps(src_ptr.get_unchecked(24..).as_ptr());
+
+                store_0 = _mm256_fma_ps::<FMA>(store_0, item_row_0, w0);
+                store_1 = _mm256_fma_ps::<FMA>(store_1, item_row_1, w0);
+                store_2 = _mm256_fma_ps::<FMA>(store_2, item_row_2, w0);
+                store_3 = _mm256_fma_ps::<FMA>(store_3, item_row_3, w0);
+
+                let item_row_0 = _mm256_loadu_ps(src_ptr.get_unchecked(src_stride..).as_ptr());
+                let item_row_1 = _mm256_loadu_ps(src_ptr.get_unchecked(src_stride + 8..).as_ptr());
+                let item_row_2 = _mm256_loadu_ps(src_ptr.get_unchecked(src_stride + 16..).as_ptr());
+                let item_row_3 = _mm256_loadu_ps(src_ptr.get_unchecked(src_stride + 24..).as_ptr());
+
+                store_0 = _mm256_fma_ps::<FMA>(store_0, item_row_0, w1);
+                store_1 = _mm256_fma_ps::<FMA>(store_1, item_row_1, w1);
+                store_2 = _mm256_fma_ps::<FMA>(store_2, item_row_2, w1);
+                store_3 = _mm256_fma_ps::<FMA>(store_3, item_row_3, w1);
+
+                let item_row_0 = _mm256_loadu_ps(src_ptr.get_unchecked(src_stride * 2..).as_ptr());
+                let item_row_1 =
+                    _mm256_loadu_ps(src_ptr.get_unchecked(src_stride * 2 + 8..).as_ptr());
+                let item_row_2 =
+                    _mm256_loadu_ps(src_ptr.get_unchecked(src_stride * 2 + 16..).as_ptr());
+                let item_row_3 =
+                    _mm256_loadu_ps(src_ptr.get_unchecked(src_stride * 2 + 24..).as_ptr());
+
+                store_0 = _mm256_fma_ps::<FMA>(store_0, item_row_0, w2);
+                store_1 = _mm256_fma_ps::<FMA>(store_1, item_row_1, w2);
+                store_2 = _mm256_fma_ps::<FMA>(store_2, item_row_2, w2);
+                store_3 = _mm256_fma_ps::<FMA>(store_3, item_row_3, w2);
+
+                let item_row_0 = _mm256_loadu_ps(src_ptr.get_unchecked(src_stride * 3..).as_ptr());
+                let item_row_1 =
+                    _mm256_loadu_ps(src_ptr.get_unchecked(src_stride * 3 + 8..).as_ptr());
+                let item_row_2 =
+                    _mm256_loadu_ps(src_ptr.get_unchecked(src_stride * 3 + 16..).as_ptr());
+                let item_row_3 =
+                    _mm256_loadu_ps(src_ptr.get_unchecked(src_stride * 3 + 24..).as_ptr());
+
+                store_0 = _mm256_fma_ps::<FMA>(store_0, item_row_0, w3);
+                store_1 = _mm256_fma_ps::<FMA>(store_1, item_row_1, w3);
+                store_2 = _mm256_fma_ps::<FMA>(store_2, item_row_2, w3);
+                store_3 = _mm256_fma_ps::<FMA>(store_3, item_row_3, w3);
+
+                j += 4;
+            }
+
+            for j in j..bounds.size {
                 let py = start_y + j;
                 let weight = filter.get_unchecked(j);
                 let v_weight = _mm256_broadcast_ss(weight);
@@ -130,7 +192,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
     }
 
     #[inline(always)]
-    unsafe fn convolve_vertical_part_avx_8_f32(
+    fn convolve_vertical_part_avx_8_f32(
         &self,
         start_y: usize,
         start_x: usize,
@@ -161,7 +223,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
     }
 
     #[inline(always)]
-    unsafe fn convolve_vertical_part_avx_16_f32(
+    fn convolve_vertical_part_avx_16_f32(
         &self,
         start_y: usize,
         start_x: usize,
@@ -197,7 +259,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
     }
 
     #[inline(always)]
-    unsafe fn convolve_vertical_part_avx_f32(
+    fn convolve_vertical_part_avx_f32(
         &self,
         start_y: usize,
         start_x: usize,
@@ -229,7 +291,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
     }
 
     #[inline(always)]
-    unsafe fn pass(
+    fn pass(
         &self,
         _: usize,
         bounds: &FilterBounds,
