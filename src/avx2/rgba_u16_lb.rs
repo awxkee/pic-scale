@@ -449,29 +449,25 @@ pub(crate) fn convolve_horizontal_rgba_avx_u16lp_row(
 
 #[cfg(feature = "avx512")]
 #[target_feature(enable = "avxvnni", enable = "avx2")]
-unsafe fn convolve_horizontal_rgba_avx_u16_row_vn(
+fn convolve_horizontal_rgba_avx_u16_row_vn(
     src: &[u16],
     dst: &mut [u16],
     filter_weights: &FilterWeights<i16>,
     bit_depth: u32,
 ) {
-    unsafe {
-        let unit = OneRowExecutionUnit::<true>::default();
-        unit.pass(src, dst, filter_weights, bit_depth);
-    }
+    let unit = OneRowExecutionUnit::<true>::default();
+    unit.pass(src, dst, filter_weights, bit_depth);
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn convolve_horizontal_rgba_avx_u16_row_avx(
+fn convolve_horizontal_rgba_avx_u16_row_avx(
     src: &[u16],
     dst: &mut [u16],
     filter_weights: &FilterWeights<i16>,
     bit_depth: u32,
 ) {
-    unsafe {
-        let unit = OneRowExecutionUnit::<false>::default();
-        unit.pass(src, dst, filter_weights, bit_depth);
-    }
+    let unit = OneRowExecutionUnit::<false>::default();
+    unit.pass(src, dst, filter_weights, bit_depth);
 }
 
 #[derive(Copy, Clone, Default)]
@@ -479,7 +475,7 @@ struct OneRowExecutionUnit<const D: bool> {}
 
 impl<const D: bool> OneRowExecutionUnit<D> {
     #[inline(always)]
-    unsafe fn pass(
+    fn pass(
         &self,
         src: &[u16],
         dst: &mut [u16],
