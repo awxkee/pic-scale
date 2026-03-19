@@ -1,9 +1,11 @@
 #![feature(f16)]
+mod acc;
 mod merge;
 mod split;
 
 use std::time::Instant;
 
+use crate::acc::resize_with_accelerate;
 use core::f16;
 use fast_image_resize::images::Image;
 use fast_image_resize::{
@@ -34,7 +36,7 @@ fn main() {
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
 
-    let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
     // scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
@@ -54,6 +56,7 @@ fn main() {
         dimensions.1 as usize / 4,
         8,
     );
+    // resize_with_accelerate(& store, &mut dst_store);
     resizing_plan.resample(&store, &mut dst_store).unwrap();
     // scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
     //

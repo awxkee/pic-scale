@@ -248,7 +248,7 @@ fn convolve_16_items(
     bounds: &FilterBounds,
     src: &[u8],
     src_stride: usize,
-    weight: &[i16],
+    weights: &[i16],
     cx: usize,
 ) -> usize {
     let mut cx = cx;
@@ -264,9 +264,43 @@ fn convolve_16_items(
 
         let px = cx;
 
-        for j in 0..bounds.size {
+        let mut j = 0usize;
+        while j + 4 <= bounds.size {
             let py = bounds.start + j;
-            let weight = unsafe { weight.get_unchecked(j..) };
+            let weight = unsafe { vld1_s16(weights.get_unchecked(j..).as_ptr()) };
+            let src_ptr = unsafe { src.get_unchecked((src_stride * py + px)..) };
+            let item_row = unsafe { vld1q_u8(src_ptr.as_ptr()) };
+            let item_row1 = unsafe { vld1q_u8(src_ptr.get_unchecked(src_stride..).as_ptr()) };
+            let item_row2 = unsafe { vld1q_u8(src_ptr.get_unchecked(src_stride * 2..).as_ptr()) };
+            let item_row3 = unsafe { vld1q_u8(src_ptr.get_unchecked(src_stride * 3..).as_ptr()) };
+
+            (store_0, store_1) = vdot_lane::<SCALE, 0>(store_0, store_1, item_row, weight);
+            (store_0, store_1) = vdot_lane::<SCALE, 1>(store_0, store_1, item_row1, weight);
+            (store_0, store_1) = vdot_lane::<SCALE, 2>(store_0, store_1, item_row2, weight);
+            (store_0, store_1) = vdot_lane::<SCALE, 3>(store_0, store_1, item_row3, weight);
+            j += 4;
+        }
+
+        while j + 2 <= bounds.size {
+            let py = bounds.start + j;
+            let weight = unsafe {
+                vreinterpret_s16_u32(vld1_lane_u32::<0>(
+                    weights.get_unchecked(j..).as_ptr().cast(),
+                    vdup_n_u32(0),
+                ))
+            };
+            let src_ptr = unsafe { src.get_unchecked((src_stride * py + px)..) };
+            let item_row = unsafe { vld1q_u8(src_ptr.as_ptr()) };
+            let item_row1 = unsafe { vld1q_u8(src_ptr.get_unchecked(src_stride..).as_ptr()) };
+
+            (store_0, store_1) = vdot_lane::<SCALE, 0>(store_0, store_1, item_row, weight);
+            (store_0, store_1) = vdot_lane::<SCALE, 1>(store_0, store_1, item_row1, weight);
+            j += 2;
+        }
+
+        for j in j..bounds.size {
+            let py = bounds.start + j;
+            let weight = unsafe { weights.get_unchecked(j..) };
             let v_weight = unsafe { vld1q_dup_s16(weight.as_ptr()) };
             let src_ptr = unsafe { src.get_unchecked((src_stride * py + px)..) };
             let item_row = unsafe { vld1q_u8(src_ptr.as_ptr()) };

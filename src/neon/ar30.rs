@@ -283,7 +283,7 @@ pub(crate) fn vunzip_3_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
 // }
 
 #[inline(always)]
-pub(crate) unsafe fn vunzip_3_ar30_separate<const AR30_TYPE: usize, const AR30_ORDER: usize>(
+pub(crate) fn vunzip_3_ar30_separate<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: uint32x4x2_t,
 ) -> int16x8x4_t {
     unsafe {
@@ -301,7 +301,7 @@ pub(crate) unsafe fn vunzip_3_ar30_separate<const AR30_TYPE: usize, const AR30_O
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vunzips_4_ar30_separate<const AR30_TYPE: usize, const AR30_ORDER: usize>(
+pub(crate) fn vunzips_4_ar30_separate<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: uint32x4_t,
 ) -> int16x8x2_t {
     unsafe {
@@ -407,7 +407,7 @@ pub(crate) unsafe fn vld1_ar30_s16<const AR30_TYPE: usize, const AR30_ORDER: usi
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vextract_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
+pub(crate) fn vextract_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: uint16x4_t,
 ) -> uint32x2_t {
     unsafe {

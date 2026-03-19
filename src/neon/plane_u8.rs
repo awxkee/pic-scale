@@ -33,7 +33,7 @@ use std::arch::aarch64::*;
 
 #[must_use]
 #[inline(always)]
-unsafe fn accumulate_16_horiz<const D: bool>(
+fn accumulate_16_horiz<const D: bool>(
     store: int32x4_t,
     ptr: &[u8],
     weights: int16x8x2_t,
@@ -54,11 +54,7 @@ unsafe fn accumulate_16_horiz<const D: bool>(
 
 #[must_use]
 #[inline(always)]
-unsafe fn accumulate_8_horiz<const D: bool>(
-    store: int32x4_t,
-    ptr: &[u8],
-    weight: int16x8_t,
-) -> int32x4_t {
+fn accumulate_8_horiz<const D: bool>(store: int32x4_t, ptr: &[u8], weight: int16x8_t) -> int32x4_t {
     unsafe {
         let pixel_colors = vld1_u8(ptr.as_ptr());
         let px_16 = vreinterpretq_s16_u16(vmovl_u8(pixel_colors));
@@ -71,11 +67,7 @@ unsafe fn accumulate_8_horiz<const D: bool>(
 
 #[must_use]
 #[inline(always)]
-unsafe fn accumulate_4_horiz<const D: bool>(
-    store: int32x4_t,
-    ptr: &[u8],
-    weight: int16x4_t,
-) -> int32x4_t {
+fn accumulate_4_horiz<const D: bool>(store: int32x4_t, ptr: &[u8], weight: int16x4_t) -> int32x4_t {
     unsafe {
         let pixel_colors = vmovl_u8(vreinterpret_u8_u32(vld1_lane_u32::<0>(
             ptr.as_ptr() as *const u32,
@@ -88,11 +80,7 @@ unsafe fn accumulate_4_horiz<const D: bool>(
 
 #[must_use]
 #[inline(always)]
-unsafe fn accumulate_1_horiz<const D: bool>(
-    store: int32x4_t,
-    ptr: &[u8],
-    weight: int16x4_t,
-) -> int32x4_t {
+fn accumulate_1_horiz<const D: bool>(store: int32x4_t, ptr: &[u8], weight: int16x4_t) -> int32x4_t {
     unsafe {
         let pixel_colors = vmovl_u8(vld1_lane_u8::<0>(ptr.as_ptr(), vdup_n_u8(0)));
         let px_16 = vreinterpret_s16_u16(vget_low_u16(pixel_colors));
@@ -180,7 +168,7 @@ fn convolve_horizontal_plane_neon_rows_4_u8_impl<const D: bool, const PRECISION:
             let src2 = src1.get_unchecked(src_stride..);
             let src3 = src2.get_unchecked(src_stride..);
 
-            while jx + 16 < bounds.size {
+            while jx + 16 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = xvld1q_s16_x2(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
@@ -200,7 +188,7 @@ fn convolve_horizontal_plane_neon_rows_4_u8_impl<const D: bool, const PRECISION:
                 jx += 16;
             }
 
-            while jx + 8 < bounds.size {
+            while jx + 8 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1q_s16(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
@@ -220,7 +208,7 @@ fn convolve_horizontal_plane_neon_rows_4_u8_impl<const D: bool, const PRECISION:
                 jx += 8;
             }
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1_s16(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
@@ -323,7 +311,7 @@ fn convolve_horizontal_plane_neon_row_impl<const D: bool, const PRECISION: i32>(
             let mut jx = 0usize;
             let mut store = base_val;
 
-            while jx + 16 < bounds_size {
+            while jx + 16 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = xvld1q_s16_x2(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
@@ -334,7 +322,7 @@ fn convolve_horizontal_plane_neon_row_impl<const D: bool, const PRECISION: i32>(
                 jx += 16;
             }
 
-            while jx + 8 < bounds_size {
+            while jx + 8 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1q_s16(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
@@ -345,7 +333,7 @@ fn convolve_horizontal_plane_neon_row_impl<const D: bool, const PRECISION: i32>(
                 jx += 8;
             }
 
-            while jx + 4 < bounds_size {
+            while jx + 4 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1_s16(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;

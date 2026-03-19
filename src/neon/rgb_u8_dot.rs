@@ -92,7 +92,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4_dot(
 }
 
 #[target_feature(enable = "i8mm")]
-unsafe fn convolve_horizontal_rgb_neon_rows_4_impl(
+fn convolve_horizontal_rgb_neon_rows_4_impl(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -215,7 +215,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_row_one_dot(
 }
 
 #[target_feature(enable = "i8mm")]
-unsafe fn convolve_horizontal_rgb_neon_row_one_impl_dot(
+fn convolve_horizontal_rgb_neon_row_one_impl_dot(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i8>,

@@ -36,7 +36,7 @@ use std::arch::aarch64::*;
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_8_u8<const D: bool>(
+fn conv_horiz_rgba_8_u8<const D: bool>(
     start_x: usize,
     src: &[u8],
     weights: int16x8_t,
@@ -68,7 +68,7 @@ unsafe fn conv_horiz_rgba_8_u8<const D: bool>(
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_2_u8<const D: bool>(
+fn conv_horiz_rgba_2_u8<const D: bool>(
     start_x: usize,
     src: &[u8],
     weights: int16x4_t,
@@ -88,7 +88,7 @@ unsafe fn conv_horiz_rgba_2_u8<const D: bool>(
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_4_u8<const D: bool>(
+fn conv_horiz_rgba_4_u8<const D: bool>(
     start_x: usize,
     src: &[u8],
     weights: int16x4_t,
@@ -112,7 +112,7 @@ unsafe fn conv_horiz_rgba_4_u8<const D: bool>(
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_1_u8<const D: bool>(
+fn conv_horiz_rgba_1_u8<const D: bool>(
     start_x: usize,
     src: &[u8],
     w0: int16x4_t,

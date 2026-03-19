@@ -50,7 +50,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_row_one_f32_f64(
             let mut store0 = vdupq_n_f64(0.);
             let mut store1 = vdupq_n_f64(0.);
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let wz0 = vld1q_f64(ptr);
@@ -72,7 +72,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_row_one_f32_f64(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let wz = vld1q_f64(ptr);
@@ -142,7 +142,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_rows_4_f32_f64(
             let mut store_6 = zeros;
             let mut store_7 = zeros;
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let w0 = vld1q_f64(ptr);
                 let bounds_start = bounds.start + jx;

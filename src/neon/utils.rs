@@ -251,7 +251,7 @@ pub(crate) fn vxmlal_high_s16<const D: bool>(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vxmlal_high_laneq_s16<const D: bool, const LANE: i32>(
+pub(crate) fn vxmlal_high_laneq_s16<const D: bool, const LANE: i32>(
     a: int32x4_t,
     b: int16x8_t,
     c: int16x8_t,
@@ -266,7 +266,7 @@ pub(crate) unsafe fn vxmlal_high_laneq_s16<const D: bool, const LANE: i32>(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vxmlal_laneq_s16<const D: bool, const LANE: i32>(
+pub(crate) fn vxmlal_laneq_s16<const D: bool, const LANE: i32>(
     a: int32x4_t,
     b: int16x4_t,
     c: int16x8_t,

@@ -34,7 +34,7 @@ use std::arch::aarch64::*;
 #[must_use]
 #[inline]
 #[target_feature(enable = "rdm")]
-unsafe fn conv_horiz_rgb_4(
+fn conv_horiz_rgb_4(
     start_x: usize,
     src: &[u8],
     w0: int16x8_t,
@@ -66,7 +66,7 @@ unsafe fn conv_horiz_rgb_4(
 #[must_use]
 #[inline]
 #[target_feature(enable = "rdm")]
-unsafe fn conv_horiz_rgb_2(
+fn conv_horiz_rgb_2(
     start_x: usize,
     src: &[u8],
     weights: int16x8_t,
@@ -92,7 +92,7 @@ unsafe fn conv_horiz_rgb_2(
 #[must_use]
 #[inline]
 #[target_feature(enable = "rdm")]
-unsafe fn conv_hor_rgb_1(
+fn conv_hor_rgb_1(
     start_x: usize,
     src: &[u8],
     w0: int16x8_t,
@@ -142,7 +142,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_rdm_rows_4(
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn convolve_horizontal_rgb_neon_rdm_rows_4_impl(
+fn convolve_horizontal_rgb_neon_rdm_rows_4_impl(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -266,7 +266,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_rdm_row_one(
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn convolve_horizontal_rgb_neon_row_rdm_one_impl(
+fn convolve_horizontal_rgb_neon_row_rdm_one_impl(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,

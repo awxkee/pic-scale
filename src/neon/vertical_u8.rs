@@ -28,7 +28,8 @@
  */
 use crate::filter_weights::FilterBounds;
 use crate::neon::utils::{
-    vxmlal_high_lane_s16, vxmlal_high_s16, vxmlal_lane_s16, vxmlal_s16, xvld1q_u8_x2, xvst1q_u8_x2,
+    vxmlal_high_lane_s16, vxmlal_high_laneq_s16, vxmlal_high_s16, vxmlal_lane_s16,
+    vxmlal_laneq_s16, vxmlal_s16, xvld1q_u8_x2, xvst1q_u8_x2,
 };
 use std::arch::aarch64::*;
 
@@ -92,6 +93,28 @@ fn accumulate_4_into_lane<const D: bool, const W: i32>(
         let store_1 = vxmlal_high_lane_s16::<D, W>(store_1, low, weight);
         let store_2 = vxmlal_lane_s16::<D, W>(store_2, vget_low_s16(high), weight);
         let store_3 = vxmlal_high_lane_s16::<D, W>(store_3, high, weight);
+        (store_0, store_1, store_2, store_3)
+    }
+}
+
+#[must_use]
+#[inline(always)]
+fn accumulate_4_into_laneq<const D: bool, const W: i32>(
+    item: uint8x16_t,
+    store_0: int32x4_t,
+    store_1: int32x4_t,
+    store_2: int32x4_t,
+    store_3: int32x4_t,
+    weight: int16x8_t,
+) -> (int32x4_t, int32x4_t, int32x4_t, int32x4_t) {
+    unsafe {
+        let low = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(item)));
+        let high = vreinterpretq_s16_u16(vmovl_high_u8(item));
+
+        let store_0 = vxmlal_laneq_s16::<D, W>(store_0, vget_low_s16(low), weight);
+        let store_1 = vxmlal_high_laneq_s16::<D, W>(store_1, low, weight);
+        let store_2 = vxmlal_laneq_s16::<D, W>(store_2, vget_low_s16(high), weight);
+        let store_3 = vxmlal_high_laneq_s16::<D, W>(store_3, high, weight);
         (store_0, store_1, store_2, store_3)
     }
 }

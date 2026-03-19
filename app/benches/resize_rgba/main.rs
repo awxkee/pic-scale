@@ -1,4 +1,5 @@
 #![feature(f16)]
+use accelerate::kvImageNoFlags;
 use criterion::{criterion_group, criterion_main, Criterion};
 use fast_image_resize::images::Image;
 use fast_image_resize::FilterType::Lanczos3;
@@ -220,7 +221,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     c.bench_function("Apple Accelerate RGBA: Lanczos 3", |b| {
         let copied: Vec<u8> = Vec::from(src_bytes);
-        use accelerate::{kvImageDoNotTile, vImageScale_ARGB8888, vImage_Buffer};
+        use accelerate::{vImageScale_ARGB8888, vImage_Buffer};
         let mut target =
             ImageStoreMut::<u8, 4>::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
 
@@ -247,7 +248,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     &src_buffer,
                     &mut dst_buffer,
                     std::ptr::null_mut(),
-                    kvImageDoNotTile,
+                    kvImageNoFlags,
                 )
             };
             if result != 0 {

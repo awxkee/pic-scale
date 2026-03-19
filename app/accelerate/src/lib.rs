@@ -145,6 +145,16 @@ mod accelerate {
     #[allow(non_snake_case)]
     #[allow(non_upper_case_globals)]
     pub const kvImageDoNotTile: libc::c_uint = 16;
+
+    #[allow(non_camel_case_types)]
+    #[allow(non_snake_case)]
+    #[allow(non_upper_case_globals)]
+    pub const kvImageLeaveAlphaUnchanged: libc::c_uint = 1 << 1;
+
+    #[allow(non_camel_case_types)]
+    #[allow(non_snake_case)]
+    #[allow(non_upper_case_globals)]
+    pub const kvImageHighQualityResampling: libc::c_uint = 1 << 2;
 }
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]

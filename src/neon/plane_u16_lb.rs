@@ -31,12 +31,7 @@ use std::arch::aarch64::*;
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_1_u16(
-    start_x: usize,
-    src: &[u16],
-    w0: int16x4_t,
-    store: int32x4_t,
-) -> int32x4_t {
+fn conv_horiz_1_u16(start_x: usize, src: &[u16], w0: int16x4_t, store: int32x4_t) -> int32x4_t {
     unsafe {
         const CN: usize = 1;
         let src_ptr = src.get_unchecked((start_x * CN)..);
@@ -47,12 +42,7 @@ unsafe fn conv_horiz_1_u16(
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_2_u16(
-    start_x: usize,
-    src: &[u16],
-    w0: int16x4_t,
-    store: int32x4_t,
-) -> int32x4_t {
+fn conv_horiz_2_u16(start_x: usize, src: &[u16], w0: int16x4_t, store: int32x4_t) -> int32x4_t {
     unsafe {
         const CN: usize = 1;
         let src_ptr = src.get_unchecked((start_x * CN)..);
@@ -68,7 +58,7 @@ unsafe fn conv_horiz_2_u16(
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_4_u16(
+fn conv_horiz_4_u16(
     start_x: usize,
     src: &[u16],
     weights: int16x4_t,
@@ -155,7 +145,7 @@ pub(crate) fn convolve_horizontal_plane_neon_rows_4_lb_u16(
             let src2 = src1.get_unchecked(src_stride..);
             let src3 = src2.get_unchecked(src_stride..);
 
-            while jx + 8 < bounds_size {
+            while jx + 8 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights_set = vld1q_s16(w_ptr.as_ptr());
@@ -166,7 +156,7 @@ pub(crate) fn convolve_horizontal_plane_neon_rows_4_lb_u16(
                 jx += 8;
             }
 
-            while jx + 4 < bounds_size {
+            while jx + 4 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1_s16(w_ptr.as_ptr());
@@ -236,7 +226,7 @@ pub(crate) fn convolve_horizontal_plane_neon_u16_lb_row(
             let mut jx = 0usize;
             let mut store = vdupq_n_s32(ROUNDING_CONST);
 
-            while jx + 8 < bounds_size {
+            while jx + 8 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights_set = vld1q_s16(w_ptr.as_ptr());
@@ -244,7 +234,7 @@ pub(crate) fn convolve_horizontal_plane_neon_u16_lb_row(
                 jx += 8;
             }
 
-            while jx + 4 < bounds_size {
+            while jx + 4 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1_s16(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
@@ -252,7 +242,7 @@ pub(crate) fn convolve_horizontal_plane_neon_u16_lb_row(
                 jx += 4;
             }
 
-            while jx + 2 < bounds_size {
+            while jx + 2 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let w0 = vreinterpret_s16_s32(vld1_lane_s32::<0>(
