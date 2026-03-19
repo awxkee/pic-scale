@@ -26,16 +26,13 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+use crate::colors::common_splitter::{SplitPlanInterceptor, Splitter};
 use crate::mixed_storage::CpuRound;
-use crate::scaler::{Scaling, ScalingF32};
-use crate::support::check_image_size_overflow;
-use crate::validation::{PicScaleError, try_vec};
-use crate::{
-    ImageStore, ImageStoreMut, ImageStoreScaling, ResamplingFunction, Scaler, ScalingOptions,
-    ScalingU16, ThreadingPolicy,
-};
+use crate::plan::Resampling;
+use crate::validation::PicScaleError;
+use crate::{ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy};
 use colorutils_rs::TransferFunction;
+use std::sync::Arc;
 
 #[derive(Debug, Copy, Clone)]
 /// Converts image to linear f32 components scales it and convert back.
@@ -70,6 +67,165 @@ impl LinearScaler {
     }
 }
 
+struct Common8BitSplitter<const N: usize> {
+    linearization: Box<[f32; 256]>,
+    gamma: Box<[u8; 65536]>,
+    has_alpha: bool,
+}
+
+impl<const N: usize> Splitter<u8, f32, N> for Common8BitSplitter<N> {
+    fn split(&self, from: &ImageStore<'_, u8, N>, into: &mut ImageStoreMut<'_, f32, N>) {
+        const S: f32 = 1. / 255.;
+        if N == 4 {
+            for (src, dst) in from
+                .as_bytes()
+                .chunks_exact(4)
+                .zip(into.buffer.borrow_mut().chunks_exact_mut(4))
+            {
+                dst[0] = self.linearization[src[0] as usize];
+                dst[1] = self.linearization[src[1] as usize];
+                dst[2] = self.linearization[src[2] as usize];
+                dst[3] = src[3] as f32 * S;
+            }
+        } else if N == 2 && self.has_alpha {
+            for (src, dst) in from
+                .as_bytes()
+                .chunks_exact(2)
+                .zip(into.buffer.borrow_mut().chunks_exact_mut(2))
+            {
+                dst[0] = self.linearization[src[0] as usize];
+                dst[1] = src[1] as f32 * S;
+            }
+        } else {
+            for (&src, dst) in from.as_bytes().iter().zip(into.buffer.borrow_mut()) {
+                *dst = self.linearization[src as usize];
+            }
+        }
+    }
+
+    fn merge(&self, from: &ImageStore<'_, f32, N>, into: &mut ImageStoreMut<'_, u8, N>) {
+        if N == 4 {
+            for (src, dst) in from
+                .as_bytes()
+                .chunks_exact(4)
+                .zip(into.buffer.borrow_mut().chunks_exact_mut(4))
+            {
+                let v0 = (src[0] * 65535.).cpu_round() as u16;
+                let v1 = (src[1] * 65535.).cpu_round() as u16;
+                let v2 = (src[2] * 65535.).cpu_round() as u16;
+
+                dst[0] = self.gamma[v0 as usize];
+                dst[1] = self.gamma[v1 as usize];
+                dst[2] = self.gamma[v2 as usize];
+                dst[3] = (src[3] * 255.).cpu_round() as u8;
+            }
+        } else if N == 2 && self.has_alpha {
+            for (src, dst) in from
+                .as_bytes()
+                .chunks_exact(2)
+                .zip(into.buffer.borrow_mut().chunks_exact_mut(2))
+            {
+                let v0 = (src[0] * 65535.).cpu_round() as u16;
+
+                dst[0] = self.gamma[v0 as usize];
+                dst[1] = (src[1] * 255.).cpu_round() as u8;
+            }
+        } else {
+            for (&src, dst) in from.as_bytes().iter().zip(into.buffer.borrow_mut()) {
+                let v = (src * 65535.).cpu_round() as u16;
+                *dst = self.gamma[v as usize];
+            }
+        }
+    }
+}
+
+struct Common16BitSplitter<const N: usize> {
+    linearization: Box<[f32; 65536]>,
+    gamma: Box<[u16; 262144]>,
+    has_alpha: bool,
+    bit_depth: usize,
+}
+
+impl<const N: usize> Splitter<u16, f32, N> for Common16BitSplitter<N> {
+    fn split(&self, from: &ImageStore<'_, u16, N>, into: &mut ImageStoreMut<'_, f32, N>) {
+        if N == 4 {
+            let max_bit_depth_value = ((1u32 << self.bit_depth) - 1) as f32;
+
+            let v_recip = 1. / max_bit_depth_value;
+
+            for (src, dst) in from
+                .as_bytes()
+                .chunks_exact(4)
+                .zip(into.buffer.borrow_mut().chunks_exact_mut(4))
+            {
+                dst[0] = self.linearization[src[0] as usize];
+                dst[1] = self.linearization[src[1] as usize];
+                dst[2] = self.linearization[src[2] as usize];
+                dst[3] = src[3] as f32 * v_recip;
+            }
+        } else if N == 2 && self.has_alpha {
+            let max_bit_depth_value = ((1u32 << self.bit_depth) - 1) as f32;
+            let v_recip = 1. / max_bit_depth_value;
+
+            for (src, dst) in from
+                .as_bytes()
+                .chunks_exact(2)
+                .zip(into.buffer.borrow_mut().chunks_exact_mut(2))
+            {
+                dst[0] = self.linearization[src[0] as usize];
+                dst[1] = src[1] as f32 * v_recip;
+            }
+        } else {
+            for (&src, dst) in from.as_bytes().iter().zip(into.buffer.borrow_mut()) {
+                *dst = self.linearization[src as usize];
+            }
+        }
+    }
+
+    fn merge(&self, from: &ImageStore<'_, f32, N>, into: &mut ImageStoreMut<'_, u16, N>) {
+        if N == 4 {
+            let max_bit_depth_value = ((1u32 << self.bit_depth) - 1) as f32;
+            for (src, dst) in from
+                .as_bytes()
+                .chunks_exact(4)
+                .zip(into.buffer.borrow_mut().chunks_exact_mut(4))
+            {
+                let v0 = ((src[0] * 262143.).cpu_round().max(0.) as u32).min(262143);
+                let v1 = ((src[1] * 262143.).cpu_round().max(0.) as u32).min(262143);
+                let v2 = ((src[2] * 262143.).cpu_round().max(0.) as u32).min(262143);
+
+                dst[0] = self.gamma[v0 as usize];
+                dst[1] = self.gamma[v1 as usize];
+                dst[2] = self.gamma[v2 as usize];
+                dst[3] = (src[3] * max_bit_depth_value)
+                    .cpu_round()
+                    .min(max_bit_depth_value)
+                    .max(0.) as u16;
+            }
+        } else if N == 2 && self.has_alpha {
+            let max_bit_depth_value = ((1u32 << self.bit_depth) - 1) as f32;
+            for (src, dst) in from
+                .as_bytes()
+                .chunks_exact(2)
+                .zip(into.buffer.borrow_mut().chunks_exact_mut(2))
+            {
+                let v0 = ((src[0] * 262143.).cpu_round().max(0.) as u32).min(262143);
+
+                dst[0] = self.gamma[v0 as usize];
+                dst[1] = (src[1] * max_bit_depth_value)
+                    .cpu_round()
+                    .min(max_bit_depth_value)
+                    .max(0.) as u16;
+            }
+        } else {
+            for (&src, dst) in from.as_bytes().iter().zip(into.buffer.borrow_mut()) {
+                let v = ((src * 262143.).cpu_round().max(0.) as u32).min(262143);
+                *dst = self.gamma[v as usize];
+            }
+        }
+    }
+}
+
 struct Linearization {
     linearization: Box<[f32; 256]>,
     gamma: Box<[u8; 65536]>,
@@ -92,12 +248,16 @@ fn make_linearization16(
     let keep_max = 1u32 << bit_depth;
     let mut gamma = Box::new([0u16; 262144]);
 
+    let rcp_bit_depth = 1. / max_lin_depth as f32;
+
     for (i, dst) in linearizing.iter_mut().take(keep_max as usize).enumerate() {
-        *dst = transfer_function.linearize(i as f32 / max_lin_depth as f32);
+        *dst = transfer_function.linearize(i as f32 * rcp_bit_depth);
     }
 
+    const RCP_LUT_CAP: f32 = 1. / 262143.;
+
     for (i, dst) in gamma.iter_mut().enumerate() {
-        *dst = (transfer_function.gamma(i as f32 / 262143.) * max_lin_depth as f32)
+        *dst = (transfer_function.gamma(i as f32 * RCP_LUT_CAP) * max_lin_depth as f32)
             .cpu_round()
             .min(max_lin_depth as f32) as u16;
     }
@@ -112,12 +272,16 @@ fn make_linearization(transfer_function: TransferFunction) -> Linearization {
     let mut linearizing = Box::new([0f32; 256]);
     let mut gamma = Box::new([0u8; 65536]);
 
+    const S: f32 = 1. / 255.;
+
     for (i, dst) in linearizing.iter_mut().enumerate() {
-        *dst = transfer_function.linearize(i as f32 / 255.);
+        *dst = transfer_function.linearize(i as f32 * S);
     }
 
+    const RCP_LUT_CAP: f32 = 1. / 65535.;
+
     for (i, dst) in gamma.iter_mut().enumerate() {
-        *dst = (transfer_function.gamma(i as f32 / 65535.) * 255.)
+        *dst = (transfer_function.gamma(i as f32 * RCP_LUT_CAP) * 255.)
             .cpu_round()
             .min(255.) as u8;
     }
@@ -128,561 +292,237 @@ fn make_linearization(transfer_function: TransferFunction) -> Linearization {
     }
 }
 
-fn resize_typical8<'a, const CN: usize>(
-    resampling_function: ResamplingFunction,
-    transfer_function: TransferFunction,
-    threading_policy: ThreadingPolicy,
-    store: &ImageStore<'a, u8, CN>,
-    into: &mut ImageStoreMut<'a, u8, CN>,
-) -> Result<(), PicScaleError>
-where
-    ImageStore<'a, f32, CN>: ImageStoreScaling<'a, f32, CN>,
-{
-    let new_size = into.get_size();
-    into.validate()?;
-    store.validate()?;
-    if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
-        return Err(PicScaleError::ZeroImageDimensions);
-    }
-
-    if check_image_size_overflow(store.width, store.height, store.channels) {
-        return Err(PicScaleError::SourceImageIsTooLarge);
-    }
-
-    if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
-        return Err(PicScaleError::DestinationImageIsTooLarge);
-    }
-
-    if store.width == new_size.width && store.height == new_size.height {
-        store.copied_to_mut(into);
-        return Ok(());
-    }
-
-    let mut target_vertical = try_vec![f32::default(); store.width * store.height * CN];
-
-    let mut linear_store =
-        ImageStoreMut::<f32, CN>::from_slice(&mut target_vertical, store.width, store.height)?;
-
-    let linearization = make_linearization(transfer_function);
-
-    for (&src, dst) in store
-        .as_bytes()
-        .iter()
-        .zip(linear_store.buffer.borrow_mut())
-    {
-        *dst = linearization.linearization[src as usize];
-    }
-
-    let new_immutable_store = ImageStore::<f32, CN> {
-        buffer: std::borrow::Cow::Owned(target_vertical),
-        channels: CN,
-        width: store.width,
-        height: store.height,
-        stride: store.width * CN,
-        bit_depth: 12,
-    };
-
-    let mut new_store =
-        ImageStoreMut::<f32, CN>::try_alloc_with_depth(into.width, into.height, 12)?;
-
-    new_immutable_store.scale(
-        &mut new_store,
-        ScalingOptions {
-            resampling_function,
-            threading_policy,
-            ..Default::default()
-        },
-    )?;
-
-    for (&src, dst) in new_store.as_bytes().iter().zip(into.buffer.borrow_mut()) {
-        let v = (src * 65535.).cpu_round().min(65535.).max(0.) as u16;
-        *dst = linearization.gamma[v as usize];
-    }
-
-    Ok(())
-}
-
-fn resize_typical16<'a, const CN: usize>(
-    resampling_function: ResamplingFunction,
-    transfer_function: TransferFunction,
-    threading_policy: ThreadingPolicy,
-    store: &ImageStore<'a, u16, CN>,
-    into: &mut ImageStoreMut<'a, u16, CN>,
-) -> Result<(), PicScaleError>
-where
-    ImageStore<'a, f32, CN>: ImageStoreScaling<'a, f32, CN>,
-{
-    let new_size = into.get_size();
-    into.validate()?;
-    store.validate()?;
-    if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
-        return Err(PicScaleError::ZeroImageDimensions);
-    }
-
-    if check_image_size_overflow(store.width, store.height, store.channels) {
-        return Err(PicScaleError::SourceImageIsTooLarge);
-    }
-
-    if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
-        return Err(PicScaleError::DestinationImageIsTooLarge);
-    }
-
-    if store.width == new_size.width && store.height == new_size.height {
-        store.copied_to_mut(into);
-        return Ok(());
-    }
-
-    let mut target_vertical = try_vec![f32::default(); store.width * store.height * CN];
-
-    let mut linear_store =
-        ImageStoreMut::<f32, CN>::from_slice(&mut target_vertical, store.width, store.height)?;
-
-    let linearization = make_linearization16(transfer_function, into.bit_depth)?;
-
-    for (&src, dst) in store
-        .as_bytes()
-        .iter()
-        .zip(linear_store.buffer.borrow_mut())
-    {
-        *dst = linearization.linearization[src as usize];
-    }
-
-    let new_immutable_store = ImageStore::<f32, CN> {
-        buffer: std::borrow::Cow::Owned(target_vertical),
-        channels: CN,
-        width: store.width,
-        height: store.height,
-        stride: store.width * CN,
-        bit_depth: 16,
-    };
-
-    let mut new_store = ImageStoreMut::<f32, CN>::try_alloc(into.width, into.height)?;
-
-    new_immutable_store.scale(
-        &mut new_store,
-        ScalingOptions {
-            resampling_function,
-            threading_policy,
-            ..Default::default()
-        },
-    )?;
-
-    for (&src, dst) in new_store.as_bytes().iter().zip(into.buffer.borrow_mut()) {
-        let v = ((src * 262143.).cpu_round().max(0.) as u32).min(262143);
-        *dst = linearization.gamma[v as usize];
-    }
-
-    Ok(())
-}
-
-impl Scaling for LinearScaler {
-    fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy) {
+impl LinearScaler {
+    pub fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy) -> Self {
         self.scaler.threading_policy = threading_policy;
+        *self
     }
 
-    fn resize_plane<'a>(
-        &'a self,
-        store: &ImageStore<'a, u8, 1>,
-        into: &mut ImageStoreMut<'a, u8, 1>,
-    ) -> Result<(), PicScaleError> {
-        resize_typical8(
-            self.scaler.function,
-            self.transfer_function,
-            self.scaler.threading_policy,
-            store,
-            into,
-        )
+    pub fn plan_planar_resampling(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+    ) -> Result<Arc<Resampling<u8, 1>>, PicScaleError> {
+        let intercept = self
+            .scaler
+            .plan_planar_resampling_f32(source_size, target_size)?;
+        let scratch_size = intercept.scratch_size();
+        let lin = make_linearization(self.transfer_function);
+        Ok(Arc::new(SplitPlanInterceptor {
+            intercept,
+            splitter: Arc::new(Common8BitSplitter {
+                linearization: lin.linearization,
+                gamma: lin.gamma,
+                has_alpha: false,
+            }),
+            inner_scratch: scratch_size,
+        }))
     }
 
-    fn resize_cbcr8<'a>(
-        &'a self,
-        store: &ImageStore<'a, u8, 2>,
-        into: &mut ImageStoreMut<'a, u8, 2>,
-    ) -> Result<(), PicScaleError> {
-        resize_typical8(
-            self.scaler.function,
-            self.transfer_function,
-            self.scaler.threading_policy,
-            store,
-            into,
-        )
+    pub fn plan_cbcr_resampling(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+    ) -> Result<Arc<Resampling<u8, 2>>, PicScaleError> {
+        let intercept = self
+            .scaler
+            .plan_cbcr_resampling_f32(source_size, target_size)?;
+        let scratch_size = intercept.scratch_size();
+        let lin = make_linearization(self.transfer_function);
+        Ok(Arc::new(SplitPlanInterceptor {
+            intercept,
+            splitter: Arc::new(Common8BitSplitter {
+                linearization: lin.linearization,
+                gamma: lin.gamma,
+                has_alpha: false,
+            }),
+            inner_scratch: scratch_size,
+        }))
     }
 
-    fn resize_gray_alpha<'a>(
-        &'a self,
-        store: &ImageStore<'a, u8, 2>,
-        into: &mut ImageStoreMut<'a, u8, 2>,
+    pub fn plan_gray_alpha_resampling(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
         premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError> {
-        let new_size = into.get_size();
-        into.validate()?;
-        store.validate()?;
-        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
-            return Err(PicScaleError::ZeroImageDimensions);
-        }
-
-        if check_image_size_overflow(store.width, store.height, store.channels) {
-            return Err(PicScaleError::SourceImageIsTooLarge);
-        }
-
-        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
-            return Err(PicScaleError::DestinationImageIsTooLarge);
-        }
-
-        if store.width == new_size.width && store.height == new_size.height {
-            store.copied_to_mut(into);
-            return Ok(());
-        }
-
-        const CN: usize = 2;
-
-        let mut target_vertical = try_vec![f32::default(); store.width * store.height * CN];
-
-        let mut linear_store =
-            ImageStoreMut::<f32, CN>::from_slice(&mut target_vertical, store.width, store.height)?;
-
-        let linearization = make_linearization(self.transfer_function);
-
-        for (src, dst) in store
-            .as_bytes()
-            .chunks_exact(2)
-            .zip(linear_store.buffer.borrow_mut().chunks_exact_mut(2))
-        {
-            dst[0] = linearization.linearization[src[0] as usize];
-            dst[1] = src[1] as f32 / 255.;
-        }
-
-        let new_immutable_store = ImageStore::<f32, CN> {
-            buffer: std::borrow::Cow::Owned(target_vertical),
-            channels: CN,
-            width: store.width,
-            height: store.height,
-            stride: store.width * CN,
-            bit_depth: 12,
-        };
-
-        let mut new_store = ImageStoreMut::<f32, CN>::try_alloc(into.width, into.height)?;
-
-        self.scaler.resize_gray_alpha_f32(
-            &new_immutable_store,
-            &mut new_store,
+    ) -> Result<Arc<Resampling<u8, 2>>, PicScaleError> {
+        let intercept = self.scaler.plan_gray_alpha_resampling_f32(
+            source_size,
+            target_size,
             premultiply_alpha,
         )?;
-
-        for (src, dst) in new_store
-            .as_bytes()
-            .chunks_exact(2)
-            .zip(into.buffer.borrow_mut().chunks_exact_mut(2))
-        {
-            let v0 = (src[0] * 65535.).cpu_round().min(65535.).max(0.) as u16;
-
-            dst[0] = linearization.gamma[v0 as usize];
-            dst[1] = (src[1] * 255.).cpu_round().min(255.).max(0.) as u8;
-        }
-
-        Ok(())
+        let scratch_size = intercept.scratch_size();
+        let lin = make_linearization(self.transfer_function);
+        Ok(Arc::new(SplitPlanInterceptor {
+            intercept,
+            splitter: Arc::new(Common8BitSplitter {
+                linearization: lin.linearization,
+                gamma: lin.gamma,
+                has_alpha: true,
+            }),
+            inner_scratch: scratch_size,
+        }))
     }
 
-    fn resize_rgb<'a>(
-        &'a self,
-        store: &ImageStore<'a, u8, 3>,
-        into: &mut ImageStoreMut<'a, u8, 3>,
-    ) -> Result<(), PicScaleError> {
-        resize_typical8(
-            self.scaler.function,
-            self.transfer_function,
-            self.scaler.threading_policy,
-            store,
-            into,
-        )
+    pub fn plan_rgb_resampling(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+    ) -> Result<Arc<Resampling<u8, 3>>, PicScaleError> {
+        let intercept = self
+            .scaler
+            .plan_rgb_resampling_f32(source_size, target_size)?;
+        let scratch_size = intercept.scratch_size();
+        let lin = make_linearization(self.transfer_function);
+        Ok(Arc::new(SplitPlanInterceptor {
+            intercept,
+            splitter: Arc::new(Common8BitSplitter {
+                linearization: lin.linearization,
+                gamma: lin.gamma,
+                has_alpha: false,
+            }),
+            inner_scratch: scratch_size,
+        }))
     }
 
-    fn resize_rgba<'a>(
-        &'a self,
-        store: &ImageStore<'a, u8, 4>,
-        into: &mut ImageStoreMut<'a, u8, 4>,
+    pub fn plan_rgba_resampling(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
         premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError> {
-        let new_size = into.get_size();
-        into.validate()?;
-        store.validate()?;
-        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
-            return Err(PicScaleError::ZeroImageDimensions);
-        }
-
-        if check_image_size_overflow(store.width, store.height, store.channels) {
-            return Err(PicScaleError::SourceImageIsTooLarge);
-        }
-
-        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
-            return Err(PicScaleError::DestinationImageIsTooLarge);
-        }
-
-        if store.width == new_size.width && store.height == new_size.height {
-            store.copied_to_mut(into);
-            return Ok(());
-        }
-
-        const CN: usize = 4;
-
-        let mut target_vertical = try_vec![f32::default(); store.width * store.height * CN];
-
-        let mut linear_store =
-            ImageStoreMut::<f32, CN>::from_slice(&mut target_vertical, store.width, store.height)?;
-
-        let linearization = make_linearization(self.transfer_function);
-
-        for (src, dst) in store
-            .as_bytes()
-            .chunks_exact(4)
-            .zip(linear_store.buffer.borrow_mut().chunks_exact_mut(4))
-        {
-            dst[0] = linearization.linearization[src[0] as usize];
-            dst[1] = linearization.linearization[src[1] as usize];
-            dst[2] = linearization.linearization[src[2] as usize];
-            dst[3] = src[3] as f32 / 255.;
-        }
-
-        let new_immutable_store = ImageStore::<f32, CN> {
-            buffer: std::borrow::Cow::Owned(target_vertical),
-            channels: CN,
-            width: store.width,
-            height: store.height,
-            stride: store.width * CN,
-            bit_depth: 12,
-        };
-
-        let mut new_store = ImageStoreMut::<f32, CN>::try_alloc(into.width, into.height)?;
-
-        self.scaler
-            .resize_rgba_f32(&new_immutable_store, &mut new_store, premultiply_alpha)?;
-
-        for (src, dst) in new_store
-            .as_bytes()
-            .chunks_exact(4)
-            .zip(into.buffer.borrow_mut().chunks_exact_mut(4))
-        {
-            let v0 = (src[0] * 65535.).cpu_round().min(65535.).max(0.) as u16;
-            let v1 = (src[1] * 65535.).cpu_round().min(65535.).max(0.) as u16;
-            let v2 = (src[2] * 65535.).cpu_round().min(65535.).max(0.) as u16;
-
-            dst[0] = linearization.gamma[v0 as usize];
-            dst[1] = linearization.gamma[v1 as usize];
-            dst[2] = linearization.gamma[v2 as usize];
-            dst[3] = (src[3] * 255.).cpu_round().min(255.).max(0.) as u8;
-        }
-
-        Ok(())
-    }
-}
-
-impl ScalingU16 for LinearScaler {
-    fn resize_plane_u16<'a>(
-        &'a self,
-        store: &ImageStore<'a, u16, 1>,
-        into: &mut ImageStoreMut<'a, u16, 1>,
-    ) -> Result<(), PicScaleError> {
-        resize_typical16(
-            self.scaler.function,
-            self.transfer_function,
-            self.scaler.threading_policy,
-            store,
-            into,
-        )
+    ) -> Result<Arc<Resampling<u8, 4>>, PicScaleError> {
+        let intercept =
+            self.scaler
+                .plan_rgba_resampling_f32(source_size, target_size, premultiply_alpha)?;
+        let scratch_size = intercept.scratch_size();
+        let lin = make_linearization(self.transfer_function);
+        Ok(Arc::new(SplitPlanInterceptor {
+            intercept,
+            splitter: Arc::new(Common8BitSplitter {
+                linearization: lin.linearization,
+                gamma: lin.gamma,
+                has_alpha: true,
+            }),
+            inner_scratch: scratch_size,
+        }))
     }
 
-    fn resize_cbcr_u16<'a>(
-        &'a self,
-        store: &ImageStore<'a, u16, 2>,
-        into: &mut ImageStoreMut<'a, u16, 2>,
-    ) -> Result<(), PicScaleError> {
-        resize_typical16(
-            self.scaler.function,
-            self.transfer_function,
-            self.scaler.threading_policy,
-            store,
-            into,
-        )
+    pub fn plan_planar_resampling16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        bit_depth: usize,
+    ) -> Result<Arc<Resampling<u16, 1>>, PicScaleError> {
+        let intercept = self
+            .scaler
+            .plan_planar_resampling_f32(source_size, target_size)?;
+        let scratch_size = intercept.scratch_size();
+        let lin = make_linearization16(self.transfer_function, bit_depth)?;
+        Ok(Arc::new(SplitPlanInterceptor {
+            intercept,
+            splitter: Arc::new(Common16BitSplitter {
+                linearization: lin.linearization,
+                gamma: lin.gamma,
+                has_alpha: false,
+                bit_depth,
+            }),
+            inner_scratch: scratch_size,
+        }))
     }
 
-    fn resize_gray_alpha16<'a>(
-        &'a self,
-        store: &ImageStore<'a, u16, 2>,
-        into: &mut ImageStoreMut<'a, u16, 2>,
+    pub fn plan_gray_alpha_resampling16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
         premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError> {
-        let new_size = into.get_size();
-        into.validate()?;
-        store.validate()?;
-        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
-            return Err(PicScaleError::ZeroImageDimensions);
-        }
-
-        if check_image_size_overflow(store.width, store.height, store.channels) {
-            return Err(PicScaleError::SourceImageIsTooLarge);
-        }
-
-        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
-            return Err(PicScaleError::DestinationImageIsTooLarge);
-        }
-
-        if store.width == new_size.width && store.height == new_size.height {
-            store.copied_to_mut(into);
-            return Ok(());
-        }
-
-        const CN: usize = 2;
-
-        let mut target_vertical = try_vec![f32::default(); store.width * store.height * CN];
-
-        let mut linear_store =
-            ImageStoreMut::<f32, CN>::from_slice(&mut target_vertical, store.width, store.height)?;
-
-        let linearization = make_linearization16(self.transfer_function, into.bit_depth)?;
-
-        let max_bit_depth_value = ((1u32 << into.bit_depth) - 1) as f32;
-
-        let v_recip = 1. / max_bit_depth_value;
-
-        for (src, dst) in store
-            .as_bytes()
-            .chunks_exact(2)
-            .zip(linear_store.buffer.borrow_mut().chunks_exact_mut(2))
-        {
-            dst[0] = linearization.linearization[src[0] as usize];
-            dst[1] = src[1] as f32 * v_recip;
-        }
-
-        let new_immutable_store = ImageStore::<f32, CN> {
-            buffer: std::borrow::Cow::Owned(target_vertical),
-            channels: CN,
-            width: store.width,
-            height: store.height,
-            stride: store.width * CN,
-            bit_depth: 16,
-        };
-
-        let mut new_store = ImageStoreMut::<f32, CN>::try_alloc(into.width, into.height)?;
-
-        self.scaler.resize_gray_alpha_f32(
-            &new_immutable_store,
-            &mut new_store,
+        bit_depth: usize,
+    ) -> Result<Arc<Resampling<u16, 2>>, PicScaleError> {
+        let intercept = self.scaler.plan_gray_alpha_resampling_f32(
+            source_size,
+            target_size,
             premultiply_alpha,
         )?;
-
-        for (src, dst) in new_store
-            .as_bytes()
-            .chunks_exact(2)
-            .zip(into.buffer.borrow_mut().chunks_exact_mut(2))
-        {
-            let v0 = ((src[0] * 262143.).cpu_round().max(0.) as u32).min(262143);
-
-            dst[0] = linearization.gamma[v0 as usize];
-            dst[1] = (src[1] * max_bit_depth_value)
-                .cpu_round()
-                .min(max_bit_depth_value)
-                .max(0.) as u16;
-        }
-
-        Ok(())
+        let scratch_size = intercept.scratch_size();
+        let lin = make_linearization16(self.transfer_function, bit_depth)?;
+        Ok(Arc::new(SplitPlanInterceptor {
+            intercept,
+            splitter: Arc::new(Common16BitSplitter {
+                linearization: lin.linearization,
+                gamma: lin.gamma,
+                has_alpha: true,
+                bit_depth,
+            }),
+            inner_scratch: scratch_size,
+        }))
     }
 
-    fn resize_rgb_u16<'a>(
-        &'a self,
-        store: &ImageStore<'a, u16, 3>,
-        into: &mut ImageStoreMut<'a, u16, 3>,
-    ) -> Result<(), PicScaleError> {
-        resize_typical16(
-            self.scaler.function,
-            self.transfer_function,
-            self.scaler.threading_policy,
-            store,
-            into,
-        )
+    pub fn plan_cbcr_resampling16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        bit_depth: usize,
+    ) -> Result<Arc<Resampling<u16, 2>>, PicScaleError> {
+        let intercept = self
+            .scaler
+            .plan_cbcr_resampling_f32(source_size, target_size)?;
+        let scratch_size = intercept.scratch_size();
+        let lin = make_linearization16(self.transfer_function, bit_depth)?;
+        Ok(Arc::new(SplitPlanInterceptor {
+            intercept,
+            splitter: Arc::new(Common16BitSplitter {
+                linearization: lin.linearization,
+                gamma: lin.gamma,
+                has_alpha: false,
+                bit_depth,
+            }),
+            inner_scratch: scratch_size,
+        }))
     }
 
-    fn resize_rgba_u16<'a>(
-        &'a self,
-        store: &ImageStore<'a, u16, 4>,
-        into: &mut ImageStoreMut<'a, u16, 4>,
+    pub fn plan_rgb_resampling16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        bit_depth: usize,
+    ) -> Result<Arc<Resampling<u16, 3>>, PicScaleError> {
+        let intercept = self
+            .scaler
+            .plan_rgb_resampling_f32(source_size, target_size)?;
+        let scratch_size = intercept.scratch_size();
+        let lin = make_linearization16(self.transfer_function, bit_depth)?;
+        Ok(Arc::new(SplitPlanInterceptor {
+            intercept,
+            splitter: Arc::new(Common16BitSplitter {
+                linearization: lin.linearization,
+                gamma: lin.gamma,
+                has_alpha: false,
+                bit_depth,
+            }),
+            inner_scratch: scratch_size,
+        }))
+    }
+
+    pub fn plan_rgba_resampling16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
         premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError> {
-        let new_size = into.get_size();
-        into.validate()?;
-        store.validate()?;
-        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
-            return Err(PicScaleError::ZeroImageDimensions);
-        }
-
-        if check_image_size_overflow(store.width, store.height, store.channels) {
-            return Err(PicScaleError::SourceImageIsTooLarge);
-        }
-
-        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
-            return Err(PicScaleError::DestinationImageIsTooLarge);
-        }
-
-        if store.width == new_size.width && store.height == new_size.height {
-            store.copied_to_mut(into);
-            return Ok(());
-        }
-
-        const CN: usize = 4;
-
-        let mut target_vertical = try_vec![f32::default(); store.width * store.height * CN];
-
-        let mut linear_store =
-            ImageStoreMut::<f32, CN>::from_slice(&mut target_vertical, store.width, store.height)?;
-
-        let linearization = make_linearization16(self.transfer_function, into.bit_depth)?;
-
-        let max_bit_depth_value = ((1u32 << into.bit_depth) - 1) as f32;
-
-        let v_recip = 1. / max_bit_depth_value;
-
-        for (src, dst) in store
-            .as_bytes()
-            .chunks_exact(4)
-            .zip(linear_store.buffer.borrow_mut().chunks_exact_mut(4))
-        {
-            dst[0] = linearization.linearization[src[0] as usize];
-            dst[1] = linearization.linearization[src[1] as usize];
-            dst[2] = linearization.linearization[src[2] as usize];
-            dst[3] = src[3] as f32 * v_recip;
-        }
-
-        let new_immutable_store = ImageStore::<f32, CN> {
-            buffer: std::borrow::Cow::Owned(target_vertical),
-            channels: CN,
-            width: store.width,
-            height: store.height,
-            stride: store.width * CN,
-            bit_depth: 16,
-        };
-
-        let mut new_store = ImageStoreMut::<f32, CN>::try_alloc(into.width, into.height)?;
-
-        self.scaler
-            .resize_rgba_f32(&new_immutable_store, &mut new_store, premultiply_alpha)?;
-
-        for (src, dst) in new_store
-            .as_bytes()
-            .chunks_exact(4)
-            .zip(into.buffer.borrow_mut().chunks_exact_mut(4))
-        {
-            let v0 = ((src[0] * 262143.).cpu_round().max(0.) as u32).min(262143);
-            let v1 = ((src[1] * 262143.).cpu_round().max(0.) as u32).min(262143);
-            let v2 = ((src[2] * 262143.).cpu_round().max(0.) as u32).min(262143);
-
-            dst[0] = linearization.gamma[v0 as usize];
-            dst[1] = linearization.gamma[v1 as usize];
-            dst[2] = linearization.gamma[v2 as usize];
-            dst[3] = (src[3] * max_bit_depth_value)
-                .cpu_round()
-                .min(max_bit_depth_value)
-                .max(0.) as u16;
-        }
-
-        Ok(())
+        bit_depth: usize,
+    ) -> Result<Arc<Resampling<u16, 4>>, PicScaleError> {
+        let intercept =
+            self.scaler
+                .plan_rgba_resampling_f32(source_size, target_size, premultiply_alpha)?;
+        let scratch_size = intercept.scratch_size();
+        let lin = make_linearization16(self.transfer_function, bit_depth)?;
+        Ok(Arc::new(SplitPlanInterceptor {
+            intercept,
+            splitter: Arc::new(Common16BitSplitter {
+                linearization: lin.linearization,
+                gamma: lin.gamma,
+                has_alpha: true,
+                bit_depth,
+            }),
+            inner_scratch: scratch_size,
+        }))
     }
 }

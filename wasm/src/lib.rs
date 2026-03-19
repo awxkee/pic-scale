@@ -44,7 +44,7 @@ pub fn process(image: Uint8Array) -> Uint8Array {
         ImageStoreMut::<u8, 3>::alloc(dimensions.0 as usize / 3, dimensions.1 as usize / 3);
 
     let planned = scaler
-        .plan_rgb_resampling(store.get_size(), target_store.get_size())
+        .plan_rgb_resampling(store.get_size(), target_store.size())
         .unwrap();
     planned.resample(&store, &mut target_store).unwrap();
 

@@ -496,12 +496,9 @@ where
     }
 }
 
-impl<'a, T, const N: usize> ImageStoreMut<'a, T, N>
-where
-    T: Clone + Copy + Debug,
-{
+impl<'a, T, const N: usize> ImageStoreMut<'a, T, N> {
     /// Returns bounded image size
-    pub fn get_size(&self) -> ImageSize {
+    pub fn size(&self) -> ImageSize {
         ImageSize::new(self.width, self.height)
     }
 
@@ -538,7 +535,12 @@ where
             bit_depth: 0,
         })
     }
+}
 
+impl<'a, T, const N: usize> ImageStoreMut<'a, T, N>
+where
+    T: Clone,
+{
     /// Performs deep copy into a new mutable image
     pub fn copied<'b>(&self) -> ImageStoreMut<'b, T, N> {
         ImageStoreMut::<T, N> {

@@ -28,17 +28,57 @@
  */
 #![forbid(unsafe_code)]
 use crate::image_store::ImageStoreMut;
+use crate::plan::Resampling;
 use crate::scaler::ScalingOptions;
 use crate::validation::PicScaleError;
 use crate::{
-    CbCrF16ImageStore, ImageStoreScaling, PlanarF16ImageStore, RgbF16ImageStore, RgbaF16ImageStore,
-    Scaler,
+    CbCrF16ImageStore, ImageSize, ImageStoreScaling, PlanarF16ImageStore, RgbF16ImageStore,
+    RgbaF16ImageStore, Scaler,
 };
 use core::f16;
+use std::sync::Arc;
 
 /// Implements `f16` type support
 #[cfg_attr(docsrs, doc(cfg(feature = "nightly_f16")))]
-impl Scaler {}
+impl Scaler {
+    pub fn plan_planar_resampling_f16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+    ) -> Result<Arc<Resampling<f16, 1>>, PicScaleError> {
+        self.plan_generic_resize::<f16, f32, 1>(source_size, target_size, 8)
+    }
+
+    pub fn plan_cbcr_resampling_f16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+    ) -> Result<Arc<Resampling<f16, 2>>, PicScaleError> {
+        self.plan_generic_resize::<f16, f32, 2>(source_size, target_size, 8)
+    }
+
+    pub fn plan_rgb_resampling_f16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+    ) -> Result<Arc<Resampling<f16, 3>>, PicScaleError> {
+        self.plan_generic_resize::<f16, f32, 3>(source_size, target_size, 8)
+    }
+
+    pub fn plan_rgba_resampling_f16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        premultiply_alpha: bool,
+    ) -> Result<Arc<Resampling<f16, 4>>, PicScaleError> {
+        self.plan_generic_resize_with_alpha::<f16, f32, 4>(
+            source_size,
+            target_size,
+            8,
+            premultiply_alpha,
+        )
+    }
+}
 
 #[cfg_attr(docsrs, doc(cfg(feature = "nightly_f16")))]
 impl<'b> ImageStoreScaling<'b, f16, 1> for PlanarF16ImageStore<'b> {
@@ -49,8 +89,7 @@ impl<'b> ImageStoreScaling<'b, f16, 1> for PlanarF16ImageStore<'b> {
     ) -> Result<(), PicScaleError> {
         let mut scaler = Scaler::new(options.resampling_function);
         scaler.set_threading_policy(options.threading_policy);
-        let plan =
-            scaler.plan_generic_resize(self.get_size(), store.get_size(), store.bit_depth)?;
+        let plan = scaler.plan_generic_resize(self.get_size(), store.size(), store.bit_depth)?;
         plan.resample(self, store)
     }
 }
@@ -64,8 +103,7 @@ impl<'b> ImageStoreScaling<'b, f16, 2> for CbCrF16ImageStore<'b> {
     ) -> Result<(), PicScaleError> {
         let mut scaler = Scaler::new(options.resampling_function);
         scaler.set_threading_policy(options.threading_policy);
-        let plan =
-            scaler.plan_generic_resize(self.get_size(), store.get_size(), store.bit_depth)?;
+        let plan = scaler.plan_generic_resize(self.get_size(), store.size(), store.bit_depth)?;
         plan.resample(self, store)
     }
 }
@@ -79,8 +117,7 @@ impl<'b> ImageStoreScaling<'b, f16, 3> for RgbF16ImageStore<'b> {
     ) -> Result<(), PicScaleError> {
         let mut scaler = Scaler::new(options.resampling_function);
         scaler.set_threading_policy(options.threading_policy);
-        let plan =
-            scaler.plan_generic_resize(self.get_size(), store.get_size(), store.bit_depth)?;
+        let plan = scaler.plan_generic_resize(self.get_size(), store.size(), store.bit_depth)?;
         plan.resample(self, store)
     }
 }
@@ -96,7 +133,7 @@ impl<'b> ImageStoreScaling<'b, f16, 4> for RgbaF16ImageStore<'b> {
         scaler.set_threading_policy(options.threading_policy);
         let plan = scaler.plan_generic_resize_with_alpha(
             self.get_size(),
-            store.get_size(),
+            store.size(),
             store.bit_depth,
             options.premultiply_alpha,
         )?;

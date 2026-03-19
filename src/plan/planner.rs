@@ -45,3 +45,5 @@ pub trait ResamplingPlan<T: Copy, const N: usize> {
     fn get_target_size(&self) -> ImageSize;
     fn get_source_size(&self) -> ImageSize;
 }
+
+pub type Resampling<T, const N: usize> = dyn ResamplingPlan<T, N> + Send + Sync;

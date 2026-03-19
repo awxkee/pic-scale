@@ -109,6 +109,7 @@ pub(crate) fn get_vertical_dispatcher_ar30<const AR30_TYPE: usize, const AR30_OR
 ) -> fn(usize, &FilterBounds, &[u8], &mut [u8], usize, &[i16], u32) {
     #[cfg(all(target_arch = "aarch64", feature = "neon", feature = "rdm"))]
     let is_rdm_available = std::arch::is_aarch64_feature_detected!("rdm");
+    #[allow(clippy::type_complexity)]
     let mut _dispatch: fn(usize, &FilterBounds, &[u8], &mut [u8], usize, &[i16], u32) =
         column_handler_fixed_point_ar30::<AR30_TYPE, AR30_ORDER>;
     #[cfg(all(target_arch = "aarch64", feature = "neon"))]

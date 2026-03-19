@@ -97,9 +97,11 @@ impl HorizontalFilterPass<f32, f64, 4> for ImageStore<'_, f32, 4> {
         threading_policy: ThreadingPolicy,
         _: ConvolutionOptions,
     ) -> Arc<dyn Filtering<f32, 4> + Send + Sync> {
+        #[allow(clippy::type_complexity)]
         let mut _dispatcher_4_rows: Option<
             fn(&[f32], usize, &mut [f32], usize, &FilterWeights<f64>, u32),
         > = Some(convolve_horizontal_4_row_f32_f64::<4>);
+        #[allow(clippy::type_complexity)]
         let mut _dispatcher_row: fn(&[f32], &mut [f32], &FilterWeights<f64>, u32) =
             convolve_horizontal_native_row_f32_f64::<4>;
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]

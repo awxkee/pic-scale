@@ -137,11 +137,7 @@ where
     }
 
     fn alloc_scratch(&self) -> Vec<T> {
-        if self.should_do_horizontal && self.should_do_vertical {
-            vec![T::default(); self.scratch_size()]
-        } else {
-            vec![]
-        }
+        vec![T::default(); self.scratch_size()]
     }
 
     fn scratch_size(&self) -> usize {

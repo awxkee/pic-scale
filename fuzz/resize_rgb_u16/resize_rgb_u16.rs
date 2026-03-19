@@ -94,7 +94,9 @@ fn resize_rgb(
     let store = ImageStore::<u16, 3>::borrow(&src_slice, src_width, src_height).unwrap();
     let mut target = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 10);
 
-    let scaler = Scaler::new(sampler).set_workload_strategy(workload_strategy).set_threading_policy(threading_policy);
+    let scaler = Scaler::new(sampler)
+        .set_workload_strategy(workload_strategy)
+        .set_threading_policy(threading_policy);
 
     let planned = scaler
         .plan_rgb_resampling16(store.get_size(), target.get_size(), 10)

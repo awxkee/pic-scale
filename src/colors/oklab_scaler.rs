@@ -27,11 +27,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use colorutils_rs::{TransferFunction, oklab_to_rgb, oklab_to_rgba, rgb_to_oklab, rgba_to_oklab};
+use std::sync::Arc;
 
-use crate::scaler::ScalingF32;
-use crate::support::check_image_size_overflow;
-use crate::validation::{PicScaleError, try_vec};
-use crate::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ThreadingPolicy};
+use crate::colors::common_splitter::{SplitPlanInterceptor, Splitter};
+use crate::validation::PicScaleError;
+use crate::{
+    ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, ResamplingPlan, Scaler,
+    ThreadingPolicy,
+};
 
 #[derive(Debug, Copy, Clone)]
 /// Converts image to *Oklab* components scales it and convert back
@@ -51,176 +54,112 @@ impl OklabScaler {
     }
 }
 
-impl Scaling for OklabScaler {
-    fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy) {
-        self.scaler.threading_policy = threading_policy;
-    }
+struct OklabRgbSplitter {
+    transfer_function: TransferFunction,
+}
 
-    fn resize_plane<'a>(
-        &'a self,
-        _: &ImageStore<'a, u8, 1>,
-        _: &mut ImageStoreMut<'a, u8, 1>,
-    ) -> Result<(), PicScaleError> {
-        unimplemented!()
-    }
+impl Splitter<u8, f32, 3> for OklabRgbSplitter {
+    fn split(&self, from: &ImageStore<'_, u8, 3>, into: &mut ImageStoreMut<'_, f32, 3>) {
+        let lab_stride = into.width as u32 * 3u32 * size_of::<f32>() as u32;
 
-    fn resize_cbcr8<'a>(
-        &'a self,
-        _: &ImageStore<'a, u8, 2>,
-        _: &mut ImageStoreMut<'a, u8, 2>,
-    ) -> Result<(), PicScaleError> {
-        unimplemented!()
-    }
-
-    fn resize_gray_alpha<'a>(
-        &'a self,
-        _: &ImageStore<'a, u8, 2>,
-        _: &mut ImageStoreMut<'a, u8, 2>,
-        _: bool,
-    ) -> Result<(), PicScaleError> {
-        unimplemented!()
-    }
-
-    fn resize_rgb<'a>(
-        &self,
-        store: &ImageStore<'a, u8, 3>,
-        into: &mut ImageStoreMut<'a, u8, 3>,
-    ) -> Result<(), PicScaleError> {
-        let new_size = into.get_size();
-        into.validate()?;
-        store.validate()?;
-        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
-            return Err(PicScaleError::ZeroImageDimensions);
-        }
-
-        if check_image_size_overflow(store.width, store.height, store.channels) {
-            return Err(PicScaleError::SourceImageIsTooLarge);
-        }
-
-        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
-            return Err(PicScaleError::DestinationImageIsTooLarge);
-        }
-
-        if store.width == new_size.width && store.height == new_size.height {
-            store.copied_to_mut(into);
-            return Ok(());
-        }
-
-        const CN: usize = 3;
-
-        let mut target_vertical = try_vec![f32::default(); store.width * store.height * CN];
-
-        let mut lab_store =
-            ImageStoreMut::<f32, CN>::from_slice(&mut target_vertical, store.width, store.height)?;
-        lab_store.bit_depth = into.bit_depth;
-
-        let lab_stride = lab_store.width as u32 * CN as u32 * size_of::<f32>() as u32;
         rgb_to_oklab(
-            store.buffer.as_ref(),
-            store.width as u32 * CN as u32,
-            lab_store.buffer.borrow_mut(),
-            lab_stride,
-            lab_store.width as u32,
-            lab_store.height as u32,
-            self.transfer_function,
-        );
-
-        let new_immutable_store = ImageStore::<f32, CN> {
-            buffer: std::borrow::Cow::Owned(target_vertical),
-            channels: CN,
-            width: store.width,
-            height: store.height,
-            stride: store.width * CN,
-            bit_depth: into.bit_depth,
-        };
-
-        let mut new_store = ImageStoreMut::<f32, CN>::try_alloc(into.width, into.height)?;
-        self.scaler
-            .resize_rgb_f32(&new_immutable_store, &mut new_store)?;
-
-        let new_lab_stride = new_store.width as u32 * CN as u32 * size_of::<f32>() as u32;
-
-        oklab_to_rgb(
-            new_store.buffer.borrow(),
-            new_lab_stride,
+            from.buffer.as_ref(),
+            from.width as u32 * 3u32,
             into.buffer.borrow_mut(),
-            into.width as u32 * CN as u32,
-            new_store.width as u32,
-            new_store.height as u32,
+            lab_stride,
+            into.width as u32,
+            into.height as u32,
             self.transfer_function,
         );
-        Ok(())
     }
 
-    fn resize_rgba<'a>(
-        &'a self,
-        store: &ImageStore<'a, u8, 4>,
-        into: &mut ImageStoreMut<'a, u8, 4>,
-        premultiply_alpha: bool,
-    ) -> Result<(), PicScaleError> {
-        let new_size = into.get_size();
-        into.validate()?;
-        store.validate()?;
-        if store.width == 0 || store.height == 0 || new_size.width == 0 || new_size.height == 0 {
-            return Err(PicScaleError::ZeroImageDimensions);
-        }
-
-        if check_image_size_overflow(store.width, store.height, store.channels) {
-            return Err(PicScaleError::SourceImageIsTooLarge);
-        }
-
-        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
-            return Err(PicScaleError::DestinationImageIsTooLarge);
-        }
-
-        if store.width == new_size.width && store.height == new_size.height {
-            store.copied_to_mut(into);
-            return Ok(());
-        }
-
-        const CN: usize = 4;
-
-        let mut target_vertical = try_vec![f32::default(); store.width * store.height * CN];
-
-        let mut lab_store =
-            ImageStoreMut::<f32, CN>::from_slice(&mut target_vertical, store.width, store.height)?;
-        lab_store.bit_depth = into.bit_depth;
-
-        let lab_stride = lab_store.width as u32 * CN as u32 * size_of::<f32>() as u32;
-        rgba_to_oklab(
-            store.buffer.as_ref(),
-            store.width as u32 * CN as u32,
-            lab_store.buffer.borrow_mut(),
-            lab_stride,
-            lab_store.width as u32,
-            lab_store.height as u32,
-            self.transfer_function,
-        );
-
-        let new_immutable_store = ImageStore::<f32, CN> {
-            buffer: std::borrow::Cow::Owned(target_vertical),
-            channels: CN,
-            width: store.width,
-            height: store.height,
-            stride: store.width * CN,
-            bit_depth: into.bit_depth,
-        };
-
-        let mut new_store = ImageStoreMut::<f32, CN>::try_alloc(into.width, into.height)?;
-        self.scaler
-            .resize_rgba_f32(&new_immutable_store, &mut new_store, premultiply_alpha)?;
-
-        let new_lab_stride = new_store.width as u32 * CN as u32 * size_of::<f32>() as u32;
-
-        oklab_to_rgba(
-            new_store.buffer.borrow(),
+    fn merge(&self, from: &ImageStore<'_, f32, 3>, into: &mut ImageStoreMut<'_, u8, 3>) {
+        let new_lab_stride = into.width as u32 * 3 * size_of::<f32>() as u32;
+        oklab_to_rgb(
+            from.buffer.as_ref(),
             new_lab_stride,
             into.buffer.borrow_mut(),
-            into.width as u32 * CN as u32,
-            new_store.width as u32,
-            new_store.height as u32,
+            into.width as u32 * 3,
+            into.width as u32,
+            into.height as u32,
             self.transfer_function,
         );
-        Ok(())
+    }
+}
+
+struct OklabRgbaSplitter {
+    transfer_function: TransferFunction,
+}
+
+impl Splitter<u8, f32, 4> for OklabRgbaSplitter {
+    fn split(&self, from: &ImageStore<'_, u8, 4>, into: &mut ImageStoreMut<'_, f32, 4>) {
+        let lab_stride = into.width as u32 * 4u32 * size_of::<f32>() as u32;
+
+        rgba_to_oklab(
+            from.buffer.as_ref(),
+            from.width as u32 * 4u32,
+            into.buffer.borrow_mut(),
+            lab_stride,
+            into.width as u32,
+            into.height as u32,
+            self.transfer_function,
+        );
+    }
+
+    fn merge(&self, from: &ImageStore<'_, f32, 4>, into: &mut ImageStoreMut<'_, u8, 4>) {
+        let new_lab_stride = into.width as u32 * 4 * size_of::<f32>() as u32;
+        oklab_to_rgba(
+            from.buffer.as_ref(),
+            new_lab_stride,
+            into.buffer.borrow_mut(),
+            into.width as u32 * 4,
+            into.width as u32,
+            into.height as u32,
+            self.transfer_function,
+        );
+    }
+}
+
+impl OklabScaler {
+    pub fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy) -> Self {
+        self.scaler.threading_policy = threading_policy;
+        *self
+    }
+
+    pub fn plan_rgb_resampling(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+    ) -> Result<Arc<dyn ResamplingPlan<u8, 3> + Send + Sync>, PicScaleError> {
+        let intercept = self
+            .scaler
+            .plan_rgb_resampling_f32(source_size, target_size)?;
+        let scratch_size = intercept.scratch_size();
+        Ok(Arc::new(SplitPlanInterceptor {
+            intercept,
+            splitter: Arc::new(OklabRgbSplitter {
+                transfer_function: self.transfer_function,
+            }),
+            inner_scratch: scratch_size,
+        }))
+    }
+
+    pub fn plan_rgba_resampling(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        premultiply_alpha: bool,
+    ) -> Result<Arc<dyn ResamplingPlan<u8, 4> + Send + Sync>, PicScaleError> {
+        let intercept =
+            self.scaler
+                .plan_rgba_resampling_f32(source_size, target_size, premultiply_alpha)?;
+        let scratch_size = intercept.scratch_size();
+        Ok(Arc::new(SplitPlanInterceptor {
+            intercept,
+            splitter: Arc::new(OklabRgbaSplitter {
+                transfer_function: self.transfer_function,
+            }),
+            inner_scratch: scratch_size,
+        }))
     }
 }

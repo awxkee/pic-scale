@@ -29,7 +29,11 @@
 #![deny(deprecated)]
 // #![deny(unreachable_code, unused)]
 #![allow(stable_features, clippy::incompatible_msrv)]
-#![allow(clippy::too_many_arguments, clippy::manual_clamp)]
+#![allow(
+    clippy::too_many_arguments,
+    clippy::manual_clamp,
+    clippy::type_complexity
+)]
 #![cfg_attr(
     all(feature = "nightly_i8mm", target_arch = "aarch64"),
     feature(stdarch_neon_i8mm)

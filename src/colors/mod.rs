@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+mod common_splitter;
 mod jzazbz_scaler;
 mod lab_scaler;
 mod lch_scaler;

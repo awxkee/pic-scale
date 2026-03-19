@@ -37,5 +37,5 @@ pub(crate) use alpha_plan::AlphaConvolvePlan;
 pub(crate) use horizontal_filtering::HorizontalFiltering;
 pub(crate) use nearest_plan::ResampleNearestPlan;
 pub(crate) use non_alpha_plan::NonAlphaConvolvePlan;
-pub use planner::ResamplingPlan;
+pub use planner::{Resampling, ResamplingPlan};
 pub(crate) use vertical_filtering::VerticalFiltering;

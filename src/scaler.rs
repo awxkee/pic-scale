@@ -36,7 +36,7 @@ use crate::image_store::{
 };
 use crate::math::WeightsGenerator;
 use crate::plan::{
-    AlphaConvolvePlan, HorizontalFiltering, NonAlphaConvolvePlan, ResampleNearestPlan,
+    AlphaConvolvePlan, HorizontalFiltering, NonAlphaConvolvePlan, ResampleNearestPlan, Resampling,
     VerticalFiltering,
 };
 use crate::threading_policy::ThreadingPolicy;
@@ -100,7 +100,7 @@ impl Scaler {
         source_size: ImageSize,
         destination_size: ImageSize,
         bit_depth: usize,
-    ) -> Result<Arc<dyn ResamplingPlan<T, N> + Send + Sync>, PicScaleError>
+    ) -> Result<Arc<Resampling<T, N>>, PicScaleError>
     where
         for<'a> ImageStore<'a, T, N>:
             VerticalConvolutionPass<T, W, N> + HorizontalFilterPass<T, W, N>,
@@ -152,7 +152,7 @@ impl Scaler {
         destination_size: ImageSize,
         bit_depth: usize,
         needs_alpha_premultiplication: bool,
-    ) -> Result<Arc<dyn ResamplingPlan<T, N> + Send + Sync>, PicScaleError>
+    ) -> Result<Arc<Resampling<T, N>>, PicScaleError>
     where
         for<'a> ImageStore<'a, T, N>:
             VerticalConvolutionPass<T, W, N> + HorizontalFilterPass<T, W, N> + AssociateAlpha<T, N>,
@@ -203,7 +203,7 @@ impl Scaler {
         &self,
         source_size: ImageSize,
         target_size: ImageSize,
-    ) -> Result<Arc<dyn ResamplingPlan<u8, 1> + Send + Sync>, PicScaleError> {
+    ) -> Result<Arc<Resampling<u8, 1>>, PicScaleError> {
         self.plan_generic_resize(source_size, target_size, 8)
     }
 
@@ -212,7 +212,7 @@ impl Scaler {
         source_size: ImageSize,
         target_size: ImageSize,
         premultiply_alpha: bool,
-    ) -> Result<Arc<dyn ResamplingPlan<u8, 2> + Send + Sync>, PicScaleError> {
+    ) -> Result<Arc<Resampling<u8, 2>>, PicScaleError> {
         if premultiply_alpha {
             self.plan_generic_resize_with_alpha(source_size, target_size, 8, premultiply_alpha)
         } else {
@@ -224,7 +224,7 @@ impl Scaler {
         &self,
         source_size: ImageSize,
         target_size: ImageSize,
-    ) -> Result<Arc<dyn ResamplingPlan<u8, 2> + Send + Sync>, PicScaleError> {
+    ) -> Result<Arc<Resampling<u8, 2>>, PicScaleError> {
         self.plan_generic_resize(source_size, target_size, 8)
     }
 
@@ -232,7 +232,7 @@ impl Scaler {
         &self,
         source_size: ImageSize,
         target_size: ImageSize,
-    ) -> Result<Arc<dyn ResamplingPlan<u8, 3> + Send + Sync>, PicScaleError> {
+    ) -> Result<Arc<Resampling<u8, 3>>, PicScaleError> {
         self.plan_generic_resize(source_size, target_size, 8)
     }
 
@@ -241,7 +241,7 @@ impl Scaler {
         source_size: ImageSize,
         target_size: ImageSize,
         premultiply_alpha: bool,
-    ) -> Result<Arc<dyn ResamplingPlan<u8, 4> + Send + Sync>, PicScaleError> {
+    ) -> Result<Arc<Resampling<u8, 4>>, PicScaleError> {
         if premultiply_alpha {
             self.plan_generic_resize_with_alpha(source_size, target_size, 8, premultiply_alpha)
         } else {
@@ -254,7 +254,7 @@ impl Scaler {
         source_size: ImageSize,
         target_size: ImageSize,
         bit_depth: usize,
-    ) -> Result<Arc<dyn ResamplingPlan<u16, 1> + Send + Sync>, PicScaleError> {
+    ) -> Result<Arc<Resampling<u16, 1>>, PicScaleError> {
         self.plan_generic_resize(source_size, target_size, bit_depth)
     }
 
@@ -263,7 +263,7 @@ impl Scaler {
         source_size: ImageSize,
         target_size: ImageSize,
         bit_depth: usize,
-    ) -> Result<Arc<dyn ResamplingPlan<u16, 2> + Send + Sync>, PicScaleError> {
+    ) -> Result<Arc<Resampling<u16, 2>>, PicScaleError> {
         self.plan_generic_resize(source_size, target_size, bit_depth)
     }
 
@@ -273,7 +273,7 @@ impl Scaler {
         target_size: ImageSize,
         premultiply_alpha: bool,
         bit_depth: usize,
-    ) -> Result<Arc<dyn ResamplingPlan<u16, 2> + Send + Sync>, PicScaleError> {
+    ) -> Result<Arc<Resampling<u16, 2>>, PicScaleError> {
         if premultiply_alpha {
             self.plan_generic_resize_with_alpha(
                 source_size,
@@ -291,7 +291,7 @@ impl Scaler {
         source_size: ImageSize,
         target_size: ImageSize,
         bit_depth: usize,
-    ) -> Result<Arc<dyn ResamplingPlan<u16, 3> + Send + Sync>, PicScaleError> {
+    ) -> Result<Arc<Resampling<u16, 3>>, PicScaleError> {
         self.plan_generic_resize(source_size, target_size, bit_depth)
     }
 
@@ -301,7 +301,7 @@ impl Scaler {
         target_size: ImageSize,
         premultiply_alpha: bool,
         bit_depth: usize,
-    ) -> Result<Arc<dyn ResamplingPlan<u16, 4> + Send + Sync>, PicScaleError> {
+    ) -> Result<Arc<Resampling<u16, 4>>, PicScaleError> {
         if premultiply_alpha {
             self.plan_generic_resize_with_alpha(
                 source_size,
@@ -318,7 +318,7 @@ impl Scaler {
         &self,
         source_size: ImageSize,
         target_size: ImageSize,
-    ) -> Result<Arc<dyn ResamplingPlan<f32, 1> + Send + Sync>, PicScaleError> {
+    ) -> Result<Arc<Resampling<f32, 1>>, PicScaleError> {
         match self.workload_strategy {
             WorkloadStrategy::PreferQuality => {
                 self.plan_generic_resize::<f32, f64, 1>(source_size, target_size, 8)
@@ -349,7 +349,7 @@ impl Scaler {
         source_size: ImageSize,
         target_size: ImageSize,
         premultiply_alpha: bool,
-    ) -> Result<Arc<dyn ResamplingPlan<f32, 2> + Send + Sync>, PicScaleError> {
+    ) -> Result<Arc<Resampling<f32, 2>>, PicScaleError> {
         if premultiply_alpha {
             match self.workload_strategy {
                 WorkloadStrategy::PreferQuality => self
@@ -376,7 +376,7 @@ impl Scaler {
         &self,
         source_size: ImageSize,
         target_size: ImageSize,
-    ) -> Result<Arc<dyn ResamplingPlan<f32, 3> + Send + Sync>, PicScaleError> {
+    ) -> Result<Arc<Resampling<f32, 3>>, PicScaleError> {
         match self.workload_strategy {
             WorkloadStrategy::PreferQuality => {
                 self.plan_generic_resize::<f32, f64, 3>(source_size, target_size, 8)
@@ -392,7 +392,7 @@ impl Scaler {
         source_size: ImageSize,
         target_size: ImageSize,
         premultiply_alpha: bool,
-    ) -> Result<Arc<dyn ResamplingPlan<f32, 4> + Send + Sync>, PicScaleError> {
+    ) -> Result<Arc<Resampling<f32, 4>>, PicScaleError> {
         if premultiply_alpha {
             match self.workload_strategy {
                 WorkloadStrategy::PreferQuality => self
@@ -433,7 +433,7 @@ impl Scaler {
         &self,
         source_size: ImageSize,
         destination_size: ImageSize,
-    ) -> Result<Arc<dyn ResamplingPlan<u8, 4> + Send + Sync>, PicScaleError> {
+    ) -> Result<Arc<Resampling<u8, 4>>, PicScaleError> {
         if self.function == ResamplingFunction::Nearest {
             return Ok(Arc::new(ResampleNearestPlan {
                 source_size,
@@ -501,7 +501,7 @@ impl Scaler {
         source_size: ImageSize,
         target_size: ImageSize,
         order: Ar30ByteOrder,
-    ) -> Result<Arc<dyn ResamplingPlan<u8, 4> + Send + Sync>, PicScaleError> {
+    ) -> Result<Arc<Resampling<u8, 4>>, PicScaleError> {
         match order {
             Ar30ByteOrder::Host => self
                 .plan_resize_ar30::<{ Rgb30::Ar30 as usize }, { Ar30ByteOrder::Host as usize }>(
@@ -529,7 +529,7 @@ impl Scaler {
         source_size: ImageSize,
         target_size: ImageSize,
         order: Ar30ByteOrder,
-    ) -> Result<Arc<dyn ResamplingPlan<u8, 4> + Send + Sync>, PicScaleError> {
+    ) -> Result<Arc<Resampling<u8, 4>>, PicScaleError> {
         match order {
             Ar30ByteOrder::Host => self
                 .plan_resize_ar30::<{ Rgb30::Ra30 as usize }, { Ar30ByteOrder::Host as usize }>(
@@ -573,11 +573,11 @@ macro_rules! def_image_scaling_alpha {
                 store: &mut ImageStoreMut<'b, $fx_type, $cn>,
                 options: ScalingOptions,
             ) -> Result<(), PicScaleError> {
-                let mut scaler = Scaler::new(options.resampling_function);
-                scaler.set_threading_policy(options.threading_policy);
+                let scaler = Scaler::new(options.resampling_function)
+                    .set_threading_policy(options.threading_policy);
                 let plan = scaler.plan_generic_resize_with_alpha::<$fx_type, f32, $cn>(
                     self.get_size(),
-                    store.get_size(),
+                    store.size(),
                     store.bit_depth,
                     options.premultiply_alpha,
                 )?;
@@ -595,11 +595,11 @@ macro_rules! def_image_scaling {
                 store: &mut ImageStoreMut<'b, $fx_type, $cn>,
                 options: ScalingOptions,
             ) -> Result<(), PicScaleError> {
-                let mut scaler = Scaler::new(options.resampling_function);
-                scaler.set_threading_policy(options.threading_policy);
+                let scaler = Scaler::new(options.resampling_function)
+                    .set_threading_policy(options.threading_policy);
                 let plan = scaler.plan_generic_resize::<$fx_type, f32, $cn>(
                     self.get_size(),
-                    store.get_size(),
+                    store.size(),
                     store.bit_depth,
                 )?;
                 plan.resample(self, store)
@@ -706,7 +706,7 @@ mod tests {
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
         let planned = scaler
-            .plan_rgba_resampling(src_store.get_size(), target_store.get_size(), false)
+            .plan_rgba_resampling(src_store.get_size(), target_store.size(), false)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -731,7 +731,7 @@ mod tests {
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width / 2, image_height / 2);
         let planned = scaler
-            .plan_rgba_resampling(src_store.get_size(), target_store.get_size(), false)
+            .plan_rgba_resampling(src_store.get_size(), target_store.size(), false)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -756,7 +756,7 @@ mod tests {
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width / 2, image_height / 2);
         let planned = scaler
-            .plan_rgba_resampling(src_store.get_size(), target_store.get_size(), true)
+            .plan_rgba_resampling(src_store.get_size(), target_store.size(), true)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -779,7 +779,7 @@ mod tests {
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
         let planned = scaler
-            .plan_rgb_resampling(src_store.get_size(), target_store.get_size())
+            .plan_rgb_resampling(src_store.get_size(), target_store.size())
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -803,7 +803,7 @@ mod tests {
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
         let planned = scaler
-            .plan_rgb_resampling(src_store.get_size(), target_store.get_size())
+            .plan_rgb_resampling(src_store.get_size(), target_store.size())
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -830,7 +830,7 @@ mod tests {
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 10);
         let planned = scaler
-            .plan_rgba_resampling16(src_store.get_size(), target_store.get_size(), true, 10)
+            .plan_rgba_resampling16(src_store.get_size(), target_store.size(), true, 10)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -855,7 +855,7 @@ mod tests {
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 10);
         let planned = scaler
-            .plan_rgb_resampling16(src_store.get_size(), target_store.get_size(), 10)
+            .plan_rgb_resampling16(src_store.get_size(), target_store.size(), 10)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -880,7 +880,7 @@ mod tests {
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 10);
         let planned = scaler
-            .plan_rgb_resampling16(src_store.get_size(), target_store.get_size(), 10)
+            .plan_rgb_resampling16(src_store.get_size(), target_store.size(), 10)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -905,7 +905,7 @@ mod tests {
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 16);
         let planned = scaler
-            .plan_rgb_resampling16(src_store.get_size(), target_store.get_size(), 16)
+            .plan_rgb_resampling16(src_store.get_size(), target_store.size(), 16)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -931,7 +931,7 @@ mod tests {
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 16);
         let planned = scaler
-            .plan_rgb_resampling16(src_store.get_size(), target_store.get_size(), 16)
+            .plan_rgba_resampling16(src_store.get_size(), target_store.size(), false, 16)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -957,7 +957,7 @@ mod tests {
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 16);
         let planned = scaler
-            .plan_rgba_resampling16(src_store.get_size(), target_store.get_size(), false, 16)
+            .plan_rgba_resampling16(src_store.get_size(), target_store.size(), false, 16)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -982,7 +982,7 @@ mod tests {
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
         let planned = scaler
-            .plan_rgba_resampling(src_store.get_size(), target_store.get_size(), false)
+            .plan_rgba_resampling(src_store.get_size(), target_store.size(), false)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -1007,7 +1007,7 @@ mod tests {
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
         let planned = scaler
-            .plan_rgba_resampling(src_store.get_size(), target_store.get_size(), false)
+            .plan_rgba_resampling(src_store.get_size(), target_store.size(), false)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();

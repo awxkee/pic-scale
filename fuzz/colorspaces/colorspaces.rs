@@ -32,8 +32,8 @@
 use libfuzzer_sys::fuzz_target;
 use pic_scale::{
     ImageStore, ImageStoreMut, JzazbzScaler, LChScaler, LabScaler, LinearApproxScaler,
-    LinearScaler, LuvScaler, OklabScaler, ResamplingFunction, Scaling, ScalingU16, SigmoidalScaler,
-    TransferFunction, XYZScaler,
+    LinearScaler, LuvScaler, OklabScaler, ResamplingFunction, SigmoidalScaler, TransferFunction,
+    XYZScaler,
 };
 
 fuzz_target!(|data: (u16, u16, u16, u16, u8, bool)| {
