@@ -339,7 +339,7 @@ pub(crate) fn avx2_pack_u16(s_1: __m256i, s_2: __m256i) -> __m256i {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn avx2_pack_u32(s_1: __m256i, s_2: __m256i) -> __m256i {
+pub(crate) fn avx2_pack_u32(s_1: __m256i, s_2: __m256i) -> __m256i {
     unsafe {
         let packed = _mm256_packus_epi32(s_1, s_2);
         const MASK: i32 = shuffle(3, 1, 2, 0);
@@ -390,7 +390,7 @@ pub(crate) unsafe fn _mm256_packts_epi64(a: __m256i, b: __m256i) -> __m256i {
 #[inline]
 #[allow(dead_code)]
 /// Pack 64bytes integers into 32 bytes
-pub(crate) unsafe fn _mm256_cvtepi64_epi32x(v: __m256i) -> __m128i {
+pub(crate) fn _mm256_cvtepi64_epi32x(v: __m256i) -> __m128i {
     unsafe {
         let vf = _mm256_castsi256_ps(v);
         let hi = _mm256_extractf128_ps::<1>(vf);
@@ -403,7 +403,7 @@ pub(crate) unsafe fn _mm256_cvtepi64_epi32x(v: __m256i) -> __m128i {
 
 #[allow(dead_code)]
 #[inline(always)]
-pub(crate) unsafe fn _mm256_dot16_avx_epi32<const HAS_DOT: bool>(
+pub(crate) fn _mm256_dot16_avx_epi32<const HAS_DOT: bool>(
     a: __m256i,
     b: __m256i,
     c: __m256i,
@@ -468,12 +468,8 @@ pub(crate) unsafe fn _mm_udot8_epi16<const DOT: bool>(
     }
 }
 
-#[inline]
-pub(crate) unsafe fn _mm256_prefer_fma_ps<const FMA: bool>(
-    a: __m256,
-    b: __m256,
-    c: __m256,
-) -> __m256 {
+#[inline(always)]
+pub(crate) fn _mm256_prefer_fma_ps<const FMA: bool>(a: __m256, b: __m256, c: __m256) -> __m256 {
     unsafe {
         if FMA {
             _mm256_fmadd_ps(b, c, a)

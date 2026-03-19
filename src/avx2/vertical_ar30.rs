@@ -53,7 +53,7 @@ struct ExecutionUnit<const AR30_TYPE: usize, const AR30_ORDER: usize> {}
 
 impl<const AR30_TYPE: usize, const AR30_ORDER: usize> ExecutionUnit<AR30_TYPE, AR30_ORDER> {
     #[target_feature(enable = "avx2")]
-    unsafe fn pass(
+    fn pass(
         &self,
         bounds: &FilterBounds,
         src: &[u8],
