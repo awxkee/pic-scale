@@ -91,7 +91,7 @@ unsafe fn hdot(store: __m128i, v: __m128i, w01: __m128i) -> __m128i {
 }
 
 #[inline(always)]
-unsafe fn _mm_add_hi_lo_epi16(v: __m128i) -> __m128i {
+fn _mm_add_hi_lo_epi16(v: __m128i) -> __m128i {
     unsafe {
         let p = _mm_unpackhi_epi64(v, v);
         _mm_add_epi16(v, p)
@@ -100,7 +100,7 @@ unsafe fn _mm_add_hi_lo_epi16(v: __m128i) -> __m128i {
 
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_rgba_avx_rows_4_impl(
+fn convolve_horizontal_rgba_avx_rows_4_impl(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
