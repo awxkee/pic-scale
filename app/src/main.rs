@@ -42,7 +42,7 @@ fn main() {
     let resizing_plan = scaler
         .plan_rgba_resampling(
             ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-            ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize/ 4),
+            ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
             true,
         )
         .unwrap();
@@ -50,7 +50,11 @@ fn main() {
     let mut store =
         Rgba8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     store.bit_depth = 8;
-    let mut dst_store = Rgba8ImageStoreMut::alloc_with_depth(dimensions.0 as usize / 4, dimensions.1 as usize/ 4, 8);
+    let mut dst_store = Rgba8ImageStoreMut::alloc_with_depth(
+        dimensions.0 as usize / 4,
+        dimensions.1 as usize / 4,
+        8,
+    );
     resizing_plan.resample(&store, &mut dst_store).unwrap();
     // scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
     //
