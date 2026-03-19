@@ -60,9 +60,7 @@ fn convolve_column_lb_u16_def(
     weight: &[f32],
     bit_depth: u32,
 ) {
-    unsafe {
-        convolve_column_lb_u16_impl::<false>(bounds, src, dst, src_stride, weight, bit_depth);
-    }
+    convolve_column_lb_u16_impl::<false>(bounds, src, dst, src_stride, weight, bit_depth);
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
@@ -75,9 +73,7 @@ fn convolve_column_lb_u16_fma(
     weight: &[f32],
     bit_depth: u32,
 ) {
-    unsafe {
-        convolve_column_lb_u16_impl::<true>(bounds, src, dst, src_stride, weight, bit_depth);
-    }
+    convolve_column_lb_u16_impl::<true>(bounds, src, dst, src_stride, weight, bit_depth);
 }
 
 #[inline(always)]

@@ -78,9 +78,7 @@ fn convolve_column_lb_avx_u16_reg(
     weight: &[i16],
     bit_depth: u32,
 ) {
-    unsafe {
         convolve_column_lb_avx_u16_impl::<false>(bounds, src, dst, src_stride, weight, bit_depth);
-    }
 }
 
 #[inline(always)]

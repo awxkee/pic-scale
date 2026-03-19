@@ -277,7 +277,6 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         src_stride: usize,
         weights: &[f64],
     ) {
-        unsafe {
             let mut cx = 0usize;
             let dst_width = dst.len();
 
@@ -321,6 +320,5 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 );
                 cx += 1;
             }
-        }
     }
 }
