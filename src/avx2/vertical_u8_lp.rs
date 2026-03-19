@@ -65,7 +65,7 @@ macro_rules! m256dot {
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn convolve_vertical_avx2_row_impl(
+fn convolve_vertical_avx2_row_impl(
     _: usize,
     bounds: &FilterBounds,
     src: &[u8],
@@ -98,136 +98,25 @@ unsafe fn convolve_vertical_avx2_row_impl(
 
             let px = cx;
 
-            if bounds_size == 2 {
-                let py = bounds.start;
-                let weights = weights.get_unchecked(0..2);
-                let v_weight0 = _mm256_set1_epi16(weights[0]);
-                let v_weight1 = _mm256_set1_epi16(weights[1]);
-                let v_offset0 = src_stride * py + px;
-                let src_ptr0 = src.get_unchecked(v_offset0..);
-                let v_offset1 = src_stride * (py + 1) + px;
-                let src_ptr1 = src.get_unchecked(v_offset1..);
+            let py = bounds.start;
+            let w0 = weights.get_unchecked(0);
+            let v_weight = _mm256_set1_epi16(*w0);
+            let v_offset = src_stride * py + px;
+            let src_ptr = src.get_unchecked(v_offset..);
+            let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
+            let item_row1 =
+                _mm256_loadu_si256(src_ptr.get_unchecked(32..).as_ptr() as *const __m256i);
+            let item_row2 =
+                _mm256_loadu_si256(src_ptr.get_unchecked(64..).as_ptr() as *const __m256i);
 
-                let item_row0 = _mm256_loadu_si256(src_ptr0.as_ptr() as *const __m256i);
-                let item_row1 =
-                    _mm256_loadu_si256(src_ptr0.get_unchecked(32..).as_ptr() as *const __m256i);
-                let item_row2 =
-                    _mm256_loadu_si256(src_ptr0.get_unchecked(64..).as_ptr() as *const __m256i);
+            (store0, store1) = m256dot!(store0, store1, item_row0, v_weight);
+            (store2, store3) = m256dot!(store2, store3, item_row1, v_weight);
+            (store4, store5) = m256dot!(store4, store5, item_row2, v_weight);
 
-                (store0, store1) = m256dot!(store0, store1, item_row0, v_weight0);
-                (store2, store3) = m256dot!(store2, store3, item_row1, v_weight0);
-                (store4, store5) = m256dot!(store4, store5, item_row2, v_weight0);
-
-                let item_row10 = _mm256_loadu_si256(src_ptr1.as_ptr() as *const __m256i);
-                let item_row11 =
-                    _mm256_loadu_si256(src_ptr1.get_unchecked(32..).as_ptr() as *const __m256i);
-                let item_row12 =
-                    _mm256_loadu_si256(src_ptr1.get_unchecked(64..).as_ptr() as *const __m256i);
-
-                (store0, store1) = m256dot!(store0, store1, item_row10, v_weight1);
-                (store2, store3) = m256dot!(store2, store3, item_row11, v_weight1);
-                (store4, store5) = m256dot!(store4, store5, item_row12, v_weight1);
-            } else if bounds_size == 3 {
-                let py = bounds.start;
-                let weights = weights.get_unchecked(0..3);
-                let v_weight0 = _mm256_set1_epi16(weights[0]);
-                let v_weight1 = _mm256_set1_epi16(weights[1]);
-                let v_weight2 = _mm256_set1_epi16(weights[2]);
-                let v_offset0 = src_stride * py + px;
-                let src_ptr0 = src.get_unchecked(v_offset0..);
-                let v_offset1 = src_stride * (py + 1) + px;
-                let src_ptr1 = src.get_unchecked(v_offset1..);
-                let v_offset2 = src_stride * (py + 2) + px;
-                let src_ptr2 = src.get_unchecked(v_offset2..);
-
-                let item_row0 = _mm256_loadu_si256(src_ptr0.as_ptr() as *const __m256i);
-                let item_row1 =
-                    _mm256_loadu_si256(src_ptr0.get_unchecked(32..).as_ptr() as *const __m256i);
-                let item_row2 =
-                    _mm256_loadu_si256(src_ptr0.get_unchecked(64..).as_ptr() as *const __m256i);
-
-                (store0, store1) = m256dot!(store0, store1, item_row0, v_weight0);
-                (store2, store3) = m256dot!(store2, store3, item_row1, v_weight0);
-                (store4, store5) = m256dot!(store4, store5, item_row2, v_weight0);
-
-                let item_row10 = _mm256_loadu_si256(src_ptr1.as_ptr() as *const __m256i);
-                let item_row11 =
-                    _mm256_loadu_si256(src_ptr1.get_unchecked(32..).as_ptr() as *const __m256i);
-                let item_row12 =
-                    _mm256_loadu_si256(src_ptr1.get_unchecked(64..).as_ptr() as *const __m256i);
-
-                (store0, store1) = m256dot!(store0, store1, item_row10, v_weight1);
-                (store2, store3) = m256dot!(store2, store3, item_row11, v_weight1);
-                (store4, store5) = m256dot!(store4, store5, item_row12, v_weight1);
-
-                let item_row20 = _mm256_loadu_si256(src_ptr2.as_ptr() as *const __m256i);
-                let item_row21 =
-                    _mm256_loadu_si256(src_ptr2.get_unchecked(32..).as_ptr() as *const __m256i);
-                let item_row22 =
-                    _mm256_loadu_si256(src_ptr2.get_unchecked(64..).as_ptr() as *const __m256i);
-
-                (store0, store1) = m256dot!(store0, store1, item_row20, v_weight2);
-                (store2, store3) = m256dot!(store2, store3, item_row21, v_weight2);
-                (store4, store5) = m256dot!(store4, store5, item_row22, v_weight2);
-            } else if bounds_size == 4 {
-                let py = bounds.start;
-                let weights = weights.get_unchecked(0..4);
-                let v_weight0 = _mm256_set1_epi16(weights[0]);
-                let v_weight1 = _mm256_set1_epi16(weights[1]);
-                let v_weight2 = _mm256_set1_epi16(weights[2]);
-                let v_weight3 = _mm256_set1_epi16(weights[3]);
-                let v_offset0 = src_stride * py + px;
-                let src_ptr0 = src.get_unchecked(v_offset0..);
-                let v_offset1 = src_stride * (py + 1) + px;
-                let src_ptr1 = src.get_unchecked(v_offset1..);
-                let v_offset2 = src_stride * (py + 2) + px;
-                let src_ptr2 = src.get_unchecked(v_offset2..);
-                let v_offset3 = src_stride * (py + 3) + px;
-                let src_ptr3 = src.get_unchecked(v_offset3..);
-
-                let item_row0 = _mm256_loadu_si256(src_ptr0.as_ptr() as *const __m256i);
-                let item_row1 =
-                    _mm256_loadu_si256(src_ptr0.get_unchecked(32..).as_ptr() as *const __m256i);
-                let item_row2 =
-                    _mm256_loadu_si256(src_ptr0.get_unchecked(64..).as_ptr() as *const __m256i);
-
-                (store0, store1) = m256dot!(store0, store1, item_row0, v_weight0);
-                (store2, store3) = m256dot!(store2, store3, item_row1, v_weight0);
-                (store4, store5) = m256dot!(store4, store5, item_row2, v_weight0);
-
-                let item_row10 = _mm256_loadu_si256(src_ptr1.as_ptr() as *const __m256i);
-                let item_row11 =
-                    _mm256_loadu_si256(src_ptr1.get_unchecked(32..).as_ptr() as *const __m256i);
-                let item_row12 =
-                    _mm256_loadu_si256(src_ptr1.get_unchecked(64..).as_ptr() as *const __m256i);
-
-                (store0, store1) = m256dot!(store0, store1, item_row10, v_weight1);
-                (store2, store3) = m256dot!(store2, store3, item_row11, v_weight1);
-                (store4, store5) = m256dot!(store4, store5, item_row12, v_weight1);
-
-                let item_row20 = _mm256_loadu_si256(src_ptr2.as_ptr() as *const __m256i);
-                let item_row21 =
-                    _mm256_loadu_si256(src_ptr2.get_unchecked(32..).as_ptr() as *const __m256i);
-                let item_row22 =
-                    _mm256_loadu_si256(src_ptr2.get_unchecked(64..).as_ptr() as *const __m256i);
-
-                (store0, store1) = m256dot!(store0, store1, item_row20, v_weight2);
-                (store2, store3) = m256dot!(store2, store3, item_row21, v_weight2);
-                (store4, store5) = m256dot!(store4, store5, item_row22, v_weight2);
-
-                let item_row30 = _mm256_loadu_si256(src_ptr3.as_ptr() as *const __m256i);
-                let item_row31 =
-                    _mm256_loadu_si256(src_ptr3.get_unchecked(32..).as_ptr() as *const __m256i);
-                let item_row32 =
-                    _mm256_loadu_si256(src_ptr3.get_unchecked(64..).as_ptr() as *const __m256i);
-
-                (store0, store1) = m256dot!(store0, store1, item_row30, v_weight3);
-                (store2, store3) = m256dot!(store2, store3, item_row31, v_weight3);
-                (store4, store5) = m256dot!(store4, store5, item_row32, v_weight3);
-            } else {
-                let py = bounds.start;
-                let w0 = weights.get_unchecked(0);
-                let v_weight = _mm256_set1_epi16(*w0);
+            for j in 1..bounds_size {
+                let py = bounds.start + j;
+                let weight = weights.get_unchecked(j);
+                let v_weight = _mm256_set1_epi16(*weight);
                 let v_offset = src_stride * py + px;
                 let src_ptr = src.get_unchecked(v_offset..);
                 let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
@@ -239,23 +128,6 @@ unsafe fn convolve_vertical_avx2_row_impl(
                 (store0, store1) = m256dot!(store0, store1, item_row0, v_weight);
                 (store2, store3) = m256dot!(store2, store3, item_row1, v_weight);
                 (store4, store5) = m256dot!(store4, store5, item_row2, v_weight);
-
-                for j in 1..bounds_size {
-                    let py = bounds.start + j;
-                    let weight = weights.get_unchecked(j);
-                    let v_weight = _mm256_set1_epi16(*weight);
-                    let v_offset = src_stride * py + px;
-                    let src_ptr = src.get_unchecked(v_offset..);
-                    let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
-                    let item_row1 =
-                        _mm256_loadu_si256(src_ptr.get_unchecked(32..).as_ptr() as *const __m256i);
-                    let item_row2 =
-                        _mm256_loadu_si256(src_ptr.get_unchecked(64..).as_ptr() as *const __m256i);
-
-                    (store0, store1) = m256dot!(store0, store1, item_row0, v_weight);
-                    (store2, store3) = m256dot!(store2, store3, item_row1, v_weight);
-                    (store4, store5) = m256dot!(store4, store5, item_row2, v_weight);
-                }
             }
 
             let rebased0 = _mm256_srai_epi16::<R_SHR_SCALE>(store0);
@@ -293,119 +165,18 @@ unsafe fn convolve_vertical_avx2_row_impl(
 
             let px = cx;
 
-            if bounds_size == 2 {
-                let py = bounds.start;
-                let weights = weights.get_unchecked(0..2);
-                let v_weight0 = _mm256_set1_epi16(weights[0]);
-                let v_weight1 = _mm256_set1_epi16(weights[1]);
-                let v_offset0 = src_stride * py + px;
-                let src_ptr0 = src.get_unchecked(v_offset0..);
-                let v_offset1 = src_stride * (py + 1) + px;
-                let src_ptr1 = src.get_unchecked(v_offset1..);
-
-                let item_row0 = _mm256_loadu_si256(src_ptr0.as_ptr() as *const __m256i);
+            for j in 0..bounds_size {
+                let py = bounds.start + j;
+                let weight = weights.get_unchecked(j);
+                let v_weight = _mm256_set1_epi16(*weight);
+                let v_offset = src_stride * py + px;
+                let src_ptr = src.get_unchecked(v_offset..);
+                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
                 let item_row1 =
-                    _mm256_loadu_si256(src_ptr0.get_unchecked(32..).as_ptr() as *const __m256i);
+                    _mm256_loadu_si256(src_ptr.get_unchecked(32..).as_ptr() as *const __m256i);
 
-                (store0, store1) = m256dot!(store0, store1, item_row0, v_weight0);
-                (store2, store3) = m256dot!(store2, store3, item_row1, v_weight0);
-
-                let item_row10 = _mm256_loadu_si256(src_ptr1.as_ptr() as *const __m256i);
-                let item_row11 =
-                    _mm256_loadu_si256(src_ptr1.get_unchecked(32..).as_ptr() as *const __m256i);
-
-                (store0, store1) = m256dot!(store0, store1, item_row10, v_weight1);
-                (store2, store3) = m256dot!(store2, store3, item_row11, v_weight1);
-            } else if bounds_size == 3 {
-                let py = bounds.start;
-                let weights = weights.get_unchecked(0..3);
-                let v_weight0 = _mm256_set1_epi16(weights[0]);
-                let v_weight1 = _mm256_set1_epi16(weights[1]);
-                let v_weight2 = _mm256_set1_epi16(weights[2]);
-                let v_offset0 = src_stride * py + px;
-                let src_ptr0 = src.get_unchecked(v_offset0..);
-                let v_offset1 = src_stride * (py + 1) + px;
-                let src_ptr1 = src.get_unchecked(v_offset1..);
-                let v_offset2 = src_stride * (py + 2) + px;
-                let src_ptr2 = src.get_unchecked(v_offset2..);
-
-                let item_row0 = _mm256_loadu_si256(src_ptr0.as_ptr() as *const __m256i);
-                let item_row1 =
-                    _mm256_loadu_si256(src_ptr0.get_unchecked(32..).as_ptr() as *const __m256i);
-
-                (store0, store1) = m256dot!(store0, store1, item_row0, v_weight0);
-                (store2, store3) = m256dot!(store2, store3, item_row1, v_weight0);
-
-                let item_row10 = _mm256_loadu_si256(src_ptr1.as_ptr() as *const __m256i);
-                let item_row11 =
-                    _mm256_loadu_si256(src_ptr1.get_unchecked(32..).as_ptr() as *const __m256i);
-
-                (store0, store1) = m256dot!(store0, store1, item_row10, v_weight1);
-                (store2, store3) = m256dot!(store2, store3, item_row11, v_weight1);
-
-                let item_row20 = _mm256_loadu_si256(src_ptr2.as_ptr() as *const __m256i);
-                let item_row21 =
-                    _mm256_loadu_si256(src_ptr2.get_unchecked(32..).as_ptr() as *const __m256i);
-
-                (store0, store1) = m256dot!(store0, store1, item_row20, v_weight2);
-                (store2, store3) = m256dot!(store2, store3, item_row21, v_weight2);
-            } else if bounds_size == 4 {
-                let py = bounds.start;
-                let weights = weights.get_unchecked(0..4);
-                let v_weight0 = _mm256_set1_epi16(weights[0]);
-                let v_weight1 = _mm256_set1_epi16(weights[1]);
-                let v_weight2 = _mm256_set1_epi16(weights[2]);
-                let v_weight3 = _mm256_set1_epi16(weights[3]);
-                let v_offset0 = src_stride * py + px;
-                let src_ptr0 = src.get_unchecked(v_offset0..);
-                let v_offset1 = src_stride * (py + 1) + px;
-                let src_ptr1 = src.get_unchecked(v_offset1..);
-                let v_offset2 = src_stride * (py + 2) + px;
-                let src_ptr2 = src.get_unchecked(v_offset2..);
-                let v_offset3 = src_stride * (py + 3) + px;
-                let src_ptr3 = src.get_unchecked(v_offset3..);
-
-                let item_row0 = _mm256_loadu_si256(src_ptr0.as_ptr() as *const __m256i);
-                let item_row1 =
-                    _mm256_loadu_si256(src_ptr0.get_unchecked(32..).as_ptr() as *const __m256i);
-
-                (store0, store1) = m256dot!(store0, store1, item_row0, v_weight0);
-                (store2, store3) = m256dot!(store2, store3, item_row1, v_weight0);
-
-                let item_row10 = _mm256_loadu_si256(src_ptr1.as_ptr() as *const __m256i);
-                let item_row11 =
-                    _mm256_loadu_si256(src_ptr1.get_unchecked(32..).as_ptr() as *const __m256i);
-
-                (store0, store1) = m256dot!(store0, store1, item_row10, v_weight1);
-                (store2, store3) = m256dot!(store2, store3, item_row11, v_weight1);
-
-                let item_row20 = _mm256_loadu_si256(src_ptr2.as_ptr() as *const __m256i);
-                let item_row21 =
-                    _mm256_loadu_si256(src_ptr2.get_unchecked(32..).as_ptr() as *const __m256i);
-
-                (store0, store1) = m256dot!(store0, store1, item_row20, v_weight2);
-                (store2, store3) = m256dot!(store2, store3, item_row21, v_weight2);
-
-                let item_row30 = _mm256_loadu_si256(src_ptr3.as_ptr() as *const __m256i);
-                let item_row31 =
-                    _mm256_loadu_si256(src_ptr3.get_unchecked(32..).as_ptr() as *const __m256i);
-
-                (store0, store1) = m256dot!(store0, store1, item_row30, v_weight3);
-                (store2, store3) = m256dot!(store2, store3, item_row31, v_weight3);
-            } else {
-                for j in 0..bounds_size {
-                    let py = bounds.start + j;
-                    let weight = weights.get_unchecked(j);
-                    let v_weight = _mm256_set1_epi16(*weight);
-                    let v_offset = src_stride * py + px;
-                    let src_ptr = src.get_unchecked(v_offset..);
-                    let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
-                    let item_row1 =
-                        _mm256_loadu_si256(src_ptr.get_unchecked(32..).as_ptr() as *const __m256i);
-
-                    (store0, store1) = m256dot!(store0, store1, item_row0, v_weight);
-                    (store2, store3) = m256dot!(store2, store3, item_row1, v_weight);
-                }
+                (store0, store1) = m256dot!(store0, store1, item_row0, v_weight);
+                (store2, store3) = m256dot!(store2, store3, item_row1, v_weight);
             }
 
             let rebased0 = _mm256_srai_epi16::<R_SHR_SCALE>(store0);
@@ -435,80 +206,15 @@ unsafe fn convolve_vertical_avx2_row_impl(
 
             let px = cx;
 
-            if bounds_size == 2 {
-                let py = bounds.start;
-                let weights = weights.get_unchecked(0..2);
-                let v_weight0 = _mm256_set1_epi16(weights[0]);
-                let v_weight1 = _mm256_set1_epi16(weights[1]);
-                let v_offset0 = src_stride * py + px;
-                let src_ptr0 = src.get_unchecked(v_offset0..);
-                let v_offset1 = src_stride * (py + 1) + px;
-                let src_ptr1 = src.get_unchecked(v_offset1..);
+            for j in 0..bounds_size {
+                let py = bounds.start + j;
+                let weight = weights.get_unchecked(j);
+                let v_weight = _mm256_set1_epi16(*weight);
+                let v_offset = src_stride * py + px;
+                let src_ptr = src.get_unchecked(v_offset..);
+                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
 
-                let item_row0 = _mm256_loadu_si256(src_ptr0.as_ptr() as *const __m256i);
-                (store0, store1) = m256dot!(store0, store1, item_row0, v_weight0);
-
-                let item_row1 = _mm256_loadu_si256(src_ptr1.as_ptr() as *const __m256i);
-                (store0, store1) = m256dot!(store0, store1, item_row1, v_weight1);
-            } else if bounds_size == 3 {
-                let py = bounds.start;
-                let weights = weights.get_unchecked(0..3);
-                let v_weight0 = _mm256_set1_epi16(weights[0]);
-                let v_weight1 = _mm256_set1_epi16(weights[1]);
-                let v_weight2 = _mm256_set1_epi16(weights[2]);
-                let v_offset0 = src_stride * py + px;
-                let src_ptr0 = src.get_unchecked(v_offset0..);
-                let v_offset1 = src_stride * (py + 1) + px;
-                let src_ptr1 = src.get_unchecked(v_offset1..);
-                let v_offset2 = src_stride * (py + 2) + px;
-                let src_ptr2 = src.get_unchecked(v_offset2..);
-
-                let item_row0 = _mm256_loadu_si256(src_ptr0.as_ptr() as *const __m256i);
-                (store0, store1) = m256dot!(store0, store1, item_row0, v_weight0);
-
-                let item_row1 = _mm256_loadu_si256(src_ptr1.as_ptr() as *const __m256i);
-                (store0, store1) = m256dot!(store0, store1, item_row1, v_weight1);
-
-                let item_row2 = _mm256_loadu_si256(src_ptr2.as_ptr() as *const __m256i);
-                (store0, store1) = m256dot!(store0, store1, item_row2, v_weight2);
-            } else if bounds_size == 4 {
-                let py = bounds.start;
-                let weights = weights.get_unchecked(0..4);
-                let v_weight0 = _mm256_set1_epi16(weights[0]);
-                let v_weight1 = _mm256_set1_epi16(weights[1]);
-                let v_weight2 = _mm256_set1_epi16(weights[2]);
-                let v_weight3 = _mm256_set1_epi16(weights[3]);
-                let v_offset0 = src_stride * py + px;
-                let src_ptr0 = src.get_unchecked(v_offset0..);
-                let v_offset1 = src_stride * (py + 1) + px;
-                let src_ptr1 = src.get_unchecked(v_offset1..);
-                let v_offset2 = src_stride * (py + 2) + px;
-                let src_ptr2 = src.get_unchecked(v_offset2..);
-                let v_offset3 = src_stride * (py + 3) + px;
-                let src_ptr3 = src.get_unchecked(v_offset3..);
-
-                let item_row0 = _mm256_loadu_si256(src_ptr0.as_ptr() as *const __m256i);
-                (store0, store1) = m256dot!(store0, store1, item_row0, v_weight0);
-
-                let item_row1 = _mm256_loadu_si256(src_ptr1.as_ptr() as *const __m256i);
-                (store0, store1) = m256dot!(store0, store1, item_row1, v_weight1);
-
-                let item_row2 = _mm256_loadu_si256(src_ptr2.as_ptr() as *const __m256i);
-                (store0, store1) = m256dot!(store0, store1, item_row2, v_weight2);
-
-                let item_row3 = _mm256_loadu_si256(src_ptr3.as_ptr() as *const __m256i);
-                (store0, store1) = m256dot!(store0, store1, item_row3, v_weight3);
-            } else {
-                for j in 0..bounds_size {
-                    let py = bounds.start + j;
-                    let weight = weights.get_unchecked(j);
-                    let v_weight = _mm256_set1_epi16(*weight);
-                    let v_offset = src_stride * py + px;
-                    let src_ptr = src.get_unchecked(v_offset..);
-                    let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
-
-                    (store0, store1) = m256dot!(store0, store1, item_row0, v_weight);
-                }
+                (store0, store1) = m256dot!(store0, store1, item_row0, v_weight);
             }
 
             let rebased0 = _mm256_srai_epi16::<R_SHR_SCALE>(store0);
