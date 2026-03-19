@@ -268,27 +268,27 @@ fn convolve_vertical_avx2_row_impl(
 
         let mut rem = dst;
 
-        cx = process_chunk_96(
-            rem.as_chunks_mut::<96>().0,
-            bounds,
-            src,
-            src_stride,
-            weights,
-            cx,
-        );
-
-        rem = rem.as_chunks_mut::<96>().1;
-
-        cx = process_chunk_64(
-            rem.as_chunks_mut::<64>().0,
-            bounds,
-            src,
-            src_stride,
-            weights,
-            cx,
-        );
-
-        rem = rem.as_chunks_mut::<64>().1;
+        // cx = process_chunk_96(
+        //     rem.as_chunks_mut::<96>().0,
+        //     bounds,
+        //     src,
+        //     src_stride,
+        //     weights,
+        //     cx,
+        // );
+        //
+        // rem = rem.as_chunks_mut::<96>().1;
+        //
+        // cx = process_chunk_64(
+        //     rem.as_chunks_mut::<64>().0,
+        //     bounds,
+        //     src,
+        //     src_stride,
+        //     weights,
+        //     cx,
+        // );
+        //
+        // rem = rem.as_chunks_mut::<64>().1;
 
         cx = process_chunk_32(
             rem.as_chunks_mut::<32>().0,
