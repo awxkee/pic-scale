@@ -247,6 +247,58 @@ fn process_chunk_32(
 }
 
 #[target_feature(enable = "avx2")]
+fn process_chunk_16(
+    chunks: &mut [[u8; 16]],
+    bounds: &FilterBounds,
+    src: &[u8],
+    src_stride: usize,
+    weights: &[i16],
+    cx: usize,
+) -> usize {
+    const SCALE: i32 = 6;
+    const R_SHR_SCALE: i32 = SCALE;
+    const ROUNDING: i16 = 1 << (R_SHR_SCALE - 1);
+
+    let mut cx = cx;
+
+    let bounds_size = bounds.size;
+
+    for dst in chunks {
+        let mut store0 = _mm256_set1_epi16(ROUNDING);
+
+        let px = cx;
+
+        for j in 0..bounds_size {
+            let py = bounds.start + j;
+            let weight = unsafe { weights.get_unchecked(j) };
+            let v_weight = _mm256_set1_epi16(*weight);
+            let v_offset = src_stride * py + px;
+            let src_ptr = unsafe { src.get_unchecked(v_offset..) };
+            let mut item_row = _mm256_permute4x64_epi64::<0x50>(_mm256_castsi128_si256(unsafe {
+                _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i)
+            }));
+            item_row = _mm256_unpacklo_epi8(item_row, item_row);
+            store0 = _mm256_add_epi16(
+                store0,
+                _mm256_mulhrs_epi16(_mm256_srli_epi16::<2>(item_row), v_weight),
+            );
+        }
+
+        store0 = _mm256_srai_epi16::<R_SHR_SCALE>(store0);
+
+        let packed = avx2_pack_u16(store0, store0);
+
+        let rebased0 = _mm256_castsi256_si128(packed);
+        unsafe {
+            _mm_storeu_si128(dst.as_mut_ptr() as *mut __m128i, rebased0);
+        }
+
+        cx += 16;
+    }
+    cx
+}
+
+#[target_feature(enable = "avx2")]
 fn convolve_vertical_avx2_row_impl(
     _: usize,
     bounds: &FilterBounds,
@@ -279,16 +331,16 @@ fn convolve_vertical_avx2_row_impl(
         //
         // rem = rem.as_chunks_mut::<96>().1;
         //
-        // cx = process_chunk_64(
-        //     rem.as_chunks_mut::<64>().0,
-        //     bounds,
-        //     src,
-        //     src_stride,
-        //     weights,
-        //     cx,
-        // );
-        //
-        // rem = rem.as_chunks_mut::<64>().1;
+        cx = process_chunk_64(
+            rem.as_chunks_mut::<64>().0,
+            bounds,
+            src,
+            src_stride,
+            weights,
+            cx,
+        );
+
+        rem = rem.as_chunks_mut::<64>().1;
 
         cx = process_chunk_32(
             rem.as_chunks_mut::<32>().0,
@@ -300,40 +352,17 @@ fn convolve_vertical_avx2_row_impl(
         );
 
         rem = rem.as_chunks_mut::<32>().1;
-        let iter_16 = rem.chunks_exact_mut(16);
 
-        for dst in iter_16 {
-            let mut store0 = _mm256_set1_epi16(ROUNDING);
+        cx = process_chunk_16(
+            rem.as_chunks_mut::<16>().0,
+            bounds,
+            src,
+            src_stride,
+            weights,
+            cx,
+        );
 
-            let px = cx;
-
-            for j in 0..bounds_size {
-                let py = bounds.start + j;
-                let weight = weights.get_unchecked(j);
-                let v_weight = _mm256_set1_epi16(*weight);
-                let v_offset = src_stride * py + px;
-                let src_ptr = src.get_unchecked(v_offset..);
-                let mut item_row = _mm256_permute4x64_epi64::<0x50>(_mm256_castsi128_si256(
-                    _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i),
-                ));
-                item_row = _mm256_unpacklo_epi8(item_row, item_row);
-                store0 = _mm256_add_epi16(
-                    store0,
-                    _mm256_mulhrs_epi16(_mm256_srli_epi16::<2>(item_row), v_weight),
-                );
-            }
-
-            store0 = _mm256_srai_epi16::<R_SHR_SCALE>(store0);
-
-            let packed = avx2_pack_u16(store0, store0);
-
-            let rebased0 = _mm256_castsi256_si128(packed);
-            _mm_storeu_si128(dst.as_mut_ptr() as *mut __m128i, rebased0);
-
-            cx += 16;
-        }
-
-        rem = rem.chunks_exact_mut(16).into_remainder();
+        rem = rem.as_chunks_mut::<16>().1;
         let iter_8 = rem.chunks_exact_mut(8);
 
         for dst in iter_8 {
