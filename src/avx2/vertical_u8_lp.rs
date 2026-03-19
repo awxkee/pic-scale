@@ -139,6 +139,114 @@ fn process_chunk_96(
 }
 
 #[target_feature(enable = "avx2")]
+fn process_chunk_64(
+    chunks: &mut [[u8; 64]],
+    bounds: &FilterBounds,
+    src: &[u8],
+    src_stride: usize,
+    weights: &[i16],
+    cx: usize,
+) -> usize {
+    const SCALE: i32 = 6;
+    const R_SHR_SCALE: i32 = SCALE;
+    const ROUNDING: i16 = 1 << (R_SHR_SCALE - 1);
+
+    let mut cx = cx;
+
+    let bounds_size = bounds.size;
+
+    for dst in chunks {
+        let mut store0 = _mm256_set1_epi16(ROUNDING);
+        let mut store1 = _mm256_set1_epi16(ROUNDING);
+        let mut store2 = _mm256_set1_epi16(ROUNDING);
+        let mut store3 = _mm256_set1_epi16(ROUNDING);
+
+        let px = cx;
+
+        for j in 0..bounds_size {
+            let py = bounds.start + j;
+            let weight = unsafe { weights.get_unchecked(j) };
+            let v_weight = _mm256_set1_epi16(*weight);
+            let v_offset = src_stride * py + px;
+            let src_ptr = unsafe { src.get_unchecked(v_offset..) };
+            let item_row0 = unsafe { _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i) };
+            let item_row1 = unsafe {
+                _mm256_loadu_si256(src_ptr.get_unchecked(32..).as_ptr() as *const __m256i)
+            };
+
+            (store0, store1) = m256dot!(store0, store1, item_row0, v_weight);
+            (store2, store3) = m256dot!(store2, store3, item_row1, v_weight);
+        }
+
+        let rebased0 = _mm256_srai_epi16::<R_SHR_SCALE>(store0);
+        let rebased1 = _mm256_srai_epi16::<R_SHR_SCALE>(store1);
+        let rebased2 = _mm256_srai_epi16::<R_SHR_SCALE>(store2);
+        let rebased3 = _mm256_srai_epi16::<R_SHR_SCALE>(store3);
+
+        let shrank0 = _mm256_packus_epi16(rebased0, rebased1);
+        let shrank1 = _mm256_packus_epi16(rebased2, rebased3);
+
+        unsafe {
+            _mm256_storeu_si256(dst.as_mut_ptr() as *mut __m256i, shrank0);
+            _mm256_storeu_si256(
+                dst.get_unchecked_mut(32..).as_mut_ptr() as *mut __m256i,
+                shrank1,
+            );
+        }
+
+        cx += 64;
+    }
+    cx
+}
+
+#[target_feature(enable = "avx2")]
+fn process_chunk_32(
+    chunks: &mut [[u8; 32]],
+    bounds: &FilterBounds,
+    src: &[u8],
+    src_stride: usize,
+    weights: &[i16],
+    cx: usize,
+) -> usize {
+    const SCALE: i32 = 6;
+    const R_SHR_SCALE: i32 = SCALE;
+    const ROUNDING: i16 = 1 << (R_SHR_SCALE - 1);
+
+    let mut cx = cx;
+
+    let bounds_size = bounds.size;
+
+    for dst in chunks {
+        let mut store0 = _mm256_set1_epi16(ROUNDING);
+        let mut store1 = _mm256_set1_epi16(ROUNDING);
+
+        let px = cx;
+
+        for j in 0..bounds_size {
+            let py = bounds.start + j;
+            let weight = unsafe { weights.get_unchecked(j) };
+            let v_weight = _mm256_set1_epi16(*weight);
+            let v_offset = src_stride * py + px;
+            let src_ptr = unsafe { src.get_unchecked(v_offset..) };
+            let item_row0 = unsafe { _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i) };
+
+            (store0, store1) = m256dot!(store0, store1, item_row0, v_weight);
+        }
+
+        let rebased0 = _mm256_srai_epi16::<R_SHR_SCALE>(store0);
+        let rebased1 = _mm256_srai_epi16::<R_SHR_SCALE>(store1);
+
+        let shrank0 = _mm256_packus_epi16(rebased0, rebased1);
+        unsafe {
+            _mm256_storeu_si256(dst.as_mut_ptr() as *mut __m256i, shrank0);
+        }
+
+        cx += 32;
+    }
+    cx
+}
+
+#[target_feature(enable = "avx2")]
 fn convolve_vertical_avx2_row_impl(
     _: usize,
     bounds: &FilterBounds,
@@ -170,78 +278,28 @@ fn convolve_vertical_avx2_row_impl(
         );
 
         rem = rem.as_chunks_mut::<96>().1;
-        let iter_64 = rem.chunks_exact_mut(64);
 
-        for dst in iter_64 {
-            let mut store0 = _mm256_set1_epi16(ROUNDING);
-            let mut store1 = _mm256_set1_epi16(ROUNDING);
-            let mut store2 = _mm256_set1_epi16(ROUNDING);
-            let mut store3 = _mm256_set1_epi16(ROUNDING);
+        cx = process_chunk_64(
+            rem.as_chunks_mut::<64>().0,
+            bounds,
+            src,
+            src_stride,
+            weights,
+            cx,
+        );
 
-            let px = cx;
+        rem = rem.as_chunks_mut::<64>().1;
 
-            for j in 0..bounds_size {
-                let py = bounds.start + j;
-                let weight = weights.get_unchecked(j);
-                let v_weight = _mm256_set1_epi16(*weight);
-                let v_offset = src_stride * py + px;
-                let src_ptr = src.get_unchecked(v_offset..);
-                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
-                let item_row1 =
-                    _mm256_loadu_si256(src_ptr.get_unchecked(32..).as_ptr() as *const __m256i);
+        cx = process_chunk_32(
+            rem.as_chunks_mut::<32>().0,
+            bounds,
+            src,
+            src_stride,
+            weights,
+            cx,
+        );
 
-                (store0, store1) = m256dot!(store0, store1, item_row0, v_weight);
-                (store2, store3) = m256dot!(store2, store3, item_row1, v_weight);
-            }
-
-            let rebased0 = _mm256_srai_epi16::<R_SHR_SCALE>(store0);
-            let rebased1 = _mm256_srai_epi16::<R_SHR_SCALE>(store1);
-            let rebased2 = _mm256_srai_epi16::<R_SHR_SCALE>(store2);
-            let rebased3 = _mm256_srai_epi16::<R_SHR_SCALE>(store3);
-
-            let shrank0 = _mm256_packus_epi16(rebased0, rebased1);
-            let shrank1 = _mm256_packus_epi16(rebased2, rebased3);
-
-            _mm256_storeu_si256(dst.as_mut_ptr() as *mut __m256i, shrank0);
-            _mm256_storeu_si256(
-                dst.get_unchecked_mut(32..).as_mut_ptr() as *mut __m256i,
-                shrank1,
-            );
-
-            cx += 64;
-        }
-
-        rem = rem.chunks_exact_mut(64).into_remainder();
-
-        let iter_32 = rem.chunks_exact_mut(32);
-
-        for dst in iter_32 {
-            let mut store0 = _mm256_set1_epi16(ROUNDING);
-            let mut store1 = _mm256_set1_epi16(ROUNDING);
-
-            let px = cx;
-
-            for j in 0..bounds_size {
-                let py = bounds.start + j;
-                let weight = weights.get_unchecked(j);
-                let v_weight = _mm256_set1_epi16(*weight);
-                let v_offset = src_stride * py + px;
-                let src_ptr = src.get_unchecked(v_offset..);
-                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
-
-                (store0, store1) = m256dot!(store0, store1, item_row0, v_weight);
-            }
-
-            let rebased0 = _mm256_srai_epi16::<R_SHR_SCALE>(store0);
-            let rebased1 = _mm256_srai_epi16::<R_SHR_SCALE>(store1);
-
-            let shrank0 = _mm256_packus_epi16(rebased0, rebased1);
-            _mm256_storeu_si256(dst.as_mut_ptr() as *mut __m256i, shrank0);
-
-            cx += 32;
-        }
-
-        rem = rem.chunks_exact_mut(32).into_remainder();
+        rem = rem.as_chunks_mut::<32>().1;
         let iter_16 = rem.chunks_exact_mut(16);
 
         for dst in iter_16 {
