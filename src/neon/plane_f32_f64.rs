@@ -47,7 +47,7 @@ pub(crate) fn convolve_horizontal_plane_neon_row_one_f32_f64(
             let mut jx = 0usize;
             let mut store = vdupq_n_f64(0.);
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let w0 = vld1q_f64(ptr);
@@ -58,7 +58,7 @@ pub(crate) fn convolve_horizontal_plane_neon_row_one_f32_f64(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let weights0 = vld1q_f64(ptr);
@@ -113,7 +113,7 @@ pub(crate) fn convolve_horizontal_plane_neon_rows_4_f32_f64(
             let src2 = src.get_unchecked(src_stride * 2..);
             let src3 = src.get_unchecked(src_stride * 3..);
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let w0 = vld1q_f64(ptr);
                 let w1 = vld1q_f64(ptr.add(2));
@@ -139,7 +139,7 @@ pub(crate) fn convolve_horizontal_plane_neon_rows_4_f32_f64(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let weights0 = vld1q_f64(ptr);
                 let bounds_start = bounds.start + jx;

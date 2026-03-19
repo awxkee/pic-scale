@@ -89,7 +89,7 @@ impl<const FMA: bool> Row1ExecutorUnit<FMA> {
                 let mut jx = 0usize;
                 let mut store = _mm256_setzero_pd();
 
-                while jx + 4 < bounds.size {
+                while jx + 4 <= bounds.size {
                     let bounds_start = bounds.start + jx;
                     let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                     let w0 = _mm256_loadu_pd(ptr.as_ptr());
@@ -103,7 +103,7 @@ impl<const FMA: bool> Row1ExecutorUnit<FMA> {
                     _mm256_extractf128_pd::<1>(store),
                 );
 
-                while jx + 2 < bounds.size {
+                while jx + 2 <= bounds.size {
                     let bounds_start = bounds.start + jx;
                     let w = weights_ptr.get_unchecked(jx + filter_offset..);
                     let w0 = _mm_loadu_pd(w.as_ptr() as *const _);
@@ -163,32 +163,28 @@ pub(crate) fn convolve_hor_plane_avx_rows_4_f32_f64<const FMA: bool>(
 
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_plane_avx_rows_4_regular_f32_f64(
+fn convolve_horizontal_plane_avx_rows_4_regular_f32_f64(
     filter_weights: &FilterWeights<f64>,
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
     dst_stride: usize,
 ) {
-    unsafe {
-        let unit = Row4ExecutionUnit::<false>::default();
-        unit.pass(filter_weights, src, src_stride, dst, dst_stride);
-    }
+    let unit = Row4ExecutionUnit::<false>::default();
+    unit.pass(filter_weights, src, src_stride, dst, dst_stride);
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_plane_avx_rows_4_fma_f32_f64(
+fn convolve_horizontal_plane_avx_rows_4_fma_f32_f64(
     filter_weights: &FilterWeights<f64>,
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
     dst_stride: usize,
 ) {
-    unsafe {
-        let unit = Row4ExecutionUnit::<true>::default();
-        unit.pass(filter_weights, src, src_stride, dst, dst_stride);
-    }
+    let unit = Row4ExecutionUnit::<true>::default();
+    unit.pass(filter_weights, src, src_stride, dst, dst_stride);
 }
 
 #[derive(Copy, Clone, Default)]
@@ -196,7 +192,7 @@ struct Row4ExecutionUnit<const FMA: bool> {}
 
 impl<const FMA: bool> Row4ExecutionUnit<FMA> {
     #[inline(always)]
-    unsafe fn pass(
+    fn pass(
         &self,
         filter_weights: &FilterWeights<f64>,
         src: &[f32],

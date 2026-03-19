@@ -34,7 +34,7 @@ use std::arch::aarch64::*;
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgb_4_u8<const D: bool>(
+fn conv_horiz_rgb_4_u8<const D: bool>(
     start_x: usize,
     src: &[u8],
     weights: int16x4_t,
@@ -65,7 +65,7 @@ unsafe fn conv_horiz_rgb_4_u8<const D: bool>(
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_2_u8<const D: bool>(
+fn conv_horiz_rgba_2_u8<const D: bool>(
     start_x: usize,
     src: &[u8],
     weights: int16x4_t,
@@ -204,7 +204,7 @@ fn convolve_horizontal_rgb_neon_rows_4_impl<const D: bool, const PRECISION: i32>
             let src2 = src1.get_unchecked(src_stride..);
             let src3 = src2.get_unchecked(src_stride..);
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..(jx + 4));
                 let weights = vld1_s16(w_ptr.as_ptr());
@@ -215,7 +215,7 @@ fn convolve_horizontal_rgb_neon_rows_4_impl<const D: bool, const PRECISION: i32>
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 2));
                 let bnds = bounds.start + jx;
                 let mut v_weight = vld1_dup_s16(w_ptr.as_ptr());
@@ -294,7 +294,7 @@ fn convolve_horizontal_rgb_neon_row_one_impl<const D: bool, const PRECISION: i32
             let mut jx = 0usize;
             let mut store = vdupq_n_s32(rnd_const);
 
-            while jx + 4 < bounds_size {
+            while jx + 4 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..(jx + 4));
                 let weights = vld1_s16(w_ptr.as_ptr());
@@ -302,7 +302,7 @@ fn convolve_horizontal_rgb_neon_row_one_impl<const D: bool, const PRECISION: i32
                 jx += 4;
             }
 
-            while jx + 2 < bounds_size {
+            while jx + 2 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 2));
                 let bounds_start = bounds.start + jx;
                 let v_weight = vreinterpret_s16_s32(vld1_dup_s32(w_ptr.as_ptr() as *const _));

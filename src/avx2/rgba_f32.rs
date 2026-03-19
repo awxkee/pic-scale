@@ -32,7 +32,7 @@ use crate::filter_weights::FilterWeights;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-unsafe fn convolve_horizontal_parts_one_rgba_f32<const FMA: bool>(
+fn convolve_horizontal_parts_one_rgba_f32<const FMA: bool>(
     start_x: usize,
     src: &[f32],
     weight0: __m256,
@@ -51,7 +51,7 @@ unsafe fn convolve_horizontal_parts_one_rgba_f32<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn convolve_horizontal_parts_4_rgba_f32<const FMA: bool>(
+fn convolve_horizontal_parts_4_rgba_f32<const FMA: bool>(
     start_x: usize,
     src: &[f32],
     weight0: __m256,
@@ -72,7 +72,7 @@ unsafe fn convolve_horizontal_parts_4_rgba_f32<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn convolve_horizontal_parts_8_rgba_f32<const FMA: bool>(
+fn convolve_horizontal_parts_8_rgba_f32<const FMA: bool>(
     start_x: usize,
     src: &[f32],
     weight0: __m256,
@@ -99,7 +99,7 @@ unsafe fn convolve_horizontal_parts_8_rgba_f32<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn convolve_horizontal_parts_2_rgba_f32<const FMA: bool>(
+fn convolve_horizontal_parts_2_rgba_f32<const FMA: bool>(
     start_x: usize,
     src: &[f32],
     weight0: __m256,
@@ -199,7 +199,7 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
                 let mut store_2 = zeros;
                 let mut store_3 = zeros;
 
-                while jx + 8 < bounds.size {
+                while jx + 8 <= bounds.size {
                     let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
 
                     let w0 = _mm_broadcast_ss(ptr.get_unchecked(0));
@@ -257,7 +257,7 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
                     jx += 8;
                 }
 
-                while jx + 4 < bounds.size {
+                while jx + 4 <= bounds.size {
                     let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                     let w0 = _mm_broadcast_ss(ptr.get_unchecked(0));
                     let w1 = _mm_broadcast_ss(ptr.get_unchecked(1));
@@ -299,7 +299,7 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
                     jx += 4;
                 }
 
-                while jx + 2 < bounds.size {
+                while jx + 2 <= bounds.size {
                     let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                     let weight0 = _mm_broadcast_ss(ptr.get_unchecked(0));
                     let weight1 = _mm_broadcast_ss(ptr.get_unchecked(1));

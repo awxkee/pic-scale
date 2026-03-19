@@ -214,7 +214,7 @@ fn convolve_horizontal_rgba_avx_rows_4_impl(
                 _mm256_permute2x128_si256::<0x31>(store_2, store_3),
             );
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
 
                 let w0_3 = _mm_loadu_si64(w_ptr.as_ptr() as *const _);
@@ -259,7 +259,7 @@ fn convolve_horizontal_rgba_avx_rows_4_impl(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
 
@@ -378,7 +378,7 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_one_lb(
 
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
+fn convolve_horizontal_rgba_avx_rows_one_impl(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
@@ -423,7 +423,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
             let mut jx = 0usize;
             let mut store = vld;
 
-            while jx + 8 < bounds.size {
+            while jx + 8 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
 
                 let w0_7 = _mm_loadu_si128(w_ptr.as_ptr() as *const _);
@@ -443,7 +443,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
                 jx += 8;
             }
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
 
@@ -471,7 +471,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
                 _mm256_extracti128_si256::<1>(store),
             );
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
 

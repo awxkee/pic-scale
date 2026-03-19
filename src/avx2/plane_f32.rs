@@ -155,7 +155,7 @@ fn convolve_horizontal_plane_avx_row_one_impl<const FMA: bool>(
 
             use crate::avx2::utils::_mm_prefer_fma_ps;
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                 let read_weights = _mm_loadu_ps(ptr.as_ptr());
@@ -163,7 +163,7 @@ fn convolve_horizontal_plane_avx_row_one_impl<const FMA: bool>(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let bounds_start = bounds.start + jx;
                 let w = weights_ptr.get_unchecked(jx + filter_offset..);
                 let weights = _mm_castsi128_ps(_mm_loadu_si64(w.as_ptr() as *const _));
@@ -275,7 +275,7 @@ fn convolve_horizontal_plane_avx_rows_4_impl<const FMA: bool>(
             let mut store_0 = _mm256_setzero_ps();
             let mut store_1 = _mm256_setzero_ps();
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                 let w0 = _mm_loadu_ps(ptr.as_ptr());
 
@@ -298,7 +298,7 @@ fn convolve_horizontal_plane_avx_rows_4_impl<const FMA: bool>(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let w = weights_ptr.get_unchecked(jx + filter_offset..);
                 let w0 = _mm_castsi128_ps(_mm_loadu_si64(w.as_ptr() as *const _));
                 let weights = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w0);

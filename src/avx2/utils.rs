@@ -426,7 +426,7 @@ pub(crate) fn _mm256_dot16_avx_epi32<const HAS_DOT: bool>(
 
 #[allow(dead_code)]
 #[inline(always)]
-pub(crate) unsafe fn _mm_dot16_avx_epi32<const HAS_DOT: bool>(
+pub(crate) fn _mm_dot16_avx_epi32<const HAS_DOT: bool>(
     a: __m128i,
     b: __m128i,
     c: __m128i,
@@ -502,7 +502,7 @@ pub(crate) fn _mm_prefer_fma_pd<const FMA: bool>(a: __m128d, b: __m128d, c: __m1
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_reduce_r_epi32<const PRECISION: i32>(x: __m128i) -> __m128i {
+pub(crate) fn _mm_reduce_r_epi32<const PRECISION: i32>(x: __m128i) -> __m128i {
     unsafe {
         const FIRST_MASK: i32 = shuffle(1, 0, 3, 2);
         let hi64 = _mm_shuffle_epi32::<FIRST_MASK>(x);
@@ -515,7 +515,7 @@ pub(crate) unsafe fn _mm_reduce_r_epi32<const PRECISION: i32>(x: __m128i) -> __m
 
 /// Sums all lanes in float32
 #[inline(always)]
-pub(crate) unsafe fn _mm_hsum_ps(v: __m128) -> __m128 {
+pub(crate) fn _mm_hsum_ps(v: __m128) -> __m128 {
     unsafe {
         let mut shuf = _mm_movehdup_ps(v);
         let sums = _mm_add_ps(v, shuf);
@@ -525,7 +525,7 @@ pub(crate) unsafe fn _mm_hsum_ps(v: __m128) -> __m128 {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_hsum_pd(v: __m128d) -> __m128d {
+pub(crate) fn _mm_hsum_pd(v: __m128d) -> __m128d {
     unsafe {
         let undef = _mm_undefined_ps();
         let shuftmp = _mm_movehl_ps(undef, _mm_castpd_ps(v));

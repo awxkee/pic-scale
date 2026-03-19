@@ -26,12 +26,12 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::avx2::utils::{_mm_prefer_fma_ps, _mm256_prefer_fma_ps};
+use crate::avx2::utils::{_mm_prefer_fma_ps, _mm256_prefer_fma_ps, shuffle};
 use crate::filter_weights::FilterWeights;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-unsafe fn conv_horiz_rgba_1_u16<const FMA: bool>(
+fn conv_horiz_rgba_1_u16<const FMA: bool>(
     start_x: usize,
     src: &[u16],
     w0: __m128,
@@ -50,7 +50,7 @@ unsafe fn conv_horiz_rgba_1_u16<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn conv_horiz_rgba_2_u16<const FMA: bool>(
+fn conv_horiz_rgba_2_u16<const FMA: bool>(
     start_x: usize,
     src: &[u16],
     w0: __m128,
@@ -76,8 +76,8 @@ unsafe fn conv_horiz_rgba_2_u16<const FMA: bool>(
     }
 }
 
-#[inline]
-unsafe fn conv_horiz_rgba_4_u16<const FMA: bool>(
+#[inline(always)]
+fn conv_horiz_rgba_4_u16<const FMA: bool>(
     start_x: usize,
     src: &[u16],
     w0: __m256,
@@ -104,7 +104,7 @@ unsafe fn conv_horiz_rgba_4_u16<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn conv_horiz_rgba_8_u16<const FMA: bool>(
+fn conv_horiz_rgba_8_u16<const FMA: bool>(
     start_x: usize,
     src: &[u16],
     w01: __m256,
@@ -178,7 +178,7 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_4_u16_f(
 
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_rgba_avx_rows_4_u16_def(
+fn convolve_horizontal_rgba_avx_rows_4_u16_def(
     src: &[u16],
     src_stride: usize,
     dst: &mut [u16],
@@ -186,15 +186,13 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_u16_def(
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
-    unsafe {
-        let unit = Row4ExecutionHandler::<false>::default();
-        unit.pass(src, src_stride, dst, dst_stride, filter_weights, bit_depth);
-    }
+    let unit = Row4ExecutionHandler::<false>::default();
+    unit.pass(src, src_stride, dst, dst_stride, filter_weights, bit_depth);
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_rgba_avx_rows_4_u16_fma(
+fn convolve_horizontal_rgba_avx_rows_4_u16_fma(
     src: &[u16],
     src_stride: usize,
     dst: &mut [u16],
@@ -202,10 +200,8 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_u16_fma(
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
-    unsafe {
-        let unit = Row4ExecutionHandler::<true>::default();
-        unit.pass(src, src_stride, dst, dst_stride, filter_weights, bit_depth);
-    }
+    let unit = Row4ExecutionHandler::<true>::default();
+    unit.pass(src, src_stride, dst, dst_stride, filter_weights, bit_depth);
 }
 
 #[derive(Copy, Clone, Default)]
@@ -213,7 +209,7 @@ struct Row4ExecutionHandler<const FMA: bool> {}
 
 impl<const FMA: bool> Row4ExecutionHandler<FMA> {
     #[inline(always)]
-    unsafe fn rgba_2_u16_avx(
+    fn rgba_2_u16_avx(
         &self,
         start_x: usize,
         src0: &[u16],
@@ -249,7 +245,7 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
     }
 
     #[inline(always)]
-    unsafe fn rgba_1_u16(
+    fn rgba_1_u16(
         &self,
         start_x: usize,
         src0: &[u16],
@@ -274,7 +270,7 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
     }
 
     #[inline(always)]
-    unsafe fn pass(
+    fn pass(
         &self,
         src: &[u16],
         src_stride: usize,
@@ -326,18 +322,22 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                     let mut astore_2 = _mm256_setzero_ps();
                     let mut astore_3 = _mm256_setzero_ps();
 
-                    while jx + 8 < bounds_size {
+                    while jx + 8 <= bounds_size {
                         let bounds_start = bounds.start + jx;
                         let w_ptr = weights.get_unchecked(jx..);
 
-                        let w0 = _mm_broadcast_ss(w_ptr.get_unchecked(0));
-                        let w1 = _mm_broadcast_ss(w_ptr.get_unchecked(1));
-                        let w2 = _mm_broadcast_ss(w_ptr.get_unchecked(2));
-                        let w3 = _mm_broadcast_ss(w_ptr.get_unchecked(3));
-                        let w4 = _mm_broadcast_ss(w_ptr.get_unchecked(4));
-                        let w5 = _mm_broadcast_ss(w_ptr.get_unchecked(5));
-                        let w6 = _mm_broadcast_ss(w_ptr.get_unchecked(6));
-                        let w7 = _mm_broadcast_ss(w_ptr.get_unchecked(7));
+                        let weights = _mm256_loadu_ps(w_ptr.as_ptr());
+                        let w_lo = _mm256_castps256_ps128(weights);
+                        let w_hi = _mm256_extractf128_ps::<1>(weights);
+
+                        let w0 = _mm_shuffle_ps::<{ shuffle(0, 0, 0, 0) }>(w_lo, w_lo);
+                        let w1 = _mm_shuffle_ps::<{ shuffle(1, 1, 1, 1) }>(w_lo, w_lo);
+                        let w2 = _mm_shuffle_ps::<{ shuffle(2, 2, 2, 2) }>(w_lo, w_lo);
+                        let w3 = _mm_shuffle_ps::<{ shuffle(3, 3, 3, 3) }>(w_lo, w_lo);
+                        let w4 = _mm_shuffle_ps::<{ shuffle(0, 0, 0, 0) }>(w_hi, w_hi);
+                        let w5 = _mm_shuffle_ps::<{ shuffle(1, 1, 1, 1) }>(w_hi, w_hi);
+                        let w6 = _mm_shuffle_ps::<{ shuffle(2, 2, 2, 2) }>(w_hi, w_hi);
+                        let w7 = _mm_shuffle_ps::<{ shuffle(3, 3, 3, 3) }>(w_hi, w_hi);
 
                         let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
                         let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
@@ -383,14 +383,16 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                         jx += 8;
                     }
 
-                    while jx + 4 < bounds_size {
+                    while jx + 4 <= bounds_size {
                         let bounds_start = bounds.start + jx;
                         let w_ptr = weights.get_unchecked(jx..);
 
-                        let w0 = _mm_broadcast_ss(w_ptr.get_unchecked(0));
-                        let w1 = _mm_broadcast_ss(w_ptr.get_unchecked(1));
-                        let w2 = _mm_broadcast_ss(w_ptr.get_unchecked(2));
-                        let w3 = _mm_broadcast_ss(w_ptr.get_unchecked(3));
+                        let weights = _mm_loadu_ps(w_ptr.as_ptr());
+
+                        let w0 = _mm_shuffle_ps::<{ shuffle(0, 0, 0, 0) }>(weights, weights);
+                        let w1 = _mm_shuffle_ps::<{ shuffle(1, 1, 1, 1) }>(weights, weights);
+                        let w2 = _mm_shuffle_ps::<{ shuffle(2, 2, 2, 2) }>(weights, weights);
+                        let w3 = _mm_shuffle_ps::<{ shuffle(3, 3, 3, 3) }>(weights, weights);
 
                         let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
                         let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
@@ -417,7 +419,7 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                     );
                 }
 
-                while jx + 2 < bounds_size {
+                while jx + 2 <= bounds_size {
                     let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
                     let w0 = _mm256_broadcast_ss(w_ptr.get_unchecked(0));
@@ -511,7 +513,7 @@ struct OneRowExecutionHandler<const FMA: bool> {}
 
 impl<const FMA: bool> OneRowExecutionHandler<FMA> {
     #[inline(always)]
-    unsafe fn pass(
+    fn pass(
         &self,
         src: &[u16],
         dst: &mut [u16],
@@ -539,17 +541,22 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
                 if jx >= 4 {
                     let mut astore = _mm256_setzero_ps();
 
-                    while jx + 8 < bounds_size {
+                    while jx + 8 <= bounds_size {
                         let bounds_start = bounds.start + jx;
                         let w_ptr = weights.get_unchecked(jx..);
-                        let w0 = _mm_broadcast_ss(w_ptr.get_unchecked(0));
-                        let w1 = _mm_broadcast_ss(w_ptr.get_unchecked(1));
-                        let w2 = _mm_broadcast_ss(w_ptr.get_unchecked(2));
-                        let w3 = _mm_broadcast_ss(w_ptr.get_unchecked(3));
-                        let w4 = _mm_broadcast_ss(w_ptr.get_unchecked(4));
-                        let w5 = _mm_broadcast_ss(w_ptr.get_unchecked(5));
-                        let w6 = _mm_broadcast_ss(w_ptr.get_unchecked(6));
-                        let w7 = _mm_broadcast_ss(w_ptr.get_unchecked(7));
+                        let weights = _mm256_loadu_ps(w_ptr.as_ptr());
+                        let w_lo = _mm256_castps256_ps128(weights);
+                        let w_hi = _mm256_extractf128_ps::<1>(weights);
+
+                        let w0 = _mm_shuffle_ps::<{ shuffle(0, 0, 0, 0) }>(w_lo, w_lo);
+                        let w1 = _mm_shuffle_ps::<{ shuffle(1, 1, 1, 1) }>(w_lo, w_lo);
+                        let w2 = _mm_shuffle_ps::<{ shuffle(2, 2, 2, 2) }>(w_lo, w_lo);
+                        let w3 = _mm_shuffle_ps::<{ shuffle(3, 3, 3, 3) }>(w_lo, w_lo);
+                        let w4 = _mm_shuffle_ps::<{ shuffle(0, 0, 0, 0) }>(w_hi, w_hi);
+                        let w5 = _mm_shuffle_ps::<{ shuffle(1, 1, 1, 1) }>(w_hi, w_hi);
+                        let w6 = _mm_shuffle_ps::<{ shuffle(2, 2, 2, 2) }>(w_hi, w_hi);
+                        let w7 = _mm_shuffle_ps::<{ shuffle(3, 3, 3, 3) }>(w_hi, w_hi);
+
                         let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
                         let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
                         let w45 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w4), w5);
@@ -566,13 +573,14 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
                         jx += 8;
                     }
 
-                    while jx + 4 < bounds_size {
+                    while jx + 4 <= bounds_size {
                         let w_ptr = weights.get_unchecked(jx..);
+                        let weights = _mm_loadu_ps(w_ptr.as_ptr());
 
-                        let w0 = _mm_broadcast_ss(w_ptr.get_unchecked(0));
-                        let w1 = _mm_broadcast_ss(w_ptr.get_unchecked(1));
-                        let w2 = _mm_broadcast_ss(w_ptr.get_unchecked(2));
-                        let w3 = _mm_broadcast_ss(w_ptr.get_unchecked(3));
+                        let w0 = _mm_shuffle_ps::<{ shuffle(0, 0, 0, 0) }>(weights, weights);
+                        let w1 = _mm_shuffle_ps::<{ shuffle(1, 1, 1, 1) }>(weights, weights);
+                        let w2 = _mm_shuffle_ps::<{ shuffle(2, 2, 2, 2) }>(weights, weights);
+                        let w3 = _mm_shuffle_ps::<{ shuffle(3, 3, 3, 3) }>(weights, weights);
 
                         let bounds_start = bounds.start + jx;
 
@@ -589,7 +597,7 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
                     );
                 }
 
-                while jx + 2 < bounds_size {
+                while jx + 2 <= bounds_size {
                     let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
                     let w0 = _mm_broadcast_ss(w_ptr.get_unchecked(0));
