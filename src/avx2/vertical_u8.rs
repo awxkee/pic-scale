@@ -87,7 +87,7 @@ struct ExecutionUnit<const HAS_DOT: bool> {}
 
 impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
     #[inline(always)]
-    unsafe fn dot_prod(
+    fn dot_prod(
         store_0: __m256i,
         store_1: __m256i,
         store_2: __m256i,
@@ -113,7 +113,7 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
     }
 
     #[inline(always)]
-    unsafe fn convolve_vertical_part_avx_64(
+    fn convolve_vertical_part_avx_64(
         &self,
         start_y: usize,
         start_x: usize,
@@ -414,7 +414,7 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
 
     #[inline(always)]
     /// This inlining is required to activate all features for runtime dispatch
-    unsafe fn pass(
+    fn pass(
         &self,
         _: usize,
         bounds: &FilterBounds,

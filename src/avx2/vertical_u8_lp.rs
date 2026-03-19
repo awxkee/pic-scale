@@ -251,6 +251,52 @@ fn process_chunk_32(
 
 #[target_feature(enable = "avx2")]
 #[inline(never)]
+fn process_chunk_32_unrolled<const BOUNDS: usize>(
+    chunks: &mut [[u8; 32]],
+    bounds: &FilterBounds,
+    src: &[u8],
+    src_stride: usize,
+    weights: &[i16],
+    cx: usize,
+) -> usize {
+    const SCALE: i32 = 6;
+    const R_SHR_SCALE: i32 = SCALE;
+    const ROUNDING: i16 = 1 << (R_SHR_SCALE - 1);
+
+    let mut cx = cx;
+
+    for dst in chunks {
+        let mut store0 = _mm256_set1_epi16(ROUNDING);
+        let mut store1 = _mm256_set1_epi16(ROUNDING);
+
+        let px = cx;
+
+        for j in 0..BOUNDS {
+            let py = bounds.start + j;
+            let weight = unsafe { weights.get_unchecked(j) };
+            let v_weight = _mm256_set1_epi16(*weight);
+            let v_offset = src_stride * py + px;
+            let src_ptr = unsafe { src.get_unchecked(v_offset..) };
+            let item_row0 = unsafe { _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i) };
+
+            (store0, store1) = m256dot!(store0, store1, item_row0, v_weight);
+        }
+
+        let rebased0 = _mm256_srai_epi16::<R_SHR_SCALE>(store0);
+        let rebased1 = _mm256_srai_epi16::<R_SHR_SCALE>(store1);
+
+        let shrank0 = _mm256_packus_epi16(rebased0, rebased1);
+        unsafe {
+            _mm256_storeu_si256(dst.as_mut_ptr() as *mut __m256i, shrank0);
+        }
+
+        cx += 32;
+    }
+    cx
+}
+
+#[target_feature(enable = "avx2")]
+#[inline(never)]
 fn process_chunk_16(
     chunks: &mut [[u8; 16]],
     bounds: &FilterBounds,
@@ -437,14 +483,70 @@ fn convolve_vertical_avx2_row_impl(
     //
     // rem = rem.as_chunks_mut::<64>().1;
 
-    cx = process_chunk_32(
-        rem.as_chunks_mut::<32>().0,
-        bounds,
-        src,
-        src_stride,
-        weights,
-        cx,
-    );
+    if bounds.size == 12 {
+        cx = process_chunk_32_unrolled::<12>(
+            rem.as_chunks_mut::<32>().0,
+            bounds,
+            src,
+            src_stride,
+            weights,
+            cx,
+        );
+    } else if bounds.size == 10 {
+        cx = process_chunk_32_unrolled::<10>(
+            rem.as_chunks_mut::<32>().0,
+            bounds,
+            src,
+            src_stride,
+            weights,
+            cx,
+        );
+    } else if bounds.size == 8 {
+        cx = process_chunk_32_unrolled::<8>(
+            rem.as_chunks_mut::<32>().0,
+            bounds,
+            src,
+            src_stride,
+            weights,
+            cx,
+        );
+    } else if bounds.size == 6 {
+        cx = process_chunk_32_unrolled::<6>(
+            rem.as_chunks_mut::<32>().0,
+            bounds,
+            src,
+            src_stride,
+            weights,
+            cx,
+        );
+    } else if bounds.size == 4 {
+        cx = process_chunk_32_unrolled::<4>(
+            rem.as_chunks_mut::<32>().0,
+            bounds,
+            src,
+            src_stride,
+            weights,
+            cx,
+        );
+    } else if bounds.size == 2 {
+        cx = process_chunk_32_unrolled::<2>(
+            rem.as_chunks_mut::<32>().0,
+            bounds,
+            src,
+            src_stride,
+            weights,
+            cx,
+        );
+    } else {
+        cx = process_chunk_32(
+            rem.as_chunks_mut::<32>().0,
+            bounds,
+            src,
+            src_stride,
+            weights,
+            cx,
+        );
+    }
 
     rem = rem.as_chunks_mut::<32>().1;
 
