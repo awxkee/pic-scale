@@ -318,10 +318,7 @@ impl DisassociateAlpha for Avx2DisassociateAlpha {
 }
 
 #[target_feature(enable = "avx2")]
-fn avx_unpremultiply_alpha_rgba_impl_row(
-    in_place: &mut [u8],
-    executor: impl DisassociateAlpha,
-) {
+fn avx_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8], executor: impl DisassociateAlpha) {
     unsafe {
         executor.disassociate(in_place);
     }

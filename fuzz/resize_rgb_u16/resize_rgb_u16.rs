@@ -99,14 +99,14 @@ fn resize_rgb(
         .set_threading_policy(threading_policy);
 
     let planned = scaler
-        .plan_rgb_resampling16(store.size(), target.get_size(), 10)
+        .plan_rgb_resampling16(store.size(), target.size(), 10)
         .unwrap();
     planned.resample(&store, &mut target).unwrap();
 
     let store = ImageStore::<u16, 3>::alloc(src_width, src_height);
     let mut target16 = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
     let planned = scaler
-        .plan_rgb_resampling16(store.size(), target.get_size(), 16)
+        .plan_rgb_resampling16(store.size(), target.size(), 16)
         .unwrap();
     planned.resample(&store, &mut target16).unwrap();
 }

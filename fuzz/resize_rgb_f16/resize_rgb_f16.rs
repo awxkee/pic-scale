@@ -96,7 +96,7 @@ fn resize_rgb(
         .set_workload_strategy(workload_strategy)
         .set_threading_policy(threading_policy);
     let planned = scaler
-        .plan_rgb_resampling_f16(store.size(), target.get_size())
+        .plan_rgb_resampling_f16(store.size(), target.size())
         .unwrap();
     planned.resample(&store, &mut target).unwrap();
 }

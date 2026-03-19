@@ -101,11 +101,11 @@ fn resize_cbcr8(
         .set_workload_strategy(workload_strategy);
     let planner = if mul_alpha {
         scaler
-            .plan_gray_alpha_resampling(store.size(), target.get_size(), true)
+            .plan_gray_alpha_resampling(store.size(), target.size(), true)
             .unwrap()
     } else {
         scaler
-            .plan_cbcr_resampling(store.size(), target.get_size())
+            .plan_cbcr_resampling(store.size(), target.size())
             .unwrap()
     };
     planner.resample(&store, &mut target).unwrap();

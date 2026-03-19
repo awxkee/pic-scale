@@ -101,12 +101,12 @@ fn resize_rgba(
         .set_workload_strategy(workload_strategy)
         .set_threading_policy(threading_policy);
     let planned = scaler
-        .plan_rgba_resampling(store.size(), target.get_size(), false)
+        .plan_rgba_resampling(store.size(), target.size(), false)
         .unwrap();
     planned.resample(&store, &mut target).unwrap();
     let store = ImageStore::<u8, 4>::borrow(&src_data, src_width, src_height).unwrap();
     let planned = scaler
-        .plan_rgba_resampling(store.size(), target.get_size(), true)
+        .plan_rgba_resampling(store.size(), target.size(), true)
         .unwrap();
     planned.resample(&store, &mut target).unwrap();
 }

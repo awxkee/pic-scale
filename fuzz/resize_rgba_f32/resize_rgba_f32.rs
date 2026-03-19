@@ -103,7 +103,7 @@ fn resize_rgba(
         })
         .set_threading_policy(threading_policy);
     let planned = scaler
-        .plan_rgba_resampling_f32(store.size(), target.get_size(), premultiply_alpha)
+        .plan_rgba_resampling_f32(store.size(), target.size(), premultiply_alpha)
         .unwrap();
     planned.resample(&store, &mut target).unwrap();
 }
