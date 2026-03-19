@@ -66,6 +66,53 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
+    c.bench_function("Pic scale RGBA without alpha: Lanczos 3", |b| {
+        let copied: Vec<u8> = Vec::from(src_bytes);
+        let store =
+            ImageStore::<u8, 4>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
+                .unwrap();
+        let scaler =
+            Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
+        let resampler = scaler
+            .plan_rgba_resampling(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+                false,
+            )
+            .unwrap();
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+        b.iter(|| {
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
+        })
+    });
+
+    c.bench_function("Pic scale RGBA without alpha: Lanczos 3/Quality", |b| {
+        let copied: Vec<u8> = Vec::from(src_bytes);
+        let store =
+            ImageStore::<u8, 4>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
+                .unwrap();
+        let scaler = Scaler::new(ResamplingFunction::Lanczos3)
+            .set_threading_policy(ThreadingPolicy::Single)
+            .set_workload_strategy(WorkloadStrategy::PreferQuality);
+        let resampler = scaler
+            .plan_rgba_resampling(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+                false,
+            )
+            .unwrap();
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+        b.iter(|| {
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
+        })
+    });
+
     c.bench_function("Pic scale RGBA with alpha: Bilinear", |b| {
         let copied: Vec<u8> = Vec::from(src_bytes);
         let store =
@@ -166,53 +213,6 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                         .resize_alg(ResizeAlg::Convolution(FilterType::Bilinear))
                         .use_alpha(true),
                 )
-                .unwrap();
-        })
-    });
-
-    c.bench_function("Pic scale RGBA without alpha: Lanczos 3", |b| {
-        let copied: Vec<u8> = Vec::from(src_bytes);
-        let store =
-            ImageStore::<u8, 4>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
-                .unwrap();
-        let scaler =
-            Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
-        let resampler = scaler
-            .plan_rgba_resampling(
-                store.size(),
-                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
-                false,
-            )
-            .unwrap();
-        let mut scratch = resampler.alloc_scratch();
-        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
-        b.iter(|| {
-            resampler
-                .resample_with_scratch(&store, &mut target, &mut scratch)
-                .unwrap();
-        })
-    });
-
-    c.bench_function("Pic scale RGBA without alpha: Lanczos 3/Quality", |b| {
-        let copied: Vec<u8> = Vec::from(src_bytes);
-        let store =
-            ImageStore::<u8, 4>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
-                .unwrap();
-        let scaler = Scaler::new(ResamplingFunction::Lanczos3)
-            .set_threading_policy(ThreadingPolicy::Single)
-            .set_workload_strategy(WorkloadStrategy::PreferQuality);
-        let resampler = scaler
-            .plan_rgba_resampling(
-                store.size(),
-                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
-                false,
-            )
-            .unwrap();
-        let mut scratch = resampler.alloc_scratch();
-        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
-        b.iter(|| {
-            resampler
-                .resample_with_scratch(&store, &mut target, &mut scratch)
                 .unwrap();
         })
     });
