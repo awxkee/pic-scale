@@ -358,47 +358,32 @@ fn convolve_32_items<const FMA: bool>(
 }
 
 #[inline(always)]
-fn convolve_column_lb_u16_impl<const FMA: bool>(
+fn convolve_16_items<const FMA: bool>(
+    chunks: &mut [[u16; 16]],
     bounds: &FilterBounds,
     src: &[u16],
-    dst: &mut [u16],
     src_stride: usize,
-    weight: &[f32],
+    weights: &[f32],
     bit_depth: u32,
-) {
+    cx: usize,
+) -> usize {
+    let max_colors = (1i32 << bit_depth) - 1;
+    let mut cx = cx;
+
     unsafe {
-        let max_colors = (1i32 << bit_depth) - 1;
-        let mut cx = 0usize;
-
         let bounds_size = bounds.size;
-
-        let zeros_ps = _mm_setzero_ps();
-        let zeros = _mm_setzero_si128();
 
         let v_cap_colors = _mm256_set1_epi16((max_colors as u16) as i16);
 
-        cx = convolve_32_items::<FMA>(
-            dst.as_chunks_mut::<32>().0,
-            bounds,
-            src,
-            src_stride,
-            weight,
-            bit_depth,
-            cx,
-        );
-
-        let tail32 = dst.chunks_exact_mut(32).into_remainder();
-        let iter16 = tail32.chunks_exact_mut(16);
-
         let v_px = cx;
 
-        for (x, dst) in iter16.enumerate() {
+        for (x, dst) in chunks.iter_mut().enumerate() {
             let mut store0 = _mm256_setzero_ps();
             let mut store1 = _mm256_setzero_ps();
 
             let v_dx = v_px + x * 16;
 
-            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
+            for (j, &k_weight) in weights.iter().take(bounds_size).enumerate() {
                 let py = bounds.start + j;
                 let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
 
@@ -427,20 +412,38 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
 
             cx = v_dx;
         }
+        cx
+    }
+}
 
-        let tail16 = tail32.chunks_exact_mut(16).into_remainder();
-        let iter8 = tail16.chunks_exact_mut(8);
+#[inline(always)]
+fn convolve_8_items<const FMA: bool>(
+    chunks: &mut [[u16; 8]],
+    bounds: &FilterBounds,
+    src: &[u16],
+    src_stride: usize,
+    weights: &[f32],
+    bit_depth: u32,
+    cx: usize,
+) -> usize {
+    let max_colors = (1i32 << bit_depth) - 1;
+    let mut cx = cx;
+
+    unsafe {
+        let bounds_size = bounds.size;
+
+        let v_cap_colors = _mm256_set1_epi16((max_colors as u16) as i16);
 
         let v_px = cx;
 
-        for (x, dst) in iter8.enumerate() {
+        for (x, dst) in chunks.iter_mut().enumerate() {
             let mut store0 = _mm256_setzero_ps();
 
             let v_dx = v_px + x * 8;
 
             const S: i32 = shuffle(3, 1, 2, 0);
 
-            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
+            for (j, &k_weight) in weights.iter().take(bounds_size).enumerate() {
                 let py = bounds.start + j;
                 let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
 
@@ -470,8 +473,65 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
 
             cx = v_dx;
         }
+        cx
+    }
+}
 
-        let tail8 = tail16.chunks_exact_mut(8).into_remainder();
+#[inline(always)]
+fn convolve_column_lb_u16_impl<const FMA: bool>(
+    bounds: &FilterBounds,
+    src: &[u16],
+    dst: &mut [u16],
+    src_stride: usize,
+    weight: &[f32],
+    bit_depth: u32,
+) {
+    unsafe {
+        let max_colors = (1i32 << bit_depth) - 1;
+        let mut cx = 0usize;
+
+        let bounds_size = bounds.size;
+
+        let zeros_ps = _mm_setzero_ps();
+        let zeros = _mm_setzero_si128();
+
+        let v_cap_colors = _mm256_set1_epi16((max_colors as u16) as i16);
+
+        cx = convolve_32_items::<FMA>(
+            dst.as_chunks_mut::<32>().0,
+            bounds,
+            src,
+            src_stride,
+            weight,
+            bit_depth,
+            cx,
+        );
+
+        let mut rem = dst.as_chunks_mut::<32>().1;
+
+        cx = convolve_16_items::<FMA>(
+            rem.as_chunks_mut::<16>().0,
+            bounds,
+            src,
+            src_stride,
+            weight,
+            bit_depth,
+            cx,
+        );
+
+        rem = rem.as_chunks_mut::<16>().1;
+
+        cx = convolve_8_items::<FMA>(
+            rem.as_chunks_mut::<8>().0,
+            bounds,
+            src,
+            src_stride,
+            weight,
+            bit_depth,
+            cx,
+        );
+        let tail8 = rem.as_chunks_mut::<8>().1;
+
         let iter4 = tail8.chunks_exact_mut(4);
 
         let v_cx = cx;
