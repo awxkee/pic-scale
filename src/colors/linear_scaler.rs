@@ -128,6 +128,10 @@ impl<const N: usize> Splitter<u8, u16, N> for Common8BitSplitter<N> {
             }
         }
     }
+
+    fn bit_depth(&self) -> usize {
+        12
+    }
 }
 
 struct Linearization {
@@ -400,6 +404,10 @@ impl<const N: usize> Splitter<u16, u16, N> for Common16BitSplitter<N> {
                 *dst = self.gamma[src as usize];
             }
         }
+    }
+
+    fn bit_depth(&self) -> usize {
+        16
     }
 }
 

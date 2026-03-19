@@ -40,6 +40,7 @@ where
 {
     fn split(&self, from: &ImageStore<'_, T, N>, into: &mut ImageStoreMut<'_, R, N>);
     fn merge(&self, from: &ImageStore<'_, R, N>, into: &mut ImageStoreMut<'_, T, N>);
+    fn bit_depth(&self) -> usize;
 }
 
 pub(crate) struct SplitPlanInterceptor<T, R, const N: usize> {
@@ -91,7 +92,7 @@ impl<T: Default + Clone + Copy + Debug, R: Default + Clone + Copy + Debug, const
 
         let mut intermediate_store =
             ImageStoreMut::<R, N>::from_slice(scratch_target, store.width, store.height)?;
-        intermediate_store.bit_depth = into.bit_depth;
+        intermediate_store.bit_depth = self.splitter.bit_depth();
 
         self.splitter.split(store, &mut intermediate_store);
 
@@ -101,10 +102,14 @@ impl<T: Default + Clone + Copy + Debug, R: Default + Clone + Copy + Debug, const
             width: store.width,
             height: store.height,
             stride: store.width * N,
-            bit_depth: into.bit_depth,
+            bit_depth: self.splitter.bit_depth(),
         };
 
-        let mut scaled_im_store = ImageStoreMut::<R, N>::try_alloc(into.width, into.height)?;
+        let mut scaled_im_store = ImageStoreMut::<R, N>::try_alloc_with_depth(
+            into.width,
+            into.height,
+            self.splitter.bit_depth(),
+        )?;
 
         self.intercept.resample_with_scratch(
             &new_immutable_store,

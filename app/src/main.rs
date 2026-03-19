@@ -13,10 +13,10 @@ use fast_image_resize::{
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
     Ar30ByteOrder, CbCr8ImageStore, CbCr8ImageStoreMut, ImageSize, ImageStore, ImageStoreMut,
-    ImageStoreScaling, Planar16ImageStore, Planar16ImageStoreMut, Planar8ImageStore,
-    Planar8ImageStoreMut, PlanarF32ImageStore, PlanarF32ImageStoreMut, ResamplingFunction,
-    Rgb8ImageStore, Rgb8ImageStoreMut, RgbF32ImageStore, RgbF32ImageStoreMut, Rgba16ImageStore,
-    Rgba16ImageStoreMut, Rgba8ImageStore, Rgba8ImageStoreMut, RgbaF32ImageStore,
+    ImageStoreScaling, LinearApproxScaler, LinearScaler, Planar16ImageStore, Planar16ImageStoreMut,
+    Planar8ImageStore, Planar8ImageStoreMut, PlanarF32ImageStore, PlanarF32ImageStoreMut,
+    ResamplingFunction, Rgb8ImageStore, Rgb8ImageStoreMut, RgbF32ImageStore, RgbF32ImageStoreMut,
+    Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore, Rgba8ImageStoreMut, RgbaF32ImageStore,
     RgbaF32ImageStoreMut, Scaler, ThreadingPolicy, WorkloadStrategy,
 };
 use yuv::{ar30_to_rgb8, rgba8_to_ar30, Rgb30ByteOrder};
@@ -35,9 +35,9 @@ fn main() {
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
 
-    let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
+    let mut scaler = LinearApproxScaler::new(ResamplingFunction::Bilinear);
     scaler.set_threading_policy(ThreadingPolicy::Adaptive);
-    scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
+    // scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
     let resizing_plan = scaler
         .plan_rgba_resampling(
@@ -162,7 +162,7 @@ fn test_fast_image() {
     let mut dst_image = Image::new(3240, 2160, pixel_type);
 
     let mut resizer = Resizer::new();
-    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64"))]
     unsafe {
         resizer.set_cpu_extensions(CpuExtensions::Neon);
     }

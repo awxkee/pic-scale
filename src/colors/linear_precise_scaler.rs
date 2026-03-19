@@ -137,6 +137,10 @@ impl<const N: usize> Splitter<u8, f32, N> for Common8BitSplitter<N> {
             }
         }
     }
+
+    fn bit_depth(&self) -> usize {
+        8
+    }
 }
 
 struct Common16BitSplitter<const N: usize> {
@@ -223,6 +227,10 @@ impl<const N: usize> Splitter<u16, f32, N> for Common16BitSplitter<N> {
                 *dst = self.gamma[v as usize];
             }
         }
+    }
+
+    fn bit_depth(&self) -> usize {
+        8
     }
 }
 

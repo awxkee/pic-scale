@@ -83,6 +83,10 @@ impl Splitter<u8, f32, 3> for OklabRgbSplitter {
             self.transfer_function,
         );
     }
+
+    fn bit_depth(&self) -> usize {
+        8
+    }
 }
 
 struct OklabRgbaSplitter {
@@ -115,6 +119,10 @@ impl Splitter<u8, f32, 4> for OklabRgbaSplitter {
             into.height as u32,
             self.transfer_function,
         );
+    }
+
+    fn bit_depth(&self) -> usize {
+        8
     }
 }
 

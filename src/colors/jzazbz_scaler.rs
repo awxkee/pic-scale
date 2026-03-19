@@ -76,6 +76,10 @@ impl Splitter<u8, f32, 3> for JzbzazRgbSplitter {
             self.transfer_function,
         );
     }
+
+    fn bit_depth(&self) -> usize {
+        8
+    }
 }
 
 struct JzazbzRgbaSplitter {
@@ -111,6 +115,10 @@ impl Splitter<u8, f32, 4> for JzazbzRgbaSplitter {
             self.display_luminance,
             self.transfer_function,
         );
+    }
+
+    fn bit_depth(&self) -> usize {
+        8
     }
 }
 

@@ -71,6 +71,9 @@ impl Splitter<u8, f32, 3> for LabRgbSplitter {
             into.height as u32,
         );
     }
+    fn bit_depth(&self) -> usize {
+        8
+    }
 }
 
 struct LabRgbaSplitter {}
@@ -103,6 +106,10 @@ impl Splitter<u8, f32, 4> for LabRgbaSplitter {
             &XYZ_TO_SRGB_D65,
             TransferFunction::Srgb,
         );
+    }
+
+    fn bit_depth(&self) -> usize {
+        8
     }
 }
 
