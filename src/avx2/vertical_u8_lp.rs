@@ -255,7 +255,7 @@ fn process_chunk_32(
             j += 4;
         }
 
-        for j in 0..bounds_size {
+        for j in j..bounds_size {
             let py = bounds.start + j;
             let weight = unsafe { weights.get_unchecked(j) };
             let v_weight = _mm256_set1_epi16(*weight);
