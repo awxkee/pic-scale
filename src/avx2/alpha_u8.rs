@@ -291,16 +291,12 @@ impl Avx2DisassociateAlpha {
 
     #[target_feature(enable = "avx2")]
     fn disassociate_avx2(&self, in_place: &mut [u8]) {
-        unsafe {
-            self.disassociate_work::<false>(in_place);
-        }
+        self.disassociate_work::<false>(in_place);
     }
 
     #[target_feature(enable = "avx2", enable = "fma")]
     fn disassociate_fma(&self, in_place: &mut [u8]) {
-        unsafe {
-            self.disassociate_work::<true>(in_place);
-        }
+        self.disassociate_work::<true>(in_place);
     }
 }
 

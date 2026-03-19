@@ -64,7 +64,7 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_4_lb(
 }
 
 #[inline(always)]
-unsafe fn hdot4(store: __m256i, v0: __m256i, w01: __m256i, w23: __m256i) -> __m256i {
+fn hdot4(store: __m256i, v0: __m256i, w01: __m256i, w23: __m256i) -> __m256i {
     unsafe {
         let lo0 = _mm256_srli_epi16::<2>(_mm256_unpacklo_epi8(v0, v0));
         let hi0 = _mm256_srli_epi16::<2>(_mm256_unpackhi_epi8(v0, v0));
@@ -75,7 +75,7 @@ unsafe fn hdot4(store: __m256i, v0: __m256i, w01: __m256i, w23: __m256i) -> __m2
 }
 
 #[inline(always)]
-unsafe fn hdot2(store: __m256i, v: __m256i, w0123: __m256i) -> __m256i {
+fn hdot2(store: __m256i, v: __m256i, w0123: __m256i) -> __m256i {
     unsafe {
         let lo = _mm256_srli_epi16::<2>(_mm256_unpacklo_epi8(v, v));
         _mm256_add_epi16(store, _mm256_mulhrs_epi16(lo, w0123))
@@ -83,7 +83,7 @@ unsafe fn hdot2(store: __m256i, v: __m256i, w0123: __m256i) -> __m256i {
 }
 
 #[inline(always)]
-unsafe fn hdot(store: __m128i, v: __m128i, w01: __m128i) -> __m128i {
+fn hdot(store: __m128i, v: __m128i, w01: __m128i) -> __m128i {
     unsafe {
         let lo = _mm_srli_epi16::<2>(_mm_unpacklo_epi8(v, v));
         _mm_add_epi16(store, _mm_mulhrs_epi16(lo, w01))
