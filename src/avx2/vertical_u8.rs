@@ -51,7 +51,7 @@ pub(crate) fn convolve_vertical_avx_row(
 
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_vertical_avx_row_reg(
+fn convolve_vertical_avx_row_reg(
     _ignored: usize,
     bounds: &FilterBounds,
     src: &[u8],
@@ -59,16 +59,14 @@ unsafe fn convolve_vertical_avx_row_reg(
     src_stride: usize,
     weights: &[i16],
 ) {
-    unsafe {
-        let unit = ExecutionUnit::<false>::default();
-        unit.pass(_ignored, bounds, src, dst, src_stride, weights);
-    }
+    let unit = ExecutionUnit::<false>::default();
+    unit.pass(_ignored, bounds, src, dst, src_stride, weights);
 }
 
 #[cfg(feature = "avx512")]
 #[target_feature(enable = "avx2", enable = "avxvnni")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_vertical_avx_row_dot(
+fn convolve_vertical_avx_row_dot(
     _ignored: usize,
     bounds: &FilterBounds,
     src: &[u8],
@@ -76,10 +74,8 @@ unsafe fn convolve_vertical_avx_row_dot(
     src_stride: usize,
     weights: &[i16],
 ) {
-    unsafe {
-        let unit = ExecutionUnit::<true>::default();
-        unit.pass(_ignored, bounds, src, dst, src_stride, weights);
-    }
+    let unit = ExecutionUnit::<true>::default();
+    unit.pass(_ignored, bounds, src, dst, src_stride, weights);
 }
 
 #[derive(Copy, Clone, Default)]

@@ -265,6 +265,8 @@ fn process_chunk_32_unrolled<const BOUNDS: usize>(
 
     let mut cx = cx;
 
+    let weights: [__m256i; 12] = std::array::from_fn(|x| _mm256_set1_epi16(weights[x]));
+
     for dst in chunks {
         let mut store0 = _mm256_set1_epi16(ROUNDING);
         let mut store1 = _mm256_set1_epi16(ROUNDING);
@@ -273,13 +275,11 @@ fn process_chunk_32_unrolled<const BOUNDS: usize>(
 
         for j in 0..BOUNDS {
             let py = bounds.start + j;
-            let weight = unsafe { weights.get_unchecked(j) };
-            let v_weight = _mm256_set1_epi16(*weight);
             let v_offset = src_stride * py + px;
             let src_ptr = unsafe { src.get_unchecked(v_offset..) };
             let item_row0 = unsafe { _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i) };
 
-            (store0, store1) = m256dot!(store0, store1, item_row0, v_weight);
+            (store0, store1) = m256dot!(store0, store1, item_row0, weights[j]);
         }
 
         let rebased0 = _mm256_srai_epi16::<R_SHR_SCALE>(store0);
