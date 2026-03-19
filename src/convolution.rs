@@ -50,7 +50,7 @@ where
         filter_weights: FilterWeights<W>,
         threading_policy: ThreadingPolicy,
         options: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<T, N> + Send + Sync>;
+    ) -> Arc<dyn RowFilter<T, N> + Send + Sync>;
 }
 
 pub(crate) trait VerticalConvolutionPass<T, W, const N: usize>
@@ -61,10 +61,17 @@ where
         filter_weights: FilterWeights<W>,
         threading_policy: ThreadingPolicy,
         options: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<T, N> + Send + Sync>;
+    ) -> Arc<dyn ColumnFilter<T, N> + Send + Sync>;
 }
 
-pub(crate) trait Filtering<T, const N: usize>
+pub(crate) trait RowFilter<T, const N: usize>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
+    fn filter(&self, source: &ImageStore<'_, T, N>, destination: &mut ImageStoreMut<T, N>);
+}
+
+pub(crate) trait ColumnFilter<T, const N: usize>
 where
     [T]: ToOwned<Owned = Vec<T>>,
 {

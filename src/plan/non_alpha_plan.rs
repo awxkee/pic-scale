@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::convolution::Filtering;
+use crate::convolution::{ColumnFilter, RowFilter};
 use crate::image_store::CheckStoreDensity;
 use crate::validation::{validate_scratch, validate_sizes};
 use crate::{ImageSize, ImageStore, ImageStoreMut, PicScaleError, ResamplingPlan};
@@ -36,8 +36,8 @@ use std::sync::Arc;
 pub(crate) struct NonAlphaConvolvePlan<T: Send + Sync, const N: usize> {
     pub(crate) source_size: ImageSize,
     pub(crate) target_size: ImageSize,
-    pub(crate) horizontal_filter: Arc<dyn Filtering<T, N> + Send + Sync>,
-    pub(crate) vertical_filter: Arc<dyn Filtering<T, N> + Send + Sync>,
+    pub(crate) horizontal_filter: Arc<dyn RowFilter<T, N> + Send + Sync>,
+    pub(crate) vertical_filter: Arc<dyn ColumnFilter<T, N> + Send + Sync>,
     pub(crate) should_do_horizontal: bool,
     pub(crate) should_do_vertical: bool,
 }

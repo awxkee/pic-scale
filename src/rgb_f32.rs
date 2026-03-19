@@ -28,9 +28,7 @@
  */
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::convolve_vertical_avx_row_f32;
-use crate::convolution::{
-    ConvolutionOptions, Filtering, HorizontalFilterPass, VerticalConvolutionPass,
-};
+use crate::convolution::{ConvolutionOptions, RowFilter, HorizontalFilterPass, VerticalConvolutionPass, ColumnFilter};
 use crate::convolve_naive_f32::*;
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::floating_point_vertical::column_handler_floating_point;
@@ -72,7 +70,7 @@ impl HorizontalFilterPass<f32, f32, 3> for ImageStore<'_, f32, 3> {
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
         _: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<f32, 3> + Send + Sync> {
+    ) -> Arc<dyn RowFilter<f32, 3> + Send + Sync> {
         let mut _dispatcher_4_rows: Option<
             fn(&[f32], usize, &mut [f32], usize, &FilterWeights<f32>, u32),
         > = Some(convolve_horizontal_rgba_4_row_f32::<3>);
@@ -123,7 +121,7 @@ impl HorizontalFilterPass<f32, f64, 3> for ImageStore<'_, f32, 3> {
         filter_weights: FilterWeights<f64>,
         threading_policy: ThreadingPolicy,
         _: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<f32, 3> + Send + Sync> {
+    ) -> Arc<dyn RowFilter<f32, 3> + Send + Sync> {
         let mut _dispatcher_4_rows: Option<
             fn(&[f32], usize, &mut [f32], usize, &FilterWeights<f64>, u32),
         > = Some(convolve_horizontal_4_row_f32_f64::<3>);
@@ -168,7 +166,7 @@ impl VerticalConvolutionPass<f32, f32, 3> for ImageStore<'_, f32, 3> {
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
         _: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<f32, 3> + Send + Sync> {
+    ) -> Arc<dyn ColumnFilter<f32, 3> + Send + Sync> {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(
             usize,
@@ -212,7 +210,7 @@ impl VerticalConvolutionPass<f32, f64, 3> for ImageStore<'_, f32, 3> {
         filter_weights: FilterWeights<f64>,
         threading_policy: ThreadingPolicy,
         options: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<f32, 3> + Send + Sync> {
+    ) -> Arc<dyn ColumnFilter<f32, 3> + Send + Sync> {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(
             usize,

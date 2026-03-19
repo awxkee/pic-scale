@@ -30,7 +30,7 @@ use crate::ThreadingPolicy;
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::{convolve_vertical_avx_row, convolve_vertical_avx_row_lp};
 use crate::convolution::{
-    ConvolutionOptions, Filtering, HorizontalFilterPass, VerticalConvolutionPass,
+    ColumnFilter, ConvolutionOptions, HorizontalFilterPass, RowFilter, VerticalConvolutionPass,
 };
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::handler_provider::{
@@ -54,7 +54,7 @@ impl HorizontalFilterPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
         _options: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<u8, 3> + Send + Sync> {
+    ) -> Arc<dyn RowFilter<u8, 3> + Send + Sync> {
         let _scale_factor = _options.src_size.width as f32 / _options.dst_size.width as f32;
         let mut _dispatcher_4_rows: Option<
             fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>, u32),
@@ -147,7 +147,7 @@ impl VerticalConvolutionPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
         _options: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<u8, 3> + Send + Sync> {
+    ) -> Arc<dyn ColumnFilter<u8, 3> + Send + Sync> {
         let _scale_factor = _options.src_size.height as f32 / _options.dst_size.height as f32;
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(

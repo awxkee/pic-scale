@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::convolution::Filtering;
+use crate::convolution::{ColumnFilter, RowFilter};
 use crate::image_store::{AssociateAlpha, CheckStoreDensity, UnassociateAlpha};
 use crate::validation::{validate_scratch, validate_sizes};
 use crate::{
@@ -41,8 +41,8 @@ pub(crate) struct AlphaConvolvePlan<T: Send + Sync, const N: usize> {
     pub(crate) source_size: ImageSize,
     pub(crate) target_size: ImageSize,
     pub(crate) threading_policy: ThreadingPolicy,
-    pub(crate) horizontal_filter: Arc<dyn Filtering<T, N> + Send + Sync>,
-    pub(crate) vertical_filter: Arc<dyn Filtering<T, N> + Send + Sync>,
+    pub(crate) horizontal_filter: Arc<dyn RowFilter<T, N> + Send + Sync>,
+    pub(crate) vertical_filter: Arc<dyn ColumnFilter<T, N> + Send + Sync>,
     pub(crate) should_do_horizontal: bool,
     pub(crate) should_do_vertical: bool,
     pub(crate) workload_strategy: WorkloadStrategy,

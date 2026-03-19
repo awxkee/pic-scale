@@ -29,7 +29,7 @@
 #![allow(clippy::type_complexity)]
 
 use crate::ThreadingPolicy;
-use crate::convolution::{ConvolutionOptions, Filtering};
+use crate::convolution::{ColumnFilter, ConvolutionOptions, RowFilter};
 use crate::filter_weights::{DefaultWeightsConverter, FilterWeights, WeightsConverter};
 use crate::handler_provider::{
     ColumnHandlerFixedPoint, ColumnHandlerFloatingPoint, RowHandlerFixedPoint,
@@ -44,7 +44,7 @@ pub(crate) trait RowFactoryProducer {
         weights: &FilterWeights<f32>,
         bit_depth: usize,
         threading_policy: ThreadingPolicy,
-    ) -> Arc<dyn Filtering<u16, CN> + Send + Sync>;
+    ) -> Arc<dyn RowFilter<u16, CN> + Send + Sync>;
 }
 
 impl RowFactoryProducer for u16 {
@@ -52,7 +52,7 @@ impl RowFactoryProducer for u16 {
         weights: &FilterWeights<f32>,
         bit_depth: usize,
         threading_policy: ThreadingPolicy,
-    ) -> Arc<dyn Filtering<u16, CN> + Send + Sync> {
+    ) -> Arc<dyn RowFilter<u16, CN> + Send + Sync> {
         if bit_depth < 12 {
             let approx = weights.numerical_approximation_i16::<PRECISION>(0);
             return Arc::new(HorizontalFiltering {
@@ -117,7 +117,7 @@ pub(crate) fn vertical_plan_u16<const CN: usize>(
     filter_weights: FilterWeights<f32>,
     threading_policy: ThreadingPolicy,
     _options: ConvolutionOptions,
-) -> Arc<dyn Filtering<u16, CN> + Send + Sync> {
+) -> Arc<dyn ColumnFilter<u16, CN> + Send + Sync> {
     if _options.bit_depth > 12 {
         #[cfg(all(target_arch = "aarch64", feature = "neon", feature = "rdm"))]
         {

@@ -28,9 +28,7 @@
  */
 #![forbid(unsafe_code)]
 
-use crate::convolution::{
-    ConvolutionOptions, Filtering, HorizontalFilterPass, VerticalConvolutionPass,
-};
+use crate::convolution::{ConvolutionOptions, RowFilter, HorizontalFilterPass, VerticalConvolutionPass, ColumnFilter};
 use crate::dispatch_group_u16::{RowFactoryProducer, vertical_plan_u16};
 use crate::filter_weights::FilterWeights;
 use crate::{ImageStore, ThreadingPolicy};
@@ -41,7 +39,7 @@ impl HorizontalFilterPass<u16, f32, 4> for ImageStore<'_, u16, 4> {
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
         options: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<u16, 4> + Send + Sync> {
+    ) -> Arc<dyn RowFilter<u16, 4> + Send + Sync> {
         u16::make_plan::<4>(&filter_weights, options.bit_depth, threading_policy)
     }
 }
@@ -51,7 +49,7 @@ impl VerticalConvolutionPass<u16, f32, 4> for ImageStore<'_, u16, 4> {
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
         options: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<u16, 4> + Send + Sync> {
+    ) -> Arc<dyn ColumnFilter<u16, 4> + Send + Sync> {
         vertical_plan_u16(filter_weights, threading_policy, options)
     }
 }

@@ -31,9 +31,7 @@ use crate::avx2::{
     convolve_horizontal_rgba_avx_row_one_f32, convolve_horizontal_rgba_avx_rows_4_f32,
     convolve_vertical_avx_row_f32,
 };
-use crate::convolution::{
-    ConvolutionOptions, Filtering, HorizontalFilterPass, VerticalConvolutionPass,
-};
+use crate::convolution::{ConvolutionOptions, RowFilter, HorizontalFilterPass, VerticalConvolutionPass, ColumnFilter};
 use crate::convolve_naive_f32::{
     convolve_horizontal_4_row_f32_f64, convolve_horizontal_native_row_f32,
     convolve_horizontal_native_row_f32_f64, convolve_horizontal_rgba_4_row_f32,
@@ -53,7 +51,7 @@ impl HorizontalFilterPass<f32, f32, 4> for ImageStore<'_, f32, 4> {
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
         _: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<f32, 4> + Send + Sync> {
+    ) -> Arc<dyn RowFilter<f32, 4> + Send + Sync> {
         let mut _dispatcher_4_rows: Option<
             fn(&[f32], usize, &mut [f32], usize, &FilterWeights<f32>, u32),
         > = Some(convolve_horizontal_rgba_4_row_f32::<4>);
@@ -96,7 +94,7 @@ impl HorizontalFilterPass<f32, f64, 4> for ImageStore<'_, f32, 4> {
         filter_weights: FilterWeights<f64>,
         threading_policy: ThreadingPolicy,
         _: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<f32, 4> + Send + Sync> {
+    ) -> Arc<dyn RowFilter<f32, 4> + Send + Sync> {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher_4_rows: Option<
             fn(&[f32], usize, &mut [f32], usize, &FilterWeights<f64>, u32),
@@ -142,7 +140,7 @@ impl VerticalConvolutionPass<f32, f32, 4> for ImageStore<'_, f32, 4> {
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
         _: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<f32, 4> + Send + Sync> {
+    ) -> Arc<dyn ColumnFilter<f32, 4> + Send + Sync> {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(
             usize,
@@ -186,7 +184,7 @@ impl VerticalConvolutionPass<f32, f64, 4> for ImageStore<'_, f32, 4> {
         filter_weights: FilterWeights<f64>,
         threading_policy: ThreadingPolicy,
         _: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<f32, 4> + Send + Sync> {
+    ) -> Arc<dyn ColumnFilter<f32, 4> + Send + Sync> {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(
             usize,

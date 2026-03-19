@@ -34,9 +34,7 @@ use crate::avx2::{
     convolve_horizontal_rgba_avx_row_one_f16, convolve_horizontal_rgba_avx_rows_4_f16,
     convolve_vertical_avx_row_f16,
 };
-use crate::convolution::{
-    ConvolutionOptions, Filtering, HorizontalFilterPass, VerticalConvolutionPass,
-};
+use crate::convolution::{ConvolutionOptions, RowFilter, HorizontalFilterPass, VerticalConvolutionPass, ColumnFilter};
 #[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::filter_weights::WeightsConverter;
 use crate::filter_weights::{FilterBounds, FilterWeights};
@@ -114,7 +112,7 @@ impl HorizontalFilterPass<f16, f32, 4> for ImageStore<'_, f16, 4> {
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
         _options: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<f16, 4> + Send + Sync> {
+    ) -> Arc<dyn RowFilter<f16, 4> + Send + Sync> {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher_4_rows: Option<
             fn(&[f16], usize, &mut [f16], usize, &FilterWeights<f32>, u32),
@@ -218,7 +216,7 @@ impl VerticalConvolutionPass<f16, f32, 4> for ImageStore<'_, f16, 4> {
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
         _options: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<f16, 4> + Send + Sync> {
+    ) -> Arc<dyn ColumnFilter<f16, 4> + Send + Sync> {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(
             usize,
@@ -287,7 +285,7 @@ impl HorizontalFilterPass<f16, f32, 3> for ImageStore<'_, f16, 3> {
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
         _options: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<f16, 3> + Send + Sync> {
+    ) -> Arc<dyn RowFilter<f16, 3> + Send + Sync> {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher_4_rows: Option<
             fn(&[f16], usize, &mut [f16], usize, &FilterWeights<f32>, u32),
@@ -360,7 +358,7 @@ impl VerticalConvolutionPass<f16, f32, 3> for ImageStore<'_, f16, 3> {
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
         _options: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<f16, 3> + Send + Sync> {
+    ) -> Arc<dyn ColumnFilter<f16, 3> + Send + Sync> {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(
             usize,
@@ -430,7 +428,7 @@ impl HorizontalFilterPass<f16, f32, 1> for ImageStore<'_, f16, 1> {
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
         _: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<f16, 1> + Send + Sync> {
+    ) -> Arc<dyn RowFilter<f16, 1> + Send + Sync> {
         #[allow(clippy::type_complexity)]
         let _dispatcher_4_rows: Option<
             fn(&[f16], usize, &mut [f16], usize, &FilterWeights<f32>, u32),
@@ -451,7 +449,7 @@ impl VerticalConvolutionPass<f16, f32, 1> for ImageStore<'_, f16, 1> {
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
         _options: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<f16, 1> + Send + Sync> {
+    ) -> Arc<dyn ColumnFilter<f16, 1> + Send + Sync> {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(
             usize,
@@ -520,7 +518,7 @@ impl HorizontalFilterPass<f16, f32, 2> for ImageStore<'_, f16, 2> {
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
         _: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<f16, 2> + Send + Sync> {
+    ) -> Arc<dyn RowFilter<f16, 2> + Send + Sync> {
         #[allow(clippy::type_complexity)]
         let _dispatcher_4_rows: Option<
             fn(&[f16], usize, &mut [f16], usize, &FilterWeights<f32>, u32),
@@ -541,7 +539,7 @@ impl VerticalConvolutionPass<f16, f32, 2> for ImageStore<'_, f16, 2> {
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
         _options: ConvolutionOptions,
-    ) -> Arc<dyn Filtering<f16, 2> + Send + Sync> {
+    ) -> Arc<dyn ColumnFilter<f16, 2> + Send + Sync> {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(
             usize,

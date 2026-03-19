@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::convolution::Filtering;
+use crate::convolution::RowFilter;
 use crate::filter_weights::FilterWeights;
 use crate::{ImageSize, ImageStore, ImageStoreMut, ThreadingPolicy};
 use novtb::{ParallelZonedIterator, TbSliceMut};
@@ -48,7 +48,7 @@ pub(crate) struct HorizontalFiltering<T, F, const N: usize> {
     pub(crate) threading_policy: ThreadingPolicy,
 }
 
-impl<T: Send + Sync, F: Send + Sync, const N: usize> Filtering<T, N>
+impl<T: Send + Sync, F: Send + Sync, const N: usize> RowFilter<T, N>
     for HorizontalFiltering<T, F, N>
 where
     [T]: ToOwned<Owned = Vec<T>>,
