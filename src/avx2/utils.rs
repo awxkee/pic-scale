@@ -41,7 +41,7 @@ pub(crate) fn _mm256_fma_pd<const FMA: bool>(a: __m256d, b: __m256d, c: __m256d)
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_fma_pd<const FMA: bool>(a: __m128d, b: __m128d, c: __m128d) -> __m128d {
+pub(crate) fn _mm_fma_pd<const FMA: bool>(a: __m128d, b: __m128d, c: __m128d) -> __m128d {
     unsafe {
         if FMA {
             _mm_fmadd_pd(b, c, a)
@@ -73,7 +73,7 @@ pub(crate) const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm256_select_si256(
+pub(crate) fn _mm256_select_si256(
     mask: __m256i,
     true_vals: __m256i,
     false_vals: __m256i,
@@ -82,17 +82,13 @@ pub(crate) unsafe fn _mm256_select_si256(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm256_selecti_ps(
-    mask: __m256i,
-    true_vals: __m256,
-    false_vals: __m256,
-) -> __m256 {
+pub(crate) fn _mm256_selecti_ps(mask: __m256i, true_vals: __m256, false_vals: __m256) -> __m256 {
     unsafe { _mm256_blendv_ps(false_vals, true_vals, _mm256_castsi256_ps(mask)) }
 }
 
 /// Exact division by 255 with rounding to nearest
 #[inline(always)]
-pub(crate) unsafe fn avx2_div_by255(v: __m256i) -> __m256i {
+pub(crate) fn avx2_div_by255(v: __m256i) -> __m256i {
     unsafe {
         let addition = _mm256_set1_epi16(127);
         let j0 = _mm256_add_epi16(v, addition);
@@ -102,7 +98,7 @@ pub(crate) unsafe fn avx2_div_by255(v: __m256i) -> __m256i {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn avx2_deinterleave_rgba(
+pub(crate) fn avx2_deinterleave_rgba(
     rgba0: __m256i,
     rgba1: __m256i,
     rgba2: __m256i,
@@ -144,7 +140,7 @@ pub(crate) unsafe fn avx2_deinterleave_rgba(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn avx_deinterleave_rgba_epi32(
+pub(crate) fn avx_deinterleave_rgba_epi32(
     p0: __m256i,
     p1: __m256i,
     p2: __m256i,
@@ -170,7 +166,7 @@ pub(crate) unsafe fn avx_deinterleave_rgba_epi32(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn avx_interleave_rgba_epi32(
+pub(crate) fn avx_interleave_rgba_epi32(
     p0: __m256i,
     p1: __m256i,
     p2: __m256i,
@@ -197,7 +193,7 @@ pub(crate) unsafe fn avx_interleave_rgba_epi32(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn avx_interleave_rgba_epi16(
+pub(crate) fn avx_interleave_rgba_epi16(
     a: __m256i,
     b: __m256i,
     c: __m256i,
@@ -223,7 +219,7 @@ pub(crate) unsafe fn avx_interleave_rgba_epi16(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn avx_deinterleave_rgba_epi16(
+pub(crate) fn avx_deinterleave_rgba_epi16(
     a: __m256i,
     b: __m256i,
     c: __m256i,
@@ -258,7 +254,7 @@ pub(crate) unsafe fn avx_deinterleave_rgba_epi16(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn avx_deinterleave_rgba_ps(
+pub(crate) fn avx_deinterleave_rgba_ps(
     p0: __m256,
     p1: __m256,
     p2: __m256,
@@ -281,7 +277,7 @@ pub(crate) unsafe fn avx_deinterleave_rgba_ps(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn avx_interleave_rgba_ps(
+pub(crate) fn avx_interleave_rgba_ps(
     p0: __m256,
     p1: __m256,
     p2: __m256,
@@ -304,7 +300,7 @@ pub(crate) unsafe fn avx_interleave_rgba_ps(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn avx2_interleave_rgba(
+pub(crate) fn avx2_interleave_rgba(
     r: __m256i,
     g: __m256i,
     b: __m256i,
@@ -374,9 +370,9 @@ pub(crate) unsafe fn _mm256_srai_epi64x<const IMM8: i32>(a: __m256i) -> __m256i 
     }
 }
 
-#[inline]
+#[inline(always)]
 /// Pack 64bytes integers into 32 bytes using truncation
-pub(crate) unsafe fn _mm256_packts_epi64(a: __m256i, b: __m256i) -> __m256i {
+pub(crate) fn _mm256_packts_epi64(a: __m256i, b: __m256i) -> __m256i {
     unsafe {
         const SHUFFLE_1: i32 = shuffle(2, 0, 2, 0);
         let combined =

@@ -31,7 +31,7 @@ use crate::filter_weights::FilterWeights;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-unsafe fn conv_horiz_rgba_1_u16<const FMA: bool>(
+fn conv_horiz_rgba_1_u16<const FMA: bool>(
     start_x: usize,
     src: &[u16],
     w0: __m128,
@@ -50,7 +50,7 @@ unsafe fn conv_horiz_rgba_1_u16<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn conv_horiz_rgba_2_u16<const FMA: bool>(
+fn conv_horiz_rgba_2_u16<const FMA: bool>(
     start_x: usize,
     src: &[u16],
     w0: __m128,
@@ -71,7 +71,7 @@ unsafe fn conv_horiz_rgba_2_u16<const FMA: bool>(
 }
 
 #[inline]
-unsafe fn conv_horiz_rgba_4_u16<const FMA: bool>(
+fn conv_horiz_rgba_4_u16<const FMA: bool>(
     start_x: usize,
     src: &[u16],
     w0: __m128,
@@ -92,7 +92,7 @@ unsafe fn conv_horiz_rgba_4_u16<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn conv_horiz_rgba_8_u16<const FMA: bool>(
+fn conv_horiz_rgba_8_u16<const FMA: bool>(
     start_x: usize,
     src: &[u16],
     w: __m256,
@@ -143,7 +143,7 @@ pub(crate) fn convolve_horizontal_plane_avx_rows_4_u16_f(
 
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_plane_avx_rows_4_u16_def(
+fn convolve_horizontal_plane_avx_rows_4_u16_def(
     src: &[u16],
     src_stride: usize,
     dst: &mut [u16],
@@ -151,15 +151,13 @@ unsafe fn convolve_horizontal_plane_avx_rows_4_u16_def(
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
-    unsafe {
-        let unit = Row4ExecutionHandler::<false>::default();
-        unit.pass(src, src_stride, dst, dst_stride, filter_weights, bit_depth);
-    }
+    let unit = Row4ExecutionHandler::<false>::default();
+    unit.pass(src, src_stride, dst, dst_stride, filter_weights, bit_depth);
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_plane_avx_rows_4_u16_fma(
+fn convolve_horizontal_plane_avx_rows_4_u16_fma(
     src: &[u16],
     src_stride: usize,
     dst: &mut [u16],
@@ -167,10 +165,8 @@ unsafe fn convolve_horizontal_plane_avx_rows_4_u16_fma(
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
-    unsafe {
-        let unit = Row4ExecutionHandler::<true>::default();
-        unit.pass(src, src_stride, dst, dst_stride, filter_weights, bit_depth);
-    }
+    let unit = Row4ExecutionHandler::<true>::default();
+    unit.pass(src, src_stride, dst, dst_stride, filter_weights, bit_depth);
 }
 
 #[derive(Copy, Clone, Default)]
@@ -178,7 +174,7 @@ struct Row4ExecutionHandler<const FMA: bool> {}
 
 impl<const FMA: bool> Row4ExecutionHandler<FMA> {
     #[inline(always)]
-    unsafe fn pass(
+    fn pass(
         &self,
         src: &[u16],
         src_stride: usize,
@@ -322,30 +318,26 @@ pub(crate) fn convolve_horizontal_plane_avx_u16_row_f(
 
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_plane_avx_u16_row_def(
+fn convolve_horizontal_plane_avx_u16_row_def(
     src: &[u16],
     dst: &mut [u16],
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
-    unsafe {
-        let unit = OneRowExecutionHandler::<false>::default();
-        unit.pass(src, dst, filter_weights, bit_depth);
-    }
+    let unit = OneRowExecutionHandler::<false>::default();
+    unit.pass(src, dst, filter_weights, bit_depth);
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_plane_avx_u16_row_fma(
+fn convolve_horizontal_plane_avx_u16_row_fma(
     src: &[u16],
     dst: &mut [u16],
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
-    unsafe {
-        let unit = OneRowExecutionHandler::<true>::default();
-        unit.pass(src, dst, filter_weights, bit_depth);
-    }
+    let unit = OneRowExecutionHandler::<true>::default();
+    unit.pass(src, dst, filter_weights, bit_depth);
 }
 
 #[derive(Copy, Clone, Default)]
@@ -353,7 +345,7 @@ struct OneRowExecutionHandler<const FMA: bool> {}
 
 impl<const FMA: bool> OneRowExecutionHandler<FMA> {
     #[inline(always)]
-    unsafe fn pass(
+    fn pass(
         &self,
         src: &[u16],
         dst: &mut [u16],

@@ -170,7 +170,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
             while j + 2 <= bounds.size {
                 let py = start_y + j;
                 let weights =
-                    _mm_castsi128_ps(_mm_loadu_epi64(filter.get_unchecked(j..).as_ptr().cast()));
+                    _mm_castsi128_ps(_mm_loadu_si64(filter.get_unchecked(j..).as_ptr().cast()));
 
                 let xw0 = _mm_shuffle_ps::<{ shuffle(0, 0, 0, 0) }>(weights, weights);
                 let xw1 = _mm_shuffle_ps::<{ shuffle(1, 1, 1, 1) }>(weights, weights);

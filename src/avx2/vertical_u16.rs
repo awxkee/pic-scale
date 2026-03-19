@@ -239,7 +239,7 @@ fn convolve_32_items<const FMA: bool>(
                 let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
 
                 let weights =
-                    _mm_castsi128_ps(_mm_loadu_epi64(weights.get_unchecked(j..).as_ptr().cast()));
+                    _mm_castsi128_ps(_mm_loadu_si64(weights.get_unchecked(j..).as_ptr().cast()));
 
                 let xw0 = _mm_shuffle_ps::<{ shuffle(0, 0, 0, 0) }>(weights, weights);
                 let xw1 = _mm_shuffle_ps::<{ shuffle(1, 1, 1, 1) }>(weights, weights);

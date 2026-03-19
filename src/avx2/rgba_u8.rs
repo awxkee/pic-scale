@@ -45,7 +45,7 @@ pub(crate) fn convolve_horizontal_rgba_row_4(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn convolve_horizontal_rgba_avx_row_4_impl(
+fn convolve_horizontal_rgba_avx_row_4_impl(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],

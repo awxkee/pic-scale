@@ -33,7 +33,7 @@ use novtb::{ParallelZonedIterator, TbSliceMut};
 use std::arch::x86_64::*;
 
 #[inline(always)]
-pub(crate) unsafe fn avx_unpremultiply_row_f32(x: __m256, a: __m256) -> __m256 {
+pub(crate) fn avx_unpremultiply_row_f32(x: __m256, a: __m256) -> __m256 {
     unsafe {
         let is_zero_mask = _mm256_cmp_ps::<_CMP_EQ_OS>(a, _mm256_setzero_ps());
         let rs = _mm256_div_ps(x, a);

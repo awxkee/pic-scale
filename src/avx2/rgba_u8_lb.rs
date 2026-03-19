@@ -32,7 +32,7 @@ use crate::filter_weights::FilterWeights;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-unsafe fn convolve_horizontal_parts_one_rgba_sse(
+fn convolve_horizontal_parts_one_rgba_sse(
     start_x: usize,
     src: &[u8],
     weight0: __m128i,

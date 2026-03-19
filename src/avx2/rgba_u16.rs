@@ -482,30 +482,26 @@ pub(crate) fn convolve_horizontal_rgba_avx_u16_row_f(
 
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_rgba_avx_u16_row_def(
+fn convolve_horizontal_rgba_avx_u16_row_def(
     src: &[u16],
     dst: &mut [u16],
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
-    unsafe {
-        let unit = OneRowExecutionHandler::<false>::default();
-        unit.pass(src, dst, filter_weights, bit_depth);
-    }
+    let unit = OneRowExecutionHandler::<false>::default();
+    unit.pass(src, dst, filter_weights, bit_depth);
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_rgba_avx_u16_row_fma(
+fn convolve_horizontal_rgba_avx_u16_row_fma(
     src: &[u16],
     dst: &mut [u16],
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
-    unsafe {
-        let unit = OneRowExecutionHandler::<true>::default();
-        unit.pass(src, dst, filter_weights, bit_depth);
-    }
+    let unit = OneRowExecutionHandler::<true>::default();
+    unit.pass(src, dst, filter_weights, bit_depth);
 }
 
 #[derive(Copy, Clone, Default)]
