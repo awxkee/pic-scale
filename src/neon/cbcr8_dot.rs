@@ -55,7 +55,7 @@ unsafe fn ld4(src: &[u8]) -> uint8x16_t {
 }
 
 #[inline(always)]
-unsafe fn store_cbcr(ptr: &mut [u8], store: int32x2_t) {
+fn store_cbcr(ptr: &mut [u8], store: int32x2_t) {
     unsafe {
         let m0 = vqshrun_n_s32::<7>(vcombine_s32(store, vdup_n_s32(0)));
         let v0 = vreinterpret_u16_u8(vqmovn_u16(vcombine_u16(m0, m0)));
@@ -69,6 +69,7 @@ pub(crate) fn convolve_horizontal_cbcr_neon_rows_dot_4_u8(
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i8>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_cbcr_neon_rows_4_u8_impl_dot(
@@ -82,7 +83,7 @@ pub(crate) fn convolve_horizontal_cbcr_neon_rows_dot_4_u8(
 }
 
 #[target_feature(enable = "i8mm")]
-unsafe fn convolve_horizontal_cbcr_neon_rows_4_u8_impl_dot(
+fn convolve_horizontal_cbcr_neon_rows_4_u8_impl_dot(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -131,7 +132,7 @@ unsafe fn convolve_horizontal_cbcr_neon_rows_4_u8_impl_dot(
             let src2 = src1.get_unchecked(src_stride..);
             let src3 = src2.get_unchecked(src_stride..);
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let mut v_weight = vreinterpretq_s8_s32(vld1q_lane_s32::<0>(
                     w_ptr.as_ptr() as *const _,
@@ -169,7 +170,7 @@ unsafe fn convolve_horizontal_cbcr_neon_rows_4_u8_impl_dot(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let mut v_weight = vreinterpretq_s8_s16(vld1q_lane_s16::<0>(
                     w_ptr.as_ptr() as *const _,
@@ -237,6 +238,7 @@ pub fn convolve_horizontal_cbcr_neon_dot_row(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i8>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_cbcr_neon_rdm_row_impl(src, dst, filter_weights);
@@ -244,7 +246,7 @@ pub fn convolve_horizontal_cbcr_neon_dot_row(
 }
 
 #[target_feature(enable = "i8mm")]
-unsafe fn convolve_horizontal_cbcr_neon_rdm_row_impl(
+fn convolve_horizontal_cbcr_neon_rdm_row_impl(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i8>,
@@ -274,7 +276,7 @@ unsafe fn convolve_horizontal_cbcr_neon_rdm_row_impl(
             let mut jx = 0usize;
             let mut store = base_val;
 
-            while jx + 4 < bounds_size {
+            while jx + 4 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let mut v_weight = vreinterpretq_s8_s32(vld1q_lane_s32::<0>(
                     w_ptr.as_ptr() as *const _,
@@ -289,7 +291,7 @@ unsafe fn convolve_horizontal_cbcr_neon_rdm_row_impl(
                 jx += 4;
             }
 
-            while jx + 2 < bounds_size {
+            while jx + 2 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let mut v_weight = vreinterpretq_s8_s16(vld1q_lane_s16::<0>(
                     w_ptr.as_ptr() as *const _,

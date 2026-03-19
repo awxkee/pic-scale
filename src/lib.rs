@@ -28,31 +28,19 @@
  */
 #![deny(deprecated)]
 // #![deny(unreachable_code, unused)]
-#![allow(stable_features, clippy::incompatible_msrv)]
-#![allow(clippy::too_many_arguments, clippy::manual_clamp)]
+#![allow(stable_features, clippy::incompatible_msrv, unused_features)]
+#![allow(
+    clippy::too_many_arguments,
+    clippy::manual_clamp,
+    clippy::type_complexity
+)]
 #![cfg_attr(
     all(feature = "nightly_i8mm", target_arch = "aarch64"),
     feature(stdarch_neon_i8mm)
 )]
 #![cfg_attr(
-    all(feature = "nightly_avx512", target_arch = "x86_64"),
-    feature(cfg_version)
-)]
-#![cfg_attr(
-    all(feature = "nightly_avx512", target_arch = "x86_64"),
-    feature(avx512_target_feature)
-)]
-#![cfg_attr(
-    all(feature = "nightly_avx512", target_arch = "x86_64"),
-    feature(stdarch_x86_avx512)
-)]
-#![cfg_attr(
     all(feature = "nightly_avx512fp16", target_arch = "x86_64"),
     feature(stdarch_x86_avx512_f16)
-)]
-#![cfg_attr(
-    all(feature = "nightly_avx512", target_arch = "x86_64"),
-    feature(x86_amx_intrinsics)
 )]
 #![cfg_attr(feature = "nightly_f16", feature(f16))]
 #![cfg_attr(
@@ -70,7 +58,7 @@ mod alpha_handle_u8;
 mod ar30;
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 mod avx2;
-#[cfg(all(target_arch = "x86_64", feature = "nightly_avx512"))]
+#[cfg(all(target_arch = "x86_64", feature = "avx512"))]
 mod avx512;
 mod cbcr16;
 mod cbcr8;
@@ -81,11 +69,7 @@ mod colors;
 mod convolution;
 mod convolve_naive_f32;
 mod dispatch_group_ar30;
-#[cfg(feature = "nightly_f16")]
-mod dispatch_group_f16;
-mod dispatch_group_f32;
 mod dispatch_group_u16;
-mod dispatch_group_u8;
 #[cfg(feature = "nightly_f16")]
 mod f16;
 mod filter_weights;
@@ -101,14 +85,12 @@ mod image_store;
 mod math;
 mod mixed_storage;
 mod mlaf;
-mod nearest_sampler;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 mod neon;
-mod pic_scale_error;
+mod plan;
 mod plane_f32;
 mod plane_u16;
 mod plane_u8;
-mod resize_ar30;
 mod rgb_f32;
 mod rgb_u16;
 mod rgb_u8;
@@ -125,6 +107,7 @@ mod scaler_f16;
 mod sse;
 mod support;
 mod threading_policy;
+mod validation;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 mod wasm32;
 
@@ -151,8 +134,8 @@ pub use image_store::{
     RgbF16ImageStore, RgbF16ImageStoreMut, RgbaF16ImageStore, RgbaF16ImageStoreMut,
 };
 pub(crate) use math::*;
-pub use pic_scale_error::{PicScaleBufferMismatch, PicScaleError};
+pub use plan::{Resampling, ResamplingPlan};
 pub use sampler::*;
 pub use scaler::{ImageStoreScaling, Scaler, ScalingOptions, WorkloadStrategy};
-pub use scaler::{Scaling, ScalingF32, ScalingU16};
 pub use threading_policy::ThreadingPolicy;
+pub use validation::{PicScaleBufferMismatch, PicScaleError};

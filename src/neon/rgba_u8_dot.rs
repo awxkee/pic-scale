@@ -46,6 +46,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_rows_4_u8_dot(
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i8>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_rgba_neon_rows_4_u8_impl_dot(
@@ -59,7 +60,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_rows_4_u8_dot(
 }
 
 #[target_feature(enable = "i8mm")]
-unsafe fn convolve_horizontal_rgba_neon_rows_4_u8_impl_dot(
+fn convolve_horizontal_rgba_neon_rows_4_u8_impl_dot(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -85,6 +86,14 @@ unsafe fn convolve_horizontal_rgba_neon_rows_4_u8_impl_dot(
         let v_tbl = vld1q_u8(tbl.as_ptr());
         let weights_tbl: [u8; 16] = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3];
         let v_weights = vld1q_u8(weights_tbl.as_ptr());
+        let weights_tbl1: [u8; 16] = [4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7];
+        let v_weights_hi = vld1q_u8(weights_tbl1.as_ptr());
+        let weights_tbl2: [u8; 16] = [8, 9, 10, 11, 8, 9, 10, 11, 8, 9, 10, 11, 8, 9, 10, 11];
+        let v_weights_hi2 = vld1q_u8(weights_tbl2.as_ptr());
+        let weights_tbl3: [u8; 16] = [
+            12, 13, 14, 15, 12, 13, 14, 15, 12, 13, 14, 15, 12, 13, 14, 15,
+        ];
+        let v_weights_hi3 = vld1q_u8(weights_tbl3.as_ptr());
 
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
             .zip(iter_row1)
@@ -110,7 +119,92 @@ unsafe fn convolve_horizontal_rgba_neon_rows_4_u8_impl_dot(
             let src2 = src1.get_unchecked(src_stride..);
             let src3 = src2.get_unchecked(src_stride..);
 
-            while jx + 4 < bounds_size {
+            while jx + 16 <= bounds_size {
+                let bounds_start = bounds.start + jx;
+                let w_ptr = weights.get_unchecked(jx..);
+                let weights = vreinterpretq_s8_s16(vld1q_s16(w_ptr.as_ptr().cast()));
+                let w0 = vqtbl1q_s8(weights, v_weights);
+                let w1 = vqtbl1q_s8(weights, v_weights_hi);
+                let w2 = vqtbl1q_s8(weights, v_weights_hi2);
+                let w3 = vqtbl1q_s8(weights, v_weights_hi3);
+
+                let rgba_pixel0 = vld1q_u8(src0.get_unchecked((bounds_start * CN)..).as_ptr());
+                let rgba_pixel1 = vld1q_u8(src1.get_unchecked((bounds_start * CN)..).as_ptr());
+                let rgba_pixel2 = vld1q_u8(src2.get_unchecked((bounds_start * CN)..).as_ptr());
+                let rgba_pixel3 = vld1q_u8(src3.get_unchecked((bounds_start * CN)..).as_ptr());
+
+                store_0 = vusdotq_s32(store_0, vqtbl1q_u8(rgba_pixel0, v_tbl), w0);
+                store_1 = vusdotq_s32(store_1, vqtbl1q_u8(rgba_pixel1, v_tbl), w0);
+                store_2 = vusdotq_s32(store_2, vqtbl1q_u8(rgba_pixel2, v_tbl), w0);
+                store_3 = vusdotq_s32(store_3, vqtbl1q_u8(rgba_pixel3, v_tbl), w0);
+
+                let rgba_pixel0 = vld1q_u8(src0.get_unchecked((bounds_start * CN) + 16..).as_ptr());
+                let rgba_pixel1 = vld1q_u8(src1.get_unchecked((bounds_start * CN) + 16..).as_ptr());
+                let rgba_pixel2 = vld1q_u8(src2.get_unchecked((bounds_start * CN) + 16..).as_ptr());
+                let rgba_pixel3 = vld1q_u8(src3.get_unchecked((bounds_start * CN) + 16..).as_ptr());
+
+                store_0 = vusdotq_s32(store_0, vqtbl1q_u8(rgba_pixel0, v_tbl), w1);
+                store_1 = vusdotq_s32(store_1, vqtbl1q_u8(rgba_pixel1, v_tbl), w1);
+                store_2 = vusdotq_s32(store_2, vqtbl1q_u8(rgba_pixel2, v_tbl), w1);
+                store_3 = vusdotq_s32(store_3, vqtbl1q_u8(rgba_pixel3, v_tbl), w1);
+
+                let rgba_pixel0 = vld1q_u8(src0.get_unchecked((bounds_start * CN) + 32..).as_ptr());
+                let rgba_pixel1 = vld1q_u8(src1.get_unchecked((bounds_start * CN) + 32..).as_ptr());
+                let rgba_pixel2 = vld1q_u8(src2.get_unchecked((bounds_start * CN) + 32..).as_ptr());
+                let rgba_pixel3 = vld1q_u8(src3.get_unchecked((bounds_start * CN) + 32..).as_ptr());
+
+                store_0 = vusdotq_s32(store_0, vqtbl1q_u8(rgba_pixel0, v_tbl), w2);
+                store_1 = vusdotq_s32(store_1, vqtbl1q_u8(rgba_pixel1, v_tbl), w2);
+                store_2 = vusdotq_s32(store_2, vqtbl1q_u8(rgba_pixel2, v_tbl), w2);
+                store_3 = vusdotq_s32(store_3, vqtbl1q_u8(rgba_pixel3, v_tbl), w2);
+
+                let rgba_pixel0 = vld1q_u8(src0.get_unchecked((bounds_start * CN) + 48..).as_ptr());
+                let rgba_pixel1 = vld1q_u8(src1.get_unchecked((bounds_start * CN) + 48..).as_ptr());
+                let rgba_pixel2 = vld1q_u8(src2.get_unchecked((bounds_start * CN) + 48..).as_ptr());
+                let rgba_pixel3 = vld1q_u8(src3.get_unchecked((bounds_start * CN) + 48..).as_ptr());
+
+                store_0 = vusdotq_s32(store_0, vqtbl1q_u8(rgba_pixel0, v_tbl), w3);
+                store_1 = vusdotq_s32(store_1, vqtbl1q_u8(rgba_pixel1, v_tbl), w3);
+                store_2 = vusdotq_s32(store_2, vqtbl1q_u8(rgba_pixel2, v_tbl), w3);
+                store_3 = vusdotq_s32(store_3, vqtbl1q_u8(rgba_pixel3, v_tbl), w3);
+
+                jx += 16;
+            }
+
+            while jx + 8 <= bounds_size {
+                let bounds_start = bounds.start + jx;
+                let w_ptr = weights.get_unchecked(jx..);
+                let weights = vreinterpretq_s8_s16(vcombine_s16(
+                    vld1_s16(w_ptr.as_ptr().cast()),
+                    vdup_n_s16(0),
+                ));
+                let w0 = vqtbl1q_s8(weights, v_weights);
+                let w1 = vqtbl1q_s8(weights, v_weights_hi);
+
+                let rgba_pixel0 = vld1q_u8(src0.get_unchecked((bounds_start * CN)..).as_ptr());
+                let rgba_pixel1 = vld1q_u8(src1.get_unchecked((bounds_start * CN)..).as_ptr());
+                let rgba_pixel2 = vld1q_u8(src2.get_unchecked((bounds_start * CN)..).as_ptr());
+                let rgba_pixel3 = vld1q_u8(src3.get_unchecked((bounds_start * CN)..).as_ptr());
+
+                store_0 = vusdotq_s32(store_0, vqtbl1q_u8(rgba_pixel0, v_tbl), w0);
+                store_1 = vusdotq_s32(store_1, vqtbl1q_u8(rgba_pixel1, v_tbl), w0);
+                store_2 = vusdotq_s32(store_2, vqtbl1q_u8(rgba_pixel2, v_tbl), w0);
+                store_3 = vusdotq_s32(store_3, vqtbl1q_u8(rgba_pixel3, v_tbl), w0);
+
+                let rgba_pixel0 = vld1q_u8(src0.get_unchecked((bounds_start * CN) + 16..).as_ptr());
+                let rgba_pixel1 = vld1q_u8(src1.get_unchecked((bounds_start * CN) + 16..).as_ptr());
+                let rgba_pixel2 = vld1q_u8(src2.get_unchecked((bounds_start * CN) + 16..).as_ptr());
+                let rgba_pixel3 = vld1q_u8(src3.get_unchecked((bounds_start * CN) + 16..).as_ptr());
+
+                store_0 = vusdotq_s32(store_0, vqtbl1q_u8(rgba_pixel0, v_tbl), w1);
+                store_1 = vusdotq_s32(store_1, vqtbl1q_u8(rgba_pixel1, v_tbl), w1);
+                store_2 = vusdotq_s32(store_2, vqtbl1q_u8(rgba_pixel2, v_tbl), w1);
+                store_3 = vusdotq_s32(store_3, vqtbl1q_u8(rgba_pixel3, v_tbl), w1);
+
+                jx += 8;
+            }
+
+            while jx + 4 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
                 let mut v_weight = vreinterpretq_s8_s32(vld1q_lane_s32::<0>(
@@ -131,7 +225,7 @@ unsafe fn convolve_horizontal_rgba_neon_rows_4_u8_impl_dot(
                 jx += 4;
             }
 
-            while jx + 2 < bounds_size {
+            while jx + 2 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let mut v_weight = vreinterpretq_s8_s16(vld1q_lane_s16::<0>(
@@ -219,6 +313,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_row_dot(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i8>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_rgba_neon_row_impl(src, dst, filter_weights);
@@ -226,7 +321,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_row_dot(
 }
 
 #[target_feature(enable = "i8mm")]
-unsafe fn convolve_horizontal_rgba_neon_row_impl(
+fn convolve_horizontal_rgba_neon_row_impl(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i8>,
@@ -253,7 +348,7 @@ unsafe fn convolve_horizontal_rgba_neon_row_impl(
             let mut jx = 0usize;
             let mut store = vdupq_n_s32(rnd_const);
 
-            while jx + 4 < bounds_size {
+            while jx + 4 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let mut v_weight = vreinterpretq_s8_s32(vld1q_lane_s32::<0>(
                     w_ptr.as_ptr() as *const _,
@@ -267,7 +362,7 @@ unsafe fn convolve_horizontal_rgba_neon_row_impl(
                 jx += 4;
             }
 
-            while jx + 2 < bounds_size {
+            while jx + 2 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let mut v_weight = vreinterpretq_s8_s16(vld1q_lane_s16::<0>(
@@ -284,7 +379,7 @@ unsafe fn convolve_horizontal_rgba_neon_row_impl(
                 jx += 2;
             }
 
-            while jx < bounds_size {
+            while jx <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let weight0 = vld1q_dup_s8(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;

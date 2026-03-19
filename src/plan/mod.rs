@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ * Copyright (c) Radzivon Bartoshyk 3/2026. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -26,47 +26,18 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#![forbid(unsafe_code)]
+mod alpha_plan;
+mod horizontal_filtering;
+mod nearest_plan;
+mod non_alpha_plan;
+mod planner;
+mod trampoline_filtering;
+mod vertical_filtering;
 
-use novtb::{ParallelZonedIterator, TbSliceMut};
-
-pub(crate) fn resize_nearest<T: Copy + Send + Sync, const N: usize>(
-    src: &[T],
-    src_width: usize,
-    src_height: usize,
-    dst: &mut [T],
-    dst_width: usize,
-    dst_height: usize,
-    pool: &novtb::ThreadPool,
-) {
-    const SCALE: i32 = 32;
-
-    let k_x: u64 = ((src_width as u64) << SCALE) / dst_width as u64;
-    let k_y: u64 = ((src_height as u64) << SCALE) / dst_height as u64;
-    let k_x_half: u64 = k_x >> 1;
-    let k_y_half: u64 = k_y >> 1;
-
-    let dst_stride = dst_width * N;
-    let src_stride = src_width * N;
-
-    dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst_chunk| {
-            let src_y = ((y as u64 * k_y + k_y_half) >> SCALE) as usize;
-            let src_offset_y = src_y * src_stride;
-
-            let mut src_x_fixed = k_x_half;
-            for dst in dst_chunk.chunks_exact_mut(N) {
-                let src_x = (src_x_fixed >> SCALE) as usize;
-
-                let src_px = src_x * N;
-                let offset = src_offset_y + src_px;
-
-                let src_slice = &src[offset..(offset + N)];
-
-                for (src, dst) in src_slice.iter().zip(dst.iter_mut()) {
-                    *dst = *src;
-                }
-                src_x_fixed += k_x;
-            }
-        });
-}
+pub(crate) use alpha_plan::AlphaConvolvePlan;
+pub(crate) use horizontal_filtering::HorizontalFiltering;
+pub(crate) use nearest_plan::ResampleNearestPlan;
+pub(crate) use non_alpha_plan::NonAlphaConvolvePlan;
+pub use planner::{Resampling, ResamplingPlan};
+pub(crate) use trampoline_filtering::TrampolineFiltering;
+pub(crate) use vertical_filtering::VerticalFiltering;

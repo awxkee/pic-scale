@@ -33,7 +33,7 @@ use crate::support::{PRECISION, ROUNDING_CONST};
 use std::arch::x86_64::*;
 
 #[inline(always)]
-unsafe fn acc_1_dot<const D: bool>(
+fn acc_1_dot<const D: bool>(
     start_x: usize,
     src: &[u16],
     w0: __m128i,
@@ -49,7 +49,7 @@ unsafe fn acc_1_dot<const D: bool>(
 }
 
 #[inline(always)]
-unsafe fn acc_2_dot<const D: bool>(
+fn acc_2_dot<const D: bool>(
     start_x: usize,
     src: &[u16],
     w0: __m128i,
@@ -65,7 +65,7 @@ unsafe fn acc_2_dot<const D: bool>(
 }
 
 #[inline(always)]
-unsafe fn acc_4_dot<const D: bool>(
+fn acc_4_dot<const D: bool>(
     start_x: usize,
     src: &[u16],
     w0: __m256i,
@@ -81,7 +81,7 @@ unsafe fn acc_4_dot<const D: bool>(
 }
 
 #[inline(always)]
-unsafe fn acc_8_dot<const D: bool>(
+fn acc_8_dot<const D: bool>(
     start_x: usize,
     src: &[u16],
     w0: __m256i,
@@ -109,7 +109,7 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_4_u16(
     bit_depth: u32,
 ) {
     unsafe {
-        #[cfg(feature = "nightly_avx512")]
+        #[cfg(feature = "avx512")]
         #[allow(clippy::incompatible_msrv)]
         if std::arch::is_x86_feature_detected!("avxvnni") {
             return convolve_horizontal_rgba_avx_rows_4_lb_vn(
@@ -132,9 +132,9 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_4_u16(
     }
 }
 
-#[cfg(feature = "nightly_avx512")]
+#[cfg(feature = "avx512")]
 #[target_feature(enable = "avxvnni", enable = "avx2")]
-unsafe fn convolve_horizontal_rgba_avx_rows_4_lb_vn(
+fn convolve_horizontal_rgba_avx_rows_4_lb_vn(
     src: &[u16],
     src_stride: usize,
     dst: &mut [u16],
@@ -142,14 +142,12 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_lb_vn(
     filter_weights: &FilterWeights<i16>,
     bit_depth: u32,
 ) {
-    unsafe {
-        let unit = Row4ExecutionHandler::<true>::default();
-        unit.pass(src, src_stride, dst, dst_stride, filter_weights, bit_depth);
-    }
+    let unit = Row4ExecutionHandler::<true>::default();
+    unit.pass(src, src_stride, dst, dst_stride, filter_weights, bit_depth);
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn convolve_horizontal_rgba_avx_rows_4_lb_a(
+fn convolve_horizontal_rgba_avx_rows_4_lb_a(
     src: &[u16],
     src_stride: usize,
     dst: &mut [u16],
@@ -157,10 +155,8 @@ unsafe fn convolve_horizontal_rgba_avx_rows_4_lb_a(
     filter_weights: &FilterWeights<i16>,
     bit_depth: u32,
 ) {
-    unsafe {
-        let unit = Row4ExecutionHandler::<false>::default();
-        unit.pass(src, src_stride, dst, dst_stride, filter_weights, bit_depth);
-    }
+    let unit = Row4ExecutionHandler::<false>::default();
+    unit.pass(src, src_stride, dst, dst_stride, filter_weights, bit_depth);
 }
 
 #[derive(Copy, Clone, Default)]
@@ -168,7 +164,7 @@ struct Row4ExecutionHandler<const D: bool> {}
 
 impl<const D: bool> Row4ExecutionHandler<D> {
     #[inline(always)]
-    unsafe fn acc_1_dot_avx(
+    fn acc_1_dot_avx(
         &self,
         start_x: usize,
         src0: &[u16],
@@ -194,7 +190,7 @@ impl<const D: bool> Row4ExecutionHandler<D> {
     }
 
     #[inline(always)]
-    unsafe fn acc_2_dot_avx(
+    fn acc_2_dot_avx(
         &self,
         start_x: usize,
         src0: &[u16],
@@ -220,7 +216,7 @@ impl<const D: bool> Row4ExecutionHandler<D> {
     }
 
     #[inline(always)]
-    unsafe fn pass(
+    fn pass(
         &self,
         src: &[u16],
         src_stride: usize,
@@ -307,7 +303,7 @@ impl<const D: bool> Row4ExecutionHandler<D> {
                 let mut store_1 = init256;
 
                 if bounds_size >= 4 {
-                    while jx + 8 < bounds_size {
+                    while jx + 8 <= bounds_size {
                         let w_ptr = weights.get_unchecked(jx..);
                         let wl =
                             _mm256_castsi128_si256(_mm_loadu_si128(w_ptr.as_ptr() as *const _));
@@ -331,7 +327,7 @@ impl<const D: bool> Row4ExecutionHandler<D> {
                         jx += 8;
                     }
 
-                    while jx + 4 < bounds_size {
+                    while jx + 4 <= bounds_size {
                         let bounds_start = bounds.start + jx;
                         let w_ptr = weights.get_unchecked(jx..);
                         let w0 = _mm256_shuffle_epi8(
@@ -363,7 +359,7 @@ impl<const D: bool> Row4ExecutionHandler<D> {
                     );
                 }
 
-                while jx + 2 < bounds_size {
+                while jx + 2 <= bounds_size {
                     let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
                     let ww0 = _mm_loadu_si32(w_ptr.as_ptr() as *const _);
@@ -442,7 +438,7 @@ pub(crate) fn convolve_horizontal_rgba_avx_u16lp_row(
     bit_depth: u32,
 ) {
     unsafe {
-        #[cfg(feature = "nightly_avx512")]
+        #[cfg(feature = "avx512")]
         #[allow(clippy::incompatible_msrv)]
         if std::arch::is_x86_feature_detected!("avxvnni") {
             return convolve_horizontal_rgba_avx_u16_row_vn(src, dst, filter_weights, bit_depth);
@@ -451,31 +447,27 @@ pub(crate) fn convolve_horizontal_rgba_avx_u16lp_row(
     }
 }
 
-#[cfg(feature = "nightly_avx512")]
+#[cfg(feature = "avx512")]
 #[target_feature(enable = "avxvnni", enable = "avx2")]
-unsafe fn convolve_horizontal_rgba_avx_u16_row_vn(
+fn convolve_horizontal_rgba_avx_u16_row_vn(
     src: &[u16],
     dst: &mut [u16],
     filter_weights: &FilterWeights<i16>,
     bit_depth: u32,
 ) {
-    unsafe {
-        let unit = OneRowExecutionUnit::<true>::default();
-        unit.pass(src, dst, filter_weights, bit_depth);
-    }
+    let unit = OneRowExecutionUnit::<true>::default();
+    unit.pass(src, dst, filter_weights, bit_depth);
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn convolve_horizontal_rgba_avx_u16_row_avx(
+fn convolve_horizontal_rgba_avx_u16_row_avx(
     src: &[u16],
     dst: &mut [u16],
     filter_weights: &FilterWeights<i16>,
     bit_depth: u32,
 ) {
-    unsafe {
-        let unit = OneRowExecutionUnit::<false>::default();
-        unit.pass(src, dst, filter_weights, bit_depth);
-    }
+    let unit = OneRowExecutionUnit::<false>::default();
+    unit.pass(src, dst, filter_weights, bit_depth);
 }
 
 #[derive(Copy, Clone, Default)]
@@ -483,7 +475,7 @@ struct OneRowExecutionUnit<const D: bool> {}
 
 impl<const D: bool> OneRowExecutionUnit<D> {
     #[inline(always)]
-    unsafe fn pass(
+    fn pass(
         &self,
         src: &[u16],
         dst: &mut [u16],

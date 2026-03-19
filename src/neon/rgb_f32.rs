@@ -108,13 +108,12 @@ macro_rules! conv_horiz_1_rgb_f32 {
 }
 
 pub(crate) fn convolve_horizontal_rgb_neon_rows_4_f32(
-    dst_width: usize,
-    src_width: usize,
-    filter_weights: &FilterWeights<f32>,
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
     dst_stride: usize,
+    filter_weights: &FilterWeights<f32>,
+    _: u32,
 ) {
     unsafe {
         const CN: usize = 3;
@@ -123,6 +122,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4_f32(
         let zeros = vdupq_n_f32(0.);
 
         let weights_ptr = filter_weights.weights.as_ptr();
+        let dst_width = filter_weights.bounds.len();
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);
@@ -132,7 +132,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4_f32(
             let mut store_2 = zeros;
             let mut store_3 = zeros;
 
-            while jx + 4 < bounds.size && bounds.start + jx + 5 < src_width {
+            while jx + 5 < bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let read_weights = vld1q_f32(ptr);
@@ -193,23 +193,24 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4_f32(
 }
 
 pub(crate) fn convolve_horizontal_rgb_neon_row_one_f32(
-    dst_width: usize,
-    src_width: usize,
-    filter_weights: &FilterWeights<f32>,
     src: &[f32],
     dst: &mut [f32],
+    filter_weights: &FilterWeights<f32>,
+    _: u32,
 ) {
     unsafe {
         const CN: usize = 3;
         let weights_ptr = filter_weights.weights.as_ptr();
         let mut filter_offset = 0usize;
 
+        let dst_width = filter_weights.bounds.len();
+
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);
             let mut jx = 0usize;
             let mut store = vdupq_n_f32(0f32);
 
-            while jx + 4 < bounds.size && bounds.start + jx + 5 < src_width {
+            while jx + 5 < bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let read_weights = vld1q_f32(ptr);

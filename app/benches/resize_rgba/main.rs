@@ -1,13 +1,14 @@
 #![feature(f16)]
+use accelerate::kvImageNoFlags;
 use criterion::{criterion_group, criterion_main, Criterion};
 use fast_image_resize::images::Image;
 use fast_image_resize::FilterType::Lanczos3;
+#[allow(unused_imports)]
 use fast_image_resize::{CpuExtensions, FilterType, PixelType, ResizeAlg, ResizeOptions, Resizer};
 use image::{GenericImageView, ImageReader};
 use pic_scale::{
-    Ar30ByteOrder, ImageStore, ImageStoreMut, LinearApproxScaler, ResamplingFunction,
-    Rgba8ImageStore, Rgba8ImageStoreMut, Scaler, Scaling, ScalingF32, ScalingU16, ThreadingPolicy,
-    WorkloadStrategy,
+    Ar30ByteOrder, ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, Rgba8ImageStore,
+    Rgba8ImageStoreMut, Scaler, ThreadingPolicy, WorkloadStrategy,
 };
 
 pub fn criterion_benchmark(c: &mut Criterion) {
@@ -20,86 +21,156 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("Pic scale RGBA with alpha: Lanczos 3", |b| {
         let copied: Vec<u8> = Vec::from(src_bytes);
-        b.iter(|| {
-            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Single);
-            scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
-            let store = ImageStore::<u8, 4>::from_slice(
-                &copied,
-                dimensions.0 as usize,
-                dimensions.1 as usize,
+        let store =
+            ImageStore::<u8, 4>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
+                .unwrap();
+        let scaler = Scaler::new(ResamplingFunction::Lanczos3)
+            .set_threading_policy(ThreadingPolicy::Single)
+            .set_workload_strategy(WorkloadStrategy::PreferQuality);
+        let resampler = scaler
+            .plan_rgba_resampling(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+                true,
             )
             .unwrap();
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
-            _ = scaler.resize_rgba(&store, &mut target, true);
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+        b.iter(|| {
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
         })
     });
 
     c.bench_function("Pic scale RGBA with alpha(Speed): Lanczos 3", |b| {
         let copied: Vec<u8> = Vec::from(src_bytes);
-        b.iter(|| {
-            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Single);
-            scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
-            let store = ImageStore::<u8, 4>::from_slice(
-                &copied,
-                dimensions.0 as usize,
-                dimensions.1 as usize,
+        let store =
+            ImageStore::<u8, 4>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
+                .unwrap();
+        let scaler = Scaler::new(ResamplingFunction::Lanczos3)
+            .set_threading_policy(ThreadingPolicy::Single)
+            .set_workload_strategy(WorkloadStrategy::PreferSpeed);
+        let resampler = scaler
+            .plan_rgba_resampling(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+                true,
             )
             .unwrap();
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
-            _ = scaler.resize_rgba(&store, &mut target, true);
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+        b.iter(|| {
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
+        })
+    });
+
+    c.bench_function("Pic scale RGBA without alpha: Lanczos 3", |b| {
+        let copied: Vec<u8> = Vec::from(src_bytes);
+        let store =
+            ImageStore::<u8, 4>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
+                .unwrap();
+        let scaler =
+            Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
+        let resampler = scaler
+            .plan_rgba_resampling(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+                false,
+            )
+            .unwrap();
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+        b.iter(|| {
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
+        })
+    });
+
+    c.bench_function("Pic scale RGBA without alpha: Lanczos 3/Quality", |b| {
+        let copied: Vec<u8> = Vec::from(src_bytes);
+        let store =
+            ImageStore::<u8, 4>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
+                .unwrap();
+        let scaler = Scaler::new(ResamplingFunction::Lanczos3)
+            .set_threading_policy(ThreadingPolicy::Single)
+            .set_workload_strategy(WorkloadStrategy::PreferQuality);
+        let resampler = scaler
+            .plan_rgba_resampling(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+                false,
+            )
+            .unwrap();
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+        b.iter(|| {
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
         })
     });
 
     c.bench_function("Pic scale RGBA with alpha: Bilinear", |b| {
         let copied: Vec<u8> = Vec::from(src_bytes);
-        b.iter(|| {
-            let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-            scaler.set_threading_policy(ThreadingPolicy::Single);
-            scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
-            let store = ImageStore::<u8, 4>::from_slice(
-                &copied,
-                dimensions.0 as usize,
-                dimensions.1 as usize,
+        let store =
+            ImageStore::<u8, 4>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
+                .unwrap();
+        let scaler = Scaler::new(ResamplingFunction::Bilinear)
+            .set_threading_policy(ThreadingPolicy::Single)
+            .set_workload_strategy(WorkloadStrategy::PreferQuality);
+        let resampler = scaler
+            .plan_rgba_resampling(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+                true,
             )
             .unwrap();
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
-            _ = scaler.resize_rgba(&store, &mut target, true);
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+        b.iter(|| {
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
         })
     });
 
     c.bench_function("Pic scale RGBA with alpha(Speed): Bilinear", |b| {
         let copied: Vec<u8> = Vec::from(src_bytes);
-        b.iter(|| {
-            let mut scaler = Scaler::new(ResamplingFunction::Bilinear);
-            scaler.set_threading_policy(ThreadingPolicy::Single);
-            scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
-            let store = ImageStore::<u8, 4>::from_slice(
-                &copied,
-                dimensions.0 as usize,
-                dimensions.1 as usize,
+        let store =
+            ImageStore::<u8, 4>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
+                .unwrap();
+        let scaler = Scaler::new(ResamplingFunction::Bilinear)
+            .set_threading_policy(ThreadingPolicy::Single)
+            .set_workload_strategy(WorkloadStrategy::PreferSpeed);
+        let resampler = scaler
+            .plan_rgba_resampling(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+                true,
             )
             .unwrap();
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
-            _ = scaler.resize_rgba(&store, &mut target, true);
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+        b.iter(|| {
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
         })
     });
 
     c.bench_function("Fast image resize RGBA8 with alpha: Lanczos 3", |b| {
         let mut vc = Vec::from(img.as_bytes());
+        let pixel_type: PixelType = PixelType::U8x4;
+        let src_image =
+            Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
+        let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
         b.iter(|| {
-            let pixel_type: PixelType = PixelType::U8x4;
-            let src_image =
-                Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
-            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
-
             let mut resizer = Resizer::new();
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            #[cfg(all(target_arch = "aarch64"))]
             unsafe {
                 resizer.set_cpu_extensions(CpuExtensions::Neon);
             }
@@ -121,14 +192,13 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("Fast image resize RGBA8 with alpha: Bilinear", |b| {
         let mut vc = Vec::from(img.as_bytes());
+        let pixel_type: PixelType = PixelType::U8x4;
+        let src_image =
+            Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
+        let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
         b.iter(|| {
-            let pixel_type: PixelType = PixelType::U8x4;
-            let src_image =
-                Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
-            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
-
             let mut resizer = Resizer::new();
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            #[cfg(all(target_arch = "aarch64"))]
             unsafe {
                 resizer.set_cpu_extensions(CpuExtensions::Neon);
             }
@@ -148,49 +218,14 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    c.bench_function("Pic scale RGBA without alpha: Lanczos 3", |b| {
-        let copied: Vec<u8> = Vec::from(src_bytes);
-        b.iter(|| {
-            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Single);
-            let store = ImageStore::<u8, 4>::from_slice(
-                &copied,
-                dimensions.0 as usize,
-                dimensions.1 as usize,
-            )
-            .unwrap();
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
-            _ = scaler.resize_rgba(&store, &mut target, false);
-        })
-    });
-
-    c.bench_function("Pic scale RGBA without alpha: Lanczos 3/Quality", |b| {
-        let copied: Vec<u8> = Vec::from(src_bytes);
-        b.iter(|| {
-            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Single);
-            scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
-            let store = ImageStore::<u8, 4>::from_slice(
-                &copied,
-                dimensions.0 as usize,
-                dimensions.1 as usize,
-            )
-            .unwrap();
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
-            _ = scaler.resize_rgba(&store, &mut target, false);
-        })
-    });
-
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     c.bench_function("Apple Accelerate RGBA: Lanczos 3", |b| {
         let copied: Vec<u8> = Vec::from(src_bytes);
-        use accelerate::{kvImageDoNotTile, vImageScale_ARGB8888, vImage_Buffer};
-        b.iter(|| {
-            let mut target =
-                ImageStoreMut::<u8, 4>::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+        use accelerate::{vImageScale_ARGB8888, vImage_Buffer};
+        let mut target =
+            ImageStoreMut::<u8, 4>::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
 
+        b.iter(|| {
             let src_buffer = vImage_Buffer {
                 data: copied.as_ptr() as *mut libc::c_void,
                 width: dimensions.0 as usize,
@@ -213,7 +248,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     &src_buffer,
                     &mut dst_buffer,
                     std::ptr::null_mut(),
-                    kvImageDoNotTile,
+                    kvImageNoFlags,
                 )
             };
             if result != 0 {
@@ -224,14 +259,13 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("Fast image resize RGBA without alpha: Lanczos 3", |b| {
         let mut vc = Vec::from(img.as_bytes());
+        let pixel_type: PixelType = PixelType::U8x4;
+        let src_image =
+            Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
+        let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
         b.iter(|| {
-            let pixel_type: PixelType = PixelType::U8x4;
-            let src_image =
-                Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
-            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
-
             let mut resizer = Resizer::new();
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            #[cfg(all(target_arch = "aarch64"))]
             unsafe {
                 resizer.set_cpu_extensions(CpuExtensions::Neon);
             }
@@ -255,36 +289,48 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("Pic scale RGBA with alpha f32: Lanczos 3", |b| {
         let copied: Vec<f32> = Vec::from(f32_image.clone());
-        b.iter(|| {
-            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Single);
-            let store = ImageStore::<f32, 4>::from_slice(
-                &copied,
-                dimensions.0 as usize,
-                dimensions.1 as usize,
+        let scaler =
+            Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
+        let store =
+            ImageStore::<f32, 4>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
+                .unwrap();
+        let resampler = scaler
+            .plan_rgba_resampling_f32(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+                true,
             )
             .unwrap();
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
-            _ = scaler.resize_rgba_f32(&store, &mut target, false);
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+        b.iter(|| {
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
         })
     });
 
     c.bench_function("Pic scale RGBA with alpha f32(Quality): Lanczos 3", |b| {
         let copied: Vec<f32> = Vec::from(f32_image.clone());
-        b.iter(|| {
-            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Single);
-            scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
-            let store = ImageStore::<f32, 4>::from_slice(
-                &copied,
-                dimensions.0 as usize,
-                dimensions.1 as usize,
+        let scaler = Scaler::new(ResamplingFunction::Lanczos3)
+            .set_threading_policy(ThreadingPolicy::Single)
+            .set_workload_strategy(WorkloadStrategy::PreferQuality);
+        let store =
+            ImageStore::<f32, 4>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
+                .unwrap();
+        let resampler = scaler
+            .plan_rgba_resampling_f32(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+                true,
             )
             .unwrap();
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
-            _ = scaler.resize_rgba_f32(&store, &mut target, false);
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+        b.iter(|| {
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
         })
     });
 
@@ -294,14 +340,13 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             .flat_map(|&x| x.to_ne_bytes())
             .collect::<Vec<u8>>();
         let mut vc = Vec::from(packed_f32);
+        let pixel_type: PixelType = PixelType::F32x4;
+        let src_image =
+            Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
+        let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
         b.iter(|| {
-            let pixel_type: PixelType = PixelType::F32x4;
-            let src_image =
-                Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
-            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
-
             let mut resizer = Resizer::new();
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            #[cfg(all(target_arch = "aarch64"))]
             unsafe {
                 resizer.set_cpu_extensions(CpuExtensions::Neon);
             }
@@ -328,21 +373,32 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 .map(|&x| ((x as u16) << 2) | ((x as u16) >> 6))
                 .collect::<Vec<_>>(),
         );
-        b.iter(|| {
-            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Single);
-            let store = ImageStore::<u16, 4>::from_slice(
-                &mut copied,
-                dimensions.0 as usize,
-                dimensions.1 as usize,
+        let scaler =
+            Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
+        let store = ImageStore::<u16, 4>::from_slice(
+            &mut copied,
+            dimensions.0 as usize,
+            dimensions.1 as usize,
+        )
+        .unwrap();
+        let resampler = scaler
+            .plan_rgba_resampling16(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+                true,
+                10,
             )
             .unwrap();
-            let mut target = ImageStoreMut::alloc_with_depth(
-                dimensions.0 as usize / 4,
-                dimensions.1 as usize / 4,
-                10,
-            );
-            _ = scaler.resize_rgba_u16(&store, &mut target, true);
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc_with_depth(
+            dimensions.0 as usize / 4,
+            dimensions.1 as usize / 4,
+            10,
+        );
+        b.iter(|| {
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
         })
     });
 
@@ -354,14 +410,14 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 .flat_map(|x| x)
                 .collect::<Vec<_>>(),
         );
-        b.iter(|| {
-            let pixel_type: PixelType = PixelType::U16x4;
-            let src_image =
-                Image::from_slice_u8(dimensions.0, dimensions.1, &mut copied, pixel_type).unwrap();
-            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
+        let pixel_type: PixelType = PixelType::U16x4;
+        let src_image =
+            Image::from_slice_u8(dimensions.0, dimensions.1, &mut copied, pixel_type).unwrap();
+        let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
 
+        b.iter(|| {
             let mut resizer = Resizer::new();
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            #[cfg(all(target_arch = "aarch64"))]
             unsafe {
                 resizer.set_cpu_extensions(CpuExtensions::Neon);
             }
@@ -388,21 +444,32 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 .map(|&x| u16::from_ne_bytes([x, x]))
                 .collect::<Vec<_>>(),
         );
-        b.iter(|| {
-            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Single);
-            let store = ImageStore::<u16, 4>::from_slice(
-                &mut copied,
-                dimensions.0 as usize,
-                dimensions.1 as usize,
+        let scaler =
+            Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
+        let store = ImageStore::<u16, 4>::from_slice(
+            &mut copied,
+            dimensions.0 as usize,
+            dimensions.1 as usize,
+        )
+        .unwrap();
+        let resampler = scaler
+            .plan_rgba_resampling16(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+                false,
+                16,
             )
             .unwrap();
-            let mut target = ImageStoreMut::alloc_with_depth(
-                dimensions.0 as usize / 4,
-                dimensions.1 as usize / 4,
-                16,
-            );
-            _ = scaler.resize_rgba_u16(&store, &mut target, false);
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc_with_depth(
+            dimensions.0 as usize / 4,
+            dimensions.1 as usize / 4,
+            16,
+        );
+        b.iter(|| {
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
         })
     });
 
@@ -413,21 +480,32 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 .map(|&x| ((x as u16) << 2) | ((x as u16) >> 6))
                 .collect::<Vec<_>>(),
         );
-        b.iter(|| {
-            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Single);
-            let store = ImageStore::<u16, 4>::from_slice(
-                &mut copied,
-                dimensions.0 as usize,
-                dimensions.1 as usize,
+        let store = ImageStore::<u16, 4>::from_slice(
+            &mut copied,
+            dimensions.0 as usize,
+            dimensions.1 as usize,
+        )
+        .unwrap();
+        let scaler =
+            Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
+        let resampler = scaler
+            .plan_rgba_resampling16(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+                false,
+                10,
             )
             .unwrap();
-            let mut target = ImageStoreMut::alloc_with_depth(
-                dimensions.0 as usize / 4,
-                dimensions.1 as usize / 4,
-                10,
-            );
-            _ = scaler.resize_rgba_u16(&store, &mut target, false);
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc_with_depth(
+            dimensions.0 as usize / 4,
+            dimensions.1 as usize / 4,
+            10,
+        );
+        b.iter(|| {
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
         })
     });
 
@@ -439,14 +517,14 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 .flat_map(|x| x)
                 .collect::<Vec<_>>(),
         );
-        b.iter(|| {
-            let pixel_type: PixelType = PixelType::U16x4;
-            let src_image =
-                Image::from_slice_u8(dimensions.0, dimensions.1, &mut copied, pixel_type).unwrap();
-            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
+        let pixel_type: PixelType = PixelType::U16x4;
+        let src_image =
+            Image::from_slice_u8(dimensions.0, dimensions.1, &mut copied, pixel_type).unwrap();
+        let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
 
+        b.iter(|| {
             let mut resizer = Resizer::new();
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            #[cfg(all(target_arch = "aarch64"))]
             unsafe {
                 resizer.set_cpu_extensions(CpuExtensions::Neon);
             }
@@ -475,12 +553,10 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 .collect::<Vec<_>>(),
         );
         use accelerate::{kvImageDoNotTile, vImageScale_ARGB16U, vImage_Buffer};
-        b.iter(|| {
-            let mut target = ImageStoreMut::<u16, 4>::alloc(
-                dimensions.0 as usize / 4,
-                dimensions.1 as usize / 4,
-            );
+        let mut target =
+            ImageStoreMut::<u16, 4>::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
 
+        b.iter(|| {
             let src_buffer = vImage_Buffer {
                 data: copied.as_ptr() as *mut libc::c_void,
                 width: dimensions.0 as usize,
@@ -516,19 +592,25 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("Pic scale RGBA F16 without alpha: Lanczos 3/Quality", |b| {
         let copied: Vec<f16> = vec![0.; src_bytes.len()];
-        b.iter(|| {
-            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Single);
-            scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
-            let store = ImageStore::<f16, 4>::from_slice(
-                &copied,
-                dimensions.0 as usize,
-                dimensions.1 as usize,
+        let scaler = Scaler::new(ResamplingFunction::Lanczos3)
+            .set_threading_policy(ThreadingPolicy::Single)
+            .set_workload_strategy(WorkloadStrategy::PreferQuality);
+        let store =
+            ImageStore::<f16, 4>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
+                .unwrap();
+        let resampler = scaler
+            .plan_rgba_resampling_f16(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+                false,
             )
             .unwrap();
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
-            scaler.resize_rgba_f16(&store, &mut target, false).unwrap();
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+        b.iter(|| {
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
         })
     });
 
@@ -536,12 +618,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("Apple Accelerate RGBAF16: Lanczos 3", |b| {
         let copied: Vec<f16> = vec![0.; src_bytes.len()];
         use accelerate::{kvImageDoNotTile, vImageScale_ARGB16F, vImage_Buffer};
+        let mut target =
+            ImageStoreMut::<f16, 4>::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
         b.iter(|| {
-            let mut target = ImageStoreMut::<f16, 4>::alloc(
-                dimensions.0 as usize / 4,
-                dimensions.1 as usize / 4,
-            );
-
             let src_buffer = vImage_Buffer {
                 data: copied.as_ptr() as *mut libc::c_void,
                 width: dimensions.0 as usize,
@@ -581,13 +660,21 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         let mut dst_ar30 =
             Rgba8ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
 
-        b.iter(|| {
-            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Single);
-            scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
+        let scaler = Scaler::new(ResamplingFunction::Lanczos3)
+            .set_threading_policy(ThreadingPolicy::Single)
+            .set_workload_strategy(WorkloadStrategy::PreferSpeed);
+        let resampler = scaler
+            .plan_ar30_resampling(
+                src_image.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+                Ar30ByteOrder::Network,
+            )
+            .unwrap();
+        let mut scratch = resampler.alloc_scratch();
 
-            scaler
-                .resize_ar30(&src_image, &mut dst_ar30, Ar30ByteOrder::Network)
+        b.iter(|| {
+            resampler
+                .resample_with_scratch(&src_image, &mut dst_ar30, &mut scratch)
                 .unwrap();
         })
     });
@@ -600,13 +687,22 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         let mut dst_ar30 =
             Rgba8ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
 
-        b.iter(|| {
-            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Single);
-            scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
+        let scaler = Scaler::new(ResamplingFunction::Lanczos3)
+            .set_threading_policy(ThreadingPolicy::Single)
+            .set_workload_strategy(WorkloadStrategy::PreferQuality);
 
-            scaler
-                .resize_ar30(&src_image, &mut dst_ar30, Ar30ByteOrder::Network)
+        let resampler = scaler
+            .plan_ar30_resampling(
+                src_image.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+                Ar30ByteOrder::Network,
+            )
+            .unwrap();
+        let mut scratch = resampler.alloc_scratch();
+
+        b.iter(|| {
+            resampler
+                .resample_with_scratch(&src_image, &mut dst_ar30, &mut scratch)
                 .unwrap();
         })
     });
@@ -646,7 +742,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 )
             };
             if result != 0 {
-                panic!("Can't resize by accelerate");
+                panic!("Can't resize with accelerate");
             }
         })
     });

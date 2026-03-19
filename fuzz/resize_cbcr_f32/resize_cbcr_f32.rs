@@ -32,8 +32,7 @@
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use pic_scale::{
-    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32, ThreadingPolicy,
-    WorkloadStrategy,
+    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy, WorkloadStrategy,
 };
 
 #[derive(Clone, Debug, Arbitrary)]
@@ -96,18 +95,21 @@ fn resize_cbcr_f32(
     let store = ImageStore::<f32, 2>::from_slice(&mut src_data, src_width, src_height).unwrap();
     let mut target = ImageStoreMut::alloc(dst_width, dst_height);
 
-    let mut scaler = Scaler::new(sampler);
-    scaler.set_workload_strategy(if use_quality {
-        WorkloadStrategy::PreferQuality
-    } else {
-        WorkloadStrategy::PreferSpeed
-    });
-    scaler.set_threading_policy(threading_policy);
-    if mul_alpha {
+    let scaler = Scaler::new(sampler)
+        .set_workload_strategy(if use_quality {
+            WorkloadStrategy::PreferQuality
+        } else {
+            WorkloadStrategy::PreferSpeed
+        })
+        .set_threading_policy(threading_policy);
+    let planner = if mul_alpha {
         scaler
-            .resize_gray_alpha_f32(&store, &mut target, mul_alpha)
-            .unwrap();
+            .plan_gray_alpha_resampling_f32(store.size(), target.size(), true)
+            .unwrap()
     } else {
-        scaler.resize_cbcr_f32(&store, &mut target).unwrap();
-    }
+        scaler
+            .plan_cbcr_resampling_f32(store.size(), target.size())
+            .unwrap()
+    };
+    planner.resample(&store, &mut target).unwrap();
 }

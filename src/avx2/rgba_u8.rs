@@ -37,6 +37,7 @@ pub(crate) fn convolve_horizontal_rgba_row_4(
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_rgba_avx_row_4_impl(src, src_stride, dst, dst_stride, filter_weights);
@@ -44,7 +45,7 @@ pub(crate) fn convolve_horizontal_rgba_row_4(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn convolve_horizontal_rgba_avx_row_4_impl(
+fn convolve_horizontal_rgba_avx_row_4_impl(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -129,7 +130,7 @@ unsafe fn convolve_horizontal_rgba_avx_row_4_impl(
                 let mut store_avx2 = init256;
                 let mut store_avx3 = init256;
 
-                while jx + 8 < bounds.size {
+                while jx + 8 <= bounds.size {
                     let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
 
@@ -176,7 +177,7 @@ unsafe fn convolve_horizontal_rgba_avx_row_4_impl(
                     jx += 8;
                 }
 
-                while jx + 4 < bounds.size {
+                while jx + 4 <= bounds.size {
                     let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
 
@@ -232,7 +233,7 @@ unsafe fn convolve_horizontal_rgba_avx_row_4_impl(
                 );
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
 
@@ -330,6 +331,7 @@ pub(crate) fn convolve_horizontal_rgba_avx_row_1(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_rgba_avx_rows_one_impl(src, dst, filter_weights);
@@ -337,7 +339,7 @@ pub(crate) fn convolve_horizontal_rgba_avx_row_1(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
+fn convolve_horizontal_rgba_avx_rows_one_impl(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
@@ -398,7 +400,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
                     0,
                 );
 
-                while jx + 8 < bounds.size {
+                while jx + 8 <= bounds.size {
                     let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
 
@@ -421,7 +423,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
                     jx += 8;
                 }
 
-                while jx + 4 < bounds.size {
+                while jx + 4 <= bounds.size {
                     let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
 
@@ -449,7 +451,7 @@ unsafe fn convolve_horizontal_rgba_avx_rows_one_impl(
                 );
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
 

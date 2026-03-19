@@ -97,20 +97,19 @@ pub(crate) fn convolve_horizontal_rgba_wasm_rows_4_u8(
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
-    unsafe {
-        convolve_horizontal_rgba_wasm_rows_4_u8_impl::<15>(
-            src,
-            src_stride,
-            dst,
-            dst_stride,
-            filter_weights,
-        );
-    }
+    convolve_horizontal_rgba_wasm_rows_4_u8_impl::<15>(
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+        filter_weights,
+    );
 }
 
 #[target_feature(enable = "simd128")]
-unsafe fn convolve_horizontal_rgba_wasm_rows_4_u8_impl<const PRECISION: i32>(
+fn convolve_horizontal_rgba_wasm_rows_4_u8_impl<const PRECISION: i32>(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -217,14 +216,13 @@ pub(crate) fn convolve_horizontal_rgba_wasm_row(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
-    unsafe {
-        convolve_horizontal_rgba_wasm_row_impl::<15>(src, dst, filter_weights);
-    }
+    convolve_horizontal_rgba_wasm_row_impl::<15>(src, dst, filter_weights);
 }
 
 #[target_feature(enable = "simd128")]
-unsafe fn convolve_horizontal_rgba_wasm_row_impl<const PRECISION: i32>(
+fn convolve_horizontal_rgba_wasm_row_impl<const PRECISION: i32>(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,

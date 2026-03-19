@@ -12,7 +12,7 @@ yuv = "0.8.3"
 libc = "0.2.169"
 
 [dev-dependencies]
-criterion = "0.6"
+criterion = "0.8.2"
 #image = { version = "0.25.2", features = ["default"] }
 fast_image_resize = { version = "6.0.0", features = [] }
 

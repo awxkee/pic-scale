@@ -42,6 +42,7 @@ pub(crate) fn convolve_horizontal_rgb_sse_rows_4(
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_rgb_sse_rows_4_impl(src, src_stride, dst, dst_stride, filter_weights);
@@ -257,6 +258,7 @@ pub(crate) fn convolve_horizontal_rgb_sse_row_one(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_rgb_sse_row_one_impl(src, dst, filter_weights);

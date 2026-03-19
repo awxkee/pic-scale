@@ -31,7 +31,7 @@ use std::arch::aarch64::*;
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_1_u16(
+fn conv_horiz_rgba_1_u16(
     start_x: usize,
     src: &[u16],
     w0: int16x4_t,
@@ -52,7 +52,7 @@ unsafe fn conv_horiz_rgba_1_u16(
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_2_u16(
+fn conv_horiz_rgba_2_u16(
     start_x: usize,
     src: &[u16],
     w0: int16x4_t,
@@ -78,7 +78,7 @@ unsafe fn conv_horiz_rgba_2_u16(
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_4_u16(
+fn conv_horiz_rgba_4_u16(
     start_x: usize,
     src: &[u16],
     weights: int16x4_t,

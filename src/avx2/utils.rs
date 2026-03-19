@@ -30,7 +30,7 @@
 use std::arch::x86_64::*;
 
 #[inline(always)]
-pub(crate) unsafe fn _mm256_fma_pd<const FMA: bool>(a: __m256d, b: __m256d, c: __m256d) -> __m256d {
+pub(crate) fn _mm256_fma_pd<const FMA: bool>(a: __m256d, b: __m256d, c: __m256d) -> __m256d {
     unsafe {
         if FMA {
             _mm256_fmadd_pd(b, c, a)
@@ -41,7 +41,7 @@ pub(crate) unsafe fn _mm256_fma_pd<const FMA: bool>(a: __m256d, b: __m256d, c: _
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_fma_pd<const FMA: bool>(a: __m128d, b: __m128d, c: __m128d) -> __m128d {
+pub(crate) fn _mm_fma_pd<const FMA: bool>(a: __m128d, b: __m128d, c: __m128d) -> __m128d {
     unsafe {
         if FMA {
             _mm_fmadd_pd(b, c, a)
@@ -52,7 +52,7 @@ pub(crate) unsafe fn _mm_fma_pd<const FMA: bool>(a: __m128d, b: __m128d, c: __m1
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm256_fma_ps<const FMA: bool>(a: __m256, b: __m256, c: __m256) -> __m256 {
+pub(crate) fn _mm256_fma_ps<const FMA: bool>(a: __m256, b: __m256, c: __m256) -> __m256 {
     unsafe {
         if FMA {
             _mm256_fma_psx(a, b, c)
@@ -63,7 +63,7 @@ pub(crate) unsafe fn _mm256_fma_ps<const FMA: bool>(a: __m256, b: __m256, c: __m
 }
 
 #[inline(always)]
-unsafe fn _mm256_fma_psx(a: __m256, b: __m256, c: __m256) -> __m256 {
+fn _mm256_fma_psx(a: __m256, b: __m256, c: __m256) -> __m256 {
     unsafe { _mm256_fmadd_ps(b, c, a) }
 }
 
@@ -73,7 +73,7 @@ pub(crate) const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm256_select_si256(
+pub(crate) fn _mm256_select_si256(
     mask: __m256i,
     true_vals: __m256i,
     false_vals: __m256i,
@@ -82,17 +82,13 @@ pub(crate) unsafe fn _mm256_select_si256(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm256_selecti_ps(
-    mask: __m256i,
-    true_vals: __m256,
-    false_vals: __m256,
-) -> __m256 {
+pub(crate) fn _mm256_selecti_ps(mask: __m256i, true_vals: __m256, false_vals: __m256) -> __m256 {
     unsafe { _mm256_blendv_ps(false_vals, true_vals, _mm256_castsi256_ps(mask)) }
 }
 
 /// Exact division by 255 with rounding to nearest
 #[inline(always)]
-pub(crate) unsafe fn avx2_div_by255(v: __m256i) -> __m256i {
+pub(crate) fn avx2_div_by255(v: __m256i) -> __m256i {
     unsafe {
         let addition = _mm256_set1_epi16(127);
         let j0 = _mm256_add_epi16(v, addition);
@@ -102,7 +98,7 @@ pub(crate) unsafe fn avx2_div_by255(v: __m256i) -> __m256i {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn avx2_deinterleave_rgba(
+pub(crate) fn avx2_deinterleave_rgba(
     rgba0: __m256i,
     rgba1: __m256i,
     rgba2: __m256i,
@@ -144,7 +140,7 @@ pub(crate) unsafe fn avx2_deinterleave_rgba(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn avx_deinterleave_rgba_epi32(
+pub(crate) fn avx_deinterleave_rgba_epi32(
     p0: __m256i,
     p1: __m256i,
     p2: __m256i,
@@ -170,7 +166,7 @@ pub(crate) unsafe fn avx_deinterleave_rgba_epi32(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn avx_interleave_rgba_epi32(
+pub(crate) fn avx_interleave_rgba_epi32(
     p0: __m256i,
     p1: __m256i,
     p2: __m256i,
@@ -197,7 +193,7 @@ pub(crate) unsafe fn avx_interleave_rgba_epi32(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn avx_interleave_rgba_epi16(
+pub(crate) fn avx_interleave_rgba_epi16(
     a: __m256i,
     b: __m256i,
     c: __m256i,
@@ -223,7 +219,7 @@ pub(crate) unsafe fn avx_interleave_rgba_epi16(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn avx_deinterleave_rgba_epi16(
+pub(crate) fn avx_deinterleave_rgba_epi16(
     a: __m256i,
     b: __m256i,
     c: __m256i,
@@ -258,7 +254,7 @@ pub(crate) unsafe fn avx_deinterleave_rgba_epi16(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn avx_deinterleave_rgba_ps(
+pub(crate) fn avx_deinterleave_rgba_ps(
     p0: __m256,
     p1: __m256,
     p2: __m256,
@@ -281,7 +277,7 @@ pub(crate) unsafe fn avx_deinterleave_rgba_ps(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn avx_interleave_rgba_ps(
+pub(crate) fn avx_interleave_rgba_ps(
     p0: __m256,
     p1: __m256,
     p2: __m256,
@@ -304,7 +300,7 @@ pub(crate) unsafe fn avx_interleave_rgba_ps(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn avx2_interleave_rgba(
+pub(crate) fn avx2_interleave_rgba(
     r: __m256i,
     g: __m256i,
     b: __m256i,
@@ -330,7 +326,7 @@ pub(crate) unsafe fn avx2_interleave_rgba(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn avx2_pack_u16(s_1: __m256i, s_2: __m256i) -> __m256i {
+pub(crate) fn avx2_pack_u16(s_1: __m256i, s_2: __m256i) -> __m256i {
     unsafe {
         let packed = _mm256_packus_epi16(s_1, s_2);
         const MASK: i32 = shuffle(3, 1, 2, 0);
@@ -339,7 +335,7 @@ pub(crate) unsafe fn avx2_pack_u16(s_1: __m256i, s_2: __m256i) -> __m256i {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn avx2_pack_u32(s_1: __m256i, s_2: __m256i) -> __m256i {
+pub(crate) fn avx2_pack_u32(s_1: __m256i, s_2: __m256i) -> __m256i {
     unsafe {
         let packed = _mm256_packus_epi32(s_1, s_2);
         const MASK: i32 = shuffle(3, 1, 2, 0);
@@ -349,13 +345,13 @@ pub(crate) unsafe fn avx2_pack_u32(s_1: __m256i, s_2: __m256i) -> __m256i {
 
 #[inline(always)]
 #[allow(dead_code)]
-pub(crate) unsafe fn avx_combine_ps(lo: __m128, hi: __m128) -> __m256 {
+pub(crate) fn avx_combine_ps(lo: __m128, hi: __m128) -> __m256 {
     unsafe { _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(lo), hi) }
 }
 
 #[inline(always)]
 #[allow(dead_code)]
-pub(crate) unsafe fn avx_combine_epi(lo: __m128i, hi: __m128i) -> __m256i {
+pub(crate) fn avx_combine_epi(lo: __m128i, hi: __m128i) -> __m256i {
     unsafe {
         _mm256_castps_si256(_mm256_insertf128_ps::<1>(
             _mm256_castps128_ps256(_mm_castsi128_ps(lo)),
@@ -374,9 +370,9 @@ pub(crate) unsafe fn _mm256_srai_epi64x<const IMM8: i32>(a: __m256i) -> __m256i 
     }
 }
 
-#[inline]
+#[inline(always)]
 /// Pack 64bytes integers into 32 bytes using truncation
-pub(crate) unsafe fn _mm256_packts_epi64(a: __m256i, b: __m256i) -> __m256i {
+pub(crate) fn _mm256_packts_epi64(a: __m256i, b: __m256i) -> __m256i {
     unsafe {
         const SHUFFLE_1: i32 = shuffle(2, 0, 2, 0);
         let combined =
@@ -390,7 +386,7 @@ pub(crate) unsafe fn _mm256_packts_epi64(a: __m256i, b: __m256i) -> __m256i {
 #[inline]
 #[allow(dead_code)]
 /// Pack 64bytes integers into 32 bytes
-pub(crate) unsafe fn _mm256_cvtepi64_epi32x(v: __m256i) -> __m128i {
+pub(crate) fn _mm256_cvtepi64_epi32x(v: __m256i) -> __m128i {
     unsafe {
         let vf = _mm256_castsi256_ps(v);
         let hi = _mm256_extractf128_ps::<1>(vf);
@@ -403,13 +399,13 @@ pub(crate) unsafe fn _mm256_cvtepi64_epi32x(v: __m256i) -> __m128i {
 
 #[allow(dead_code)]
 #[inline(always)]
-pub(crate) unsafe fn _mm256_dot16_avx_epi32<const HAS_DOT: bool>(
+pub(crate) fn _mm256_dot16_avx_epi32<const HAS_DOT: bool>(
     a: __m256i,
     b: __m256i,
     c: __m256i,
 ) -> __m256i {
     unsafe {
-        #[cfg(feature = "nightly_avx512")]
+        #[cfg(feature = "avx512")]
         {
             if HAS_DOT {
                 _mm256_dpwssd_avx_epi32(a, b, c)
@@ -417,7 +413,7 @@ pub(crate) unsafe fn _mm256_dot16_avx_epi32<const HAS_DOT: bool>(
                 _mm256_add_epi32(a, _mm256_madd_epi16(b, c))
             }
         }
-        #[cfg(not(feature = "nightly_avx512"))]
+        #[cfg(not(feature = "avx512"))]
         {
             _mm256_add_epi32(a, _mm256_madd_epi16(b, c))
         }
@@ -426,13 +422,13 @@ pub(crate) unsafe fn _mm256_dot16_avx_epi32<const HAS_DOT: bool>(
 
 #[allow(dead_code)]
 #[inline(always)]
-pub(crate) unsafe fn _mm_dot16_avx_epi32<const HAS_DOT: bool>(
+pub(crate) fn _mm_dot16_avx_epi32<const HAS_DOT: bool>(
     a: __m128i,
     b: __m128i,
     c: __m128i,
 ) -> __m128i {
     unsafe {
-        #[cfg(feature = "nightly_avx512")]
+        #[cfg(feature = "avx512")]
         {
             if HAS_DOT {
                 _mm_dpwssd_avx_epi32(a, b, c)
@@ -440,7 +436,7 @@ pub(crate) unsafe fn _mm_dot16_avx_epi32<const HAS_DOT: bool>(
                 _mm_add_epi32(a, _mm_madd_epi16(b, c))
             }
         }
-        #[cfg(not(feature = "nightly_avx512"))]
+        #[cfg(not(feature = "avx512"))]
         {
             _mm_add_epi32(a, _mm_madd_epi16(b, c))
         }
@@ -455,25 +451,21 @@ pub(crate) unsafe fn _mm_udot8_epi16<const DOT: bool>(
     c: __m128i,
 ) -> __m128i {
     unsafe {
-        #[cfg(feature = "nightly_avx512")]
+        #[cfg(feature = "avx512")]
         if DOT {
             _mm_dpbusd_avx_epi32(a, b, c)
         } else {
             _mm_adds_epi16(a, _mm_maddubs_epi16(b, c))
         }
-        #[cfg(not(feature = "nightly_avx512"))]
+        #[cfg(not(feature = "avx512"))]
         {
             _mm_adds_epi16(a, _mm_maddubs_epi16(b, c))
         }
     }
 }
 
-#[inline]
-pub(crate) unsafe fn _mm256_prefer_fma_ps<const FMA: bool>(
-    a: __m256,
-    b: __m256,
-    c: __m256,
-) -> __m256 {
+#[inline(always)]
+pub(crate) fn _mm256_prefer_fma_ps<const FMA: bool>(a: __m256, b: __m256, c: __m256) -> __m256 {
     unsafe {
         if FMA {
             _mm256_fmadd_ps(b, c, a)
@@ -484,7 +476,7 @@ pub(crate) unsafe fn _mm256_prefer_fma_ps<const FMA: bool>(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_prefer_fma_ps<const FMA: bool>(a: __m128, b: __m128, c: __m128) -> __m128 {
+pub(crate) fn _mm_prefer_fma_ps<const FMA: bool>(a: __m128, b: __m128, c: __m128) -> __m128 {
     unsafe {
         if FMA {
             _mm_fmadd_ps(b, c, a)
@@ -495,11 +487,7 @@ pub(crate) unsafe fn _mm_prefer_fma_ps<const FMA: bool>(a: __m128, b: __m128, c:
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_prefer_fma_pd<const FMA: bool>(
-    a: __m128d,
-    b: __m128d,
-    c: __m128d,
-) -> __m128d {
+pub(crate) fn _mm_prefer_fma_pd<const FMA: bool>(a: __m128d, b: __m128d, c: __m128d) -> __m128d {
     unsafe {
         if FMA {
             _mm_fmadd_pd(b, c, a)
@@ -510,7 +498,7 @@ pub(crate) unsafe fn _mm_prefer_fma_pd<const FMA: bool>(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_reduce_r_epi32<const PRECISION: i32>(x: __m128i) -> __m128i {
+pub(crate) fn _mm_reduce_r_epi32<const PRECISION: i32>(x: __m128i) -> __m128i {
     unsafe {
         const FIRST_MASK: i32 = shuffle(1, 0, 3, 2);
         let hi64 = _mm_shuffle_epi32::<FIRST_MASK>(x);
@@ -523,7 +511,7 @@ pub(crate) unsafe fn _mm_reduce_r_epi32<const PRECISION: i32>(x: __m128i) -> __m
 
 /// Sums all lanes in float32
 #[inline(always)]
-pub(crate) unsafe fn _mm_hsum_ps(v: __m128) -> __m128 {
+pub(crate) fn _mm_hsum_ps(v: __m128) -> __m128 {
     unsafe {
         let mut shuf = _mm_movehdup_ps(v);
         let sums = _mm_add_ps(v, shuf);
@@ -533,7 +521,7 @@ pub(crate) unsafe fn _mm_hsum_ps(v: __m128) -> __m128 {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_hsum_pd(v: __m128d) -> __m128d {
+pub(crate) fn _mm_hsum_pd(v: __m128d) -> __m128d {
     unsafe {
         let undef = _mm_undefined_ps();
         let shuftmp = _mm_movehl_ps(undef, _mm_castpd_ps(v));

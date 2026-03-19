@@ -113,61 +113,40 @@ unsafe fn convolve_horizontal_parts_one_rgb_f32<const FMA: bool>(
 }
 
 pub(crate) fn convolve_horizontal_rgb_sse_row_one_f32<const FMA: bool>(
-    dst_width: usize,
-    src_width: usize,
-    filter_weights: &FilterWeights<f32>,
     src: &[f32],
     dst: &mut [f32],
+    filter_weights: &FilterWeights<f32>,
+    _: u32,
 ) {
     unsafe {
         if FMA {
-            convolve_horizontal_rgb_sse_row_one_f32_fma(
-                dst_width,
-                src_width,
-                filter_weights,
-                src,
-                dst,
-            );
+            convolve_horizontal_rgb_sse_row_one_f32_fma(filter_weights, src, dst);
         } else {
-            convolve_horizontal_rgb_sse_row_one_f32_regular(
-                dst_width,
-                src_width,
-                filter_weights,
-                src,
-                dst,
-            );
+            convolve_horizontal_rgb_sse_row_one_f32_regular(filter_weights, src, dst);
         }
     }
 }
 
 #[target_feature(enable = "sse4.1")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_horizontal_rgb_sse_row_one_f32_regular(
-    dst_width: usize,
-    src_width: usize,
+fn convolve_horizontal_rgb_sse_row_one_f32_regular(
     filter_weights: &FilterWeights<f32>,
     src: &[f32],
     dst: &mut [f32],
 ) {
-    unsafe {
-        let unit = ExecutionUnit1Row::<false>::default();
-        unit.pass(dst_width, src_width, filter_weights, src, dst);
-    }
+    let unit = ExecutionUnit1Row::<false>::default();
+    unit.pass(filter_weights, src, dst);
 }
 
 #[target_feature(enable = "sse4.1", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_horizontal_rgb_sse_row_one_f32_fma(
-    dst_width: usize,
-    src_width: usize,
+fn convolve_horizontal_rgb_sse_row_one_f32_fma(
     filter_weights: &FilterWeights<f32>,
     src: &[f32],
     dst: &mut [f32],
 ) {
-    unsafe {
-        let unit = ExecutionUnit1Row::<true>::default();
-        unit.pass(dst_width, src_width, filter_weights, src, dst);
-    }
+    let unit = ExecutionUnit1Row::<true>::default();
+    unit.pass(filter_weights, src, dst);
 }
 
 #[derive(Copy, Clone, Default)]
@@ -175,18 +154,13 @@ struct ExecutionUnit1Row<const FMA: bool> {}
 
 impl<const FMA: bool> ExecutionUnit1Row<FMA> {
     #[inline(always)]
-    unsafe fn pass(
-        &self,
-        dst_width: usize,
-        _: usize,
-        filter_weights: &FilterWeights<f32>,
-        src: &[f32],
-        dst: &mut [f32],
-    ) {
+    fn pass(&self, filter_weights: &FilterWeights<f32>, src: &[f32], dst: &mut [f32]) {
         unsafe {
             const CHANNELS: usize = 3;
             let mut filter_offset = 0usize;
             let weights_ptr = filter_weights.weights.as_ptr();
+
+            let dst_width = filter_weights.bounds.len();
 
             for x in 0..dst_width {
                 let bounds = filter_weights.bounds.get_unchecked(x);
@@ -256,19 +230,16 @@ impl<const FMA: bool> ExecutionUnit1Row<FMA> {
 }
 
 pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f32<const FMA: bool>(
-    dst_width: usize,
-    src_width: usize,
-    filter_weights: &FilterWeights<f32>,
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
     dst_stride: usize,
+    filter_weights: &FilterWeights<f32>,
+    _: u32,
 ) {
     unsafe {
         if FMA {
             convolve_horizontal_rgb_sse_rows_4_f32_fma(
-                dst_width,
-                src_width,
                 filter_weights,
                 src,
                 src_stride,
@@ -277,8 +248,6 @@ pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f32<const FMA: bool>(
             );
         } else {
             convolve_horizontal_rgb_sse_rows_4_f32_regular(
-                dst_width,
-                src_width,
                 filter_weights,
                 src,
                 src_stride,
@@ -291,52 +260,28 @@ pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f32<const FMA: bool>(
 
 #[target_feature(enable = "sse4.1")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_horizontal_rgb_sse_rows_4_f32_regular(
-    dst_width: usize,
-    src_width: usize,
+fn convolve_horizontal_rgb_sse_rows_4_f32_regular(
     filter_weights: &FilterWeights<f32>,
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
     dst_stride: usize,
 ) {
-    unsafe {
-        let unit = ExecutionUnit4Row::<false>::default();
-        unit.pass(
-            dst_width,
-            src_width,
-            filter_weights,
-            src,
-            src_stride,
-            dst,
-            dst_stride,
-        );
-    }
+    let unit = ExecutionUnit4Row::<false>::default();
+    unit.pass(filter_weights, src, src_stride, dst, dst_stride);
 }
 
 #[target_feature(enable = "sse4.1", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_horizontal_rgb_sse_rows_4_f32_fma(
-    dst_width: usize,
-    src_width: usize,
+fn convolve_horizontal_rgb_sse_rows_4_f32_fma(
     filter_weights: &FilterWeights<f32>,
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
     dst_stride: usize,
 ) {
-    unsafe {
-        let unit = ExecutionUnit4Row::<true>::default();
-        unit.pass(
-            dst_width,
-            src_width,
-            filter_weights,
-            src,
-            src_stride,
-            dst,
-            dst_stride,
-        );
-    }
+    let unit = ExecutionUnit4Row::<true>::default();
+    unit.pass(filter_weights, src, src_stride, dst, dst_stride);
 }
 
 #[derive(Copy, Clone, Default)]
@@ -344,10 +289,8 @@ struct ExecutionUnit4Row<const FMA: bool> {}
 
 impl<const FMA: bool> ExecutionUnit4Row<FMA> {
     #[inline(always)]
-    unsafe fn pass(
+    fn pass(
         &self,
-        dst_width: usize,
-        _: usize,
         filter_weights: &FilterWeights<f32>,
         src: &[f32],
         src_stride: usize,
@@ -359,6 +302,8 @@ impl<const FMA: bool> ExecutionUnit4Row<FMA> {
             let mut filter_offset = 0usize;
             let zeros = _mm_setzero_ps();
             let weights_ptr = filter_weights.weights.as_ptr();
+
+            let dst_width = filter_weights.bounds.len();
 
             for x in 0..dst_width {
                 let bounds = filter_weights.bounds.get_unchecked(x);

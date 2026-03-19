@@ -206,6 +206,7 @@ pub(crate) fn convolve_vertical_rgb_neon_row_f16(
     dst: &mut [f16],
     src_stride: usize,
     weight_ptr: &[f32],
+    _: u32,
 ) {
     let mut cx = 0usize;
     let dst_width = dst.len();

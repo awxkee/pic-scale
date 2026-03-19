@@ -32,19 +32,16 @@ use crate::filter_weights::FilterWeights;
 use std::arch::x86_64::*;
 
 pub(crate) fn convolve_horizontal_rgba_avx_rows_4_f32_f64<const FMA: bool>(
-    dst_width: usize,
-    src_width: usize,
-    filter_weights: &FilterWeights<f64>,
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
     dst_stride: usize,
+    filter_weights: &FilterWeights<f64>,
+    _: u32,
 ) {
     unsafe {
         if FMA {
             convolve_horizontal_rgba_avx_rows_4_f32_f64_fma(
-                dst_width,
-                src_width,
                 filter_weights,
                 src,
                 src_stride,
@@ -53,8 +50,6 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_4_f32_f64<const FMA: bool>(
             );
         } else {
             convolve_horizontal_rgba_avx_rows_4_f32_f64_regular(
-                dst_width,
-                src_width,
                 filter_weights,
                 src,
                 src_stride,
@@ -67,52 +62,28 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_4_f32_f64<const FMA: bool>(
 
 #[target_feature(enable = "avx2")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_horizontal_rgba_avx_rows_4_f32_f64_regular(
-    dst_width: usize,
-    src_width: usize,
+fn convolve_horizontal_rgba_avx_rows_4_f32_f64_regular(
     filter_weights: &FilterWeights<f64>,
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
     dst_stride: usize,
 ) {
-    unsafe {
-        let unit = Row4ExecutionUnit::<false>::default();
-        unit.pass(
-            dst_width,
-            src_width,
-            filter_weights,
-            src,
-            src_stride,
-            dst,
-            dst_stride,
-        );
-    }
+    let unit = Row4ExecutionUnit::<false>::default();
+    unit.pass(filter_weights, src, src_stride, dst, dst_stride);
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_horizontal_rgba_avx_rows_4_f32_f64_fma(
-    dst_width: usize,
-    src_width: usize,
+fn convolve_horizontal_rgba_avx_rows_4_f32_f64_fma(
     filter_weights: &FilterWeights<f64>,
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
     dst_stride: usize,
 ) {
-    unsafe {
-        let unit = Row4ExecutionUnit::<true>::default();
-        unit.pass(
-            dst_width,
-            src_width,
-            filter_weights,
-            src,
-            src_stride,
-            dst,
-            dst_stride,
-        );
-    }
+    let unit = Row4ExecutionUnit::<true>::default();
+    unit.pass(filter_weights, src, src_stride, dst, dst_stride);
 }
 
 #[derive(Copy, Clone, Default)]
@@ -120,10 +91,8 @@ struct Row4ExecutionUnit<const FMA: bool> {}
 
 impl<const FMA: bool> Row4ExecutionUnit<FMA> {
     #[inline(always)]
-    unsafe fn pass(
+    fn pass(
         &self,
-        dst_width: usize,
-        _: usize,
         filter_weights: &FilterWeights<f64>,
         src: &[f32],
         src_stride: usize,
@@ -134,6 +103,8 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
             const CN: usize = 4;
             let mut filter_offset = 0usize;
             let weights_ptr = &filter_weights.weights;
+
+            let dst_width = filter_weights.bounds.len();
 
             let src1 = src.get_unchecked(src_stride..);
             let src2 = src.get_unchecked(src_stride * 2..);
@@ -147,7 +118,7 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
                 let mut store_2 = _mm256_setzero_pd();
                 let mut store_3 = _mm256_setzero_pd();
 
-                while jx + 2 < bounds.size {
+                while jx + 2 <= bounds.size {
                     let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                     let w0 = _mm256_set1_pd(*ptr.get_unchecked(0));
                     let w1 = _mm256_set1_pd(*ptr.get_unchecked(1));
@@ -244,59 +215,38 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
 }
 
 pub(crate) fn convolve_horizontal_rgba_avx_row_one_f32_f64<const FMA: bool>(
-    dst_width: usize,
-    src_width: usize,
-    filter_weights: &FilterWeights<f64>,
     src: &[f32],
     dst: &mut [f32],
+    filter_weights: &FilterWeights<f64>,
+    _: u32,
 ) {
     unsafe {
         if FMA {
-            convolve_horizontal_rgba_avx_row_one_f32_f64_fma(
-                dst_width,
-                src_width,
-                filter_weights,
-                src,
-                dst,
-            );
+            convolve_horizontal_rgba_avx_row_one_f32_f64_fma(filter_weights, src, dst);
         } else {
-            convolve_horizontal_rgba_avx_row_one_f32_f64_regular(
-                dst_width,
-                src_width,
-                filter_weights,
-                src,
-                dst,
-            );
+            convolve_horizontal_rgba_avx_row_one_f32_f64_regular(filter_weights, src, dst);
         }
     }
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn convolve_horizontal_rgba_avx_row_one_f32_f64_regular(
-    dst_width: usize,
-    _: usize, // src_width
+fn convolve_horizontal_rgba_avx_row_one_f32_f64_regular(
     filter_weights: &FilterWeights<f64>,
     src: &[f32],
     dst: &mut [f32],
 ) {
-    unsafe {
-        let unit = OneRowExecutionUnit::<false>::default();
-        unit.pass(dst_width, filter_weights, src, dst);
-    }
+    let unit = OneRowExecutionUnit::<false>::default();
+    unit.pass(filter_weights, src, dst);
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
-unsafe fn convolve_horizontal_rgba_avx_row_one_f32_f64_fma(
-    dst_width: usize,
-    _: usize, // src_width
+fn convolve_horizontal_rgba_avx_row_one_f32_f64_fma(
     filter_weights: &FilterWeights<f64>,
     src: &[f32],
     dst: &mut [f32],
 ) {
-    unsafe {
-        let unit = OneRowExecutionUnit::<true>::default();
-        unit.pass(dst_width, filter_weights, src, dst);
-    }
+    let unit = OneRowExecutionUnit::<true>::default();
+    unit.pass(filter_weights, src, dst);
 }
 
 #[derive(Copy, Clone, Default)]
@@ -304,24 +254,20 @@ struct OneRowExecutionUnit<const FMA: bool> {}
 
 impl<const FMA: bool> OneRowExecutionUnit<FMA> {
     #[inline(always)]
-    unsafe fn pass(
-        &self,
-        dst_width: usize,
-        filter_weights: &FilterWeights<f64>,
-        src: &[f32],
-        dst: &mut [f32],
-    ) {
+    fn pass(&self, filter_weights: &FilterWeights<f64>, src: &[f32], dst: &mut [f32]) {
         unsafe {
             const CN: usize = 4;
             let mut filter_offset = 0usize;
             let weights_ptr = &filter_weights.weights;
+
+            let dst_width = filter_weights.bounds.len();
 
             for x in 0..dst_width {
                 let bounds = filter_weights.bounds.get_unchecked(x);
                 let mut jx = 0usize;
                 let mut store = _mm256_setzero_pd();
 
-                while jx + 4 < bounds.size {
+                while jx + 4 <= bounds.size {
                     let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
 
                     let w0 = _mm256_set1_pd(*ptr.get_unchecked(0));
@@ -360,7 +306,7 @@ impl<const FMA: bool> OneRowExecutionUnit<FMA> {
                     jx += 4;
                 }
 
-                while jx + 2 < bounds.size {
+                while jx + 2 <= bounds.size {
                     let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                     let weight0 = _mm256_set1_pd(*ptr.get_unchecked(0));
                     let weight1 = _mm256_set1_pd(*ptr.get_unchecked(1));

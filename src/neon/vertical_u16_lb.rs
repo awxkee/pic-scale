@@ -29,7 +29,169 @@
 use crate::filter_weights::FilterBounds;
 use std::arch::aarch64::*;
 
-#[inline(always)]
+#[target_feature(enable = "neon")]
+fn convolve_chunks_16(
+    chunks: &mut [[u16; 16]],
+    bounds: &FilterBounds,
+    src: &[u16],
+    src_stride: usize,
+    weights: &[i16],
+    bit_depth: u32,
+    cx: usize,
+) -> usize {
+    let max_colors = (1u32 << bit_depth) - 1;
+    let mut cx = cx;
+
+    let bounds_size = bounds.size;
+
+    const PRECISION: i32 = 16;
+    const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
+
+    let initial_store = vdupq_n_s32(ROUNDING_CONST);
+
+    let v_max_colors = vdupq_n_u16(max_colors as u16);
+
+    let v_px = cx;
+
+    for (x, dst) in chunks.iter_mut().enumerate() {
+        let mut store0 = initial_store;
+        let mut store1 = initial_store;
+        let mut store2 = initial_store;
+        let mut store3 = initial_store;
+
+        let v_dx = v_px + x * 16;
+
+        let mut j = 0usize;
+
+        while j + 4 <= bounds_size {
+            let py = bounds.start + j;
+            let src_ptr = unsafe { src.get_unchecked((src_stride * py + v_dx)..) };
+
+            let weights = unsafe { vld1_s16(weights.get_unchecked(j..).as_ptr()) };
+
+            let item_row0 = unsafe { vreinterpretq_s16_u16(vld1q_u16(src_ptr.as_ptr())) };
+            let item_row1 =
+                unsafe { vreinterpretq_s16_u16(vld1q_u16(src_ptr.get_unchecked(8..).as_ptr())) };
+
+            store0 = vqdmlal_lane_s16::<0>(store0, vget_low_s16(item_row0), weights);
+            store1 = vqdmlal_high_lane_s16::<0>(store1, item_row0, weights);
+            store2 = vqdmlal_lane_s16::<0>(store2, vget_low_s16(item_row1), weights);
+            store3 = vqdmlal_high_lane_s16::<0>(store3, item_row1, weights);
+
+            let item_row0 = unsafe {
+                vreinterpretq_s16_u16(vld1q_u16(src_ptr.get_unchecked(src_stride..).as_ptr()))
+            };
+            let item_row1 = unsafe {
+                vreinterpretq_s16_u16(vld1q_u16(src_ptr.get_unchecked(src_stride + 8..).as_ptr()))
+            };
+
+            store0 = vqdmlal_lane_s16::<1>(store0, vget_low_s16(item_row0), weights);
+            store1 = vqdmlal_high_lane_s16::<1>(store1, item_row0, weights);
+            store2 = vqdmlal_lane_s16::<1>(store2, vget_low_s16(item_row1), weights);
+            store3 = vqdmlal_high_lane_s16::<1>(store3, item_row1, weights);
+
+            let item_row0 = unsafe {
+                vreinterpretq_s16_u16(vld1q_u16(src_ptr.get_unchecked(src_stride * 2..).as_ptr()))
+            };
+            let item_row1 = unsafe {
+                vreinterpretq_s16_u16(vld1q_u16(
+                    src_ptr.get_unchecked(src_stride * 2 + 8..).as_ptr(),
+                ))
+            };
+
+            store0 = vqdmlal_lane_s16::<2>(store0, vget_low_s16(item_row0), weights);
+            store1 = vqdmlal_high_lane_s16::<2>(store1, item_row0, weights);
+            store2 = vqdmlal_lane_s16::<2>(store2, vget_low_s16(item_row1), weights);
+            store3 = vqdmlal_high_lane_s16::<2>(store3, item_row1, weights);
+
+            let item_row0 = unsafe {
+                vreinterpretq_s16_u16(vld1q_u16(src_ptr.get_unchecked(src_stride * 3..).as_ptr()))
+            };
+            let item_row1 = unsafe {
+                vreinterpretq_s16_u16(vld1q_u16(
+                    src_ptr.get_unchecked(src_stride * 3 + 8..).as_ptr(),
+                ))
+            };
+
+            store0 = vqdmlal_lane_s16::<3>(store0, vget_low_s16(item_row0), weights);
+            store1 = vqdmlal_high_lane_s16::<3>(store1, item_row0, weights);
+            store2 = vqdmlal_lane_s16::<3>(store2, vget_low_s16(item_row1), weights);
+            store3 = vqdmlal_high_lane_s16::<3>(store3, item_row1, weights);
+
+            j += 4;
+        }
+
+        while j + 2 <= bounds_size {
+            let py = bounds.start + j;
+            let src_ptr = unsafe { src.get_unchecked((src_stride * py + v_dx)..) };
+
+            let weights = unsafe {
+                vreinterpret_s16_u32(vld1_lane_u32::<0>(
+                    weights.get_unchecked(j..).as_ptr().cast(),
+                    vdup_n_u32(0),
+                ))
+            };
+
+            let item_row0 = unsafe { vreinterpretq_s16_u16(vld1q_u16(src_ptr.as_ptr())) };
+            let item_row1 =
+                unsafe { vreinterpretq_s16_u16(vld1q_u16(src_ptr.get_unchecked(8..).as_ptr())) };
+
+            store0 = vqdmlal_lane_s16::<0>(store0, vget_low_s16(item_row0), weights);
+            store1 = vqdmlal_high_lane_s16::<0>(store1, item_row0, weights);
+            store2 = vqdmlal_lane_s16::<0>(store2, vget_low_s16(item_row1), weights);
+            store3 = vqdmlal_high_lane_s16::<0>(store3, item_row1, weights);
+
+            let item_row0 = unsafe {
+                vreinterpretq_s16_u16(vld1q_u16(src_ptr.get_unchecked(src_stride..).as_ptr()))
+            };
+            let item_row1 = unsafe {
+                vreinterpretq_s16_u16(vld1q_u16(src_ptr.get_unchecked(src_stride + 8..).as_ptr()))
+            };
+
+            store0 = vqdmlal_lane_s16::<1>(store0, vget_low_s16(item_row0), weights);
+            store1 = vqdmlal_high_lane_s16::<1>(store1, item_row0, weights);
+            store2 = vqdmlal_lane_s16::<1>(store2, vget_low_s16(item_row1), weights);
+            store3 = vqdmlal_high_lane_s16::<1>(store3, item_row1, weights);
+
+            j += 2;
+        }
+
+        let weights = &weights[j..bounds_size];
+
+        for (j, &k_weight) in weights.iter().enumerate() {
+            let py = bounds.start + j;
+            let src_ptr = unsafe { src.get_unchecked((src_stride * py + v_dx)..) };
+
+            let v_weight = vdupq_n_s16(k_weight);
+
+            let item_row0 = unsafe { vreinterpretq_s16_u16(vld1q_u16(src_ptr.as_ptr())) };
+            let item_row1 =
+                unsafe { vreinterpretq_s16_u16(vld1q_u16(src_ptr.get_unchecked(8..).as_ptr())) };
+
+            store0 = vqdmlal_s16(store0, vget_low_s16(item_row0), vget_low_s16(v_weight));
+            store1 = vqdmlal_high_s16(store1, item_row0, v_weight);
+            store2 = vqdmlal_s16(store2, vget_low_s16(item_row1), vget_low_s16(v_weight));
+            store3 = vqdmlal_high_s16(store3, item_row1, v_weight);
+        }
+
+        let store0 = vqshrun_n_s32::<PRECISION>(store0);
+        let store1 = vqshrun_n_s32::<PRECISION>(store1);
+        let store2 = vqshrun_n_s32::<PRECISION>(store2);
+        let store3 = vqshrun_n_s32::<PRECISION>(store3);
+
+        let item0 = vminq_u16(vcombine_u16(store0, store1), v_max_colors);
+        let item1 = vminq_u16(vcombine_u16(store2, store3), v_max_colors);
+
+        unsafe {
+            vst1q_u16(dst.as_mut_ptr(), item0);
+            vst1q_u16(dst.get_unchecked_mut(8..).as_mut_ptr(), item1);
+        }
+
+        cx = v_dx;
+    }
+    cx
+}
+
 pub(crate) fn convolve_column_lb_u16(
     _: usize,
     bounds: &FilterBounds,
@@ -52,150 +214,16 @@ pub(crate) fn convolve_column_lb_u16(
 
         let v_max_colors = vdupq_n_u16(max_colors as u16);
 
-        let v_px = cx;
-
-        let iter16 = dst.chunks_exact_mut(16);
-
-        for (x, dst) in iter16.enumerate() {
-            let mut store0 = initial_store;
-            let mut store1 = initial_store;
-            let mut store2 = initial_store;
-            let mut store3 = initial_store;
-
-            let v_dx = v_px + x * 16;
-
-            if bounds_size == 2 {
-                let weights = weight.get_unchecked(0..2);
-                let mut v_weight = vld1_dup_s16(weights.as_ptr());
-                v_weight = vld1_lane_s16::<1>(weights.as_ptr().add(1), v_weight);
-
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
-
-                let item_row0 = vreinterpretq_s16_u16(vld1q_u16(src_ptr0.as_ptr()));
-                let item_row1 = vreinterpretq_s16_u16(vld1q_u16(src_ptr0.as_ptr().add(8)));
-
-                store0 = vqdmlal_lane_s16::<0>(store0, vget_low_s16(item_row0), v_weight);
-                store1 = vqdmlal_high_lane_s16::<0>(store1, item_row0, v_weight);
-                store2 = vqdmlal_lane_s16::<0>(store2, vget_low_s16(item_row1), v_weight);
-                store3 = vqdmlal_high_lane_s16::<0>(store3, item_row1, v_weight);
-
-                let item_row10 = vreinterpretq_s16_u16(vld1q_u16(src_ptr1.as_ptr()));
-                let item_row11 = vreinterpretq_s16_u16(vld1q_u16(src_ptr1.as_ptr().add(8)));
-
-                store0 = vqdmlal_lane_s16::<1>(store0, vget_low_s16(item_row10), v_weight);
-                store1 = vqdmlal_high_lane_s16::<1>(store1, item_row10, v_weight);
-                store2 = vqdmlal_lane_s16::<1>(store2, vget_low_s16(item_row11), v_weight);
-                store3 = vqdmlal_high_lane_s16::<1>(store3, item_row11, v_weight);
-            } else if bounds_size == 3 {
-                let weights = weight.get_unchecked(0..3);
-                let mut v_weight = vld1_dup_s16(weights.as_ptr());
-                v_weight = vld1_lane_s16::<1>(weights.as_ptr().add(1), v_weight);
-                v_weight = vld1_lane_s16::<2>(weights.as_ptr().add(2), v_weight);
-
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
-
-                let item_row0 = vreinterpretq_s16_u16(vld1q_u16(src_ptr0.as_ptr()));
-                let item_row1 = vreinterpretq_s16_u16(vld1q_u16(src_ptr0.as_ptr().add(8)));
-
-                store0 = vqdmlal_lane_s16::<0>(store0, vget_low_s16(item_row0), v_weight);
-                store1 = vqdmlal_high_lane_s16::<0>(store1, item_row0, v_weight);
-                store2 = vqdmlal_lane_s16::<0>(store2, vget_low_s16(item_row1), v_weight);
-                store3 = vqdmlal_high_lane_s16::<0>(store3, item_row1, v_weight);
-
-                let item_row10 = vreinterpretq_s16_u16(vld1q_u16(src_ptr1.as_ptr()));
-                let item_row11 = vreinterpretq_s16_u16(vld1q_u16(src_ptr1.as_ptr().add(8)));
-
-                store0 = vqdmlal_lane_s16::<1>(store0, vget_low_s16(item_row10), v_weight);
-                store1 = vqdmlal_high_lane_s16::<1>(store1, item_row10, v_weight);
-                store2 = vqdmlal_lane_s16::<1>(store2, vget_low_s16(item_row11), v_weight);
-                store3 = vqdmlal_high_lane_s16::<1>(store3, item_row11, v_weight);
-
-                let item_row20 = vreinterpretq_s16_u16(vld1q_u16(src_ptr2.as_ptr()));
-                let item_row21 = vreinterpretq_s16_u16(vld1q_u16(src_ptr2.as_ptr().add(8)));
-
-                store0 = vqdmlal_lane_s16::<2>(store0, vget_low_s16(item_row20), v_weight);
-                store1 = vqdmlal_high_lane_s16::<2>(store1, item_row20, v_weight);
-                store2 = vqdmlal_lane_s16::<2>(store2, vget_low_s16(item_row21), v_weight);
-                store3 = vqdmlal_high_lane_s16::<2>(store3, item_row21, v_weight);
-            } else if bounds_size == 4 {
-                let weights = weight.get_unchecked(0..4);
-
-                let v_weight = vld1_s16(weights.as_ptr());
-
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
-                let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + v_dx)..);
-
-                let item_row0 = vreinterpretq_s16_u16(vld1q_u16(src_ptr0.as_ptr()));
-                let item_row1 = vreinterpretq_s16_u16(vld1q_u16(src_ptr0.as_ptr().add(8)));
-
-                store0 = vqdmlal_lane_s16::<0>(store0, vget_low_s16(item_row0), v_weight);
-                store1 = vqdmlal_high_lane_s16::<0>(store1, item_row0, v_weight);
-                store2 = vqdmlal_lane_s16::<0>(store2, vget_low_s16(item_row1), v_weight);
-                store3 = vqdmlal_high_lane_s16::<0>(store3, item_row1, v_weight);
-
-                let item_row10 = vreinterpretq_s16_u16(vld1q_u16(src_ptr1.as_ptr()));
-                let item_row11 = vreinterpretq_s16_u16(vld1q_u16(src_ptr1.as_ptr().add(8)));
-
-                store0 = vqdmlal_lane_s16::<1>(store0, vget_low_s16(item_row10), v_weight);
-                store1 = vqdmlal_high_lane_s16::<1>(store1, item_row10, v_weight);
-                store2 = vqdmlal_lane_s16::<1>(store2, vget_low_s16(item_row11), v_weight);
-                store3 = vqdmlal_high_lane_s16::<1>(store3, item_row11, v_weight);
-
-                let item_row20 = vreinterpretq_s16_u16(vld1q_u16(src_ptr2.as_ptr()));
-                let item_row21 = vreinterpretq_s16_u16(vld1q_u16(src_ptr2.as_ptr().add(8)));
-
-                store0 = vqdmlal_lane_s16::<2>(store0, vget_low_s16(item_row20), v_weight);
-                store1 = vqdmlal_high_lane_s16::<2>(store1, item_row20, v_weight);
-                store2 = vqdmlal_lane_s16::<2>(store2, vget_low_s16(item_row21), v_weight);
-                store3 = vqdmlal_high_lane_s16::<2>(store3, item_row21, v_weight);
-
-                let item_row30 = vreinterpretq_s16_u16(vld1q_u16(src_ptr3.as_ptr()));
-                let item_row31 = vreinterpretq_s16_u16(vld1q_u16(src_ptr3.as_ptr().add(8)));
-
-                store0 = vqdmlal_lane_s16::<3>(store0, vget_low_s16(item_row30), v_weight);
-                store1 = vqdmlal_high_lane_s16::<3>(store1, item_row30, v_weight);
-                store2 = vqdmlal_lane_s16::<3>(store2, vget_low_s16(item_row31), v_weight);
-                store3 = vqdmlal_high_lane_s16::<3>(store3, item_row31, v_weight);
-            } else {
-                for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
-                    let py = bounds.start + j;
-                    let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
-
-                    let v_weight = vdupq_n_s16(k_weight);
-
-                    let item_row0 = vreinterpretq_s16_u16(vld1q_u16(src_ptr.as_ptr()));
-                    let item_row1 = vreinterpretq_s16_u16(vld1q_u16(src_ptr.as_ptr().add(8)));
-
-                    store0 = vqdmlal_s16(store0, vget_low_s16(item_row0), vget_low_s16(v_weight));
-                    store1 = vqdmlal_high_s16(store1, item_row0, v_weight);
-                    store2 = vqdmlal_s16(store2, vget_low_s16(item_row1), vget_low_s16(v_weight));
-                    store3 = vqdmlal_high_s16(store3, item_row1, v_weight);
-                }
-            }
-
-            let store0 = vqshrun_n_s32::<PRECISION>(store0);
-            let store1 = vqshrun_n_s32::<PRECISION>(store1);
-            let store2 = vqshrun_n_s32::<PRECISION>(store2);
-            let store3 = vqshrun_n_s32::<PRECISION>(store3);
-
-            let item0 = vminq_u16(vcombine_u16(store0, store1), v_max_colors);
-            let item1 = vminq_u16(vcombine_u16(store2, store3), v_max_colors);
-
-            vst1q_u16(dst.as_mut_ptr(), item0);
-            vst1q_u16(dst.as_mut_ptr().add(8), item1);
-
-            cx = v_dx;
-        }
-
-        let tail16 = dst.chunks_exact_mut(16).into_remainder();
+        cx = convolve_chunks_16(
+            dst.as_chunks_mut::<16>().0,
+            bounds,
+            src,
+            src_stride,
+            weight,
+            bit_depth,
+            cx,
+        );
+        let tail16 = dst.as_chunks_mut::<16>().1;
         let iter8 = tail16.chunks_exact_mut(8);
 
         let v_px = cx;
@@ -206,90 +234,16 @@ pub(crate) fn convolve_column_lb_u16(
 
             let v_dx = v_px + x * 8;
 
-            if bounds_size == 2 {
-                let weights = weight.get_unchecked(0..2);
-                let mut v_weight = vld1_dup_s16(weights.as_ptr());
-                v_weight = vld1_lane_s16::<1>(weights.as_ptr().add(1), v_weight);
+            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
+                let py = bounds.start + j;
+                let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
 
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
+                let v_weight = vdupq_n_s16(k_weight);
 
-                let item_row0 = vreinterpretq_s16_u16(vld1q_u16(src_ptr0.as_ptr()));
+                let item_row = vreinterpretq_s16_u16(vld1q_u16(src_ptr.as_ptr()));
 
-                store0 = vqdmlal_lane_s16::<0>(store0, vget_low_s16(item_row0), v_weight);
-                store1 = vqdmlal_high_lane_s16::<0>(store1, item_row0, v_weight);
-
-                let item_row1 = vreinterpretq_s16_u16(vld1q_u16(src_ptr1.as_ptr()));
-
-                store0 = vqdmlal_lane_s16::<1>(store0, vget_low_s16(item_row1), v_weight);
-                store1 = vqdmlal_high_lane_s16::<1>(store1, item_row1, v_weight);
-            } else if bounds_size == 3 {
-                let weights = weight.get_unchecked(0..3);
-                let mut v_weight = vld1_dup_s16(weights.as_ptr());
-                v_weight = vld1_lane_s16::<1>(weights.as_ptr().add(1), v_weight);
-                v_weight = vld1_lane_s16::<2>(weights.as_ptr().add(2), v_weight);
-
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
-
-                let item_row0 = vreinterpretq_s16_u16(vld1q_u16(src_ptr0.as_ptr()));
-
-                store0 = vqdmlal_lane_s16::<0>(store0, vget_low_s16(item_row0), v_weight);
-                store1 = vqdmlal_high_lane_s16::<0>(store1, item_row0, v_weight);
-
-                let item_row1 = vreinterpretq_s16_u16(vld1q_u16(src_ptr1.as_ptr()));
-
-                store0 = vqdmlal_lane_s16::<1>(store0, vget_low_s16(item_row1), v_weight);
-                store1 = vqdmlal_high_lane_s16::<1>(store1, item_row1, v_weight);
-
-                let item_row2 = vreinterpretq_s16_u16(vld1q_u16(src_ptr2.as_ptr()));
-
-                store0 = vqdmlal_lane_s16::<2>(store0, vget_low_s16(item_row2), v_weight);
-                store1 = vqdmlal_high_lane_s16::<2>(store1, item_row2, v_weight);
-            } else if bounds_size == 4 {
-                let weights = weight.get_unchecked(0..4);
-                let v_weight = vld1_s16(weights.as_ptr());
-
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
-                let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + v_dx)..);
-
-                let item_row0 = vreinterpretq_s16_u16(vld1q_u16(src_ptr0.as_ptr()));
-
-                store0 = vqdmlal_lane_s16::<0>(store0, vget_low_s16(item_row0), v_weight);
-                store1 = vqdmlal_high_lane_s16::<0>(store1, item_row0, v_weight);
-
-                let item_row1 = vreinterpretq_s16_u16(vld1q_u16(src_ptr1.as_ptr()));
-
-                store0 = vqdmlal_lane_s16::<1>(store0, vget_low_s16(item_row1), v_weight);
-                store1 = vqdmlal_high_lane_s16::<1>(store1, item_row1, v_weight);
-
-                let item_row2 = vreinterpretq_s16_u16(vld1q_u16(src_ptr2.as_ptr()));
-
-                store0 = vqdmlal_lane_s16::<2>(store0, vget_low_s16(item_row2), v_weight);
-                store1 = vqdmlal_high_lane_s16::<2>(store1, item_row2, v_weight);
-
-                let item_row3 = vreinterpretq_s16_u16(vld1q_u16(src_ptr3.as_ptr()));
-
-                store0 = vqdmlal_lane_s16::<3>(store0, vget_low_s16(item_row3), v_weight);
-                store1 = vqdmlal_high_lane_s16::<3>(store1, item_row3, v_weight);
-            } else {
-                for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
-                    let py = bounds.start + j;
-                    let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
-
-                    let v_weight = vdupq_n_s16(k_weight);
-
-                    let item_row = vreinterpretq_s16_u16(vld1q_u16(src_ptr.as_ptr()));
-
-                    store0 = vqdmlal_s16(store0, vget_low_s16(item_row), vget_low_s16(v_weight));
-                    store1 = vqdmlal_high_s16(store1, item_row, v_weight);
-                }
+                store0 = vqdmlal_s16(store0, vget_low_s16(item_row), vget_low_s16(v_weight));
+                store1 = vqdmlal_high_s16(store1, item_row, v_weight);
             }
 
             let item = vminq_u16(
@@ -314,71 +268,15 @@ pub(crate) fn convolve_column_lb_u16(
 
             let v_dx = v_cx + x * 4;
 
-            if bounds_size == 2 {
-                let weights = weight.get_unchecked(0..2);
-                let mut v_weight = vld1_dup_s16(weights.as_ptr());
-                v_weight = vld1_lane_s16::<1>(weights.as_ptr().add(1), v_weight);
+            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
+                let py = bounds.start + j;
+                let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
 
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
+                let v_weight = vdup_n_s16(k_weight);
 
-                let item_row0 = vreinterpret_s16_u16(vld1_u16(src_ptr0.as_ptr()));
-                store0 = vqdmlal_lane_s16::<0>(store0, item_row0, v_weight);
+                let item_row = vreinterpret_s16_u16(vld1_u16(src_ptr.as_ptr()));
 
-                let item_row1 = vreinterpret_s16_u16(vld1_u16(src_ptr1.as_ptr()));
-                store0 = vqdmlal_lane_s16::<1>(store0, item_row1, v_weight);
-            } else if bounds_size == 3 {
-                let weights = weight.get_unchecked(0..3);
-                let mut v_weight = vld1_dup_s16(weights.as_ptr());
-                v_weight = vld1_lane_s16::<1>(weights.as_ptr().add(1), v_weight);
-                v_weight = vld1_lane_s16::<2>(weights.as_ptr().add(2), v_weight);
-
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
-
-                let item_row0 = vreinterpret_s16_u16(vld1_u16(src_ptr0.as_ptr()));
-                store0 = vqdmlal_lane_s16::<0>(store0, item_row0, v_weight);
-
-                let item_row1 = vreinterpret_s16_u16(vld1_u16(src_ptr1.as_ptr()));
-                store0 = vqdmlal_lane_s16::<1>(store0, item_row1, v_weight);
-
-                let item_row2 = vreinterpret_s16_u16(vld1_u16(src_ptr2.as_ptr()));
-                store0 = vqdmlal_lane_s16::<2>(store0, item_row2, v_weight);
-            } else if bounds_size == 4 {
-                let weights = weight.get_unchecked(0..4);
-                let v_weight = vld1_s16(weights.as_ptr());
-
-                let py = bounds.start;
-                let src_ptr0 = src.get_unchecked((src_stride * py + v_dx)..);
-                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_dx)..);
-                let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_dx)..);
-                let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + v_dx)..);
-
-                let item_row0 = vreinterpret_s16_u16(vld1_u16(src_ptr0.as_ptr()));
-                store0 = vqdmlal_lane_s16::<0>(store0, item_row0, v_weight);
-
-                let item_row1 = vreinterpret_s16_u16(vld1_u16(src_ptr1.as_ptr()));
-                store0 = vqdmlal_lane_s16::<1>(store0, item_row1, v_weight);
-
-                let item_row2 = vreinterpret_s16_u16(vld1_u16(src_ptr2.as_ptr()));
-                store0 = vqdmlal_lane_s16::<2>(store0, item_row2, v_weight);
-
-                let item_row3 = vreinterpret_s16_u16(vld1_u16(src_ptr3.as_ptr()));
-                store0 = vqdmlal_lane_s16::<3>(store0, item_row3, v_weight);
-            } else {
-                for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
-                    let py = bounds.start + j;
-                    let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
-
-                    let v_weight = vdup_n_s16(k_weight);
-
-                    let item_row = vreinterpret_s16_u16(vld1_u16(src_ptr.as_ptr()));
-
-                    store0 = vqdmlal_s16(store0, item_row, v_weight);
-                }
+                store0 = vqdmlal_s16(store0, item_row, v_weight);
             }
 
             let u_store0 = vmin_u16(
@@ -399,95 +297,15 @@ pub(crate) fn convolve_column_lb_u16(
 
             let v_px = a_px + x;
 
-            if bounds_size == 2 {
-                let weights = weight.get_unchecked(0..2);
-                let weight0 = weights[0];
-                let weight1 = weights[1];
-
-                let py = bounds.start;
-                let offset0 = src_stride * py + v_px;
-                let src_ptr0 = *src.get_unchecked(offset0);
-                let offset1 = src_stride * (py + 1) + v_px;
-                let src_ptr1 = *src.get_unchecked(offset1);
+            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
+                let py = bounds.start + j;
+                let offset = src_stride * py + v_px;
+                let src_ptr = *src.get_unchecked(offset);
 
                 store0 = store0.wrapping_add(
-                    2i32.wrapping_mul(src_ptr0 as i32)
-                        .wrapping_mul(weight0 as i32),
+                    2i32.wrapping_mul(src_ptr as i32)
+                        .wrapping_mul(k_weight as i32),
                 );
-                store0 = store0.wrapping_add(
-                    2i32.wrapping_mul(src_ptr1 as i32)
-                        .wrapping_mul(weight1 as i32),
-                );
-            } else if bounds_size == 3 {
-                let weights = weight.get_unchecked(0..3);
-                let weight0 = weights[0];
-                let weight1 = weights[1];
-                let weight2 = weights[2];
-
-                let py = bounds.start;
-                let offset0 = src_stride * py + v_px;
-                let src_ptr0 = *src.get_unchecked(offset0);
-                let offset1 = src_stride * (py + 1) + v_px;
-                let src_ptr1 = *src.get_unchecked(offset1);
-                let offset2 = src_stride * (py + 2) + v_px;
-                let src_ptr2 = *src.get_unchecked(offset2);
-
-                store0 = store0.wrapping_add(
-                    2i32.wrapping_mul(src_ptr0 as i32)
-                        .wrapping_mul(weight0 as i32),
-                );
-                store0 = store0.wrapping_add(
-                    2i32.wrapping_mul(src_ptr1 as i32)
-                        .wrapping_mul(weight1 as i32),
-                );
-                store0 = store0.wrapping_add(
-                    2i32.wrapping_mul(src_ptr2 as i32)
-                        .wrapping_mul(weight2 as i32),
-                );
-            } else if bounds_size == 4 {
-                let weights = weight.get_unchecked(0..4);
-                let weight0 = weights[0];
-                let weight1 = weights[1];
-                let weight2 = weights[2];
-                let weight3 = weights[3];
-
-                let py = bounds.start;
-                let offset0 = src_stride * py + v_px;
-                let src_ptr0 = *src.get_unchecked(offset0);
-                let offset1 = src_stride * (py + 1) + v_px;
-                let src_ptr1 = *src.get_unchecked(offset1);
-                let offset2 = src_stride * (py + 2) + v_px;
-                let src_ptr2 = *src.get_unchecked(offset2);
-                let offset3 = src_stride * (py + 3) + v_px;
-                let src_ptr3 = *src.get_unchecked(offset3);
-
-                store0 = store0.wrapping_add(
-                    2i32.wrapping_mul(src_ptr0 as i32)
-                        .wrapping_mul(weight0 as i32),
-                );
-                store0 = store0.wrapping_add(
-                    2i32.wrapping_mul(src_ptr1 as i32)
-                        .wrapping_mul(weight1 as i32),
-                );
-                store0 = store0.wrapping_add(
-                    2i32.wrapping_mul(src_ptr2 as i32)
-                        .wrapping_mul(weight2 as i32),
-                );
-                store0 = store0.wrapping_add(
-                    2i32.wrapping_mul(src_ptr3 as i32)
-                        .wrapping_mul(weight3 as i32),
-                );
-            } else {
-                for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
-                    let py = bounds.start + j;
-                    let offset = src_stride * py + v_px;
-                    let src_ptr = *src.get_unchecked(offset);
-
-                    store0 = store0.wrapping_add(
-                        2i32.wrapping_mul(src_ptr as i32)
-                            .wrapping_mul(k_weight as i32),
-                    );
-                }
             }
 
             *dst = (store0 >> PRECISION).max(0).min(max_colors as i32) as u16;

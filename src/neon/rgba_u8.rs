@@ -36,7 +36,7 @@ use std::arch::aarch64::*;
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_8_u8<const D: bool>(
+fn conv_horiz_rgba_8_u8<const D: bool>(
     start_x: usize,
     src: &[u8],
     weights: int16x8_t,
@@ -68,7 +68,7 @@ unsafe fn conv_horiz_rgba_8_u8<const D: bool>(
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_2_u8<const D: bool>(
+fn conv_horiz_rgba_2_u8<const D: bool>(
     start_x: usize,
     src: &[u8],
     weights: int16x4_t,
@@ -88,7 +88,7 @@ unsafe fn conv_horiz_rgba_2_u8<const D: bool>(
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_4_u8<const D: bool>(
+fn conv_horiz_rgba_4_u8<const D: bool>(
     start_x: usize,
     src: &[u8],
     weights: int16x4_t,
@@ -112,7 +112,7 @@ unsafe fn conv_horiz_rgba_4_u8<const D: bool>(
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_1_u8<const D: bool>(
+fn conv_horiz_rgba_1_u8<const D: bool>(
     start_x: usize,
     src: &[u8],
     w0: int16x4_t,
@@ -133,6 +133,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_rows_4_u8(
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     convolve_horizontal_rgba_neon_rows_4_u8_impl::<false, 15>(
         src,
@@ -149,6 +150,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_rows_4_u8_q(
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     convolve_horizontal_rgba_neon_rows_4_u8_impl::<true, 16>(
         src,
@@ -283,6 +285,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_row(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     convolve_horizontal_rgba_neon_row_impl::<false, 15>(src, dst, filter_weights);
 }
@@ -291,6 +294,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_row_q(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     convolve_horizontal_rgba_neon_row_impl::<true, 16>(src, dst, filter_weights);
 }

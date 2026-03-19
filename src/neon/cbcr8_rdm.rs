@@ -33,12 +33,7 @@ use std::arch::aarch64::*;
 #[must_use]
 #[inline]
 #[target_feature(enable = "rdm")]
-unsafe fn accumulate_8_horiz(
-    store: int16x8_t,
-    ptr: *const u8,
-    w0: int16x8_t,
-    w1: int16x8_t,
-) -> int16x8_t {
+fn accumulate_8_horiz(store: int16x8_t, ptr: *const u8, w0: int16x8_t, w1: int16x8_t) -> int16x8_t {
     unsafe {
         let pixel_colors = vld1q_u8(ptr);
         let lo = expand8_to_14(vget_low_u8(pixel_colors));
@@ -51,7 +46,7 @@ unsafe fn accumulate_8_horiz(
 #[must_use]
 #[inline]
 #[target_feature(enable = "rdm")]
-unsafe fn accumulate_4_horiz(store: int16x8_t, ptr: *const u8, weights: int16x8_t) -> int16x8_t {
+fn accumulate_4_horiz(store: int16x8_t, ptr: *const u8, weights: int16x8_t) -> int16x8_t {
     unsafe {
         let pixel_colors = vld1_u8(ptr);
         let lo = expand8_to_14(pixel_colors);
@@ -62,7 +57,7 @@ unsafe fn accumulate_4_horiz(store: int16x8_t, ptr: *const u8, weights: int16x8_
 #[must_use]
 #[inline]
 #[target_feature(enable = "rdm")]
-unsafe fn accumulate_1_horiz(store: int16x8_t, ptr: *const u8, weights: int16x8_t) -> int16x8_t {
+fn accumulate_1_horiz(store: int16x8_t, ptr: *const u8, weights: int16x8_t) -> int16x8_t {
     unsafe {
         let pixel_colors =
             vreinterpret_u8_u16(vld1_lane_u16::<0>(ptr as *const u16, vdup_n_u16(0)));
@@ -93,6 +88,7 @@ pub(crate) fn convolve_horizontal_cbcr_neon_rows_rdm_4_u8(
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_cbcr_neon_rows_4_u8_impl(
@@ -106,7 +102,7 @@ pub(crate) fn convolve_horizontal_cbcr_neon_rows_rdm_4_u8(
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn convolve_horizontal_cbcr_neon_rows_4_u8_impl(
+fn convolve_horizontal_cbcr_neon_rows_4_u8_impl(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -163,7 +159,7 @@ unsafe fn convolve_horizontal_cbcr_neon_rows_4_u8_impl(
             let src2 = src1.get_unchecked(src_stride..);
             let src3 = src2.get_unchecked(src_stride..);
 
-            while jx + 8 < bounds.size {
+            while jx + 8 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1q_s16(w_ptr.as_ptr());
                 let w0 = vreinterpretq_s16_u8(vqtbl1q_u8(
@@ -191,7 +187,7 @@ unsafe fn convolve_horizontal_cbcr_neon_rows_4_u8_impl(
                 jx += 8;
             }
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = vreinterpretq_s16_u8(vqtbl1q_u8(
                     vreinterpretq_u8_s16(vcombine_s16(vld1_s16(w_ptr.as_ptr()), vdup_n_s16(0))),
@@ -252,6 +248,7 @@ pub fn convolve_horizontal_cbcr_neon_rdm_row(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         convolve_horizontal_cbcr_neon_rdm_row_impl(src, dst, filter_weights);
@@ -259,7 +256,7 @@ pub fn convolve_horizontal_cbcr_neon_rdm_row(
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn convolve_horizontal_cbcr_neon_rdm_row_impl(
+fn convolve_horizontal_cbcr_neon_rdm_row_impl(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
@@ -297,7 +294,7 @@ unsafe fn convolve_horizontal_cbcr_neon_rdm_row_impl(
             let mut jx = 0usize;
             let mut store = base_val;
 
-            while jx + 8 < bounds_size {
+            while jx + 8 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1q_s16(w_ptr.as_ptr());
                 let w0 = vreinterpretq_s16_u8(vqtbl1q_u8(
@@ -316,7 +313,7 @@ unsafe fn convolve_horizontal_cbcr_neon_rdm_row_impl(
                 jx += 8;
             }
 
-            while jx + 4 < bounds_size {
+            while jx + 4 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = vreinterpretq_s16_u8(vqtbl1q_u8(
                     vreinterpretq_u8_s16(vcombine_s16(vld1_s16(w_ptr.as_ptr()), vdup_n_s16(0))),

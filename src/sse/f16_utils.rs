@@ -145,7 +145,7 @@ unsafe fn _mm_cvtph_ps_fallback(k: __m128i) -> __m128 {
    This is not fully IEEE complaint conversion, only more straight for fallback
 **/
 #[inline]
-unsafe fn _mm_cvtps_ph_fallback(x: __m128) -> __m128i {
+fn _mm_cvtps_ph_fallback(x: __m128) -> __m128i {
     unsafe {
         let b = _mm_add_epi32(_mm_castps_si128(x), _mm_set1_epi32(0x00001000));
         let e = _mm_srli_epi32::<23>(_mm_and_si128(b, _mm_set1_epi32(0x7F800000)));
@@ -192,12 +192,12 @@ unsafe fn _mm_cvtps_ph_fallback(x: __m128) -> __m128i {
 
 #[inline]
 #[target_feature(enable = "f16c")]
-unsafe fn _mm_cvtps_phdx(x: __m128) -> __m128i {
+fn _mm_cvtps_phdx(x: __m128) -> __m128i {
     _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(x)
 }
 
 #[inline]
-pub(crate) unsafe fn _mm_cvtps_phx<const F16C: bool>(x: __m128) -> __m128i {
+pub(crate) fn _mm_cvtps_phx<const F16C: bool>(x: __m128) -> __m128i {
     unsafe {
         if F16C {
             _mm_cvtps_phdx(x)
@@ -234,9 +234,9 @@ mod tests {
         unsafe {
             // Test regular
             let value = _mm_set1_ps(24.);
-            let converted = _mm_cvtps_phx(value);
+            let converted = _mm_cvtps_phx::<false>(value);
             let flag = _mm_extract_epi16::<0>(converted) as u16;
-            let bits = f16::from_f32(24.);
+            let bits = 24. as f16;
             assert_eq!(flag, bits.to_bits());
         }
     }

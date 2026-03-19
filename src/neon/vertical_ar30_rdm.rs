@@ -39,11 +39,13 @@ pub(crate) fn neon_column_handler_fixed_point_ar30_rdm<
     const AR30_TYPE: usize,
     const AR30_ORDER: usize,
 >(
+    _: usize,
     bounds: &FilterBounds,
     src: &[u8],
     dst: &mut [u8],
     src_stride: usize,
     weight: &[i16],
+    _: u32,
 ) {
     unsafe {
         let unit = ExecutionUnit::<AR30_TYPE, AR30_ORDER>::default();

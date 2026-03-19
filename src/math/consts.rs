@@ -70,7 +70,7 @@ impl ConstPI for f64 {
         any(target_arch = "x86", target_arch = "x86_64"),
         target_feature = "fma"
     ),
-    all(target_arch = "aarch64", target_feature = "neon")
+    all(target_arch = "aarch64", feature = "neon")
 ))]
 #[inline(always)]
 pub(crate) fn mla<T: Copy + Mul<T, Output = T> + Add<T, Output = T> + MulAdd<T, Output = T>>(
@@ -87,7 +87,7 @@ pub(crate) fn mla<T: Copy + Mul<T, Output = T> + Add<T, Output = T> + MulAdd<T, 
         any(target_arch = "x86", target_arch = "x86_64"),
         target_feature = "fma"
     ),
-    all(target_arch = "aarch64", target_feature = "neon")
+    all(target_arch = "aarch64", feature = "neon")
 )))]
 pub(crate) fn mla<T: Copy + Mul<T, Output = T> + Add<T, Output = T> + MulAdd<T, Output = T>>(
     a: T,

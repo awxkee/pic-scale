@@ -29,9 +29,9 @@
 #![forbid(unsafe_code)]
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::{avx_premultiply_alpha_rgba_f16, avx_unpremultiply_alpha_rgba_f16};
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::neon::{neon_premultiply_alpha_rgba_f16, neon_unpremultiply_alpha_rgba_f16};
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::neon::{neon_premultiply_alpha_rgba_f16_full, neon_unpremultiply_alpha_rgba_f16_full};
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::{sse_premultiply_alpha_rgba_f16, sse_unpremultiply_alpha_rgba_f16};
@@ -40,7 +40,7 @@ use novtb::{ParallelZonedIterator, TbSliceMut};
 
 #[inline]
 pub(crate) fn unpremultiply_pixel_f16_row(in_place: &mut [f16]) {
-    for dst in in_place.chunks_exact_mut(4) {
+    for dst in in_place.as_chunks_mut::<4>().0.iter_mut() {
         let mut r = dst[0] as f32;
         let mut g = dst[1] as f32;
         let mut b = dst[2] as f32;
@@ -63,7 +63,12 @@ pub(crate) fn unpremultiply_pixel_f16_row(in_place: &mut [f16]) {
 
 #[inline]
 pub(crate) fn premultiply_pixel_f16_row(dst: &mut [f16], src: &[f16]) {
-    for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+    for (dst, src) in dst
+        .as_chunks_mut::<4>()
+        .0
+        .iter_mut()
+        .zip(src.as_chunks::<4>().0.iter())
+    {
         let mut r = src[0] as f32;
         let mut g = src[1] as f32;
         let mut b = src[2] as f32;
@@ -125,7 +130,7 @@ pub(crate) fn premultiply_alpha_rgba_f16(
         usize,
         &novtb::ThreadPool,
     ) = premultiply_alpha_rgba_impl_f16;
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     {
         _dispatcher = neon_premultiply_alpha_rgba_f16;
         if std::arch::is_aarch64_feature_detected!("fp16") {
@@ -158,7 +163,7 @@ pub(crate) fn unpremultiply_alpha_rgba_f16(
 ) {
     let mut _dispatcher: fn(&mut [f16], usize, usize, usize, &novtb::ThreadPool) =
         unpremultiply_alpha_rgba_impl_f16;
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     {
         _dispatcher = neon_unpremultiply_alpha_rgba_f16;
         if std::arch::is_aarch64_feature_detected!("fp16") {

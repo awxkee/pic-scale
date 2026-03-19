@@ -41,6 +41,7 @@ pub(crate) fn avx_convolve_horizontal_rgba_rows_4_ar30<
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         let unit = Row4ExecutionUnit::<AR_TYPE, AR_ORDER>::default();
@@ -54,7 +55,7 @@ struct Row4ExecutionUnit<const AR_TYPE: usize, const AR_ORDER: usize> {}
 impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_ORDER> {
     #[inline]
     #[target_feature(enable = "avx2")]
-    unsafe fn conv_horiz_rgba_8_u8_i16(
+    fn conv_horiz_rgba_8_u8_i16(
         &self,
         start_x: usize,
         src0: &[u8],
@@ -109,7 +110,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
 
     #[inline]
     #[target_feature(enable = "avx2")]
-    unsafe fn conv_horiz_rgba_4_u8_i16(
+    fn conv_horiz_rgba_4_u8_i16(
         &self,
         start_x: usize,
         src0: &[u8],
@@ -175,7 +176,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
     }
 
     #[target_feature(enable = "avx2")]
-    unsafe fn pass(
+    fn pass(
         &self,
         src: &[u8],
         src_stride: usize,
@@ -223,7 +224,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
                 let src2 = src1.get_unchecked(src_stride..);
                 let src3 = src2.get_unchecked(src_stride..);
 
-                while jx + 8 < bounds_size {
+                while jx + 8 <= bounds_size {
                     let bounds_start = bounds.start + jx;
                     let w_ptr = weights.get_unchecked(jx..);
                     let w0 = _mm256_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
@@ -256,7 +257,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
                     jx += 8;
                 }
 
-                while jx + 4 < bounds_size {
+                while jx + 4 <= bounds_size {
                     let bounds_start = bounds.start + jx;
                     let w_ptr = weights.get_unchecked(jx..);
                     let w0 = _mm256_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
@@ -311,6 +312,7 @@ pub(crate) fn avx_convolve_horizontal_rgba_rows_ar30<
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     unsafe {
         let unit = Row1ExecutionUnit::<AR_TYPE, AR_ORDER>::default();
@@ -324,7 +326,7 @@ struct Row1ExecutionUnit<const AR_TYPE: usize, const AR_ORDER: usize> {}
 impl<const AR_TYPE: usize, const AR_ORDER: usize> Row1ExecutionUnit<AR_TYPE, AR_ORDER> {
     #[inline]
     #[target_feature(enable = "avx2")]
-    unsafe fn conv_horiz_rgba_1_u8_i16(
+    fn conv_horiz_rgba_1_u8_i16(
         start_x: usize,
         src: &[u8],
         w0: __m128i,
@@ -342,7 +344,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row1ExecutionUnit<AR_TYPE, AR_
 
     #[inline]
     #[target_feature(enable = "avx2")]
-    unsafe fn conv_horiz_rgba_8_u8_i16(
+    fn conv_horiz_rgba_8_u8_i16(
         &self,
         start_x: usize,
         src: &[u8],
@@ -376,7 +378,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row1ExecutionUnit<AR_TYPE, AR_
 
     #[inline]
     #[target_feature(enable = "avx2")]
-    unsafe fn conv_horiz_rgba_4_u8_i16(
+    fn conv_horiz_rgba_4_u8_i16(
         &self,
         start_x: usize,
         src: &[u8],
@@ -402,7 +404,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row1ExecutionUnit<AR_TYPE, AR_
     }
 
     #[target_feature(enable = "avx2")]
-    unsafe fn pass(&self, src: &[u8], dst: &mut [u8], filter_weights: &FilterWeights<i16>) {
+    fn pass(&self, src: &[u8], dst: &mut [u8], filter_weights: &FilterWeights<i16>) {
         unsafe {
             const PRECISION: i32 = 16;
             const ROUNDING: i32 = 1 << (PRECISION - 1);
@@ -428,7 +430,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row1ExecutionUnit<AR_TYPE, AR_
 
                 let src0 = src;
 
-                while jx + 8 < bounds_size {
+                while jx + 8 <= bounds_size {
                     let bounds_start = bounds.start + jx;
                     let w_ptr = weights.get_unchecked(jx..);
                     let w0 = _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
@@ -440,7 +442,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row1ExecutionUnit<AR_TYPE, AR_
                     jx += 8;
                 }
 
-                while jx + 4 < bounds_size {
+                while jx + 4 <= bounds_size {
                     let bounds_start = bounds.start + jx;
                     let w_ptr = weights.get_unchecked(jx..);
                     let w0 = _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());

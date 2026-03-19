@@ -27,12 +27,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
-use crate::color_group::{ColorGroup, ld_ar30, ld_ar30_with_offset, load_ar30_p};
+use crate::color_group::{ColorGroup, load_ar30_p};
 use crate::filter_weights::FilterWeights;
 use crate::support::ROUNDING_CONST;
 use num_traits::AsPrimitive;
 
-#[inline(always)]
 pub(crate) fn convolve_row_handler_fixed_point_ar30<
     const AR30_TYPE: usize,
     const AR30_ORDER: usize,
@@ -40,6 +39,7 @@ pub(crate) fn convolve_row_handler_fixed_point_ar30<
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     for ((chunk, &bounds), weights) in dst
         .chunks_exact_mut(4)
@@ -58,86 +58,15 @@ pub(crate) fn convolve_row_handler_fixed_point_ar30<
         const CN: usize = 4;
         let px = start_x * CN;
 
-        if bounds_size == 2 {
-            let src_ptr0 = &src[px..(px + 2 * CN)];
-            let sliced_weights = &weights[0..2];
-            let weight0 = sliced_weights[0] as i32;
-            let weight1 = sliced_weights[1] as i32;
-            sums = sums
-                .trunc_add(&ld_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER).trunc_mul(weight0))
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1).trunc_mul(weight1),
-                );
-        } else if bounds_size == 3 {
-            let src_ptr0 = &src[px..(px + 3 * CN)];
-            let sliced_weights = &weights[0..3];
-            let weight0 = sliced_weights[0] as i32;
-            let weight1 = sliced_weights[1] as i32;
-            let weight2 = sliced_weights[2] as i32;
-            sums = sums
-                .trunc_add(&ld_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER).trunc_mul(weight0))
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1).trunc_mul(weight1),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 2).trunc_mul(weight2),
-                );
-        } else if bounds_size == 4 {
-            let src_ptr0 = &src[px..(px + 4 * CN)];
-            let sliced_weights = &weights[0..4];
-            let weight0 = sliced_weights[0] as i32;
-            let weight1 = sliced_weights[1] as i32;
-            let weight2 = sliced_weights[2] as i32;
-            let weight3 = sliced_weights[3] as i32;
-            sums = sums
-                .trunc_add(&ld_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER).trunc_mul(weight0))
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1).trunc_mul(weight1),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 2).trunc_mul(weight2),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 3).trunc_mul(weight3),
-                );
-        } else if bounds_size == 6 {
-            let src_ptr0 = &src[px..(px + 6 * CN)];
-
-            let sliced_weights = &weights[0..6];
-            let weight0 = sliced_weights[0] as i32;
-            let weight1 = sliced_weights[1] as i32;
-            let weight2 = sliced_weights[2] as i32;
-            let weight3 = sliced_weights[3] as i32;
-            let weight4 = sliced_weights[4] as i32;
-            let weight5 = sliced_weights[5] as i32;
-            sums = sums
-                .trunc_add(&ld_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER).trunc_mul(weight0))
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1).trunc_mul(weight1),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 2).trunc_mul(weight2),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 3).trunc_mul(weight3),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 4).trunc_mul(weight4),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 5).trunc_mul(weight5),
-                );
-        } else {
-            let src_ptr0 = &src[px..(px + bounds_size)];
-            for (&k_weight, src) in weights
-                .iter()
-                .zip(src_ptr0.chunks_exact(4))
-                .take(bounds.size)
-            {
-                let weight: i32 = k_weight as i32;
-                let new_px = load_ar30_p!(src, AR30_TYPE, AR30_ORDER);
-                sums = sums.trunc_add(&new_px.trunc_mul(weight));
-            }
+        let src_ptr0 = &src[px..(px + bounds_size)];
+        for (&k_weight, src) in weights
+            .iter()
+            .zip(src_ptr0.chunks_exact(4))
+            .take(bounds.size)
+        {
+            let weight: i32 = k_weight as i32;
+            let new_px = load_ar30_p!(src, AR30_TYPE, AR30_ORDER);
+            sums = sums.trunc_add(&new_px.trunc_mul(weight));
         }
 
         let narrowed = sums.saturate_ar30();
@@ -159,6 +88,7 @@ pub(crate) fn convolve_row_handler_fixed_point_4_ar30<
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
     let (row0_ref, rest) = dst.split_at_mut(dst_stride);
     let (row1_ref, rest) = rest.split_at_mut(dst_stride);
@@ -166,15 +96,16 @@ pub(crate) fn convolve_row_handler_fixed_point_4_ar30<
 
     const CN: usize = 4;
 
-    let iter_row0 = row0_ref.chunks_exact_mut(CN);
-    let iter_row1 = row1_ref.chunks_exact_mut(CN);
-    let iter_row2 = row2_ref.chunks_exact_mut(CN);
-    let iter_row3 = row3_ref.chunks_exact_mut(CN);
+    let iter_row0 = row0_ref.as_chunks_mut::<CN>().0;
+    let iter_row1 = row1_ref.as_chunks_mut::<CN>().0;
+    let iter_row2 = row2_ref.as_chunks_mut::<CN>().0;
+    let iter_row3 = row3_ref.as_chunks_mut::<CN>().0;
 
     for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
-        .zip(iter_row1)
-        .zip(iter_row2)
-        .zip(iter_row3)
+        .iter_mut()
+        .zip(iter_row1.iter_mut())
+        .zip(iter_row2.iter_mut())
+        .zip(iter_row3.iter_mut())
         .zip(filter_weights.bounds.iter())
         .zip(
             filter_weights
@@ -192,253 +123,30 @@ pub(crate) fn convolve_row_handler_fixed_point_4_ar30<
         let px = start_x * CN;
         let bounds_size = bounds.size;
 
-        if bounds_size == 2 {
-            let src_ptr0 = &src[px..(px + 2 * CN)];
-            let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 2 * 4)];
-            let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + 2 * 4)];
-            let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + 2 * 4)];
+        let src_ptr0 = &src[px..(px + bounds_size * CN)];
+        let src_ptr1 = &src[(px + src_stride)..(px + src_stride + bounds_size * CN)];
+        let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + bounds_size * CN)];
+        let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + bounds_size * CN)];
 
-            let sliced_weights = &weights[0..2];
-            let weight0 = sliced_weights[0] as i32;
-            let weight1 = sliced_weights[1] as i32;
-            sums0 = sums0.trunc_add(
-                &ld_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER)
-                    .trunc_mul(weight0)
-                    .trunc_add(
-                        &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1)
-                            .trunc_mul(weight1),
-                    ),
-            );
-            sums1 = sums1
-                .trunc_add(&ld_ar30!(src_ptr1, AR30_TYPE, AR30_ORDER).trunc_mul(weight0))
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 1).trunc_mul(weight1),
-                );
-            sums2 = sums2.trunc_add(
-                &ld_ar30!(src_ptr2, AR30_TYPE, AR30_ORDER)
-                    .trunc_mul(weight0)
-                    .trunc_add(
-                        &ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 1)
-                            .trunc_mul(weight1),
-                    ),
-            );
-            sums3 += ld_ar30!(src_ptr3, AR30_TYPE, AR30_ORDER).trunc_mul(weight0)
-                + ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 1).trunc_mul(weight1);
-        } else if bounds_size == 3 {
-            let src_ptr0 = &src[px..(px + 3 * CN)];
-            let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 3 * 4)];
-            let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + 3 * 4)];
-            let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + 3 * 4)];
+        for ((((&k_weight, src0), src1), src2), src3) in weights
+            .iter()
+            .zip(src_ptr0.chunks_exact(4))
+            .zip(src_ptr1.chunks_exact(4))
+            .zip(src_ptr2.chunks_exact(4))
+            .zip(src_ptr3.chunks_exact(4))
+            .take(bounds.size)
+        {
+            let weight: i32 = k_weight as i32;
 
-            let sliced_weights = &weights[0..3];
-            let weight0 = sliced_weights[0] as i32;
-            let weight1 = sliced_weights[1] as i32;
-            let weight2 = sliced_weights[2] as i32;
-            sums0 = sums0.trunc_add(
-                &ld_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER)
-                    .trunc_mul(weight0)
-                    .trunc_add(
-                        &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1)
-                            .trunc_mul(weight1),
-                    )
-                    .trunc_add(
-                        &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 2)
-                            .trunc_mul(weight2),
-                    ),
-            );
-            sums1 = sums1
-                .trunc_add(&ld_ar30!(src_ptr1, AR30_TYPE, AR30_ORDER).trunc_mul(weight0))
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 1).trunc_mul(weight1),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 2).trunc_mul(weight2),
-                );
-            sums2 = sums2
-                .trunc_add(&ld_ar30!(src_ptr2, AR30_TYPE, AR30_ORDER).trunc_mul(weight0))
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 1).trunc_mul(weight1),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 2).trunc_mul(weight2),
-                );
-            sums3 = sums3
-                .trunc_add(&ld_ar30!(src_ptr3, AR30_TYPE, AR30_ORDER).trunc_mul(weight0))
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 1).trunc_mul(weight1),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 2).trunc_mul(weight2),
-                );
-        } else if bounds_size == 4 {
-            let src_ptr0 = &src[px..(px + 4 * CN)];
-            let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 4 * 4)];
-            let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + 4 * 4)];
-            let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + 4 * 4)];
+            let new_px0 = load_ar30_p!(src0, AR30_TYPE, AR30_ORDER);
+            let new_px1 = load_ar30_p!(src1, AR30_TYPE, AR30_ORDER);
+            let new_px2 = load_ar30_p!(src2, AR30_TYPE, AR30_ORDER);
+            let new_px3 = load_ar30_p!(src3, AR30_TYPE, AR30_ORDER);
 
-            let sliced_weights = &weights[0..4];
-            let weight0 = sliced_weights[0] as i32;
-            let weight1 = sliced_weights[1] as i32;
-            let weight2 = sliced_weights[2] as i32;
-            let weight3 = sliced_weights[3] as i32;
-            sums0 = sums0
-                .trunc_add(&ld_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER).trunc_mul(weight0))
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1).trunc_mul(weight1),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 2).trunc_mul(weight2),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 3).trunc_mul(weight3),
-                );
-            sums1 = sums1
-                .trunc_add(&ld_ar30!(src_ptr1, AR30_TYPE, AR30_ORDER).trunc_mul(weight0))
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 1).trunc_mul(weight1),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 2).trunc_mul(weight2),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 3).trunc_mul(weight3),
-                );
-            sums2 = sums2
-                .trunc_add(&ld_ar30!(src_ptr2, AR30_TYPE, AR30_ORDER).trunc_mul(weight0))
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 1).trunc_mul(weight1),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 2).trunc_mul(weight2),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 3).trunc_mul(weight3),
-                );
-            sums3 = sums3
-                .trunc_add(&ld_ar30!(src_ptr3, AR30_TYPE, AR30_ORDER).trunc_mul(weight0))
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 1).trunc_mul(weight1),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 2).trunc_mul(weight2),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 3).trunc_mul(weight3),
-                );
-        } else if bounds_size == 6 {
-            let src_ptr0 = &src[px..(px + 6 * CN)];
-            let src_ptr1 = &src[(px + src_stride)..(px + src_stride + 6 * 4)];
-            let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + 6 * 4)];
-            let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + 6 * 4)];
-
-            let sliced_weights = &weights[0..6];
-            let weight0 = sliced_weights[0] as i32;
-            let weight1 = sliced_weights[1] as i32;
-            let weight2 = sliced_weights[2] as i32;
-            let weight3 = sliced_weights[3] as i32;
-            let weight4 = sliced_weights[4] as i32;
-            let weight5 = sliced_weights[5] as i32;
-            sums0 = sums0.trunc_add(
-                &ld_ar30!(src_ptr0, AR30_TYPE, AR30_ORDER)
-                    .trunc_mul(weight0)
-                    .trunc_add(
-                        &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 1)
-                            .trunc_mul(weight1),
-                    )
-                    .trunc_add(
-                        &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 2)
-                            .trunc_mul(weight2),
-                    )
-                    .trunc_add(
-                        &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 3)
-                            .trunc_mul(weight3),
-                    )
-                    .trunc_add(
-                        &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 4)
-                            .trunc_mul(weight4),
-                    )
-                    .trunc_add(
-                        &ld_ar30_with_offset!(src_ptr0, AR30_TYPE, AR30_ORDER, 5)
-                            .trunc_mul(weight5),
-                    ),
-            );
-            sums1 = sums1
-                .trunc_add(&ld_ar30!(src_ptr1, AR30_TYPE, AR30_ORDER).trunc_mul(weight0))
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 1).trunc_mul(weight1),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 2).trunc_mul(weight2),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 3).trunc_mul(weight3),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 4).trunc_mul(weight4),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr1, AR30_TYPE, AR30_ORDER, 5).trunc_mul(weight5),
-                );
-            sums2 = sums2
-                .trunc_add(&ld_ar30!(src_ptr2, AR30_TYPE, AR30_ORDER).trunc_mul(weight0))
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 1).trunc_mul(weight1),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 2).trunc_mul(weight2),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 3).trunc_mul(weight3),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 4).trunc_mul(weight4),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr2, AR30_TYPE, AR30_ORDER, 5).trunc_mul(weight5),
-                );
-            sums3 = sums3
-                .trunc_add(&ld_ar30!(src_ptr3, AR30_TYPE, AR30_ORDER).trunc_mul(weight0))
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 1).trunc_mul(weight1),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 2).trunc_mul(weight2),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 3).trunc_mul(weight3),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 4).trunc_mul(weight4),
-                )
-                .trunc_add(
-                    &ld_ar30_with_offset!(src_ptr3, AR30_TYPE, AR30_ORDER, 5).trunc_mul(weight5),
-                );
-        } else {
-            let src_ptr0 = &src[px..(px + bounds_size * CN)];
-            let src_ptr1 = &src[(px + src_stride)..(px + src_stride + bounds_size * CN)];
-            let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + bounds_size * CN)];
-            let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + bounds_size * CN)];
-
-            for ((((&k_weight, src0), src1), src2), src3) in weights
-                .iter()
-                .zip(src_ptr0.chunks_exact(4))
-                .zip(src_ptr1.chunks_exact(4))
-                .zip(src_ptr2.chunks_exact(4))
-                .zip(src_ptr3.chunks_exact(4))
-                .take(bounds.size)
-            {
-                let weight: i32 = k_weight as i32;
-
-                let new_px0 = load_ar30_p!(src0, AR30_TYPE, AR30_ORDER);
-                let new_px1 = load_ar30_p!(src1, AR30_TYPE, AR30_ORDER);
-                let new_px2 = load_ar30_p!(src2, AR30_TYPE, AR30_ORDER);
-                let new_px3 = load_ar30_p!(src3, AR30_TYPE, AR30_ORDER);
-
-                sums0 = sums0.trunc_add(&new_px0.trunc_mul(weight));
-                sums1 = sums1.trunc_add(&new_px1.trunc_mul(weight));
-                sums2 = sums2.trunc_add(&new_px2.trunc_mul(weight));
-                sums3 = sums3.trunc_add(&new_px3.trunc_mul(weight));
-            }
+            sums0 = sums0.trunc_add(&new_px0.trunc_mul(weight));
+            sums1 = sums1.trunc_add(&new_px1.trunc_mul(weight));
+            sums2 = sums2.trunc_add(&new_px2.trunc_mul(weight));
+            sums3 = sums3.trunc_add(&new_px3.trunc_mul(weight));
         }
 
         let narrowed0 = sums0.saturate_ar30();

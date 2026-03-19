@@ -33,16 +33,17 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-#[inline(always)]
 pub(crate) fn sse_column_handler_fixed_point_ar30<
     const AR30_TYPE: usize,
     const AR30_ORDER: usize,
 >(
+    _: usize,
     bounds: &FilterBounds,
     src: &[u8],
     dst: &mut [u8],
     src_stride: usize,
     weight: &[i16],
+    _: u32,
 ) {
     unsafe {
         sse_column_handler_fixed_point_ar30_impl::<AR30_TYPE, AR30_ORDER>(

@@ -31,7 +31,7 @@ use crate::math::gaussian::Exponential;
 use crate::math::kaiser::BesselI0;
 use crate::math::sinc::{Sinc, Trigonometry};
 use crate::math::{ConstPI, ConstSqrt2, Jinc};
-use crate::pic_scale_error::try_vec;
+use crate::validation::try_vec;
 use crate::{PicScaleError, ResamplingFunction};
 use num_traits::{AsPrimitive, Float, MulAdd, Signed};
 use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub};

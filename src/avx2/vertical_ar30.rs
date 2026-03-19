@@ -30,16 +30,17 @@ use crate::avx2::ar30_utils::{_mm_unzip_3_ar30, _mm_zip_4_ar30};
 use crate::filter_weights::FilterBounds;
 use std::arch::x86_64::*;
 
-#[inline(always)]
 pub(crate) fn avx_column_handler_fixed_point_ar30<
     const AR30_TYPE: usize,
     const AR30_ORDER: usize,
 >(
+    _: usize,
     bounds: &FilterBounds,
     src: &[u8],
     dst: &mut [u8],
     src_stride: usize,
     weight: &[i16],
+    _: u32,
 ) {
     unsafe {
         let unit = ExecutionUnit::<AR30_TYPE, AR30_ORDER>::default();
@@ -52,7 +53,7 @@ struct ExecutionUnit<const AR30_TYPE: usize, const AR30_ORDER: usize> {}
 
 impl<const AR30_TYPE: usize, const AR30_ORDER: usize> ExecutionUnit<AR30_TYPE, AR30_ORDER> {
     #[target_feature(enable = "avx2")]
-    unsafe fn pass(
+    fn pass(
         &self,
         bounds: &FilterBounds,
         src: &[u8],

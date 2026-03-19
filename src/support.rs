@@ -31,10 +31,10 @@ pub(crate) const PRECISION: i32 = 15;
 pub(crate) const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
 
 pub(crate) fn check_image_size_overflow(width: usize, height: usize, chan: usize) -> bool {
-    let (stride, is_overflowed) = width.overflowing_mul(chan);
+    let (stride, is_overflowed) = (width as isize).overflowing_mul(chan as isize);
     if is_overflowed {
         return true;
     }
-    let (_, is_overflowed) = height.overflowing_mul(stride);
+    let (_, is_overflowed) = (height as isize).overflowing_mul(stride);
     is_overflowed
 }

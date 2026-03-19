@@ -32,7 +32,7 @@
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::avx2::{avx_premultiply_alpha_rgba_u16, avx_unpremultiply_alpha_rgba_u16};
 use crate::mixed_storage::CpuRound;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon",))]
+#[cfg(all(target_arch = "aarch64", feature = "neon",))]
 use crate::neon::{neon_premultiply_alpha_rgba_u16, neon_unpremultiply_alpha_rgba_u16};
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::{premultiply_alpha_sse_rgba_u16, unpremultiply_alpha_sse_rgba_u16};
@@ -65,7 +65,12 @@ pub(crate) fn div_by_65535(v: u32) -> u16 {
 
 pub(crate) fn premultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], max_colors: u32) {
     if max_colors == 1023 {
-        for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+        for (dst, src) in dst
+            .as_chunks_mut::<4>()
+            .0
+            .iter_mut()
+            .zip(src.as_chunks::<4>().0.iter())
+        {
             let a = src[3] as u32;
             dst[0] = div_by_1023((src[0] as u32).wrapping_mul(a));
             dst[1] = div_by_1023((src[1] as u32).wrapping_mul(a));
@@ -73,7 +78,12 @@ pub(crate) fn premultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], max_color
             dst[3] = div_by_1023((src[3] as u32).wrapping_mul(1023));
         }
     } else if max_colors == 4096 {
-        for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+        for (dst, src) in dst
+            .as_chunks_mut::<4>()
+            .0
+            .iter_mut()
+            .zip(src.as_chunks::<4>().0.iter())
+        {
             let a = src[3] as u32;
             dst[0] = div_by_4095((src[0] as u32).wrapping_mul(a));
             dst[1] = div_by_4095((src[1] as u32).wrapping_mul(a));
@@ -81,7 +91,12 @@ pub(crate) fn premultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], max_color
             dst[3] = div_by_4095((src[3] as u32).wrapping_mul(4095));
         }
     } else if max_colors == 65535 {
-        for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+        for (dst, src) in dst
+            .as_chunks_mut::<4>()
+            .0
+            .iter_mut()
+            .zip(src.as_chunks::<4>().0.iter())
+        {
             let a = src[3] as u32;
             dst[0] = div_by_65535((src[0] as u32).wrapping_mul(a));
             dst[1] = div_by_65535((src[1] as u32).wrapping_mul(a));
@@ -90,7 +105,12 @@ pub(crate) fn premultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], max_color
         }
     } else {
         let recip_max_colors = 1. / max_colors as f32;
-        for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+        for (dst, src) in dst
+            .as_chunks_mut::<4>()
+            .0
+            .iter_mut()
+            .zip(src.as_chunks::<4>().0.iter())
+        {
             let a = src[3] as u32;
             dst[0] = (((src[0] as u32).wrapping_mul(a) as f32 * recip_max_colors).cpu_round()
                 as u32)
@@ -109,26 +129,46 @@ pub(crate) fn premultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], max_color
 
 pub(crate) fn premultiply_alpha_gray_alpha_row(dst: &mut [u16], src: &[u16], max_colors: u32) {
     if max_colors == 1023 {
-        for (dst, src) in dst.chunks_exact_mut(2).zip(src.chunks_exact(2)) {
+        for (dst, src) in dst
+            .as_chunks_mut::<2>()
+            .0
+            .iter_mut()
+            .zip(src.as_chunks::<2>().0.iter())
+        {
             let a = src[1] as u32;
             dst[0] = div_by_1023((src[0] as u32).wrapping_mul(a));
             dst[1] = div_by_1023(a.wrapping_mul(1023));
         }
     } else if max_colors == 4096 {
-        for (dst, src) in dst.chunks_exact_mut(2).zip(src.chunks_exact(2)) {
+        for (dst, src) in dst
+            .as_chunks_mut::<2>()
+            .0
+            .iter_mut()
+            .zip(src.as_chunks::<2>().0.iter())
+        {
             let a = src[1] as u32;
             dst[0] = div_by_4095((src[0] as u32).wrapping_mul(a));
             dst[1] = div_by_4095(a.wrapping_mul(4095));
         }
     } else if max_colors == 65535 {
-        for (dst, src) in dst.chunks_exact_mut(2).zip(src.chunks_exact(2)) {
+        for (dst, src) in dst
+            .as_chunks_mut::<2>()
+            .0
+            .iter_mut()
+            .zip(src.as_chunks::<2>().0.iter())
+        {
             let a = src[1] as u32;
             dst[0] = div_by_65535((src[0] as u32).wrapping_mul(a));
             dst[1] = div_by_65535(a.wrapping_mul(65535));
         }
     } else {
         let recip_max_colors = 1. / max_colors as f32;
-        for (dst, src) in dst.chunks_exact_mut(2).zip(src.chunks_exact(2)) {
+        for (dst, src) in dst
+            .as_chunks_mut::<2>()
+            .0
+            .iter_mut()
+            .zip(src.as_chunks::<2>().0.iter())
+        {
             let a = src[1] as u32;
             dst[0] = (((src[0] as u32).wrapping_mul(a) as f32 * recip_max_colors).cpu_round()
                 as u32)
@@ -140,7 +180,7 @@ pub(crate) fn premultiply_alpha_gray_alpha_row(dst: &mut [u16], src: &[u16], max
 }
 
 pub(crate) fn unpremultiply_alpha_rgba_row(in_place: &mut [u16], max_colors: u32) {
-    for dst in in_place.chunks_exact_mut(4) {
+    for dst in in_place.as_chunks_mut::<4>().0.iter_mut() {
         let a = dst[3] as u32;
         if a != 0 {
             let a_recip = max_colors as f32 / a as f32;
@@ -153,7 +193,7 @@ pub(crate) fn unpremultiply_alpha_rgba_row(in_place: &mut [u16], max_colors: u32
 }
 
 pub(crate) fn unpremultiply_alpha_gray_alpha_row(in_place: &mut [u16], max_colors: u32) {
-    for dst in in_place.chunks_exact_mut(2) {
+    for dst in in_place.as_chunks_mut::<2>().0.iter_mut() {
         let a = dst[1] as u32;
         if a != 0 {
             let a_recip = max_colors as f32 / a as f32;
@@ -264,7 +304,7 @@ pub(crate) fn premultiply_alpha_rgba_u16(
             _dispatcher = avx_premultiply_alpha_rgba_u16;
         }
     }
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     {
         _dispatcher = neon_premultiply_alpha_rgba_u16;
     }
@@ -322,7 +362,7 @@ pub(crate) fn unpremultiply_alpha_rgba_u16(
             _dispatcher = avx_unpremultiply_alpha_rgba_u16;
         }
     }
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     {
         _dispatcher = neon_unpremultiply_alpha_rgba_u16;
     }

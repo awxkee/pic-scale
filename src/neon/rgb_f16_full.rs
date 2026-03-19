@@ -132,18 +132,15 @@ unsafe fn conv_horiz_1_rgb_f16(
 }
 
 pub(crate) fn xconvolve_horizontal_rgb_neon_rows_4_f16(
-    dst_width: usize,
-    src_width: usize,
-    filter_weights: &FilterWeights<f32>,
     src: &[f16],
     src_stride: usize,
     dst: &mut [f16],
     dst_stride: usize,
+    filter_weights: &FilterWeights<f32>,
+    _: u32,
 ) {
     unsafe {
         xconvolve_horizontal_rgb_neon_rows_4_f16_impl(
-            dst_width,
-            src_width,
             filter_weights,
             src,
             src_stride,
@@ -155,8 +152,6 @@ pub(crate) fn xconvolve_horizontal_rgb_neon_rows_4_f16(
 
 #[target_feature(enable = "fp16")]
 unsafe fn xconvolve_horizontal_rgb_neon_rows_4_f16_impl(
-    dst_width: usize,
-    _: usize,
     filter_weights: &FilterWeights<f32>,
     src: &[f16],
     src_stride: usize,
@@ -168,6 +163,8 @@ unsafe fn xconvolve_horizontal_rgb_neon_rows_4_f16_impl(
         let mut filter_offset = 0usize;
 
         let weights_ptr = filter_weights.weights.as_ptr();
+
+        let dst_width = filter_weights.bounds.len();
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);
@@ -239,27 +236,18 @@ unsafe fn xconvolve_horizontal_rgb_neon_rows_4_f16_impl(
 }
 
 pub(crate) fn xconvolve_horizontal_rgb_neon_row_one_f16(
-    dst_width: usize,
-    src_width: usize,
-    filter_weights: &FilterWeights<f32>,
     src: &[f16],
     dst: &mut [f16],
+    filter_weights: &FilterWeights<f32>,
+    _: u32,
 ) {
     unsafe {
-        xconvolve_horizontal_rgb_neon_row_one_f16_impl(
-            dst_width,
-            src_width,
-            filter_weights,
-            src,
-            dst,
-        );
+        xconvolve_horizontal_rgb_neon_row_one_f16_impl(filter_weights, src, dst);
     }
 }
 
 #[target_feature(enable = "fp16")]
 unsafe fn xconvolve_horizontal_rgb_neon_row_one_f16_impl(
-    dst_width: usize,
-    _: usize,
     filter_weights: &FilterWeights<f32>,
     src: &[f16],
     dst: &mut [f16],
@@ -268,6 +256,8 @@ unsafe fn xconvolve_horizontal_rgb_neon_row_one_f16_impl(
         const CN: usize = 3;
         let weights_ptr = filter_weights.weights.as_ptr();
         let mut filter_offset = 0usize;
+
+        let dst_width = filter_weights.bounds.len();
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);

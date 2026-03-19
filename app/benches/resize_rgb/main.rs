@@ -1,11 +1,11 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use fast_image_resize::images::Image;
 use fast_image_resize::FilterType::Lanczos3;
-use fast_image_resize::{CpuExtensions, PixelType, ResizeAlg, ResizeOptions, Resizer};
+use fast_image_resize::{PixelType, ResizeAlg, ResizeOptions, Resizer};
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
-    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, Scaling, ScalingF32, ScalingU16,
-    ThreadingPolicy, WorkloadStrategy,
+    ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy,
+    WorkloadStrategy,
 };
 
 pub fn criterion_benchmark(c: &mut Criterion) {
@@ -22,13 +22,21 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         let store =
             ImageStore::<u8, 3>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
                 .unwrap();
+        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+        scaler.set_threading_policy(ThreadingPolicy::Single);
+        scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
+        let resampler = scaler
+            .plan_rgb_resampling(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+            )
+            .unwrap();
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
         b.iter(|| {
-            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Single);
-            scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
-            scaler.resize_rgb(&store, &mut target).unwrap();
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
         })
     });
 
@@ -37,13 +45,21 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         let store =
             ImageStore::<u8, 3>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
                 .unwrap();
+        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+        scaler.set_threading_policy(ThreadingPolicy::Single);
+        scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
+        let resampler = scaler
+            .plan_rgb_resampling(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+            )
+            .unwrap();
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
         b.iter(|| {
-            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Single);
-            scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
-            scaler.resize_rgb(&store, &mut target).unwrap();
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
         })
     });
 
@@ -53,16 +69,18 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
         let src_image =
             Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
-        b.iter(|| {
-            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
+        let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
 
+        b.iter(|| {
             let mut resizer = Resizer::new();
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            #[cfg(all(target_arch = "aarch64"))]
             unsafe {
+                use fast_image_resize::CpuExtensions;
                 resizer.set_cpu_extensions(CpuExtensions::Neon);
             }
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             unsafe {
+                use fast_image_resize::CpuExtensions;
                 resizer.set_cpu_extensions(CpuExtensions::Avx2);
             }
             resizer
@@ -84,21 +102,31 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 .map(|&x| u16::from_ne_bytes([x, x]))
                 .collect::<Vec<_>>(),
         );
-        b.iter(|| {
-            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Single);
-            let store = ImageStore::<u16, 3>::from_slice(
-                &mut copied,
-                dimensions.0 as usize,
-                dimensions.1 as usize,
+        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let store = ImageStore::<u16, 3>::from_slice(
+            &mut copied,
+            dimensions.0 as usize,
+            dimensions.1 as usize,
+        )
+        .unwrap();
+        let resampler = scaler
+            .plan_rgb_resampling16(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+                16,
             )
             .unwrap();
-            let mut target = ImageStoreMut::alloc_with_depth(
-                dimensions.0 as usize / 4,
-                dimensions.1 as usize / 4,
-                16,
-            );
-            _ = scaler.resize_rgb_u16(&store, &mut target);
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc_with_depth(
+            dimensions.0 as usize / 4,
+            dimensions.1 as usize / 4,
+            16,
+        );
+        b.iter(|| {
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
         })
     });
 
@@ -109,21 +137,31 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 .map(|&x| ((x as u16) << 2) | ((x as u16) >> 6))
                 .collect::<Vec<_>>(),
         );
-        b.iter(|| {
-            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Single);
-            let store = ImageStore::<u16, 3>::from_slice(
-                &mut copied,
-                dimensions.0 as usize,
-                dimensions.1 as usize,
+        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let store = ImageStore::<u16, 3>::from_slice(
+            &mut copied,
+            dimensions.0 as usize,
+            dimensions.1 as usize,
+        )
+        .unwrap();
+        let resampler = scaler
+            .plan_rgb_resampling16(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+                10,
             )
             .unwrap();
-            let mut target = ImageStoreMut::alloc_with_depth(
-                dimensions.0 as usize / 4,
-                dimensions.1 as usize / 4,
-                10,
-            );
-            _ = scaler.resize_rgb_u16(&store, &mut target);
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc_with_depth(
+            dimensions.0 as usize / 4,
+            dimensions.1 as usize / 4,
+            10,
+        );
+        b.iter(|| {
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
         })
     });
 
@@ -139,16 +177,18 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
         let src_image =
             Image::from_slice_u8(dimensions.0, dimensions.1, &mut copied, pixel_type).unwrap();
-        b.iter(|| {
-            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
+        let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
 
+        b.iter(|| {
             let mut resizer = Resizer::new();
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            #[cfg(all(target_arch = "aarch64"))]
             unsafe {
+                use fast_image_resize::CpuExtensions;
                 resizer.set_cpu_extensions(CpuExtensions::Neon);
             }
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             unsafe {
+                use fast_image_resize::CpuExtensions;
                 resizer.set_cpu_extensions(CpuExtensions::Avx2);
             }
             resizer
@@ -173,13 +213,21 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             dimensions.1 as usize,
         )
         .unwrap();
+        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+        scaler.set_threading_policy(ThreadingPolicy::Single);
+        scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
+        let resampler = scaler
+            .plan_rgb_resampling_f32(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+            )
+            .unwrap();
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
         b.iter(|| {
-            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Single);
-            scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
-            scaler.resize_rgb_f32(&store, &mut target).unwrap();
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
         })
     });
 
@@ -191,13 +239,21 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             dimensions.1 as usize,
         )
         .unwrap();
+        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+        scaler.set_threading_policy(ThreadingPolicy::Single);
+        scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
+        let resampler = scaler
+            .plan_rgb_resampling_f32(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+            )
+            .unwrap();
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
         b.iter(|| {
-            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-            scaler.set_threading_policy(ThreadingPolicy::Single);
-            scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
-            let mut target =
-                ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
-            scaler.resize_rgb_f32(&store, &mut target).unwrap();
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
         })
     });
 
@@ -211,16 +267,17 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
         let src_image =
             Image::from_slice_u8(dimensions.0, dimensions.1, &mut vc, pixel_type).unwrap();
+        let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
         b.iter(|| {
-            let mut dst_image = Image::new(dimensions.0 / 4, dimensions.1 / 4, pixel_type);
-
             let mut resizer = Resizer::new();
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            #[cfg(all(target_arch = "aarch64"))]
             unsafe {
+                use fast_image_resize::CpuExtensions;
                 resizer.set_cpu_extensions(CpuExtensions::Neon);
             }
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             unsafe {
+                use fast_image_resize::CpuExtensions;
                 resizer.set_cpu_extensions(CpuExtensions::Avx2);
             }
             resizer

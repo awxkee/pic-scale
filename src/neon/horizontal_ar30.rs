@@ -33,8 +33,8 @@ use crate::neon::ar30::{
 use crate::neon::utils::xvld1q_u32_x2;
 use std::arch::aarch64::*;
 
-#[inline]
-unsafe fn conv_horiz_rgba_1_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
+#[inline(always)]
+fn conv_horiz_rgba_1_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
     start_x: usize,
     src: &[u8],
     w0: int16x4_t,
@@ -48,7 +48,7 @@ unsafe fn conv_horiz_rgba_1_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
 }
 
 #[inline(always)]
-unsafe fn conv_horiz_rgba_8_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
+fn conv_horiz_rgba_8_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
     start_x: usize,
     src: &[u8],
     w: int16x8_t,
@@ -72,8 +72,8 @@ unsafe fn conv_horiz_rgba_8_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
     }
 }
 
-#[inline]
-unsafe fn conv_horiz_rgba_4_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
+#[inline(always)]
+fn conv_horiz_rgba_4_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
     start_x: usize,
     src: &[u8],
     w: int16x4_t,
@@ -101,18 +101,17 @@ pub(crate) fn neon_convolve_horizontal_rgba_rows_4_ar30<
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
-    unsafe {
-        let unit = Row4ExecutionUnit::<AR_TYPE, AR_ORDER>::default();
-        unit.pass(src, src_stride, dst, dst_stride, filter_weights);
-    }
+    let unit = Row4ExecutionUnit::<AR_TYPE, AR_ORDER>::default();
+    unit.pass(src, src_stride, dst, dst_stride, filter_weights);
 }
 
 #[derive(Copy, Clone, Default)]
 struct Row4ExecutionUnit<const AR_TYPE: usize, const AR_ORDER: usize> {}
 
 impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_ORDER> {
-    unsafe fn pass(
+    fn pass(
         &self,
         src: &[u8],
         src_stride: usize,
@@ -162,7 +161,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
                 let src2 = src1.get_unchecked(src_stride..);
                 let src3 = src2.get_unchecked(src_stride..);
 
-                while jx + 8 < bounds_size {
+                while jx + 8 <= bounds_size {
                     let bounds_start = bounds.start + jx;
                     let w_ptr = weights.get_unchecked(jx..);
                     let weights_set = vld1q_s16(w_ptr.as_ptr());
@@ -193,7 +192,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
                     jx += 8;
                 }
 
-                while jx + 4 < bounds_size {
+                while jx + 4 <= bounds_size {
                     let bounds_start = bounds.start + jx;
                     let w_ptr = weights.get_unchecked(jx..);
                     let weights = vld1_s16(w_ptr.as_ptr());
@@ -285,18 +284,17 @@ pub(crate) fn neon_convolve_horizontal_rgba_rows_ar30<
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
+    _: u32,
 ) {
-    unsafe {
-        let unit = Row1ExecutionUnit::<AR_TYPE, AR_ORDER>::default();
-        unit.pass(src, dst, filter_weights);
-    }
+    let unit = Row1ExecutionUnit::<AR_TYPE, AR_ORDER>::default();
+    unit.pass(src, dst, filter_weights);
 }
 
 #[derive(Copy, Clone, Default)]
 struct Row1ExecutionUnit<const AR_TYPE: usize, const AR_ORDER: usize> {}
 
 impl<const AR_TYPE: usize, const AR_ORDER: usize> Row1ExecutionUnit<AR_TYPE, AR_ORDER> {
-    unsafe fn pass(&self, src: &[u8], dst: &mut [u8], filter_weights: &FilterWeights<i16>) {
+    fn pass(&self, src: &[u8], dst: &mut [u8], filter_weights: &FilterWeights<i16>) {
         unsafe {
             const PRECISION: i32 = 16;
             const ROUNDING: i32 = 1 << (PRECISION - 1);
@@ -322,7 +320,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row1ExecutionUnit<AR_TYPE, AR_
 
                 let src0 = src;
 
-                while jx + 8 < bounds_size {
+                while jx + 8 <= bounds_size {
                     let bounds_start = bounds.start + jx;
                     let w_ptr = weights.get_unchecked(jx..);
                     let weights_set = vld1q_s16(w_ptr.as_ptr());
@@ -335,7 +333,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row1ExecutionUnit<AR_TYPE, AR_
                     jx += 8;
                 }
 
-                while jx + 4 < bounds_size {
+                while jx + 4 <= bounds_size {
                     let bounds_start = bounds.start + jx;
                     let w_ptr = weights.get_unchecked(jx..);
                     let weights = vld1_s16(w_ptr.as_ptr());
