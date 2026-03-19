@@ -65,6 +65,7 @@ macro_rules! m256dot {
 }
 
 #[target_feature(enable = "avx2")]
+#[inline(never)]
 fn process_chunk_96(
     chunks: &mut [[u8; 96]],
     bounds: &FilterBounds,
@@ -139,6 +140,7 @@ fn process_chunk_96(
 }
 
 #[target_feature(enable = "avx2")]
+#[inline(never)]
 fn process_chunk_64(
     chunks: &mut [[u8; 64]],
     bounds: &FilterBounds,
@@ -200,6 +202,7 @@ fn process_chunk_64(
 }
 
 #[target_feature(enable = "avx2")]
+#[inline(never)]
 fn process_chunk_32(
     chunks: &mut [[u8; 32]],
     bounds: &FilterBounds,
@@ -247,6 +250,7 @@ fn process_chunk_32(
 }
 
 #[target_feature(enable = "avx2")]
+#[inline(never)]
 fn process_chunk_16(
     chunks: &mut [[u8; 16]],
     bounds: &FilterBounds,
@@ -294,6 +298,53 @@ fn process_chunk_16(
         }
 
         cx += 16;
+    }
+    cx
+}
+
+#[target_feature(enable = "avx2")]
+#[inline(never)]
+fn process_chunk_8(
+    chunks: &mut [[u8; 8]],
+    bounds: &FilterBounds,
+    src: &[u8],
+    src_stride: usize,
+    weights: &[i16],
+    cx: usize,
+) -> usize {
+    const SCALE: i32 = 6;
+    const R_SHR_SCALE: i32 = SCALE;
+    const ROUNDING: i16 = 1 << (R_SHR_SCALE - 1);
+
+    let mut cx = cx;
+
+    let bounds_size = bounds.size;
+
+    for dst in chunks {
+        let mut store = _mm_set1_epi16(ROUNDING);
+
+        let px = cx;
+
+        for j in 0..bounds_size {
+            let py = bounds.start + j;
+            let weight = unsafe { weights.get_unchecked(j) };
+            let v_weight = _mm_set1_epi16(*weight);
+            let v_offset = src_stride * py + px;
+            let src_ptr = unsafe { src.get_unchecked(v_offset..) };
+            let mut item_row = unsafe { _mm_loadu_si64(src_ptr.as_ptr()) };
+            item_row = _mm_unpacklo_epi8(item_row, item_row);
+
+            let low = _mm_srli_epi16::<2>(item_row);
+            store = _mm_add_epi16(store, _mm_mulhrs_epi16(low, v_weight));
+        }
+
+        let rebased = _mm_srai_epi16::<R_SHR_SCALE>(store);
+        let shrank = _mm_packus_epi16(rebased, rebased);
+        unsafe {
+            _mm_storeu_si64(dst.as_mut_ptr(), shrank);
+        }
+
+        cx += 8;
     }
     cx
 }
@@ -363,34 +414,16 @@ fn convolve_vertical_avx2_row_impl(
         );
 
         rem = rem.as_chunks_mut::<16>().1;
-        let iter_8 = rem.chunks_exact_mut(8);
+        cx = process_chunk_8(
+            rem.as_chunks_mut::<8>().0,
+            bounds,
+            src,
+            src_stride,
+            weights,
+            cx,
+        );
 
-        for dst in iter_8 {
-            let mut store = _mm_set1_epi16(ROUNDING);
-
-            let px = cx;
-
-            for j in 0..bounds_size {
-                let py = bounds.start + j;
-                let weight = weights.get_unchecked(j);
-                let v_weight = _mm_set1_epi16(*weight);
-                let v_offset = src_stride * py + px;
-                let src_ptr = src.get_unchecked(v_offset..);
-                let mut item_row = _mm_loadu_si64(src_ptr.as_ptr());
-                item_row = _mm_unpacklo_epi8(item_row, item_row);
-
-                let low = _mm_srli_epi16::<2>(item_row);
-                store = _mm_add_epi16(store, _mm_mulhrs_epi16(low, v_weight));
-            }
-
-            let rebased = _mm_srai_epi16::<R_SHR_SCALE>(store);
-            let shrank = _mm_packus_epi16(rebased, rebased);
-            _mm_storeu_si64(dst.as_mut_ptr(), shrank);
-
-            cx += 8;
-        }
-
-        rem = rem.chunks_exact_mut(8).into_remainder();
+        rem = rem.as_chunks_mut::<8>().1;
         let iter_1 = rem.iter_mut();
 
         for dst in iter_1 {
