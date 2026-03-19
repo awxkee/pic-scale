@@ -134,7 +134,7 @@ pub use image_store::{
     RgbF16ImageStore, RgbF16ImageStoreMut, RgbaF16ImageStore, RgbaF16ImageStoreMut,
 };
 pub(crate) use math::*;
-pub use plan::ResamplingPlan;
+pub use plan::{Resampling, ResamplingPlan};
 pub use sampler::*;
 pub use scaler::{ImageStoreScaling, Scaler, ScalingOptions, WorkloadStrategy};
 pub use threading_policy::ThreadingPolicy;

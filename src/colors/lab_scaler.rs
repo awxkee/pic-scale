@@ -27,11 +27,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::colors::common_splitter::{SplitPlanInterceptor, Splitter};
+use crate::plan::Resampling;
 use crate::validation::PicScaleError;
-use crate::{
-    ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, ResamplingPlan, Scaler,
-    ThreadingPolicy,
-};
+use crate::{ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy};
 use colorutils_rs::{
     SRGB_TO_XYZ_D65, TransferFunction, XYZ_TO_SRGB_D65, lab_to_srgb, lab_with_alpha_to_rgba,
     rgb_to_lab, rgba_to_lab_with_alpha,
@@ -125,7 +123,7 @@ impl LabScaler {
         &self,
         source_size: ImageSize,
         target_size: ImageSize,
-    ) -> Result<Arc<dyn ResamplingPlan<u8, 3> + Send + Sync>, PicScaleError> {
+    ) -> Result<Arc<Resampling<u8, 3>>, PicScaleError> {
         let intercept = self
             .scaler
             .plan_rgb_resampling_f32(source_size, target_size)?;
@@ -142,7 +140,7 @@ impl LabScaler {
         source_size: ImageSize,
         target_size: ImageSize,
         premultiply_alpha: bool,
-    ) -> Result<Arc<dyn ResamplingPlan<u8, 4> + Send + Sync>, PicScaleError> {
+    ) -> Result<Arc<Resampling<u8, 4>>, PicScaleError> {
         let intercept =
             self.scaler
                 .plan_rgba_resampling_f32(source_size, target_size, premultiply_alpha)?;

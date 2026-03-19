@@ -104,11 +104,11 @@ fn resize_cbcr_f32(
         .set_threading_policy(threading_policy);
     let planner = if mul_alpha {
         scaler
-            .plan_gray_alpha_resampling_f32(store.get_size(), target.get_size(), true)
+            .plan_gray_alpha_resampling_f32(store.size(), target.get_size(), true)
             .unwrap()
     } else {
         scaler
-            .plan_cbcr_resampling_f32(store.get_size(), target.get_size())
+            .plan_cbcr_resampling_f32(store.size(), target.get_size())
             .unwrap()
     };
     planner.resample(&store, &mut target).unwrap();

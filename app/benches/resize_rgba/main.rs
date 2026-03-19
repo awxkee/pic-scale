@@ -27,7 +27,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             .set_workload_strategy(WorkloadStrategy::PreferQuality);
         let resampler = scaler
             .plan_rgba_resampling(
-                store.get_size(),
+                store.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
                 true,
             )
@@ -52,7 +52,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             .set_workload_strategy(WorkloadStrategy::PreferSpeed);
         let resampler = scaler
             .plan_rgba_resampling(
-                store.get_size(),
+                store.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
                 false,
             )
@@ -77,7 +77,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             .set_workload_strategy(WorkloadStrategy::PreferQuality);
         let resampler = scaler
             .plan_rgba_resampling(
-                store.get_size(),
+                store.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
                 true,
             )
@@ -102,7 +102,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             .set_workload_strategy(WorkloadStrategy::PreferSpeed);
         let resampler = scaler
             .plan_rgba_resampling(
-                store.get_size(),
+                store.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
                 true,
             )
@@ -184,7 +184,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
         let resampler = scaler
             .plan_rgba_resampling(
-                store.get_size(),
+                store.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
                 false,
             )
@@ -209,7 +209,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             .set_workload_strategy(WorkloadStrategy::PreferQuality);
         let resampler = scaler
             .plan_rgba_resampling(
-                store.get_size(),
+                store.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
                 false,
             )
@@ -303,7 +303,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 .unwrap();
         let resampler = scaler
             .plan_rgba_resampling_f32(
-                store.get_size(),
+                store.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
                 true,
             )
@@ -328,7 +328,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 .unwrap();
         let resampler = scaler
             .plan_rgba_resampling_f32(
-                store.get_size(),
+                store.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
                 true,
             )
@@ -393,7 +393,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         .unwrap();
         let resampler = scaler
             .plan_rgba_resampling16(
-                store.get_size(),
+                store.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
                 true,
                 10,
@@ -464,7 +464,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         .unwrap();
         let resampler = scaler
             .plan_rgba_resampling16(
-                store.get_size(),
+                store.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
                 true,
                 16,
@@ -500,7 +500,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
         let resampler = scaler
             .plan_rgba_resampling16(
-                store.get_size(),
+                store.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
                 false,
                 10,
@@ -612,7 +612,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 .unwrap();
         let resampler = scaler
             .plan_rgba_resampling_f16(
-                store.get_size(),
+                store.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
                 true,
             )
@@ -681,7 +681,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             .set_workload_strategy(WorkloadStrategy::PreferSpeed);
         let resampler = scaler
             .plan_ar30_resampling(
-                src_image.get_size(),
+                src_image.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
                 Ar30ByteOrder::Network,
             )
@@ -709,7 +709,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
         let resampler = scaler
             .plan_ar30_resampling(
-                src_image.get_size(),
+                src_image.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
                 Ar30ByteOrder::Network,
             )

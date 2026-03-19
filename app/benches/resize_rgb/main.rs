@@ -27,7 +27,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
         let resampler = scaler
             .plan_rgb_resampling(
-                store.get_size(),
+                store.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
             )
             .unwrap();
@@ -51,7 +51,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
         let resampler = scaler
             .plan_rgb_resampling(
-                store.get_size(),
+                store.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
             )
             .unwrap();
@@ -114,7 +114,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         .unwrap();
         let resampler = scaler
             .plan_rgb_resampling16(
-                store.get_size(),
+                store.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
                 16,
             )
@@ -149,7 +149,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         .unwrap();
         let resampler = scaler
             .plan_rgb_resampling16(
-                store.get_size(),
+                store.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
                 10,
             )
@@ -220,7 +220,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
         let resampler = scaler
             .plan_rgb_resampling_f32(
-                store.get_size(),
+                store.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
             )
             .unwrap();
@@ -247,7 +247,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
         let resampler = scaler
             .plan_rgb_resampling_f32(
-                store.get_size(),
+                store.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
             )
             .unwrap();

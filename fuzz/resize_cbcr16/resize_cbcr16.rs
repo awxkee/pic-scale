@@ -107,11 +107,11 @@ fn resize_cbcr16(
         .set_threading_policy(threading_policy);
     let planner = if mul_alpha {
         scaler
-            .plan_gray_alpha_resampling16(store.get_size(), target.get_size(), true, 10)
+            .plan_gray_alpha_resampling16(store.size(), target.get_size(), true, 10)
             .unwrap()
     } else {
         scaler
-            .plan_cbcr_resampling16(store.get_size(), target.get_size(), 10)
+            .plan_cbcr_resampling16(store.size(), target.get_size(), 10)
             .unwrap()
     };
     planner.resample(&store, &mut target).unwrap();
@@ -120,11 +120,11 @@ fn resize_cbcr16(
     let mut target16 = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
     let planner = if mul_alpha {
         scaler
-            .plan_gray_alpha_resampling16(store.get_size(), target.get_size(), true, 16)
+            .plan_gray_alpha_resampling16(store.size(), target.get_size(), true, 16)
             .unwrap()
     } else {
         scaler
-            .plan_cbcr_resampling16(store.get_size(), target.get_size(), 16)
+            .plan_cbcr_resampling16(store.size(), target.get_size(), 16)
             .unwrap()
     };
     planner.resample(&store, &mut target16).unwrap();

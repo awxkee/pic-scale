@@ -576,7 +576,7 @@ macro_rules! def_image_scaling_alpha {
                 let scaler = Scaler::new(options.resampling_function)
                     .set_threading_policy(options.threading_policy);
                 let plan = scaler.plan_generic_resize_with_alpha::<$fx_type, f32, $cn>(
-                    self.get_size(),
+                    self.size(),
                     store.size(),
                     store.bit_depth,
                     options.premultiply_alpha,
@@ -598,7 +598,7 @@ macro_rules! def_image_scaling {
                 let scaler = Scaler::new(options.resampling_function)
                     .set_threading_policy(options.threading_policy);
                 let plan = scaler.plan_generic_resize::<$fx_type, f32, $cn>(
-                    self.get_size(),
+                    self.size(),
                     store.size(),
                     store.bit_depth,
                 )?;
@@ -706,7 +706,7 @@ mod tests {
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
         let planned = scaler
-            .plan_rgba_resampling(src_store.get_size(), target_store.size(), false)
+            .plan_rgba_resampling(src_store.size(), target_store.size(), false)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -731,7 +731,7 @@ mod tests {
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width / 2, image_height / 2);
         let planned = scaler
-            .plan_rgba_resampling(src_store.get_size(), target_store.size(), false)
+            .plan_rgba_resampling(src_store.size(), target_store.size(), false)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -756,7 +756,7 @@ mod tests {
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width / 2, image_height / 2);
         let planned = scaler
-            .plan_rgba_resampling(src_store.get_size(), target_store.size(), true)
+            .plan_rgba_resampling(src_store.size(), target_store.size(), true)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -779,7 +779,7 @@ mod tests {
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
         let planned = scaler
-            .plan_rgb_resampling(src_store.get_size(), target_store.size())
+            .plan_rgb_resampling(src_store.size(), target_store.size())
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -803,7 +803,7 @@ mod tests {
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
         let planned = scaler
-            .plan_rgb_resampling(src_store.get_size(), target_store.size())
+            .plan_rgb_resampling(src_store.size(), target_store.size())
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -830,7 +830,7 @@ mod tests {
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 10);
         let planned = scaler
-            .plan_rgba_resampling16(src_store.get_size(), target_store.size(), true, 10)
+            .plan_rgba_resampling16(src_store.size(), target_store.size(), true, 10)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -855,7 +855,7 @@ mod tests {
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 10);
         let planned = scaler
-            .plan_rgb_resampling16(src_store.get_size(), target_store.size(), 10)
+            .plan_rgb_resampling16(src_store.size(), target_store.size(), 10)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -880,7 +880,7 @@ mod tests {
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 10);
         let planned = scaler
-            .plan_rgb_resampling16(src_store.get_size(), target_store.size(), 10)
+            .plan_rgb_resampling16(src_store.size(), target_store.size(), 10)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -905,7 +905,7 @@ mod tests {
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 16);
         let planned = scaler
-            .plan_rgb_resampling16(src_store.get_size(), target_store.size(), 16)
+            .plan_rgb_resampling16(src_store.size(), target_store.size(), 16)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -931,7 +931,7 @@ mod tests {
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 16);
         let planned = scaler
-            .plan_rgba_resampling16(src_store.get_size(), target_store.size(), false, 16)
+            .plan_rgba_resampling16(src_store.size(), target_store.size(), false, 16)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -957,7 +957,7 @@ mod tests {
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 16);
         let planned = scaler
-            .plan_rgba_resampling16(src_store.get_size(), target_store.size(), false, 16)
+            .plan_rgba_resampling16(src_store.size(), target_store.size(), false, 16)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -982,7 +982,7 @@ mod tests {
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
         let planned = scaler
-            .plan_rgba_resampling(src_store.get_size(), target_store.size(), false)
+            .plan_rgba_resampling(src_store.size(), target_store.size(), false)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();
@@ -1007,7 +1007,7 @@ mod tests {
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
         let planned = scaler
-            .plan_rgba_resampling(src_store.get_size(), target_store.size(), false)
+            .plan_rgba_resampling(src_store.size(), target_store.size(), false)
             .unwrap();
         planned.resample(&src_store, &mut target_store).unwrap();
         let target_data = target_store.buffer.borrow();

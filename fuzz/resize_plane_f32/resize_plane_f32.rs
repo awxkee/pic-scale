@@ -98,7 +98,7 @@ fn resize_plane(
         })
         .set_threading_policy(threading_policy);
     let planned = scaler
-        .plan_planar_resampling_f32(store.get_size(), target.get_size())
+        .plan_planar_resampling_f32(store.size(), target.get_size())
         .unwrap();
     planned.resample(&store, &mut target).unwrap();
 }

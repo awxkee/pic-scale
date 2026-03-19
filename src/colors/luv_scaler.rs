@@ -33,11 +33,9 @@ use colorutils_rs::{
 use std::sync::Arc;
 
 use crate::colors::common_splitter::{SplitPlanInterceptor, Splitter};
+use crate::plan::Resampling;
 use crate::validation::PicScaleError;
-use crate::{
-    ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, ResamplingPlan, Scaler,
-    ThreadingPolicy,
-};
+use crate::{ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy};
 
 #[derive(Debug, Copy, Clone)]
 /// Converts image to *CIE LUV* components scales it and convert back
@@ -129,7 +127,7 @@ impl LuvScaler {
         &self,
         source_size: ImageSize,
         target_size: ImageSize,
-    ) -> Result<Arc<dyn ResamplingPlan<u8, 3> + Send + Sync>, PicScaleError> {
+    ) -> Result<Arc<Resampling<u8, 3>>, PicScaleError> {
         let intercept = self
             .scaler
             .plan_rgb_resampling_f32(source_size, target_size)?;
@@ -146,7 +144,7 @@ impl LuvScaler {
         source_size: ImageSize,
         target_size: ImageSize,
         premultiply_alpha: bool,
-    ) -> Result<Arc<dyn ResamplingPlan<u8, 4> + Send + Sync>, PicScaleError> {
+    ) -> Result<Arc<Resampling<u8, 4>>, PicScaleError> {
         let intercept =
             self.scaler
                 .plan_rgba_resampling_f32(source_size, target_size, premultiply_alpha)?;

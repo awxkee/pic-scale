@@ -170,13 +170,13 @@ macro_rules! validate_sizes {
         if $store.width != $src_size.width && $store.height != $src_size.height {
             return Err(PicScaleError::InvalidSourceSize {
                 expected: $src_size,
-                size: $store.get_size(),
+                size: $store.size(),
             });
         }
         if $into.width != $dst_size.width && $into.height != $dst_size.height {
             return Err(PicScaleError::InvalidDestinationSize {
                 expected: $src_size,
-                size: $store.get_size(),
+                size: $store.size(),
             });
         }
         if $store.width == $into.width && $store.height == $into.height {

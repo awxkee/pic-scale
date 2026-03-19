@@ -106,7 +106,7 @@ fn resize_rgba(
     scaler.set_workload_strategy(workload_strategy);
     scaler.set_threading_policy(threading_policy);
     let planned = scaler
-        .plan_rgba_resampling16(store.get_size(), target.get_size(), premultiply_alpha, 10)
+        .plan_rgba_resampling16(store.size(), target.get_size(), premultiply_alpha, 10)
         .unwrap();
     planned.resample(&store, &mut target).unwrap();
 
@@ -114,14 +114,14 @@ fn resize_rgba(
 
     let store = ImageStore::<u16, 4>::borrow(&src_data, src_width, src_height).unwrap();
     let planned = scaler
-        .plan_rgba_resampling16(store.get_size(), target.get_size(), premultiply_alpha, 16)
+        .plan_rgba_resampling16(store.size(), target.get_size(), premultiply_alpha, 16)
         .unwrap();
     planned.resample(&store, &mut target).unwrap();
     let src_data2 = vec![data.min(255) as u8; src_width * src_height * 4];
     let store_ar30 = ImageStore::<u8, 4>::borrow(&src_data2, src_width, src_height).unwrap();
     let mut target_ar30 = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 10);
     let planned = scaler
-        .plan_ar30_resampling(store.get_size(), target.get_size(), Ar30ByteOrder::Host)
+        .plan_ar30_resampling(store.size(), target.get_size(), Ar30ByteOrder::Host)
         .unwrap();
     planned.resample(&store_ar30, &mut target_ar30).unwrap();
 }

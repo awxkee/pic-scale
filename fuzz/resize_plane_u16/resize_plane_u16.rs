@@ -99,13 +99,13 @@ fn resize_rgb(
         });
 
     let planned = scaler
-        .plan_planar_resampling16(store.get_size(), target.get_size(), 10)
+        .plan_planar_resampling16(store.size(), target.get_size(), 10)
         .unwrap();
     planned.resample(&store, &mut target).unwrap();
     let store = ImageStore::<u16, 1>::borrow(&src_slice, src_width, src_height).unwrap();
     let mut target16 = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
     let planned = scaler
-        .plan_planar_resampling16(store.get_size(), target.get_size(), 16)
+        .plan_planar_resampling16(store.size(), target.get_size(), 16)
         .unwrap();
     planned.resample(&store, &mut target16).unwrap();
 }

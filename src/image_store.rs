@@ -430,7 +430,7 @@ where
     T: Clone + Copy + Debug,
 {
     /// Returns bounded image size
-    pub fn get_size(&self) -> ImageSize {
+    pub fn size(&self) -> ImageSize {
         ImageSize::new(self.width, self.height)
     }
 
