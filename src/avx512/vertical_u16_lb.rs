@@ -34,7 +34,6 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-#[inline(always)]
 /// This is fixed point path for bit-depth's lower or equal to 12
 pub(crate) fn convolve_column_lb_avx512_u16(
     _: usize,
