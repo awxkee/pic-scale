@@ -170,7 +170,7 @@ fn conv_vertical_part_neon_48_f32(
 }
 
 #[inline(always)]
-unsafe fn convolve_vertical_part_neon_8_f32(
+fn convolve_vertical_part_neon_8_f32(
     start_y: usize,
     start_x: usize,
     src: &[f32],
@@ -204,7 +204,7 @@ unsafe fn convolve_vertical_part_neon_8_f32(
 }
 
 #[inline(always)]
-unsafe fn convolve_vertical_part_neon_4_f32(
+fn convolve_vertical_part_neon_4_f32(
     start_y: usize,
     start_x: usize,
     src: &[f32],
@@ -235,7 +235,7 @@ unsafe fn convolve_vertical_part_neon_4_f32(
 }
 
 #[inline(always)]
-unsafe fn convolve_vertical_part_neon_1_f32(
+fn convolve_vertical_part_neon_1_f32(
     start_y: usize,
     start_x: usize,
     src: &[f32],
