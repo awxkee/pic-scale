@@ -274,66 +274,60 @@ pub(crate) fn convolve_horizontal_rgba_sse_rows_4_f16<const F16C: bool, const FM
 
 #[inline]
 #[target_feature(enable = "sse4.1,f16c,fma")]
-unsafe fn convolve_horizontal_rgba_sse_rows_4_f16c_fma(
+fn convolve_horizontal_rgba_sse_rows_4_f16c_fma(
     filter_weights: &FilterWeights<f32>,
     src: &[f16],
     src_stride: usize,
     dst: &mut [f16],
     dst_stride: usize,
 ) {
-    unsafe {
-        convolve_horizontal_rgba_sse_rows_4_f16_impl::<true, true>(
-            filter_weights,
-            src,
-            src_stride,
-            dst,
-            dst_stride,
-        );
-    }
+    convolve_horizontal_rgba_sse_rows_4_f16_impl::<true, true>(
+        filter_weights,
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+    );
 }
 
 #[inline]
 #[target_feature(enable = "sse4.1,f16c")]
-unsafe fn convolve_horizontal_rgba_sse_rows_4_f16c(
+fn convolve_horizontal_rgba_sse_rows_4_f16c(
     filter_weights: &FilterWeights<f32>,
     src: &[f16],
     src_stride: usize,
     dst: &mut [f16],
     dst_stride: usize,
 ) {
-    unsafe {
-        convolve_horizontal_rgba_sse_rows_4_f16_impl::<true, false>(
-            filter_weights,
-            src,
-            src_stride,
-            dst,
-            dst_stride,
-        );
-    }
+    convolve_horizontal_rgba_sse_rows_4_f16_impl::<true, false>(
+        filter_weights,
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+    );
 }
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
-unsafe fn convolve_horizontal_rgba_sse_rows_4_f16_regular(
+fn convolve_horizontal_rgba_sse_rows_4_f16_regular(
     filter_weights: &FilterWeights<f32>,
     src: &[f16],
     src_stride: usize,
     dst: &mut [f16],
     dst_stride: usize,
 ) {
-    unsafe {
-        convolve_horizontal_rgba_sse_rows_4_f16_impl::<false, false>(
-            filter_weights,
-            src,
-            src_stride,
-            dst,
-            dst_stride,
-        );
-    }
+    convolve_horizontal_rgba_sse_rows_4_f16_impl::<false, false>(
+        filter_weights,
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+    );
 }
 
 #[inline]
-unsafe fn convolve_horizontal_rgba_sse_rows_4_f16_impl<const F16C: bool, const FMA: bool>(
+fn convolve_horizontal_rgba_sse_rows_4_f16_impl<const F16C: bool, const FMA: bool>(
     filter_weights: &FilterWeights<f32>,
     src: &[f16],
     src_stride: usize,
