@@ -175,7 +175,7 @@ fn convolve_16_items(
             );
         }
 
-        let base_y = weights.len() * 4 + bounds.start;
+        let base_y = weights.as_chunks::<4>().0.len() * 4 + bounds.start;
         let weights = weights.as_chunks::<4>().1;
 
         for (j, &k_weight) in weights.iter().enumerate() {

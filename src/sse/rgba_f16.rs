@@ -171,11 +171,11 @@ fn convolve_horizontal_rgba_sse_row_one_f16_impl<const F16C: bool, const FMA: bo
     for x in 0..dst_width {
         let bounds = unsafe { filter_weights.bounds.get_unchecked(x) };
         let mut jx = 0usize;
-        let mut store = unsafe { _mm_setzero_ps() };
+        let mut store = _mm_setzero_ps();
 
         while jx + 4 <= bounds.size {
             let ptr = unsafe { weights_ptr.add(jx + filter_offset) };
-            let (weight0, weight1, weight2, weight3) = load_4_weights!(ptr);
+            let (weight0, weight1, weight2, weight3) = unsafe { load_4_weights!(ptr) };
             let filter_start = jx + bounds.start;
             store = convolve_horizontal_parts_4_rgba_f16::<F16C, FMA>(
                 filter_start,
