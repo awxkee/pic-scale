@@ -59,26 +59,28 @@ impl<const AR30_TYPE: usize, const AR30_ORDER: usize> ExecutionUnit<AR30_TYPE, A
         src: &[u8],
         dst: &mut [u8],
         src_stride: usize,
-        weight: &[i16],
+        weights: &[i16],
     ) {
         unsafe {
             let mut cx = 0usize;
 
             let total_width = dst.len() / 4;
 
+            let weights = &weights[..bounds.size];
+
             const PREC: i32 = 15;
             const RND_CONST: i32 = 1 << (PREC - 1);
 
-            while cx + 8 < total_width {
+            while cx + 8 <= total_width {
                 let v_max = _mm_set1_epi16(1023);
-                let filter = weight;
+                let filter = weights;
                 let v_start_px = cx * 4;
 
                 let mut v0 = _mm256_set1_epi32(RND_CONST);
                 let mut v1 = _mm256_set1_epi32(RND_CONST);
                 let mut v2 = _mm256_set1_epi32(RND_CONST);
 
-                for (j, &k_weight) in filter.iter().take(bounds.size).enumerate() {
+                for (j, &k_weight) in filter.iter().enumerate() {
                     let py = bounds.start + j;
                     let weight = _mm256_set1_epi16(k_weight);
                     let offset = src_stride * py + v_start_px;
@@ -141,7 +143,7 @@ impl<const AR30_TYPE: usize, const AR30_ORDER: usize> ExecutionUnit<AR30_TYPE, A
                 let mut dst_transient: [u8; 4 * 8] = [0; 4 * 8];
 
                 let v_max = _mm_set1_epi16(1023);
-                let filter = weight;
+                let filter = weights;
                 let v_start_px = cx * 4;
 
                 let mut v0 = _mm256_set1_epi32(RND_CONST);

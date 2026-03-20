@@ -129,11 +129,11 @@ impl<T: Default + Clone + Copy + Debug, R: Default + Clone + Copy + Debug, const
         self.inner_scratch
     }
 
-    fn get_target_size(&self) -> ImageSize {
-        self.intercept.get_target_size()
+    fn target_size(&self) -> ImageSize {
+        self.intercept.target_size()
     }
 
-    fn get_source_size(&self) -> ImageSize {
-        self.intercept.get_source_size()
+    fn source_size(&self) -> ImageSize {
+        self.intercept.source_size()
     }
 }

@@ -86,10 +86,10 @@ fn convolve_horizontal_rgba_avx_row_4_impl(
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
         let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let iter_row0 = row0_ref.chunks_exact_mut(CHANNELS);
-        let iter_row1 = row1_ref.chunks_exact_mut(CHANNELS);
-        let iter_row2 = row2_ref.chunks_exact_mut(CHANNELS);
-        let iter_row3 = row3_ref.chunks_exact_mut(CHANNELS);
+        let iter_row0 = row0_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
+        let iter_row1 = row1_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
+        let iter_row2 = row2_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
+        let iter_row3 = row3_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
 
         let init256 = _mm256_setr_epi32(
             ROUNDING_CONST,
@@ -377,7 +377,9 @@ fn convolve_horizontal_rgba_avx_rows_one_impl(
         let vld = _mm_set1_epi32(PRECISION);
 
         for ((dst, bounds), weights) in dst
-            .chunks_exact_mut(CHANNELS)
+            .as_chunks_mut::<CHANNELS>()
+            .0
+            .iter_mut()
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights

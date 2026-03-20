@@ -209,12 +209,12 @@ pub(crate) fn _mm_cvtps_phx<const F16C: bool>(x: __m128) -> __m128i {
 
 #[inline]
 #[target_feature(enable = "f16c")]
-unsafe fn _mm_cvtph_psdx(x: __m128i) -> __m128 {
+fn _mm_cvtph_psdx(x: __m128i) -> __m128 {
     _mm_cvtph_ps(x)
 }
 
 #[inline]
-pub(crate) unsafe fn _mm_cvtph_psx<const F16C: bool>(x: __m128i) -> __m128 {
+pub(crate) fn _mm_cvtph_psx<const F16C: bool>(x: __m128i) -> __m128 {
     unsafe {
         if F16C {
             _mm_cvtph_ps(x)

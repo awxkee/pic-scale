@@ -32,7 +32,7 @@ use core::f16;
 use std::arch::aarch64::*;
 
 #[inline(always)]
-unsafe fn write_rgb_f16(store: float32x4_t, dest_ptr: &mut [f16]) {
+fn write_rgb_f16(store: float32x4_t, dest_ptr: &mut [f16]) {
     unsafe {
         let cvt = vreinterpret_u16_f16(vcvt_f16_f32(store));
         let l1 = vget_lane_u32::<0>(vreinterpret_u32_u16(cvt));
@@ -47,7 +47,7 @@ unsafe fn write_rgb_f16(store: float32x4_t, dest_ptr: &mut [f16]) {
 #[must_use]
 #[inline]
 #[target_feature(enable = "neon,fp16,fhm")]
-unsafe fn conv_horiz_4_rgb_f16(
+fn conv_horiz_4_rgb_f16(
     start_x: usize,
     src: &[f16],
     w: float16x4_t,
@@ -84,7 +84,7 @@ unsafe fn conv_horiz_4_rgb_f16(
 #[must_use]
 #[inline]
 #[target_feature(enable = "neon,fp16,fhm")]
-unsafe fn conv_horiz_2_rgb_f16(
+fn conv_horiz_2_rgb_f16(
     start_x: usize,
     src: &[f16],
     w: float16x4_t,
@@ -115,7 +115,7 @@ unsafe fn conv_horiz_2_rgb_f16(
 #[must_use]
 #[inline]
 #[target_feature(enable = "neon,fp16,fhm")]
-unsafe fn conv_horiz_1_rgb_f16(
+fn conv_horiz_1_rgb_f16(
     start_x: usize,
     src: &[f16],
     w: float16x4_t,
@@ -154,7 +154,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4_f16_fhm(
 }
 
 #[target_feature(enable = "fp16,fhm")]
-unsafe fn convolve_horizontal_rgb_neon_rows_4_f16_impl(
+fn convolve_horizontal_rgb_neon_rows_4_f16_impl(
     src: &[f16],
     src_stride: usize,
     dst: &mut [f16],
@@ -179,7 +179,7 @@ unsafe fn convolve_horizontal_rgb_neon_rows_4_f16_impl(
             let mut store_2 = zeros;
             let mut store_3 = zeros;
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let read_weights = vld1_f16(ptr);
@@ -193,7 +193,7 @@ unsafe fn convolve_horizontal_rgb_neon_rows_4_f16_impl(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let read_weights =
@@ -250,7 +250,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_row_one_f16_fhm(
 }
 
 #[target_feature(enable = "fhm")]
-unsafe fn convolve_horizontal_rgb_neon_row_one_f16_impl(
+fn convolve_horizontal_rgb_neon_row_one_f16_impl(
     src: &[f16],
     dst: &mut [f16],
     filter_weights: &FilterWeights<f16>,
@@ -267,7 +267,7 @@ unsafe fn convolve_horizontal_rgb_neon_row_one_f16_impl(
             let mut jx = 0usize;
             let mut store = vdupq_n_f32(0f32);
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let read_weights = vld1_f16(ptr);
@@ -275,7 +275,7 @@ unsafe fn convolve_horizontal_rgb_neon_row_one_f16_impl(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let read_weights =

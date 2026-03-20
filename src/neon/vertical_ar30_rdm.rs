@@ -31,8 +31,7 @@ use crate::fixed_point_vertical_ar30::convolve_column_handler_fip_db_ar30;
 use crate::neon::ar30::{vunzip_3_ar30, vzip_4_ar30};
 use crate::neon::utils::{xvld1q_u32_x2, xvst1q_u32_x2};
 use std::arch::aarch64::{
-    int16x8x4_t, vdupq_n_s16, vmaxq_s16, vminq_s16, vqrdmlahq_s16, vqrdmulhq_s16, vrshrq_n_s16,
-    vshlq_n_s16,
+    int16x8x4_t, vdupq_n_s16, vmaxq_s16, vminq_s16, vqrdmlahq_s16, vrshrq_n_s16, vshlq_n_s16,
 };
 
 pub(crate) fn neon_column_handler_fixed_point_ar30_rdm<
@@ -58,7 +57,7 @@ struct ExecutionUnit<const AR30_TYPE: usize, const AR30_ORDER: usize> {}
 
 impl<const AR30_TYPE: usize, const AR30_ORDER: usize> ExecutionUnit<AR30_TYPE, AR30_ORDER> {
     #[target_feature(enable = "rdm")]
-    unsafe fn pass(
+    fn pass(
         &self,
         bounds: &FilterBounds,
         src: &[u8],
@@ -73,105 +72,29 @@ impl<const AR30_TYPE: usize, const AR30_ORDER: usize> ExecutionUnit<AR30_TYPE, A
         const PREC: i32 = 5;
         const BACK: i32 = 5;
 
-        let bounds_size = bounds.size;
-
-        while cx + 8 < total_width {
+        while cx + 8 <= total_width {
             unsafe {
                 let v_max = vdupq_n_s16(1023);
                 let zeros = vdupq_n_s16(0);
                 let filter = weight;
                 let v_start_px = cx * 4;
 
-                let py = bounds.start;
-                let weight = vdupq_n_s16(filter[0]);
-                let offset = src_stride * py + v_start_px;
-                let src_ptr = src.get_unchecked(offset..(offset + 8));
+                let mut v0 = vdupq_n_s16(0);
+                let mut v1 = vdupq_n_s16(0);
+                let mut v2 = vdupq_n_s16(0);
 
-                let ps = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(xvld1q_u32_x2(
-                    src_ptr.as_ptr() as *const _
-                ));
-                let mut v0 = vqrdmulhq_s16(vshlq_n_s16::<PREC>(ps.0), weight);
-                let mut v1 = vqrdmulhq_s16(vshlq_n_s16::<PREC>(ps.1), weight);
-                let mut v2 = vqrdmulhq_s16(vshlq_n_s16::<PREC>(ps.2), weight);
+                for (j, &k_weight) in filter.iter().take(bounds.size).enumerate() {
+                    let py = bounds.start + j;
+                    let weight = vdupq_n_s16(k_weight);
+                    let offset = src_stride * py + v_start_px;
+                    let src_ptr = src.get_unchecked(offset..(offset + 8 * 4));
 
-                if bounds_size == 2 {
-                    let weights = filter.get_unchecked(0..2);
-                    let py = bounds.start;
-                    let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_start_px)..);
-
-                    let v_weight1 = vdupq_n_s16(weights[1]);
-
-                    let ps1 = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(xvld1q_u32_x2(
-                        src_ptr1.as_ptr() as *const _,
+                    let ps = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(xvld1q_u32_x2(
+                        src_ptr.as_ptr() as *const _,
                     ));
-                    v0 = vqrdmlahq_s16(v0, vshlq_n_s16::<PREC>(ps1.0), v_weight1);
-                    v1 = vqrdmlahq_s16(v1, vshlq_n_s16::<PREC>(ps1.1), v_weight1);
-                    v2 = vqrdmlahq_s16(v2, vshlq_n_s16::<PREC>(ps1.2), v_weight1);
-                } else if bounds_size == 3 {
-                    let weights = filter.get_unchecked(0..3);
-                    let py = bounds.start;
-                    let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_start_px)..);
-                    let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_start_px)..);
-
-                    let v_weight1 = vdupq_n_s16(weights[1]);
-                    let v_weight2 = vdupq_n_s16(weights[2]);
-
-                    let ps1 = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(xvld1q_u32_x2(
-                        src_ptr1.as_ptr() as *const _,
-                    ));
-                    v0 = vqrdmlahq_s16(v0, vshlq_n_s16::<PREC>(ps1.0), v_weight1);
-                    v1 = vqrdmlahq_s16(v1, vshlq_n_s16::<PREC>(ps1.1), v_weight1);
-                    v2 = vqrdmlahq_s16(v2, vshlq_n_s16::<PREC>(ps1.2), v_weight1);
-                    let ps2 = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(xvld1q_u32_x2(
-                        src_ptr2.as_ptr() as *const _,
-                    ));
-                    v0 = vqrdmlahq_s16(v0, vshlq_n_s16::<PREC>(ps2.0), v_weight2);
-                    v1 = vqrdmlahq_s16(v1, vshlq_n_s16::<PREC>(ps2.1), v_weight2);
-                    v2 = vqrdmlahq_s16(v2, vshlq_n_s16::<PREC>(ps2.2), v_weight2);
-                } else if bounds_size == 4 {
-                    let weights = filter.get_unchecked(0..4);
-                    let py = bounds.start;
-                    let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + v_start_px)..);
-                    let src_ptr2 = src.get_unchecked((src_stride * (py + 2) + v_start_px)..);
-                    let src_ptr3 = src.get_unchecked((src_stride * (py + 3) + v_start_px)..);
-
-                    let v_weight1 = vdupq_n_s16(weights[1]);
-                    let v_weight2 = vdupq_n_s16(weights[2]);
-                    let v_weight3 = vdupq_n_s16(weights[3]);
-
-                    let ps1 = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(xvld1q_u32_x2(
-                        src_ptr1.as_ptr() as *const _,
-                    ));
-                    v0 = vqrdmlahq_s16(v0, vshlq_n_s16::<PREC>(ps1.0), v_weight1);
-                    v1 = vqrdmlahq_s16(v1, vshlq_n_s16::<PREC>(ps1.1), v_weight1);
-                    v2 = vqrdmlahq_s16(v2, vshlq_n_s16::<PREC>(ps1.2), v_weight1);
-                    let ps2 = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(xvld1q_u32_x2(
-                        src_ptr2.as_ptr() as *const _,
-                    ));
-                    v0 = vqrdmlahq_s16(v0, vshlq_n_s16::<PREC>(ps2.0), v_weight2);
-                    v1 = vqrdmlahq_s16(v1, vshlq_n_s16::<PREC>(ps2.1), v_weight2);
-                    v2 = vqrdmlahq_s16(v2, vshlq_n_s16::<PREC>(ps2.2), v_weight2);
-                    let ps3 = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(xvld1q_u32_x2(
-                        src_ptr3.as_ptr() as *const _,
-                    ));
-                    v0 = vqrdmlahq_s16(v0, vshlq_n_s16::<PREC>(ps3.0), v_weight3);
-                    v1 = vqrdmlahq_s16(v1, vshlq_n_s16::<PREC>(ps3.1), v_weight3);
-                    v2 = vqrdmlahq_s16(v2, vshlq_n_s16::<PREC>(ps3.2), v_weight3);
-                } else {
-                    for (j, &k_weight) in filter.iter().take(bounds.size).skip(1).enumerate() {
-                        // Adding 1 is necessary because skip do not incrementing value on values that skipped
-                        let py = bounds.start + j + 1;
-                        let weight = vdupq_n_s16(k_weight);
-                        let offset = src_stride * py + v_start_px;
-                        let src_ptr = src.get_unchecked(offset..(offset + 8 * 4));
-
-                        let ps = vunzip_3_ar30::<AR30_TYPE, AR30_ORDER>(xvld1q_u32_x2(
-                            src_ptr.as_ptr() as *const _,
-                        ));
-                        v0 = vqrdmlahq_s16(v0, vshlq_n_s16::<PREC>(ps.0), weight);
-                        v1 = vqrdmlahq_s16(v1, vshlq_n_s16::<PREC>(ps.1), weight);
-                        v2 = vqrdmlahq_s16(v2, vshlq_n_s16::<PREC>(ps.2), weight);
-                    }
+                    v0 = vqrdmlahq_s16(v0, vshlq_n_s16::<PREC>(ps.0), weight);
+                    v1 = vqrdmlahq_s16(v1, vshlq_n_s16::<PREC>(ps.1), weight);
+                    v2 = vqrdmlahq_s16(v2, vshlq_n_s16::<PREC>(ps.2), weight);
                 }
 
                 let v_dst = dst.get_unchecked_mut(v_start_px..(v_start_px + 8 * 4));
@@ -192,7 +115,7 @@ impl<const AR30_TYPE: usize, const AR30_ORDER: usize> ExecutionUnit<AR30_TYPE, A
             cx += 8;
         }
 
-        while cx + 4 < total_width {
+        while cx + 4 <= total_width {
             convolve_column_handler_fip_db_ar30::<AR30_TYPE, AR30_ORDER, 4>(
                 src, src_stride, dst, weight, bounds, cx,
             );

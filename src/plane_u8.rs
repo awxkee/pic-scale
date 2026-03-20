@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
-use crate::avx2::{convolve_vertical_avx_row, convolve_vertical_avx_row_lp};
+use crate::avx2::convolve_vertical_avx_row;
 use crate::convolution::{
     ColumnFilter, ConvolutionOptions, HorizontalFilterPass, RowFilter, VerticalConvolutionPass,
 };
@@ -41,7 +41,7 @@ use crate::plan::{HorizontalFiltering, VerticalFiltering};
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::{
     convolve_horizontal_plane_sse_row, convolve_horizontal_plane_sse_rows_4_u8,
-    convolve_vertical_sse_row, convolve_vertical_sse_row_lp,
+    convolve_vertical_sse_row,
 };
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 use crate::wasm32::wasm_vertical_neon_row;
@@ -94,16 +94,6 @@ impl HorizontalFilterPass<u8, f32, 1> for ImageStore<'_, u8, 1> {
             if std::arch::is_x86_feature_detected!("sse4.1") {
                 _dispatcher_4_rows = Some(convolve_horizontal_plane_sse_rows_4_u8);
                 _dispatcher_1_row = convolve_horizontal_plane_sse_row;
-                if _scale_factor < 8.
-                    && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
-                {
-                    use crate::sse::{
-                        convolve_horizontal_plane_sse_row_hrs,
-                        convolve_horizontal_plane_sse_rows_hrs_4_u8,
-                    };
-                    _dispatcher_4_rows = Some(convolve_horizontal_plane_sse_rows_hrs_4_u8);
-                    _dispatcher_1_row = convolve_horizontal_plane_sse_row_hrs;
-                }
             }
         }
         use crate::support::PRECISION;
@@ -162,25 +152,13 @@ impl VerticalConvolutionPass<u8, f32, 1> for ImageStore<'_, u8, 1> {
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             if std::arch::is_x86_feature_detected!("sse4.1") {
-                if _scale_factor < 8.
-                    && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
-                {
-                    _dispatcher = convolve_vertical_sse_row_lp;
-                } else {
-                    _dispatcher = convolve_vertical_sse_row;
-                }
+                _dispatcher = convolve_vertical_sse_row;
             }
         }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         {
             if std::arch::is_x86_feature_detected!("avx2") {
-                if _scale_factor < 8.
-                    && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
-                {
-                    _dispatcher = convolve_vertical_avx_row_lp;
-                } else {
-                    _dispatcher = convolve_vertical_avx_row;
-                }
+                _dispatcher = convolve_vertical_avx_row;
             }
         }
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]

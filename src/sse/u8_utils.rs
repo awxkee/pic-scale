@@ -114,7 +114,7 @@ pub(crate) fn _mm_unzip_3_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
-pub(crate) unsafe fn _mm_zip_4_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
+pub(crate) fn _mm_zip_4_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     v: (__m128i, __m128i, __m128i, __m128i),
 ) -> (__m128i, __m128i) {
     let ar_type: Rgb30 = AR30_TYPE.into();

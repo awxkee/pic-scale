@@ -67,11 +67,7 @@ fn accumulate_1_horiz(store: int16x8_t, ptr: *const u8, weights: int16x8_t) -> i
 }
 
 #[inline(always)]
-unsafe fn store_cbcr<const PRECISION: i32>(
-    ptr: *mut u8,
-    store: int16x8_t,
-    reduction_shuffle: uint8x8_t,
-) {
+fn store_cbcr<const PRECISION: i32>(ptr: *mut u8, store: int16x8_t, reduction_shuffle: uint8x8_t) {
     unsafe {
         let m0 = vadd_s16(vget_low_s16(store), vget_high_s16(store));
         let m_shuf = vreinterpret_s16_u8(vtbl1_u8(vreinterpret_u8_s16(m0), reduction_shuffle));

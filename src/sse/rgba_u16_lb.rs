@@ -34,12 +34,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline]
-unsafe fn conv_horiz_rgba_1_u16(
-    start_x: usize,
-    src: &[u16],
-    w0: __m128i,
-    store: __m128i,
-) -> __m128i {
+fn conv_horiz_rgba_1_u16(start_x: usize, src: &[u16], w0: __m128i, store: __m128i) -> __m128i {
     unsafe {
         const COMPONENTS: usize = 4;
         let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
@@ -53,7 +48,7 @@ unsafe fn conv_horiz_rgba_1_u16(
 }
 
 #[inline]
-unsafe fn conv_horiz_rgba_2_u16(
+fn conv_horiz_rgba_2_u16(
     start_x: usize,
     src: &[u16],
     w0: __m128i,
@@ -78,7 +73,7 @@ unsafe fn conv_horiz_rgba_2_u16(
 }
 
 #[inline]
-unsafe fn conv_horiz_rgba_4_u16(
+fn conv_horiz_rgba_4_u16(
     start_x: usize,
     src: &[u16],
     w0: __m128i,
@@ -116,7 +111,7 @@ unsafe fn conv_horiz_rgba_4_u16(
 }
 
 #[inline(always)]
-unsafe fn conv_horiz_rgba_8_u16(
+fn conv_horiz_rgba_8_u16(
     start_x: usize,
     src: &[u16],
     set1: (__m128i, __m128i, __m128i, __m128i),
@@ -192,7 +187,7 @@ pub(crate) fn convolve_horizontal_rgba_sse_rows_4_lb_u8(
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn convolve_horizontal_rgba_sse_rows_4_lb_u8_impl(
+fn convolve_horizontal_rgba_sse_rows_4_lb_u8_impl(
     src: &[u16],
     src_stride: usize,
     dst: &mut [u16],
@@ -241,7 +236,7 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_lb_u8_impl(
             let src3 = src2.get_unchecked(src_stride..);
 
             #[cfg(target_arch = "x86_64")]
-            while jx + 8 < bounds_size {
+            while jx + 8 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..(jx + 8));
                 let w0 = _mm_set1_epi16(w_ptr[0]);
@@ -261,7 +256,7 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_lb_u8_impl(
                 jx += 8;
             }
 
-            while jx + 4 < bounds_size {
+            while jx + 4 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..(jx + 4));
                 let w0 = _mm_set1_epi16(w_ptr[0]);
@@ -275,7 +270,7 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_lb_u8_impl(
                 jx += 4;
             }
 
-            while jx + 2 < bounds_size {
+            while jx + 2 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 2));
                 let bounds_start = bounds.start + jx;
                 let w0 = _mm_set1_epi16(w_ptr[0]);

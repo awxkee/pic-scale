@@ -160,11 +160,11 @@ where
         basic_size + alpha_scratch
     }
 
-    fn get_target_size(&self) -> ImageSize {
+    fn target_size(&self) -> ImageSize {
         self.target_size
     }
 
-    fn get_source_size(&self) -> ImageSize {
+    fn source_size(&self) -> ImageSize {
         self.source_size
     }
 }

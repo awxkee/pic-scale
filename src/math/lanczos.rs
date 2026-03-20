@@ -91,6 +91,18 @@ where
     lanczos_jinc(x, 4f32.as_())
 }
 
+pub(crate) fn lanczos5_jinc<
+    V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI + AsPrimitive<f64> + Jinc<V>,
+>(
+    x: V,
+) -> V
+where
+    f32: AsPrimitive<V>,
+    f64: AsPrimitive<V>,
+{
+    lanczos_jinc(x, 5f32.as_())
+}
+
 pub(crate) fn lanczos6_jinc<
     V: Copy + PartialEq + Div<Output = V> + 'static + Float + ConstPI + AsPrimitive<f64> + Jinc<V>,
 >(
@@ -141,6 +153,17 @@ where
     f32: AsPrimitive<V>,
 {
     lanczos_sinc(x, 4f32.as_())
+}
+
+pub(crate) fn lanczos5<
+    V: Copy + PartialEq + Div<Output = V> + 'static + Trigonometry + Float + ConstPI + Sinc,
+>(
+    x: V,
+) -> V
+where
+    f32: AsPrimitive<V>,
+{
+    lanczos_sinc(x, 5f32.as_())
 }
 
 pub(crate) fn lanczos6<

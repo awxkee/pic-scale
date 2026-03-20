@@ -53,10 +53,7 @@ pub(crate) fn sse_column_handler_fixed_point_ar30<
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn sse_column_handler_fixed_point_ar30_impl<
-    const AR30_TYPE: usize,
-    const AR30_ORDER: usize,
->(
+fn sse_column_handler_fixed_point_ar30_impl<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     bounds: &FilterBounds,
     src: &[u8],
     dst: &mut [u8],

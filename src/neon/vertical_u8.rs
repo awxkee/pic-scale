@@ -28,8 +28,7 @@
  */
 use crate::filter_weights::FilterBounds;
 use crate::neon::utils::{
-    vxmlal_high_lane_s16, vxmlal_high_s16, vxmlal_lane_s16
-    , vxmlal_s16, xvld1q_u8_x2, xvst1q_u8_x2,
+    vxmlal_high_lane_s16, vxmlal_high_s16, vxmlal_lane_s16, vxmlal_s16, xvld1q_u8_x2, xvst1q_u8_x2,
 };
 use std::arch::aarch64::*;
 

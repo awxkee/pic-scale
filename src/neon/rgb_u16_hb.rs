@@ -119,7 +119,7 @@ fn conv_horiz_rgba_4_u16(
 }
 
 #[inline(always)]
-unsafe fn set_pixel(ptr: &mut [u16], pixel: uint16x4_t) {
+fn set_pixel(ptr: &mut [u16], pixel: uint16x4_t) {
     unsafe {
         vst1_lane_u32::<0>(ptr.as_mut_ptr() as *mut _, vreinterpret_u32_u16(pixel));
         vst1_lane_u16::<2>(ptr.get_unchecked_mut(2..).as_mut_ptr(), pixel);
@@ -258,7 +258,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_u16_hb_row(
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn convolve_horizontal_rgb_neon_u16_hb_impl(
+fn convolve_horizontal_rgb_neon_u16_hb_impl(
     src: &[u16],
     dst: &mut [u16],
     filter_weights: &FilterWeights<i32>,

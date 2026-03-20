@@ -65,7 +65,7 @@ unsafe fn conv_horiz_rgb_4_u8(
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_2_u8(
+fn conv_horiz_rgba_2_u8(
     start_x: usize,
     src: &[u8],
     w0: v128,
@@ -90,7 +90,7 @@ unsafe fn conv_horiz_rgba_2_u8(
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_1_u8(start_x: usize, src: &[u8], w0: v128, store: v128) -> v128 {
+fn conv_horiz_rgba_1_u8(start_x: usize, src: &[u8], w0: v128, store: v128) -> v128 {
     unsafe {
         const COMPONENTS: usize = 3;
         let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
@@ -102,7 +102,7 @@ unsafe fn conv_horiz_rgba_1_u8(start_x: usize, src: &[u8], w0: v128, store: v128
 }
 
 #[inline(always)]
-unsafe fn write_accumulator_u8<const PRECISION: i32>(store: v128, dst: &mut [u8]) {
+fn write_accumulator_u8<const PRECISION: i32>(store: v128, dst: &mut [u8]) {
     unsafe {
         let mut store_16 = i32x4_shr(store, PRECISION as u32);
         store_16 = i32x4_max(store_16, i32x4_splat(0));

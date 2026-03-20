@@ -32,7 +32,7 @@ use core::f16;
 use novtb::{ParallelZonedIterator, TbSliceMut};
 use std::arch::aarch64::*;
 
-unsafe fn neon_premultiply_alpha_rgba_row_f16(dst: &mut [f16], src: &[f16]) {
+fn neon_premultiply_alpha_rgba_row_f16(dst: &mut [f16], src: &[f16]) {
     unsafe {
         let mut rem = dst;
         let mut src_rem = src;
@@ -103,13 +103,13 @@ pub(crate) fn neon_premultiply_alpha_rgba_f16(
     pool: &novtb::ThreadPool,
 ) {
     dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| unsafe {
+        .for_each_enumerated(pool, |y, dst| {
             let src = &src[y * src_stride..(y + 1) * src_stride];
             neon_premultiply_alpha_rgba_row_f16(&mut dst[..width * 4], &src[..width * 4]);
         });
 }
 
-unsafe fn neon_unpremultiply_alpha_rgba_row_f16(in_place: &mut [f16]) {
+fn neon_unpremultiply_alpha_rgba_row_f16(in_place: &mut [f16]) {
     unsafe {
         let mut rem = in_place;
 
@@ -196,7 +196,7 @@ pub(crate) fn neon_unpremultiply_alpha_rgba_f16(
 ) {
     in_place
         .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| unsafe {
+        .for_each(pool, |row| {
             neon_unpremultiply_alpha_rgba_row_f16(&mut row[..width * 4]);
         });
 }

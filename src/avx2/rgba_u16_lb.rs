@@ -269,10 +269,10 @@ impl<const D: bool> Row4ExecutionHandler<D> {
                 0,
             );
 
-            let iter_row0 = row0_ref.chunks_exact_mut(CHANNELS);
-            let iter_row1 = row1_ref.chunks_exact_mut(CHANNELS);
-            let iter_row2 = row2_ref.chunks_exact_mut(CHANNELS);
-            let iter_row3 = row3_ref.chunks_exact_mut(CHANNELS);
+            let iter_row0 = row0_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
+            let iter_row1 = row1_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
+            let iter_row2 = row2_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
+            let iter_row3 = row3_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
 
             for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
                 .zip(iter_row1)

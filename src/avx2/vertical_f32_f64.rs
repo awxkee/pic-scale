@@ -137,7 +137,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 j += 2;
             }
 
-            for j in 0..bounds.size {
+            for j in j..bounds.size {
                 let py = start_y + j;
                 let weight = filter.get_unchecked(j);
                 let v_weight = _mm256_broadcast_sd(weight);

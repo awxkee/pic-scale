@@ -138,7 +138,7 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
 
             let mut jj = 0usize;
 
-            while jj < bounds_size.saturating_sub(2) {
+            while jj + 2 <= bounds_size {
                 let py = start_y + jj;
                 let f_ptr = filter.get_unchecked(jj..).as_ptr() as *const i32;
                 let v_weight_2 = _mm256_set1_epi32(f_ptr.read_unaligned());
@@ -281,7 +281,39 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
 
             let bounds_size = bounds.size;
 
-            for j in 0..bounds_size {
+            let mut jj = 0usize;
+
+            while jj + 2 <= bounds_size {
+                let py = start_y + jj;
+                // Pack two consecutive i16 weights into one i32 broadcast
+                let f_ptr = filter.get_unchecked(jj..).as_ptr() as *const i32;
+                let v_weight_2 = _mm256_set1_epi32(f_ptr.read_unaligned());
+
+                let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
+                let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
+
+                let item_row0 = _mm256_loadu_si256(src_ptr0.as_ptr() as *const __m256i);
+                let item_row1 = _mm256_loadu_si256(src_ptr1.as_ptr() as *const __m256i);
+
+                // Interleave rows so dot_prod processes both weights in one pass
+                let zeros = _mm256_setzero_si256();
+
+                let interleaved_lo = _mm256_unpacklo_epi8(item_row0, item_row1);
+                let pix = _mm256_unpacklo_epi8(interleaved_lo, zeros);
+                store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_0, pix, v_weight_2);
+                let pix = _mm256_unpackhi_epi8(interleaved_lo, zeros);
+                store_1 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_1, pix, v_weight_2);
+
+                let interleaved_hi = _mm256_unpackhi_epi8(item_row0, item_row1);
+                let pix = _mm256_unpacklo_epi8(interleaved_hi, zeros);
+                store_2 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_2, pix, v_weight_2);
+                let pix = _mm256_unpackhi_epi8(interleaved_hi, zeros);
+                store_3 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_3, pix, v_weight_2);
+
+                jj += 2;
+            }
+
+            for j in jj..bounds_size {
                 let py = start_y + j;
                 let weight = *filter.get_unchecked(j);
                 let v_weight = _mm256_set1_epi16(weight);
@@ -370,7 +402,7 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
         let mut cx = 0usize;
         let total_width = dst.len();
 
-        while cx + 64 < total_width {
+        while cx + 64 <= total_width {
             self.convolve_vertical_part_avx_64(
                 bounds.start,
                 cx,
@@ -384,7 +416,7 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
             cx += 64;
         }
 
-        while cx + 32 < total_width {
+        while cx + 32 <= total_width {
             self.convolve_vertical_part_avx_32(
                 bounds.start,
                 cx,
@@ -398,7 +430,7 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
             cx += 32;
         }
 
-        while cx + 8 < total_width {
+        while cx + 8 <= total_width {
             self.convolve_vertical_part_8_avx(
                 bounds.start,
                 cx,

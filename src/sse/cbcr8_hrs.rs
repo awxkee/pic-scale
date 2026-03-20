@@ -107,7 +107,7 @@ unsafe fn conv_cb_cr_8(
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn convolve_horizontal_cbcr_sse_hrs_rows_4_impl(
+fn convolve_horizontal_cbcr_sse_hrs_rows_4_impl(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],

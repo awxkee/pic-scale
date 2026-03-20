@@ -34,7 +34,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline]
-pub(crate) unsafe fn _mm_prefer_fma_ps<const FMA: bool>(a: __m128, b: __m128, c: __m128) -> __m128 {
+pub(crate) fn _mm_prefer_fma_ps<const FMA: bool>(a: __m128, b: __m128, c: __m128) -> __m128 {
     unsafe {
         if FMA {
             _mm_fma_psx(a, b, c)
@@ -50,7 +50,7 @@ unsafe fn _mm_fma_psx(a: __m128, b: __m128, c: __m128) -> __m128 {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn sse_deinterleave_rgba_ps(
+pub(crate) fn sse_deinterleave_rgba_ps(
     v0: __m128,
     v1: __m128,
     v2: __m128,
@@ -70,7 +70,7 @@ pub(crate) unsafe fn sse_deinterleave_rgba_ps(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn sse_interleave_rgba_ps(
+pub(crate) fn sse_interleave_rgba_ps(
     v0: __m128,
     v1: __m128,
     v2: __m128,
@@ -91,7 +91,7 @@ pub(crate) unsafe fn sse_interleave_rgba_ps(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn sse_deinterleave_rgba(
+pub(crate) fn sse_deinterleave_rgba(
     rgba0: __m128i,
     rgba1: __m128i,
     rgba2: __m128i,
@@ -130,7 +130,7 @@ pub(crate) unsafe fn sse_deinterleave_rgba(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn sse_interleave_rgba(
+pub(crate) fn sse_interleave_rgba(
     r: __m128i,
     g: __m128i,
     b: __m128i,
@@ -152,7 +152,7 @@ pub(crate) unsafe fn sse_interleave_rgba(
 
 /// Sums all lanes in float32
 #[inline(always)]
-pub(crate) unsafe fn _mm_hsum_ps(v: __m128) -> f32 {
+pub(crate) fn _mm_hsum_ps(v: __m128) -> f32 {
     unsafe {
         let mut shuf = _mm_movehdup_ps(v);
         let mut sums = _mm_add_ps(v, shuf);
@@ -164,7 +164,7 @@ pub(crate) unsafe fn _mm_hsum_ps(v: __m128) -> f32 {
 
 #[inline(always)]
 #[allow(dead_code)]
-pub(crate) unsafe fn sse_deinterleave_rgba_epi16(
+pub(crate) fn sse_deinterleave_rgba_epi16(
     rgba0: __m128i,
     rgba1: __m128i,
     rgba2: __m128i,
@@ -191,7 +191,7 @@ pub(crate) unsafe fn sse_deinterleave_rgba_epi16(
 
 #[inline(always)]
 #[allow(dead_code)]
-pub(crate) unsafe fn sse_interleave_rgba_epi16(
+pub(crate) fn sse_interleave_rgba_epi16(
     a: __m128i,
     b: __m128i,
     c: __m128i,
@@ -217,7 +217,7 @@ pub(crate) unsafe fn sse_interleave_rgba_epi16(
 /// Horizontal add i16 across vector
 #[allow(dead_code)]
 #[inline(always)]
-pub(crate) unsafe fn _mm_hsum_epi16(x: __m128i) -> i16 {
+pub(crate) fn _mm_hsum_epi16(x: __m128i) -> i16 {
     unsafe {
         // [v0 + v4] [v1 + v5] [v2 + v6] [v3 + v7]
         let v0 = _mm_hadd_epi16(x, x);
@@ -232,7 +232,7 @@ pub(crate) unsafe fn _mm_hsum_epi16(x: __m128i) -> i16 {
 
 #[allow(dead_code)]
 #[inline(always)]
-pub(crate) unsafe fn _mm_hsum_epi32(x: __m128i) -> i32 {
+pub(crate) fn _mm_hsum_epi32(x: __m128i) -> i32 {
     unsafe {
         const FIRST_MASK: i32 = shuffle(1, 0, 3, 2);
         let hi64 = _mm_shuffle_epi32::<FIRST_MASK>(x);
@@ -245,13 +245,13 @@ pub(crate) unsafe fn _mm_hsum_epi32(x: __m128i) -> i32 {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_muladd_wide_epi16(a: __m128i, b: __m128i, c: __m128i) -> __m128i {
+pub(crate) fn _mm_muladd_wide_epi16(a: __m128i, b: __m128i, c: __m128i) -> __m128i {
     unsafe { _mm_add_epi32(a, _mm_madd_epi16(b, c)) }
 }
 
-#[inline]
+#[inline(always)]
 /// Arithmetic shift for i64, shifting with sign bits
-pub(crate) unsafe fn _mm_srai_epi64x<const IMM8: i32>(a: __m128i) -> __m128i {
+pub(crate) fn _mm_srai_epi64x<const IMM8: i32>(a: __m128i) -> __m128i {
     unsafe {
         let m = _mm_set1_epi64x(1 << (64 - 1));
         let x = _mm_srli_epi64::<IMM8>(a);
@@ -261,7 +261,7 @@ pub(crate) unsafe fn _mm_srai_epi64x<const IMM8: i32>(a: __m128i) -> __m128i {
 
 #[inline]
 /// Packs i64 into i32 using truncation
-pub(crate) unsafe fn _mm_packus_epi64(a: __m128i, b: __m128i) -> __m128i {
+pub(crate) fn _mm_packus_epi64(a: __m128i, b: __m128i) -> __m128i {
     unsafe {
         const SHUFFLE_MASK: i32 = shuffle(3, 1, 2, 0);
         let a = _mm_shuffle_epi32::<SHUFFLE_MASK>(a);
@@ -272,7 +272,7 @@ pub(crate) unsafe fn _mm_packus_epi64(a: __m128i, b: __m128i) -> __m128i {
 
 #[inline(always)]
 /// Extracts i64 value
-pub(crate) unsafe fn _mm_extract_epi64x<const IMM: i32>(d: __m128i) -> i64 {
+pub(crate) fn _mm_extract_epi64x<const IMM: i32>(d: __m128i) -> i64 {
     unsafe {
         #[cfg(target_arch = "x86_64")]
         {

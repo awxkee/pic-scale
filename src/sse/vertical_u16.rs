@@ -55,7 +55,7 @@ pub(crate) fn convolve_column_sse_u16(
 
 #[target_feature(enable = "sse4.1")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_column_lb_u16_def(
+fn convolve_column_lb_u16_def(
     bounds: &FilterBounds,
     src: &[u16],
     dst: &mut [u16],
@@ -63,14 +63,12 @@ unsafe fn convolve_column_lb_u16_def(
     weight: &[f32],
     bit_depth: u32,
 ) {
-    unsafe {
-        convolve_column_lb_u16_impl::<false>(bounds, src, dst, src_stride, weight, bit_depth);
-    }
+    convolve_column_lb_u16_impl::<false>(bounds, src, dst, src_stride, weight, bit_depth);
 }
 
 #[target_feature(enable = "sse4.1", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch
-unsafe fn convolve_column_lb_u16_fma(
+fn convolve_column_lb_u16_fma(
     bounds: &FilterBounds,
     src: &[u16],
     dst: &mut [u16],
@@ -78,13 +76,11 @@ unsafe fn convolve_column_lb_u16_fma(
     weight: &[f32],
     bit_depth: u32,
 ) {
-    unsafe {
-        convolve_column_lb_u16_impl::<true>(bounds, src, dst, src_stride, weight, bit_depth);
-    }
+    convolve_column_lb_u16_impl::<true>(bounds, src, dst, src_stride, weight, bit_depth);
 }
 
 #[inline(always)]
-unsafe fn convolve_column_lb_u16_impl<const FMA: bool>(
+fn convolve_column_lb_u16_impl<const FMA: bool>(
     bounds: &FilterBounds,
     src: &[u16],
     dst: &mut [u16],

@@ -36,7 +36,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline]
-unsafe fn conv_horiz_rgba_1_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
+fn conv_horiz_rgba_1_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
     start_x: usize,
     src: &[u8],
     w0: __m128i,
@@ -53,7 +53,7 @@ unsafe fn conv_horiz_rgba_1_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
 }
 
 #[inline(always)]
-unsafe fn conv_horiz_rgba_8_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
+fn conv_horiz_rgba_8_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
     start_x: usize,
     src: &[u8],
     w0: __m128i,
@@ -85,7 +85,7 @@ unsafe fn conv_horiz_rgba_8_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
 }
 
 #[inline]
-unsafe fn conv_horiz_rgba_4_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
+fn conv_horiz_rgba_4_u8_i16<const AR_TYPE: usize, const AR_ORDER: usize>(
     start_x: usize,
     src: &[u8],
     w0: __m128i,
@@ -132,7 +132,7 @@ pub(crate) fn sse_convolve_horizontal_rgba_rows_4_ar30<
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn sse_convolve_horizontal_rgba_rows_4_impl<const AR_TYPE: usize, const AR_ORDER: usize>(
+fn sse_convolve_horizontal_rgba_rows_4_impl<const AR_TYPE: usize, const AR_ORDER: usize>(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -336,7 +336,7 @@ pub(crate) fn sse_convolve_horizontal_rgba_rows_ar30<
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn sse_convolve_horizontal_rgba_row_impl<const AR_TYPE: usize, const AR_ORDER: usize>(
+fn sse_convolve_horizontal_rgba_row_impl<const AR_TYPE: usize, const AR_ORDER: usize>(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,

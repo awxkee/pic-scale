@@ -26,7 +26,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use colorutils_rs::{TransferFunction, jzazbz_to_rgb, jzazbz_to_rgba, rgba_to_jzazbz, rgb_to_jzazbz};
+use colorutils_rs::{
+    TransferFunction, jzazbz_to_rgb, jzazbz_to_rgba, rgb_to_jzazbz, rgba_to_jzazbz,
+};
 use std::sync::Arc;
 
 use crate::colors::common_splitter::{SplitPlanInterceptor, Splitter};
