@@ -46,7 +46,7 @@ macro_rules! premultiply_vec {
     }};
 }
 
-unsafe fn neon_premultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8]) {
+fn neon_premultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8]) {
     unsafe {
         let mut rem = dst;
         let mut src_rem = src;
@@ -125,7 +125,7 @@ pub(crate) fn neon_premultiply_alpha_rgba(
     pool: &novtb::ThreadPool,
 ) {
     dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| unsafe {
+        .for_each_enumerated(pool, |y, dst| {
             let src = &src[y * src_stride..(y + 1) * src_stride];
             neon_premultiply_alpha_rgba_impl_row(&mut dst[..width * 4], &src[..width * 4]);
         });
@@ -144,7 +144,7 @@ struct NeonDisassociateAlphaFast {}
 
 impl NeonDisassociateAlpha {
     #[inline(always)]
-    unsafe fn get_reciprocal(a_values: uint8x16_t) -> float32x4x4_t {
+    fn get_reciprocal(a_values: uint8x16_t) -> float32x4x4_t {
         unsafe {
             let a_hi = vmovl_high_u8(a_values);
             let a_lo = vmovl_u8(vget_low_u8(a_values));
@@ -157,7 +157,7 @@ impl NeonDisassociateAlpha {
     }
 
     #[inline(always)]
-    unsafe fn get_reciprocalh(a_values: uint8x8_t) -> float32x4x2_t {
+    fn get_reciprocalh(a_values: uint8x8_t) -> float32x4x2_t {
         unsafe {
             let a_lo = vmovl_u8(a_values);
             let a_lo_lo = vrecpeq_f32(vcvtq_f32_u32(vmovl_u16(vget_low_u16(a_lo))));
@@ -167,11 +167,7 @@ impl NeonDisassociateAlpha {
     }
 
     #[inline(always)]
-    unsafe fn unpremultiply_vec(
-        v: uint8x16_t,
-        mask: uint8x16_t,
-        recip: float32x4x4_t,
-    ) -> uint8x16_t {
+    fn unpremultiply_vec(v: uint8x16_t, mask: uint8x16_t, recip: float32x4x4_t) -> uint8x16_t {
         unsafe {
             let scale = vdupq_n_u8(255);
             let hi = vmull_high_u8(v, scale);
@@ -196,11 +192,7 @@ impl NeonDisassociateAlpha {
     }
 
     #[inline(always)]
-    unsafe fn unpremultiply_vech(
-        v: uint8x8_t,
-        mask: uint8x8_t,
-        reciprocal: float32x4x2_t,
-    ) -> uint8x8_t {
+    fn unpremultiply_vech(v: uint8x8_t, mask: uint8x8_t, reciprocal: float32x4x2_t) -> uint8x8_t {
         unsafe {
             let scale = vdupq_n_u8(255);
             let lo = vmull_u8(v, vget_low_u8(scale));
@@ -278,7 +270,7 @@ define_execution_rule!(NeonDisassociateAlphaFast);
 impl NeonDisassociateAlphaFast {
     #[inline]
     #[target_feature(enable = "rdm")]
-    unsafe fn get_reciprocal(alpha: uint8x16_t) -> int32x4x4_t {
+    fn get_reciprocal(alpha: uint8x16_t) -> int32x4x4_t {
         const Q: f32 = ((1i64 << 31) - 1) as f32;
 
         let q0_31_divider = vdupq_n_f32(Q);
@@ -307,7 +299,7 @@ impl NeonDisassociateAlphaFast {
 
     #[inline]
     #[target_feature(enable = "rdm")]
-    unsafe fn get_reciprocalh(alpha: uint8x8_t) -> int32x4x2_t {
+    fn get_reciprocalh(alpha: uint8x8_t) -> int32x4x2_t {
         const Q: f32 = ((1i64 << 31) - 1) as f32;
 
         let q0_31_divider = vdupq_n_f32(Q);
@@ -327,11 +319,7 @@ impl NeonDisassociateAlphaFast {
 
     #[inline]
     #[target_feature(enable = "rdm")]
-    unsafe fn unpremultiply_vec(
-        v: uint8x16_t,
-        mask: uint8x16_t,
-        reciprocal: int32x4x4_t,
-    ) -> uint8x16_t {
+    fn unpremultiply_vec(v: uint8x16_t, mask: uint8x16_t, reciprocal: int32x4x4_t) -> uint8x16_t {
         let scale = vdupq_n_u8(255);
         let hi = vmull_high_u8(v, scale);
         let lo = vmull_u8(vget_low_u8(v), vget_low_u8(scale));
@@ -355,11 +343,7 @@ impl NeonDisassociateAlphaFast {
 
     #[inline]
     #[target_feature(enable = "rdm")]
-    unsafe fn unpremultiply_vech(
-        v: uint8x8_t,
-        mask: uint8x8_t,
-        reciprocal: int32x4x2_t,
-    ) -> uint8x8_t {
+    fn unpremultiply_vech(v: uint8x8_t, mask: uint8x8_t, reciprocal: int32x4x2_t) -> uint8x8_t {
         let scale = vdupq_n_u8(255);
         let lo = vmull_u8(v, vget_low_u8(scale));
         let lo_lo = vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(lo)));
@@ -373,24 +357,20 @@ impl NeonDisassociateAlphaFast {
 }
 
 #[inline]
-unsafe fn neon_dis_dispatch(in_place: &mut [u8], handler: impl DisassociateAlpha) {
+fn neon_dis_dispatch(in_place: &mut [u8], handler: impl DisassociateAlpha) {
     unsafe {
         handler.disassociate(in_place);
     }
 }
 
-unsafe fn neon_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8]) {
-    unsafe {
-        neon_dis_dispatch(in_place, NeonDisassociateAlpha::default());
-    }
+fn neon_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8]) {
+    neon_dis_dispatch(in_place, NeonDisassociateAlpha::default());
 }
 
 #[cfg(feature = "rdm")]
 #[target_feature(enable = "rdm")]
-unsafe fn neon_unpremultiply_alpha_rgba_impl_row_rdm(in_place: &mut [u8]) {
-    unsafe {
-        neon_dis_dispatch(in_place, NeonDisassociateAlphaFast::default());
-    }
+fn neon_unpremultiply_alpha_rgba_impl_row_rdm(in_place: &mut [u8]) {
+    neon_dis_dispatch(in_place, NeonDisassociateAlphaFast::default());
 }
 
 pub(crate) fn neon_unpremultiply_alpha_rgba(

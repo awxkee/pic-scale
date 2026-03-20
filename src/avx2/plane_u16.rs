@@ -70,7 +70,7 @@ fn conv_horiz_rgba_2_u16<const FMA: bool>(
     }
 }
 
-#[inline]
+#[inline(always)]
 fn conv_horiz_rgba_4_u16<const FMA: bool>(
     start_x: usize,
     src: &[u16],

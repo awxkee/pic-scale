@@ -90,8 +90,6 @@ fn convolve_32_items<const FMA: bool>(
     let mut cx = cx;
 
     unsafe {
-        let bounds_size = bounds.size;
-
         let v_cap_colors = _mm256_set1_epi16((max_colors as u16) as i16);
 
         let v_px = cx;
@@ -303,10 +301,11 @@ fn convolve_32_items<const FMA: bool>(
                 j += 2;
             }
 
-            let weights = &weights[j..bounds_size];
+            let weights = &weights[j..bounds.size];
+            let base_y = bounds.start + j;
 
-            for (j, &k_weight) in weights.iter().take(bounds_size).enumerate() {
-                let py = bounds.start + j;
+            for (j, &k_weight) in weights.iter().enumerate() {
+                let py = base_y + j;
                 let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
 
                 let v_weight = _mm256_set1_ps(k_weight);
@@ -483,7 +482,7 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
     src: &[u16],
     dst: &mut [u16],
     src_stride: usize,
-    weight: &[f32],
+    weights: &[f32],
     bit_depth: u32,
 ) {
     unsafe {
@@ -491,6 +490,7 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
         let mut cx = 0usize;
 
         let bounds_size = bounds.size;
+        let weights = &weights[..bounds.size];
 
         let zeros_ps = _mm_setzero_ps();
         let zeros = _mm_setzero_si128();
@@ -502,7 +502,7 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
             bounds,
             src,
             src_stride,
-            weight,
+            weights,
             bit_depth,
             cx,
         );
@@ -514,7 +514,7 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
             bounds,
             src,
             src_stride,
-            weight,
+            weights,
             bit_depth,
             cx,
         );
@@ -526,7 +526,7 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
             bounds,
             src,
             src_stride,
-            weight,
+            weights,
             bit_depth,
             cx,
         );
@@ -541,7 +541,7 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
 
             let v_dx = v_cx + x * 4;
 
-            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
+            for (j, &k_weight) in weights.iter().take(bounds_size).enumerate() {
                 let py = bounds.start + j;
                 let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
 
@@ -576,7 +576,7 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
 
             let v_px = a_px + x;
 
-            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
+            for (j, &k_weight) in weights.iter().take(bounds_size).enumerate() {
                 let py = bounds.start + j;
                 let offset = src_stride * py + v_px;
                 let src_ptr = src.get_unchecked(offset);

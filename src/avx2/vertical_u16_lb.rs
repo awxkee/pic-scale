@@ -395,7 +395,7 @@ fn convolve_column_lb_avx_u16_impl<const HAS_DOT: bool>(
     src: &[u16],
     dst: &mut [u16],
     src_stride: usize,
-    weight: &[i16],
+    weights: &[i16],
     bit_depth: u32,
 ) {
     unsafe {
@@ -404,6 +404,7 @@ fn convolve_column_lb_avx_u16_impl<const HAS_DOT: bool>(
         let mut cx = 0usize;
 
         let bounds_size = bounds.size;
+        let weights = &weights[..bounds.size];
 
         let zeros = _mm_setzero_si128();
         let v_max_colors_sse = _mm_set1_epi16(max_colors);
@@ -413,7 +414,7 @@ fn convolve_column_lb_avx_u16_impl<const HAS_DOT: bool>(
             bounds,
             src,
             src_stride,
-            weight,
+            weights,
             bit_depth,
             cx,
         );
@@ -425,7 +426,7 @@ fn convolve_column_lb_avx_u16_impl<const HAS_DOT: bool>(
             bounds,
             src,
             src_stride,
-            weight,
+            weights,
             bit_depth,
             cx,
         );
@@ -437,7 +438,7 @@ fn convolve_column_lb_avx_u16_impl<const HAS_DOT: bool>(
             bounds,
             src,
             src_stride,
-            weight,
+            weights,
             bit_depth,
             cx,
         );
@@ -452,7 +453,7 @@ fn convolve_column_lb_avx_u16_impl<const HAS_DOT: bool>(
 
             let v_dx = v_cx + x * 4;
 
-            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
+            for (j, &k_weight) in weights.iter().take(bounds_size).enumerate() {
                 let py = bounds.start + j;
                 let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
 
@@ -484,7 +485,7 @@ fn convolve_column_lb_avx_u16_impl<const HAS_DOT: bool>(
 
             let v_px = a_px + x;
 
-            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
+            for (j, &k_weight) in weights.iter().take(bounds_size).enumerate() {
                 let py = bounds.start + j;
                 let offset = src_stride * py + v_px;
                 let src_ptr = src.get_unchecked(offset);

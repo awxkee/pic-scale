@@ -54,7 +54,7 @@ pub(crate) fn avx_unpremultiply_alpha_rgba_f32(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn avx_unpremultiply_alpha_rgba_f32_row_impl(in_place: &mut [f32]) {
+fn avx_unpremultiply_alpha_rgba_f32_row_impl(in_place: &mut [f32]) {
     unsafe {
         let mut rem = in_place;
 
@@ -87,7 +87,7 @@ unsafe fn avx_unpremultiply_alpha_rgba_f32_row_impl(in_place: &mut [f32]) {
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn avx_unpremultiply_alpha_rgba_f32_impl(
+fn avx_unpremultiply_alpha_rgba_f32_impl(
     in_place: &mut [f32],
     stride: usize,
     width: usize,
@@ -96,7 +96,7 @@ unsafe fn avx_unpremultiply_alpha_rgba_f32_impl(
 ) {
     in_place
         .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| unsafe {
+        .for_each(pool, |row| {
             avx_unpremultiply_alpha_rgba_f32_row_impl(&mut row[..width * 4]);
         });
 }
@@ -116,7 +116,7 @@ pub(crate) fn avx_premultiply_alpha_rgba_f32(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn avx_premultiply_alpha_rgba_f32_row_impl(dst: &mut [f32], src: &[f32]) {
+fn avx_premultiply_alpha_rgba_f32_row_impl(dst: &mut [f32], src: &[f32]) {
     unsafe {
         let mut _cx = 0usize;
 
@@ -154,7 +154,7 @@ unsafe fn avx_premultiply_alpha_rgba_f32_row_impl(dst: &mut [f32], src: &[f32]) 
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn avx_premultiply_alpha_rgba_f32_impl(
+fn avx_premultiply_alpha_rgba_f32_impl(
     dst: &mut [f32],
     dst_stride: usize,
     src: &[f32],
@@ -164,7 +164,7 @@ unsafe fn avx_premultiply_alpha_rgba_f32_impl(
     pool: &novtb::ThreadPool,
 ) {
     dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| unsafe {
+        .for_each_enumerated(pool, |y, dst| {
             let src = &src[y * src_stride..(y + 1) * src_stride];
             avx_premultiply_alpha_rgba_f32_row_impl(&mut dst[..width * 4], &src[..width * 4]);
         });

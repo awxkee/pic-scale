@@ -326,15 +326,6 @@ pub(crate) fn avx2_interleave_rgba(
 }
 
 #[inline(always)]
-pub(crate) fn avx2_pack_u16(s_1: __m256i, s_2: __m256i) -> __m256i {
-    unsafe {
-        let packed = _mm256_packus_epi16(s_1, s_2);
-        const MASK: i32 = shuffle(3, 1, 2, 0);
-        _mm256_permute4x64_epi64::<MASK>(packed)
-    }
-}
-
-#[inline(always)]
 pub(crate) fn avx2_pack_u32(s_1: __m256i, s_2: __m256i) -> __m256i {
     unsafe {
         let packed = _mm256_packus_epi32(s_1, s_2);

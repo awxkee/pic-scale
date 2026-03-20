@@ -85,7 +85,7 @@ pub(crate) const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_hsum_epi32(x: __m128i) -> i32 {
+pub(crate) fn _mm_hsum_epi32(x: __m128i) -> i32 {
     unsafe {
         const FIRST_MASK: i32 = shuffle(1, 0, 3, 2);
         let hi64 = _mm_shuffle_epi32::<FIRST_MASK>(x);

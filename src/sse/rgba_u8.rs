@@ -36,7 +36,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline]
-unsafe fn convolve_horizontal_parts_one_rgba_sse(
+fn convolve_horizontal_parts_one_rgba_sse(
     start_x: usize,
     src: &[u8],
     weight0: __m128i,
@@ -68,7 +68,7 @@ pub(crate) fn convolve_horizontal_rgba_sse_rows_4(
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn convolve_horizontal_rgba_sse_rows_4_impl(
+fn convolve_horizontal_rgba_sse_rows_4_impl(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -258,9 +258,8 @@ pub(crate) fn convolve_horizontal_rgba_sse_rows_one(
     }
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1")]
-unsafe fn convolve_horizontal_rgba_sse_rows_one_impl(
+fn convolve_horizontal_rgba_sse_rows_one_impl(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,

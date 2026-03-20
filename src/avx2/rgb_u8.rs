@@ -58,36 +58,32 @@ pub(crate) fn convolve_horizontal_rgb_avx_rows_4(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn convolve_horizontal_rgb_avx_rows_4_reg(
+fn convolve_horizontal_rgb_avx_rows_4_reg(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
 ) {
-    unsafe {
-        let unit = Row4ExecutionUnit::<false>::default();
-        unit.pass(src, src_stride, dst, dst_stride, filter_weights);
-    }
+    let unit = Row4ExecutionUnit::<false>::default();
+    unit.pass(src, src_stride, dst, dst_stride, filter_weights);
 }
 
 #[cfg(feature = "avx512")]
 #[target_feature(enable = "avx2", enable = "avxvnni")]
-unsafe fn convolve_horizontal_rgb_avx_rows_4_vnni(
+fn convolve_horizontal_rgb_avx_rows_4_vnni(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
     dst_stride: usize,
     filter_weights: &FilterWeights<i16>,
 ) {
-    unsafe {
-        let unit = Row4ExecutionUnit::<true>::default();
-        unit.pass(src, src_stride, dst, dst_stride, filter_weights);
-    }
+    let unit = Row4ExecutionUnit::<true>::default();
+    unit.pass(src, src_stride, dst, dst_stride, filter_weights);
 }
 
 #[inline(always)]
-unsafe fn load_rgb_x2(src: &[u8]) -> __m128i {
+fn load_rgb_x2(src: &[u8]) -> __m128i {
     unsafe {
         let mut rgb_pixel = _mm_setzero_si128();
         rgb_pixel = _mm_insert_epi32::<0>(rgb_pixel, (src.as_ptr() as *const i32).read_unaligned());
@@ -100,7 +96,7 @@ unsafe fn load_rgb_x2(src: &[u8]) -> __m128i {
 }
 
 #[inline(always)]
-unsafe fn load_rgb_x4(src: &[u8]) -> __m128i {
+fn load_rgb_x4(src: &[u8]) -> __m128i {
     unsafe {
         let mut rgb_pixel = _mm_loadu_si64(src.as_ptr());
         rgb_pixel = _mm_insert_epi32::<2>(
@@ -112,7 +108,7 @@ unsafe fn load_rgb_x4(src: &[u8]) -> __m128i {
 }
 
 #[inline(always)]
-unsafe fn load_distr_x4_rgb(src: &[u8], shuf: __m256i) -> __m256i {
+fn load_distr_x4_rgb(src: &[u8], shuf: __m256i) -> __m256i {
     unsafe {
         let rgb_pixel = load_rgb_x4(src);
 
@@ -127,7 +123,7 @@ unsafe fn load_distr_x4_rgb(src: &[u8], shuf: __m256i) -> __m256i {
 }
 
 #[inline(always)]
-unsafe fn load_distr_x8_rgb(src: &[u8], shuf: __m256i) -> (__m256i, __m256i) {
+fn load_distr_x8_rgb(src: &[u8], shuf: __m256i) -> (__m256i, __m256i) {
     unsafe {
         let pixel_lo = _mm_loadu_si128(src.as_ptr() as *const _);
         let pixel_hi = _mm_loadu_si64(src.get_unchecked(16..).as_ptr() as *const _);
@@ -139,7 +135,7 @@ unsafe fn load_distr_x8_rgb(src: &[u8], shuf: __m256i) -> (__m256i, __m256i) {
 }
 
 #[inline(always)]
-unsafe fn make_first_4(pixel: __m128i, shuf: __m256i) -> __m256i {
+fn make_first_4(pixel: __m128i, shuf: __m256i) -> __m256i {
     unsafe {
         // Extracting top pixel part
         let top_pixels = _mm_alignr_epi8::<6>(pixel, pixel);
@@ -152,7 +148,7 @@ unsafe fn make_first_4(pixel: __m128i, shuf: __m256i) -> __m256i {
 }
 
 #[inline(always)]
-unsafe fn make_second_4(pixel: __m128i, pixel2: __m128i, shuf: __m256i) -> __m256i {
+fn make_second_4(pixel: __m128i, pixel2: __m128i, shuf: __m256i) -> __m256i {
     unsafe {
         // Low part
         // [R0, G0, B0] [R1, G1, B1] [R2 G2 B2] [R3 G3 B3] [R4 G4 B4] [R5]
@@ -198,7 +194,7 @@ impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
     }
 
     #[inline(always)]
-    unsafe fn pass(
+    fn pass(
         &self,
         src: &[u8],
         src_stride: usize,
@@ -232,10 +228,10 @@ impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
             let (row1_ref, rest) = rest.split_at_mut(dst_stride);
             let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-            let iter_row0 = row0_ref.chunks_exact_mut(CHANNELS);
-            let iter_row1 = row1_ref.chunks_exact_mut(CHANNELS);
-            let iter_row2 = row2_ref.chunks_exact_mut(CHANNELS);
-            let iter_row3 = row3_ref.chunks_exact_mut(CHANNELS);
+            let iter_row0 = row0_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
+            let iter_row1 = row1_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
+            let iter_row2 = row2_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
+            let iter_row3 = row3_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
 
             for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
                 .zip(iter_row1)
@@ -474,32 +470,28 @@ pub(crate) fn convolve_horizontal_rgb_avx_row_one(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn convolve_horizontal_rgb_avx_row_one_reg(
+fn convolve_horizontal_rgb_avx_row_one_reg(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
 ) {
-    unsafe {
-        let unit = Row1Execution::<false>::default();
-        unit.pass(src, dst, filter_weights);
-    }
+    let unit = Row1Execution::<false>::default();
+    unit.pass(src, dst, filter_weights);
 }
 
 #[cfg(feature = "avx512")]
 #[target_feature(enable = "avx2", enable = "avxvnni")]
-unsafe fn convolve_horizontal_rgb_avx_row_one_vnni(
+fn convolve_horizontal_rgb_avx_row_one_vnni(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
 ) {
-    unsafe {
-        let unit = Row1Execution::<true>::default();
-        unit.pass(src, dst, filter_weights);
-    }
+    let unit = Row1Execution::<true>::default();
+    unit.pass(src, dst, filter_weights);
 }
 
 #[inline(always)]
-unsafe fn add_one_weight<const HAS_DOT: bool>(
+fn add_one_weight<const HAS_DOT: bool>(
     start_x: usize,
     src: &[u8],
     weight0: __m128i,
@@ -524,7 +516,7 @@ struct Row1Execution<const HAS_DOT: bool> {}
 
 impl<const HAS_DOT: bool> Row1Execution<HAS_DOT> {
     #[inline(always)]
-    unsafe fn pass(&self, src: &[u8], dst: &mut [u8], filter_weights: &FilterWeights<i16>) {
+    fn pass(&self, src: &[u8], dst: &mut [u8], filter_weights: &FilterWeights<i16>) {
         unsafe {
             const CHANNELS: usize = 3;
 
@@ -549,7 +541,9 @@ impl<const HAS_DOT: bool> Row1Execution<HAS_DOT> {
             // [G5, B5] [R6, G6, B6] [R7, G7, B7]
 
             for ((dst, bounds), weights) in dst
-                .chunks_exact_mut(CHANNELS)
+                .as_chunks_mut::<CHANNELS>()
+                .0
+                .iter_mut()
                 .zip(filter_weights.bounds.iter())
                 .zip(
                     filter_weights

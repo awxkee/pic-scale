@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#![cfg(all(target_arch = "aarch64", target_os = "macos"))]
 use accelerate::{kvImageNoFlags, vImageScale_ARGB8888, vImage_Buffer};
 use pic_scale::{ImageStore, ImageStoreMut};
 

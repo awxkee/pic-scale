@@ -34,7 +34,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-unsafe fn convolve_vertical_part_sse_24_f32<const FMA: bool>(
+fn convolve_vertical_part_sse_24_f32<const FMA: bool>(
     start_y: usize,
     start_x: usize,
     src: &[f32],
@@ -85,7 +85,7 @@ unsafe fn convolve_vertical_part_sse_24_f32<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn convolve_vertical_part_sse_16_f32<const FMA: bool>(
+fn convolve_vertical_part_sse_16_f32<const FMA: bool>(
     start_y: usize,
     start_x: usize,
     src: &[f32],
@@ -128,7 +128,7 @@ unsafe fn convolve_vertical_part_sse_16_f32<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn convolve_vertical_part_sse_8_f32<const FMA: bool>(
+fn convolve_vertical_part_sse_8_f32<const FMA: bool>(
     start_y: usize,
     start_x: usize,
     src: &[f32],
@@ -163,7 +163,7 @@ unsafe fn convolve_vertical_part_sse_8_f32<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn convolve_vertical_part_sse_4_f32<const FMA: bool>(
+fn convolve_vertical_part_sse_4_f32<const FMA: bool>(
     start_y: usize,
     start_x: usize,
     src: &[f32],
@@ -195,7 +195,7 @@ unsafe fn convolve_vertical_part_sse_4_f32<const FMA: bool>(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn convolve_vertical_part_sse_f32<const FMA: bool>(
+pub(crate) fn convolve_vertical_part_sse_f32<const FMA: bool>(
     start_y: usize,
     start_x: usize,
     src: &[f32],
@@ -247,7 +247,7 @@ pub(crate) fn convolve_vertical_rgb_sse_row_f32<const FMA: bool>(
 
 #[target_feature(enable = "sse4.1")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_vertical_rgb_sse_row_f32_regular(
+fn convolve_vertical_rgb_sse_row_f32_regular(
     width: usize,
     bounds: &FilterBounds,
     src: &[f32],
@@ -255,16 +255,14 @@ unsafe fn convolve_vertical_rgb_sse_row_f32_regular(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    unsafe {
-        convolve_vertical_rgb_sse_row_f32_impl::<false>(
-            width, bounds, src, dst, src_stride, weight_ptr,
-        );
-    }
+    convolve_vertical_rgb_sse_row_f32_impl::<false>(
+        width, bounds, src, dst, src_stride, weight_ptr,
+    );
 }
 
 #[target_feature(enable = "sse4.1", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_vertical_rgb_sse_row_f32_fma(
+fn convolve_vertical_rgb_sse_row_f32_fma(
     width: usize,
     bounds: &FilterBounds,
     src: &[f32],
@@ -272,15 +270,11 @@ unsafe fn convolve_vertical_rgb_sse_row_f32_fma(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    unsafe {
-        convolve_vertical_rgb_sse_row_f32_impl::<true>(
-            width, bounds, src, dst, src_stride, weight_ptr,
-        );
-    }
+    convolve_vertical_rgb_sse_row_f32_impl::<true>(width, bounds, src, dst, src_stride, weight_ptr);
 }
 
 #[inline(always)]
-unsafe fn convolve_vertical_rgb_sse_row_f32_impl<const FMA: bool>(
+fn convolve_vertical_rgb_sse_row_f32_impl<const FMA: bool>(
     _: usize,
     bounds: &FilterBounds,
     src: &[f32],
@@ -288,77 +282,75 @@ unsafe fn convolve_vertical_rgb_sse_row_f32_impl<const FMA: bool>(
     src_stride: usize,
     weight_ptr: &[f32],
 ) {
-    unsafe {
-        let mut cx = 0usize;
-        let dst_width = dst.len();
+    let mut cx = 0usize;
+    let dst_width = dst.len();
 
-        while cx + 24 < dst_width {
-            convolve_vertical_part_sse_24_f32::<FMA>(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
+    while cx + 24 < dst_width {
+        convolve_vertical_part_sse_24_f32::<FMA>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+        );
 
-            cx += 24;
-        }
+        cx += 24;
+    }
 
-        while cx + 16 < dst_width {
-            convolve_vertical_part_sse_16_f32::<FMA>(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
+    while cx + 16 < dst_width {
+        convolve_vertical_part_sse_16_f32::<FMA>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+        );
 
-            cx += 16;
-        }
+        cx += 16;
+    }
 
-        while cx + 8 < dst_width {
-            convolve_vertical_part_sse_8_f32::<FMA>(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
+    while cx + 8 < dst_width {
+        convolve_vertical_part_sse_8_f32::<FMA>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+        );
 
-            cx += 8;
-        }
+        cx += 8;
+    }
 
-        while cx + 4 < dst_width {
-            convolve_vertical_part_sse_4_f32::<FMA>(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
+    while cx + 4 < dst_width {
+        convolve_vertical_part_sse_4_f32::<FMA>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+        );
 
-            cx += 4;
-        }
+        cx += 4;
+    }
 
-        while cx < dst_width {
-            convolve_vertical_part_sse_f32::<FMA>(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
-            cx += 1;
-        }
+    while cx < dst_width {
+        convolve_vertical_part_sse_f32::<FMA>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+        );
+        cx += 1;
     }
 }

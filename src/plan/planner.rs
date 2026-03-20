@@ -74,9 +74,9 @@ pub trait ResamplingPlan<T: Copy, const N: usize> {
     /// Pass a slice of at least this length to [`resample_with_scratch`].
     fn scratch_size(&self) -> usize;
     /// Returns the target (output) image dimensions this plan was built for.
-    fn get_target_size(&self) -> ImageSize;
+    fn target_size(&self) -> ImageSize;
     /// Returns the source (input) image dimensions this plan was built for.
-    fn get_source_size(&self) -> ImageSize;
+    fn source_size(&self) -> ImageSize;
 }
 
 /// Type alias for a thread-safe, dynamically dispatched [`ResamplingPlan`].

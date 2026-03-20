@@ -1,12 +1,12 @@
 #![feature(f16)]
 mod acc;
+mod fuzzer_explore;
 mod merge;
 mod split;
-mod fuzzer_explore;
 
 use std::time::Instant;
 
-use crate::acc::resize_with_accelerate;
+use crate::fuzzer_explore::resize_rgba;
 use core::f16;
 use fast_image_resize::images::Image;
 use fast_image_resize::{
@@ -22,16 +22,9 @@ use pic_scale::{
     RgbaF32ImageStoreMut, Scaler, ThreadingPolicy, WorkloadStrategy,
 };
 use yuv::{ar30_to_rgb8, rgba8_to_ar30, Rgb30ByteOrder};
-use crate::fuzzer_explore::resize_rgba;
 
 fn main() {
-    resize_rgba(   0, 1,
-                   256,
-                   79,
-                   256,
-                   ResamplingFunction::Bilinear,
-                   false,
-    );
+    resize_rgba(0, 1, 256, 79, 256, ResamplingFunction::Bilinear, false);
     #[allow(overflowing_literals)]
     // test_fast_image();
     let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
@@ -45,7 +38,7 @@ fn main() {
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
 
-    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    let mut scaler = Scaler::new(ResamplingFunction::MitchellNetravalli);
     scaler.set_threading_policy(ThreadingPolicy::Single);
     // scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 

@@ -37,7 +37,7 @@ use crate::sse::_mm_prefer_fma_ps;
 use crate::sse::f16_utils::{_mm_cvtph_psx, _mm_cvtps_phx};
 
 #[inline(always)]
-pub(crate) unsafe fn convolve_vertical_part_sse_f16<const F16C: bool, const FMA: bool>(
+pub(crate) fn convolve_vertical_part_sse_f16<const F16C: bool, const FMA: bool>(
     start_y: usize,
     start_x: usize,
     src: &[f16],
@@ -72,7 +72,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_f16<const F16C: bool, const FMA:
 }
 
 #[inline(always)]
-pub(crate) unsafe fn convolve_vertical_part_sse_4_f16<const F16C: bool, const FMA: bool>(
+pub(crate) fn convolve_vertical_part_sse_4_f16<const F16C: bool, const FMA: bool>(
     start_y: usize,
     start_x: usize,
     src: &[f16],
@@ -106,7 +106,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_4_f16<const F16C: bool, const FM
 }
 
 #[inline(always)]
-pub(crate) unsafe fn convolve_vertical_part_sse_16_16<const F16C: bool, const FMA: bool>(
+pub(crate) fn convolve_vertical_part_sse_16_16<const F16C: bool, const FMA: bool>(
     start_y: usize,
     start_x: usize,
     src: &[f16],
@@ -161,7 +161,7 @@ pub(crate) unsafe fn convolve_vertical_part_sse_16_16<const F16C: bool, const FM
 }
 
 #[inline(always)]
-pub(crate) unsafe fn convolve_vertical_part_sse_8_f16<const F16C: bool, const FMA: bool>(
+pub(crate) fn convolve_vertical_part_sse_8_f16<const F16C: bool, const FMA: bool>(
     start_y: usize,
     start_x: usize,
     src: &[f16],
@@ -286,65 +286,57 @@ fn convolve_vertical_sse_row_f16_impl<const FMA: bool, const F16C: bool>(
     let dst_width = dst.len();
 
     while cx + 16 < dst_width {
-        unsafe {
-            convolve_vertical_part_sse_16_16::<F16C, FMA>(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
-        }
+        convolve_vertical_part_sse_16_16::<F16C, FMA>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+        );
 
         cx += 16;
     }
 
     while cx + 8 < dst_width {
-        unsafe {
-            convolve_vertical_part_sse_8_f16::<F16C, FMA>(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
-        }
+        convolve_vertical_part_sse_8_f16::<F16C, FMA>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+        );
 
         cx += 8;
     }
 
     while cx + 4 < dst_width {
-        unsafe {
-            convolve_vertical_part_sse_4_f16::<F16C, FMA>(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
-        }
+        convolve_vertical_part_sse_4_f16::<F16C, FMA>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+        );
 
         cx += 4;
     }
 
     while cx < dst_width {
-        unsafe {
-            convolve_vertical_part_sse_f16::<F16C, FMA>(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
-        }
+        convolve_vertical_part_sse_f16::<F16C, FMA>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+        );
         cx += 1;
     }
 }

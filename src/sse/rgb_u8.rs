@@ -50,7 +50,7 @@ pub(crate) fn convolve_horizontal_rgb_sse_rows_4(
 }
 
 #[inline(always)]
-unsafe fn load_rgb_x2(src: &[u8]) -> __m128i {
+fn load_rgb_x2(src: &[u8]) -> __m128i {
     unsafe {
         let mut rgb_pixel = _mm_setzero_si128();
         rgb_pixel = _mm_insert_epi32::<0>(rgb_pixel, (src.as_ptr() as *const i32).read_unaligned());
@@ -63,7 +63,7 @@ unsafe fn load_rgb_x2(src: &[u8]) -> __m128i {
 }
 
 #[inline(always)]
-unsafe fn load_rgb_x4(src: &[u8]) -> __m128i {
+fn load_rgb_x4(src: &[u8]) -> __m128i {
     unsafe {
         let mut rgb_pixel = _mm_loadu_si64(src.as_ptr());
         rgb_pixel = _mm_insert_epi32::<2>(
@@ -267,7 +267,7 @@ pub(crate) fn convolve_horizontal_rgb_sse_row_one(
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
-unsafe fn convolve_horizontal_rgb_sse_row_one_impl(
+fn convolve_horizontal_rgb_sse_row_one_impl(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,

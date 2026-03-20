@@ -35,7 +35,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-unsafe fn convolve_horizontal_parts_one_rgba_f32<const FMA: bool>(
+fn convolve_horizontal_parts_one_rgba_f32<const FMA: bool>(
     start_x: usize,
     src: &[f32],
     weight0: __m128,
@@ -161,7 +161,7 @@ fn convolve_horizontal_rgba_sse_row_one_f32_impl<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn convolve_horizontal_parts_4_rgba_f32<const FMA: bool>(
+fn convolve_horizontal_parts_4_rgba_f32<const FMA: bool>(
     start_x: usize,
     src: &[f32],
     weight0: __m128,
@@ -187,7 +187,7 @@ unsafe fn convolve_horizontal_parts_4_rgba_f32<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn convolve_horizontal_parts_2_rgba_f32<const FMA: bool>(
+fn convolve_horizontal_parts_2_rgba_f32<const FMA: bool>(
     start_x: usize,
     src: &[f32],
     weight0: __m128,

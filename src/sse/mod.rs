@@ -39,7 +39,6 @@ mod f16_utils;
 mod horizontal_ar30;
 mod plane_f32;
 mod plane_u8;
-mod plane_u8_hrs;
 #[cfg(feature = "nightly_f16")]
 mod rgb_f16;
 mod rgb_f32;
@@ -50,7 +49,6 @@ mod rgba_f32;
 mod rgba_u16;
 mod rgba_u16_lb;
 mod rgba_u8;
-mod rgba_u8_lb;
 mod routines;
 mod u8_utils;
 mod utils;
@@ -61,7 +59,6 @@ mod vertical_f32;
 mod vertical_u16;
 mod vertical_u16_lb;
 mod vertical_u8;
-mod vertical_u8_lp;
 
 #[cfg(feature = "nightly_f16")]
 pub(crate) use alpha_f16::{sse_premultiply_alpha_rgba_f16, sse_unpremultiply_alpha_rgba_f16};
@@ -83,9 +80,6 @@ pub(crate) use plane_f32::convolve_horizontal_plane_sse_rows_4;
 pub(crate) use plane_u8::{
     convolve_horizontal_plane_sse_row, convolve_horizontal_plane_sse_rows_4_u8,
 };
-pub(crate) use plane_u8_hrs::{
-    convolve_horizontal_plane_sse_row_hrs, convolve_horizontal_plane_sse_rows_hrs_4_u8,
-};
 #[cfg(feature = "nightly_f16")]
 pub(crate) use rgb_f16::{
     convolve_horizontal_rgb_sse_row_one_f16, convolve_horizontal_rgb_sse_rows_4_f16,
@@ -104,9 +98,6 @@ pub(crate) use rgba_f32::{
 pub(crate) use rgba_u8::{
     convolve_horizontal_rgba_sse_rows_4, convolve_horizontal_rgba_sse_rows_one,
 };
-pub(crate) use rgba_u8_lb::{
-    convolve_horizontal_rgba_sse_rows_4_lb, convolve_horizontal_rgba_sse_rows_one_lb,
-};
 pub(crate) use rgba_u16::{
     convolve_horizontal_rgba_sse_rows_4_u16, convolve_horizontal_rgba_sse_u16_row,
 };
@@ -121,7 +112,6 @@ pub(crate) use vertical_ar30::sse_column_handler_fixed_point_ar30;
 pub(crate) use vertical_f16::convolve_vertical_sse_row_f16;
 pub(crate) use vertical_f32::convolve_vertical_rgb_sse_row_f32;
 pub(crate) use vertical_u8::convolve_vertical_sse_row;
-pub(crate) use vertical_u8_lp::convolve_vertical_sse_row_lp;
 pub(crate) use vertical_u16::convolve_column_sse_u16;
 pub(crate) use vertical_u16_lb::convolve_column_lb_sse_u16;
 

@@ -34,7 +34,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-unsafe fn conv_horiz_rgba_1_u16<const FMA: bool>(
+fn conv_horiz_rgba_1_u16<const FMA: bool>(
     start_x: usize,
     src: &[u16],
     w0: __m128,
@@ -53,7 +53,7 @@ unsafe fn conv_horiz_rgba_1_u16<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn conv_horiz_rgba_2_u16<const FMA: bool>(
+fn conv_horiz_rgba_2_u16<const FMA: bool>(
     start_x: usize,
     src: &[u16],
     w0: __m128,
@@ -80,7 +80,7 @@ unsafe fn conv_horiz_rgba_2_u16<const FMA: bool>(
 }
 
 #[inline]
-unsafe fn conv_horiz_rgba_4_u16<const FMA: bool>(
+fn conv_horiz_rgba_4_u16<const FMA: bool>(
     start_x: usize,
     src: &[u16],
     w0: __m128,
@@ -120,7 +120,7 @@ unsafe fn conv_horiz_rgba_4_u16<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn conv_horiz_rgba_8_u16<const FMA: bool>(
+fn conv_horiz_rgba_8_u16<const FMA: bool>(
     start_x: usize,
     src: &[u16],
     set1: (__m128, __m128, __m128, __m128),
@@ -216,7 +216,7 @@ pub(crate) fn convolve_horizontal_rgba_sse_rows_4_u16(
 
 #[target_feature(enable = "sse4.1")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_rgba_sse_rows_4_u16_def(
+fn convolve_horizontal_rgba_sse_rows_4_u16_def(
     src: &[u16],
     src_stride: usize,
     dst: &mut [u16],
@@ -224,21 +224,19 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_u16_def(
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
-    unsafe {
-        convolve_horizontal_rgba_sse_rows_4_u16_impl::<false>(
-            src,
-            src_stride,
-            dst,
-            dst_stride,
-            filter_weights,
-            bit_depth,
-        );
-    }
+    convolve_horizontal_rgba_sse_rows_4_u16_impl::<false>(
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+        filter_weights,
+        bit_depth,
+    );
 }
 
 #[target_feature(enable = "sse4.1", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_rgba_sse_rows_4_u16_fma(
+fn convolve_horizontal_rgba_sse_rows_4_u16_fma(
     src: &[u16],
     src_stride: usize,
     dst: &mut [u16],
@@ -246,20 +244,18 @@ unsafe fn convolve_horizontal_rgba_sse_rows_4_u16_fma(
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
-    unsafe {
-        convolve_horizontal_rgba_sse_rows_4_u16_impl::<true>(
-            src,
-            src_stride,
-            dst,
-            dst_stride,
-            filter_weights,
-            bit_depth,
-        );
-    }
+    convolve_horizontal_rgba_sse_rows_4_u16_impl::<true>(
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+        filter_weights,
+        bit_depth,
+    );
 }
 
 #[inline(always)]
-unsafe fn convolve_horizontal_rgba_sse_rows_4_u16_impl<const FMA: bool>(
+fn convolve_horizontal_rgba_sse_rows_4_u16_impl<const FMA: bool>(
     src: &[u16],
     src_stride: usize,
     dst: &mut [u16],
@@ -409,32 +405,28 @@ pub(crate) fn convolve_horizontal_rgba_sse_u16_row(
 
 #[target_feature(enable = "sse4.1")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_rgba_sse_u16_row_def(
+fn convolve_horizontal_rgba_sse_u16_row_def(
     src: &[u16],
     dst: &mut [u16],
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
-    unsafe {
-        convolve_horizontal_rgba_sse_u16_row_impl::<false>(src, dst, filter_weights, bit_depth);
-    }
+    convolve_horizontal_rgba_sse_u16_row_impl::<false>(src, dst, filter_weights, bit_depth);
 }
 
 #[target_feature(enable = "sse4.1", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
-unsafe fn convolve_horizontal_rgba_sse_u16_row_fma(
+fn convolve_horizontal_rgba_sse_u16_row_fma(
     src: &[u16],
     dst: &mut [u16],
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
-    unsafe {
-        convolve_horizontal_rgba_sse_u16_row_impl::<true>(src, dst, filter_weights, bit_depth);
-    }
+    convolve_horizontal_rgba_sse_u16_row_impl::<true>(src, dst, filter_weights, bit_depth);
 }
 
 #[inline(always)]
-unsafe fn convolve_horizontal_rgba_sse_u16_row_impl<const FMA: bool>(
+fn convolve_horizontal_rgba_sse_u16_row_impl<const FMA: bool>(
     src: &[u16],
     dst: &mut [u16],
     filter_weights: &FilterWeights<f32>,

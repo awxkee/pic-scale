@@ -36,34 +36,34 @@ use crate::filter_weights::FilterWeights;
 use crate::sse::{_mm_muladd_wide_epi16, shuffle};
 use crate::support::{PRECISION, ROUNDING_CONST};
 
-macro_rules! s_accumulate_8_horiz {
-    ($store: expr, $ptr: expr, $weights: expr) => {{
-        let pixel_colors = _mm_loadu_si64($ptr);
-        let px_16 = _mm_unpacklo_epi8(pixel_colors, _mm_setzero_si128());
-        let px_lo = _mm_unpacklo_epi16(px_16, _mm_setzero_si128());
-        let px_hi = _mm_unpackhi_epi16(px_16, _mm_setzero_si128());
+#[inline]
+#[target_feature(enable = "sse4.1")]
+fn s_accumulate_8_horiz(store: __m128i, ptr: &[u8], weights: (__m128i, __m128i)) -> __m128i {
+    let pixel_colors = unsafe { _mm_loadu_si64(ptr.as_ptr()) };
+    let px_16 = _mm_unpacklo_epi8(pixel_colors, _mm_setzero_si128());
+    let px_lo = _mm_unpacklo_epi16(px_16, _mm_setzero_si128());
+    let px_hi = _mm_unpackhi_epi16(px_16, _mm_setzero_si128());
 
-        $store = _mm_muladd_wide_epi16($store, px_lo, $weights.0);
-        $store = _mm_muladd_wide_epi16($store, px_hi, $weights.1);
-    }};
+    let store = _mm_muladd_wide_epi16(store, px_lo, weights.0);
+    _mm_muladd_wide_epi16(store, px_hi, weights.1)
 }
 
-macro_rules! s_accumulate_4_horiz {
-    ($store: expr, $ptr: expr, $weights: expr) => {{
-        let zeros = _mm_setzero_si128();
-        let pixel_colors = _mm_unpacklo_epi16(
-            _mm_unpacklo_epi8(_mm_loadu_si32($ptr as *const _), zeros),
-            zeros,
-        );
-        $store = _mm_muladd_wide_epi16($store, pixel_colors, $weights);
-    }};
+#[inline]
+#[target_feature(enable = "sse4.1")]
+fn s_accumulate_4_horiz(store: __m128i, ptr: &[u8], weights: __m128i) -> __m128i {
+    let zeros = _mm_setzero_si128();
+    let pixel_colors = _mm_unpacklo_epi16(
+        _mm_unpacklo_epi8(unsafe { _mm_loadu_si32(ptr.as_ptr().cast()) }, zeros),
+        zeros,
+    );
+    _mm_muladd_wide_epi16(store, pixel_colors, weights)
 }
 
-macro_rules! s_accumulate_1_horiz {
-    ($store: expr, $ptr: expr, $weight: expr) => {{
-        let pixel_colors = _mm_setr_epi32($ptr.read_unaligned() as i32, 0, 0, 0);
-        $store = _mm_muladd_wide_epi16($store, pixel_colors, $weight);
-    }};
+#[inline]
+#[target_feature(enable = "sse4.1")]
+fn s_accumulate_1_horiz(store: __m128i, ptr: &[u8], weight: __m128i) -> __m128i {
+    let pixel_colors = _mm_setr_epi32(unsafe { *ptr.get_unchecked(0) } as i32, 0, 0, 0);
+    _mm_muladd_wide_epi16(store, pixel_colors, weight)
 }
 
 pub(crate) fn convolve_horizontal_plane_sse_rows_4_u8(
@@ -86,7 +86,7 @@ pub(crate) fn convolve_horizontal_plane_sse_rows_4_u8(
 }
 
 #[inline(always)]
-unsafe fn _mm_hsum_reduce_epi32<const PRECISION: i32>(x: __m128i) -> u8 {
+fn _mm_hsum_reduce_epi32<const PRECISION: i32>(x: __m128i) -> u8 {
     unsafe {
         const FIRST_MASK: i32 = shuffle(1, 0, 3, 2);
         let hi64 = _mm_shuffle_epi32::<FIRST_MASK>(x);
@@ -101,7 +101,7 @@ unsafe fn _mm_hsum_reduce_epi32<const PRECISION: i32>(x: __m128i) -> u8 {
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn convolve_horizontal_plane_sse_rows_4_u8_impl(
+fn convolve_horizontal_plane_sse_rows_4_u8_impl(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -142,7 +142,7 @@ unsafe fn convolve_horizontal_plane_sse_rows_4_u8_impl(
             let src2 = src1.get_unchecked(src_stride..);
             let src3 = src2.get_unchecked(src_stride..);
 
-            while jx + 8 < bounds.size {
+            while jx + 8 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 8));
                 let weights_i16 = _mm_loadu_si128(w_ptr.as_ptr() as *const __m128i);
                 let weights = (
@@ -152,36 +152,36 @@ unsafe fn convolve_horizontal_plane_sse_rows_4_u8_impl(
                 let bounds_start = bounds.start + jx;
 
                 let src_ptr = src0.get_unchecked(bounds_start..);
-                s_accumulate_8_horiz!(store0, src_ptr.as_ptr(), weights);
+                store0 = s_accumulate_8_horiz(store0, src_ptr, weights);
 
                 let src_ptr1 = src1.get_unchecked(bounds_start..);
-                s_accumulate_8_horiz!(store1, src_ptr1.as_ptr(), weights);
+                store1 = s_accumulate_8_horiz(store1, src_ptr1, weights);
 
                 let src_ptr2 = src2.get_unchecked(bounds_start..);
-                s_accumulate_8_horiz!(store2, src_ptr2.as_ptr(), weights);
+                store2 = s_accumulate_8_horiz(store2, src_ptr2, weights);
 
                 let src_ptr3 = src3.get_unchecked(bounds_start..);
-                s_accumulate_8_horiz!(store3, src_ptr3.as_ptr(), weights);
+                store3 = s_accumulate_8_horiz(store3, src_ptr3, weights);
 
                 jx += 8;
             }
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 4));
                 let weights = _mm_cvtepi16_epi32(_mm_loadu_si64(w_ptr.as_ptr() as *const u8));
                 let bounds_start = bounds.start + jx;
 
                 let src_ptr = src0.get_unchecked(bounds_start..);
-                s_accumulate_4_horiz!(store0, src_ptr.as_ptr(), weights);
+                store0 = s_accumulate_4_horiz(store0, src_ptr, weights);
 
                 let src_ptr1 = src1.get_unchecked(bounds_start..);
-                s_accumulate_4_horiz!(store1, src_ptr1.as_ptr(), weights);
+                store1 = s_accumulate_4_horiz(store1, src_ptr1, weights);
 
                 let src_ptr2 = src2.get_unchecked(bounds_start..);
-                s_accumulate_4_horiz!(store2, src_ptr2.as_ptr(), weights);
+                store2 = s_accumulate_4_horiz(store2, src_ptr2, weights);
 
                 let src_ptr3 = src3.get_unchecked(bounds_start..);
-                s_accumulate_4_horiz!(store3, src_ptr3.as_ptr(), weights);
+                store3 = s_accumulate_4_horiz(store3, src_ptr3, weights);
 
                 jx += 4;
             }
@@ -192,16 +192,16 @@ unsafe fn convolve_horizontal_plane_sse_rows_4_u8_impl(
                 let bounds_start = bounds.start + jx;
 
                 let src_ptr = src0.get_unchecked(bounds_start..);
-                s_accumulate_1_horiz!(store0, src_ptr.as_ptr(), weight);
+                store0 = s_accumulate_1_horiz(store0, src_ptr, weight);
 
                 let src_ptr1 = src1.get_unchecked(bounds_start..);
-                s_accumulate_1_horiz!(store1, src_ptr1.as_ptr(), weight);
+                store1 = s_accumulate_1_horiz(store1, src_ptr1, weight);
 
                 let src_ptr2 = src2.get_unchecked(bounds_start..);
-                s_accumulate_1_horiz!(store2, src_ptr2.as_ptr(), weight);
+                store2 = s_accumulate_1_horiz(store2, src_ptr2, weight);
 
                 let src_ptr3 = src3.get_unchecked(bounds_start..);
-                s_accumulate_1_horiz!(store3, src_ptr3.as_ptr(), weight);
+                store3 = s_accumulate_1_horiz(store3, src_ptr3, weight);
 
                 jx += 1;
             }
@@ -249,7 +249,7 @@ unsafe fn convolve_horizontal_plane_sse_row_impl(
             let mut jx = 0usize;
             let mut store = _mm_setr_epi32(ROUNDING_CONST, 0i32, 0i32, 0i32);
 
-            while jx + 8 < bounds.size {
+            while jx + 8 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 8));
                 let weights_i16 = _mm_loadu_si128(w_ptr.as_ptr() as *const __m128i);
                 let weights = (
@@ -259,18 +259,18 @@ unsafe fn convolve_horizontal_plane_sse_row_impl(
                 let bounds_start = bounds.start + jx;
 
                 let src_ptr = src.get_unchecked(bounds_start..);
-                s_accumulate_8_horiz!(store, src_ptr.as_ptr(), weights);
+                store = s_accumulate_8_horiz(store, src_ptr, weights);
 
                 jx += 8;
             }
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 4));
                 let weights = _mm_cvtepi16_epi32(_mm_loadu_si64(w_ptr.as_ptr() as *const u8));
                 let bounds_start = bounds.start + jx;
 
                 let src_ptr = src.get_unchecked(bounds_start..);
-                s_accumulate_4_horiz!(store, src_ptr.as_ptr(), weights);
+                store = s_accumulate_4_horiz(store, src_ptr, weights);
 
                 jx += 4;
             }
@@ -280,7 +280,7 @@ unsafe fn convolve_horizontal_plane_sse_row_impl(
                 let weight = _mm_setr_epi32(w_ptr.as_ptr().read_unaligned() as i32, 0, 0, 0);
                 let bounds_start = bounds.start + jx;
                 let src_ptr = src.get_unchecked(bounds_start..);
-                s_accumulate_1_horiz!(store, src_ptr.as_ptr(), weight);
+                store = s_accumulate_1_horiz(store, src_ptr, weight);
                 jx += 1;
             }
 

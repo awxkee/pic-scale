@@ -228,15 +228,35 @@ where
                 local_filter_iteration += 1;
             }
 
-            let alpha: W = 0.7f32.as_();
             if resampling_filter.is_ewa && !local_filters.is_empty() {
-                weights_sum = local_filters[0].as_();
-                let ones_w: W = 1f32.as_();
-                for j in 1..local_filter_iteration {
-                    let new_weight = alpha * local_filters[j].as_()
-                        + (ones_w - alpha) * local_filters[j - 1].as_();
-                    local_filters[j] = new_weight.as_();
-                    weights_sum += new_weight;
+                weights_sum = 0f32.as_();
+                for (j, filter) in local_filters
+                    .iter_mut()
+                    .take(local_filter_iteration)
+                    .enumerate()
+                {
+                    // recompute weight using 2D radial distance from center
+                    // dx is the 1D offset we already computed per tap; treat it as the radial r
+                    let tap_pos: T = (start + j).as_();
+                    let dx = (tap_pos - center).abs();
+                    // r² = dx² — in 1D separable EWA pass, r = |dx|, but we weight
+                    // using jinc(r) * window(r) so it behaves as a slice through
+                    // the 2D circular kernel rather than an outer product of 1D kernels
+                    let r = dx * filter_scale;
+                    let ewa_weight = if r < resampling_filter.min_kernel_size.as_() {
+                        T::jinc(r)
+                            * match window_func {
+                                Some(w) => {
+                                    let wr = r / resampling_filter.min_kernel_size.as_();
+                                    (w.window)(wr * w.window_size.as_())
+                                }
+                                None => 1f32.as_(),
+                            }
+                    } else {
+                        0f32.as_()
+                    };
+                    *filter = ewa_weight;
+                    weights_sum += ewa_weight.as_();
                 }
             }
 

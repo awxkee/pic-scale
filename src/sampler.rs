@@ -46,6 +46,7 @@ use crate::lanczos::{
 };
 use crate::math::gaussian::Exponential;
 use crate::math::kaiser::BesselI0;
+use crate::math::lanczos::{lanczos5, lanczos5_jinc};
 use crate::math::sinc::{Sinc, Trigonometry};
 use crate::quadric::quadric;
 use crate::sinc::sinc;
@@ -102,10 +103,14 @@ pub enum ResamplingFunction {
     Lanczos2,
     Lanczos3,
     Lanczos4,
+    Lanczos5,
+    Lanczos6,
     Lanczos2Jinc,
     Lanczos3Jinc,
     Lanczos4Jinc,
-    EwaLanczos3Jinc,
+    Lanczos5Jinc,
+    Lanczos6Jinc,
+    EwaLanczos3,
     Ginseng,
     EwaGinseng,
     EwaLanczosSharp,
@@ -114,8 +119,8 @@ pub enum ResamplingFunction {
     HaasnSoft,
     Lagrange2,
     Lagrange3,
-    Lanczos6,
-    Lanczos6Jinc,
+    EwaMitchellNetravalli,
+    EwaCatmullRom,
     /// This method replicates `INTER_AREA` behaviour from OpenCV
     Area,
 }
@@ -160,7 +165,7 @@ impl From<u32> for ResamplingFunction {
             34 => ResamplingFunction::EwaBlackman,
             35 => ResamplingFunction::EwaQuadric,
             36 => ResamplingFunction::EwaRobidouxSharp,
-            37 => ResamplingFunction::EwaLanczos3Jinc,
+            37 => ResamplingFunction::EwaLanczos3,
             38 => ResamplingFunction::Ginseng,
             39 => ResamplingFunction::EwaGinseng,
             40 => ResamplingFunction::EwaLanczosSharp,
@@ -172,6 +177,10 @@ impl From<u32> for ResamplingFunction {
             46 => ResamplingFunction::Lanczos6,
             47 => ResamplingFunction::Lanczos6Jinc,
             48 => ResamplingFunction::Area,
+            49 => ResamplingFunction::Lanczos5,
+            50 => ResamplingFunction::Lanczos5Jinc,
+            51 => ResamplingFunction::EwaCatmullRom,
+            52 => ResamplingFunction::EwaMitchellNetravalli,
             _ => ResamplingFunction::Bilinear,
         }
     }
@@ -300,14 +309,15 @@ impl ResamplingFunction {
             ResamplingFunction::MitchellNetravalli => {
                 ResamplingFilter::new(mitchell_netravalli, 2f32, false)
             }
-            ResamplingFunction::Lanczos3 => ResamplingFilter::new(lanczos3, 3f32, false),
             ResamplingFunction::CatmullRom => ResamplingFilter::new(catmull_rom, 2f32, false),
+            ResamplingFunction::Lanczos2 => ResamplingFilter::new(lanczos2, 2f32, false),
+            ResamplingFunction::Lanczos3 => ResamplingFilter::new(lanczos3, 3f32, false),
+            ResamplingFunction::Lanczos4 => ResamplingFilter::new(lanczos4, 4f32, false),
+            ResamplingFunction::Lanczos5 => ResamplingFilter::new(lanczos5, 5f32, false),
             ResamplingFunction::Hermite => ResamplingFilter::new(hermite_spline, 2f32, false),
             ResamplingFunction::BSpline => ResamplingFilter::new(b_spline, 2f32, false),
             ResamplingFunction::Hann => ResamplingFilter::new(hann, 3f32, false),
             ResamplingFunction::Bicubic => ResamplingFilter::new(bicubic_spline, 2f32, false),
-            ResamplingFunction::Lanczos4 => ResamplingFilter::new(lanczos4, 4f32, false),
-            ResamplingFunction::Lanczos2 => ResamplingFilter::new(lanczos2, 2f32, false),
             ResamplingFunction::Hamming => ResamplingFilter::new(hamming, 1f32, false),
             ResamplingFunction::Hanning => ResamplingFilter::new(hanning, 2f32, false),
             ResamplingFunction::EwaHanning => ResamplingFilter::new_with_window(
@@ -344,8 +354,9 @@ impl ResamplingFunction {
             ResamplingFunction::Bohman => ResamplingFilter::new(bohman, 2f32, false),
             ResamplingFunction::Lanczos2Jinc => ResamplingFilter::new(lanczos2_jinc, 2f32, false),
             ResamplingFunction::Lanczos3Jinc => ResamplingFilter::new(lanczos3_jinc, 3f32, false),
-            ResamplingFunction::EwaLanczos3Jinc => ResamplingFilter::new(lanczos3_jinc, 3f32, true),
+            ResamplingFunction::EwaLanczos3 => ResamplingFilter::new(lanczos3, 3f32, true),
             ResamplingFunction::Lanczos4Jinc => ResamplingFilter::new(lanczos4_jinc, 4f32, false),
+            ResamplingFunction::Lanczos5Jinc => ResamplingFilter::new(lanczos5_jinc, 5f32, false),
             ResamplingFunction::Blackman => ResamplingFilter::new(blackman, 2f32, false),
             ResamplingFunction::EwaBlackman => ResamplingFilter::new(blackman, 2f32, true),
             ResamplingFunction::Ginseng => ResamplingFilter::new_with_window(
@@ -388,6 +399,10 @@ impl ResamplingFunction {
             ResamplingFunction::Lagrange3 => ResamplingFilter::new(lagrange3, 3f32, false),
             ResamplingFunction::Lanczos6Jinc => ResamplingFilter::new(lanczos6_jinc, 6f32, false),
             ResamplingFunction::Lanczos6 => ResamplingFilter::new(lanczos6, 6f32, false),
+            ResamplingFunction::EwaMitchellNetravalli => {
+                ResamplingFilter::new(mitchell_netravalli, 2f32, true)
+            }
+            ResamplingFunction::EwaCatmullRom => ResamplingFilter::new(catmull_rom, 2f32, true),
         }
     }
 }

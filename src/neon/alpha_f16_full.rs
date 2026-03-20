@@ -33,7 +33,7 @@ use novtb::{ParallelZonedIterator, TbSliceMut};
 use std::arch::aarch64::*;
 
 #[target_feature(enable = "fp16")]
-unsafe fn neon_premultiply_alpha_rgba_row_f16_full(dst: &mut [f16], src: &[f16]) {
+fn neon_premultiply_alpha_rgba_row_f16_full(dst: &mut [f16], src: &[f16]) {
     unsafe {
         let mut rem = dst;
         let mut src_rem = src;
@@ -106,7 +106,7 @@ pub(crate) fn neon_premultiply_alpha_rgba_f16_full(
 }
 
 #[target_feature(enable = "fp16")]
-unsafe fn neon_unpremultiply_alpha_rgba_f16_row_full(in_place: &mut [f16]) {
+fn neon_unpremultiply_alpha_rgba_f16_row_full(in_place: &mut [f16]) {
     unsafe {
         let mut rem = in_place;
 

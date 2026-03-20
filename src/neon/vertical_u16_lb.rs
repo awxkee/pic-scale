@@ -29,6 +29,7 @@
 use crate::filter_weights::FilterBounds;
 use std::arch::aarch64::*;
 
+#[inline(never)]
 #[target_feature(enable = "neon")]
 fn convolve_chunks_16(
     chunks: &mut [[u16; 16]],
@@ -158,8 +159,10 @@ fn convolve_chunks_16(
 
         let weights = &weights[j..bounds_size];
 
+        let base_y = bounds.start + j;
+
         for (j, &k_weight) in weights.iter().enumerate() {
-            let py = bounds.start + j;
+            let py = base_y + j;
             let src_ptr = unsafe { src.get_unchecked((src_stride * py + v_dx)..) };
 
             let v_weight = vdupq_n_s16(k_weight);
@@ -192,6 +195,119 @@ fn convolve_chunks_16(
     cx
 }
 
+#[inline(never)]
+#[target_feature(enable = "neon")]
+fn convolve_chunks_8(
+    chunks: &mut [[u16; 8]],
+    bounds: &FilterBounds,
+    src: &[u16],
+    src_stride: usize,
+    weights: &[i16],
+    bit_depth: u32,
+    cx: usize,
+) -> usize {
+    let max_colors = (1u32 << bit_depth) - 1;
+    let mut cx = cx;
+
+    let bounds_size = bounds.size;
+
+    const PRECISION: i32 = 16;
+    const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
+
+    let initial_store = vdupq_n_s32(ROUNDING_CONST);
+
+    let v_max_colors = vdupq_n_u16(max_colors as u16);
+
+    let v_px = cx;
+
+    for (x, dst) in chunks.iter_mut().enumerate() {
+        let mut store0 = initial_store;
+        let mut store1 = initial_store;
+
+        let v_dx = v_px + x * 8;
+
+        for (j, &k_weight) in weights.iter().take(bounds_size).enumerate() {
+            let py = bounds.start + j;
+            let src_ptr = unsafe { src.get_unchecked((src_stride * py + v_dx)..) };
+
+            let v_weight = vdupq_n_s16(k_weight);
+
+            let item_row = unsafe { vreinterpretq_s16_u16(vld1q_u16(src_ptr.as_ptr())) };
+
+            store0 = vqdmlal_s16(store0, vget_low_s16(item_row), vget_low_s16(v_weight));
+            store1 = vqdmlal_high_s16(store1, item_row, v_weight);
+        }
+
+        let item = vminq_u16(
+            vcombine_u16(
+                vqshrun_n_s32::<PRECISION>(store0),
+                vqshrun_n_s32::<PRECISION>(store1),
+            ),
+            v_max_colors,
+        );
+        unsafe {
+            vst1q_u16(dst.as_mut_ptr(), item);
+        }
+
+        cx = v_dx;
+    }
+    cx
+}
+
+#[inline(never)]
+#[target_feature(enable = "neon")]
+fn convolve_chunks_4(
+    chunks: &mut [[u16; 4]],
+    bounds: &FilterBounds,
+    src: &[u16],
+    src_stride: usize,
+    weights: &[i16],
+    bit_depth: u32,
+    cx: usize,
+) -> usize {
+    let max_colors = (1u32 << bit_depth) - 1;
+    let mut cx = cx;
+
+    let bounds_size = bounds.size;
+
+    const PRECISION: i32 = 16;
+    const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
+
+    let initial_store = vdupq_n_s32(ROUNDING_CONST);
+
+    let v_max_colors = vdupq_n_u16(max_colors as u16);
+
+    let v_px = cx;
+
+    for (x, dst) in chunks.iter_mut().enumerate() {
+        let mut store0 = initial_store;
+
+        let v_dx = v_px + x * 4;
+
+        for (j, &k_weight) in weights.iter().take(bounds_size).enumerate() {
+            let py = bounds.start + j;
+            let src_ptr = unsafe { src.get_unchecked((src_stride * py + v_dx)..) };
+
+            let v_weight = vdup_n_s16(k_weight);
+
+            let item_row = unsafe { vreinterpret_s16_u16(vld1_u16(src_ptr.as_ptr())) };
+
+            store0 = vqdmlal_s16(store0, item_row, v_weight);
+        }
+
+        let u_store0 = vmin_u16(
+            vqshrun_n_s32::<PRECISION>(store0),
+            vget_low_u16(v_max_colors),
+        );
+        unsafe {
+            vst1_u16(dst.as_mut_ptr(), u_store0);
+        }
+
+        cx = v_dx;
+    }
+    cx
+}
+
 pub(crate) fn convolve_column_lb_u16(
     _: usize,
     bounds: &FilterBounds,
@@ -210,10 +326,6 @@ pub(crate) fn convolve_column_lb_u16(
         const PRECISION: i32 = 16;
         const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
 
-        let initial_store = vdupq_n_s32(ROUNDING_CONST);
-
-        let v_max_colors = vdupq_n_u16(max_colors as u16);
-
         cx = convolve_chunks_16(
             dst.as_chunks_mut::<16>().0,
             bounds,
@@ -223,72 +335,29 @@ pub(crate) fn convolve_column_lb_u16(
             bit_depth,
             cx,
         );
-        let tail16 = dst.as_chunks_mut::<16>().1;
-        let iter8 = tail16.chunks_exact_mut(8);
+        let mut rem = dst.as_chunks_mut::<16>().1;
+        cx = convolve_chunks_8(
+            rem.as_chunks_mut::<8>().0,
+            bounds,
+            src,
+            src_stride,
+            weight,
+            bit_depth,
+            cx,
+        );
 
-        let v_px = cx;
+        rem = rem.as_chunks_mut::<8>().1;
+        cx = convolve_chunks_4(
+            rem.as_chunks_mut::<4>().0,
+            bounds,
+            src,
+            src_stride,
+            weight,
+            bit_depth,
+            cx,
+        );
 
-        for (x, dst) in iter8.enumerate() {
-            let mut store0 = initial_store;
-            let mut store1 = initial_store;
-
-            let v_dx = v_px + x * 8;
-
-            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
-                let py = bounds.start + j;
-                let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
-
-                let v_weight = vdupq_n_s16(k_weight);
-
-                let item_row = vreinterpretq_s16_u16(vld1q_u16(src_ptr.as_ptr()));
-
-                store0 = vqdmlal_s16(store0, vget_low_s16(item_row), vget_low_s16(v_weight));
-                store1 = vqdmlal_high_s16(store1, item_row, v_weight);
-            }
-
-            let item = vminq_u16(
-                vcombine_u16(
-                    vqshrun_n_s32::<PRECISION>(store0),
-                    vqshrun_n_s32::<PRECISION>(store1),
-                ),
-                v_max_colors,
-            );
-            vst1q_u16(dst.as_mut_ptr(), item);
-
-            cx = v_dx;
-        }
-
-        let tail8 = tail16.chunks_exact_mut(8).into_remainder();
-        let iter4 = tail8.chunks_exact_mut(4);
-
-        let v_cx = cx;
-
-        for (x, dst) in iter4.enumerate() {
-            let mut store0 = initial_store;
-
-            let v_dx = v_cx + x * 4;
-
-            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
-                let py = bounds.start + j;
-                let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
-
-                let v_weight = vdup_n_s16(k_weight);
-
-                let item_row = vreinterpret_s16_u16(vld1_u16(src_ptr.as_ptr()));
-
-                store0 = vqdmlal_s16(store0, item_row, v_weight);
-            }
-
-            let u_store0 = vmin_u16(
-                vqshrun_n_s32::<PRECISION>(store0),
-                vget_low_u16(v_max_colors),
-            );
-            vst1_u16(dst.as_mut_ptr(), u_store0);
-
-            cx = v_dx;
-        }
-
-        let tail4 = tail8.chunks_exact_mut(4).into_remainder();
+        let tail4 = rem.as_chunks_mut::<4>().1;
 
         let a_px = cx;
 

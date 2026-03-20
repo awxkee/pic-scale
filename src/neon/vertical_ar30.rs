@@ -43,17 +43,15 @@ pub(crate) fn neon_column_handler_fixed_point_ar30<
     weight: &[i16],
     _: u32,
 ) {
-    unsafe {
-        let unit = ExecutionUnit::<AR30_TYPE, AR30_ORDER>::default();
-        unit.pass(bounds, src, dst, src_stride, weight);
-    }
+    let unit = ExecutionUnit::<AR30_TYPE, AR30_ORDER>::default();
+    unit.pass(bounds, src, dst, src_stride, weight);
 }
 
 #[derive(Copy, Clone, Default)]
 struct ExecutionUnit<const AR30_TYPE: usize, const AR30_ORDER: usize> {}
 
 impl<const AR30_TYPE: usize, const AR30_ORDER: usize> ExecutionUnit<AR30_TYPE, AR30_ORDER> {
-    unsafe fn pass(
+    fn pass(
         &self,
         bounds: &FilterBounds,
         src: &[u8],
@@ -69,7 +67,7 @@ impl<const AR30_TYPE: usize, const AR30_ORDER: usize> ExecutionUnit<AR30_TYPE, A
             const PREC: i32 = 16;
             const RND_CONST: i32 = 1 << (PREC - 1);
 
-            while cx + 8 < total_width {
+            while cx + 8 <= total_width {
                 let v_max = vdupq_n_u16(1023);
                 let filter = weight;
                 let v_start_px = cx * 4;

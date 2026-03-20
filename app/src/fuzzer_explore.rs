@@ -26,8 +26,12 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use pic_scale::{
+    ImageSize, ImageStore, ImageStoreMut, JzazbzScaler, LChScaler, LabScaler, LinearApproxScaler,
+    LinearScaler, LuvScaler, OklabScaler, PicScaleError, Resampling, ResamplingFunction,
+    SigmoidalScaler, TransferFunction, XYZScaler,
+};
 use std::sync::Arc;
-use pic_scale::{ImageSize, ImageStore, ImageStoreMut, JzazbzScaler, LChScaler, LabScaler, LinearApproxScaler, LinearScaler, LuvScaler, OklabScaler, PicScaleError, Resampling, ResamplingFunction, SigmoidalScaler, TransferFunction, XYZScaler};
 
 enum Scaler {
     Jzazbz(JzazbzScaler),
