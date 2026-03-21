@@ -226,7 +226,7 @@ pub(crate) fn runner_rgba_accelerate(
     )
     .unwrap();
     let mut dest_image = Rgba8ImageStoreMut::alloc(target_size.width, target_size.height);
-    use accelerate::{kvImageDoNotTile, vImageScale_ARGB8888, vImage_Buffer};
+    use accelerate::{kvImageDoNotTile, vImage_Buffer, vImageScale_ARGB8888};
 
     let src_buffer = vImage_Buffer {
         data: source_image.buffer.as_ptr() as *mut libc::c_void,
