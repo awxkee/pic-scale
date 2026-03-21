@@ -178,6 +178,9 @@ mod tests {
 
     #[test]
     fn check_alpha_exists_rgba8() {
+        if !is_x86_feature_detected!("sse4.1") {
+            return;
+        }
         let image_size = 256usize;
         let mut image = vec![0u8; image_size * image_size * 4];
         image[3 + 150 * 4] = 75;
@@ -187,6 +190,9 @@ mod tests {
 
     #[test]
     fn check_alpha_exists_rgba16() {
+        if !is_x86_feature_detected!("sse4.1") {
+            return;
+        }
         let image_size = 256usize;
         let mut image = vec![0u16; image_size * image_size * 4];
         image[3] = 715;
@@ -199,6 +205,9 @@ mod tests {
 
     #[test]
     fn check_alpha_not_exists_rgba8() {
+        if !is_x86_feature_detected!("sse4.1") {
+            return;
+        }
         let image_size = 256usize;
         let image = vec![255u8; image_size * image_size * 4];
         let has_alpha = sse_has_non_constant_cap_alpha_rgba8(&image, image_size, image_size * 4);
@@ -207,6 +216,9 @@ mod tests {
 
     #[test]
     fn check_alpha_not_exists_rgba16() {
+        if !is_x86_feature_detected!("sse4.1") {
+            return;
+        }
         let image_size = 256usize;
         let image = vec![255u16; image_size * image_size * 4];
         let has_alpha = sse_has_non_constant_cap_alpha_rgba16(&image, image_size, image_size * 4);
