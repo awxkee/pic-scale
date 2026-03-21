@@ -1,0 +1,15 @@
+[package]
+name = "speedtest"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+pic-scale = {path = "../", features = ["nightly_f16", "rdm", "nightly_i8mm", "avx", "sse"]}
+plotters = { version = "0.3", default-features = false, features = ["svg_backend", "line_series", "full_palette"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+image = "0.25.10"
+fast_image_resize = "6.0.0"
+pic-scale-safe = "0.1.10"
+accelerate = {path = "../app/accelerate"}
+libc = "0.2.183"

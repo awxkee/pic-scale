@@ -1,4 +1,4 @@
-workspace = { members = ["app", "wasm", "app/accelerate"], exclude = ["picscale", "fuzz"] }
+workspace = { members = ["app", "wasm", "app/accelerate", "speedtest"], exclude = ["picscale", "fuzz"] }
 
 [package]
 name = "pic-scale"
@@ -13,7 +13,7 @@ documentation = "https://github.com/awxkee/pic-scale"
 categories = ["multimedia::images", "multimedia::video"]
 homepage = "https://github.com/awxkee/pic-scale"
 repository = "https://github.com/awxkee/pic-scale"
-exclude = ["*.jpg", "/assets", "*.png", "*.sh", "/assets/*"]
+exclude = ["*.jpg", "/assets", "*.png", "*.sh", "/assets/*", "/.github"]
 rust-version = "1.89.0"
 
 [dependencies]
