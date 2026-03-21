@@ -316,19 +316,19 @@ pub(crate) fn convolve_vertical_rgb_neon_row_f32(
     let mut cx = 0usize;
     let dst_width = dst.len();
 
-    while cx + 32 < dst_width {
+    while cx + 32 <= dst_width {
         conv_vertical_part_neon_32_f32(bounds.start, cx, src, src_stride, dst, weight_ptr, bounds);
 
         cx += 32;
     }
 
-    while cx + 16 < dst_width {
+    while cx + 16 <= dst_width {
         conv_vertical_part_neon_16_f32(bounds.start, cx, src, src_stride, dst, weight_ptr, bounds);
 
         cx += 16;
     }
 
-    while cx + 8 < dst_width {
+    while cx + 8 <= dst_width {
         convolve_vertical_part_neon_8_f32(
             bounds.start,
             cx,
@@ -342,7 +342,7 @@ pub(crate) fn convolve_vertical_rgb_neon_row_f32(
         cx += 8;
     }
 
-    while cx + 4 < dst_width {
+    while cx + 4 <= dst_width {
         convolve_vertical_part_neon_4_f32(
             bounds.start,
             cx,

@@ -46,6 +46,20 @@ fn conv_horiz_plane_4_f32<const FMA: bool>(
 }
 
 #[inline(always)]
+fn conv_horiz_plane_8_f32<const FMA: bool>(
+    start_x: usize,
+    src: &[f32],
+    set1: __m256,
+    store: __m256,
+) -> __m256 {
+    unsafe {
+        let src_ptr = src.get_unchecked(start_x..).as_ptr();
+        let rgb_pixel = _mm256_loadu_ps(src_ptr);
+        _mm256_prefer_fma_ps::<FMA>(store, rgb_pixel, set1)
+    }
+}
+
+#[inline(always)]
 fn conv_horiz_plane_4_f32_avx<const FMA: bool>(
     start_x: usize,
     src0: &[f32],
@@ -168,18 +182,32 @@ fn convolve_horizontal_plane_avx_row_one_impl<const FMA: bool>(
 ) {
     unsafe {
         let mut filter_offset = 0usize;
-        let weights_ptr = &filter_weights.weights;
 
         let dst_width = filter_weights.bounds.len();
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);
             let mut jx = 0usize;
-            let mut store = _mm_setzero_ps();
+            let mut store256 = _mm256_setzero_ps();
+
+            let local_filters = filter_weights.weights.get_unchecked(filter_offset..);
+
+            while jx + 8 <= bounds.size {
+                let bounds_start = bounds.start + jx;
+                let ptr = local_filters.get_unchecked(jx..);
+                let read_weights = _mm256_loadu_ps(ptr.as_ptr());
+                store256 = conv_horiz_plane_8_f32::<FMA>(bounds_start, src, read_weights, store256);
+                jx += 8;
+            }
+
+            let mut store = _mm_add_ps(
+                _mm256_castps256_ps128(store256),
+                _mm256_extractf128_ps::<1>(store256),
+            );
 
             while jx + 4 <= bounds.size {
                 let bounds_start = bounds.start + jx;
-                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
+                let ptr = local_filters.get_unchecked(jx..);
                 let read_weights = _mm_loadu_ps(ptr.as_ptr());
                 store = conv_horiz_plane_4_f32::<FMA>(bounds_start, src, read_weights, store);
                 jx += 4;
@@ -187,7 +215,7 @@ fn convolve_horizontal_plane_avx_row_one_impl<const FMA: bool>(
 
             while jx + 2 <= bounds.size {
                 let bounds_start = bounds.start + jx;
-                let w = weights_ptr.get_unchecked(jx + filter_offset..);
+                let w = local_filters.get_unchecked(jx..);
                 let weights = _mm_castsi128_ps(_mm_loadu_si64(w.as_ptr() as *const _));
                 store = conv_horiz_plane_2_f32::<FMA>(bounds_start, src, weights, store);
                 jx += 2;
@@ -195,14 +223,13 @@ fn convolve_horizontal_plane_avx_row_one_impl<const FMA: bool>(
 
             while jx < bounds.size {
                 let bounds_start = bounds.start + jx;
-                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
+                let ptr = local_filters.get_unchecked(jx..);
                 let weight0 = _mm_load_ss(ptr.as_ptr());
                 store = conv_horiz_plane_1_f32::<FMA>(bounds_start, src, weight0, store);
                 jx += 1;
             }
 
-            let px = x;
-            let dest_ptr = dst.get_unchecked_mut(px);
+            let dest_ptr = dst.get_unchecked_mut(x);
             _mm_store_ss(dest_ptr, _mm_hsum_ps(store));
 
             filter_offset += filter_weights.aligned_size;
@@ -285,18 +312,49 @@ fn convolve_horizontal_plane_avx_rows_4_impl<const FMA: bool>(
 ) {
     unsafe {
         let mut filter_offset = 0usize;
-        let weights_ptr = &filter_weights.weights;
 
         let dst_width = filter_weights.bounds.len();
 
         for x in 0..dst_width {
             let bounds = filter_weights.bounds.get_unchecked(x);
             let mut jx = 0usize;
-            let mut store_0 = _mm256_setzero_ps();
-            let mut store_1 = _mm256_setzero_ps();
+
+            let local_filters = filter_weights.weights.get_unchecked(filter_offset..);
+
+            let mut store256_0 = _mm256_setzero_ps();
+            let mut store256_1 = _mm256_setzero_ps();
+            let mut store256_2 = _mm256_setzero_ps();
+            let mut store256_3 = _mm256_setzero_ps();
+
+            while jx + 8 <= bounds.size {
+                let ptr = local_filters.get_unchecked(jx..);
+                let w0 = _mm256_loadu_ps(ptr.as_ptr());
+
+                let bounds_start = bounds.start + jx;
+                let s_ptr1 = src.get_unchecked(src_stride..);
+                let s_ptr2 = src.get_unchecked(src_stride * 2..);
+                let s_ptr3 = src.get_unchecked(src_stride * 3..);
+                store256_0 = conv_horiz_plane_8_f32::<FMA>(bounds_start, src, w0, store256_0);
+                store256_1 = conv_horiz_plane_8_f32::<FMA>(bounds_start, s_ptr1, w0, store256_1);
+                store256_2 = conv_horiz_plane_8_f32::<FMA>(bounds_start, s_ptr2, w0, store256_2);
+                store256_3 = conv_horiz_plane_8_f32::<FMA>(bounds_start, s_ptr3, w0, store256_3);
+                jx += 8;
+            }
+
+            const HI_HI: i32 = 0b0011_0001;
+            const LO_LO: i32 = 0b0010_0000;
+
+            let mut store_0 = _mm256_add_ps(
+                _mm256_permute2f128_ps::<LO_LO>(store256_0, store256_1),
+                _mm256_permute2f128_ps::<HI_HI>(store256_0, store256_1),
+            );
+            let mut store_1 = _mm256_add_ps(
+                _mm256_permute2f128_ps::<LO_LO>(store256_2, store256_3),
+                _mm256_permute2f128_ps::<HI_HI>(store256_2, store256_3),
+            );
 
             while jx + 4 <= bounds.size {
-                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
+                let ptr = local_filters.get_unchecked(jx..);
                 let w0 = _mm_loadu_ps(ptr.as_ptr());
 
                 let weights = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w0);
@@ -318,7 +376,7 @@ fn convolve_horizontal_plane_avx_rows_4_impl<const FMA: bool>(
             }
 
             while jx + 2 <= bounds.size {
-                let w = weights_ptr.get_unchecked(jx + filter_offset..);
+                let w = local_filters.get_unchecked(jx..);
                 let w0 = _mm_castsi128_ps(_mm_loadu_si64(w.as_ptr() as *const _));
                 let weights = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w0);
                 let bounds_start = bounds.start + jx;
@@ -338,7 +396,7 @@ fn convolve_horizontal_plane_avx_rows_4_impl<const FMA: bool>(
             }
 
             while jx < bounds.size {
-                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
+                let ptr = local_filters.get_unchecked(jx..);
                 let w0 = _mm_load_ss(ptr.as_ptr());
                 let weights = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w0);
 
@@ -358,17 +416,16 @@ fn convolve_horizontal_plane_avx_rows_4_impl<const FMA: bool>(
                 jx += 1;
             }
 
-            let px = x;
-            let dest_ptr = dst.get_unchecked_mut(px);
+            let dest_ptr = dst.get_unchecked_mut(x);
             _mm_store_ss(dest_ptr, _mm_hsum_ps(_mm256_castps256_ps128(store_0)));
 
-            let dest_ptr = dst.get_unchecked_mut(px + dst_stride);
+            let dest_ptr = dst.get_unchecked_mut(x + dst_stride);
             _mm_store_ss(dest_ptr, _mm_hsum_ps(_mm256_extractf128_ps::<1>(store_0)));
 
-            let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 2);
+            let dest_ptr = dst.get_unchecked_mut(x + dst_stride * 2);
             _mm_store_ss(dest_ptr, _mm_hsum_ps(_mm256_castps256_ps128(store_1)));
 
-            let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 3);
+            let dest_ptr = dst.get_unchecked_mut(x + dst_stride * 3);
             _mm_store_ss(dest_ptr, _mm_hsum_ps(_mm256_extractf128_ps::<1>(store_1)));
 
             filter_offset += filter_weights.aligned_size;

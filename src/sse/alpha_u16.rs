@@ -96,14 +96,12 @@ pub(crate) fn _mm_div_by_65535_epi32(v: __m128i) -> __m128i {
 
 #[inline(always)]
 fn _mm_div_by<const BIT_DEPTH: usize>(v: __m128i) -> __m128i {
-    unsafe {
-        if BIT_DEPTH == 10 {
-            _mm_div_by_1023_epi32(v)
-        } else if BIT_DEPTH == 12 {
-            _mm_div_by_4095_epi32(v)
-        } else {
-            _mm_div_by_65535_epi32(v)
-        }
+    if BIT_DEPTH == 10 {
+        _mm_div_by_1023_epi32(v)
+    } else if BIT_DEPTH == 12 {
+        _mm_div_by_4095_epi32(v)
+    } else {
+        _mm_div_by_65535_epi32(v)
     }
 }
 

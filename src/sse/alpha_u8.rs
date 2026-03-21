@@ -244,7 +244,7 @@ fn sse_premultiply_alpha_rgba_impl(
     pool: &novtb::ThreadPool,
 ) {
     dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| unsafe {
+        .for_each_enumerated(pool, |y, dst| {
             let src = &src[y * src_stride..(y + 1) * src_stride];
             sse_premultiply_alpha_rgba_impl_row(
                 &mut dst[..width * 4],
@@ -345,7 +345,7 @@ fn sse_unpremultiply_alpha_rgba_impl(
 ) {
     in_place
         .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| unsafe {
+        .for_each(pool, |row| {
             sse_unpremultiply_alpha_rgba_impl_row(
                 &mut row[..width * 4],
                 DisassociateAlphaDefault::default(),
