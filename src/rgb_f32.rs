@@ -86,12 +86,8 @@ impl HorizontalFilterPass<f32, f32, 3> for ImageStore<'_, f32, 3> {
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             if std::arch::is_x86_feature_detected!("sse4.1") {
-                _dispatcher_4_rows = Some(convolve_horizontal_rgb_sse_rows_4_f32::<false>);
-                _dispatcher_row = convolve_horizontal_rgb_sse_row_one_f32::<false>;
-                if std::arch::is_x86_feature_detected!("fma") {
-                    _dispatcher_4_rows = Some(convolve_horizontal_rgb_sse_rows_4_f32::<true>);
-                    _dispatcher_row = convolve_horizontal_rgb_sse_row_one_f32::<true>;
-                }
+                _dispatcher_4_rows = Some(convolve_horizontal_rgb_sse_rows_4_f32);
+                _dispatcher_row = convolve_horizontal_rgb_sse_row_one_f32;
             }
         }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
@@ -186,7 +182,7 @@ impl VerticalConvolutionPass<f32, f32, 3> for ImageStore<'_, f32, 3> {
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             if std::arch::is_x86_feature_detected!("sse4.1") {
-                _dispatcher = convolve_vertical_rgb_sse_row_f32::<false>;
+                _dispatcher = convolve_vertical_rgb_sse_row_f32;
             }
         }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]

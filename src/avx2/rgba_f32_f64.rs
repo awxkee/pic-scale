@@ -175,7 +175,7 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
                         w1,
                     );
 
-                    jx += 2
+                    jx += 2;
                 }
 
                 while jx < bounds.size {

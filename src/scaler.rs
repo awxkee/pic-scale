@@ -1307,8 +1307,8 @@ mod tests {
             dst[2] = 99;
             dst[3] = 255;
         }
-        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-        scaler.set_threading_policy(ThreadingPolicy::Adaptive);
+        let scaler = Scaler::new(ResamplingFunction::Lanczos3)
+            .set_threading_policy(ThreadingPolicy::Adaptive);
         let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 16);
