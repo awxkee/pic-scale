@@ -83,7 +83,7 @@ jobs:
               echo "Running: $test"
               RUSTFLAGS="-C target-feature=+sse4.1,-avx,-avx2,-fma" \
               CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="qemu-x86_64 -cpu Nehalem" \
-              cargo +nightly test --lib -- "$test" --exact 2>&1 | grep -E "FAILED|ok|signal 4"
+              cargo +nightly test --lib --features "avx,sse,nightly_f16" -- "$test" --exact 2>&1 | grep -E "FAILED|ok|signal 4"
           done
 
   tests_x86_avx2_isolated:
@@ -98,7 +98,7 @@ jobs:
               echo "Running: $test"
               RUSTFLAGS="-C target-feature=+avx2,-fma" \
               CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="qemu-x86_64 -cpu Haswell-noTSX,avx2=on,fma=off" \
-              cargo +nightly test --lib --features "avx" --target x86_64-unknown-linux-gnu -- "$test" --exact 2>&1 | grep -E "FAILED|ok|signal 4"
+              cargo +nightly test --lib --features "avx,nightly_f16" --target x86_64-unknown-linux-gnu -- "$test" --exact 2>&1 | grep -E "FAILED|ok|signal 4"
           done
 
   tests_arm:
