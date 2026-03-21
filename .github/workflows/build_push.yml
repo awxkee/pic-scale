@@ -71,6 +71,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo +nightly test --features "${{ matrix.feature }}"
 
+  tests_x86_sse_isolated:
+    name: Testing x86 SSE isolated
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: sudo apt-get install -y qemu-user
+      - run: CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="qemu-x86_64 -cpu Nehalem" cargo +nightly test --features "sse"
+        env:
+          RUSTFLAGS: "-C target-feature=+sse4.1,-avx,-avx2,-fma"
+
   tests_arm:
     name: Testing ARM
     strategy:
