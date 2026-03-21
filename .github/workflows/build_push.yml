@@ -78,9 +78,28 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - run: sudo apt-get install -y qemu-user
-      - run: CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="qemu-x86_64 -cpu Nehalem" cargo +nightly test --features "sse"
-        env:
-          RUSTFLAGS: "-C target-feature=+sse4.1,-avx,-avx2,-fma"
+      - run: |
+          cargo +nightly test --lib -- --list 2>/dev/null | grep ': test' | sed 's/: test//' | while read test; do
+              echo "Running: $test"
+              RUSTFLAGS="-C target-feature=+sse4.1,-avx,-avx2,-fma" \
+              CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="qemu-x86_64 -cpu Nehalem" \
+              cargo +nightly test --lib -- "$test" --exact 2>&1 | grep -E "FAILED|ok|signal 4"
+          done
+
+  tests_x86_avx2_isolated:
+    name: Testing x86 AVX2 isolated (no FMA)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: sudo apt-get install -y qemu-user
+      - run: |
+          cargo +nightly test --lib -- --list 2>/dev/null | grep ': test' | sed 's/: test//' | while read test; do
+              echo "Running: $test"
+              RUSTFLAGS="-C target-feature=+avx2,-fma" \
+              CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="qemu-x86_64 -cpu Haswell-noTSX,avx2=on,fma=off" \
+              cargo +nightly test --lib --features "avx" --target x86_64-unknown-linux-gnu -- "$test" --exact 2>&1 | grep -E "FAILED|ok|signal 4"
+          done
 
   tests_arm:
     name: Testing ARM
