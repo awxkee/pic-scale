@@ -28,7 +28,7 @@ jobs:
       - run: |
           set -e
           failed=0
-          cargo +nightly test --lib -- --list 2>/dev/null | grep ': test' | sed 's/: test//' | while read test; do
+          cargo +nightly test --lib --features "neon,rdm,nightly_i8mm" --target aarch64-unknown-linux-gnu -- --list 2>/dev/null | grep ': test' | sed 's/: test//' | while read test; do
               echo "Running: $test"
               output=$(RUSTFLAGS="-C target-feature=+neon,-rdm" \
               CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER="qemu-aarch64 -cpu Nehalem" \
