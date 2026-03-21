@@ -38,14 +38,14 @@ fn main() {
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
 
-    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+    let mut scaler = Scaler::new(ResamplingFunction::Box);
     scaler.set_threading_policy(ThreadingPolicy::Single);
     // scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
     let resizing_plan = scaler
         .plan_rgba_resampling(
             ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-            ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+            ImageSize::new(dimensions.0 as usize - 1, dimensions.1 as usize - 1),
             false,
         )
         .unwrap();
@@ -54,8 +54,8 @@ fn main() {
         Rgba8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     store.bit_depth = 8;
     let mut dst_store = Rgba8ImageStoreMut::alloc_with_depth(
-        dimensions.0 as usize / 4,
-        dimensions.1 as usize / 4,
+        dimensions.0 as usize - 1,
+        dimensions.1 as usize - 1,
         8,
     );
     resizing_plan.resample(&store, &mut dst_store).unwrap();

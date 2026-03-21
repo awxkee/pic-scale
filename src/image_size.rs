@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use std::ops::{Add, Div, Sub};
 
 /// Struct that represents image size
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -38,5 +39,26 @@ impl ImageSize {
     /// Creates new image size
     pub fn new(width: usize, height: usize) -> ImageSize {
         ImageSize { width, height }
+    }
+}
+
+impl Sub<usize> for ImageSize {
+    type Output = ImageSize;
+    fn sub(self, rhs: usize) -> ImageSize {
+        ImageSize::new(self.width - rhs, self.height - rhs)
+    }
+}
+
+impl Add<usize> for ImageSize {
+    type Output = ImageSize;
+    fn add(self, rhs: usize) -> ImageSize {
+        ImageSize::new(self.width + rhs, self.height + rhs)
+    }
+}
+
+impl Div<usize> for ImageSize {
+    type Output = ImageSize;
+    fn div(self, rhs: usize) -> ImageSize {
+        ImageSize::new(self.width / rhs, self.height / rhs)
     }
 }
