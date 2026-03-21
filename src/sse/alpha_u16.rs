@@ -36,7 +36,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-unsafe fn sse_unpremultiply_row_u16(
+fn sse_unpremultiply_row_u16(
     x: __m128i,
     is_zero_mask: __m128i,
     a_lo_f: __m128,
@@ -63,7 +63,7 @@ unsafe fn sse_unpremultiply_row_u16(
 
 /// Exact division by 1023 with rounding to nearest
 #[inline(always)]
-pub(crate) unsafe fn _mm_div_by_1023_epi32(v: __m128i) -> __m128i {
+pub(crate) fn _mm_div_by_1023_epi32(v: __m128i) -> __m128i {
     unsafe {
         const DIVIDING_BY: i32 = 10;
         let addition = _mm_set1_epi32(1 << (DIVIDING_BY - 1));
@@ -74,7 +74,7 @@ pub(crate) unsafe fn _mm_div_by_1023_epi32(v: __m128i) -> __m128i {
 
 /// Exact division by 4095 with rounding to nearest
 #[inline(always)]
-pub(crate) unsafe fn _mm_div_by_4095_epi32(v: __m128i) -> __m128i {
+pub(crate) fn _mm_div_by_4095_epi32(v: __m128i) -> __m128i {
     unsafe {
         const DIVIDING_BY: i32 = 12;
         let addition = _mm_set1_epi32(1 << (DIVIDING_BY - 1));
@@ -85,7 +85,7 @@ pub(crate) unsafe fn _mm_div_by_4095_epi32(v: __m128i) -> __m128i {
 
 /// Exact division by 65535 with rounding to nearest
 #[inline(always)]
-pub(crate) unsafe fn _mm_div_by_65535_epi32(v: __m128i) -> __m128i {
+pub(crate) fn _mm_div_by_65535_epi32(v: __m128i) -> __m128i {
     unsafe {
         const DIVIDING_BY: i32 = 16;
         let addition = _mm_set1_epi32(1 << (DIVIDING_BY - 1));
@@ -95,7 +95,7 @@ pub(crate) unsafe fn _mm_div_by_65535_epi32(v: __m128i) -> __m128i {
 }
 
 #[inline(always)]
-unsafe fn _mm_div_by<const BIT_DEPTH: usize>(v: __m128i) -> __m128i {
+fn _mm_div_by<const BIT_DEPTH: usize>(v: __m128i) -> __m128i {
     unsafe {
         if BIT_DEPTH == 10 {
             _mm_div_by_1023_epi32(v)
