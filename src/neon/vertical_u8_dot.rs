@@ -664,52 +664,52 @@ fn convolve_vertical_neon_row_upper(
     let mut cx = 0usize;
 
     let size = bounds.size;
-    if size == 10 {
-        cx = convolve_32_items_unrolled::<10, 3>(
-            dst.as_chunks_mut::<32>().0,
-            bounds,
-            src,
-            src_stride,
-            weight,
-            cx,
-        );
-    } else if size == 8 {
-        cx = convolve_32_items_unrolled::<8, 2>(
-            dst.as_chunks_mut::<32>().0,
-            bounds,
-            src,
-            src_stride,
-            weight,
-            cx,
-        );
-    } else if size == 6 {
-        cx = convolve_32_items_unrolled::<6, 2>(
-            dst.as_chunks_mut::<32>().0,
-            bounds,
-            src,
-            src_stride,
-            weight,
-            cx,
-        );
-    } else if size == 4 {
-        cx = convolve_32_items_unrolled::<4, 1>(
-            dst.as_chunks_mut::<32>().0,
-            bounds,
-            src,
-            src_stride,
-            weight,
-            cx,
-        );
-    } else if size == 2 {
-        cx = convolve_32_items_unrolled::<2, 1>(
-            dst.as_chunks_mut::<32>().0,
-            bounds,
-            src,
-            src_stride,
-            weight,
-            cx,
-        );
-    } else {
+    // if size == 10 {
+    //     cx = convolve_32_items_unrolled::<10, 3>(
+    //         dst.as_chunks_mut::<32>().0,
+    //         bounds,
+    //         src,
+    //         src_stride,
+    //         weight,
+    //         cx,
+    //     );
+    // } else if size == 8 {
+    //     cx = convolve_32_items_unrolled::<8, 2>(
+    //         dst.as_chunks_mut::<32>().0,
+    //         bounds,
+    //         src,
+    //         src_stride,
+    //         weight,
+    //         cx,
+    //     );
+    // } else if size == 6 {
+    //     cx = convolve_32_items_unrolled::<6, 2>(
+    //         dst.as_chunks_mut::<32>().0,
+    //         bounds,
+    //         src,
+    //         src_stride,
+    //         weight,
+    //         cx,
+    //     );
+    // } else if size == 4 {
+    //     cx = convolve_32_items_unrolled::<4, 1>(
+    //         dst.as_chunks_mut::<32>().0,
+    //         bounds,
+    //         src,
+    //         src_stride,
+    //         weight,
+    //         cx,
+    //     );
+    // } else if size == 2 {
+    //     cx = convolve_32_items_unrolled::<2, 1>(
+    //         dst.as_chunks_mut::<32>().0,
+    //         bounds,
+    //         src,
+    //         src_stride,
+    //         weight,
+    //         cx,
+    //     );
+    // } else {
         cx = convolve_32_items(
             dst.as_chunks_mut::<32>().0,
             bounds,
@@ -718,7 +718,7 @@ fn convolve_vertical_neon_row_upper(
             weight,
             cx,
         );
-    }
+    // }
 
     let mut rem = dst.as_chunks_mut::<32>().1;
     cx = convolve_16_items(
