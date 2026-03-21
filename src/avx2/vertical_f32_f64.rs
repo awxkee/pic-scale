@@ -280,7 +280,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         let mut cx = 0usize;
         let dst_width = dst.len();
 
-        while cx + 16 < dst_width {
+        while cx + 16 <= dst_width {
             self.convolve_vertical_part_avx_16_f32(
                 bounds.start,
                 cx,
@@ -294,7 +294,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
             cx += 16;
         }
 
-        while cx + 8 < dst_width {
+        while cx + 8 <= dst_width {
             self.convolve_vertical_part_avx_8_f32(
                 bounds.start,
                 cx,
