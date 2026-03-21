@@ -71,24 +71,35 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo +nightly test --features "${{ matrix.feature }}"
 
-tests_arm_neon_no_rdm_i8mm:
-  name: Testing ARM NEON isolated (no RDM, no I8MM)
-  runs-on: ubuntu-latest
-  steps:
-    - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@nightly
-    - run: sudo apt-get install -y qemu-user gcc-aarch64-linux-gnu
-    - run: rustup target add aarch64-unknown-linux-gnu
-    - run: |
-        RUSTFLAGS="-C target-feature=+neon,-rdm" \
-        CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER="qemu-aarch64 -cpu cortex-a53" \
-        cargo +nightly test --lib --features "neon,rdm,nightly_i8mm" --target aarch64-unknown-linux-gnu -- --list 2>/dev/null \
-        | grep ': test' | sed 's/: test//' | while read test; do
-            echo "Running: $test"
-            RUSTFLAGS="-C target-feature=+neon,-rdm" \
-            CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER="qemu-aarch64 -cpu cortex-a53" \
-            cargo +nightly test --lib --features "neon,rdm,nightly_i8mm" --target aarch64-unknown-linux-gnu -- "$test" --exact 2>&1 | grep -E "FAILED|ok|signal 4"
-        done
+  tests_arm_neon_no_rdm_i8mm:
+    name: Testing ARM NEON isolated (no RDM, no I8MM)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: sudo apt-get install -y qemu-user gcc-aarch64-linux-gnu
+      - run: rustup target add aarch64-unknown-linux-gnu
+      - run: |
+          mkdir -p .cargo
+          echo '[target.aarch64-unknown-linux-gnu]' >> .cargo/config.toml
+          echo 'linker = "aarch64-linux-gnu-gcc"' >> .cargo/config.toml
+      - run: |
+          set -e
+          failed=0
+          RUSTFLAGS="-C target-feature=+neon,-rdm" \
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER="qemu-aarch64 -cpu cortex-a53" \
+          cargo +nightly test --lib --features "neon,rdm,nightly_i8mm" --target aarch64-unknown-linux-gnu -- --list 2>/dev/null \
+          | grep ': test' | sed 's/: test//' | while read test; do
+              echo "Running: $test"
+              output=$(RUSTFLAGS="-C target-feature=+neon,-rdm" \
+              CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER="qemu-aarch64 -cpu cortex-a53" \
+              cargo +nightly test --lib --features "neon,rdm,nightly_i8mm" --target aarch64-unknown-linux-gnu -- "$test" --exact 2>&1)
+              echo "$output" | grep -E "FAILED|ok|signal 4"
+              if echo "$output" | grep -qE "FAILED|signal 4"; then
+                  failed=1
+              fi
+          done
+          exit $failed
 
   tests_x86_sse_isolated:
     name: Testing x86 SSE isolated
@@ -98,12 +109,19 @@ tests_arm_neon_no_rdm_i8mm:
       - uses: dtolnay/rust-toolchain@nightly
       - run: sudo apt-get install -y qemu-user
       - run: |
+          set -e
+          failed=0
           cargo +nightly test --lib -- --list 2>/dev/null | grep ': test' | sed 's/: test//' | while read test; do
               echo "Running: $test"
-              RUSTFLAGS="-C target-feature=+sse4.1,-avx,-avx2,-fma" \
+              output=$(RUSTFLAGS="-C target-feature=+sse4.1,-avx,-avx2,-fma" \
               CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="qemu-x86_64 -cpu Nehalem" \
-              cargo +nightly test --lib --features "avx,sse,nightly_f16" -- "$test" --exact 2>&1 | grep -E "FAILED|ok|signal 4"
+              cargo +nightly test --lib --features "avx,sse,nightly_f16" -- "$test" --exact 2>&1)
+              echo "$output" | grep -E "FAILED|ok|signal 4"
+              if echo "$output" | grep -qE "FAILED|signal 4"; then
+                  failed=1
+              fi
           done
+          exit $failed
 
   tests_x86_avx2_isolated:
     name: Testing x86 AVX2 isolated (no FMA)
@@ -113,12 +131,19 @@ tests_arm_neon_no_rdm_i8mm:
       - uses: dtolnay/rust-toolchain@nightly
       - run: sudo apt-get install -y qemu-user
       - run: |
+          set -e
+          failed=0
           cargo +nightly test --lib -- --list 2>/dev/null | grep ': test' | sed 's/: test//' | while read test; do
               echo "Running: $test"
-              RUSTFLAGS="-C target-feature=+avx2,-fma" \
+              output=$(RUSTFLAGS="-C target-feature=+avx2,-fma" \
               CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="qemu-x86_64 -cpu Haswell-noTSX,avx2=on,fma=off" \
-              cargo +nightly test --lib --features "avx,nightly_f16" --target x86_64-unknown-linux-gnu -- "$test" --exact 2>&1 | grep -E "FAILED|ok|signal 4"
+              cargo +nightly test --lib --features "avx,nightly_f16" --target x86_64-unknown-linux-gnu -- "$test" --exact 2>&1)
+              echo "$output" | grep -E "FAILED|ok|signal 4"
+              if echo "$output" | grep -qE "FAILED|signal 4"; then
+                  failed=1
+              fi
           done
+          exit $failed
 
   tests_arm:
     name: Testing ARM
