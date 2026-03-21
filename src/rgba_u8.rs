@@ -106,7 +106,7 @@ impl HorizontalFilterPass<u8, f32, 4> for ImageStore<'_, u8, 4> {
                         _dispatcher_1_row = convolve_horizontal_rgba_neon_row;
                     }
                     #[cfg(feature = "nightly_i8mm")]
-                    if _scale_factor < 5.5 && std::arch::is_aarch64_feature_detected!("i8mm") {
+                    if _scale_factor < 10. && std::arch::is_aarch64_feature_detected!("i8mm") {
                         let _dispatcher_4_rows: Option<
                             fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i8>, u32),
                         > = Some(convolve_horizontal_rgba_neon_rows_4_u8_dot);
@@ -212,6 +212,17 @@ impl VerticalConvolutionPass<u8, f32, 4> for ImageStore<'_, u8, 4> {
                         use crate::neon::convolve_vertical_neon_i32_precision;
                         _dispatcher = convolve_vertical_neon_i32_precision;
                     }
+                    #[cfg(feature = "nightly_i8mm")]
+                    if _scale_factor < 10. && std::arch::is_aarch64_feature_detected!("i8mm") {
+                        use crate::neon::convolve_vertical_neon_i8_dot;
+                        let _dispatcher = convolve_vertical_neon_i8_dot;
+                        let i_weights = filter_weights.numerical_approximation_q0_7(0);
+                        return Arc::new(VerticalFiltering {
+                            filter_weights: i_weights,
+                            filter_row: _dispatcher,
+                            threading_policy,
+                        });
+                    }
                     #[cfg(not(feature = "rdm"))]
                     {
                         use crate::neon::convolve_vertical_neon_i32_precision;
@@ -232,25 +243,6 @@ impl VerticalConvolutionPass<u8, f32, 4> for ImageStore<'_, u8, 4> {
                 _dispatcher = convolve_vertical_avx_row;
             }
         }
-        // #[cfg(all(target_arch = "x86_64", feature = "avx"))]
-        // {
-        //     if std::arch::is_x86_feature_detected!("avx2")
-        //         && _scale_factor < 8.
-        //         && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
-        //     {
-        //         {
-        //             use crate::avx2::convolve_vertical_avx_row_q07;
-        //             return convolve_vertical_dispatch_u8(
-        //                 self,
-        //                 filter_weights,
-        //                 destination,
-        //                 pool,
-        //                 convolve_vertical_avx_row_q07,
-        //                 DefaultWeightsConverterQ7::default(),
-        //             );
-        //         }
-        //     }
-        // }
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
         {
             _dispatcher = wasm_vertical_neon_row;

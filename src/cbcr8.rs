@@ -148,6 +148,17 @@ impl VerticalConvolutionPass<u8, f32, 2> for ImageStore<'_, u8, 2> {
                         use crate::neon::convolve_vertical_neon_i32_precision;
                         _dispatcher = convolve_vertical_neon_i32_precision;
                     }
+                    #[cfg(feature = "nightly_i8mm")]
+                    if _scale_factor < 10. && std::arch::is_aarch64_feature_detected!("i8mm") {
+                        use crate::neon::convolve_vertical_neon_i8_dot;
+                        let _dispatcher = convolve_vertical_neon_i8_dot;
+                        let i_weights = filter_weights.numerical_approximation_q0_7(0);
+                        return Arc::new(VerticalFiltering {
+                            filter_weights: i_weights,
+                            filter_row: _dispatcher,
+                            threading_policy,
+                        });
+                    }
                     #[cfg(not(feature = "rdm"))]
                     {
                         use crate::neon::convolve_vertical_neon_i32_precision;

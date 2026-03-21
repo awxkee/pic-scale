@@ -24,10 +24,10 @@ use pic_scale::{
 use yuv::{ar30_to_rgb8, rgba8_to_ar30, Rgb30ByteOrder};
 
 fn main() {
-    resize_rgba(0, 1, 256, 79, 256, ResamplingFunction::Bilinear, false);
+    // resize_rgba(0, 1, 256, 79, 256, ResamplingFunction::Bilinear, false);
     #[allow(overflowing_literals)]
     // test_fast_image();
-    let img = ImageReader::open("./assets/nasa-4928x3279-rgba.png")
+    let img = ImageReader::open("./assets/winter_huge.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -38,7 +38,7 @@ fn main() {
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
 
-    let mut scaler = Scaler::new(ResamplingFunction::MitchellNetravalli);
+    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
     scaler.set_threading_policy(ThreadingPolicy::Single);
     // scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
@@ -58,7 +58,6 @@ fn main() {
         dimensions.1 as usize / 4,
         8,
     );
-    // resize_with_accelerate(& store, &mut dst_store);
     resizing_plan.resample(&store, &mut dst_store).unwrap();
     // scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
     //

@@ -77,10 +77,10 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_impl_dot(
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
         let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let iter_row0 = row0_ref.chunks_exact_mut(CN);
-        let iter_row1 = row1_ref.chunks_exact_mut(CN);
-        let iter_row2 = row2_ref.chunks_exact_mut(CN);
-        let iter_row3 = row3_ref.chunks_exact_mut(CN);
+        let iter_row0 = row0_ref.as_chunks_mut::<CN>().0;
+        let iter_row1 = row1_ref.as_chunks_mut::<CN>().0;
+        let iter_row2 = row2_ref.as_chunks_mut::<CN>().0;
+        let iter_row3 = row3_ref.as_chunks_mut::<CN>().0;
 
         let tbl: [u8; 16] = [0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15];
         let v_tbl = vld1q_u8(tbl.as_ptr());
@@ -96,9 +96,10 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_impl_dot(
         let v_weights_hi3 = vld1q_u8(weights_tbl3.as_ptr());
 
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
-            .zip(iter_row1)
-            .zip(iter_row2)
-            .zip(iter_row3)
+            .iter_mut()
+            .zip(iter_row1.iter_mut())
+            .zip(iter_row2.iter_mut())
+            .zip(iter_row3.iter_mut())
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights
@@ -174,10 +175,7 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_impl_dot(
             while jx + 8 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
-                let weights = vreinterpretq_s8_s16(vcombine_s16(
-                    vld1_s16(w_ptr.as_ptr().cast()),
-                    vdup_n_s16(0),
-                ));
+                let weights = vcombine_s8(vld1_s8(w_ptr.as_ptr().cast()), vdup_n_s8(0));
                 let w0 = vqtbl1q_s8(weights, v_weights);
                 let w1 = vqtbl1q_s8(weights, v_weights_hi);
 
@@ -334,9 +332,13 @@ fn convolve_horizontal_rgba_neon_row_impl(
         let v_tbl = vld1q_u8(tbl.as_ptr());
         let weights_tbl: [u8; 16] = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3];
         let v_weights = vld1q_u8(weights_tbl.as_ptr());
+        let weights_tbl1: [u8; 16] = [4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7];
+        let v_weights_hi = vld1q_u8(weights_tbl1.as_ptr());
 
         for ((dst, bounds), weights) in dst
-            .chunks_exact_mut(CN)
+            .as_chunks_mut::<CN>()
+            .0
+            .iter_mut()
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights
@@ -347,6 +349,20 @@ fn convolve_horizontal_rgba_neon_row_impl(
             let bounds_size = bounds.size;
             let mut jx = 0usize;
             let mut store = vdupq_n_s32(rnd_const);
+
+            while jx + 8 <= bounds_size {
+                let w_ptr = weights.get_unchecked(jx..);
+                let v_weight = vcombine_s8(vld1_s8(w_ptr.as_ptr().cast()), vdup_n_s8(0));
+                let weights_lo = vqtbl1q_s8(v_weight, v_weights);
+                let weights_hi = vqtbl1q_s8(v_weight, v_weights_hi);
+                let bounds_start = bounds.start + jx;
+                let rgba_pixel0 = vld1q_u8(src.get_unchecked((bounds_start * CN)..).as_ptr());
+                let rgba_pixel1 = vld1q_u8(src.get_unchecked((bounds_start * CN + 16)..).as_ptr());
+
+                store = vusdotq_s32(store, vqtbl1q_u8(rgba_pixel0, v_tbl), weights_lo);
+                store = vusdotq_s32(store, vqtbl1q_u8(rgba_pixel1, v_tbl), weights_hi);
+                jx += 8;
+            }
 
             while jx + 4 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
