@@ -158,10 +158,10 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
             let (row1_ref, rest) = rest.split_at_mut(dst_stride);
             let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-            let iter_row0 = row0_ref.chunks_exact_mut(4);
-            let iter_row1 = row1_ref.chunks_exact_mut(4);
-            let iter_row2 = row2_ref.chunks_exact_mut(4);
-            let iter_row3 = row3_ref.chunks_exact_mut(4);
+            let iter_row0 = row0_ref.as_chunks_mut::<4>().0;
+            let iter_row1 = row1_ref.as_chunks_mut::<4>().0;
+            let iter_row2 = row2_ref.as_chunks_mut::<4>().0;
+            let iter_row3 = row3_ref.as_chunks_mut::<4>().0;
 
             let v_shl_back = vld1_s16(
                 [
@@ -174,9 +174,10 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
             );
 
             for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
-                .zip(iter_row1)
-                .zip(iter_row2)
-                .zip(iter_row3)
+                .iter_mut()
+                .zip(iter_row1.iter_mut())
+                .zip(iter_row2.iter_mut())
+                .zip(iter_row3.iter_mut())
                 .zip(filter_weights.bounds.iter())
                 .zip(
                     filter_weights

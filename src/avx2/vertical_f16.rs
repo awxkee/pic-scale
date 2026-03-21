@@ -263,7 +263,7 @@ fn convolve_vertical_avx_row_f16_impl<const FMA: bool>(
     let mut cx = 0usize;
     let dst_width = dst.len();
 
-    while cx + 32 < dst_width {
+    while cx + 32 <= dst_width {
         convolve_vertical_part_avx_32_f16::<FMA>(
             bounds.start,
             cx,
@@ -277,7 +277,7 @@ fn convolve_vertical_avx_row_f16_impl<const FMA: bool>(
         cx += 32;
     }
 
-    while cx + 16 < dst_width {
+    while cx + 16 <= dst_width {
         convolve_vertical_part_avx_16_f16::<FMA>(
             bounds.start,
             cx,
@@ -291,7 +291,7 @@ fn convolve_vertical_avx_row_f16_impl<const FMA: bool>(
         cx += 16;
     }
 
-    while cx + 4 < dst_width {
+    while cx + 4 <= dst_width {
         convolve_vertical_part_avx_4_f16::<FMA>(
             bounds.start,
             cx,

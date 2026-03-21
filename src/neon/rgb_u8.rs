@@ -91,7 +91,7 @@ fn conv_horiz_rgba_2_u8<const D: bool>(
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_1_u8<const D: bool>(
+fn conv_horiz_rgba_1_u8<const D: bool>(
     start_x: usize,
     src: &[u8],
     w0: int16x4_t,
@@ -128,23 +128,6 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4(
     _: u32,
 ) {
     convolve_horizontal_rgb_neon_rows_4_impl::<false, PRECISION>(
-        src,
-        src_stride,
-        dst,
-        dst_stride,
-        filter_weights,
-    );
-}
-
-pub(crate) fn convolve_horizontal_rgb_neon_rows_4_q(
-    src: &[u8],
-    src_stride: usize,
-    dst: &mut [u8],
-    dst_stride: usize,
-    filter_weights: &FilterWeights<i16>,
-    _: u32,
-) {
-    convolve_horizontal_rgb_neon_rows_4_impl::<true, 16>(
         src,
         src_stride,
         dst,
@@ -253,15 +236,6 @@ pub(crate) fn convolve_horizontal_rgb_neon_row_one(
     _: u32,
 ) {
     convolve_horizontal_rgb_neon_row_one_impl::<false, PRECISION>(src, dst, filter_weights);
-}
-
-pub(crate) fn convolve_horizontal_rgb_neon_row_one_q(
-    src: &[u8],
-    dst: &mut [u8],
-    filter_weights: &FilterWeights<i16>,
-    _: u32,
-) {
-    convolve_horizontal_rgb_neon_row_one_impl::<true, 16>(src, dst, filter_weights);
 }
 
 fn convolve_horizontal_rgb_neon_row_one_impl<const D: bool, const PRECISION: i32>(

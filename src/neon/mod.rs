@@ -140,8 +140,7 @@ pub(crate) use plane_f32_f64::{
     convolve_horizontal_plane_neon_row_one_f32_f64, convolve_horizontal_plane_neon_rows_4_f32_f64,
 };
 pub(crate) use plane_u8::{
-    convolve_horizontal_plane_neon_row, convolve_horizontal_plane_neon_row_q,
-    convolve_horizontal_plane_neon_rows_4_u8, convolve_horizontal_plane_neon_rows_4_u8_q,
+    convolve_horizontal_plane_neon_row, convolve_horizontal_plane_neon_rows_4_u8,
 };
 #[cfg(feature = "rdm")]
 pub(crate) use plane_u8_rdm::{
@@ -173,8 +172,7 @@ pub(crate) use rgb_f32_f64::{
     convolve_horizontal_rgb_neon_row_one_f32_f64, convolve_horizontal_rgb_neon_rows_4_f32_f64,
 };
 pub(crate) use rgb_u8::{
-    convolve_horizontal_rgb_neon_row_one, convolve_horizontal_rgb_neon_row_one_q,
-    convolve_horizontal_rgb_neon_rows_4, convolve_horizontal_rgb_neon_rows_4_q,
+    convolve_horizontal_rgb_neon_row_one, convolve_horizontal_rgb_neon_rows_4,
 };
 #[cfg(feature = "nightly_i8mm")]
 pub(crate) use rgb_u8_dot::{
@@ -210,8 +208,7 @@ pub(crate) use rgba_f32_f64::{
     convolve_horizontal_rgba_neon_row_one_f32_f64, convolve_horizontal_rgba_neon_rows_4_f32_f64,
 };
 pub(crate) use rgba_u8::{
-    convolve_horizontal_rgba_neon_row, convolve_horizontal_rgba_neon_row_q,
-    convolve_horizontal_rgba_neon_rows_4_u8, convolve_horizontal_rgba_neon_rows_4_u8_q,
+    convolve_horizontal_rgba_neon_row, convolve_horizontal_rgba_neon_rows_4_u8,
 };
 #[cfg(feature = "nightly_i8mm")]
 pub(crate) use rgba_u8_dot::{
@@ -239,9 +236,7 @@ pub(crate) use vertical_f16_fhm::convolve_vertical_rgb_neon_row_f16_fhm;
 pub(crate) use vertical_f16_full::xconvolve_vertical_rgb_neon_row_f16;
 pub(crate) use vertical_f32::convolve_vertical_rgb_neon_row_f32;
 pub(crate) use vertical_f32_f64::convolve_vertical_neon_row_f32_f64;
-pub(crate) use vertical_u8::{
-    convolve_vertical_neon_i32_precision, convolve_vertical_neon_i32_precision_d,
-};
+pub(crate) use vertical_u8::convolve_vertical_neon_i32_precision;
 #[cfg(feature = "nightly_i8mm")]
 pub(crate) use vertical_u8_dot::convolve_vertical_neon_i8_dot;
 #[cfg(feature = "rdm")]

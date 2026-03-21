@@ -212,7 +212,7 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_i16_impl(
             let src2 = src1.get_unchecked(src_stride..);
             let src3 = src2.get_unchecked(src_stride..);
 
-            while jx + 8 < bounds_size {
+            while jx + 8 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights_set = vld1q_s16(w_ptr.as_ptr());
@@ -245,7 +245,7 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_i16_impl(
                 jx += 8;
             }
 
-            while jx + 4 < bounds_size {
+            while jx + 4 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1_s16(w_ptr.as_ptr());
@@ -266,7 +266,7 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_i16_impl(
                 jx += 4;
             }
 
-            while jx + 2 < bounds_size {
+            while jx + 2 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let v_weight = vreinterpret_s16_s32(vld1_dup_s32(w_ptr.as_ptr() as *const i32));
@@ -383,7 +383,7 @@ unsafe fn convolve_horizontal_rgba_neon_row_i16_impl(
             let mut jx = 0usize;
             let mut store = initial_val;
 
-            while jx + 8 < bounds_size {
+            while jx + 8 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights_set = vld1q_s16(w_ptr.as_ptr());
@@ -409,7 +409,7 @@ unsafe fn convolve_horizontal_rgba_neon_row_i16_impl(
                 jx += 8;
             }
 
-            while jx + 4 < bounds_size {
+            while jx + 4 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1_s16(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
@@ -427,7 +427,7 @@ unsafe fn convolve_horizontal_rgba_neon_row_i16_impl(
                 jx += 4;
             }
 
-            while jx + 2 < bounds_size {
+            while jx + 2 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let v_weight = vreinterpret_s16_s32(vld1_dup_s32(w_ptr.as_ptr() as *const i32));

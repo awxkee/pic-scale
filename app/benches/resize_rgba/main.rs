@@ -285,6 +285,29 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
+    c.bench_function("Pic scale RGBA w/o alpha f32: Lanczos 3", |b| {
+        let copied: Vec<f32> = Vec::from(f32_image.clone());
+        let scaler =
+            Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
+        let store =
+            ImageStore::<f32, 4>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
+                .unwrap();
+        let resampler = scaler
+            .plan_rgba_resampling_f32(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize, dimensions.1 as usize) / 4,
+                false,
+            )
+            .unwrap();
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+        b.iter(|| {
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
+        })
+    });
+
     c.bench_function("Fast image resize RGBAf32 w/o alpha: Lanczos 3", |b| {
         let packed_f32 = f32_image
             .iter()

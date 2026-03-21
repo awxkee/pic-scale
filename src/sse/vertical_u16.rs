@@ -45,11 +45,7 @@ pub(crate) fn convolve_column_sse_u16(
     bit_depth: u32,
 ) {
     unsafe {
-        if std::arch::is_x86_feature_detected!("fma") {
-            convolve_column_lb_u16_fma(bounds, src, dst, src_stride, weight, bit_depth);
-        } else {
-            convolve_column_lb_u16_def(bounds, src, dst, src_stride, weight, bit_depth);
-        }
+        convolve_column_lb_u16_def(bounds, src, dst, src_stride, weight, bit_depth);
     }
 }
 
@@ -64,19 +60,6 @@ fn convolve_column_lb_u16_def(
     bit_depth: u32,
 ) {
     convolve_column_lb_u16_impl::<false>(bounds, src, dst, src_stride, weight, bit_depth);
-}
-
-#[target_feature(enable = "sse4.1", enable = "fma")]
-/// This inlining is required to activate all features for runtime dispatch
-fn convolve_column_lb_u16_fma(
-    bounds: &FilterBounds,
-    src: &[u16],
-    dst: &mut [u16],
-    src_stride: usize,
-    weight: &[f32],
-    bit_depth: u32,
-) {
-    convolve_column_lb_u16_impl::<true>(bounds, src, dst, src_stride, weight, bit_depth);
 }
 
 #[inline(always)]

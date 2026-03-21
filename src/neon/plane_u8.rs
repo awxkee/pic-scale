@@ -105,23 +105,6 @@ pub(crate) fn convolve_horizontal_plane_neon_rows_4_u8(
     );
 }
 
-pub(crate) fn convolve_horizontal_plane_neon_rows_4_u8_q(
-    src: &[u8],
-    src_stride: usize,
-    dst: &mut [u8],
-    dst_stride: usize,
-    filter_weights: &FilterWeights<i16>,
-    _: u32,
-) {
-    convolve_horizontal_plane_neon_rows_4_u8_impl::<true, 16>(
-        src,
-        src_stride,
-        dst,
-        dst_stride,
-        filter_weights,
-    );
-}
-
 fn convolve_horizontal_plane_neon_rows_4_u8_impl<const D: bool, const PRECISION: i32>(
     src: &[u8],
     src_stride: usize,
@@ -278,15 +261,6 @@ pub(crate) fn convolve_horizontal_plane_neon_row(
     _: u32,
 ) {
     convolve_horizontal_plane_neon_row_impl::<false, PRECISION>(src, dst, filter_weights);
-}
-
-pub(crate) fn convolve_horizontal_plane_neon_row_q(
-    src: &[u8],
-    dst: &mut [u8],
-    filter_weights: &FilterWeights<i16>,
-    _: u32,
-) {
-    convolve_horizontal_plane_neon_row_impl::<true, 16>(src, dst, filter_weights);
 }
 
 fn convolve_horizontal_plane_neon_row_impl<const D: bool, const PRECISION: i32>(

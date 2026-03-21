@@ -75,7 +75,7 @@ fn load_rgb_x4(src: &[u8]) -> __m128i {
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn convolve_horizontal_rgb_sse_rows_4_impl(
+fn convolve_horizontal_rgb_sse_rows_4_impl(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],

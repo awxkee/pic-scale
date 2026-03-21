@@ -111,7 +111,7 @@ fn conv_hor_rgb_1(
 }
 
 #[inline(always)]
-unsafe fn write_accumulator_u8(store: int16x8_t, dst: &mut [u8]) {
+fn write_accumulator_u8(store: int16x8_t, dst: &mut [u8]) {
     unsafe {
         let store_16 = vqshrun_n_s16::<6>(vcombine_s16(
             vadd_s16(vget_low_s16(store), vget_high_s16(store)),
@@ -179,15 +179,16 @@ fn convolve_horizontal_rgb_neon_rdm_rows_4_impl(
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
         let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let iter_row0 = row0_ref.chunks_exact_mut(CN);
-        let iter_row1 = row1_ref.chunks_exact_mut(CN);
-        let iter_row2 = row2_ref.chunks_exact_mut(CN);
-        let iter_row3 = row3_ref.chunks_exact_mut(CN);
+        let iter_row0 = row0_ref.as_chunks_mut::<CN>().0;
+        let iter_row1 = row1_ref.as_chunks_mut::<CN>().0;
+        let iter_row2 = row2_ref.as_chunks_mut::<CN>().0;
+        let iter_row3 = row3_ref.as_chunks_mut::<CN>().0;
 
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
-            .zip(iter_row1)
-            .zip(iter_row2)
-            .zip(iter_row3)
+            .iter_mut()
+            .zip(iter_row1.iter_mut())
+            .zip(iter_row2.iter_mut())
+            .zip(iter_row3.iter_mut())
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights
@@ -299,7 +300,9 @@ fn convolve_horizontal_rgb_neon_row_rdm_one_impl(
         let v_base = vld1q_s16(base_values.as_ptr());
 
         for ((dst, bounds), weights) in dst
-            .chunks_exact_mut(CN)
+            .as_chunks_mut::<CN>()
+            .0
+            .iter_mut()
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights

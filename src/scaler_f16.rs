@@ -211,3 +211,296 @@ impl<'b> ImageStoreScaling<'b, f16, 4> for RgbaF16ImageStore<'b> {
         plan.resample(self, store)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{ImageStore, ResamplingFunction, ThreadingPolicy};
+    use core::f16;
+
+    #[test]
+    fn check_rgba_f16_resizing_vertical() {
+        let image_width = 8;
+        let image_height = 8;
+        const CN: usize = 4;
+        let mut image = vec![0_f16; image_height * image_width * CN];
+        for dst in image.as_chunks_mut::<CN>().0.iter_mut() {
+            dst[0] = (124f32 / 255f32) as f16;
+            dst[1] = (41f32 / 255f32) as f16;
+            dst[2] = (99f32 / 255f32) as f16;
+            dst[3] = 1f32 as f16;
+        }
+        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
+        let mut target_store = ImageStoreMut::<f16, 4>::alloc(image_width, image_height / 2);
+        let planned = scaler
+            .plan_rgba_resampling_f16(src_store.size(), target_store.size(), false)
+            .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
+        let target_data = target_store.buffer.borrow();
+
+        for dst in target_data.chunks_exact(CN) {
+            assert!(
+                (dst[0] as f32 * 255f32 - 124f32).abs() < 3f32,
+                "R channel mismatch: {}",
+                dst[0] as f32 * 255f32
+            );
+            assert!(
+                (dst[1] as f32 * 255f32 - 41f32).abs() < 3f32,
+                "G channel mismatch: {}",
+                dst[1] as f32 * 255f32
+            );
+            assert!(
+                (dst[2] as f32 * 255f32 - 99f32).abs() < 3f32,
+                "B channel mismatch: {}",
+                dst[2] as f32 * 255f32
+            );
+            assert!(
+                (dst[3] as f32 - 1f32).abs() < 0.01f32,
+                "A channel mismatch: {}",
+                dst[3] as f32
+            );
+        }
+    }
+
+    #[test]
+    fn check_rgba_f16_resizing_vertical_threading() {
+        let image_width = 8;
+        let image_height = 8;
+        const CN: usize = 4;
+        let mut image = vec![0_f16; image_height * image_width * CN];
+        for dst in image.as_chunks_mut::<CN>().0.iter_mut() {
+            dst[0] = (124f32 / 255f32) as f16;
+            dst[1] = (41f32 / 255f32) as f16;
+            dst[2] = (99f32 / 255f32) as f16;
+            dst[3] = 1f32 as f16;
+        }
+        let scaler = Scaler::new(ResamplingFunction::Lanczos3)
+            .set_threading_policy(ThreadingPolicy::Adaptive);
+        let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
+        let mut target_store = ImageStoreMut::<f16, 4>::alloc(image_width, image_height / 2);
+        let planned = scaler
+            .plan_rgba_resampling_f16(src_store.size(), target_store.size(), false)
+            .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
+        let target_data = target_store.buffer.borrow();
+
+        for dst in target_data.chunks_exact(CN) {
+            assert!(
+                (dst[0] as f32 * 255f32 - 124f32).abs() < 3f32,
+                "R channel mismatch: {}",
+                dst[0] as f32 * 255f32
+            );
+            assert!(
+                (dst[1] as f32 * 255f32 - 41f32).abs() < 3f32,
+                "G channel mismatch: {}",
+                dst[1] as f32 * 255f32
+            );
+            assert!(
+                (dst[2] as f32 * 255f32 - 99f32).abs() < 3f32,
+                "B channel mismatch: {}",
+                dst[2] as f32 * 255f32
+            );
+            assert!(
+                (dst[3] as f32 - 1f32).abs() < 0.01f32,
+                "A channel mismatch: {}",
+                dst[3] as f32
+            );
+        }
+    }
+
+    #[test]
+    fn check_rgba_f16_nearest_vertical() {
+        let image_width = 255;
+        let image_height = 512;
+        const CN: usize = 4;
+        let mut image = vec![0_f16; image_height * image_width * CN];
+        for dst in image.as_chunks_mut::<CN>().0.iter_mut() {
+            dst[0] = (124f32 / 255f32) as f16;
+            dst[1] = (41f32 / 255f32) as f16;
+            dst[2] = (99f32 / 255f32) as f16;
+            dst[3] = (77f32 / 255f32) as f16;
+        }
+        let mut scaler = Scaler::new(ResamplingFunction::Nearest);
+        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
+        let mut target_store = ImageStoreMut::<f16, 4>::alloc(image_width, image_height / 2);
+        let planned = scaler
+            .plan_rgba_resampling_f16(src_store.size(), target_store.size(), false)
+            .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
+        let target_data = target_store.buffer.borrow();
+
+        for dst in target_data.chunks_exact(CN) {
+            assert!(
+                (dst[0] as f32 * 255f32 - 124f32).abs() < 3f32,
+                "R channel mismatch: {}",
+                dst[0] as f32 * 255f32
+            );
+            assert!(
+                (dst[1] as f32 * 255f32 - 41f32).abs() < 3f32,
+                "G channel mismatch: {}",
+                dst[1] as f32 * 255f32
+            );
+            assert!(
+                (dst[2] as f32 * 255f32 - 99f32).abs() < 3f32,
+                "B channel mismatch: {}",
+                dst[2] as f32 * 255f32
+            );
+            assert!(
+                (dst[3] as f32 * 255f32 - 77f32).abs() < 3f32,
+                "A channel mismatch: {}",
+                dst[3] as f32 * 255f32
+            );
+        }
+    }
+
+    #[test]
+    fn check_rgba_f16_nearest_vertical_threading() {
+        let image_width = 255;
+        let image_height = 512;
+        const CN: usize = 4;
+        let mut image = vec![0_f16; image_height * image_width * CN];
+        for dst in image.as_chunks_mut::<CN>().0.iter_mut() {
+            dst[0] = (124f32 / 255f32) as f16;
+            dst[1] = (41f32 / 255f32) as f16;
+            dst[2] = (99f32 / 255f32) as f16;
+            dst[3] = (77f32 / 255f32) as f16;
+        }
+        let scaler = Scaler::new(ResamplingFunction::Nearest)
+            .set_threading_policy(ThreadingPolicy::Adaptive);
+        let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
+        let mut target_store = ImageStoreMut::<f16, 4>::alloc(image_width, image_height / 2);
+        let planned = scaler
+            .plan_rgba_resampling_f16(src_store.size(), target_store.size(), false)
+            .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
+        let target_data = target_store.buffer.borrow();
+
+        for dst in target_data.chunks_exact(CN) {
+            assert!(
+                (dst[0] as f32 * 255f32 - 124f32).abs() < 3f32,
+                "R channel mismatch: {}",
+                dst[0] as f32 * 255f32
+            );
+            assert!(
+                (dst[1] as f32 * 255f32 - 41f32).abs() < 3f32,
+                "G channel mismatch: {}",
+                dst[1] as f32 * 255f32
+            );
+            assert!(
+                (dst[2] as f32 * 255f32 - 99f32).abs() < 3f32,
+                "B channel mismatch: {}",
+                dst[2] as f32 * 255f32
+            );
+            assert!(
+                (dst[3] as f32 * 255f32 - 77f32).abs() < 3f32,
+                "A channel mismatch: {}",
+                dst[3] as f32 * 255f32
+            );
+        }
+    }
+
+    #[test]
+    fn check_rgb_f16_resizing_vertical() {
+        let image_width = 8;
+        let image_height = 8;
+        const CN: usize = 3;
+        let mut image = vec![0_f16; image_height * image_width * CN];
+        for dst in image.as_chunks_mut::<CN>().0.iter_mut() {
+            dst[0] = (124f32 / 255f32) as f16;
+            dst[1] = (41f32 / 255f32) as f16;
+            dst[2] = (99f32 / 255f32) as f16;
+        }
+        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
+        let mut target_store = ImageStoreMut::<f16, 3>::alloc(image_width, image_height / 2);
+        let planned = scaler
+            .plan_rgb_resampling_f16(src_store.size(), target_store.size())
+            .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
+        let target_data = target_store.buffer.borrow();
+
+        for dst in target_data.as_chunks::<CN>().0.iter() {
+            assert!(
+                (dst[0] as f32 * 255f32 - 124f32).abs() < 3f32,
+                "R channel mismatch: {}",
+                dst[0] as f32 * 255f32
+            );
+            assert!(
+                (dst[1] as f32 * 255f32 - 41f32).abs() < 3f32,
+                "G channel mismatch: {}",
+                dst[1] as f32 * 255f32
+            );
+            assert!(
+                (dst[2] as f32 * 255f32 - 99f32).abs() < 3f32,
+                "B channel mismatch: {}",
+                dst[2] as f32 * 255f32
+            );
+        }
+    }
+
+    #[test]
+    fn check_cbcr_f16_resizing_vertical() {
+        let image_width = 8;
+        let image_height = 8;
+        const CN: usize = 2;
+        let mut image = vec![0_f16; image_height * image_width * CN];
+        for dst in image.as_chunks_mut::<CN>().0.iter_mut() {
+            dst[0] = (124f32 / 255f32) as f16;
+            dst[1] = (41f32 / 255f32) as f16;
+        }
+        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
+        let mut target_store = ImageStoreMut::<f16, 2>::alloc(image_width, image_height / 2);
+        let planned = scaler
+            .plan_cbcr_resampling_f16(src_store.size(), target_store.size())
+            .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
+        let target_data = target_store.buffer.borrow();
+
+        for dst in target_data.as_chunks::<CN>().0.iter() {
+            assert!(
+                (dst[0] as f32 * 255f32 - 124f32).abs() < 3f32,
+                "R channel mismatch: {}",
+                dst[0] as f32 * 255f32
+            );
+            assert!(
+                (dst[1] as f32 * 255f32 - 41f32).abs() < 3f32,
+                "G channel mismatch: {}",
+                dst[1] as f32 * 255f32
+            );
+        }
+    }
+
+    #[test]
+    fn check_planar_f16_resizing_vertical() {
+        let image_width = 8;
+        let image_height = 8;
+        const CN: usize = 1;
+        let mut image = vec![0_f16; image_height * image_width * CN];
+        for dst in image.as_chunks_mut::<CN>().0.iter_mut() {
+            dst[0] = (124f32 / 255f32) as f16;
+        }
+        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
+        let mut target_store = ImageStoreMut::<f16, 1>::alloc(image_width, image_height / 2);
+        let planned = scaler
+            .plan_planar_resampling_f16(src_store.size(), target_store.size())
+            .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
+        let target_data = target_store.buffer.borrow();
+
+        for dst in target_data.as_chunks::<CN>().0.iter() {
+            assert!(
+                (dst[0] as f32 * 255f32 - 124f32).abs() < 3f32,
+                "R channel mismatch: {}",
+                dst[0] as f32 * 255f32
+            );
+        }
+    }
+}
