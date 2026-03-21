@@ -112,18 +112,14 @@ fn convolve_horizontal_parts_one_rgb_f32<const FMA: bool>(
     }
 }
 
-pub(crate) fn convolve_horizontal_rgb_sse_row_one_f32<const FMA: bool>(
+pub(crate) fn convolve_horizontal_rgb_sse_row_one_f32(
     src: &[f32],
     dst: &mut [f32],
     filter_weights: &FilterWeights<f32>,
     _: u32,
 ) {
     unsafe {
-        if FMA {
-            convolve_horizontal_rgb_sse_row_one_f32_fma(filter_weights, src, dst);
-        } else {
-            convolve_horizontal_rgb_sse_row_one_f32_regular(filter_weights, src, dst);
-        }
+        convolve_horizontal_rgb_sse_row_one_f32_regular(filter_weights, src, dst);
     }
 }
 
@@ -135,17 +131,6 @@ fn convolve_horizontal_rgb_sse_row_one_f32_regular(
     dst: &mut [f32],
 ) {
     let unit = ExecutionUnit1Row::<false>::default();
-    unit.pass(filter_weights, src, dst);
-}
-
-#[target_feature(enable = "sse4.1", enable = "fma")]
-/// This inlining is required to activate all features for runtime dispatch
-fn convolve_horizontal_rgb_sse_row_one_f32_fma(
-    filter_weights: &FilterWeights<f32>,
-    src: &[f32],
-    dst: &mut [f32],
-) {
-    let unit = ExecutionUnit1Row::<true>::default();
     unit.pass(filter_weights, src, dst);
 }
 
@@ -229,7 +214,7 @@ impl<const FMA: bool> ExecutionUnit1Row<FMA> {
     }
 }
 
-pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f32<const FMA: bool>(
+pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f32(
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
@@ -238,23 +223,13 @@ pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f32<const FMA: bool>(
     _: u32,
 ) {
     unsafe {
-        if FMA {
-            convolve_horizontal_rgb_sse_rows_4_f32_fma(
-                filter_weights,
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-            );
-        } else {
-            convolve_horizontal_rgb_sse_rows_4_f32_regular(
-                filter_weights,
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-            );
-        }
+        convolve_horizontal_rgb_sse_rows_4_f32_regular(
+            filter_weights,
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+        );
     }
 }
 
@@ -268,19 +243,6 @@ fn convolve_horizontal_rgb_sse_rows_4_f32_regular(
     dst_stride: usize,
 ) {
     let unit = ExecutionUnit4Row::<false>::default();
-    unit.pass(filter_weights, src, src_stride, dst, dst_stride);
-}
-
-#[target_feature(enable = "sse4.1", enable = "fma")]
-/// This inlining is required to activate all features for runtime dispatch
-fn convolve_horizontal_rgb_sse_rows_4_f32_fma(
-    filter_weights: &FilterWeights<f32>,
-    src: &[f32],
-    src_stride: usize,
-    dst: &mut [f32],
-    dst_stride: usize,
-) {
-    let unit = ExecutionUnit4Row::<true>::default();
     unit.pass(filter_weights, src, src_stride, dst, dst_stride);
 }
 

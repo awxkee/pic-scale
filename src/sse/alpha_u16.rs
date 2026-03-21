@@ -212,7 +212,7 @@ impl DisassociateAlpha for DisassociateAlphaDefault {
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn unpremultiply_alpha_sse_rgba_u16_row_impl(
+fn unpremultiply_alpha_sse_rgba_u16_row_impl(
     in_place: &mut [u16],
     bit_depth: usize,
     executor: impl DisassociateAlpha,
@@ -223,7 +223,7 @@ unsafe fn unpremultiply_alpha_sse_rgba_u16_row_impl(
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn unpremultiply_alpha_sse_rgba_u16_impl(
+fn unpremultiply_alpha_sse_rgba_u16_impl(
     in_place: &mut [u16],
     stride: usize,
     width: usize,
@@ -233,7 +233,7 @@ unsafe fn unpremultiply_alpha_sse_rgba_u16_impl(
 ) {
     in_place
         .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| unsafe {
+        .for_each(pool, |row| {
             unpremultiply_alpha_sse_rgba_u16_row_impl(
                 &mut row[..width * 4],
                 bit_depth,
@@ -243,7 +243,7 @@ unsafe fn unpremultiply_alpha_sse_rgba_u16_impl(
 }
 
 #[inline(always)]
-unsafe fn sse_premultiply_row_u16(
+fn sse_premultiply_row_u16(
     x: __m128i,
     a_lo_f: __m128,
     a_hi_f: __m128,
@@ -440,7 +440,7 @@ impl Sse41PremultiplyExecutor for Sse41PremultiplyExecutorAny {
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn pma_sse41_rgba16_dispatch(
+fn pma_sse41_rgba16_dispatch(
     dst: &mut [u16],
     src: &[u16],
     bit_depth: usize,
@@ -452,24 +452,22 @@ unsafe fn pma_sse41_rgba16_dispatch(
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn premultiply_alpha_sse_rgba_u16_row_impl(dst: &mut [u16], src: &[u16], bit_depth: usize) {
-    unsafe {
-        if bit_depth == 10 {
-            pma_sse41_rgba16_dispatch(
-                dst,
-                src,
-                bit_depth,
-                Sse41PremultiplyExecutorDefault::<10>::default(),
-            )
-        } else if bit_depth == 12 {
-            pma_sse41_rgba16_dispatch(
-                dst,
-                src,
-                bit_depth,
-                Sse41PremultiplyExecutorDefault::<12>::default(),
-            )
-        } else {
-            pma_sse41_rgba16_dispatch(dst, src, bit_depth, Sse41PremultiplyExecutorAny::default())
-        }
+fn premultiply_alpha_sse_rgba_u16_row_impl(dst: &mut [u16], src: &[u16], bit_depth: usize) {
+    if bit_depth == 10 {
+        pma_sse41_rgba16_dispatch(
+            dst,
+            src,
+            bit_depth,
+            Sse41PremultiplyExecutorDefault::<10>::default(),
+        )
+    } else if bit_depth == 12 {
+        pma_sse41_rgba16_dispatch(
+            dst,
+            src,
+            bit_depth,
+            Sse41PremultiplyExecutorDefault::<12>::default(),
+        )
+    } else {
+        pma_sse41_rgba16_dispatch(dst, src, bit_depth, Sse41PremultiplyExecutorAny::default())
     }
 }
