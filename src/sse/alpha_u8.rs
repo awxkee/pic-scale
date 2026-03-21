@@ -36,17 +36,13 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_select_si128(
-    mask: __m128i,
-    true_vals: __m128i,
-    false_vals: __m128i,
-) -> __m128i {
+pub(crate) fn _mm_select_si128(mask: __m128i, true_vals: __m128i, false_vals: __m128i) -> __m128i {
     unsafe { _mm_blendv_epi8(false_vals, true_vals, mask) }
 }
 
 /// Exact division by 255 with rounding to nearest
 #[inline(always)]
-pub(crate) unsafe fn _mm_div_by_255_epi16(v: __m128i) -> __m128i {
+pub(crate) fn _mm_div_by_255_epi16(v: __m128i) -> __m128i {
     unsafe {
         let addition = _mm_set1_epi16(127);
         let j0 = _mm_add_epi16(v, addition);
@@ -56,7 +52,7 @@ pub(crate) unsafe fn _mm_div_by_255_epi16(v: __m128i) -> __m128i {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
+pub(crate) fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
     unsafe {
         let zeros = _mm_setzero_si128();
         let lo = _mm_unpacklo_epi8(x, zeros);
@@ -226,7 +222,7 @@ impl Sse41PremultiplyExecutorRgba8 for Sse41PremultiplyExecutor8Default {
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn sse_premultiply_alpha_rgba_impl_row(
+fn sse_premultiply_alpha_rgba_impl_row(
     dst: &mut [u8],
     src: &[u8],
     executor: impl Sse41PremultiplyExecutorRgba8,
@@ -238,7 +234,7 @@ unsafe fn sse_premultiply_alpha_rgba_impl_row(
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
-unsafe fn sse_premultiply_alpha_rgba_impl(
+fn sse_premultiply_alpha_rgba_impl(
     dst: &mut [u8],
     dst_stride: usize,
     src: &[u8],
@@ -248,7 +244,7 @@ unsafe fn sse_premultiply_alpha_rgba_impl(
     pool: &novtb::ThreadPool,
 ) {
     dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| unsafe {
+        .for_each_enumerated(pool, |y, dst| {
             let src = &src[y * src_stride..(y + 1) * src_stride];
             sse_premultiply_alpha_rgba_impl_row(
                 &mut dst[..width * 4],
@@ -280,7 +276,7 @@ struct DisassociateAlphaDefault {}
 
 impl DisassociateAlphaDefault {
     #[inline(always)]
-    unsafe fn disassociate_chunk(&self, in_place: &mut [u8]) {
+    fn disassociate_chunk(&self, in_place: &mut [u8]) {
         unsafe {
             let src_ptr = in_place.as_ptr();
             let rgba0 = _mm_loadu_si128(src_ptr as *const __m128i);
@@ -333,17 +329,14 @@ impl DisassociateAlpha for DisassociateAlphaDefault {
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn sse_unpremultiply_alpha_rgba_impl_row(
-    in_place: &mut [u8],
-    executor: impl DisassociateAlpha,
-) {
+fn sse_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8], executor: impl DisassociateAlpha) {
     unsafe {
         executor.disassociate(in_place);
     }
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn sse_unpremultiply_alpha_rgba_impl(
+fn sse_unpremultiply_alpha_rgba_impl(
     in_place: &mut [u8],
     width: usize,
     _: usize,
@@ -352,7 +345,7 @@ unsafe fn sse_unpremultiply_alpha_rgba_impl(
 ) {
     in_place
         .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| unsafe {
+        .for_each(pool, |row| {
             sse_unpremultiply_alpha_rgba_impl_row(
                 &mut row[..width * 4],
                 DisassociateAlphaDefault::default(),

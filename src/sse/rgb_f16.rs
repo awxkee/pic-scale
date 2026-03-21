@@ -150,22 +150,14 @@ fn convolve_horizontal_parts_one_rgb_f16<const F16C: bool, const FMA: bool>(
     }
 }
 
-pub(crate) fn convolve_horizontal_rgb_sse_row_one_f16<const F16C: bool, const FMA: bool>(
+pub(crate) fn convolve_horizontal_rgb_sse_row_one_f16(
     src: &[f16],
     dst: &mut [f16],
     filter_weights: &FilterWeights<f32>,
     _: u32,
 ) {
     unsafe {
-        if F16C {
-            if FMA {
-                convolve_horizontal_rgb_sse_row_one_f16c_fma(filter_weights, src, dst);
-            } else {
-                convolve_horizontal_rgb_sse_row_one_f16c(filter_weights, src, dst);
-            }
-        } else {
-            convolve_horizontal_rgb_sse_row_one_f16_regular(filter_weights, src, dst);
-        }
+        convolve_horizontal_rgb_sse_row_one_f16_regular(filter_weights, src, dst);
     }
 }
 
@@ -177,30 +169,6 @@ fn convolve_horizontal_rgb_sse_row_one_f16_regular(
     dst: &mut [f16],
 ) {
     convolve_horizontal_rgb_sse_row_one_f16_impl::<false, false>(filter_weights, src, dst);
-}
-
-#[target_feature(enable = "sse4.1", enable = "f16c")]
-/// This inlining is required to activate all features for runtime dispatch.
-///
-/// Crate has a safe fallback for f16 conversion even it is not supported.
-fn convolve_horizontal_rgb_sse_row_one_f16c(
-    filter_weights: &FilterWeights<f32>,
-    src: &[f16],
-    dst: &mut [f16],
-) {
-    convolve_horizontal_rgb_sse_row_one_f16_impl::<true, false>(filter_weights, src, dst);
-}
-
-#[target_feature(enable = "sse4.1", enable = "f16c", enable = "fma")]
-/// This inlining is required to activate all features for runtime dispatch.
-///
-/// Crate has a safe fallback for f16 conversion even it is not supported.
-fn convolve_horizontal_rgb_sse_row_one_f16c_fma(
-    filter_weights: &FilterWeights<f32>,
-    src: &[f16],
-    dst: &mut [f16],
-) {
-    convolve_horizontal_rgb_sse_row_one_f16_impl::<true, true>(filter_weights, src, dst);
 }
 
 #[inline(always)]
@@ -284,7 +252,7 @@ fn convolve_horizontal_rgb_sse_row_one_f16_impl<const F16C: bool, const FMA: boo
     }
 }
 
-pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f16<const F16C: bool, const FMA: bool>(
+pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f16(
     src: &[f16],
     src_stride: usize,
     dst: &mut [f16],
@@ -293,33 +261,13 @@ pub(crate) fn convolve_horizontal_rgb_sse_rows_4_f16<const F16C: bool, const FMA
     _: u32,
 ) {
     unsafe {
-        if F16C {
-            if FMA {
-                convolve_horizontal_rgb_sse_rows_4_f16c_fma(
-                    filter_weights,
-                    src,
-                    src_stride,
-                    dst,
-                    dst_stride,
-                );
-            } else {
-                convolve_horizontal_rgb_sse_rows_4_f16c(
-                    filter_weights,
-                    src,
-                    src_stride,
-                    dst,
-                    dst_stride,
-                );
-            }
-        } else {
-            convolve_horizontal_rgb_sse_rows_4_f16_regular(
-                filter_weights,
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-            );
-        }
+        convolve_horizontal_rgb_sse_rows_4_f16_regular(
+            filter_weights,
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+        );
     }
 }
 
@@ -333,46 +281,6 @@ fn convolve_horizontal_rgb_sse_rows_4_f16_regular(
     dst_stride: usize,
 ) {
     convolve_horizontal_rgb_sse_rows_4_f16_impl::<false, false>(
-        filter_weights,
-        src,
-        src_stride,
-        dst,
-        dst_stride,
-    );
-}
-
-#[target_feature(enable = "sse4.1", enable = "f16c")]
-/// This inlining is required to activate all features for runtime dispatch.
-///
-/// Crate has a safe fallback for f16 conversion even it is not supported.
-fn convolve_horizontal_rgb_sse_rows_4_f16c(
-    filter_weights: &FilterWeights<f32>,
-    src: &[f16],
-    src_stride: usize,
-    dst: &mut [f16],
-    dst_stride: usize,
-) {
-    convolve_horizontal_rgb_sse_rows_4_f16_impl::<true, false>(
-        filter_weights,
-        src,
-        src_stride,
-        dst,
-        dst_stride,
-    );
-}
-
-#[target_feature(enable = "sse4.1", enable = "f16c", enable = "fma")]
-/// This inlining is required to activate all features for runtime dispatch.
-///
-/// Crate has a safe fallback for f16 conversion even it is not supported.
-fn convolve_horizontal_rgb_sse_rows_4_f16c_fma(
-    filter_weights: &FilterWeights<f32>,
-    src: &[f16],
-    src_stride: usize,
-    dst: &mut [f16],
-    dst_stride: usize,
-) {
-    convolve_horizontal_rgb_sse_rows_4_f16_impl::<true, true>(
         filter_weights,
         src,
         src_stride,

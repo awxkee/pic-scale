@@ -225,7 +225,7 @@ pub(crate) fn convolve_vertical_part_sse_f32<const FMA: bool>(
     }
 }
 
-pub(crate) fn convolve_vertical_rgb_sse_row_f32<const FMA: bool>(
+pub(crate) fn convolve_vertical_rgb_sse_row_f32(
     width: usize,
     bounds: &FilterBounds,
     src: &[f32],
@@ -235,13 +235,7 @@ pub(crate) fn convolve_vertical_rgb_sse_row_f32<const FMA: bool>(
     _: u32,
 ) {
     unsafe {
-        if FMA {
-            convolve_vertical_rgb_sse_row_f32_fma(width, bounds, src, dst, src_stride, weight_ptr);
-        } else {
-            convolve_vertical_rgb_sse_row_f32_regular(
-                width, bounds, src, dst, src_stride, weight_ptr,
-            );
-        }
+        convolve_vertical_rgb_sse_row_f32_regular(width, bounds, src, dst, src_stride, weight_ptr);
     }
 }
 
@@ -258,19 +252,6 @@ fn convolve_vertical_rgb_sse_row_f32_regular(
     convolve_vertical_rgb_sse_row_f32_impl::<false>(
         width, bounds, src, dst, src_stride, weight_ptr,
     );
-}
-
-#[target_feature(enable = "sse4.1", enable = "fma")]
-/// This inlining is required to activate all features for runtime dispatch.
-fn convolve_vertical_rgb_sse_row_f32_fma(
-    width: usize,
-    bounds: &FilterBounds,
-    src: &[f32],
-    dst: &mut [f32],
-    src_stride: usize,
-    weight_ptr: &[f32],
-) {
-    convolve_vertical_rgb_sse_row_f32_impl::<true>(width, bounds, src, dst, src_stride, weight_ptr);
 }
 
 #[inline(always)]

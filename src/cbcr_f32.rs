@@ -109,7 +109,7 @@ impl VerticalConvolutionPass<f32, f32, 2> for ImageStore<'_, f32, 2> {
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             if std::arch::is_x86_feature_detected!("sse4.1") {
-                _dispatcher = convolve_vertical_rgb_sse_row_f32::<false>;
+                _dispatcher = convolve_vertical_rgb_sse_row_f32;
             }
         }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]

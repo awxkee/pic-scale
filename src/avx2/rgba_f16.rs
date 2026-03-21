@@ -34,7 +34,7 @@ use core::f16;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-unsafe fn convolve_horizontal_parts_one_rgba_f16<const FMA: bool>(
+fn convolve_horizontal_parts_one_rgba_f16<const FMA: bool>(
     start_x: usize,
     src: *const f16,
     weight0: __m256,
@@ -50,7 +50,7 @@ unsafe fn convolve_horizontal_parts_one_rgba_f16<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn convolve_horizontal_parts_4_rgba_f16<const FMA: bool>(
+fn convolve_horizontal_parts_4_rgba_f16<const FMA: bool>(
     start_x: usize,
     src: *const f16,
     weight0: __m256,
@@ -72,7 +72,7 @@ unsafe fn convolve_horizontal_parts_4_rgba_f16<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn convolve_horizontal_parts_8_rgba_f16<const FMA: bool>(
+fn convolve_horizontal_parts_8_rgba_f16<const FMA: bool>(
     start_x: usize,
     src: *const f16,
     weight0: __m256,
@@ -102,7 +102,7 @@ unsafe fn convolve_horizontal_parts_8_rgba_f16<const FMA: bool>(
 }
 
 #[inline(always)]
-unsafe fn convolve_horizontal_parts_2_rgba_f16<const FMA: bool>(
+fn convolve_horizontal_parts_2_rgba_f16<const FMA: bool>(
     start_x: usize,
     src: *const f16,
     weight0: __m256,

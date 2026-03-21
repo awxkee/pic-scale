@@ -36,7 +36,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-unsafe fn sse_unpremultiply_row_u16(
+fn sse_unpremultiply_row_u16(
     x: __m128i,
     is_zero_mask: __m128i,
     a_lo_f: __m128,
@@ -63,7 +63,7 @@ unsafe fn sse_unpremultiply_row_u16(
 
 /// Exact division by 1023 with rounding to nearest
 #[inline(always)]
-pub(crate) unsafe fn _mm_div_by_1023_epi32(v: __m128i) -> __m128i {
+pub(crate) fn _mm_div_by_1023_epi32(v: __m128i) -> __m128i {
     unsafe {
         const DIVIDING_BY: i32 = 10;
         let addition = _mm_set1_epi32(1 << (DIVIDING_BY - 1));
@@ -74,7 +74,7 @@ pub(crate) unsafe fn _mm_div_by_1023_epi32(v: __m128i) -> __m128i {
 
 /// Exact division by 4095 with rounding to nearest
 #[inline(always)]
-pub(crate) unsafe fn _mm_div_by_4095_epi32(v: __m128i) -> __m128i {
+pub(crate) fn _mm_div_by_4095_epi32(v: __m128i) -> __m128i {
     unsafe {
         const DIVIDING_BY: i32 = 12;
         let addition = _mm_set1_epi32(1 << (DIVIDING_BY - 1));
@@ -85,7 +85,7 @@ pub(crate) unsafe fn _mm_div_by_4095_epi32(v: __m128i) -> __m128i {
 
 /// Exact division by 65535 with rounding to nearest
 #[inline(always)]
-pub(crate) unsafe fn _mm_div_by_65535_epi32(v: __m128i) -> __m128i {
+pub(crate) fn _mm_div_by_65535_epi32(v: __m128i) -> __m128i {
     unsafe {
         const DIVIDING_BY: i32 = 16;
         let addition = _mm_set1_epi32(1 << (DIVIDING_BY - 1));
@@ -95,15 +95,13 @@ pub(crate) unsafe fn _mm_div_by_65535_epi32(v: __m128i) -> __m128i {
 }
 
 #[inline(always)]
-unsafe fn _mm_div_by<const BIT_DEPTH: usize>(v: __m128i) -> __m128i {
-    unsafe {
-        if BIT_DEPTH == 10 {
-            _mm_div_by_1023_epi32(v)
-        } else if BIT_DEPTH == 12 {
-            _mm_div_by_4095_epi32(v)
-        } else {
-            _mm_div_by_65535_epi32(v)
-        }
+fn _mm_div_by<const BIT_DEPTH: usize>(v: __m128i) -> __m128i {
+    if BIT_DEPTH == 10 {
+        _mm_div_by_1023_epi32(v)
+    } else if BIT_DEPTH == 12 {
+        _mm_div_by_4095_epi32(v)
+    } else {
+        _mm_div_by_65535_epi32(v)
     }
 }
 
@@ -214,7 +212,7 @@ impl DisassociateAlpha for DisassociateAlphaDefault {
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn unpremultiply_alpha_sse_rgba_u16_row_impl(
+fn unpremultiply_alpha_sse_rgba_u16_row_impl(
     in_place: &mut [u16],
     bit_depth: usize,
     executor: impl DisassociateAlpha,
@@ -225,7 +223,7 @@ unsafe fn unpremultiply_alpha_sse_rgba_u16_row_impl(
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn unpremultiply_alpha_sse_rgba_u16_impl(
+fn unpremultiply_alpha_sse_rgba_u16_impl(
     in_place: &mut [u16],
     stride: usize,
     width: usize,
@@ -235,7 +233,7 @@ unsafe fn unpremultiply_alpha_sse_rgba_u16_impl(
 ) {
     in_place
         .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| unsafe {
+        .for_each(pool, |row| {
             unpremultiply_alpha_sse_rgba_u16_row_impl(
                 &mut row[..width * 4],
                 bit_depth,
@@ -245,7 +243,7 @@ unsafe fn unpremultiply_alpha_sse_rgba_u16_impl(
 }
 
 #[inline(always)]
-unsafe fn sse_premultiply_row_u16(
+fn sse_premultiply_row_u16(
     x: __m128i,
     a_lo_f: __m128,
     a_hi_f: __m128,
@@ -442,7 +440,7 @@ impl Sse41PremultiplyExecutor for Sse41PremultiplyExecutorAny {
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn pma_sse41_rgba16_dispatch(
+fn pma_sse41_rgba16_dispatch(
     dst: &mut [u16],
     src: &[u16],
     bit_depth: usize,
@@ -454,24 +452,22 @@ unsafe fn pma_sse41_rgba16_dispatch(
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn premultiply_alpha_sse_rgba_u16_row_impl(dst: &mut [u16], src: &[u16], bit_depth: usize) {
-    unsafe {
-        if bit_depth == 10 {
-            pma_sse41_rgba16_dispatch(
-                dst,
-                src,
-                bit_depth,
-                Sse41PremultiplyExecutorDefault::<10>::default(),
-            )
-        } else if bit_depth == 12 {
-            pma_sse41_rgba16_dispatch(
-                dst,
-                src,
-                bit_depth,
-                Sse41PremultiplyExecutorDefault::<12>::default(),
-            )
-        } else {
-            pma_sse41_rgba16_dispatch(dst, src, bit_depth, Sse41PremultiplyExecutorAny::default())
-        }
+fn premultiply_alpha_sse_rgba_u16_row_impl(dst: &mut [u16], src: &[u16], bit_depth: usize) {
+    if bit_depth == 10 {
+        pma_sse41_rgba16_dispatch(
+            dst,
+            src,
+            bit_depth,
+            Sse41PremultiplyExecutorDefault::<10>::default(),
+        )
+    } else if bit_depth == 12 {
+        pma_sse41_rgba16_dispatch(
+            dst,
+            src,
+            bit_depth,
+            Sse41PremultiplyExecutorDefault::<12>::default(),
+        )
+    } else {
+        pma_sse41_rgba16_dispatch(dst, src, bit_depth, Sse41PremultiplyExecutorAny::default())
     }
 }

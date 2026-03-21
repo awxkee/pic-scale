@@ -282,26 +282,24 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_impl_dot(
             let store_16_2 = vqshrun_n_s32::<7>(store_2);
             let store_16_3 = vqshrun_n_s32::<7>(store_3);
 
-            let store_16_8_0 = vqmovn_u16(vcombine_u16(store_16_0, store_16_0));
-            let store_16_8_1 = vqmovn_u16(vcombine_u16(store_16_1, store_16_1));
-            let store_16_8_2 = vqmovn_u16(vcombine_u16(store_16_2, store_16_2));
-            let store_16_8 = vqmovn_u16(vcombine_u16(store_16_3, store_16_3));
+            let store_16_8_0 = vqmovn_u16(vcombine_u16(store_16_0, store_16_1));
+            let store_16_8_1 = vqmovn_u16(vcombine_u16(store_16_2, store_16_3));
 
             vst1_lane_u32::<0>(
                 chunk0.as_mut_ptr() as *mut u32,
                 vreinterpret_u32_u8(store_16_8_0),
             );
-            vst1_lane_u32::<0>(
+            vst1_lane_u32::<1>(
                 chunk1.as_mut_ptr() as *mut u32,
-                vreinterpret_u32_u8(store_16_8_1),
+                vreinterpret_u32_u8(store_16_8_0),
             );
             vst1_lane_u32::<0>(
                 chunk2.as_mut_ptr() as *mut u32,
-                vreinterpret_u32_u8(store_16_8_2),
+                vreinterpret_u32_u8(store_16_8_1),
             );
-            vst1_lane_u32::<0>(
+            vst1_lane_u32::<1>(
                 chunk3.as_mut_ptr() as *mut u32,
-                vreinterpret_u32_u8(store_16_8),
+                vreinterpret_u32_u8(store_16_8_1),
             );
         }
     }

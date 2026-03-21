@@ -42,11 +42,7 @@ pub(crate) fn avx512_has_non_constant_cap_alpha_rgba8(
 }
 
 #[target_feature(enable = "avx512bw", enable = "avx512f")]
-unsafe fn avx512_has_non_constant_cap_alpha_rgba8_impl(
-    store: &[u8],
-    width: usize,
-    stride: usize,
-) -> bool {
+fn avx512_has_non_constant_cap_alpha_rgba8_impl(store: &[u8], width: usize, stride: usize) -> bool {
     unsafe {
         if store.is_empty() {
             return true;
@@ -97,6 +93,9 @@ mod tests {
 
     #[test]
     fn check_alpha_exists_rgba8() {
+        if !is_x86_feature_detected!("avx512bw") {
+            return;
+        }
         let image_size = 256usize;
         let mut image = vec![0u8; image_size * image_size * 4];
         image[3 + 150 * 4] = 75;
@@ -106,6 +105,9 @@ mod tests {
 
     #[test]
     fn check_alpha_not_exists_rgba8() {
+        if !is_x86_feature_detected!("avx512bw") {
+            return;
+        }
         let image_size = 256usize;
         let image = vec![255u8; image_size * image_size * 4];
         let has_alpha = avx512_has_non_constant_cap_alpha_rgba8(&image, image_size, image_size * 4);

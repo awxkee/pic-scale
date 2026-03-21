@@ -49,29 +49,15 @@ fn convolve_horizontal_parts_one_rgba_f32<const FMA: bool>(
     }
 }
 
-pub(crate) fn convolve_horizontal_rgba_sse_row_one_f32<const FMA: bool>(
+pub(crate) fn convolve_horizontal_rgba_sse_row_one_f32(
     src: &[f32],
     dst: &mut [f32],
     filter_weights: &FilterWeights<f32>,
     _: u32,
 ) {
     unsafe {
-        if FMA {
-            convolve_horizontal_rgba_sse_row_one_f32_fma(filter_weights, src, dst);
-        } else {
-            convolve_horizontal_rgba_sse_row_one_f32_regular(filter_weights, src, dst);
-        }
+        convolve_horizontal_rgba_sse_row_one_f32_regular(filter_weights, src, dst);
     }
-}
-
-#[target_feature(enable = "sse4.1", enable = "fma")]
-/// This inlining is required to activate all features for runtime dispatch
-fn convolve_horizontal_rgba_sse_row_one_f32_fma(
-    filter_weights: &FilterWeights<f32>,
-    src: &[f32],
-    dst: &mut [f32],
-) {
-    convolve_horizontal_rgba_sse_row_one_f32_impl::<true>(filter_weights, src, dst);
 }
 
 #[target_feature(enable = "sse4.1")]
@@ -206,7 +192,7 @@ fn convolve_horizontal_parts_2_rgba_f32<const FMA: bool>(
     }
 }
 
-pub(crate) fn convolve_horizontal_rgba_sse_rows_4_f32<const FMA: bool>(
+pub(crate) fn convolve_horizontal_rgba_sse_rows_4_f32(
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
@@ -215,42 +201,14 @@ pub(crate) fn convolve_horizontal_rgba_sse_rows_4_f32<const FMA: bool>(
     _: u32,
 ) {
     unsafe {
-        if FMA {
-            convolve_horizontal_rgba_sse_rows_4_f32_fma(
-                filter_weights,
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-            );
-        } else {
-            convolve_horizontal_rgba_sse_rows_4_f32_regular(
-                filter_weights,
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-            );
-        }
+        convolve_horizontal_rgba_sse_rows_4_f32_regular(
+            filter_weights,
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+        );
     }
-}
-
-#[target_feature(enable = "sse4.1", enable = "fma")]
-/// This inlining is required to activate all features for runtime dispatch
-fn convolve_horizontal_rgba_sse_rows_4_f32_fma(
-    filter_weights: &FilterWeights<f32>,
-    src: &[f32],
-    src_stride: usize,
-    dst: &mut [f32],
-    dst_stride: usize,
-) {
-    convolve_horizontal_rgba_sse_rows_4_f32_impl::<true>(
-        filter_weights,
-        src,
-        src_stride,
-        dst,
-        dst_stride,
-    );
 }
 
 #[target_feature(enable = "sse4.1")]

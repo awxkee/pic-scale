@@ -97,10 +97,10 @@ fn convolve_horizontal_cbcr_neon_rows_4_u8_impl_dot(
 
         const CN: usize = 2;
 
-        let iter_row0 = row0_ref.chunks_exact_mut(CN);
-        let iter_row1 = row1_ref.chunks_exact_mut(CN);
-        let iter_row2 = row2_ref.chunks_exact_mut(CN);
-        let iter_row3 = row3_ref.chunks_exact_mut(CN);
+        let iter_row0 = row0_ref.as_chunks_mut::<CN>().0;
+        let iter_row1 = row1_ref.as_chunks_mut::<CN>().0;
+        let iter_row2 = row2_ref.as_chunks_mut::<CN>().0;
+        let iter_row3 = row3_ref.as_chunks_mut::<CN>().0;
 
         static ST: [i32; 2] = [1 << 6, 1 << 6];
         let base_val = vld1_s32(ST.as_ptr());
@@ -111,9 +111,10 @@ fn convolve_horizontal_cbcr_neon_rows_4_u8_impl_dot(
         let v_weights = vld1q_u8(weights_tbl.as_ptr());
 
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
-            .zip(iter_row1)
-            .zip(iter_row2)
-            .zip(iter_row3)
+            .iter_mut()
+            .zip(iter_row1.iter_mut())
+            .zip(iter_row2.iter_mut())
+            .zip(iter_row3.iter_mut())
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights

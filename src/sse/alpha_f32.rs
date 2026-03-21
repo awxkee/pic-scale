@@ -35,7 +35,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-unsafe fn sse_unpremultiply_row_f32(x: __m128, a: __m128) -> __m128 {
+fn sse_unpremultiply_row_f32(x: __m128, a: __m128) -> __m128 {
     unsafe {
         let is_zero_mask = _mm_cmpeq_ps(a, _mm_setzero_ps());
         let rs = _mm_div_ps(x, a);
@@ -56,7 +56,7 @@ pub(crate) fn sse_unpremultiply_alpha_rgba_f32(
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn sse_unpremultiply_alpha_rgba_f32_row_impl(in_place: &mut [f32]) {
+fn sse_unpremultiply_alpha_rgba_f32_row_impl(in_place: &mut [f32]) {
     unsafe {
         for dst in in_place.chunks_exact_mut(4 * 4) {
             let src_ptr = dst.as_ptr();
@@ -87,7 +87,7 @@ unsafe fn sse_unpremultiply_alpha_rgba_f32_row_impl(in_place: &mut [f32]) {
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn sse_unpremultiply_alpha_rgba_f32_impl(
+fn sse_unpremultiply_alpha_rgba_f32_impl(
     in_place: &mut [f32],
     stride: usize,
     width: usize,
@@ -96,7 +96,7 @@ unsafe fn sse_unpremultiply_alpha_rgba_f32_impl(
 ) {
     in_place
         .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| unsafe {
+        .for_each(pool, |row| {
             sse_unpremultiply_alpha_rgba_f32_row_impl(&mut row[..width * 4]);
         });
 }
@@ -116,7 +116,7 @@ pub(crate) fn sse_premultiply_alpha_rgba_f32(
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn sse_premultiply_alpha_rgba_f32_row_impl(dst: &mut [f32], src: &[f32]) {
+fn sse_premultiply_alpha_rgba_f32_row_impl(dst: &mut [f32], src: &[f32]) {
     unsafe {
         let mut rem = dst;
         let mut src_rem = src;
@@ -151,7 +151,7 @@ unsafe fn sse_premultiply_alpha_rgba_f32_row_impl(dst: &mut [f32], src: &[f32]) 
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
-unsafe fn sse_premultiply_alpha_rgba_f32_impl(
+fn sse_premultiply_alpha_rgba_f32_impl(
     dst: &mut [f32],
     dst_stride: usize,
     src: &[f32],
@@ -161,7 +161,7 @@ unsafe fn sse_premultiply_alpha_rgba_f32_impl(
     pool: &novtb::ThreadPool,
 ) {
     dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| unsafe {
+        .for_each_enumerated(pool, |y, dst| {
             let src = &src[y * src_stride..(y + 1) * src_stride];
             sse_premultiply_alpha_rgba_f32_row_impl(&mut dst[..width * 4], &src[..width * 4]);
         });
