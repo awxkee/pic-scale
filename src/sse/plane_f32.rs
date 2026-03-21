@@ -149,7 +149,7 @@ fn convolve_horizontal_plane_sse_row_one_impl<const FMA: bool>(
             let mut jx = 0usize;
             let mut store = _mm_setzero_ps();
 
-            while jx + 16 < bounds.size {
+            while jx + 16 <= bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                 let read_weights0 = _mm_loadu_ps(ptr.as_ptr());
@@ -161,7 +161,7 @@ fn convolve_horizontal_plane_sse_row_one_impl<const FMA: bool>(
                 jx += 8;
             }
 
-            while jx + 8 < bounds.size {
+            while jx + 8 <= bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                 let read_weights0 = _mm_loadu_ps(ptr.as_ptr());
@@ -178,7 +178,7 @@ fn convolve_horizontal_plane_sse_row_one_impl<const FMA: bool>(
                 jx += 8;
             }
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                 let read_weights = _mm_loadu_ps(ptr.as_ptr());
@@ -186,7 +186,7 @@ fn convolve_horizontal_plane_sse_row_one_impl<const FMA: bool>(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let bounds_start = bounds.start + jx;
                 let w = weights_ptr.get_unchecked(jx + filter_offset..);
                 let weights = _mm_setr_ps(*w.get_unchecked(0), *w.get_unchecked(1), 0., 0.);
@@ -299,7 +299,7 @@ fn convolve_horizontal_plane_sse_rows_4_impl<const FMA: bool>(
             let mut store_2 = zeros;
             let mut store_3 = zeros;
 
-            while jx + 16 < bounds.size {
+            while jx + 16 <= bounds.size {
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                 let read_weights0 = _mm_loadu_ps(ptr.as_ptr());
                 let read_weights1 = _mm_loadu_ps(ptr.get_unchecked(4..).as_ptr());
@@ -317,7 +317,7 @@ fn convolve_horizontal_plane_sse_rows_4_impl<const FMA: bool>(
                 jx += 16;
             }
 
-            while jx + 8 < bounds.size {
+            while jx + 8 <= bounds.size {
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                 let read_weights0 = _mm_loadu_ps(ptr.as_ptr());
                 let read_weights1 = _mm_loadu_ps(ptr.get_unchecked(4..).as_ptr());
@@ -361,7 +361,7 @@ fn convolve_horizontal_plane_sse_rows_4_impl<const FMA: bool>(
                 jx += 8;
             }
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                 let read_weights = _mm_loadu_ps(ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
@@ -376,7 +376,7 @@ fn convolve_horizontal_plane_sse_rows_4_impl<const FMA: bool>(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let w = weights_ptr.get_unchecked(jx + filter_offset..);
                 let weights = _mm_setr_ps(*w.get_unchecked(0), *w.get_unchecked(1), 0., 0.);
                 let bounds_start = bounds.start + jx;
