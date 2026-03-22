@@ -315,6 +315,9 @@ mod tests {
     #[test]
     fn test_horizontal_add() {
         unsafe {
+            if !std::arch::is_x86_feature_detected!("sse4.1") {
+                return;
+            }
             let original: [i16; 8] = [0, 1, 2, 3, 4, 5, 6, 7];
             let original_sum = original.iter().sum::<i16>();
             let v_sse = _mm_loadu_si128(original.as_ptr() as *const __m128i);
