@@ -290,7 +290,7 @@ fn convolve_vertical_neon_row_impl(
         let mut cx = 0usize;
         let dst_width = dst.len();
 
-        while cx + 32 < dst_width {
+        while cx + 32 <= dst_width {
             consume_u8_32(
                 bounds.start,
                 cx,
@@ -304,7 +304,7 @@ fn convolve_vertical_neon_row_impl(
             cx += 32;
         }
 
-        while cx + 16 < dst_width {
+        while cx + 16 <= dst_width {
             consume_u8_16(
                 bounds.start,
                 cx,
@@ -318,7 +318,7 @@ fn convolve_vertical_neon_row_impl(
             cx += 16;
         }
 
-        while cx + 8 < dst_width {
+        while cx + 8 <= dst_width {
             consume_u8_8(
                 bounds.start,
                 cx,

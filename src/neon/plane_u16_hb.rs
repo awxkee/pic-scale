@@ -136,7 +136,7 @@ fn convolve_horizontal_plane_neon_rows_4_hb_impl(
     bit_depth: u32,
 ) {
     unsafe {
-        let init = vdupq_n_s32(1 << 5);
+        let init = vld1q_s32([1i32 << 5, 0, 0, 0].as_ptr());
 
         let v_max_colors = (1u32 << bit_depth) - 1;
 
@@ -220,15 +220,14 @@ fn convolve_horizontal_plane_neon_rows_4_hb_impl(
                 jx += 1;
             }
 
-            let store_16_0 = ((vaddvq_s32(store_0).max(0) as u32) >> 6).min(v_max_colors);
-            let store_16_1 = ((vaddvq_s32(store_1).max(0) as u32) >> 6).min(v_max_colors);
-            let store_16_2 = ((vaddvq_s32(store_2).max(0) as u32) >> 6).min(v_max_colors);
-            let store_16_3 = ((vaddvq_s32(store_3).max(0) as u32) >> 6).min(v_max_colors);
+            let packed = vpaddq_s32(vpaddq_s32(store_0, store_1), vpaddq_s32(store_2, store_3));
+            let mut saturated = vqshrun_n_s32::<6>(packed);
+            saturated = vmin_u16(saturated, vdup_n_u16(v_max_colors as u16));
 
-            *chunk0 = store_16_0 as u16;
-            *chunk1 = store_16_1 as u16;
-            *chunk2 = store_16_2 as u16;
-            *chunk3 = store_16_3 as u16;
+            vst1_lane_u16::<0>(chunk0, saturated);
+            vst1_lane_u16::<1>(chunk1, saturated);
+            vst1_lane_u16::<2>(chunk2, saturated);
+            vst1_lane_u16::<3>(chunk3, saturated);
         }
     }
 }
@@ -254,6 +253,8 @@ fn convolve_horizontal_plane_neon_u16_hb_impl(
     unsafe {
         let v_max_colors = (1u32 << bit_depth) - 1;
 
+        let init = vld1q_s32([1i32 << 5, 0, 0, 0].as_ptr());
+
         for ((dst, bounds), weights) in dst.iter_mut().zip(filter_weights.bounds.iter()).zip(
             filter_weights
                 .weights
@@ -261,7 +262,7 @@ fn convolve_horizontal_plane_neon_u16_hb_impl(
         ) {
             let bounds_size = bounds.size;
             let mut jx = 0usize;
-            let mut store = vdupq_n_s32(1 << 5);
+            let mut store = init;
 
             while jx + 8 <= bounds_size {
                 let bounds_start = bounds.start + jx;
@@ -298,9 +299,11 @@ fn convolve_horizontal_plane_neon_u16_hb_impl(
                 jx += 1;
             }
 
-            let store_16_0 = (((vaddvq_s32(store)) >> 6).max(0) as u32).min(v_max_colors);
+            let packed = vpaddq_s32(vpaddq_s32(store, vdupq_n_s32(0)), vdupq_n_s32(0));
+            let mut saturated = vqshrun_n_s32::<6>(packed);
+            saturated = vmin_u16(saturated, vdup_n_u16(v_max_colors as u16));
 
-            *dst = store_16_0 as u16;
+            vst1_lane_u16::<0>(dst, saturated);
         }
     }
 }

@@ -36,7 +36,7 @@ fn conv_horiz_1_u16(start_x: usize, src: &[u16], w0: int16x4_t, store: int32x4_t
         const CN: usize = 1;
         let src_ptr = src.get_unchecked((start_x * CN)..);
         let px = vld1_lane_u16::<0>(src_ptr.as_ptr() as *const _, vdup_n_u16(0));
-        vqdmlal_s16(store, vreinterpret_s16_u16(px), w0)
+        vmlal_s16(store, vreinterpret_s16_u16(px), w0)
     }
 }
 
@@ -52,7 +52,7 @@ fn conv_horiz_2_u16(start_x: usize, src: &[u16], w0: int16x4_t, store: int32x4_t
             vdup_n_u32(0),
         ));
 
-        vqdmlal_s16(store, px, w0)
+        vmlal_s16(store, px, w0)
     }
 }
 
@@ -70,13 +70,13 @@ fn conv_horiz_4_u16(
 
         let px = vld1_u16(src_ptr.as_ptr());
 
-        vqdmlal_s16(store, vreinterpret_s16_u16(px), weights)
+        vmlal_s16(store, vreinterpret_s16_u16(px), weights)
     }
 }
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_8_u16(
+fn conv_horiz_8_u16(
     start_x: usize,
     src: &[u16],
     weights: int16x8_t,
@@ -88,12 +88,12 @@ unsafe fn conv_horiz_8_u16(
 
         let px = vld1q_u16(src_ptr.as_ptr());
 
-        let acc = vqdmlal_s16(
+        let acc = vmlal_s16(
             store,
             vreinterpret_s16_u16(vget_low_u16(px)),
             vget_low_s16(weights),
         );
-        vqdmlal_high_s16(acc, vreinterpretq_s16_u16(px), weights)
+        vmlal_high_s16(acc, vreinterpretq_s16_u16(px), weights)
     }
 }
 
@@ -106,9 +106,9 @@ pub(crate) fn convolve_horizontal_plane_neon_rows_4_lb_u16(
     bit_depth: u32,
 ) {
     unsafe {
-        const PRECISION: i32 = 16;
-        const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
-        let init = vdupq_n_s32(ROUNDING_CONST);
+        const PRECISION: i32 = 15;
+        const RND: i32 = 1 << (PRECISION - 1);
+        let init = vld1q_s32([RND, 0, 0, 0].as_ptr());
 
         let v_max_colors = (1u32 << bit_depth) - 1;
 
@@ -192,15 +192,14 @@ pub(crate) fn convolve_horizontal_plane_neon_rows_4_lb_u16(
                 jx += 1;
             }
 
-            let store_16_0 = ((vaddvq_s32(store_0).max(0) as u32) >> PRECISION).min(v_max_colors);
-            let store_16_1 = ((vaddvq_s32(store_1).max(0) as u32) >> PRECISION).min(v_max_colors);
-            let store_16_2 = ((vaddvq_s32(store_2).max(0) as u32) >> PRECISION).min(v_max_colors);
-            let store_16_3 = ((vaddvq_s32(store_3).max(0) as u32) >> PRECISION).min(v_max_colors);
+            let packed = vpaddq_s32(vpaddq_s32(store_0, store_1), vpaddq_s32(store_2, store_3));
+            let mut saturated = vqshrun_n_s32::<PRECISION>(packed);
+            saturated = vmin_u16(saturated, vdup_n_u16(v_max_colors as u16));
 
-            *chunk0 = store_16_0 as u16;
-            *chunk1 = store_16_1 as u16;
-            *chunk2 = store_16_2 as u16;
-            *chunk3 = store_16_3 as u16;
+            vst1_lane_u16::<0>(chunk0, saturated);
+            vst1_lane_u16::<1>(chunk1, saturated);
+            vst1_lane_u16::<2>(chunk2, saturated);
+            vst1_lane_u16::<3>(chunk3, saturated);
         }
     }
 }
@@ -214,8 +213,10 @@ pub(crate) fn convolve_horizontal_plane_neon_u16_lb_row(
     unsafe {
         let v_max_colors = (1u32 << bit_depth) - 1;
 
-        const PRECISION: i32 = 16;
-        const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
+        const PRECISION: i32 = 15;
+        const RND: i32 = 1 << (PRECISION - 1);
+
+        let init = vld1q_s32([RND, 0, 0, 0].as_ptr());
 
         for ((dst, bounds), weights) in dst.iter_mut().zip(filter_weights.bounds.iter()).zip(
             filter_weights
@@ -224,7 +225,7 @@ pub(crate) fn convolve_horizontal_plane_neon_u16_lb_row(
         ) {
             let bounds_size = bounds.size;
             let mut jx = 0usize;
-            let mut store = vdupq_n_s32(ROUNDING_CONST);
+            let mut store = init;
 
             while jx + 8 <= bounds_size {
                 let bounds_start = bounds.start + jx;
@@ -261,9 +262,11 @@ pub(crate) fn convolve_horizontal_plane_neon_u16_lb_row(
                 jx += 1;
             }
 
-            let store_16_0 = (((vaddvq_s32(store)) >> PRECISION).max(0) as u32).min(v_max_colors);
+            let packed = vpaddq_s32(vpaddq_s32(store, vdupq_n_s32(0)), vdupq_n_s32(0));
+            let mut saturated = vqshrun_n_s32::<PRECISION>(packed);
+            saturated = vmin_u16(saturated, vdup_n_u16(v_max_colors as u16));
 
-            *dst = store_16_0 as u16;
+            vst1_lane_u16::<0>(dst, saturated);
         }
     }
 }

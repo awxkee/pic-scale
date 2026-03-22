@@ -136,7 +136,7 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
             _mm_storeu_si128(dst.as_mut_ptr() as *mut __m128i, item0);
             _mm_storeu_si128(dst.as_mut_ptr().add(8) as *mut __m128i, item1);
 
-            cx = v_dx;
+            cx += 16;
         }
 
         let tail16 = dst.chunks_exact_mut(16).into_remainder();
@@ -176,7 +176,7 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
             let item = _mm_packus_epi32(v_st0, v_st1);
             _mm_storeu_si128(dst.as_mut_ptr() as *mut __m128i, item);
 
-            cx = v_dx;
+            cx += 8;
         }
 
         let tail8 = tail16.chunks_exact_mut(8).into_remainder();
@@ -209,7 +209,7 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
             let u_store0 = _mm_packus_epi32(v_st, v_st);
             _mm_storeu_si64(dst.as_mut_ptr() as *mut u8, u_store0);
 
-            cx = v_dx;
+            cx += 4;
         }
 
         let tail4 = tail8.chunks_exact_mut(4).into_remainder();

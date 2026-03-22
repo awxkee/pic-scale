@@ -209,8 +209,6 @@ fn convolve_chunks_8(
     let max_colors = (1u32 << bit_depth) - 1;
     let mut cx = cx;
 
-    let bounds_size = bounds.size;
-
     const PRECISION: i32 = 15;
     const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
 
@@ -226,7 +224,7 @@ fn convolve_chunks_8(
 
         let v_dx = v_px + x * 8;
 
-        for (j, &k_weight) in weights.iter().take(bounds_size).enumerate() {
+        for (j, &k_weight) in weights.iter().enumerate() {
             let py = bounds.start + j;
             let src_ptr = unsafe { src.get_unchecked((src_stride * py + v_dx)..) };
 
@@ -249,7 +247,7 @@ fn convolve_chunks_8(
             vst1q_u16(dst.as_mut_ptr(), item);
         }
 
-        cx = v_dx;
+        cx += 8;
     }
     cx
 }
@@ -268,8 +266,6 @@ fn convolve_chunks_4(
     let max_colors = (1u32 << bit_depth) - 1;
     let mut cx = cx;
 
-    let bounds_size = bounds.size;
-
     const PRECISION: i32 = 15;
     const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
 
@@ -284,7 +280,7 @@ fn convolve_chunks_4(
 
         let v_dx = v_px + x * 4;
 
-        for (j, &k_weight) in weights.iter().take(bounds_size).enumerate() {
+        for (j, &k_weight) in weights.iter().enumerate() {
             let py = bounds.start + j;
             let src_ptr = unsafe { src.get_unchecked((src_stride * py + v_dx)..) };
 
@@ -303,7 +299,7 @@ fn convolve_chunks_4(
             vst1_u16(dst.as_mut_ptr(), u_store0);
         }
 
-        cx = v_dx;
+        cx += 4;
     }
     cx
 }
@@ -314,7 +310,7 @@ pub(crate) fn convolve_column_lb_u16(
     src: &[u16],
     dst: &mut [u16],
     src_stride: usize,
-    weight: &[i16],
+    weights: &[i16],
     bit_depth: u32,
 ) {
     unsafe {
@@ -322,16 +318,17 @@ pub(crate) fn convolve_column_lb_u16(
         let mut cx = 0usize;
 
         let bounds_size = bounds.size;
+        let weights = &weights[..bounds_size];
 
         const PRECISION: i32 = 15;
-        const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
+        const ROUNDING: i32 = 1 << (PRECISION - 1);
 
         cx = convolve_chunks_16(
             dst.as_chunks_mut::<16>().0,
             bounds,
             src,
             src_stride,
-            weight,
+            weights,
             bit_depth,
             cx,
         );
@@ -341,7 +338,7 @@ pub(crate) fn convolve_column_lb_u16(
             bounds,
             src,
             src_stride,
-            weight,
+            weights,
             bit_depth,
             cx,
         );
@@ -352,21 +349,19 @@ pub(crate) fn convolve_column_lb_u16(
             bounds,
             src,
             src_stride,
-            weight,
+            weights,
             bit_depth,
             cx,
         );
 
         let tail4 = rem.as_chunks_mut::<4>().1;
 
-        let a_px = cx;
-
         for (x, dst) in tail4.iter_mut().enumerate() {
-            let mut store0 = ROUNDING_CONST;
+            let mut store0 = ROUNDING;
 
-            let v_px = a_px + x;
+            let v_px = cx + x;
 
-            for (j, &k_weight) in weight.iter().take(bounds_size).enumerate() {
+            for (j, &k_weight) in weights.iter().take(bounds_size).enumerate() {
                 let py = bounds.start + j;
                 let offset = src_stride * py + v_px;
                 let src_ptr = *src.get_unchecked(offset);

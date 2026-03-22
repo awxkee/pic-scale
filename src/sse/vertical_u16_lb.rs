@@ -120,7 +120,7 @@ fn convolve_column_lb_u16_impl(
             _mm_storeu_si128(dst.as_mut_ptr() as *mut __m128i, item0);
             _mm_storeu_si128(dst.as_mut_ptr().add(8) as *mut __m128i, item1);
 
-            cx = v_dx;
+            cx += 16;
         }
 
         let tail16 = dst.chunks_exact_mut(16).into_remainder();
@@ -158,7 +158,7 @@ fn convolve_column_lb_u16_impl(
             let item = _mm_min_epi16(_mm_packus_epi32(v_st0, v_st1), v_max_colors);
             _mm_storeu_si128(dst.as_mut_ptr() as *mut __m128i, item);
 
-            cx = v_dx;
+            cx += 8;
         }
 
         let tail8 = tail16.chunks_exact_mut(8).into_remainder();
@@ -190,7 +190,7 @@ fn convolve_column_lb_u16_impl(
             let u_store0 = _mm_min_epi16(_mm_packus_epi32(v_st, v_st), v_max_colors);
             _mm_storeu_si64(dst.as_mut_ptr() as *mut u8, u_store0);
 
-            cx = v_dx;
+            cx += 4;
         }
 
         let tail4 = tail8.chunks_exact_mut(4).into_remainder();

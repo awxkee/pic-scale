@@ -295,7 +295,7 @@ fn convolve_column_hb_impl(
             );
             vst1q_u16(dst.as_mut_ptr(), item);
 
-            cx = v_dx;
+            cx += 8;
         }
 
         let tail8 = tail16.chunks_exact_mut(8).into_remainder();
@@ -326,17 +326,15 @@ fn convolve_column_hb_impl(
             let u_store0 = vmin_u16(vqshrun_n_s32::<6>(store0), vget_low_u16(v_max_colors));
             vst1_u16(dst.as_mut_ptr(), u_store0);
 
-            cx = v_dx;
+            cx += 4;
         }
 
         let tail4 = tail8.chunks_exact_mut(4).into_remainder();
 
-        let a_px = cx;
-
         for (x, dst) in tail4.iter_mut().enumerate() {
             let mut store0 = 0;
 
-            let v_px = a_px + x;
+            let v_px = cx + x;
 
             for (j, &k_weight) in weights.iter().take(bounds_size).enumerate() {
                 let py = bounds.start + j;

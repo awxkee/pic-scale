@@ -350,7 +350,7 @@ fn convolve_32_items<const FMA: bool>(
                 item1,
             );
 
-            cx = v_dx;
+            cx += 32;
         }
         cx
     }
@@ -409,7 +409,7 @@ fn convolve_16_items<const FMA: bool>(
 
             _mm256_storeu_si256(dst.as_mut_ptr() as *mut __m256i, item0);
 
-            cx = v_dx;
+            cx += 16;
         }
         cx
     }
@@ -470,7 +470,7 @@ fn convolve_8_items<const FMA: bool>(
                 _mm256_castsi256_si128(item),
             );
 
-            cx = v_dx;
+            cx += 8;
         }
         cx
     }
@@ -564,17 +564,15 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
             );
             _mm_storeu_si64(dst.as_mut_ptr() as *mut u8, u_store0);
 
-            cx = v_dx;
+            cx += 4;
         }
 
         let tail4 = tail8.chunks_exact_mut(4).into_remainder();
 
-        let a_px = cx;
-
         for (x, dst) in tail4.iter_mut().enumerate() {
             let mut store0 = 0.;
 
-            let v_px = a_px + x;
+            let v_px = cx + x;
 
             for (j, &k_weight) in weights.iter().take(bounds_size).enumerate() {
                 let py = bounds.start + j;
