@@ -61,7 +61,7 @@ fn conv_horiz_rgba_2_u16<const FMA: bool>(
         const COMPONENTS: usize = 4;
         let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
 
-        let rgba_pixel = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
+        let rgba_pixel = _mm_loadu_si128(src_ptr.as_ptr().cast());
 
         let acc = _mm_prefer_fma_ps::<FMA>(
             store,
@@ -88,7 +88,7 @@ fn conv_horiz_rgba_4_u16<const FMA: bool>(
         const COMPONENTS: usize = 4;
         let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
 
-        let rgba_pixel = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
+        let rgba_pixel = _mm256_loadu_si256(src_ptr.as_ptr().cast());
 
         let acc = _mm256_prefer_fma_ps::<FMA>(
             store,
@@ -119,8 +119,8 @@ fn conv_horiz_rgba_8_u16<const FMA: bool>(
 
         let z = _mm256_setzero_si256();
 
-        let rgba_pixel0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const _);
-        let rgba_pixel1 = _mm256_loadu_si256(src_ptr.get_unchecked(16..).as_ptr() as *const _);
+        let rgba_pixel0 = _mm256_loadu_si256(src_ptr.as_ptr().cast());
+        let rgba_pixel1 = _mm256_loadu_si256(src_ptr.get_unchecked(16..).as_ptr().cast());
 
         let mut acc = _mm256_prefer_fma_ps::<FMA>(
             store,
@@ -145,7 +145,7 @@ fn conv_horiz_rgba_8_u16<const FMA: bool>(
     }
 }
 
-pub(crate) fn convolve_horizontal_rgba_avx_rows_4_u16_f(
+pub(crate) fn convolve_horizontal_rgba_avx_rows_4_u16_default(
     src: &[u16],
     src_stride: usize,
     dst: &mut [u16],
@@ -154,25 +154,34 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_4_u16_f(
     bit_depth: u32,
 ) {
     unsafe {
-        if std::arch::is_x86_feature_detected!("fma") {
-            convolve_horizontal_rgba_avx_rows_4_u16_fma(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                filter_weights,
-                bit_depth,
-            );
-        } else {
-            convolve_horizontal_rgba_avx_rows_4_u16_def(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                filter_weights,
-                bit_depth,
-            );
-        }
+        convolve_horizontal_rgba_avx_rows_4_u16_def(
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+            filter_weights,
+            bit_depth,
+        );
+    }
+}
+
+pub(crate) fn convolve_horizontal_rgba_avx_rows_4_u16_fma(
+    src: &[u16],
+    src_stride: usize,
+    dst: &mut [u16],
+    dst_stride: usize,
+    filter_weights: &FilterWeights<f32>,
+    bit_depth: u32,
+) {
+    unsafe {
+        convolve_horizontal_rgba_avx_rows_4_u16_fma_impl(
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+            filter_weights,
+            bit_depth,
+        );
     }
 }
 
@@ -192,7 +201,7 @@ fn convolve_horizontal_rgba_avx_rows_4_u16_def(
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
-fn convolve_horizontal_rgba_avx_rows_4_u16_fma(
+fn convolve_horizontal_rgba_avx_rows_4_u16_fma_impl(
     src: &[u16],
     src_stride: usize,
     dst: &mut [u16],
@@ -224,10 +233,10 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
             let src_ptr1 = src1.get_unchecked((start_x * COMPONENTS)..);
 
             let rgba_pixel0 = _mm256_cvtepi32_ps(_mm256_cvtepu16_epi32(_mm_loadu_si128(
-                src_ptr0.as_ptr() as *const _,
+                src_ptr0.as_ptr().cast(),
             )));
             let rgba_pixel1 = _mm256_cvtepi32_ps(_mm256_cvtepu16_epi32(_mm_loadu_si128(
-                src_ptr1.as_ptr() as *const _,
+                src_ptr1.as_ptr().cast(),
             )));
 
             let lo = _mm256_insertf128_ps::<1>(
@@ -465,18 +474,26 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
     }
 }
 
-pub(crate) fn convolve_horizontal_rgba_avx_u16_row_f(
+pub(crate) fn convolve_horizontal_rgba_avx_u16_row_default(
     src: &[u16],
     dst: &mut [u16],
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
     unsafe {
-        if std::arch::is_x86_feature_detected!("fma") {
-            convolve_horizontal_rgba_avx_u16_row_fma(src, dst, filter_weights, bit_depth);
-        } else {
-            convolve_horizontal_rgba_avx_u16_row_def(src, dst, filter_weights, bit_depth);
-        }
+        convolve_horizontal_rgba_avx_u16_row_def(src, dst, filter_weights, bit_depth);
+    }
+}
+
+///SAFETY: checking FMA is required before the call
+pub(crate) fn convolve_horizontal_rgba_avx_u16_row_fma(
+    src: &[u16],
+    dst: &mut [u16],
+    filter_weights: &FilterWeights<f32>,
+    bit_depth: u32,
+) {
+    unsafe {
+        convolve_horizontal_rgba_avx_u16_row_fma_impl(src, dst, filter_weights, bit_depth);
     }
 }
 
@@ -494,7 +511,7 @@ fn convolve_horizontal_rgba_avx_u16_row_def(
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
-fn convolve_horizontal_rgba_avx_u16_row_fma(
+fn convolve_horizontal_rgba_avx_u16_row_fma_impl(
     src: &[u16],
     dst: &mut [u16],
     filter_weights: &FilterWeights<f32>,

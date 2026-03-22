@@ -41,6 +41,8 @@ mod plane_u16;
 mod plane_u16_lb;
 mod rgb_f32;
 mod rgb_f32_f64;
+mod rgb_u16;
+mod rgb_u16_lb;
 mod rgb_u8;
 #[cfg(feature = "nightly_f16")]
 mod rgba_f16;
@@ -92,6 +94,13 @@ pub(crate) use rgb_f32_f64::{
     convolve_horizontal_rgb_avx_row_one_f32_f64, convolve_horizontal_rgb_avx_rows_4_f32_f64,
 };
 pub(crate) use rgb_u8::{convolve_horizontal_rgb_avx_row_one, convolve_horizontal_rgb_avx_rows_4};
+pub(crate) use rgb_u16::{
+    convolve_horizontal_rgb_avx_rows_4_u16_default, convolve_horizontal_rgb_avx_rows_4_u16_fma,
+    convolve_horizontal_rgb_avx_u16_row_default, convolve_horizontal_rgb_avx_u16_row_fma,
+};
+pub(crate) use rgb_u16_lb::{
+    convolve_horizontal_rgb_avx_rows_4_u16, convolve_horizontal_rgb_avx_u16lp_row,
+};
 #[cfg(feature = "nightly_f16")]
 pub(crate) use rgba_f16::{
     convolve_horizontal_rgba_avx_row_one_f16, convolve_horizontal_rgba_avx_rows_4_f16,
@@ -104,7 +113,8 @@ pub(crate) use rgba_f32_f64::{
 };
 pub(crate) use rgba_u8::{convolve_horizontal_rgba_avx_row_1, convolve_horizontal_rgba_row_4};
 pub(crate) use rgba_u16::{
-    convolve_horizontal_rgba_avx_rows_4_u16_f, convolve_horizontal_rgba_avx_u16_row_f,
+    convolve_horizontal_rgba_avx_rows_4_u16_default, convolve_horizontal_rgba_avx_rows_4_u16_fma,
+    convolve_horizontal_rgba_avx_u16_row_default, convolve_horizontal_rgba_avx_u16_row_fma,
 };
 pub(crate) use rgba_u16_lb::{
     convolve_horizontal_rgba_avx_rows_4_u16, convolve_horizontal_rgba_avx_u16lp_row,
