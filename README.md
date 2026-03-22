@@ -42,7 +42,7 @@ plan.resample(&store, &mut dst_store).unwrap();
 
 ### Fastest paths using SIMD
 
-Despite all implementations are fast, not all the paths are implemented using SIMD, theere paths are slower.
+Despite all implementations are fast, not all the paths are implemented using SIMD, therefore some paths are slower.
 Here is a table which shows what's implemented with SIMD.
 
 `~` - Partially implemented
