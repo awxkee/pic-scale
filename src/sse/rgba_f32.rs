@@ -88,7 +88,7 @@ fn convolve_horizontal_rgba_sse_row_one_f32_impl<const FMA: bool>(
             let mut jx = 0usize;
             let mut store = _mm_setzero_ps();
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let (weight0, weight1, weight2, weight3) = load_4_weights!(ptr);
                 let filter_start = jx + bounds.start;
@@ -104,7 +104,7 @@ fn convolve_horizontal_rgba_sse_row_one_f32_impl<const FMA: bool>(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let weights = _mm_castsi128_ps(_mm_loadu_si64(ptr as *const u8));
                 const SHUFFLE_0: i32 = shuffle(0, 0, 0, 0);
@@ -253,7 +253,7 @@ fn convolve_horizontal_rgba_sse_rows_4_f32_impl<const FMA: bool>(
             let mut store_2 = zeros;
             let mut store_3 = zeros;
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let (weight0, weight1, weight2, weight3) = load_4_weights!(ptr);
                 let filter_start = jx + bounds.start;
@@ -297,7 +297,7 @@ fn convolve_horizontal_rgba_sse_rows_4_f32_impl<const FMA: bool>(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let weights = _mm_castsi128_ps(_mm_loadu_si64(ptr as *const u8));
                 const SHUFFLE_0: i32 = shuffle(0, 0, 0, 0);

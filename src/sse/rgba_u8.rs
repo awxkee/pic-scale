@@ -131,7 +131,7 @@ fn convolve_horizontal_rgba_sse_rows_4_impl(
             let src2 = src1.get_unchecked(src_stride..);
             let src3 = src2.get_unchecked(src_stride..);
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = _mm_loadu_si64(w_ptr.as_ptr() as *const u8);
                 const SHUFFLE_01: i32 = shuffle(0, 0, 0, 0);
@@ -176,7 +176,7 @@ fn convolve_horizontal_rgba_sse_rows_4_impl(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
 
@@ -303,7 +303,7 @@ fn convolve_horizontal_rgba_sse_rows_one_impl(
             let mut jx = 0usize;
             let mut store = vld;
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 4));
                 let bounds_start = bounds.start + jx;
 
@@ -325,7 +325,7 @@ fn convolve_horizontal_rgba_sse_rows_one_impl(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 2));
                 let bounds_start = bounds.start + jx;
 

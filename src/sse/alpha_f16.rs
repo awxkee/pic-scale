@@ -58,7 +58,7 @@ pub(crate) fn sse_premultiply_alpha_rgba_f16(
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn sse_premultiply_alpha_rgba_f16_regular(
+fn sse_premultiply_alpha_rgba_f16_regular(
     dst: &mut [f16],
     dst_stride: usize,
     src: &[f16],
@@ -67,15 +67,13 @@ unsafe fn sse_premultiply_alpha_rgba_f16_regular(
     height: usize,
     pool: &novtb::ThreadPool,
 ) {
-    unsafe {
-        sse_premultiply_alpha_rgba_f16_impl::<false>(
-            dst, dst_stride, src, src_stride, width, height, pool,
-        );
-    }
+    sse_premultiply_alpha_rgba_f16_impl::<false>(
+        dst, dst_stride, src, src_stride, width, height, pool,
+    );
 }
 
 #[target_feature(enable = "sse4.1", enable = "f16c")]
-unsafe fn sse_premultiply_alpha_rgba_f16c(
+fn sse_premultiply_alpha_rgba_f16c(
     dst: &mut [f16],
     dst_stride: usize,
     src: &[f16],
@@ -84,15 +82,13 @@ unsafe fn sse_premultiply_alpha_rgba_f16c(
     height: usize,
     pool: &novtb::ThreadPool,
 ) {
-    unsafe {
-        sse_premultiply_alpha_rgba_f16_impl::<true>(
-            dst, dst_stride, src, src_stride, width, height, pool,
-        );
-    }
+    sse_premultiply_alpha_rgba_f16_impl::<true>(
+        dst, dst_stride, src, src_stride, width, height, pool,
+    );
 }
 
 #[inline(always)]
-unsafe fn sse_premultiply_alpha_rgba_row_f16_impl<const F16C: bool>(dst: &mut [f16], src: &[f16]) {
+fn sse_premultiply_alpha_rgba_row_f16_impl<const F16C: bool>(dst: &mut [f16], src: &[f16]) {
     unsafe {
         let mut rem = dst;
         let mut src_rem = src;
@@ -146,7 +142,7 @@ unsafe fn sse_premultiply_alpha_rgba_row_f16_impl<const F16C: bool>(dst: &mut [f
 }
 
 #[inline(always)]
-unsafe fn sse_premultiply_alpha_rgba_f16_impl<const F16C: bool>(
+fn sse_premultiply_alpha_rgba_f16_impl<const F16C: bool>(
     dst: &mut [f16],
     dst_stride: usize,
     src: &[f16],
@@ -156,7 +152,7 @@ unsafe fn sse_premultiply_alpha_rgba_f16_impl<const F16C: bool>(
     pool: &novtb::ThreadPool,
 ) {
     dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| unsafe {
+        .for_each_enumerated(pool, |y, dst| {
             let src = &src[y * src_stride..(y + 1) * src_stride];
             sse_premultiply_alpha_rgba_row_f16_impl::<F16C>(
                 &mut dst[..width * 4],
@@ -182,33 +178,29 @@ pub(crate) fn sse_unpremultiply_alpha_rgba_f16(
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn sse_unpremultiply_alpha_rgba_f16_regular(
+fn sse_unpremultiply_alpha_rgba_f16_regular(
     in_place: &mut [f16],
     stride: usize,
     width: usize,
     height: usize,
     pool: &novtb::ThreadPool,
 ) {
-    unsafe {
-        sse_unpremultiply_alpha_rgba_f16_impl::<false>(in_place, stride, width, height, pool);
-    }
+    sse_unpremultiply_alpha_rgba_f16_impl::<false>(in_place, stride, width, height, pool);
 }
 
 #[target_feature(enable = "sse4.1", enable = "f16c")]
-unsafe fn sse_unpremultiply_alpha_rgba_f16c(
+fn sse_unpremultiply_alpha_rgba_f16c(
     in_place: &mut [f16],
     stride: usize,
     width: usize,
     height: usize,
     pool: &novtb::ThreadPool,
 ) {
-    unsafe {
-        sse_unpremultiply_alpha_rgba_f16_impl::<true>(in_place, stride, width, height, pool);
-    }
+    sse_unpremultiply_alpha_rgba_f16_impl::<true>(in_place, stride, width, height, pool);
 }
 
 #[inline(always)]
-unsafe fn sse_unpremultiply_alpha_rgba_f16_row_impl<const F16C: bool>(in_place: &mut [f16]) {
+fn sse_unpremultiply_alpha_rgba_f16_row_impl<const F16C: bool>(in_place: &mut [f16]) {
     unsafe {
         let mut rem = in_place;
 
@@ -287,7 +279,7 @@ unsafe fn sse_unpremultiply_alpha_rgba_f16_row_impl<const F16C: bool>(in_place: 
 }
 
 #[inline(always)]
-unsafe fn sse_unpremultiply_alpha_rgba_f16_impl<const F16C: bool>(
+fn sse_unpremultiply_alpha_rgba_f16_impl<const F16C: bool>(
     in_place: &mut [f16],
     stride: usize,
     width: usize,
@@ -296,7 +288,7 @@ unsafe fn sse_unpremultiply_alpha_rgba_f16_impl<const F16C: bool>(
 ) {
     in_place
         .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| unsafe {
+        .for_each(pool, |row| {
             sse_unpremultiply_alpha_rgba_f16_row_impl::<F16C>(&mut row[..width * 4]);
         });
 }

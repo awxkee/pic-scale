@@ -97,18 +97,14 @@ macro_rules! conv_horiz_plane_1_f32 {
     }};
 }
 
-pub(crate) fn convolve_horizontal_plane_sse_row_one<const FMA: bool>(
+pub(crate) fn convolve_horizontal_plane_sse_row_one(
     src: &[f32],
     dst: &mut [f32],
     filter_weights: &FilterWeights<f32>,
     _: u32,
 ) {
     unsafe {
-        if FMA {
-            convolve_horizontal_plane_sse_row_one_fma(filter_weights, src, dst);
-        } else {
-            convolve_horizontal_plane_sse_row_one_regular(filter_weights, src, dst);
-        }
+        convolve_horizontal_plane_sse_row_one_regular(filter_weights, src, dst);
     }
 }
 
@@ -120,16 +116,6 @@ fn convolve_horizontal_plane_sse_row_one_regular(
     dst: &mut [f32],
 ) {
     convolve_horizontal_plane_sse_row_one_impl::<false>(filter_weights, src, dst);
-}
-
-#[target_feature(enable = "sse4.1", enable = "fma")]
-/// This inlining is required to activate all features for runtime dispatch.
-fn convolve_horizontal_plane_sse_row_one_fma(
-    filter_weights: &FilterWeights<f32>,
-    src: &[f32],
-    dst: &mut [f32],
-) {
-    convolve_horizontal_plane_sse_row_one_impl::<true>(filter_weights, src, dst);
 }
 
 #[inline(always)]
@@ -211,7 +197,7 @@ fn convolve_horizontal_plane_sse_row_one_impl<const FMA: bool>(
     }
 }
 
-pub(crate) fn convolve_horizontal_plane_sse_rows_4<const FMA: bool>(
+pub(crate) fn convolve_horizontal_plane_sse_rows_4(
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
@@ -220,23 +206,13 @@ pub(crate) fn convolve_horizontal_plane_sse_rows_4<const FMA: bool>(
     _: u32,
 ) {
     unsafe {
-        if FMA {
-            convolve_horizontal_plane_sse_rows_4_fma(
-                filter_weights,
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-            );
-        } else {
-            convolve_horizontal_plane_sse_rows_4_regular(
-                filter_weights,
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-            );
-        }
+        convolve_horizontal_plane_sse_rows_4_regular(
+            filter_weights,
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+        );
     }
 }
 
@@ -250,24 +226,6 @@ fn convolve_horizontal_plane_sse_rows_4_regular(
     dst_stride: usize,
 ) {
     convolve_horizontal_plane_sse_rows_4_impl::<false>(
-        filter_weights,
-        src,
-        src_stride,
-        dst,
-        dst_stride,
-    );
-}
-
-#[target_feature(enable = "sse4.1", enable = "fma")]
-/// This inlining is required to activate all features for runtime dispatch.
-fn convolve_horizontal_plane_sse_rows_4_fma(
-    filter_weights: &FilterWeights<f32>,
-    src: &[f32],
-    src_stride: usize,
-    dst: &mut [f32],
-    dst_stride: usize,
-) {
-    convolve_horizontal_plane_sse_rows_4_impl::<true>(
         filter_weights,
         src,
         src_stride,

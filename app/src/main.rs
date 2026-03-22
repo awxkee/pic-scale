@@ -34,32 +34,32 @@ fn main() {
         .unwrap();
     // img.save("top_right.tga").unwrap();
     let dimensions = img.dimensions();
-    let transient = img.to_rgb16();
+    let transient = img.to_luma_alpha8();
     let mut bytes = transient.to_vec();
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
 
-    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-    scaler.set_threading_policy(ThreadingPolicy::Single);
+    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3)
+        .set_threading_policy(ThreadingPolicy::Single)
+        .set_workload_strategy(WorkloadStrategy::PreferQuality);
     // scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
     let mut t_size = ImageSize::new(dimensions.0 as usize, dimensions.1 as usize) / 4;
     t_size.height += 1;
     let resizing_plan = scaler
-        .plan_rgb_resampling16(
+        .plan_cbcr_resampling(
             ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
             t_size,
-            16,
         )
         .unwrap();
 
     let mut store =
-        Rgb16ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
+        CbCr8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     store.bit_depth = 8;
-    let mut dst_store = Rgb16ImageStoreMut::alloc_with_depth(
+    let mut dst_store = CbCr8ImageStoreMut::alloc_with_depth(
         dimensions.0 as usize / 4,
         dimensions.1 as usize / 4 + 1,
-        16,
+        8,
     );
     resizing_plan.resample(&store, &mut dst_store).unwrap();
     // scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
@@ -113,8 +113,8 @@ fn main() {
     let dst = dst_store
         .as_bytes()
         .iter()
-        // .map(|&x| x)
-        .map(|&x| ((x >> 8) as u8).min(255))
+        .map(|&x| x)
+        // .map(|&x| ((x >> 8) as u8).min(255))
         // .map(|&x| (x as f32 * 255.).round() as u8)
         .collect::<Vec<_>>();
 
@@ -125,6 +125,15 @@ fn main() {
             dst_store.width as u32,
             dst_store.height as u32,
             image::ColorType::Rgba8,
+        )
+        .unwrap();
+    } else if dst_store.channels == 2 {
+        image::save_buffer(
+            "converted.png",
+            &dst,
+            dst_store.width as u32,
+            dst_store.height as u32,
+            image::ColorType::La8,
         )
         .unwrap();
     } else if dst_store.channels == 1 {

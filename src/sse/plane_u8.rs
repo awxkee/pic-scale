@@ -233,7 +233,7 @@ pub(crate) fn convolve_horizontal_plane_sse_row(
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn convolve_horizontal_plane_sse_row_impl(
+fn convolve_horizontal_plane_sse_row_impl(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,

@@ -139,7 +139,7 @@ fn convolve_horizontal_rgb_sse_rows_4_impl(
             let src3 = src2.get_unchecked(src_stride..);
 
             // Will make step in 4 items however since it is RGB it is necessary to make a safe offset
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 4));
                 let weights = _mm_loadu_si64(w_ptr.as_ptr() as *const u8);
                 const SHUFFLE_01: i32 = shuffle(0, 0, 0, 0);
@@ -176,7 +176,7 @@ fn convolve_horizontal_rgb_sse_rows_4_impl(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 2));
                 let bounds_start = (bounds.start + jx) * CHANNELS;
                 let weight01 = _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
@@ -292,7 +292,7 @@ fn convolve_horizontal_rgb_sse_row_one_impl(
             let mut jx = 0usize;
             let mut store = _mm_set1_epi32(ROUNDING_CONST);
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 4));
                 let weights = _mm_loadu_si64(w_ptr.as_ptr() as *const u8);
                 const SHUFFLE_01: i32 = shuffle(0, 0, 0, 0);
@@ -312,7 +312,7 @@ fn convolve_horizontal_rgb_sse_row_one_impl(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 2));
                 let weight0 = _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
                 let src_ptr = src.get_unchecked(((bounds.start + jx) * 3)..);
