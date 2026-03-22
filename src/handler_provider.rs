@@ -214,21 +214,52 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
     ) {
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         {
-            if CN == 4 && std::arch::is_x86_feature_detected!("avx2") {
-                use crate::avx2::convolve_horizontal_rgba_avx_u16_row_f;
-                return convolve_horizontal_rgba_avx_u16_row_f(src, dst, filter_weights, bit_depth);
-            }
-        }
-        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
-        {
-            if CN == 1 && std::arch::is_x86_feature_detected!("avx2") {
-                use crate::avx2::convolve_horizontal_plane_avx_u16_row_f;
-                return convolve_horizontal_plane_avx_u16_row_f(
-                    src,
-                    dst,
-                    filter_weights,
-                    bit_depth,
-                );
+            let has_avx = std::arch::is_x86_feature_detected!("avx2");
+            let has_fma = std::arch::is_x86_feature_detected!("fma");
+            if has_avx {
+                if CN == 4 {
+                    if has_fma {
+                        use crate::avx2::convolve_horizontal_rgba_avx_u16_row_fma;
+                        return convolve_horizontal_rgba_avx_u16_row_fma(
+                            src,
+                            dst,
+                            filter_weights,
+                            bit_depth,
+                        );
+                    }
+                    use crate::avx2::convolve_horizontal_rgba_avx_u16_row_default;
+                    return convolve_horizontal_rgba_avx_u16_row_default(
+                        src,
+                        dst,
+                        filter_weights,
+                        bit_depth,
+                    );
+                } else if CN == 3 {
+                    if has_fma {
+                        use crate::avx2::convolve_horizontal_rgb_avx_u16_row_fma;
+                        return convolve_horizontal_rgb_avx_u16_row_fma(
+                            src,
+                            dst,
+                            filter_weights,
+                            bit_depth,
+                        );
+                    }
+                    use crate::avx2::convolve_horizontal_rgb_avx_u16_row_default;
+                    return convolve_horizontal_rgb_avx_u16_row_default(
+                        src,
+                        dst,
+                        filter_weights,
+                        bit_depth,
+                    );
+                } else if CN == 1 {
+                    use crate::avx2::convolve_horizontal_plane_avx_u16_row_f;
+                    return convolve_horizontal_plane_avx_u16_row_f(
+                        src,
+                        dst,
+                        filter_weights,
+                        bit_depth,
+                    );
+                }
             }
         }
         #[cfg(feature = "sse")]
@@ -273,30 +304,62 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
     ) {
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         {
-            if CN == 4 && std::arch::is_x86_feature_detected!("avx2") {
-                use crate::avx2::convolve_horizontal_rgba_avx_rows_4_u16_f;
-                return convolve_horizontal_rgba_avx_rows_4_u16_f(
-                    src,
-                    src_stride,
-                    dst,
-                    dst_stride,
-                    filter_weights,
-                    bit_depth,
-                );
-            }
-        }
-        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
-        {
-            if CN == 1 && std::arch::is_x86_feature_detected!("avx2") {
-                use crate::avx2::convolve_horizontal_plane_avx_rows_4_u16_f;
-                return convolve_horizontal_plane_avx_rows_4_u16_f(
-                    src,
-                    src_stride,
-                    dst,
-                    dst_stride,
-                    filter_weights,
-                    bit_depth,
-                );
+            let has_avx = std::arch::is_x86_feature_detected!("avx2");
+            let has_fma = std::arch::is_x86_feature_detected!("fma");
+            if has_avx {
+                if CN == 4 {
+                    if has_fma {
+                        use crate::avx2::convolve_horizontal_rgba_avx_rows_4_u16_fma;
+                        return convolve_horizontal_rgba_avx_rows_4_u16_fma(
+                            src,
+                            src_stride,
+                            dst,
+                            dst_stride,
+                            filter_weights,
+                            bit_depth,
+                        );
+                    }
+                    use crate::avx2::convolve_horizontal_rgba_avx_rows_4_u16_default;
+                    return convolve_horizontal_rgba_avx_rows_4_u16_default(
+                        src,
+                        src_stride,
+                        dst,
+                        dst_stride,
+                        filter_weights,
+                        bit_depth,
+                    );
+                } else if CN == 3 {
+                    if has_fma {
+                        use crate::avx2::convolve_horizontal_rgb_avx_rows_4_u16_fma;
+                        return convolve_horizontal_rgb_avx_rows_4_u16_fma(
+                            src,
+                            src_stride,
+                            dst,
+                            dst_stride,
+                            filter_weights,
+                            bit_depth,
+                        );
+                    }
+                    use crate::avx2::convolve_horizontal_rgb_avx_rows_4_u16_default;
+                    return convolve_horizontal_rgb_avx_rows_4_u16_default(
+                        src,
+                        src_stride,
+                        dst,
+                        dst_stride,
+                        filter_weights,
+                        bit_depth,
+                    );
+                } else if CN == 1 {
+                    use crate::avx2::convolve_horizontal_plane_avx_rows_4_u16_f;
+                    return convolve_horizontal_plane_avx_rows_4_u16_f(
+                        src,
+                        src_stride,
+                        dst,
+                        dst_stride,
+                        filter_weights,
+                        bit_depth,
+                    );
+                }
             }
         }
         #[cfg(feature = "sse")]
@@ -514,16 +577,31 @@ impl RowHandlerFixedPoint<u16> for u16 {
         u16: AsPrimitive<J>,
     {
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
-        if CN == 4 && std::arch::is_x86_feature_detected!("avx2") {
-            use crate::avx2::convolve_horizontal_rgba_avx_rows_4_u16;
-            return convolve_horizontal_rgba_avx_rows_4_u16(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                filter_weights,
-                bit_depth,
-            );
+        {
+            let has_avx = std::arch::is_x86_feature_detected!("avx2");
+            if has_avx {
+                if CN == 4 {
+                    use crate::avx2::convolve_horizontal_rgba_avx_rows_4_u16;
+                    return convolve_horizontal_rgba_avx_rows_4_u16(
+                        src,
+                        src_stride,
+                        dst,
+                        dst_stride,
+                        filter_weights,
+                        bit_depth,
+                    );
+                } else if CN == 3 {
+                    use crate::avx2::convolve_horizontal_rgb_avx_rows_4_u16;
+                    return convolve_horizontal_rgb_avx_rows_4_u16(
+                        src,
+                        src_stride,
+                        dst,
+                        dst_stride,
+                        filter_weights,
+                        bit_depth,
+                    );
+                }
+            }
         }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         if CN == 1 && std::arch::is_x86_feature_detected!("avx2") {
@@ -641,9 +719,27 @@ impl RowHandlerFixedPoint<u16> for u16 {
         u16: AsPrimitive<J>,
     {
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
-        if CN == 4 && std::arch::is_x86_feature_detected!("avx2") {
-            use crate::avx2::convolve_horizontal_rgba_avx_u16lp_row;
-            return convolve_horizontal_rgba_avx_u16lp_row(src, dst, filter_weights, bit_depth);
+        {
+            let has_avx = std::arch::is_x86_feature_detected!("avx2");
+            if has_avx {
+                if CN == 4 {
+                    use crate::avx2::convolve_horizontal_rgba_avx_u16lp_row;
+                    return convolve_horizontal_rgba_avx_u16lp_row(
+                        src,
+                        dst,
+                        filter_weights,
+                        bit_depth,
+                    );
+                } else if CN == 3 {
+                    use crate::avx2::convolve_horizontal_rgb_avx_u16lp_row;
+                    return convolve_horizontal_rgb_avx_u16lp_row(
+                        src,
+                        dst,
+                        filter_weights,
+                        bit_depth,
+                    );
+                }
+            }
         }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         if CN == 1 && std::arch::is_x86_feature_detected!("avx2") {

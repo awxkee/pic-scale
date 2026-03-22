@@ -284,6 +284,14 @@ fn run_rgb_plotter(paths: &[&DynamicImage], file_name: &str, target_sizes: &[&[I
                 "Bilinear".to_string(),
                 ResamplingFunction::Bilinear,
             ));
+            results.push(runner_rgba_ps(
+                format!("{formatted_size}").to_string(),
+                &img,
+                *size,
+                ITERATIONS,
+                "Box".to_string(),
+                ResamplingFunction::Box,
+            ));
 
             results.push(runner_rgba_fir(
                 format!("{formatted_size}").to_string(),

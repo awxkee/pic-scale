@@ -46,7 +46,7 @@ fn conv_horiz_rgba_1_u16(
         ));
         let rgba_pixel = vld1_lane_u16::<2>(src_ptr.get_unchecked(2..).as_ptr() as *const _, vl0);
         let lo = vreinterpret_s16_u16(rgba_pixel);
-        vqdmlal_s16(store, lo, w0)
+        vmlal_s16(store, lo, w0)
     }
 }
 
@@ -64,15 +64,12 @@ fn conv_horiz_rgba_2_u16(
         let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let l1 = vld1_u16(src_ptr.as_ptr());
-        let l2 = vld1_lane_u32::<0>(
-            src_ptr.get_unchecked(4..).as_ptr() as *const _,
-            vdup_n_u32(0),
-        );
+        let l2 = vld1_lane_u32::<0>(src_ptr.get_unchecked(4..).as_ptr().cast(), vdup_n_u32(0));
 
         let hi = vext_u16::<3>(l1, vreinterpret_u16_u32(l2));
 
-        let acc = vqdmlal_s16(store, vreinterpret_s16_u16(hi), w1);
-        vqdmlal_s16(acc, vreinterpret_s16_u16(l1), w0)
+        let acc = vmlal_s16(store, vreinterpret_s16_u16(hi), w1);
+        vmlal_s16(acc, vreinterpret_s16_u16(l1), w0)
     }
 }
 
@@ -95,15 +92,61 @@ fn conv_horiz_rgba_4_u16(
         let third = vext_u16::<2>(vget_high_u16(part0), part1);
         let fourth = vext_u16::<1>(part1, part1);
 
-        let acc = vqdmlal_lane_s16::<3>(store, vreinterpret_s16_u16(fourth), weights);
-        let acc = vqdmlal_lane_s16::<2>(acc, vreinterpret_s16_u16(third), weights);
-        let acc = vqdmlal_lane_s16::<1>(acc, vreinterpret_s16_u16(second), weights);
-        vqdmlal_lane_s16::<0>(acc, vreinterpret_s16_u16(vget_low_u16(part0)), weights)
+        let acc = vmlal_lane_s16::<3>(store, vreinterpret_s16_u16(fourth), weights);
+        let acc = vmlal_lane_s16::<2>(acc, vreinterpret_s16_u16(third), weights);
+        let acc = vmlal_lane_s16::<1>(acc, vreinterpret_s16_u16(second), weights);
+        vmlal_lane_s16::<0>(acc, vreinterpret_s16_u16(vget_low_u16(part0)), weights)
+    }
+}
+
+#[must_use]
+#[inline(always)]
+fn conv_horiz_rgba_8_u16(
+    start_x: usize,
+    src: &[u16],
+    weights: int16x8_t,
+    store: int32x4_t,
+) -> int32x4_t {
+    unsafe {
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
+
+        let part0 = vld1q_u16(src_ptr.as_ptr()); // [r0,g0,b0,r1,g1,b1,r2,g2]
+        let part1 = vld1q_u16(src_ptr.get_unchecked(8..).as_ptr()); // [b2,r3,g3,b3,r4,g4,b4,r5]
+        let part2 = vld1q_u16(src_ptr.get_unchecked(16..).as_ptr()); // [g5,b5,r6,g6,b6,r7,g7,b7]
+
+        // pixel 0: [r0,g0,b0,_] = low(part0)
+        // pixel 1: [r1,g1,b1,_] = vext<3>(low(part0), high(part0))
+        // pixel 2: [r2,g2,b2,_] = vext<2>(high(part0), low(part1))
+        // pixel 3: [r3,g3,b3,_] = vext<1>(low(part1), high(part1))
+        let p1 = vext_u16::<3>(vget_low_u16(part0), vget_high_u16(part0));
+        let p2 = vext_u16::<2>(vget_high_u16(part0), vget_low_u16(part1));
+        let p3 = vext_u16::<1>(vget_low_u16(part1), vget_high_u16(part1));
+
+        let mut acc =
+            vmlal_laneq_s16::<0>(store, vreinterpret_s16_u16(vget_low_u16(part0)), weights);
+        acc = vmlal_laneq_s16::<1>(acc, vreinterpret_s16_u16(p1), weights);
+        acc = vmlal_laneq_s16::<2>(acc, vreinterpret_s16_u16(p2), weights);
+        acc = vmlal_laneq_s16::<3>(acc, vreinterpret_s16_u16(p3), weights);
+
+        // pixel 4: [r4,g4,b4,_] = vext<0>(high(part1), high(part1)) = high(part1) directly
+        // pixel 5: [r5,g5,b5,_] = vext<3>(high(part1), low(part2))
+        // pixel 6: [r6,g6,b6,_] = vext<2>(low(part2), high(part2))
+        // pixel 7: [r7,g7,b7,_] = vext<1>(high(part2), high(part2))
+        let p5 = vext_u16::<3>(vget_high_u16(part1), vget_low_u16(part2));
+        let p6 = vext_u16::<2>(vget_low_u16(part2), vget_high_u16(part2));
+        let p7 = vext_u16::<1>(vget_high_u16(part2), vget_high_u16(part2));
+
+        acc = vmlal_laneq_s16::<4>(acc, vreinterpret_s16_u16(vget_high_u16(part1)), weights);
+        acc = vmlal_laneq_s16::<5>(acc, vreinterpret_s16_u16(p5), weights);
+        acc = vmlal_laneq_s16::<6>(acc, vreinterpret_s16_u16(p6), weights);
+        acc = vmlal_laneq_s16::<7>(acc, vreinterpret_s16_u16(p7), weights);
+        acc
     }
 }
 
 #[inline(always)]
-unsafe fn set_pixel(ptr: &mut [u16], pixel: uint16x4_t) {
+fn set_pixel(ptr: &mut [u16], pixel: uint16x4_t) {
     unsafe {
         vst1_lane_u32::<0>(ptr.as_mut_ptr() as *mut _, vreinterpret_u32_u16(pixel));
         vst1_lane_u16::<2>(ptr.get_unchecked_mut(2..).as_mut_ptr(), pixel);
@@ -120,7 +163,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4_lb_u16(
 ) {
     unsafe {
         const CN: usize = 3;
-        const PRECISION: i32 = 16;
+        const PRECISION: i32 = 15;
         const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
         let init = vdupq_n_s32(ROUNDING_CONST);
 
@@ -130,15 +173,16 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4_lb_u16(
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
         let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let iter_row0 = row0_ref.chunks_exact_mut(CN);
-        let iter_row1 = row1_ref.chunks_exact_mut(CN);
-        let iter_row2 = row2_ref.chunks_exact_mut(CN);
-        let iter_row3 = row3_ref.chunks_exact_mut(CN);
+        let iter_row0 = row0_ref.as_chunks_mut::<CN>().0;
+        let iter_row1 = row1_ref.as_chunks_mut::<CN>().0;
+        let iter_row2 = row2_ref.as_chunks_mut::<CN>().0;
+        let iter_row3 = row3_ref.as_chunks_mut::<CN>().0;
 
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
-            .zip(iter_row1)
-            .zip(iter_row2)
-            .zip(iter_row3)
+            .iter_mut()
+            .zip(iter_row1.iter_mut())
+            .zip(iter_row2.iter_mut())
+            .zip(iter_row3.iter_mut())
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights
@@ -156,10 +200,21 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4_lb_u16(
 
             let src0 = src;
             let src1 = src0.get_unchecked(src_stride..);
-            let src2 = src1.get_unchecked(src_stride..);
-            let src3 = src2.get_unchecked(src_stride..);
+            let src2 = src0.get_unchecked(src_stride * 2..);
+            let src3 = src0.get_unchecked(src_stride * 3..);
 
-            while jx + 4 < bounds_size {
+            while jx + 8 <= bounds_size {
+                let bounds_start = bounds.start + jx;
+                let w_ptr = weights.get_unchecked(jx..);
+                let weights = vld1q_s16(w_ptr.as_ptr());
+                store_0 = conv_horiz_rgba_8_u16(bounds_start, src0, weights, store_0);
+                store_1 = conv_horiz_rgba_8_u16(bounds_start, src1, weights, store_1);
+                store_2 = conv_horiz_rgba_8_u16(bounds_start, src2, weights, store_2);
+                store_3 = conv_horiz_rgba_8_u16(bounds_start, src3, weights, store_3);
+                jx += 8;
+            }
+
+            while jx + 4 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1_s16(w_ptr.as_ptr());
@@ -170,7 +225,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4_lb_u16(
                 jx += 4;
             }
 
-            while jx + 2 < bounds_size {
+            while jx + 2 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let w0 = vld1_dup_s16(w_ptr.as_ptr());
@@ -222,11 +277,13 @@ pub(crate) fn convolve_horizontal_rgb_neon_u16_lb_row(
 
         let v_max_colors = vdup_n_u16(((1u32 << bit_depth) - 1) as u16);
 
-        const PRECISION: i32 = 16;
+        const PRECISION: i32 = 15;
         const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
 
         for ((dst, bounds), weights) in dst
-            .chunks_exact_mut(CN)
+            .as_chunks_mut::<CN>()
+            .0
+            .iter_mut()
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights
@@ -238,7 +295,15 @@ pub(crate) fn convolve_horizontal_rgb_neon_u16_lb_row(
             let mut jx = 0usize;
             let mut store = vdupq_n_s32(ROUNDING_CONST);
 
-            while jx + 4 < bounds_size {
+            while jx + 8 <= bounds_size {
+                let w_ptr = weights.get_unchecked(jx..);
+                let weights = vld1q_s16(w_ptr.as_ptr());
+                let bounds_start = bounds.start + jx;
+                store = conv_horiz_rgba_8_u16(bounds_start, src, weights, store);
+                jx += 8;
+            }
+
+            while jx + 4 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1_s16(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
@@ -246,7 +311,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_u16_lb_row(
                 jx += 4;
             }
 
-            while jx + 2 < bounds_size {
+            while jx + 2 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let weight0 = vld1_dup_s16(w_ptr.as_ptr());

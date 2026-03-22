@@ -17,9 +17,10 @@ use pic_scale::{
     Ar30ByteOrder, CbCr8ImageStore, CbCr8ImageStoreMut, ImageSize, ImageStore, ImageStoreMut,
     ImageStoreScaling, LinearApproxScaler, LinearScaler, Planar16ImageStore, Planar16ImageStoreMut,
     Planar8ImageStore, Planar8ImageStoreMut, PlanarF32ImageStore, PlanarF32ImageStoreMut,
-    ResamplingFunction, Rgb8ImageStore, Rgb8ImageStoreMut, RgbF32ImageStore, RgbF32ImageStoreMut,
-    Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore, Rgba8ImageStoreMut, RgbaF32ImageStore,
-    RgbaF32ImageStoreMut, Scaler, ThreadingPolicy, WorkloadStrategy,
+    ResamplingFunction, Rgb16ImageStore, Rgb16ImageStoreMut, Rgb8ImageStore, Rgb8ImageStoreMut,
+    RgbF32ImageStore, RgbF32ImageStoreMut, Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore,
+    Rgba8ImageStoreMut, RgbaF32ImageStore, RgbaF32ImageStoreMut, Scaler, ThreadingPolicy,
+    WorkloadStrategy,
 };
 use yuv::{ar30_to_rgb8, rgba8_to_ar30, Rgb30ByteOrder};
 
@@ -27,13 +28,13 @@ fn main() {
     // resize_rgba(0, 1, 256, 79, 256, ResamplingFunction::Bilinear, false);
     #[allow(overflowing_literals)]
     // test_fast_image();
-    let img = ImageReader::open("./assets/winter_huge.jpg")
+    let img = ImageReader::open("./assets/sample_fhd.jpg")
         .unwrap()
         .decode()
         .unwrap();
     // img.save("top_right.tga").unwrap();
     let dimensions = img.dimensions();
-    let transient = img.to_luma32f();
+    let transient = img.to_rgb16();
     let mut bytes = transient.to_vec();
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
@@ -42,21 +43,23 @@ fn main() {
     scaler.set_threading_policy(ThreadingPolicy::Single);
     // scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
+    let mut t_size = ImageSize::new(dimensions.0 as usize, dimensions.1 as usize) / 4;
+    t_size.height += 1;
     let resizing_plan = scaler
-        .plan_planar_resampling_f32(
+        .plan_rgb_resampling16(
             ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-            ImageSize::new(dimensions.0 as usize, dimensions.1 as usize) / 4,
+            t_size,
+            16,
         )
         .unwrap();
 
     let mut store =
-        PlanarF32ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize)
-            .unwrap();
+        Rgb16ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     store.bit_depth = 8;
-    let mut dst_store = PlanarF32ImageStoreMut::alloc_with_depth(
+    let mut dst_store = Rgb16ImageStoreMut::alloc_with_depth(
         dimensions.0 as usize / 4,
-        dimensions.1 as usize / 4,
-        8,
+        dimensions.1 as usize / 4 + 1,
+        16,
     );
     resizing_plan.resample(&store, &mut dst_store).unwrap();
     // scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
@@ -111,8 +114,8 @@ fn main() {
         .as_bytes()
         .iter()
         // .map(|&x| x)
-        // .map(|&x| ((x >> 8) as u8).min(255))
-        .map(|&x| (x as f32 * 255.).round() as u8)
+        .map(|&x| ((x >> 8) as u8).min(255))
+        // .map(|&x| (x as f32 * 255.).round() as u8)
         .collect::<Vec<_>>();
 
     if dst_store.channels == 4 {
@@ -135,7 +138,7 @@ fn main() {
         .unwrap();
     } else {
         image::save_buffer(
-            "converted.png",
+            "converted1.png",
             &dst,
             dst_store.width as u32,
             dst_store.height as u32,

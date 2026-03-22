@@ -59,7 +59,7 @@ fn acc_2_dot<const D: bool>(
     unsafe {
         const COMPONENTS: usize = 4;
         let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
-        let rgba_pixel = _mm_loadu_si128(src_ptr.as_ptr() as *const _);
+        let rgba_pixel = _mm_loadu_si128(src_ptr.as_ptr().cast());
         _mm_dot16_avx_epi32::<D>(store, _mm_shuffle_epi8(rgba_pixel, shuffle), w0)
     }
 }
@@ -75,7 +75,7 @@ fn acc_4_dot<const D: bool>(
     unsafe {
         const COMPONENTS: usize = 4;
         let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
-        let rgba_pixel = _mm256_loadu_si256(src_ptr.as_ptr() as *const _);
+        let rgba_pixel = _mm256_loadu_si256(src_ptr.as_ptr().cast());
         _mm256_dot16_avx_epi32::<D>(store, _mm256_shuffle_epi8(rgba_pixel, shuffle), w0)
     }
 }
@@ -92,8 +92,8 @@ fn acc_8_dot<const D: bool>(
     unsafe {
         const COMPONENTS: usize = 4;
         let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
-        let rgba_pixel0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const _);
-        let rgba_pixel1 = _mm256_loadu_si256(src_ptr.get_unchecked(16..).as_ptr() as *const _);
+        let rgba_pixel0 = _mm256_loadu_si256(src_ptr.as_ptr().cast());
+        let rgba_pixel1 = _mm256_loadu_si256(src_ptr.get_unchecked(16..).as_ptr().cast());
 
         let p0 = _mm256_dot16_avx_epi32::<D>(store, _mm256_shuffle_epi8(rgba_pixel0, shuffle), w0);
         _mm256_dot16_avx_epi32::<D>(p0, _mm256_shuffle_epi8(rgba_pixel1, shuffle), w1)
@@ -110,7 +110,6 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_4_u16(
 ) {
     unsafe {
         #[cfg(feature = "avx512")]
-        #[allow(clippy::incompatible_msrv)]
         if std::arch::is_x86_feature_detected!("avxvnni") {
             return convolve_horizontal_rgba_avx_rows_4_lb_vn(
                 src,
@@ -179,8 +178,8 @@ impl<const D: bool> Row4ExecutionHandler<D> {
             let src_ptr0 = src0.get_unchecked((start_x * COMPONENTS)..);
             let src_ptr1 = src1.get_unchecked((start_x * COMPONENTS)..);
 
-            let rgba_pixel0 = _mm_loadu_si64(src_ptr0.as_ptr() as *const u8);
-            let rgba_pixel1 = _mm_loadu_si64(src_ptr1.as_ptr() as *const u8);
+            let rgba_pixel0 = _mm_loadu_si64(src_ptr0.as_ptr().cast());
+            let rgba_pixel1 = _mm_loadu_si64(src_ptr1.as_ptr().cast());
 
             let rgba_pixel =
                 _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgba_pixel0), rgba_pixel1);
@@ -205,8 +204,8 @@ impl<const D: bool> Row4ExecutionHandler<D> {
             let src_ptr0 = src0.get_unchecked((start_x * COMPONENTS)..);
             let src_ptr1 = src1.get_unchecked((start_x * COMPONENTS)..);
 
-            let rgba_pixel0 = _mm_loadu_si128(src_ptr0.as_ptr() as *const _);
-            let rgba_pixel1 = _mm_loadu_si128(src_ptr1.as_ptr() as *const _);
+            let rgba_pixel0 = _mm_loadu_si128(src_ptr0.as_ptr().cast());
+            let rgba_pixel1 = _mm_loadu_si128(src_ptr1.as_ptr().cast());
 
             let rgba_pixel =
                 _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgba_pixel0), rgba_pixel1);
@@ -226,7 +225,7 @@ impl<const D: bool> Row4ExecutionHandler<D> {
         bit_depth: u32,
     ) {
         unsafe {
-            const CHANNELS: usize = 4;
+            const CN: usize = 4;
 
             let v_max_colors = _mm256_set1_epi16((1 << bit_depth) - 1);
 
@@ -269,10 +268,10 @@ impl<const D: bool> Row4ExecutionHandler<D> {
                 0,
             );
 
-            let iter_row0 = row0_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
-            let iter_row1 = row1_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
-            let iter_row2 = row2_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
-            let iter_row3 = row3_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
+            let iter_row0 = row0_ref.as_chunks_mut::<CN>().0.iter_mut();
+            let iter_row1 = row1_ref.as_chunks_mut::<CN>().0.iter_mut();
+            let iter_row2 = row2_ref.as_chunks_mut::<CN>().0.iter_mut();
+            let iter_row3 = row3_ref.as_chunks_mut::<CN>().0.iter_mut();
 
             for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
                 .zip(iter_row1)
@@ -305,8 +304,7 @@ impl<const D: bool> Row4ExecutionHandler<D> {
                 if bounds_size >= 4 {
                     while jx + 8 <= bounds_size {
                         let w_ptr = weights.get_unchecked(jx..);
-                        let wl =
-                            _mm256_castsi128_si256(_mm_loadu_si128(w_ptr.as_ptr() as *const _));
+                        let wl = _mm256_castsi128_si256(_mm_loadu_si128(w_ptr.as_ptr().cast()));
                         let w0 = _mm256_shuffle_epi8(
                             _mm256_permutevar8x32_epi32(wl, permute_avx_weights),
                             a_shuffle_weights_table,
@@ -332,7 +330,7 @@ impl<const D: bool> Row4ExecutionHandler<D> {
                         let w_ptr = weights.get_unchecked(jx..);
                         let w0 = _mm256_shuffle_epi8(
                             _mm256_permutevar8x32_epi32(
-                                _mm256_castsi128_si256(_mm_loadu_si64(w_ptr.as_ptr() as *const _)),
+                                _mm256_castsi128_si256(_mm_loadu_si64(w_ptr.as_ptr().cast())),
                                 permute_avx_weights,
                             ),
                             a_shuffle_weights_table,
@@ -362,7 +360,7 @@ impl<const D: bool> Row4ExecutionHandler<D> {
                 while jx + 2 <= bounds_size {
                     let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
-                    let ww0 = _mm_loadu_si32(w_ptr.as_ptr() as *const _);
+                    let ww0 = _mm_loadu_si32(w_ptr.as_ptr().cast());
                     let w0 = _mm256_shuffle_epi8(
                         _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(ww0), ww0),
                         shuffle_weights_table,
@@ -439,7 +437,6 @@ pub(crate) fn convolve_horizontal_rgba_avx_u16lp_row(
 ) {
     unsafe {
         #[cfg(feature = "avx512")]
-        #[allow(clippy::incompatible_msrv)]
         if std::arch::is_x86_feature_detected!("avxvnni") {
             return convolve_horizontal_rgba_avx_u16_row_vn(src, dst, filter_weights, bit_depth);
         }
@@ -483,7 +480,7 @@ impl<const D: bool> OneRowExecutionUnit<D> {
         bit_depth: u32,
     ) {
         unsafe {
-            const CHANNELS: usize = 4;
+            const CN: usize = 4;
 
             let v_max_colors = _mm_set1_epi16((1 << bit_depth) - 1);
 
@@ -511,7 +508,9 @@ impl<const D: bool> OneRowExecutionUnit<D> {
             );
 
             for ((dst, bounds), weights) in dst
-                .chunks_exact_mut(CHANNELS)
+                .as_chunks_mut::<CN>()
+                .0
+                .iter_mut()
                 .zip(filter_weights.bounds.iter())
                 .zip(
                     filter_weights
@@ -532,9 +531,9 @@ impl<const D: bool> OneRowExecutionUnit<D> {
                     0,
                 );
 
-                while jx + 8 < bounds_size {
+                while jx + 8 <= bounds_size {
                     let w_ptr = weights.get_unchecked(jx..);
-                    let wl = _mm256_castsi128_si256(_mm_loadu_si128(w_ptr.as_ptr() as *const _));
+                    let wl = _mm256_castsi128_si256(_mm_loadu_si128(w_ptr.as_ptr().cast()));
                     let w0 = _mm256_shuffle_epi8(
                         _mm256_permutevar8x32_epi32(wl, permute_avx_weights),
                         a_shuffle_weights_table,
@@ -548,11 +547,11 @@ impl<const D: bool> OneRowExecutionUnit<D> {
                     jx += 8;
                 }
 
-                while jx + 4 < bounds_size {
+                while jx + 4 <= bounds_size {
                     let w_ptr = weights.get_unchecked(jx..);
                     let w0 = _mm256_shuffle_epi8(
                         _mm256_permutevar8x32_epi32(
-                            _mm256_castsi128_si256(_mm_loadu_si64(w_ptr.as_ptr() as *const _)),
+                            _mm256_castsi128_si256(_mm_loadu_si64(w_ptr.as_ptr().cast())),
                             permute_avx_weights,
                         ),
                         a_shuffle_weights_table,
@@ -571,7 +570,7 @@ impl<const D: bool> OneRowExecutionUnit<D> {
                     let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
                     let w0 = _mm_shuffle_epi8(
-                        _mm_loadu_si32(w_ptr.as_ptr() as *const _),
+                        _mm_loadu_si32(w_ptr.as_ptr().cast()),
                         shuffle_weights_table,
                     );
                     store = acc_2_dot::<D>(bounds_start, src, w0, store, shuffle_2_table);

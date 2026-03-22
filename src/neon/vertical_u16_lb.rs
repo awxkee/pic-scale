@@ -45,7 +45,7 @@ fn convolve_chunks_16(
 
     let bounds_size = bounds.size;
 
-    const PRECISION: i32 = 16;
+    const PRECISION: i32 = 15;
     const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
 
     let initial_store = vdupq_n_s32(ROUNDING_CONST);
@@ -74,10 +74,10 @@ fn convolve_chunks_16(
             let item_row1 =
                 unsafe { vreinterpretq_s16_u16(vld1q_u16(src_ptr.get_unchecked(8..).as_ptr())) };
 
-            store0 = vqdmlal_lane_s16::<0>(store0, vget_low_s16(item_row0), weights);
-            store1 = vqdmlal_high_lane_s16::<0>(store1, item_row0, weights);
-            store2 = vqdmlal_lane_s16::<0>(store2, vget_low_s16(item_row1), weights);
-            store3 = vqdmlal_high_lane_s16::<0>(store3, item_row1, weights);
+            store0 = vmlal_lane_s16::<0>(store0, vget_low_s16(item_row0), weights);
+            store1 = vmlal_high_lane_s16::<0>(store1, item_row0, weights);
+            store2 = vmlal_lane_s16::<0>(store2, vget_low_s16(item_row1), weights);
+            store3 = vmlal_high_lane_s16::<0>(store3, item_row1, weights);
 
             let item_row0 = unsafe {
                 vreinterpretq_s16_u16(vld1q_u16(src_ptr.get_unchecked(src_stride..).as_ptr()))
@@ -86,10 +86,10 @@ fn convolve_chunks_16(
                 vreinterpretq_s16_u16(vld1q_u16(src_ptr.get_unchecked(src_stride + 8..).as_ptr()))
             };
 
-            store0 = vqdmlal_lane_s16::<1>(store0, vget_low_s16(item_row0), weights);
-            store1 = vqdmlal_high_lane_s16::<1>(store1, item_row0, weights);
-            store2 = vqdmlal_lane_s16::<1>(store2, vget_low_s16(item_row1), weights);
-            store3 = vqdmlal_high_lane_s16::<1>(store3, item_row1, weights);
+            store0 = vmlal_lane_s16::<1>(store0, vget_low_s16(item_row0), weights);
+            store1 = vmlal_high_lane_s16::<1>(store1, item_row0, weights);
+            store2 = vmlal_lane_s16::<1>(store2, vget_low_s16(item_row1), weights);
+            store3 = vmlal_high_lane_s16::<1>(store3, item_row1, weights);
 
             let item_row0 = unsafe {
                 vreinterpretq_s16_u16(vld1q_u16(src_ptr.get_unchecked(src_stride * 2..).as_ptr()))
@@ -100,10 +100,10 @@ fn convolve_chunks_16(
                 ))
             };
 
-            store0 = vqdmlal_lane_s16::<2>(store0, vget_low_s16(item_row0), weights);
-            store1 = vqdmlal_high_lane_s16::<2>(store1, item_row0, weights);
-            store2 = vqdmlal_lane_s16::<2>(store2, vget_low_s16(item_row1), weights);
-            store3 = vqdmlal_high_lane_s16::<2>(store3, item_row1, weights);
+            store0 = vmlal_lane_s16::<2>(store0, vget_low_s16(item_row0), weights);
+            store1 = vmlal_high_lane_s16::<2>(store1, item_row0, weights);
+            store2 = vmlal_lane_s16::<2>(store2, vget_low_s16(item_row1), weights);
+            store3 = vmlal_high_lane_s16::<2>(store3, item_row1, weights);
 
             let item_row0 = unsafe {
                 vreinterpretq_s16_u16(vld1q_u16(src_ptr.get_unchecked(src_stride * 3..).as_ptr()))
@@ -114,10 +114,10 @@ fn convolve_chunks_16(
                 ))
             };
 
-            store0 = vqdmlal_lane_s16::<3>(store0, vget_low_s16(item_row0), weights);
-            store1 = vqdmlal_high_lane_s16::<3>(store1, item_row0, weights);
-            store2 = vqdmlal_lane_s16::<3>(store2, vget_low_s16(item_row1), weights);
-            store3 = vqdmlal_high_lane_s16::<3>(store3, item_row1, weights);
+            store0 = vmlal_lane_s16::<3>(store0, vget_low_s16(item_row0), weights);
+            store1 = vmlal_high_lane_s16::<3>(store1, item_row0, weights);
+            store2 = vmlal_lane_s16::<3>(store2, vget_low_s16(item_row1), weights);
+            store3 = vmlal_high_lane_s16::<3>(store3, item_row1, weights);
 
             j += 4;
         }
@@ -137,10 +137,10 @@ fn convolve_chunks_16(
             let item_row1 =
                 unsafe { vreinterpretq_s16_u16(vld1q_u16(src_ptr.get_unchecked(8..).as_ptr())) };
 
-            store0 = vqdmlal_lane_s16::<0>(store0, vget_low_s16(item_row0), weights);
-            store1 = vqdmlal_high_lane_s16::<0>(store1, item_row0, weights);
-            store2 = vqdmlal_lane_s16::<0>(store2, vget_low_s16(item_row1), weights);
-            store3 = vqdmlal_high_lane_s16::<0>(store3, item_row1, weights);
+            store0 = vmlal_lane_s16::<0>(store0, vget_low_s16(item_row0), weights);
+            store1 = vmlal_high_lane_s16::<0>(store1, item_row0, weights);
+            store2 = vmlal_lane_s16::<0>(store2, vget_low_s16(item_row1), weights);
+            store3 = vmlal_high_lane_s16::<0>(store3, item_row1, weights);
 
             let item_row0 = unsafe {
                 vreinterpretq_s16_u16(vld1q_u16(src_ptr.get_unchecked(src_stride..).as_ptr()))
@@ -149,10 +149,10 @@ fn convolve_chunks_16(
                 vreinterpretq_s16_u16(vld1q_u16(src_ptr.get_unchecked(src_stride + 8..).as_ptr()))
             };
 
-            store0 = vqdmlal_lane_s16::<1>(store0, vget_low_s16(item_row0), weights);
-            store1 = vqdmlal_high_lane_s16::<1>(store1, item_row0, weights);
-            store2 = vqdmlal_lane_s16::<1>(store2, vget_low_s16(item_row1), weights);
-            store3 = vqdmlal_high_lane_s16::<1>(store3, item_row1, weights);
+            store0 = vmlal_lane_s16::<1>(store0, vget_low_s16(item_row0), weights);
+            store1 = vmlal_high_lane_s16::<1>(store1, item_row0, weights);
+            store2 = vmlal_lane_s16::<1>(store2, vget_low_s16(item_row1), weights);
+            store3 = vmlal_high_lane_s16::<1>(store3, item_row1, weights);
 
             j += 2;
         }
@@ -171,10 +171,10 @@ fn convolve_chunks_16(
             let item_row1 =
                 unsafe { vreinterpretq_s16_u16(vld1q_u16(src_ptr.get_unchecked(8..).as_ptr())) };
 
-            store0 = vqdmlal_s16(store0, vget_low_s16(item_row0), vget_low_s16(v_weight));
-            store1 = vqdmlal_high_s16(store1, item_row0, v_weight);
-            store2 = vqdmlal_s16(store2, vget_low_s16(item_row1), vget_low_s16(v_weight));
-            store3 = vqdmlal_high_s16(store3, item_row1, v_weight);
+            store0 = vmlal_s16(store0, vget_low_s16(item_row0), vget_low_s16(v_weight));
+            store1 = vmlal_high_s16(store1, item_row0, v_weight);
+            store2 = vmlal_s16(store2, vget_low_s16(item_row1), vget_low_s16(v_weight));
+            store3 = vmlal_high_s16(store3, item_row1, v_weight);
         }
 
         let store0 = vqshrun_n_s32::<PRECISION>(store0);
@@ -190,7 +190,7 @@ fn convolve_chunks_16(
             vst1q_u16(dst.get_unchecked_mut(8..).as_mut_ptr(), item1);
         }
 
-        cx = v_dx;
+        cx += 16;
     }
     cx
 }
@@ -211,7 +211,7 @@ fn convolve_chunks_8(
 
     let bounds_size = bounds.size;
 
-    const PRECISION: i32 = 16;
+    const PRECISION: i32 = 15;
     const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
 
     let initial_store = vdupq_n_s32(ROUNDING_CONST);
@@ -234,8 +234,8 @@ fn convolve_chunks_8(
 
             let item_row = unsafe { vreinterpretq_s16_u16(vld1q_u16(src_ptr.as_ptr())) };
 
-            store0 = vqdmlal_s16(store0, vget_low_s16(item_row), vget_low_s16(v_weight));
-            store1 = vqdmlal_high_s16(store1, item_row, v_weight);
+            store0 = vmlal_s16(store0, vget_low_s16(item_row), vget_low_s16(v_weight));
+            store1 = vmlal_high_s16(store1, item_row, v_weight);
         }
 
         let item = vminq_u16(
@@ -270,7 +270,7 @@ fn convolve_chunks_4(
 
     let bounds_size = bounds.size;
 
-    const PRECISION: i32 = 16;
+    const PRECISION: i32 = 15;
     const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
 
     let initial_store = vdupq_n_s32(ROUNDING_CONST);
@@ -292,7 +292,7 @@ fn convolve_chunks_4(
 
             let item_row = unsafe { vreinterpret_s16_u16(vld1_u16(src_ptr.as_ptr())) };
 
-            store0 = vqdmlal_s16(store0, item_row, v_weight);
+            store0 = vmlal_s16(store0, item_row, v_weight);
         }
 
         let u_store0 = vmin_u16(
@@ -323,7 +323,7 @@ pub(crate) fn convolve_column_lb_u16(
 
         let bounds_size = bounds.size;
 
-        const PRECISION: i32 = 16;
+        const PRECISION: i32 = 15;
         const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
 
         cx = convolve_chunks_16(
@@ -371,10 +371,7 @@ pub(crate) fn convolve_column_lb_u16(
                 let offset = src_stride * py + v_px;
                 let src_ptr = *src.get_unchecked(offset);
 
-                store0 = store0.wrapping_add(
-                    2i32.wrapping_mul(src_ptr as i32)
-                        .wrapping_mul(k_weight as i32),
-                );
+                store0 = store0.wrapping_add((src_ptr as i32).wrapping_mul(k_weight as i32));
             }
 
             *dst = (store0 >> PRECISION).max(0).min(max_colors as i32) as u16;

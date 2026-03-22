@@ -34,7 +34,7 @@ use core::f16;
 
 #[inline]
 #[target_feature(enable = "fp16,fhm")]
-pub(crate) unsafe fn conv_vertical_part_neon_16_f16(
+pub(crate) fn conv_vertical_part_neon_16_f16(
     start_y: usize,
     start_x: usize,
     src: &[f16],
@@ -228,7 +228,7 @@ pub(crate) fn convolve_vertical_rgb_neon_row_f16_fhm(
 
 #[inline]
 #[target_feature(enable = "fp16,fhm")]
-unsafe fn convolve_vertical_part_neon_8_f16_fhm<const USE_BLENDING: bool>(
+fn convolve_vertical_part_neon_8_f16_fhm<const USE_BLENDING: bool>(
     start_y: usize,
     start_x: usize,
     src: &[f16],
@@ -278,7 +278,7 @@ unsafe fn convolve_vertical_part_neon_8_f16_fhm<const USE_BLENDING: bool>(
 }
 
 #[target_feature(enable = "fhm")]
-unsafe fn convolve_vertical_rgb_neon_row_f16_impl(
+fn convolve_vertical_rgb_neon_row_f16_impl(
     _: usize,
     bounds: &FilterBounds,
     src: &[f16],
