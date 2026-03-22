@@ -28,17 +28,16 @@ let dimensions = img.dimensions();
 let mut bytes = Vec::from(img.as_bytes());
 
 let mut scaler = LinearScaler::new(ResamplingFunction::Lanczos3);
-scaler.set_threading_policy(ThreadingPolicy::Adaptive);
+scaler.set_threading_policy(ThreadingPolicy::Single);
 // ImageStore::<u8, 4> - (u8, 4) represents RGBA, (u8, 3) - RGB etc
-let store =
-    ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
+let store = ImageStore::<u8, 4>::from_slice(&mut bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
 let mut dst_store = ImageStoreMut::<u8, 4>::alloc(dimensions.0 as usize / 2, dimensions.1 as usize / 2);
-let resized = scaler.resize_rgba(
-    &store,
-    &mut dst_store,
-    true
-);
-let resized_image = resized.as_bytes();
+let plan = scaler.plan_rgba_resampling(
+    ImageSize::new(dimensions.0 as usize, dimensions.1 as usize), //source size
+    ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2), // target size
+    true, // premultiply alpha
+).unwrap();
+plan.resample(&store, &mut dst_store).unwrap();
 ```
 
 ### Fastest paths using SIMD
@@ -92,38 +91,6 @@ To enable full support of *f16* `half` feature should be used, and `f16c` enable
 For NEON `f16` feature use runtime detection, if CPU supports this feature then the very fast path is available
 
 Even when `half` feature activated but platform do not support or features not enabled for `f16` speed will be slow
-
-#### Example in sRGB
-
-In common, you should not downsize an image in sRGB colorspace, however if speed is more preferable than more proper scale, then you may omit linearizing 
-
-```rust
-let mut scaler = Scaler::new(ResamplingFunction::Hermite);
-scaler.set_threading_policy(ThreadingPolicy::Single);
-let store = ImageStore::<u8, 4>::from_slice(&bytes, width, height).unwrap();
-let mut dst_store = ImageStoreMut::<u8, 4>::alloc(width / 2, height / 2);
-let resized = scaler.resize_rgba(
-    &store,
-    &mut dst_store,
-    true
-);
-```
-
-#### Example in linear
-
-At the moment only sRGB transfer function is supported. This is also good optimized path so it is reasonably fast.
-
-```rust
-let mut scaler = LinearScaler::new(ResamplingFunction::Lanczos3);
-scaler.set_threading_policy(ThreadingPolicy::Single);
-let store = ImageStore::<u8, 4>::from_slice(&bytes, width, height).unwrap();
-let mut dst_store = ImageStoreMut::<u8, 4>::alloc(width / 2, height / 2);
-let resized = scaler.resize_rgba(
-    &store,
-    &mut dst_store,
-    true
-);
-```
 
 ### Build C bindings
 
