@@ -9,11 +9,11 @@ Supported NEON, SSE, AVX-2, AVX-512, AVX-VNNI, WASM.
 
 ### Colorspace
 
-This library provides for you some conveniences to scale in different color spaces.\
+This library provides for you a convenience to scale in different color spaces.\
 Prebuilt options for CIE L\*a\*b, CIE L\*u\*v, CIE L\*c\*h, Linear, Sigmoidal, Oklab, Jzazbz available. \
 Those transformations also very efficients.
-Prefer downscale in linear colorspace or XYZ.\
-Up scaling might be done in LAB/LUB and simoidized components and also efficient in sRGB.
+Prefer downscale in linear colorspace.\
+Upscaling might be done in LAB/LUB and simoidized components and also efficient in sRGB.
 
 Have good `f16` (the “binary16” type defined in IEEE 754-2008) support.
 
@@ -42,7 +42,8 @@ plan.resample(&store, &mut dst_store).unwrap();
 
 ### Fastest paths using SIMD
 
-Despite all implementation are fast, not all the paths are implemented using SIMD, so some paths are slower
+Despite all implementations are fast, not all the paths are implemented using SIMD, theere paths are slower.
+Here is a table which shows what's implemented with SIMD.
 
 `~` - Partially implemented
 
@@ -66,31 +67,29 @@ Despite all implementation are fast, not all the paths are implemented using SIM
 
 Features: 
  -  To enable support of `f16` the feature `nightly_f16` should be activated and `nightly` compiler are required.
- -  `nightly_avx512` activates AVX-512 feature set and requires `nightly` compiler channel 
+ -  `nightly_avx512` activates AVX-512 feature set and requires `nightly` compiler channel.
 
 #### Target features with runtime dispatch
 
 For x86 and aarch64 NEON runtime dispatch is used.
 
-`neon` optional target features are available, enable it when compiling on supported platform to get full features.
+`neon` optional target features are available, enable it when compiling on supported platform to get all features.
 
-`avx2`, `fma`, `sse4.1`, `f16c` will be detected automatically if available, no additional actions need, and called the best path.
+`avx2`, `fma`, `sse4.1`, `f16c` will be detected automatically if enabled, it will automatically detect and use the best path if enabled.
 
-`avx512` requires feature `nightly_avx512` and requires `nightly` compiler channel, runtime detection if it is available then will be used.
+`avx512` requires feature `avx512` compiler channel, runtime detection if it is available then will be used.
 
-`avxvnni` requires feature `nightly_avx512` and requires `nightly` compiler channel, runtime detection if it is available then will be used.
-AVX-VNNI is helpful extension on modern Intel and AMD CPU's, consider turn it on to get maximum performance.
+`avxvnni` requires feature `avx512`, will be detected automatically if available, no additional actions need, it will automatically detect and use the best path if enabled.
+AVX-VNNI is helpful extension on modern Intel and AMD CPUs, consider turn it on to get maximum performance.
 
-`fullfp16`, `fhm` NEON target detection performed in runtime, when available best the best paths for *f16* images are available on ARM.
+`fullfp16`, `fhm` NEON target detection performed in runtime, will be detected automatically if enabled, it will automatically detect and use the best path if enabled.
 
 WASM `simd128` target feature activating is mandatory in build flags.
 
 ##### About f16
 
-To enable full support of *f16* `half` feature should be used, and `f16c` enabled when targeting x86 platforms.
+To get full support of *f16* `nightly_f16` feature should be used.
 For NEON `f16` feature use runtime detection, if CPU supports this feature then the very fast path is available
-
-Even when `half` feature activated but platform do not support or features not enabled for `f16` speed will be slow
 
 ### Build C bindings
 
