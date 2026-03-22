@@ -70,12 +70,8 @@ impl HorizontalFilterPass<f32, f32, 1> for ImageStore<'_, f32, 1> {
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             if std::arch::is_x86_feature_detected!("sse4.1") {
-                _dispatcher_4_rows = Some(convolve_horizontal_plane_sse_rows_4::<false>);
-                _dispatcher_row = convolve_horizontal_plane_sse_row_one::<false>;
-                if std::arch::is_x86_feature_detected!("fma") {
-                    _dispatcher_4_rows = Some(convolve_horizontal_plane_sse_rows_4::<true>);
-                    _dispatcher_row = convolve_horizontal_plane_sse_row_one::<true>;
-                }
+                _dispatcher_4_rows = Some(convolve_horizontal_plane_sse_rows_4);
+                _dispatcher_row = convolve_horizontal_plane_sse_row_one;
             }
         }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]

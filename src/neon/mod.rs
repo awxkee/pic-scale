@@ -34,6 +34,7 @@ mod alpha_f32;
 mod alpha_u16;
 mod alpha_u8;
 mod ar30;
+mod cbcr8;
 #[cfg(feature = "nightly_i8mm")]
 mod cbcr8_dot;
 #[cfg(feature = "rdm")]
@@ -118,6 +119,9 @@ pub(crate) use alpha_f32::neon_unpremultiply_alpha_rgba_f32;
 pub(crate) use alpha_u8::neon_premultiply_alpha_rgba;
 pub(crate) use alpha_u8::neon_unpremultiply_alpha_rgba;
 pub(crate) use alpha_u16::{neon_premultiply_alpha_rgba_u16, neon_unpremultiply_alpha_rgba_u16};
+pub(crate) use cbcr8::{
+    convolve_horizontal_cbcr_neon_row, convolve_horizontal_cbcr_neon_rows_4_u8,
+};
 #[cfg(feature = "nightly_i8mm")]
 pub(crate) use cbcr8_dot::{
     convolve_horizontal_cbcr_neon_dot_row, convolve_horizontal_cbcr_neon_rows_dot_4_u8,

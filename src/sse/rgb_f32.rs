@@ -152,7 +152,7 @@ impl<const FMA: bool> ExecutionUnit1Row<FMA> {
                 let mut jx = 0usize;
                 let mut store = _mm_setzero_ps();
 
-                while jx + 4 < bounds.size {
+                while jx + 4 <= bounds.size {
                     let ptr = weights_ptr.add(jx + filter_offset);
                     let (weight0, weight1, weight2, weight3) = load_4_weights!(ptr);
                     let filter_start = jx + bounds.start;
@@ -168,7 +168,7 @@ impl<const FMA: bool> ExecutionUnit1Row<FMA> {
                     jx += 4;
                 }
 
-                while jx + 2 < bounds.size {
+                while jx + 2 <= bounds.size {
                     let ptr = weights_ptr.add(jx + filter_offset);
                     let weights = _mm_castsi128_ps(_mm_loadu_si64(ptr as *const u8));
                     const SHUFFLE_0: i32 = shuffle(0, 0, 0, 0);
@@ -275,7 +275,7 @@ impl<const FMA: bool> ExecutionUnit4Row<FMA> {
                 let mut store_2 = zeros;
                 let mut store_3 = zeros;
 
-                while jx + 4 < bounds.size {
+                while jx + 4 <= bounds.size {
                     let ptr = weights_ptr.add(jx + filter_offset);
                     let (weight0, weight1, weight2, weight3) = load_4_weights!(ptr);
                     let filter_start = jx + bounds.start;
@@ -318,7 +318,7 @@ impl<const FMA: bool> ExecutionUnit4Row<FMA> {
                     jx += 4;
                 }
 
-                while jx + 2 < bounds.size {
+                while jx + 2 <= bounds.size {
                     let ptr = weights_ptr.add(jx + filter_offset);
                     let weights = _mm_castsi128_ps(_mm_loadu_si64(ptr as *const u8));
                     const SHUFFLE_0: i32 = shuffle(0, 0, 0, 0);

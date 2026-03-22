@@ -347,7 +347,7 @@ unsafe fn convolve_horizontal_rgba_sse_u16_lb_row_impl(
             let mut jx = 0usize;
             let mut store = _mm_set1_epi32(ROUNDING_CONST);
 
-            while jx + 8 < bounds_size {
+            while jx + 8 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..(jx + 8));
                 let w0 = _mm_set1_epi16(w_ptr[0]);
@@ -364,7 +364,7 @@ unsafe fn convolve_horizontal_rgba_sse_u16_lb_row_impl(
                 jx += 8;
             }
 
-            while jx + 4 < bounds_size {
+            while jx + 4 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 4));
                 let w0 = _mm_set1_epi16(w_ptr[0]);
                 let w1 = _mm_set1_epi16(w_ptr[1]);
@@ -375,7 +375,7 @@ unsafe fn convolve_horizontal_rgba_sse_u16_lb_row_impl(
                 jx += 4;
             }
 
-            while jx + 2 < bounds_size {
+            while jx + 2 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 2));
                 let bounds_start = bounds.start + jx;
                 let w0 = _mm_set1_epi16(w_ptr[0]);

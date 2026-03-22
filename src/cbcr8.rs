@@ -57,6 +57,11 @@ impl HorizontalFilterPass<u8, f32, 2> for ImageStore<'_, u8, 2> {
             handle_fixed_row_u8::<2>;
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
+            use crate::neon::{
+                convolve_horizontal_cbcr_neon_row, convolve_horizontal_cbcr_neon_rows_4_u8,
+            };
+            _dispatcher_4_rows = Some(convolve_horizontal_cbcr_neon_rows_4_u8);
+            _dispatcher_1_row = convolve_horizontal_cbcr_neon_row;
             #[cfg(feature = "rdm")]
             if _scale_factor < 8.
                 && std::arch::is_aarch64_feature_detected!("rdm")
@@ -70,7 +75,10 @@ impl HorizontalFilterPass<u8, f32, 2> for ImageStore<'_, u8, 2> {
                 _dispatcher_1_row = convolve_horizontal_cbcr_neon_rdm_row;
             }
             #[cfg(feature = "nightly_i8mm")]
-            if _scale_factor < 5.5 && std::arch::is_aarch64_feature_detected!("i8mm") {
+            if _scale_factor < 10.
+                && std::arch::is_aarch64_feature_detected!("i8mm")
+                && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
+            {
                 use crate::neon::{
                     convolve_horizontal_cbcr_neon_dot_row,
                     convolve_horizontal_cbcr_neon_rows_dot_4_u8,
@@ -90,16 +98,12 @@ impl HorizontalFilterPass<u8, f32, 2> for ImageStore<'_, u8, 2> {
         }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
-            if std::arch::is_x86_feature_detected!("sse4.1")
-                && _scale_factor < 8.
-                && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
-            {
+            if std::arch::is_x86_feature_detected!("sse4.1") {
                 use crate::sse::{
-                    convolve_horizontal_cbcr_sse_hrs_row_one,
-                    convolve_horizontal_cbcr_sse_hrs_rows_4,
+                    convolve_horizontal_cbcr_sse_row_one, convolve_horizontal_cbcr_sse_rows_4,
                 };
-                _dispatcher_4_rows = Some(convolve_horizontal_cbcr_sse_hrs_rows_4);
-                _dispatcher_1_row = convolve_horizontal_cbcr_sse_hrs_row_one;
+                _dispatcher_4_rows = Some(convolve_horizontal_cbcr_sse_rows_4);
+                _dispatcher_1_row = convolve_horizontal_cbcr_sse_row_one;
             }
         }
         use crate::support::PRECISION;

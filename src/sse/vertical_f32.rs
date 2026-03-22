@@ -266,7 +266,7 @@ fn convolve_vertical_rgb_sse_row_f32_impl<const FMA: bool>(
     let mut cx = 0usize;
     let dst_width = dst.len();
 
-    while cx + 24 < dst_width {
+    while cx + 24 <= dst_width {
         convolve_vertical_part_sse_24_f32::<FMA>(
             bounds.start,
             cx,
@@ -280,7 +280,7 @@ fn convolve_vertical_rgb_sse_row_f32_impl<const FMA: bool>(
         cx += 24;
     }
 
-    while cx + 16 < dst_width {
+    while cx + 16 <= dst_width {
         convolve_vertical_part_sse_16_f32::<FMA>(
             bounds.start,
             cx,
@@ -294,7 +294,7 @@ fn convolve_vertical_rgb_sse_row_f32_impl<const FMA: bool>(
         cx += 16;
     }
 
-    while cx + 8 < dst_width {
+    while cx + 8 <= dst_width {
         convolve_vertical_part_sse_8_f32::<FMA>(
             bounds.start,
             cx,
@@ -308,7 +308,7 @@ fn convolve_vertical_rgb_sse_row_f32_impl<const FMA: bool>(
         cx += 8;
     }
 
-    while cx + 4 < dst_width {
+    while cx + 4 <= dst_width {
         convolve_vertical_part_sse_4_f32::<FMA>(
             bounds.start,
             cx,

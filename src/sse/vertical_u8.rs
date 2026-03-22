@@ -333,19 +333,19 @@ fn convolve_vertical_sse_row_impl(
     let mut cx = 0usize;
     let total_width = dst.len();
 
-    while cx + 32 < total_width {
+    while cx + 32 <= total_width {
         convolve_vertical_part_sse_32(bounds.start, cx, src, dst, src_stride, weights, bounds);
 
         cx += 32;
     }
 
-    while cx + 16 < total_width {
+    while cx + 16 <= total_width {
         convolve_vertical_part_sse_16(bounds.start, cx, src, dst, src_stride, weights, bounds);
 
         cx += 16;
     }
 
-    while cx + 8 < total_width {
+    while cx + 8 <= total_width {
         convolve_vertical_part_sse_8(bounds.start, cx, src, dst, src_stride, weights, bounds);
 
         cx += 8;

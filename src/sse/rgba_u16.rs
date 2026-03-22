@@ -270,7 +270,7 @@ fn convolve_horizontal_rgba_sse_rows_4_u16_impl<const FMA: bool>(
             let src2 = src1.get_unchecked(src_stride..);
             let src3 = src2.get_unchecked(src_stride..);
 
-            while jx + 8 < bounds_size {
+            while jx + 8 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..(jx + 8));
                 let w0 = _mm_load1_ps(w_ptr.as_ptr());
@@ -290,7 +290,7 @@ fn convolve_horizontal_rgba_sse_rows_4_u16_impl<const FMA: bool>(
                 jx += 8;
             }
 
-            while jx + 4 < bounds_size {
+            while jx + 4 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..(jx + 4));
                 let w0 = _mm_load1_ps(w_ptr.as_ptr());
@@ -304,7 +304,7 @@ fn convolve_horizontal_rgba_sse_rows_4_u16_impl<const FMA: bool>(
                 jx += 4;
             }
 
-            while jx + 2 < bounds_size {
+            while jx + 2 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 2));
                 let bounds_start = bounds.start + jx;
                 let w0 = _mm_load1_ps(w_ptr.as_ptr());
@@ -404,7 +404,7 @@ fn convolve_horizontal_rgba_sse_u16_row_impl<const FMA: bool>(
             let mut jx = 0usize;
             let mut store = _mm_setzero_ps();
 
-            while jx + 8 < bounds_size {
+            while jx + 8 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..(jx + 8));
                 let w0 = _mm_load1_ps(w_ptr.as_ptr());
@@ -421,7 +421,7 @@ fn convolve_horizontal_rgba_sse_u16_row_impl<const FMA: bool>(
                 jx += 8;
             }
 
-            while jx + 4 < bounds_size {
+            while jx + 4 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 4));
                 let w0 = _mm_load1_ps(w_ptr.as_ptr());
                 let w1 = _mm_load1_ps(w_ptr.as_ptr().add(1));
@@ -432,7 +432,7 @@ fn convolve_horizontal_rgba_sse_u16_row_impl<const FMA: bool>(
                 jx += 4;
             }
 
-            while jx + 2 < bounds_size {
+            while jx + 2 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 2));
                 let bounds_start = bounds.start + jx;
                 let w0 = _mm_load1_ps(w_ptr.as_ptr());

@@ -112,10 +112,10 @@ fn convolve_horizontal_cbcr_neon_rows_4_u8_impl(
 
         const CN: usize = 2;
 
-        let iter_row0 = row0_ref.chunks_exact_mut(CN);
-        let iter_row1 = row1_ref.chunks_exact_mut(CN);
-        let iter_row2 = row2_ref.chunks_exact_mut(CN);
-        let iter_row3 = row3_ref.chunks_exact_mut(CN);
+        let iter_row0 = row0_ref.as_chunks_mut::<CN>().0;
+        let iter_row1 = row1_ref.as_chunks_mut::<CN>().0;
+        let iter_row2 = row2_ref.as_chunks_mut::<CN>().0;
+        let iter_row3 = row3_ref.as_chunks_mut::<CN>().0;
 
         const PRECISION: i32 = 6;
         const ROUNDING_CONST: i16 = 1 << (PRECISION - 1);
@@ -134,9 +134,10 @@ fn convolve_horizontal_cbcr_neon_rows_4_u8_impl(
         let reduction_shuffle = vld1_u8(reduction_table.as_ptr());
 
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
-            .zip(iter_row1)
-            .zip(iter_row2)
-            .zip(iter_row3)
+            .iter_mut()
+            .zip(iter_row1.iter_mut())
+            .zip(iter_row2.iter_mut())
+            .zip(iter_row3.iter_mut())
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights
@@ -277,7 +278,9 @@ fn convolve_horizontal_cbcr_neon_rdm_row_impl(
         let reduction_shuffle = vld1_u8(reduction_table.as_ptr());
 
         for ((dst, bounds), weights) in dst
-            .chunks_exact_mut(2)
+            .as_chunks_mut::<2>()
+            .0
+            .iter_mut()
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights

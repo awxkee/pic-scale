@@ -43,7 +43,7 @@ pub(crate) fn compress_i32(x: __m128i) -> __m128i {
 }
 
 #[inline]
-pub(crate) unsafe fn convolve_horizontal_parts_one_sse_rgb(
+pub(crate) fn convolve_horizontal_parts_one_sse_rgb(
     start_x: usize,
     src: &[u8],
     weight0: __m128i,

@@ -243,7 +243,7 @@ fn convolve_vertical_sse_row_f16_impl<const FMA: bool, const F16C: bool>(
     let mut cx = 0usize;
     let dst_width = dst.len();
 
-    while cx + 16 < dst_width {
+    while cx + 16 <= dst_width {
         convolve_vertical_part_sse_16_16::<F16C, FMA>(
             bounds.start,
             cx,
@@ -257,7 +257,7 @@ fn convolve_vertical_sse_row_f16_impl<const FMA: bool, const F16C: bool>(
         cx += 16;
     }
 
-    while cx + 8 < dst_width {
+    while cx + 8 <= dst_width {
         convolve_vertical_part_sse_8_f16::<F16C, FMA>(
             bounds.start,
             cx,
@@ -271,7 +271,7 @@ fn convolve_vertical_sse_row_f16_impl<const FMA: bool, const F16C: bool>(
         cx += 8;
     }
 
-    while cx + 4 < dst_width {
+    while cx + 4 <= dst_width {
         convolve_vertical_part_sse_4_f16::<F16C, FMA>(
             bounds.start,
             cx,

@@ -77,10 +77,10 @@ fn conv_horiz_rgb_2_u16<const FMA: bool>(
     unsafe {
         const CN: usize = 3;
         let src_ptr = src.get_unchecked((start_x * CN)..);
-        let pixel = load_rgb_u16_2(src_ptr); // [r0,g0,b0,r1,g1,b1,0,0] as u16
+        let pixel = load_rgb_u16_2(src_ptr); // [r0,g0,b0,r1,g1,b1,0,0] 
 
-        let p0 = _mm_cvtepi32_ps(_mm_cvtepu16_epi32(pixel)); // [r0,g0,b0,r1] as f32
-        let p1 = _mm_cvtepi32_ps(_mm_cvtepu16_epi32(_mm_srli_si128::<6>(pixel))); // [g1,b1,0,0] as f32
+        let p0 = _mm_cvtepi32_ps(_mm_cvtepu16_epi32(pixel)); // [r0,g0,b0,r1]
+        let p1 = _mm_cvtepi32_ps(_mm_cvtepu16_epi32(_mm_srli_si128::<6>(pixel))); // [g1,b1,0,0] 
 
         let acc = _mm_prefer_fma_ps::<FMA>(store, p0, w0);
         _mm_prefer_fma_ps::<FMA>(acc, p1, w1)
@@ -98,29 +98,17 @@ fn conv_horiz_rgb_4_u16<const FMA: bool>(
     unsafe {
         const CN: usize = 3;
         let src_ptr = src.get_unchecked((start_x * CN)..);
-        // 4 x RGB = 12 x u16 = 24 bytes
-        // Load 16 bytes + 8 bytes
-        let lo = _mm_loadu_si128(src_ptr.as_ptr().cast()); // [r0,g0,b0,r1,g1,b1,r2,g2]
-        let hi = _mm_loadu_si64(src_ptr.get_unchecked(8..).as_ptr().cast()); // [b2,r3,g3,b3]
+        let lo = _mm_loadu_si128(src_ptr.as_ptr().cast());
+        let hi = _mm_loadu_si64(src_ptr.get_unchecked(8..).as_ptr().cast());
 
-        // pixel 0: [r0,g0,b0,0], pixel 1: [r1,g1,b1,0]
-        // pixel 2: [r2,g2,b2,0], pixel 3: [r3,g3,b3,0]
         let shuf = _mm_setr_epi8(0, 1, 2, 3, 4, 5, -1, -1, 6, 7, 8, 9, 10, 11, -1, -1);
         let hi_src = _mm_alignr_epi8(hi, lo, 12); // [r2,g2,b2,r3,g3,b3,0,0]
 
         let lo_shuf = _mm_shuffle_epi8(lo, shuf); // [r0,g0,b0,0, r1,g1,b1,0]
         let hi_shuf = _mm_shuffle_epi8(hi_src, shuf); // [r2,g2,b2,0, r3,g3,b3,0]
 
-        // Convert u16 -> f32 for each pair
-        // lo_shuf as u16: [r0,g0,b0,0, r1,g1,b1,0]
-        let p01 = _mm256_cvtepi32_ps(_mm256_cvtepu16_epi32(lo_shuf)); // [r0,g0,b0,0, r1,g1,b1,0] as f32
-        let p23 = _mm256_cvtepi32_ps(_mm256_cvtepu16_epi32(hi_shuf)); // [r2,g2,b2,0, r3,g3,b3,0] as f32
-
-        // w0 covers pixels 0,1 (lo128=p0, hi128=p1)
-        // w1 covers pixels 2,3 (lo128=p2, hi128=p3)
-        // But _mm256_cvtepu16_epi32 takes lo 8 x u16 -> 8 x i32
-        // lo_shuf has [r0,g0,b0,0,r1,g1,b1,0] so cvtepu16_epi32 gives all 8 as i32
-        // p01 lo128 = [r0,g0,b0,0], hi128 = [r1,g1,b1,0] ✓
+        let p01 = _mm256_cvtepi32_ps(_mm256_cvtepu16_epi32(lo_shuf));
+        let p23 = _mm256_cvtepi32_ps(_mm256_cvtepu16_epi32(hi_shuf));
 
         let acc = _mm256_prefer_fma_ps::<FMA>(store, p01, w0);
         _mm256_prefer_fma_ps::<FMA>(acc, p23, w1)
