@@ -33,7 +33,7 @@ use std::arch::aarch64::*;
 
 #[inline]
 #[target_feature(enable = "neon,fp16")]
-pub(crate) unsafe fn xconvolve_vertical_part_neon_8_f16<const USE_BLENDING: bool>(
+pub(crate) fn xconvolve_vertical_part_neon_8_f16<const USE_BLENDING: bool>(
     start_y: usize,
     start_x: usize,
     src: &[f16],
@@ -204,7 +204,7 @@ pub(crate) fn xconvolve_vertical_rgb_neon_row_f16(
 }
 
 #[target_feature(enable = "fp16")]
-pub unsafe fn xconvolve_vertical_rgb_neon_row_f16_impl(
+fn xconvolve_vertical_rgb_neon_row_f16_impl(
     _: usize,
     bounds: &FilterBounds,
     src: &[f16],
@@ -234,18 +234,16 @@ pub unsafe fn xconvolve_vertical_rgb_neon_row_f16_impl(
     }
 
     while cx + 8 < dst_width {
-        unsafe {
-            xconvolve_vertical_part_neon_8_f16::<false>(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-                8,
-            );
-        }
+        xconvolve_vertical_part_neon_8_f16::<false>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+            8,
+        );
 
         cx += 8;
     }
@@ -253,17 +251,15 @@ pub unsafe fn xconvolve_vertical_rgb_neon_row_f16_impl(
     let left = dst_width - cx;
 
     if left > 0 {
-        unsafe {
-            xconvolve_vertical_part_neon_8_f16::<true>(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-                left,
-            );
-        }
+        xconvolve_vertical_part_neon_8_f16::<true>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+            left,
+        );
     }
 }

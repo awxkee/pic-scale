@@ -31,7 +31,7 @@ use crate::filter_weights::FilterWeights;
 use std::arch::aarch64::*;
 
 #[inline(always)]
-unsafe fn write_accumulator_u8(store: int32x4_t, dst: &mut [u8]) {
+fn write_accumulator_u8(store: int32x4_t, dst: &mut [u8]) {
     unsafe {
         let store_16 = vqshrun_n_s32::<7>(store);
         let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
@@ -44,7 +44,7 @@ unsafe fn write_accumulator_u8(store: int32x4_t, dst: &mut [u8]) {
 }
 
 #[inline(always)]
-unsafe fn load_3b_as_u8x16(src_ptr: &[u8]) -> uint8x16_t {
+fn load_3b_as_u8x16(src_ptr: &[u8]) -> uint8x16_t {
     unsafe {
         let v = vreinterpretq_u8_u16(vld1q_lane_u16::<0>(
             src_ptr.as_ptr() as *const u16,
@@ -55,7 +55,7 @@ unsafe fn load_3b_as_u8x16(src_ptr: &[u8]) -> uint8x16_t {
 }
 
 #[inline(always)]
-unsafe fn load_2x3b_as_u8x16(src_ptr: &[u8]) -> uint8x16_t {
+fn load_2x3b_as_u8x16(src_ptr: &[u8]) -> uint8x16_t {
     unsafe {
         let mut rgb_pixel = vld1q_lane_u32::<0>(src_ptr.as_ptr() as *const u32, vdupq_n_u32(0));
         rgb_pixel = vreinterpretq_u32_u16(vld1q_lane_u16::<2>(
@@ -67,7 +67,7 @@ unsafe fn load_2x3b_as_u8x16(src_ptr: &[u8]) -> uint8x16_t {
 }
 
 #[inline(always)]
-unsafe fn load_4x3b_as_u8x16(src_ptr: &[u8]) -> uint8x16_t {
+fn load_4x3b_as_u8x16(src_ptr: &[u8]) -> uint8x16_t {
     unsafe {
         let px_lo = vld1_u8(src_ptr.as_ptr());
         let px_hi_part = vld1_lane_u32::<0>(
@@ -115,15 +115,16 @@ fn convolve_horizontal_rgb_neon_rows_4_impl(
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
         let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let iter_row0 = row0_ref.chunks_exact_mut(CN);
-        let iter_row1 = row1_ref.chunks_exact_mut(CN);
-        let iter_row2 = row2_ref.chunks_exact_mut(CN);
-        let iter_row3 = row3_ref.chunks_exact_mut(CN);
+        let iter_row0 = row0_ref.as_chunks_mut::<CN>().0;
+        let iter_row1 = row1_ref.as_chunks_mut::<CN>().0;
+        let iter_row2 = row2_ref.as_chunks_mut::<CN>().0;
+        let iter_row3 = row3_ref.as_chunks_mut::<CN>().0;
 
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
-            .zip(iter_row1)
-            .zip(iter_row2)
-            .zip(iter_row3)
+            .iter_mut()
+            .zip(iter_row1.iter_mut())
+            .zip(iter_row2.iter_mut())
+            .zip(iter_row3.iter_mut())
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights
@@ -231,7 +232,9 @@ fn convolve_horizontal_rgb_neon_row_one_impl_dot(
         let rnd_const: i32 = 1 << 6;
 
         for ((dst, bounds), weights) in dst
-            .chunks_exact_mut(CN)
+            .as_chunks_mut::<CN>()
+            .0
+            .iter_mut()
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights

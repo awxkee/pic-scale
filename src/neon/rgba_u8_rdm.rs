@@ -180,17 +180,18 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_i16_impl(
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
         let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let iter_row0 = row0_ref.chunks_exact_mut(CN);
-        let iter_row1 = row1_ref.chunks_exact_mut(CN);
-        let iter_row2 = row2_ref.chunks_exact_mut(CN);
-        let iter_row3 = row3_ref.chunks_exact_mut(CN);
+        let iter_row0 = row0_ref.as_chunks_mut::<CN>().0;
+        let iter_row1 = row1_ref.as_chunks_mut::<CN>().0;
+        let iter_row2 = row2_ref.as_chunks_mut::<CN>().0;
+        let iter_row3 = row3_ref.as_chunks_mut::<CN>().0;
 
         let initial_val = vcombine_s16(vdup_n_s16(ROUNDING), vdup_n_s16(0));
 
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
-            .zip(iter_row1)
-            .zip(iter_row2)
-            .zip(iter_row3)
+            .iter_mut()
+            .zip(iter_row1.iter_mut())
+            .zip(iter_row2.iter_mut())
+            .zip(iter_row3.iter_mut())
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights
@@ -212,7 +213,7 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_i16_impl(
             let src2 = src1.get_unchecked(src_stride..);
             let src3 = src2.get_unchecked(src_stride..);
 
-            while jx + 8 < bounds_size {
+            while jx + 8 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights_set = vld1q_s16(w_ptr.as_ptr());
@@ -245,7 +246,7 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_i16_impl(
                 jx += 8;
             }
 
-            while jx + 4 < bounds_size {
+            while jx + 4 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1_s16(w_ptr.as_ptr());
@@ -266,7 +267,7 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_i16_impl(
                 jx += 4;
             }
 
-            while jx + 2 < bounds_size {
+            while jx + 2 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let v_weight = vreinterpret_s16_s32(vld1_dup_s32(w_ptr.as_ptr() as *const i32));
@@ -346,7 +347,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_row_i16(
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn convolve_horizontal_rgba_neon_row_i16_impl(
+fn convolve_horizontal_rgba_neon_row_i16_impl(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
@@ -371,7 +372,9 @@ unsafe fn convolve_horizontal_rgba_neon_row_i16_impl(
         let initial_val = vcombine_s16(vdup_n_s16(ROUNDING), vdup_n_s16(0));
 
         for ((dst, bounds), weights) in dst
-            .chunks_exact_mut(CN)
+            .as_chunks_mut::<CN>()
+            .0
+            .iter_mut()
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights
@@ -383,7 +386,7 @@ unsafe fn convolve_horizontal_rgba_neon_row_i16_impl(
             let mut jx = 0usize;
             let mut store = initial_val;
 
-            while jx + 8 < bounds_size {
+            while jx + 8 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights_set = vld1q_s16(w_ptr.as_ptr());
@@ -409,7 +412,7 @@ unsafe fn convolve_horizontal_rgba_neon_row_i16_impl(
                 jx += 8;
             }
 
-            while jx + 4 < bounds_size {
+            while jx + 4 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1_s16(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
@@ -427,7 +430,7 @@ unsafe fn convolve_horizontal_rgba_neon_row_i16_impl(
                 jx += 4;
             }
 
-            while jx + 2 < bounds_size {
+            while jx + 2 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let v_weight = vreinterpret_s16_s32(vld1_dup_s32(w_ptr.as_ptr() as *const i32));

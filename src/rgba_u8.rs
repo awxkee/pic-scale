@@ -84,12 +84,8 @@ impl HorizontalFilterPass<u8, f32, 4> for ImageStore<'_, u8, 4> {
         {
             match _options.workload_strategy {
                 crate::WorkloadStrategy::PreferQuality => {
-                    use crate::neon::{
-                        convolve_horizontal_rgba_neon_row_q,
-                        convolve_horizontal_rgba_neon_rows_4_u8_q,
-                    };
-                    _dispatcher_4_rows = Some(convolve_horizontal_rgba_neon_rows_4_u8_q);
-                    _dispatcher_1_row = convolve_horizontal_rgba_neon_row_q;
+                    _dispatcher_4_rows = Some(convolve_horizontal_rgba_neon_rows_4_u8);
+                    _dispatcher_1_row = convolve_horizontal_rgba_neon_row;
                 }
                 crate::WorkloadStrategy::PreferSpeed => {
                     #[cfg(feature = "rdm")]
@@ -199,8 +195,8 @@ impl VerticalConvolutionPass<u8, f32, 4> for ImageStore<'_, u8, 4> {
         {
             match _options.workload_strategy {
                 crate::WorkloadStrategy::PreferQuality => {
-                    use crate::neon::convolve_vertical_neon_i32_precision_d;
-                    _dispatcher = convolve_vertical_neon_i32_precision_d;
+                    use crate::neon::convolve_vertical_neon_i32_precision;
+                    _dispatcher = convolve_vertical_neon_i32_precision;
                 }
                 crate::WorkloadStrategy::PreferSpeed => {
                     // For more downscaling better to use more precise version

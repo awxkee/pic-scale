@@ -135,8 +135,8 @@ impl VerticalConvolutionPass<u8, f32, 2> for ImageStore<'_, u8, 2> {
             // For more downscaling better to use more precise version
             match _options.workload_strategy {
                 crate::WorkloadStrategy::PreferQuality => {
-                    use crate::neon::convolve_vertical_neon_i32_precision_d;
-                    _dispatcher = convolve_vertical_neon_i32_precision_d;
+                    use crate::neon::convolve_vertical_neon_i32_precision;
+                    _dispatcher = convolve_vertical_neon_i32_precision;
                 }
                 crate::WorkloadStrategy::PreferSpeed => {
                     // For more downscaling better to use more precise version

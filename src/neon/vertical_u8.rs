@@ -110,71 +110,6 @@ pub(crate) fn convolve_vertical_neon_i32_precision(
     );
 }
 
-pub(crate) fn convolve_vertical_neon_i32_precision_d(
-    width: usize,
-    bounds: &FilterBounds,
-    src: &[u8],
-    dst: &mut [u8],
-    src_stride: usize,
-    weight: &[i16],
-    _: u32,
-) {
-    convolve_vertical_neon_row_full::<true, 16>(width, bounds, src, dst, src_stride, weight);
-}
-
-#[inline(never)]
-#[target_feature(enable = "neon")]
-fn convolve_32_items_unrolled<const D: bool, const PRECISION: i32, const BOUNDS: usize>(
-    chunks: &mut [[u8; 32]],
-    bounds: &FilterBounds,
-    src: &[u8],
-    src_stride: usize,
-    weight: &[i16],
-    cx: usize,
-) -> usize {
-    let rnd_const: i32 = 1 << (PRECISION - 1);
-    let vld = vdupq_n_s32(rnd_const);
-
-    let mut cx = cx;
-
-    let weights: [int16x8_t; BOUNDS] = std::array::from_fn(|x| vdupq_n_s16(weight[x]));
-
-    for dst in chunks {
-        let mut store_0 = vld;
-        let mut store_1 = vld;
-        let mut store_2 = vld;
-        let mut store_3 = vld;
-        let mut store_4 = vld;
-        let mut store_5 = vld;
-        let mut store_6 = vld;
-        let mut store_7 = vld;
-        let px = cx;
-
-        #[allow(clippy::needless_range_loop)]
-        for j in 0..BOUNDS {
-            let py = bounds.start + j;
-            let src_ptr = unsafe { src.get_unchecked((src_stride * py + px)..) };
-            let items = unsafe { xvld1q_u8_x2(src_ptr.as_ptr()) };
-
-            (store_0, store_1, store_2, store_3) =
-                accumulate_4_into::<D>(items.0, store_0, store_1, store_2, store_3, weights[j]);
-            (store_4, store_5, store_6, store_7) =
-                accumulate_4_into::<D>(items.1, store_4, store_5, store_6, store_7, weights[j]);
-        }
-
-        let item_0 = pack_weights::<PRECISION>(store_0, store_1, store_2, store_3);
-        let item_1 = pack_weights::<PRECISION>(store_4, store_5, store_6, store_7);
-
-        let dst_items = uint8x16x2_t(item_0, item_1);
-        unsafe {
-            xvst1q_u8_x2(dst.as_mut_ptr(), dst_items);
-        }
-
-        cx += 32;
-    }
-    cx
-}
-
 #[inline(never)]
 #[target_feature(enable = "neon")]
 fn convolve_32_items<const D: bool, const PRECISION: i32>(
@@ -442,43 +377,14 @@ fn convolve_vertical_neon_row_full<const D: bool, const PRECISION: i32>(
 ) {
     let mut cx = 0usize;
     unsafe {
-        if bounds.size == 6 {
-            cx = convolve_32_items_unrolled::<D, PRECISION, 6>(
-                dst.as_chunks_mut::<32>().0,
-                bounds,
-                src,
-                src_stride,
-                weight,
-                cx,
-            );
-        } else if bounds.size == 4 {
-            cx = convolve_32_items_unrolled::<D, PRECISION, 4>(
-                dst.as_chunks_mut::<32>().0,
-                bounds,
-                src,
-                src_stride,
-                weight,
-                cx,
-            );
-        } else if bounds.size == 2 {
-            cx = convolve_32_items_unrolled::<D, PRECISION, 2>(
-                dst.as_chunks_mut::<32>().0,
-                bounds,
-                src,
-                src_stride,
-                weight,
-                cx,
-            );
-        } else {
-            cx = convolve_32_items::<D, PRECISION>(
-                dst.as_chunks_mut::<32>().0,
-                bounds,
-                src,
-                src_stride,
-                weight,
-                cx,
-            );
-        }
+        cx = convolve_32_items::<D, PRECISION>(
+            dst.as_chunks_mut::<32>().0,
+            bounds,
+            src,
+            src_stride,
+            weight,
+            cx,
+        );
 
         let mut rem = dst.as_chunks_mut::<32>().1;
 

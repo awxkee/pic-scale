@@ -91,7 +91,7 @@ fn conv_horiz_rgba_2_u8<const D: bool>(
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_1_u8<const D: bool>(
+fn conv_horiz_rgba_1_u8<const D: bool>(
     start_x: usize,
     src: &[u8],
     w0: int16x4_t,
@@ -107,7 +107,7 @@ unsafe fn conv_horiz_rgba_1_u8<const D: bool>(
 }
 
 #[inline(always)]
-unsafe fn write_accumulator_u8<const PRECISION: i32>(store: int32x4_t, dst: &mut [u8]) {
+fn write_accumulator_u8<const PRECISION: i32>(store: int32x4_t, dst: &mut [u8]) {
     unsafe {
         let store_16 = vqshrun_n_s32::<PRECISION>(store);
         let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
@@ -128,23 +128,6 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4(
     _: u32,
 ) {
     convolve_horizontal_rgb_neon_rows_4_impl::<false, PRECISION>(
-        src,
-        src_stride,
-        dst,
-        dst_stride,
-        filter_weights,
-    );
-}
-
-pub(crate) fn convolve_horizontal_rgb_neon_rows_4_q(
-    src: &[u8],
-    src_stride: usize,
-    dst: &mut [u8],
-    dst_stride: usize,
-    filter_weights: &FilterWeights<i16>,
-    _: u32,
-) {
-    convolve_horizontal_rgb_neon_rows_4_impl::<true, 16>(
         src,
         src_stride,
         dst,
@@ -177,15 +160,16 @@ fn convolve_horizontal_rgb_neon_rows_4_impl<const D: bool, const PRECISION: i32>
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
         let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let iter_row0 = row0_ref.chunks_exact_mut(CHANNELS);
-        let iter_row1 = row1_ref.chunks_exact_mut(CHANNELS);
-        let iter_row2 = row2_ref.chunks_exact_mut(CHANNELS);
-        let iter_row3 = row3_ref.chunks_exact_mut(CHANNELS);
+        let iter_row0 = row0_ref.as_chunks_mut::<CHANNELS>().0;
+        let iter_row1 = row1_ref.as_chunks_mut::<CHANNELS>().0;
+        let iter_row2 = row2_ref.as_chunks_mut::<CHANNELS>().0;
+        let iter_row3 = row3_ref.as_chunks_mut::<CHANNELS>().0;
 
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
-            .zip(iter_row1)
-            .zip(iter_row2)
-            .zip(iter_row3)
+            .iter_mut()
+            .zip(iter_row1.iter_mut())
+            .zip(iter_row2.iter_mut())
+            .zip(iter_row3.iter_mut())
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights
@@ -255,15 +239,6 @@ pub(crate) fn convolve_horizontal_rgb_neon_row_one(
     convolve_horizontal_rgb_neon_row_one_impl::<false, PRECISION>(src, dst, filter_weights);
 }
 
-pub(crate) fn convolve_horizontal_rgb_neon_row_one_q(
-    src: &[u8],
-    dst: &mut [u8],
-    filter_weights: &FilterWeights<i16>,
-    _: u32,
-) {
-    convolve_horizontal_rgb_neon_row_one_impl::<true, 16>(src, dst, filter_weights);
-}
-
 fn convolve_horizontal_rgb_neon_row_one_impl<const D: bool, const PRECISION: i32>(
     src: &[u8],
     dst: &mut [u8],
@@ -281,7 +256,9 @@ fn convolve_horizontal_rgb_neon_row_one_impl<const D: bool, const PRECISION: i32
         let rnd_const: i32 = 1i32 << (PRECISION - 1);
 
         for ((dst, bounds), weights) in dst
-            .chunks_exact_mut(CN)
+            .as_chunks_mut::<CN>()
+            .0
+            .iter_mut()
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights
