@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::avx2::utils::{_mm_hsum_ps, _mm_prefer_fma_ps};
+use crate::avx2::utils::{_mm_hsum_ps, _mm_prefer_fma_ps, _mm256_prefer_fma_ps};
 use crate::filter_weights::FilterWeights;
 use std::arch::x86_64::*;
 
@@ -38,9 +38,9 @@ fn conv_horiz_rgba_1_u16<const FMA: bool>(
     store: __m128,
 ) -> __m128 {
     unsafe {
-        const COMPONENTS: usize = 1;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
-        let rgba_pixel = _mm_loadu_si16(src_ptr.as_ptr() as *const _);
+        const CN: usize = 1;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
+        let rgba_pixel = _mm_loadu_si16(src_ptr.as_ptr().cast());
         _mm_prefer_fma_ps::<FMA>(
             store,
             _mm_cvtepi32_ps(_mm_unpacklo_epi16(rgba_pixel, _mm_setzero_si128())),
@@ -57,10 +57,10 @@ fn conv_horiz_rgba_2_u16<const FMA: bool>(
     store: __m128,
 ) -> __m128 {
     unsafe {
-        const COMPONENTS: usize = 1;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 1;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
-        let rgba_pixel = _mm_loadu_si32(src_ptr.as_ptr() as *const _);
+        let rgba_pixel = _mm_loadu_si32(src_ptr.as_ptr().cast());
 
         _mm_prefer_fma_ps::<FMA>(
             store,
@@ -78,10 +78,10 @@ fn conv_horiz_rgba_4_u16<const FMA: bool>(
     store: __m128,
 ) -> __m128 {
     unsafe {
-        const COMPONENTS: usize = 1;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 1;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
-        let rgba_pixel = _mm_loadu_si64(src_ptr.as_ptr() as *const _);
+        let rgba_pixel = _mm_loadu_si64(src_ptr.as_ptr().cast());
 
         _mm_prefer_fma_ps::<FMA>(
             store,
@@ -96,17 +96,15 @@ fn conv_horiz_rgba_8_u16<const FMA: bool>(
     start_x: usize,
     src: &[u16],
     w: __m256,
-    store: __m128,
-) -> __m128 {
+    store: __m256,
+) -> __m256 {
     unsafe {
-        const COMPONENTS: usize = 1;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 1;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
-        let px = _mm_loadu_si128(src_ptr.as_ptr() as *const _);
+        let px = _mm_loadu_si128(src_ptr.as_ptr().cast());
 
-        let acc = _mm256_mul_ps(_mm256_cvtepi32_ps(_mm256_cvtepu16_epi32(px)), w);
-        let z0 = _mm_add_ps(store, _mm256_castps256_ps128(acc));
-        _mm_add_ps(z0, _mm256_extractf128_ps::<1>(acc))
+        _mm256_prefer_fma_ps::<FMA>(store, _mm256_cvtepi32_ps(_mm256_cvtepu16_epi32(px)), w)
     }
 }
 
@@ -217,10 +215,10 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
             {
                 let mut jx = 0usize;
 
-                let mut store_0 = _mm_setzero_ps();
-                let mut store_1 = _mm_setzero_ps();
-                let mut store_2 = _mm_setzero_ps();
-                let mut store_3 = _mm_setzero_ps();
+                let mut store_0 = _mm256_setzero_ps();
+                let mut store_1 = _mm256_setzero_ps();
+                let mut store_2 = _mm256_setzero_ps();
+                let mut store_3 = _mm256_setzero_ps();
 
                 let bounds_size = bounds.size;
 
@@ -242,6 +240,23 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                     jx += 8;
                 }
 
+                let mut store_0 = _mm_add_ps(
+                    _mm256_castps256_ps128(store_0),
+                    _mm256_extractf128_ps::<1>(store_0),
+                );
+                let mut store_1 = _mm_add_ps(
+                    _mm256_castps256_ps128(store_1),
+                    _mm256_extractf128_ps::<1>(store_1),
+                );
+                let mut store_2 = _mm_add_ps(
+                    _mm256_castps256_ps128(store_2),
+                    _mm256_extractf128_ps::<1>(store_2),
+                );
+                let mut store_3 = _mm_add_ps(
+                    _mm256_castps256_ps128(store_3),
+                    _mm256_extractf128_ps::<1>(store_3),
+                );
+
                 while jx + 4 <= bounds_size {
                     let bounds_start = bounds.start + jx;
                     let w_ptr = weights.get_unchecked(jx..);
@@ -257,7 +272,7 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                 while jx + 2 <= bounds_size {
                     let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
-                    let w0 = _mm_castsi128_ps(_mm_loadu_si64(w_ptr.as_ptr() as *const _));
+                    let w0 = _mm_castsi128_ps(_mm_loadu_si64(w_ptr.as_ptr().cast()));
                     store_0 = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src0, w0, store_0);
                     store_1 = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src1, w0, store_1);
                     store_2 = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src2, w0, store_2);
@@ -359,7 +374,7 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
             ) {
                 let bounds_size = bounds.size;
                 let mut jx = 0usize;
-                let mut store = _mm_setzero_ps();
+                let mut store = _mm256_setzero_ps();
 
                 while jx + 8 <= bounds_size {
                     let bounds_start = bounds.start + jx;
@@ -368,6 +383,11 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
                     store = conv_horiz_rgba_8_u16::<FMA>(bounds_start, src, w0, store);
                     jx += 8;
                 }
+
+                let mut store = _mm_add_ps(
+                    _mm256_castps256_ps128(store),
+                    _mm256_extractf128_ps::<1>(store),
+                );
 
                 while jx + 4 <= bounds_size {
                     let w_ptr = weights.get_unchecked(jx..);
@@ -381,7 +401,7 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
                 while jx + 2 <= bounds_size {
                     let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
-                    let w0 = _mm_castsi128_ps(_mm_loadu_si64(w_ptr.as_ptr() as *const _));
+                    let w0 = _mm_castsi128_ps(_mm_loadu_si64(w_ptr.as_ptr().cast()));
                     store = conv_horiz_rgba_2_u16::<FMA>(bounds_start, src, w0, store);
                     jx += 2;
                 }

@@ -86,26 +86,55 @@ fn resize_rgb(
         return;
     }
 
-    let src_slice = vec![value; src_width * src_height];
-    let store = ImageStore::<u16, 1>::borrow(&src_slice, src_width, src_height).unwrap();
-    let mut target = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 10);
+    {
+        let src_slice = vec![value; src_width * src_height];
+        let store = ImageStore::<u16, 1>::borrow(&src_slice, src_width, src_height).unwrap();
+        let mut target = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 10);
 
-    let scaler = Scaler::new(sampler)
-        .set_threading_policy(threading_policy)
-        .set_workload_strategy(if use_quality {
-            WorkloadStrategy::PreferQuality
-        } else {
-            WorkloadStrategy::PreferSpeed
-        });
+        let scaler = Scaler::new(sampler)
+            .set_threading_policy(threading_policy)
+            .set_workload_strategy(if use_quality {
+                WorkloadStrategy::PreferQuality
+            } else {
+                WorkloadStrategy::PreferSpeed
+            });
 
-    let planned = scaler
-        .plan_planar_resampling16(store.size(), target.size(), 10)
-        .unwrap();
-    planned.resample(&store, &mut target).unwrap();
-    let store = ImageStore::<u16, 1>::borrow(&src_slice, src_width, src_height).unwrap();
-    let mut target16 = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
-    let planned = scaler
-        .plan_planar_resampling16(store.size(), target.size(), 16)
-        .unwrap();
-    planned.resample(&store, &mut target16).unwrap();
+        let planned = scaler
+            .plan_planar_resampling16(store.size(), target.size(), 10)
+            .unwrap();
+        planned.resample(&store, &mut target).unwrap();
+
+        let store = ImageStore::<u16, 1>::borrow(&src_slice, src_width, src_height).unwrap();
+        let mut target16 = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
+        let planned = scaler
+            .plan_planar_resampling16(store.size(), target.size(), 16)
+            .unwrap();
+        planned.resample(&store, &mut target16).unwrap();
+    }
+
+    {
+        let src_slice = vec![value as i16; src_width * src_height];
+        let store = ImageStore::<i16, 1>::borrow(&src_slice, src_width, src_height).unwrap();
+        let mut target = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 10);
+
+        let scaler = Scaler::new(sampler)
+            .set_threading_policy(threading_policy)
+            .set_workload_strategy(if use_quality {
+                WorkloadStrategy::PreferQuality
+            } else {
+                WorkloadStrategy::PreferSpeed
+            });
+
+        let planned = scaler
+            .plan_planar_resampling_s16(store.size(), target.size(), 10)
+            .unwrap();
+        planned.resample(&store, &mut target).unwrap();
+
+        let store = ImageStore::<i16, 1>::borrow(&src_slice, src_width, src_height).unwrap();
+        let mut target16 = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
+        let planned = scaler
+            .plan_planar_resampling_s16(store.size(), target.size(), 16)
+            .unwrap();
+        planned.resample(&store, &mut target16).unwrap();
+    }
 }

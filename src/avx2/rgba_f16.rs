@@ -41,8 +41,8 @@ fn convolve_horizontal_parts_one_rgba_f16<const FMA: bool>(
     store_0: __m256,
 ) -> __m256 {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.add(start_x * COMPONENTS);
+        const CN: usize = 4;
+        let src_ptr = src.add(start_x * CN);
         let rgb_pixel = _mm_loadu_si64(src_ptr as *const u8);
         let pixels = avx_combine_ps(_mm_cvtph_ps(rgb_pixel), _mm_setzero_ps());
         _mm256_fma_ps::<FMA>(store_0, pixels, weight0)
@@ -58,10 +58,10 @@ fn convolve_horizontal_parts_4_rgba_f16<const FMA: bool>(
     store_0: __m256,
 ) -> __m256 {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.add(start_x * COMPONENTS);
+        const CN: usize = 4;
+        let src_ptr = src.add(start_x * CN);
 
-        let rgb_pixels_row_0 = _mm256_loadu_si256(src_ptr as *const __m256i);
+        let rgb_pixels_row_0 = _mm256_loadu_si256(src_ptr.cast());
 
         let rgb_pixel_0 = _mm256_cvtph_ps(_mm256_castsi256_si128(rgb_pixels_row_0));
         let rgb_pixel_1 = _mm256_cvtph_ps(_mm256_extracti128_si256::<1>(rgb_pixels_row_0));
@@ -82,11 +82,11 @@ fn convolve_horizontal_parts_8_rgba_f16<const FMA: bool>(
     store_0: __m256,
 ) -> __m256 {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.add(start_x * COMPONENTS);
+        const CN: usize = 4;
+        let src_ptr = src.add(start_x * CN);
 
-        let rgb_pixels_row_0 = _mm256_loadu_si256(src_ptr as *const __m256i);
-        let rgb_pixels_row_1 = _mm256_loadu_si256(src_ptr.add(16) as *const __m256i);
+        let rgb_pixels_row_0 = _mm256_loadu_si256(src_ptr.cast());
+        let rgb_pixels_row_1 = _mm256_loadu_si256(src_ptr.add(16).cast());
 
         let rgb_pixel_0 = _mm256_cvtph_ps(_mm256_castsi256_si128(rgb_pixels_row_0));
         let rgb_pixel_1 = _mm256_cvtph_ps(_mm256_extracti128_si256::<1>(rgb_pixels_row_0));
@@ -109,8 +109,8 @@ fn convolve_horizontal_parts_2_rgba_f16<const FMA: bool>(
     store_0: __m256,
 ) -> __m256 {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.add(start_x * COMPONENTS);
+        const CN: usize = 4;
+        let src_ptr = src.add(start_x * CN);
         let rgb_pixels = _mm_loadu_si128(src_ptr as *const __m128i);
         _mm256_fma_ps::<FMA>(store_0, _mm256_cvtph_ps(rgb_pixels), weight0)
     }
@@ -158,7 +158,7 @@ fn convolve_horizontal_rgba_avx_row_one_f16_impl<const FMA: bool>(
     dst: &mut [f16],
 ) {
     unsafe {
-        const CHANNELS: usize = 4;
+        const CN: usize = 4;
         let mut filter_offset = 0usize;
         let weights_ptr = &filter_weights.weights;
 
@@ -169,7 +169,7 @@ fn convolve_horizontal_rgba_avx_row_one_f16_impl<const FMA: bool>(
             let mut jx = 0usize;
             let mut store = _mm256_setzero_ps();
 
-            while jx + 8 < bounds.size {
+            while jx + 8 <= bounds.size {
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                 let (weight0, weight1, weight2, weight3) = load_8_weights_group_4_avx!(ptr);
                 let filter_start = jx + bounds.start;
@@ -185,7 +185,7 @@ fn convolve_horizontal_rgba_avx_row_one_f16_impl<const FMA: bool>(
                 jx += 8;
             }
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                 let (weight0, weight1) = load_4_weights_group_2_avx!(ptr);
                 let filter_start = jx + bounds.start;
@@ -199,7 +199,7 @@ fn convolve_horizontal_rgba_avx_row_one_f16_impl<const FMA: bool>(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                 let weight0 = _mm_broadcast_ss(ptr.get_unchecked(0));
                 let weight1 = _mm_broadcast_ss(ptr.get_unchecked(1));
@@ -227,7 +227,7 @@ fn convolve_horizontal_rgba_avx_row_one_f16_impl<const FMA: bool>(
                 jx += 1;
             }
 
-            let px = x * CHANNELS;
+            let px = x * CN;
             let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
             let converted_f16 = _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(_mm_add_ps(
                 _mm256_castps256_ps128(store),
@@ -314,7 +314,7 @@ fn convolve_horizontal_rgba_avx_rows_4_f16_impl<const FMA: bool>(
     dst_stride: usize,
 ) {
     unsafe {
-        const CHANNELS: usize = 4;
+        const CN: usize = 4;
         let mut filter_offset = 0usize;
         let zeros = _mm256_setzero_ps();
         let weights_ptr = &filter_weights.weights;
@@ -329,7 +329,7 @@ fn convolve_horizontal_rgba_avx_rows_4_f16_impl<const FMA: bool>(
             let mut store_2 = zeros;
             let mut store_3 = zeros;
 
-            while jx + 8 < bounds.size {
+            while jx + 8 <= bounds.size {
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                 let (weight0, weight1, weight2, weight3) = load_8_weights_group_4_avx!(ptr);
                 let filter_start = jx + bounds.start;
@@ -373,7 +373,7 @@ fn convolve_horizontal_rgba_avx_rows_4_f16_impl<const FMA: bool>(
                 jx += 8;
             }
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                 let (weight0, weight1) = load_4_weights_group_2_avx!(ptr);
                 let filter_start = jx + bounds.start;
@@ -409,7 +409,7 @@ fn convolve_horizontal_rgba_avx_rows_4_f16_impl<const FMA: bool>(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                 let weight0 = _mm_broadcast_ss(ptr.get_unchecked(0));
                 let weight1 = _mm_broadcast_ss(ptr.get_unchecked(1));
@@ -473,7 +473,7 @@ fn convolve_horizontal_rgba_avx_rows_4_f16_impl<const FMA: bool>(
                 jx += 1;
             }
 
-            let px = x * CHANNELS;
+            let px = x * CN;
             let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
             let converted_f16_0 = _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(_mm_add_ps(
                 _mm256_castps256_ps128(store_0),

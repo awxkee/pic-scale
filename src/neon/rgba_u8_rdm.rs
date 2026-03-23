@@ -44,8 +44,8 @@ fn conv_horiz_rgba_8_u8_i16<const SCALE: i32>(
     store: int16x8_t,
 ) -> int16x8_t {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let rgba_pixel = xvld1q_u8_x2(src_ptr.as_ptr());
 
@@ -114,8 +114,8 @@ fn conv_horiz_rgba_1_u8_i16<const SCALE: i32>(
     store: int16x4_t,
 ) -> int16x4_t {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
         let rgba_pixel = expand8_to_14(load_4b_as_u8x8(src_ptr.as_ptr()));
         vqrdmlah_s16(store, vget_low_s16(rgba_pixel), w0)
     }
@@ -309,21 +309,18 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_i16_impl(
             let store_16_8 = vqmovun_s16(vcombine_s16(store_16_3, store_16_3));
 
             vst1_lane_u32::<0>(
-                chunk0.as_mut_ptr() as *mut u32,
+                chunk0.as_mut_ptr().cast(),
                 vreinterpret_u32_u8(store_16_8_0),
             );
             vst1_lane_u32::<0>(
-                chunk1.as_mut_ptr() as *mut u32,
+                chunk1.as_mut_ptr().cast(),
                 vreinterpret_u32_u8(store_16_8_1),
             );
             vst1_lane_u32::<0>(
-                chunk2.as_mut_ptr() as *mut u32,
+                chunk2.as_mut_ptr().cast(),
                 vreinterpret_u32_u8(store_16_8_2),
             );
-            vst1_lane_u32::<0>(
-                chunk3.as_mut_ptr() as *mut u32,
-                vreinterpret_u32_u8(store_16_8),
-            );
+            vst1_lane_u32::<0>(chunk3.as_mut_ptr().cast(), vreinterpret_u32_u8(store_16_8));
         }
     }
 }
@@ -456,10 +453,7 @@ fn convolve_horizontal_rgba_neon_row_i16_impl(
 
             let store_16_8 = vqmovun_s16(vcombine_s16(store_16, store_16));
 
-            vst1_lane_u32::<0>(
-                dst.as_mut_ptr() as *mut u32,
-                vreinterpret_u32_u8(store_16_8),
-            );
+            vst1_lane_u32::<0>(dst.as_mut_ptr().cast(), vreinterpret_u32_u8(store_16_8));
         }
     }
 }

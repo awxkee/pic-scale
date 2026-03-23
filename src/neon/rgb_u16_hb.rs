@@ -266,12 +266,12 @@ fn convolve_horizontal_rgb_neon_u16_hb_impl(
     bit_depth: u32,
 ) {
     unsafe {
-        const CHANNELS: usize = 3;
+        const CN: usize = 3;
 
         let v_max_colors = vdup_n_u16(((1u32 << bit_depth) - 1) as u16);
 
         for ((dst, bounds), weights) in dst
-            .as_chunks_mut::<CHANNELS>()
+            .as_chunks_mut::<CN>()
             .0
             .iter_mut()
             .zip(filter_weights.bounds.iter())

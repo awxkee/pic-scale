@@ -117,8 +117,8 @@ fn convolve_column_lb_u16_impl(
             let item0 = _mm_min_epi16(_mm_packus_epi32(v_st0, v_st1), v_max_colors);
             let item1 = _mm_min_epi16(_mm_packus_epi32(v_st2, v_st3), v_max_colors);
 
-            _mm_storeu_si128(dst.as_mut_ptr() as *mut __m128i, item0);
-            _mm_storeu_si128(dst.as_mut_ptr().add(8) as *mut __m128i, item1);
+            _mm_storeu_si128(dst.as_mut_ptr().cast(), item0);
+            _mm_storeu_si128(dst.as_mut_ptr().add(8).cast(), item1);
 
             cx += 16;
         }
@@ -156,7 +156,7 @@ fn convolve_column_lb_u16_impl(
             let v_st1 = _mm_srai_epi32::<PRECISION>(store1);
 
             let item = _mm_min_epi16(_mm_packus_epi32(v_st0, v_st1), v_max_colors);
-            _mm_storeu_si128(dst.as_mut_ptr() as *mut __m128i, item);
+            _mm_storeu_si128(dst.as_mut_ptr().cast(), item);
 
             cx += 8;
         }

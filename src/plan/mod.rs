@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 mod alpha_plan;
+mod ar30_plan;
 mod horizontal_filtering;
 mod nearest_plan;
 mod non_alpha_plan;
@@ -35,6 +36,8 @@ mod trampoline_filtering;
 mod vertical_filtering;
 
 pub(crate) use alpha_plan::AlphaConvolvePlan;
+#[allow(unused_imports)]
+pub(crate) use ar30_plan::{Ar30Destructuring, Ar30DestructuringImpl, Ar30Plan};
 pub(crate) use horizontal_filtering::HorizontalFiltering;
 pub(crate) use nearest_plan::ResampleNearestPlan;
 pub(crate) use non_alpha_plan::NonAlphaConvolvePlan;

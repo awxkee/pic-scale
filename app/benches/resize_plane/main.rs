@@ -17,7 +17,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let binding = img.to_luma8();
     let binding16 = img.to_luma16();
 
-    c.bench_function("Pic scale Plane16: Lanczos 3", |b| {
+    /*c.bench_function("Pic scale Plane16: Lanczos 3", |b| {
         let copied: Vec<u16> = binding16.as_raw().to_vec();
         let store =
             ImageStore::<u16, 1>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
@@ -76,7 +76,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 )
                 .unwrap();
         })
-    });
+    });*/
 
     c.bench_function("Pic scale Plane10: Lanczos 3", |b| {
         let copied: Vec<u16> = binding16
@@ -89,9 +89,41 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 .unwrap();
         let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
         scaler.set_threading_policy(ThreadingPolicy::Single);
-        scaler.set_workload_strategy(WorkloadStrategy::PreferQuality);
+        scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
         let resampler = scaler
             .plan_planar_resampling16(
+                store.size(),
+                ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
+                10,
+            )
+            .unwrap();
+        let mut scratch = resampler.alloc_scratch();
+        let mut target = ImageStoreMut::alloc_with_depth(
+            dimensions.0 as usize / 4,
+            dimensions.1 as usize / 4,
+            10,
+        );
+        b.iter(|| {
+            resampler
+                .resample_with_scratch(&store, &mut target, &mut scratch)
+                .unwrap();
+        })
+    });
+
+    c.bench_function("Pic scale Plane S10: Lanczos 3", |b| {
+        let copied: Vec<i16> = binding16
+            .as_raw()
+            .iter()
+            .map(|&x| (x >> 6) as i16 - 512)
+            .collect::<Vec<_>>();
+        let store =
+            ImageStore::<i16, 1>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
+                .unwrap();
+        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+        scaler.set_threading_policy(ThreadingPolicy::Single);
+        scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
+        let resampler = scaler
+            .plan_planar_resampling_s16(
                 store.size(),
                 ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4),
                 10,

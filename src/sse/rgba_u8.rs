@@ -43,8 +43,8 @@ fn convolve_horizontal_parts_one_rgba_sse(
     store_0: __m128i,
 ) -> __m128i {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let src_ptr_32 = src_ptr.as_ptr() as *const i32;
         let rgba_pixel = _mm_cvtsi32_si128(src_ptr_32.read_unaligned());
@@ -76,7 +76,7 @@ fn convolve_horizontal_rgba_sse_rows_4_impl(
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        const CHANNELS: usize = 4;
+        const CN: usize = 4;
 
         #[rustfmt::skip]
     let shuffle_lo = _mm_setr_epi8(0, -1,
@@ -104,10 +104,10 @@ fn convolve_horizontal_rgba_sse_rows_4_impl(
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
         let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let iter_row0 = row0_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
-        let iter_row1 = row1_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
-        let iter_row2 = row2_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
-        let iter_row3 = row3_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
+        let iter_row0 = row0_ref.as_chunks_mut::<CN>().0.iter_mut();
+        let iter_row1 = row1_ref.as_chunks_mut::<CN>().0.iter_mut();
+        let iter_row2 = row2_ref.as_chunks_mut::<CN>().0.iter_mut();
+        let iter_row3 = row3_ref.as_chunks_mut::<CN>().0.iter_mut();
 
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
             .zip(iter_row1)
@@ -141,16 +141,16 @@ fn convolve_horizontal_rgba_sse_rows_4_impl(
                 let start_bounds = bounds.start + jx;
 
                 let rgb_pixel_0 = _mm_loadu_si128(
-                    src0.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
+                    src0.get_unchecked((start_bounds * CN)..).as_ptr() as *const __m128i,
                 );
                 let rgb_pixel_1 = _mm_loadu_si128(
-                    src1.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
+                    src1.get_unchecked((start_bounds * CN)..).as_ptr() as *const __m128i,
                 );
                 let rgb_pixel_2 = _mm_loadu_si128(
-                    src2.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
+                    src2.get_unchecked((start_bounds * CN)..).as_ptr() as *const __m128i,
                 );
                 let rgb_pixel_3 = _mm_loadu_si128(
-                    src3.get_unchecked((start_bounds * CHANNELS)..).as_ptr() as *const __m128i,
+                    src3.get_unchecked((start_bounds * CN)..).as_ptr() as *const __m128i,
                 );
 
                 let hi_0 = _mm_shuffle_epi8(rgb_pixel_0, shuffle_hi);
@@ -183,13 +183,13 @@ fn convolve_horizontal_rgba_sse_rows_4_impl(
                 let weight01 = _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
 
                 let rgb_pixel_0 =
-                    _mm_loadu_si64(src0.get_unchecked((bounds_start * CHANNELS)..).as_ptr());
+                    _mm_loadu_si64(src0.get_unchecked((bounds_start * CN)..).as_ptr());
                 let rgb_pixel_1 =
-                    _mm_loadu_si64(src1.get_unchecked((bounds_start * CHANNELS)..).as_ptr());
+                    _mm_loadu_si64(src1.get_unchecked((bounds_start * CN)..).as_ptr());
                 let rgb_pixel_2 =
-                    _mm_loadu_si64(src2.get_unchecked((bounds_start * CHANNELS)..).as_ptr());
+                    _mm_loadu_si64(src2.get_unchecked((bounds_start * CN)..).as_ptr());
                 let rgb_pixel_3 =
-                    _mm_loadu_si64(src3.get_unchecked((bounds_start * CHANNELS)..).as_ptr());
+                    _mm_loadu_si64(src3.get_unchecked((bounds_start * CN)..).as_ptr());
 
                 let lo_0 = _mm_shuffle_epi8(rgb_pixel_0, shuffle_lo);
                 let lo_1 = _mm_shuffle_epi8(rgb_pixel_1, shuffle_lo);
@@ -265,7 +265,7 @@ fn convolve_horizontal_rgba_sse_rows_one_impl(
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        const CHANNELS: usize = 4;
+        const CN: usize = 4;
 
         #[rustfmt::skip]
     let shuffle_lo = _mm_setr_epi8(0, -1,
@@ -290,7 +290,7 @@ fn convolve_horizontal_rgba_sse_rows_one_impl(
         let vld = _mm_set1_epi32(ROUNDING_CONST);
 
         for ((dst, bounds), weights) in dst
-            .as_chunks_mut::<CHANNELS>()
+            .as_chunks_mut::<CN>()
             .0
             .iter_mut()
             .zip(filter_weights.bounds.iter())
@@ -313,7 +313,7 @@ fn convolve_horizontal_rgba_sse_rows_one_impl(
                 const SHUFFLE_23: i32 = shuffle(1, 1, 1, 1);
                 let weight23 = _mm_shuffle_epi32::<SHUFFLE_23>(weights);
 
-                let src_ptr = src.get_unchecked((bounds_start * CHANNELS)..);
+                let src_ptr = src.get_unchecked((bounds_start * CN)..);
 
                 let rgb_pixel = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
 
@@ -331,7 +331,7 @@ fn convolve_horizontal_rgba_sse_rows_one_impl(
 
                 let weight01 = _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
 
-                let src_ptr = src.get_unchecked((bounds_start * CHANNELS)..);
+                let src_ptr = src.get_unchecked((bounds_start * CN)..);
 
                 let rgb_pixel = _mm_loadu_si64(src_ptr.as_ptr());
                 let lo = _mm_shuffle_epi8(rgb_pixel, shuffle_lo);

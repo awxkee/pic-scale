@@ -46,8 +46,8 @@ fn convolve_horizontal_parts_one_rgba_f16<const F16C: bool, const FMA: bool>(
     store_0: __m128,
 ) -> __m128 {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.add(start_x * COMPONENTS);
+        const CN: usize = 4;
+        let src_ptr = src.add(start_x * CN);
         let rgb_pixel = _mm_loadu_si64(src_ptr as *const u8);
         let pixels = _mm_cvtph_psx::<F16C>(rgb_pixel);
         _mm_prefer_fma_ps::<FMA>(store_0, pixels, weight0)
@@ -65,8 +65,8 @@ fn convolve_horizontal_parts_4_rgba_f16<const F16C: bool, const FMA: bool>(
     store_0: __m128,
 ) -> __m128 {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.add(start_x * COMPONENTS);
+        const CN: usize = 4;
+        let src_ptr = src.add(start_x * CN);
 
         let rgb_pixels_row_0 = _mm_loadu_si128(src_ptr as *const __m128i);
         let rgb_pixels_row_1 = _mm_loadu_si128(src_ptr.add(8) as *const __m128i);
@@ -92,8 +92,8 @@ fn convolve_horizontal_parts_2_rgba_f16<const F16C: bool, const FMA: bool>(
     store_0: __m128,
 ) -> __m128 {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.add(start_x * COMPONENTS);
+        const CN: usize = 4;
+        let src_ptr = src.add(start_x * CN);
 
         let rgb_pixels = _mm_loadu_si128(src_ptr as *const __m128i);
 
@@ -134,7 +134,7 @@ fn convolve_horizontal_rgba_sse_row_one_f16_impl<const F16C: bool, const FMA: bo
     src: &[f16],
     dst: &mut [f16],
 ) {
-    const CHANNELS: usize = 4;
+    const CN: usize = 4;
     let mut filter_offset = 0usize;
     let weights_ptr = filter_weights.weights.as_ptr();
 
@@ -194,7 +194,7 @@ fn convolve_horizontal_rgba_sse_row_one_f16_impl<const F16C: bool, const FMA: bo
             jx += 1;
         }
 
-        let px = x * CHANNELS;
+        let px = x * CN;
         let dest_ptr = unsafe { dst.get_unchecked_mut(px..).as_mut_ptr() };
         let converted_f16 = _mm_cvtps_phx::<F16C>(store);
         unsafe {
@@ -251,7 +251,7 @@ fn convolve_horizontal_rgba_sse_rows_4_f16_impl<const F16C: bool, const FMA: boo
     dst_stride: usize,
 ) {
     unsafe {
-        const CHANNELS: usize = 4;
+        const CN: usize = 4;
         let mut filter_offset = 0usize;
         let zeros = _mm_setzero_ps();
         let weights_ptr = filter_weights.weights.as_ptr();
@@ -381,7 +381,7 @@ fn convolve_horizontal_rgba_sse_rows_4_f16_impl<const F16C: bool, const FMA: boo
                 jx += 1;
             }
 
-            let px = x * CHANNELS;
+            let px = x * CN;
             let dest_ptr0 = dst.get_unchecked_mut(px..).as_mut_ptr();
             let dest_ptr1 = dst.get_unchecked_mut(px + dst_stride..).as_mut_ptr();
             let dest_ptr2 = dst.get_unchecked_mut(px + dst_stride * 2..).as_mut_ptr();

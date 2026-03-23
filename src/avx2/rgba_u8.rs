@@ -53,7 +53,7 @@ fn convolve_horizontal_rgba_avx_row_4_impl(
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        const CHANNELS: usize = 4;
+        const CN: usize = 4;
 
         let shuffle_weights_table = _mm_setr_epi8(0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3);
 
@@ -86,10 +86,10 @@ fn convolve_horizontal_rgba_avx_row_4_impl(
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
         let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let iter_row0 = row0_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
-        let iter_row1 = row1_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
-        let iter_row2 = row2_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
-        let iter_row3 = row3_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
+        let iter_row0 = row0_ref.as_chunks_mut::<CN>().0.iter_mut();
+        let iter_row1 = row1_ref.as_chunks_mut::<CN>().0.iter_mut();
+        let iter_row2 = row2_ref.as_chunks_mut::<CN>().0.iter_mut();
+        let iter_row3 = row3_ref.as_chunks_mut::<CN>().0.iter_mut();
 
         let init256 = _mm256_setr_epi32(
             ROUNDING_CONST,
@@ -135,22 +135,22 @@ fn convolve_horizontal_rgba_avx_row_4_impl(
                     let bounds_start = bounds.start + jx;
 
                     let weights = _mm256_permute4x64_epi64::<0x50>(_mm256_castsi128_si256(
-                        _mm_loadu_si128(w_ptr.as_ptr() as *const _),
+                        _mm_loadu_si128(w_ptr.as_ptr().cast()),
                     ));
                     let weight01 = _mm256_shuffle_epi8(weights, a_shuffle_weights_table);
                     let weight23 = _mm256_shuffle_epi8(weights, a_shuffle_weights_table_hi);
 
                     let rgb_pixel0 = _mm256_loadu_si256(
-                        src0.get_unchecked((bounds_start * CHANNELS)..).as_ptr() as *const _,
+                        src0.get_unchecked((bounds_start * CN)..).as_ptr().cast(),
                     );
                     let rgb_pixel1 = _mm256_loadu_si256(
-                        src1.get_unchecked((bounds_start * CHANNELS)..).as_ptr() as *const _,
+                        src1.get_unchecked((bounds_start * CN)..).as_ptr().cast(),
                     );
                     let rgb_pixel2 = _mm256_loadu_si256(
-                        src2.get_unchecked((bounds_start * CHANNELS)..).as_ptr() as *const _,
+                        src2.get_unchecked((bounds_start * CN)..).as_ptr().cast(),
                     );
                     let rgb_pixel3 = _mm256_loadu_si256(
-                        src3.get_unchecked((bounds_start * CHANNELS)..).as_ptr() as *const _,
+                        src3.get_unchecked((bounds_start * CN)..).as_ptr().cast(),
                     );
 
                     let hi0 = _mm256_shuffle_epi8(rgb_pixel0, a_shuffle_2_table_hi);
@@ -182,23 +182,19 @@ fn convolve_horizontal_rgba_avx_row_4_impl(
                     let bounds_start = bounds.start + jx;
 
                     let weights = _mm256_permutevar8x32_epi32(
-                        _mm256_castsi128_si256(_mm_loadu_si64(w_ptr.as_ptr() as *const u8)),
+                        _mm256_castsi128_si256(_mm_loadu_si64(w_ptr.as_ptr().cast())),
                         permute_avx_weights,
                     );
                     let weight01 = _mm256_shuffle_epi8(weights, a_shuffle_weights_table);
 
-                    let rgb_pixel_0 = _mm_loadu_si128(
-                        src0.get_unchecked((bounds_start * CHANNELS)..).as_ptr() as *const _,
-                    );
-                    let rgb_pixel_1 = _mm_loadu_si128(
-                        src1.get_unchecked((bounds_start * CHANNELS)..).as_ptr() as *const _,
-                    );
-                    let rgb_pixel_2 = _mm_loadu_si128(
-                        src2.get_unchecked((bounds_start * CHANNELS)..).as_ptr() as *const _,
-                    );
-                    let rgb_pixel_3 = _mm_loadu_si128(
-                        src3.get_unchecked((bounds_start * CHANNELS)..).as_ptr() as *const _,
-                    );
+                    let rgb_pixel_0 =
+                        _mm_loadu_si128(src0.get_unchecked((bounds_start * CN)..).as_ptr().cast());
+                    let rgb_pixel_1 =
+                        _mm_loadu_si128(src1.get_unchecked((bounds_start * CN)..).as_ptr().cast());
+                    let rgb_pixel_2 =
+                        _mm_loadu_si128(src2.get_unchecked((bounds_start * CN)..).as_ptr().cast());
+                    let rgb_pixel_3 =
+                        _mm_loadu_si128(src3.get_unchecked((bounds_start * CN)..).as_ptr().cast());
 
                     let rgb_pixel0 =
                         _mm256_permute4x64_epi64::<0x50>(_mm256_castsi128_si256(rgb_pixel_0));
@@ -237,21 +233,19 @@ fn convolve_horizontal_rgba_avx_row_4_impl(
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
 
-                let w01 = _mm_shuffle_epi8(
-                    _mm_loadu_si32(w_ptr.as_ptr() as *const _),
-                    shuffle_weights_table,
-                );
+                let w01 =
+                    _mm_shuffle_epi8(_mm_loadu_si32(w_ptr.as_ptr().cast()), shuffle_weights_table);
 
                 let weight01 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(w01), w01);
 
                 let rgb_pixel_0 =
-                    _mm_loadu_si64(src0.get_unchecked((bounds_start * CHANNELS)..).as_ptr());
+                    _mm_loadu_si64(src0.get_unchecked((bounds_start * CN)..).as_ptr());
                 let rgb_pixel_1 =
-                    _mm_loadu_si64(src1.get_unchecked((bounds_start * CHANNELS)..).as_ptr());
+                    _mm_loadu_si64(src1.get_unchecked((bounds_start * CN)..).as_ptr());
                 let rgb_pixel_2 =
-                    _mm_loadu_si64(src2.get_unchecked((bounds_start * CHANNELS)..).as_ptr());
+                    _mm_loadu_si64(src2.get_unchecked((bounds_start * CN)..).as_ptr());
                 let rgb_pixel_3 =
-                    _mm_loadu_si64(src3.get_unchecked((bounds_start * CHANNELS)..).as_ptr());
+                    _mm_loadu_si64(src3.get_unchecked((bounds_start * CN)..).as_ptr());
 
                 let px0 =
                     _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgb_pixel_0), rgb_pixel_1);
@@ -274,15 +268,15 @@ fn convolve_horizontal_rgba_avx_row_4_impl(
 
                 let bounds_start = bounds.start + jx;
 
-                let src_ptr0 = src0.get_unchecked((bounds_start * CHANNELS)..);
-                let src_ptr1 = src1.get_unchecked((bounds_start * CHANNELS)..);
-                let src_ptr2 = src2.get_unchecked((bounds_start * CHANNELS)..);
-                let src_ptr3 = src3.get_unchecked((bounds_start * CHANNELS)..);
+                let src_ptr0 = src0.get_unchecked((bounds_start * CN)..);
+                let src_ptr1 = src1.get_unchecked((bounds_start * CN)..);
+                let src_ptr2 = src2.get_unchecked((bounds_start * CN)..);
+                let src_ptr3 = src3.get_unchecked((bounds_start * CN)..);
 
-                let rgba_pixel0 = _mm_loadu_si32(src_ptr0.as_ptr() as *const _);
-                let rgba_pixel1 = _mm_loadu_si32(src_ptr1.as_ptr() as *const _);
-                let rgba_pixel2 = _mm_loadu_si32(src_ptr2.as_ptr() as *const _);
-                let rgba_pixel3 = _mm_loadu_si32(src_ptr3.as_ptr() as *const _);
+                let rgba_pixel0 = _mm_loadu_si32(src_ptr0.as_ptr().cast());
+                let rgba_pixel1 = _mm_loadu_si32(src_ptr1.as_ptr().cast());
+                let rgba_pixel2 = _mm_loadu_si32(src_ptr2.as_ptr().cast());
+                let rgba_pixel3 = _mm_loadu_si32(src_ptr3.as_ptr().cast());
 
                 let px0 =
                     _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgba_pixel0), rgba_pixel1);
@@ -345,7 +339,7 @@ fn convolve_horizontal_rgba_avx_rows_one_impl(
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        const CHANNELS: usize = 4;
+        const CN: usize = 4;
 
         let shuffle_weights_table = _mm_setr_epi8(0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3);
 
@@ -377,7 +371,7 @@ fn convolve_horizontal_rgba_avx_rows_one_impl(
         let vld = _mm_set1_epi32(PRECISION);
 
         for ((dst, bounds), weights) in dst
-            .as_chunks_mut::<CHANNELS>()
+            .as_chunks_mut::<CN>()
             .0
             .iter_mut()
             .zip(filter_weights.bounds.iter())
@@ -407,14 +401,14 @@ fn convolve_horizontal_rgba_avx_rows_one_impl(
                     let bounds_start = bounds.start + jx;
 
                     let weights = _mm256_permute4x64_epi64::<0x50>(_mm256_castsi128_si256(
-                        _mm_loadu_si128(w_ptr.as_ptr() as *const _),
+                        _mm_loadu_si128(w_ptr.as_ptr().cast()),
                     ));
                     let weight01 = _mm256_shuffle_epi8(weights, a_shuffle_weights_table);
                     let weight23 = _mm256_shuffle_epi8(weights, a_shuffle_weights_table_hi);
 
-                    let src_ptr = src.get_unchecked((bounds_start * CHANNELS)..);
+                    let src_ptr = src.get_unchecked((bounds_start * CN)..);
 
-                    let rgb_pixel = _mm256_loadu_si256(src_ptr.as_ptr() as *const _);
+                    let rgb_pixel = _mm256_loadu_si256(src_ptr.as_ptr().cast());
 
                     let hi = _mm256_shuffle_epi8(rgb_pixel, a_shuffle_2_table_hi);
                     let lo = _mm256_shuffle_epi8(rgb_pixel, a_shuffle_2_table);
@@ -430,15 +424,15 @@ fn convolve_horizontal_rgba_avx_rows_one_impl(
                     let bounds_start = bounds.start + jx;
 
                     let weights = _mm256_permutevar8x32_epi32(
-                        _mm256_castsi128_si256(_mm_loadu_si64(w_ptr.as_ptr() as *const u8)),
+                        _mm256_castsi128_si256(_mm_loadu_si64(w_ptr.as_ptr().cast())),
                         permute_avx_weights,
                     );
                     let weight01 = _mm256_shuffle_epi8(weights, a_shuffle_weights_table);
 
-                    let src_ptr = src.get_unchecked((bounds_start * CHANNELS)..);
+                    let src_ptr = src.get_unchecked((bounds_start * CN)..);
 
                     let rgb_pixel = _mm256_permute4x64_epi64::<0x50>(_mm256_castsi128_si256(
-                        _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i),
+                        _mm_loadu_si128(src_ptr.as_ptr().cast()),
                     ));
 
                     let lo = _mm256_shuffle_epi8(rgb_pixel, a_shuffle_2_table);
@@ -457,12 +451,10 @@ fn convolve_horizontal_rgba_avx_rows_one_impl(
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
 
-                let weight01 = _mm_shuffle_epi8(
-                    _mm_loadu_si32(w_ptr.as_ptr() as *const _),
-                    shuffle_weights_table,
-                );
+                let weight01 =
+                    _mm_shuffle_epi8(_mm_loadu_si32(w_ptr.as_ptr().cast()), shuffle_weights_table);
 
-                let src_ptr = src.get_unchecked((bounds_start * CHANNELS)..);
+                let src_ptr = src.get_unchecked((bounds_start * CN)..);
 
                 let rgb_pixel = _mm_loadu_si64(src_ptr.as_ptr());
                 let lo = _mm_shuffle_epi8(rgb_pixel, shuffle_2_table);
@@ -473,18 +465,16 @@ fn convolve_horizontal_rgba_avx_rows_one_impl(
 
             while jx < bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
-                let weight0 = _mm_shuffle_epi8(
-                    _mm_loadu_si16(w_ptr.as_ptr() as *const _),
-                    shuffle_weights_table,
-                );
+                let weight0 =
+                    _mm_shuffle_epi8(_mm_loadu_si16(w_ptr.as_ptr().cast()), shuffle_weights_table);
 
                 let bounds_start = bounds.start + jx;
 
-                const COMPONENTS: usize = 4;
-                let src_ptr = src.get_unchecked((bounds_start * COMPONENTS)..);
+                const CN: usize = 4;
+                let src_ptr = src.get_unchecked((bounds_start * CN)..);
 
                 let src_ptr_32 = src_ptr.as_ptr() as *const i32;
-                let rgba_pixel = _mm_loadu_si32(src_ptr_32 as *const _);
+                let rgba_pixel = _mm_loadu_si32(src_ptr_32.cast());
 
                 let lo = _mm_shuffle_epi8(rgba_pixel, shuffle_1_table);
 

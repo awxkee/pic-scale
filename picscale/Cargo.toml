@@ -9,14 +9,14 @@ pic-scale = { path = "../", features = ["nightly_f16"] }
 num-traits = "0.2.19"
 
 [features]
-nightly_avx512 = ["pic-scale/nightly_avx512"]
+nightly_avx512 = ["pic-scale/avx512"]
 full_support = []
 
 [lib]
 crate-type = ["staticlib", "rlib"]
 
 [build-dependencies]
-cbindgen = "0.28.0"
+cbindgen = "0.29.2"
 
 [profile.release]
 strip = true

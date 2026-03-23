@@ -47,8 +47,8 @@ fn convolve_horizontal_parts_4_rgb_f16<const F16C: bool, const FMA: bool>(
     store_0: __m128,
 ) -> __m128 {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.add(start_x * COMPONENTS);
+        const CN: usize = 3;
+        let src_ptr = src.add(start_x * CN);
 
         let first_set = _mm_loadu_si128(src_ptr as *const __m128i); // First 8 elements
         let second_set = _mm_loadu_si64(src_ptr.add(8) as *const u8); // Last 4 elements
@@ -96,8 +96,8 @@ fn convolve_horizontal_parts_2_rgb_f16<const F16C: bool, const FMA: bool>(
     store_0: __m128,
 ) -> __m128 {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.add(start_x * COMPONENTS);
+        const CN: usize = 3;
+        let src_ptr = src.add(start_x * CN);
 
         let orig1 = _mm_cvtph_psx::<F16C>(_mm_loadu_si64(src_ptr as *const u8));
         const SHUFFLE_FLAG: i32 = shuffle(2, 1, 0, 0);
@@ -130,8 +130,8 @@ fn convolve_horizontal_parts_one_rgb_f16<const F16C: bool, const FMA: bool>(
     store_0: __m128,
 ) -> __m128 {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.add(start_x * COMPONENTS);
+        const CN: usize = 3;
+        let src_ptr = src.add(start_x * CN);
 
         let read_first = (src_ptr as *const u32).read_unaligned().to_le_bytes();
         let read_last = src_ptr.add(2).read_unaligned();
@@ -178,7 +178,7 @@ fn convolve_horizontal_rgb_sse_row_one_f16_impl<const F16C: bool, const FMA: boo
     dst: &mut [f16],
 ) {
     unsafe {
-        const CHANNELS: usize = 3;
+        const CN: usize = 3;
         let mut filter_offset = 0usize;
         let weights_ptr = filter_weights.weights.as_ptr();
 
@@ -240,7 +240,7 @@ fn convolve_horizontal_rgb_sse_row_one_f16_impl<const F16C: bool, const FMA: boo
 
             let store_ph = _mm_cvtps_phx::<F16C>(store);
 
-            let px = x * CHANNELS;
+            let px = x * CN;
             let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
             (dest_ptr as *mut i32).write_unaligned(_mm_extract_epi32::<0>(store_ph));
             (dest_ptr as *mut i16)
@@ -298,7 +298,7 @@ fn convolve_horizontal_rgb_sse_rows_4_f16_impl<const F16C: bool, const FMA: bool
     dst_stride: usize,
 ) {
     unsafe {
-        const CHANNELS: usize = 3;
+        const CN: usize = 3;
         let mut filter_offset = 0usize;
         let zeros = _mm_setzero_ps();
         let weights_ptr = filter_weights.weights.as_ptr();
@@ -433,7 +433,7 @@ fn convolve_horizontal_rgb_sse_rows_4_f16_impl<const F16C: bool, const FMA: bool
             let store_ph_2 = _mm_cvtps_phx::<F16C>(store_2);
             let store_ph_3 = _mm_cvtps_phx::<F16C>(store_3);
 
-            let px = x * CHANNELS;
+            let px = x * CN;
             let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
             (dest_ptr as *mut i32).write_unaligned(_mm_extract_epi32::<0>(store_ph_0));
             (dest_ptr as *mut i16)

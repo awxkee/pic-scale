@@ -119,17 +119,6 @@ pub(crate) fn convolve_horizontal_rgb_avx_rows_4_u16(
     bit_depth: u32,
 ) {
     unsafe {
-        #[cfg(feature = "avx512")]
-        if std::arch::is_x86_feature_detected!("avxvnni") {
-            return convolve_horizontal_rgb_avx_rows_4_lb_vn(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                filter_weights,
-                bit_depth,
-            );
-        }
         convolve_horizontal_rgb_avx_rows_4_lb_a(
             src,
             src_stride,
@@ -137,7 +126,28 @@ pub(crate) fn convolve_horizontal_rgb_avx_rows_4_u16(
             dst_stride,
             filter_weights,
             bit_depth,
-        );
+        )
+    }
+}
+
+#[cfg(feature = "avx512")]
+pub(crate) fn convolve_horizontal_rgb_avx_rows_4_u16_vnni(
+    src: &[u16],
+    src_stride: usize,
+    dst: &mut [u16],
+    dst_stride: usize,
+    filter_weights: &FilterWeights<i16>,
+    bit_depth: u32,
+) {
+    unsafe {
+        convolve_horizontal_rgb_avx_rows_4_lb_vn(
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+            filter_weights,
+            bit_depth,
+        )
     }
 }
 
@@ -227,11 +237,11 @@ impl<const D: bool> Row4ExecutionHandlerRgb<D> {
             let s0 = src0.get_unchecked((start_x * CN)..);
             let s1 = src1.get_unchecked((start_x * CN)..);
 
-            let lo0 = _mm_loadu_si64(s0.as_ptr() as *const u8);
+            let lo0 = _mm_loadu_si64(s0.as_ptr().cast());
             let hi0 = _mm_loadu_si32(s0.get_unchecked(4..).as_ptr().cast());
             let p0 = _mm_unpacklo_epi64(lo0, hi0);
 
-            let lo1 = _mm_loadu_si64(s1.as_ptr() as *const u8);
+            let lo1 = _mm_loadu_si64(s1.as_ptr().cast());
             let hi1 = _mm_loadu_si32(s1.get_unchecked(4..).as_ptr().cast());
             let p1 = _mm_unpacklo_epi64(lo1, hi1);
 
@@ -450,13 +460,17 @@ pub(crate) fn convolve_horizontal_rgb_avx_u16lp_row(
     filter_weights: &FilterWeights<i16>,
     bit_depth: u32,
 ) {
-    unsafe {
-        #[cfg(feature = "avx512")]
-        if std::arch::is_x86_feature_detected!("avxvnni") {
-            return convolve_horizontal_rgb_avx_u16_row_vn(src, dst, filter_weights, bit_depth);
-        }
-        convolve_horizontal_rgb_avx_u16_row_avx(src, dst, filter_weights, bit_depth);
-    }
+    unsafe { convolve_horizontal_rgb_avx_u16_row_avx(src, dst, filter_weights, bit_depth) }
+}
+
+#[cfg(feature = "avx512")]
+pub(crate) fn convolve_horizontal_rgb_avx_u16lp_row_vnni(
+    src: &[u16],
+    dst: &mut [u16],
+    filter_weights: &FilterWeights<i16>,
+    bit_depth: u32,
+) {
+    unsafe { convolve_horizontal_rgb_avx_u16_row_vn(src, dst, filter_weights, bit_depth) }
 }
 
 #[cfg(feature = "avx512")]

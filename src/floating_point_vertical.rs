@@ -165,6 +165,7 @@ pub(crate) fn column_handler_floating_point<
         + Default,
     F: Copy + 'static + Float + AsPrimitive<J>,
 >(
+    _: usize,
     bounds: &FilterBounds,
     src: &[T],
     dst: &mut [T],
@@ -178,7 +179,7 @@ pub(crate) fn column_handler_floating_point<
 
     let total_width = dst.len();
 
-    while cx + 16 < total_width {
+    while cx + 16 <= total_width {
         convolve_column_handler_floating_point_4::<T, J, F, 4>(
             src, src_stride, dst, weight, bounds, bit_depth, cx,
         );
@@ -186,7 +187,7 @@ pub(crate) fn column_handler_floating_point<
         cx += 16;
     }
 
-    while cx + 4 < total_width {
+    while cx + 4 <= total_width {
         convolve_column_handler_floating_point::<T, J, F, 4>(
             src, src_stride, dst, weight, bounds, bit_depth, cx,
         );

@@ -53,13 +53,12 @@ pub(crate) fn conv_vertical_part_neon_16_f16(
 
         for j in 0..bounds.size {
             let py = start_y + j;
-            let v_weight = vreinterpretq_f16_u16(vld1q_dup_u16(
-                filter.get_unchecked(j..).as_ptr() as *const _
-            ));
+            let v_weight =
+                vreinterpretq_f16_u16(vld1q_dup_u16(filter.get_unchecked(j..).as_ptr().cast()));
             let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
 
             let s_ptr = src_ptr.add(px);
-            let item_row = xvld1q_u16_x2(s_ptr as *const _);
+            let item_row = xvld1q_u16_x2(s_ptr.cast());
 
             store_0 = vfmlalq_low_f16(store_0, vreinterpretq_f16_u16(item_row.0), v_weight);
             store_1 = vfmlalq_high_f16(store_1, vreinterpretq_f16_u16(item_row.0), v_weight);
@@ -102,13 +101,12 @@ pub(crate) fn conv_vertical_part_neon_32_f16(
 
         for j in 0..bounds.size {
             let py = start_y + j;
-            let v_weight = vreinterpretq_f16_u16(vld1q_dup_u16(
-                filter.get_unchecked(j..).as_ptr() as *const _
-            ));
+            let v_weight =
+                vreinterpretq_f16_u16(vld1q_dup_u16(filter.get_unchecked(j..).as_ptr().cast()));
             let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
 
             let s_ptr = src_ptr.add(px);
-            let item_row = xvld1q_u16_x4(s_ptr as *const _);
+            let item_row = xvld1q_u16_x4(s_ptr.cast());
 
             store_0 = vfmlalq_low_f16(store_0, vreinterpretq_f16_u16(item_row.0), v_weight);
             store_1 = vfmlalq_high_f16(store_1, vreinterpretq_f16_u16(item_row.0), v_weight);
@@ -166,14 +164,13 @@ pub(crate) fn conv_vertical_part_neon_48_f16(
 
         for j in 0..bounds.size {
             let py = start_y + j;
-            let v_weight = vreinterpretq_f16_u16(vld1q_dup_u16(
-                filter.get_unchecked(j..).as_ptr() as *const _
-            ));
+            let v_weight =
+                vreinterpretq_f16_u16(vld1q_dup_u16(filter.get_unchecked(j..).as_ptr().cast()));
             let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
 
             let s_ptr = src_ptr.add(px);
-            let item_row_0 = xvld1q_u16_x4(s_ptr as *const _);
-            let item_row_1 = xvld1q_u16_x2(s_ptr.add(32) as *const _);
+            let item_row_0 = xvld1q_u16_x4(s_ptr.cast());
+            let item_row_1 = xvld1q_u16_x2(s_ptr.add(32).cast());
 
             store_0 = vfmlalq_low_f16(store_0, vreinterpretq_f16_u16(item_row_0.0), v_weight);
             store_1 = vfmlalq_high_f16(store_1, vreinterpretq_f16_u16(item_row_0.0), v_weight);
@@ -246,9 +243,8 @@ fn convolve_vertical_part_neon_8_f16_fhm<const USE_BLENDING: bool>(
 
         for j in 0..bounds.size {
             let py = start_y + j;
-            let v_weight = vreinterpretq_f16_u16(vld1q_dup_u16(
-                filter.get_unchecked(j..).as_ptr() as *const _
-            ));
+            let v_weight =
+                vreinterpretq_f16_u16(vld1q_dup_u16(filter.get_unchecked(j..).as_ptr().cast()));
             let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
 
             let s_ptr = src_ptr.add(px);

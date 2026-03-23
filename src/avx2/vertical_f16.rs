@@ -94,7 +94,7 @@ fn convolve_vertical_part_avx_4_f16<const FMA: bool>(
             let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
 
             let s_ptr = src_ptr.add(px);
-            let item_row_0 = _mm_loadu_si64(s_ptr as *const u8);
+            let item_row_0 = _mm_loadu_si64(s_ptr.cast());
 
             store_0 = _mm256_fma_ps::<FMA>(store_0, _mm256_cvtph_ps(item_row_0), v_weight);
         }
@@ -132,8 +132,8 @@ fn convolve_vertical_part_avx_32_f16<const FMA: bool>(
             let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
 
             let s_ptr = src_ptr.add(px);
-            let item_row_0 = _mm256_loadu_si256(s_ptr as *const __m256i);
-            let item_row_1 = _mm256_loadu_si256(s_ptr.add(16) as *const __m256i);
+            let item_row_0 = _mm256_loadu_si256(s_ptr.cast());
+            let item_row_1 = _mm256_loadu_si256(s_ptr.add(16).cast());
 
             let items0 = _mm256_cvtph_ps(_mm256_castsi256_si128(item_row_0));
             let items1 = _mm256_cvtph_ps(_mm256_extracti128_si256::<1>(item_row_0));
@@ -159,8 +159,8 @@ fn convolve_vertical_part_avx_32_f16<const FMA: bool>(
             _mm256_cvtps_ph::<ROUNDING_FLAGS>(store_3),
         );
 
-        _mm256_storeu_si256(dst_ptr as *mut __m256i, acc0);
-        _mm256_storeu_si256(dst_ptr.add(16) as *mut __m256i, acc1);
+        _mm256_storeu_si256(dst_ptr.cast(), acc0);
+        _mm256_storeu_si256(dst_ptr.add(16).cast(), acc1);
     }
 }
 
@@ -187,7 +187,7 @@ fn convolve_vertical_part_avx_16_f16<const FMA: bool>(
             let src_ptr = src.get_unchecked(src_stride * py..).as_ptr();
 
             let s_ptr = src_ptr.add(px);
-            let item_row = _mm256_loadu_si256(s_ptr as *const __m256i);
+            let item_row = _mm256_loadu_si256(s_ptr.cast());
 
             let items0 = _mm256_cvtph_ps(_mm256_castsi256_si128(item_row));
             let items1 = _mm256_cvtph_ps(_mm256_extracti128_si256::<1>(item_row));
@@ -203,7 +203,7 @@ fn convolve_vertical_part_avx_16_f16<const FMA: bool>(
             _mm256_cvtps_ph::<ROUNDING_FLAGS>(store_0),
             _mm256_cvtps_ph::<ROUNDING_FLAGS>(store_1),
         );
-        _mm256_storeu_si256(dst_ptr as *mut __m256i, acc0);
+        _mm256_storeu_si256(dst_ptr.cast(), acc0);
     }
 }
 

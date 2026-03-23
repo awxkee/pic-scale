@@ -37,6 +37,7 @@ mod check_alpha;
 mod horizontal_ar30;
 mod plane_f32;
 mod plane_f32_f64;
+mod plane_s16_lb;
 mod plane_u16;
 mod plane_u16_lb;
 mod rgb_f32;
@@ -58,6 +59,7 @@ mod vertical_ar30;
 mod vertical_f16;
 mod vertical_f32;
 mod vertical_f32_f64;
+mod vertical_s16_lb;
 mod vertical_u16;
 mod vertical_u16_lb;
 mod vertical_u8;
@@ -76,10 +78,16 @@ pub(crate) use horizontal_ar30::{
     avx_convolve_horizontal_rgba_rows_4_ar30, avx_convolve_horizontal_rgba_rows_ar30,
 };
 pub(crate) use plane_f32::{
-    convolve_horizontal_plane_avx_row_one_f32, convolve_horizontal_plane_avx_rows_4_f32,
+    convolve_horizontal_plane_avx_row_one_f32_default,
+    convolve_horizontal_plane_avx_row_one_f32_fma,
+    convolve_horizontal_plane_avx_rows_4_f32_default, convolve_horizontal_plane_avx_rows_4_f32_fma,
 };
 pub(crate) use plane_f32_f64::{
-    convolve_hor_plane_avx_row_one_f32_f64, convolve_hor_plane_avx_rows_4_f32_f64,
+    convolve_hor_plane_avx_row_one_f32_f64_default, convolve_hor_plane_avx_row_one_f32_f64_fma,
+    convolve_hor_plane_avx_rows_4_f32_f64_default, convolve_hor_plane_avx_rows_4_f32_f64_fma,
+};
+pub(crate) use plane_s16_lb::{
+    convolve_horizontal_plane_avx_i16lp_row, convolve_horizontal_plane_avx_rows_4_i16,
 };
 pub(crate) use plane_u16::{
     convolve_horizontal_plane_avx_rows_4_u16_default, convolve_horizontal_plane_avx_rows_4_u16_fma,
@@ -88,11 +96,19 @@ pub(crate) use plane_u16::{
 pub(crate) use plane_u16_lb::{
     convolve_horizontal_plane_avx_rows_4_u16, convolve_horizontal_plane_avx_u16lp_row,
 };
+#[cfg(feature = "avx512")]
+pub(crate) use plane_u16_lb::{
+    convolve_horizontal_plane_avx_rows_4_u16_vnni, convolve_horizontal_plane_avx_u16lp_row_vnni,
+};
 pub(crate) use rgb_f32::{
-    convolve_horizontal_rgb_avx_row_one_f32, convolve_horizontal_rgb_avx_rows_4_f32,
+    convolve_horizontal_rgb_avx_row_one_f32_default, convolve_horizontal_rgb_avx_row_one_f32_fma,
+    convolve_horizontal_rgb_avx_rows_4_f32_default, convolve_horizontal_rgb_avx_rows_4_f32_fma,
 };
 pub(crate) use rgb_f32_f64::{
-    convolve_horizontal_rgb_avx_row_one_f32_f64, convolve_horizontal_rgb_avx_rows_4_f32_f64,
+    convolve_horizontal_rgb_avx_row_one_f32_f64_default,
+    convolve_horizontal_rgb_avx_row_one_f32_f64_fma,
+    convolve_horizontal_rgb_avx_rows_4_f32_f64_default,
+    convolve_horizontal_rgb_avx_rows_4_f32_f64_fma,
 };
 pub(crate) use rgb_u8::{convolve_horizontal_rgb_avx_row_one, convolve_horizontal_rgb_avx_rows_4};
 pub(crate) use rgb_u16::{
@@ -102,15 +118,23 @@ pub(crate) use rgb_u16::{
 pub(crate) use rgb_u16_lb::{
     convolve_horizontal_rgb_avx_rows_4_u16, convolve_horizontal_rgb_avx_u16lp_row,
 };
+#[cfg(feature = "avx512")]
+pub(crate) use rgb_u16_lb::{
+    convolve_horizontal_rgb_avx_rows_4_u16_vnni, convolve_horizontal_rgb_avx_u16lp_row_vnni,
+};
 #[cfg(feature = "nightly_f16")]
 pub(crate) use rgba_f16::{
     convolve_horizontal_rgba_avx_row_one_f16, convolve_horizontal_rgba_avx_rows_4_f16,
 };
 pub(crate) use rgba_f32::{
-    convolve_horizontal_rgba_avx_row_one_f32, convolve_horizontal_rgba_avx_rows_4_f32,
+    convolve_horizontal_rgba_avx_row_one_f32_default, convolve_horizontal_rgba_avx_row_one_f32_fma,
+    convolve_horizontal_rgba_avx_rows_4_f32_default, convolve_horizontal_rgba_avx_rows_4_f32_fma,
 };
 pub(crate) use rgba_f32_f64::{
-    convolve_horizontal_rgba_avx_row_one_f32_f64, convolve_horizontal_rgba_avx_rows_4_f32_f64,
+    convolve_horizontal_rgba_avx_row_one_f32_f64_default,
+    convolve_horizontal_rgba_avx_row_one_f32_f64_fma,
+    convolve_horizontal_rgba_avx_rows_4_f32_f64_default,
+    convolve_horizontal_rgba_avx_rows_4_f32_f64_fma,
 };
 pub(crate) use rgba_u8::{convolve_horizontal_rgba_avx_row_1, convolve_horizontal_rgba_row_4};
 pub(crate) use rgba_u16::{
@@ -120,11 +144,22 @@ pub(crate) use rgba_u16::{
 pub(crate) use rgba_u16_lb::{
     convolve_horizontal_rgba_avx_rows_4_u16, convolve_horizontal_rgba_avx_u16lp_row,
 };
+#[cfg(feature = "avx512")]
+pub(crate) use rgba_u16_lb::{
+    convolve_horizontal_rgba_avx_rows_4_u16_vnni, convolve_horizontal_rgba_avx_u16lp_row_vnni,
+};
 pub(crate) use vertical_ar30::avx_column_handler_fixed_point_ar30;
 #[cfg(feature = "nightly_f16")]
 pub(crate) use vertical_f16::convolve_vertical_avx_row_f16;
-pub(crate) use vertical_f32::convolve_vertical_avx_row_f32;
-pub(crate) use vertical_f32_f64::convolve_vertical_avx_row_f32_f64;
+pub(crate) use vertical_f32::{
+    convolve_vertical_avx_row_default_f32, convolve_vertical_avx_row_fma_f32,
+};
+pub(crate) use vertical_f32_f64::{
+    convolve_vertical_avx_row_f32_f64_default, convolve_vertical_avx_row_f32_f64_fma,
+};
+pub(crate) use vertical_s16_lb::convolve_column_lb_avx2_s16;
 pub(crate) use vertical_u8::convolve_vertical_avx_row;
-pub(crate) use vertical_u16::convolve_column_avx_u16;
+pub(crate) use vertical_u16::{convolve_column_avx_u16_default, convolve_column_avx_u16_fma};
 pub(crate) use vertical_u16_lb::convolve_column_lb_avx2_u16;
+#[cfg(feature = "avx512")]
+pub(crate) use vertical_u16_lb::convolve_column_lb_avx2_u16_vnni;

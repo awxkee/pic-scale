@@ -27,17 +27,16 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
-use crate::ar30::{Ar30ByteOrder, Rgb30};
 use crate::convolution::{ConvolutionOptions, HorizontalFilterPass, VerticalConvolutionPass};
-use crate::filter_weights::{DefaultWeightsConverter, WeightsConverter};
+use crate::factory::{Ar30ByteOrder, Rgb30};
 use crate::image_size::ImageSize;
 use crate::image_store::{
     AssociateAlpha, CheckStoreDensity, ImageStore, ImageStoreMut, UnassociateAlpha,
 };
 use crate::math::WeightsGenerator;
 use crate::plan::{
-    AlphaConvolvePlan, HorizontalFiltering, NonAlphaConvolvePlan, ResampleNearestPlan, Resampling,
-    TrampolineFiltering, VerticalFiltering,
+    AlphaConvolvePlan, Ar30Destructuring, Ar30DestructuringImpl, Ar30Plan, NonAlphaConvolvePlan,
+    ResampleNearestPlan, Resampling, TrampolineFiltering,
 };
 use crate::threading_policy::ThreadingPolicy;
 use crate::validation::PicScaleError;
@@ -375,6 +374,33 @@ impl Scaler {
         target_size: ImageSize,
         bit_depth: usize,
     ) -> Result<Arc<Resampling<u16, 1>>, PicScaleError> {
+        self.plan_generic_resize(source_size, target_size, bit_depth)
+    }
+
+    /// Creates a resampling plan for a single-channel (planar/grayscale) `i16` image.
+    ///
+    /// The 16-bit variant of [`plan_planar_resampling`], suitable for high-bit-depth
+    /// grayscale content such as HDR images or luma planes from 10/12-bit video.
+    ///
+    /// # Arguments
+    ///
+    /// - `source_size` — Dimensions of the input image.
+    /// - `target_size` — Desired dimensions of the output image.
+    /// - `bit_depth` — Effective bit depth of the pixel data (e.g. `10`, `12`, or `16`).
+    ///   Must not exceed `16`.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run,ignore
+    /// let plan = scaler.plan_planar_resampling_s16(source_size, target_size, 12)?;
+    /// plan.resample(&store, &mut target_store)?;
+    /// ```
+    pub fn plan_planar_resampling_s16(
+        &self,
+        source_size: ImageSize,
+        target_size: ImageSize,
+        bit_depth: usize,
+    ) -> Result<Arc<Resampling<i16, 1>>, PicScaleError> {
         self.plan_generic_resize(source_size, target_size, bit_depth)
     }
 
@@ -751,8 +777,9 @@ impl Scaler {
 }
 
 impl Scaler {
-    pub(crate) fn plan_resize_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
+    pub(crate) fn plan_resize_ar30<const AR30_ORDER: usize>(
         &self,
+        ar30_type: Rgb30,
         source_size: ImageSize,
         destination_size: ImageSize,
     ) -> Result<Arc<Resampling<u8, 4>>, PicScaleError> {
@@ -764,57 +791,101 @@ impl Scaler {
                 _phantom_data: PhantomData,
             }));
         }
-        let vertical_filters =
-            u8::make_weights(self.function, source_size.height, destination_size.height)?;
-        let horizontal_filters =
-            u8::make_weights(self.function, source_size.width, destination_size.width)?;
-        let options = ConvolutionOptions {
-            workload_strategy: self.workload_strategy,
-            bit_depth: 10,
-            src_size: source_size,
-            dst_size: destination_size,
-        };
-        let q_vert_filters = DefaultWeightsConverter::default().prepare_weights(&vertical_filters);
-        use crate::dispatch_group_ar30::{
-            get_horizontal_dispatch_ar30, get_horizontal_dispatch4_ar30,
-            get_vertical_dispatcher_ar30,
-        };
-        let vertical_plan = Arc::new(VerticalFiltering {
-            filter_weights: q_vert_filters,
-            threading_policy: self.threading_policy,
-            filter_row: get_vertical_dispatcher_ar30::<AR30_TYPE, AR30_ORDER>(options),
-        });
+        let inner_plan = self.plan_rgb_resampling16(source_size, destination_size, 10)?;
+        let mut _decomposer: Arc<dyn Ar30Destructuring + Send + Sync> =
+            Arc::new(Ar30DestructuringImpl::<AR30_ORDER> { rgb30: ar30_type });
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            if std::arch::is_x86_feature_detected!("avx2") {
+                let vertical_filters =
+                    u8::make_weights(self.function, source_size.height, destination_size.height)?;
+                let horizontal_filters =
+                    u8::make_weights(self.function, source_size.width, destination_size.width)?;
+                use crate::avx2::{
+                    avx_column_handler_fixed_point_ar30, avx_convolve_horizontal_rgba_rows_4_ar30,
+                    avx_convolve_horizontal_rgba_rows_ar30,
+                };
+                use crate::plan::{HorizontalFiltering, VerticalFiltering};
+                let vertical_plan = Arc::new(VerticalFiltering {
+                    filter_row: match ar30_type {
+                        Rgb30::Ar30 => {
+                            avx_column_handler_fixed_point_ar30::<
+                                { Rgb30::Ar30 as usize },
+                                AR30_ORDER,
+                            >
+                        }
+                        Rgb30::Ra30 => {
+                            avx_column_handler_fixed_point_ar30::<
+                                { Rgb30::Ra30 as usize },
+                                AR30_ORDER,
+                            >
+                        }
+                    },
+                    filter_weights: vertical_filters
+                        .numerical_approximation_i16::<{ crate::support::PRECISION }>(0),
+                    threading_policy: self.threading_policy,
+                });
+                let horizontal_plan = Arc::new(HorizontalFiltering {
+                    filter_row: match ar30_type {
+                        Rgb30::Ar30 => {
+                            avx_convolve_horizontal_rgba_rows_ar30::<
+                                { Rgb30::Ar30 as usize },
+                                AR30_ORDER,
+                            >
+                        }
+                        Rgb30::Ra30 => {
+                            avx_convolve_horizontal_rgba_rows_ar30::<
+                                { Rgb30::Ra30 as usize },
+                                AR30_ORDER,
+                            >
+                        }
+                    },
+                    filter_4_rows: Some(match ar30_type {
+                        Rgb30::Ar30 => {
+                            avx_convolve_horizontal_rgba_rows_4_ar30::<
+                                { Rgb30::Ar30 as usize },
+                                AR30_ORDER,
+                            >
+                        }
+                        Rgb30::Ra30 => {
+                            avx_convolve_horizontal_rgba_rows_4_ar30::<
+                                { Rgb30::Ra30 as usize },
+                                AR30_ORDER,
+                            >
+                        }
+                    }),
+                    threading_policy: self.threading_policy,
+                    filter_weights: horizontal_filters
+                        .numerical_approximation_i16::<{ crate::support::PRECISION }>(0),
+                });
 
-        let hor_dispatch4 = get_horizontal_dispatch4_ar30::<AR30_TYPE, AR30_ORDER>(options);
-        let hor_dispatch = get_horizontal_dispatch_ar30::<AR30_TYPE, AR30_ORDER>();
-        let q_hor_filters = DefaultWeightsConverter::default().prepare_weights(&horizontal_filters);
+                let should_do_horizontal = source_size.width != destination_size.width;
+                let should_do_vertical = source_size.height != destination_size.height;
 
-        let horizontal_plan = Arc::new(HorizontalFiltering {
-            filter_weights: q_hor_filters,
-            threading_policy: self.threading_policy,
-            filter_4_rows: Some(hor_dispatch4),
-            filter_row: hor_dispatch,
-        });
+                let trampoline_filter = Arc::new(TrampolineFiltering {
+                    horizontal_filter: horizontal_plan.clone(),
+                    vertical_filter: vertical_plan.clone(),
+                    source_size,
+                    target_size: destination_size,
+                });
 
-        let should_do_horizontal = source_size.width != destination_size.width;
-        let should_do_vertical = source_size.height != destination_size.height;
-
-        let trampoline_filter = Arc::new(TrampolineFiltering {
-            horizontal_filter: horizontal_plan.clone(),
-            vertical_filter: vertical_plan.clone(),
+                return Ok(Arc::new(NonAlphaConvolvePlan {
+                    source_size,
+                    target_size: destination_size,
+                    horizontal_filter: horizontal_plan,
+                    vertical_filter: vertical_plan,
+                    trampoline_filter,
+                    should_do_vertical,
+                    should_do_horizontal,
+                    threading_policy: self.threading_policy,
+                }));
+            }
+        }
+        Ok(Arc::new(Ar30Plan {
             source_size,
             target_size: destination_size,
-        });
-
-        Ok(Arc::new(NonAlphaConvolvePlan {
-            source_size,
-            target_size: destination_size,
-            horizontal_filter: horizontal_plan,
-            vertical_filter: vertical_plan,
-            trampoline_filter,
-            should_do_vertical,
-            should_do_horizontal,
-            threading_policy: self.threading_policy,
+            inner_filter: inner_plan,
+            decomposer: _decomposer,
         }))
     }
 
@@ -846,16 +917,16 @@ impl Scaler {
         order: Ar30ByteOrder,
     ) -> Result<Arc<Resampling<u8, 4>>, PicScaleError> {
         match order {
-            Ar30ByteOrder::Host => self
-                .plan_resize_ar30::<{ Rgb30::Ar30 as usize }, { Ar30ByteOrder::Host as usize }>(
-                    source_size,
-                    target_size,
-                ),
-            Ar30ByteOrder::Network => self
-                .plan_resize_ar30::<{ Rgb30::Ar30 as usize }, { Ar30ByteOrder::Network as usize }>(
-                    source_size,
-                    target_size,
-                ),
+            Ar30ByteOrder::Host => self.plan_resize_ar30::<{ Ar30ByteOrder::Host as usize }>(
+                Rgb30::Ar30,
+                source_size,
+                target_size,
+            ),
+            Ar30ByteOrder::Network => self.plan_resize_ar30::<{ Ar30ByteOrder::Network as usize }>(
+                Rgb30::Ar30,
+                source_size,
+                target_size,
+            ),
         }
     }
 
@@ -880,23 +951,23 @@ impl Scaler {
     /// let plan = scaler.resize_ra30(source_size, target_size, Ar30ByteOrder::Host)?;
     /// plan.resample(&store, &mut target_store)?;
     /// ```
-    pub fn resize_ra30(
+    pub fn plan_ra30_resampling(
         &self,
         source_size: ImageSize,
         target_size: ImageSize,
         order: Ar30ByteOrder,
     ) -> Result<Arc<Resampling<u8, 4>>, PicScaleError> {
         match order {
-            Ar30ByteOrder::Host => self
-                .plan_resize_ar30::<{ Rgb30::Ra30 as usize }, { Ar30ByteOrder::Host as usize }>(
-                    source_size,
-                    target_size,
-                ),
-            Ar30ByteOrder::Network => self
-                .plan_resize_ar30::<{ Rgb30::Ra30 as usize }, { Ar30ByteOrder::Network as usize }>(
-                    source_size,
-                    target_size,
-                ),
+            Ar30ByteOrder::Host => self.plan_resize_ar30::<{ Ar30ByteOrder::Host as usize }>(
+                Rgb30::Ra30,
+                source_size,
+                target_size,
+            ),
+            Ar30ByteOrder::Network => self.plan_resize_ar30::<{ Ar30ByteOrder::Network as usize }>(
+                Rgb30::Ra30,
+                source_size,
+                target_size,
+            ),
         }
     }
 }

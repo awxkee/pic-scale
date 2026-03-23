@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::avx2::utils::_mm256_fma_pd;
+use crate::avx2::utils::{_mm256_fma_pd, shuffle};
 use crate::filter_weights::FilterWeights;
 use std::arch::x86_64::*;
 
@@ -37,12 +37,8 @@ unsafe fn ld4_rgb(src: &[f32]) -> (__m128, __m128, __m128, __m128) {
         let px0 = _mm_loadu_ps(src.as_ptr());
         let px1 = _mm_loadu_ps(src.get_unchecked(3..).as_ptr());
         let px2 = _mm_loadu_ps(src.get_unchecked(6..).as_ptr());
-        let px3 = _mm_setr_ps(
-            *src.get_unchecked(9),
-            *src.get_unchecked(10),
-            *src.get_unchecked(11),
-            0.,
-        );
+        let mut px3 = _mm_loadu_ps(src.get_unchecked(8..).as_ptr());
+        px3 = _mm_shuffle_ps::<{ shuffle(0, 3, 2, 1) }>(px3, px3);
         (px0, px1, px2, px3)
     }
 }
@@ -51,12 +47,8 @@ unsafe fn ld4_rgb(src: &[f32]) -> (__m128, __m128, __m128, __m128) {
 unsafe fn ld2_rgb(src: &[f32]) -> (__m128, __m128) {
     unsafe {
         let px0 = _mm_loadu_ps(src.as_ptr());
-        let px1 = _mm_setr_ps(
-            *src.get_unchecked(3),
-            *src.get_unchecked(4),
-            *src.get_unchecked(5),
-            0.,
-        );
+        let mut px1 = _mm_loadu_ps(src.get_unchecked(2..).as_ptr());
+        px1 = _mm_shuffle_ps::<{ shuffle(0, 3, 2, 1) }>(px1, px1);
         (px0, px1)
     }
 }
@@ -73,18 +65,25 @@ unsafe fn ld1_rgb(src: &[f32]) -> __m128 {
     }
 }
 
-pub(crate) fn convolve_horizontal_rgb_avx_row_one_f32_f64<const FMA: bool>(
+pub(crate) fn convolve_horizontal_rgb_avx_row_one_f32_f64_default(
     src: &[f32],
     dst: &mut [f32],
     filter_weights: &FilterWeights<f64>,
     _: u32,
 ) {
     unsafe {
-        if FMA {
-            convolve_horizontal_rgb_avx_row_one_f32_fma(filter_weights, src, dst);
-        } else {
-            convolve_horizontal_rgb_avx_row_one_f32_regular(filter_weights, src, dst);
-        }
+        convolve_horizontal_rgb_avx_row_one_f32_regular(filter_weights, src, dst);
+    }
+}
+
+pub(crate) fn convolve_horizontal_rgb_avx_row_one_f32_f64_fma(
+    src: &[f32],
+    dst: &mut [f32],
+    filter_weights: &FilterWeights<f64>,
+    _: u32,
+) {
+    unsafe {
+        convolve_horizontal_rgb_avx_row_one_f32_fma_impl(filter_weights, src, dst);
     }
 }
 
@@ -101,7 +100,7 @@ fn convolve_horizontal_rgb_avx_row_one_f32_regular(
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch
-fn convolve_horizontal_rgb_avx_row_one_f32_fma(
+fn convolve_horizontal_rgb_avx_row_one_f32_fma_impl(
     filter_weights: &FilterWeights<f64>,
     src: &[f32],
     dst: &mut [f32],
@@ -128,7 +127,7 @@ impl<const FMA: bool> ExecutionUnit1Row<FMA> {
                 let mut jx = 0usize;
                 let mut store = _mm256_setzero_pd();
 
-                while jx + 4 < bounds.size {
+                while jx + 4 <= bounds.size {
                     let ptr = weights.get_unchecked(jx + filter_offset..);
                     let weight0 = _mm256_set1_pd(*ptr.get_unchecked(0));
                     let weight1 = _mm256_set1_pd(*ptr.get_unchecked(1));
@@ -144,10 +143,10 @@ impl<const FMA: bool> ExecutionUnit1Row<FMA> {
                     jx += 4;
                 }
 
-                while jx + 2 < bounds.size {
+                while jx + 2 <= bounds.size {
                     let ptr = weights.get_unchecked(jx + filter_offset..);
-                    let weight0 = _mm256_set1_pd(*ptr.get_unchecked(0));
-                    let weight1 = _mm256_set1_pd(*ptr.get_unchecked(1));
+                    let weight0 = _mm256_broadcast_sd(ptr.get_unchecked(0));
+                    let weight1 = _mm256_broadcast_sd(ptr.get_unchecked(1));
                     let filter_start = jx + bounds.start;
                     let px = ld2_rgb(src.get_unchecked(filter_start * CN..));
                     store = _mm256_fma_pd::<FMA>(store, _mm256_cvtps_pd(px.0), weight0);
@@ -157,7 +156,7 @@ impl<const FMA: bool> ExecutionUnit1Row<FMA> {
 
                 while jx < bounds.size {
                     let ptr = weights.get_unchecked(jx + filter_offset..);
-                    let weight0 = _mm256_set1_pd(*ptr.get_unchecked(0));
+                    let weight0 = _mm256_broadcast_sd(ptr.get_unchecked(0));
                     let filter_start = jx + bounds.start;
                     let px = ld1_rgb(src.get_unchecked(filter_start * CN..));
                     store = _mm256_fma_pd::<FMA>(store, _mm256_cvtps_pd(px), weight0);
@@ -179,7 +178,7 @@ impl<const FMA: bool> ExecutionUnit1Row<FMA> {
     }
 }
 
-pub(crate) fn convolve_horizontal_rgb_avx_rows_4_f32_f64<const FMA: bool>(
+pub(crate) fn convolve_horizontal_rgb_avx_rows_4_f32_f64_default(
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
@@ -188,23 +187,32 @@ pub(crate) fn convolve_horizontal_rgb_avx_rows_4_f32_f64<const FMA: bool>(
     _: u32,
 ) {
     unsafe {
-        if FMA {
-            convolve_horizontal_rgb_avx_rows_4_f32_f64_fma(
-                filter_weights,
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-            );
-        } else {
-            convolve_horizontal_rgb_avx_rows_4_f32_f64_regular(
-                filter_weights,
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-            );
-        }
+        convolve_horizontal_rgb_avx_rows_4_f32_f64_regular(
+            filter_weights,
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+        );
+    }
+}
+
+pub(crate) fn convolve_horizontal_rgb_avx_rows_4_f32_f64_fma(
+    src: &[f32],
+    src_stride: usize,
+    dst: &mut [f32],
+    dst_stride: usize,
+    filter_weights: &FilterWeights<f64>,
+    _: u32,
+) {
+    unsafe {
+        convolve_horizontal_rgb_avx_rows_4_f32_f64_fma_impl(
+            filter_weights,
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+        );
     }
 }
 
@@ -223,7 +231,7 @@ fn convolve_horizontal_rgb_avx_rows_4_f32_f64_regular(
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch
-fn convolve_horizontal_rgb_avx_rows_4_f32_f64_fma(
+fn convolve_horizontal_rgb_avx_rows_4_f32_f64_fma_impl(
     filter_weights: &FilterWeights<f64>,
     src: &[f32],
     src_stride: usize,
@@ -267,10 +275,10 @@ impl<const FMA: bool> ExecutionUnit4Row<FMA> {
                 let mut store_2 = _mm256_setzero_pd();
                 let mut store_3 = _mm256_setzero_pd();
 
-                while jx + 2 < bounds.size {
+                while jx + 2 <= bounds.size {
                     let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
-                    let weight0 = _mm256_set1_pd(*ptr.get_unchecked(0));
-                    let weight1 = _mm256_set1_pd(*ptr.get_unchecked(1));
+                    let weight0 = _mm256_broadcast_sd(ptr.get_unchecked(0));
+                    let weight1 = _mm256_broadcast_sd(ptr.get_unchecked(1));
                     let filter_start = jx + bounds.start;
                     let px0 = ld2_rgb(src.get_unchecked(filter_start * CN..));
                     let px1 = ld2_rgb(src1.get_unchecked(filter_start * CN..));
@@ -291,7 +299,7 @@ impl<const FMA: bool> ExecutionUnit4Row<FMA> {
 
                 while jx < bounds.size {
                     let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
-                    let weight0 = _mm256_set1_pd(*ptr.get_unchecked(0));
+                    let weight0 = _mm256_broadcast_sd(ptr.get_unchecked(0));
                     let filter_start = jx + bounds.start;
                     let px0 = ld1_rgb(src.get_unchecked(filter_start * CN..));
                     let px1 = ld1_rgb(src1.get_unchecked(filter_start * CN..));

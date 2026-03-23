@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Radzivon Bartoshyk 01/2025. All rights reserved.
+ * Copyright (c) Radzivon Bartoshyk 3/2026. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -26,30 +26,20 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::convolution::{
-    ColumnFilter, ConvolutionOptions, HorizontalFilterPass, RowFilter, VerticalConvolutionPass,
-};
-use crate::dispatch_group_u16::{RowFactoryProducer, vertical_plan_u16};
-use crate::filter_weights::FilterWeights;
-use crate::{ImageStore, ThreadingPolicy};
-use std::sync::Arc;
+mod ar30;
+mod cbcr16;
+mod cbcr8;
+mod cbcr_f32;
+mod plane_f32;
+mod plane_s16;
+mod plane_u16;
+mod plane_u8;
+mod rgb_f32;
+mod rgb_u16;
+mod rgb_u8;
+mod rgba_f32;
+mod rgba_u16;
+mod rgba_u8;
 
-impl HorizontalFilterPass<u16, f32, 2> for ImageStore<'_, u16, 2> {
-    fn horizontal_plan(
-        filter_weights: FilterWeights<f32>,
-        threading_policy: ThreadingPolicy,
-        options: ConvolutionOptions,
-    ) -> Arc<dyn RowFilter<u16, 2> + Send + Sync> {
-        u16::make_plan::<2>(&filter_weights, options.bit_depth, threading_policy)
-    }
-}
-
-impl VerticalConvolutionPass<u16, f32, 2> for ImageStore<'_, u16, 2> {
-    fn vertical_plan(
-        filter_weights: FilterWeights<f32>,
-        threading_policy: ThreadingPolicy,
-        options: ConvolutionOptions,
-    ) -> Arc<dyn ColumnFilter<u16, 2> + Send + Sync> {
-        vertical_plan_u16(filter_weights, threading_policy, options)
-    }
-}
+pub use ar30::Ar30ByteOrder;
+pub(crate) use ar30::Rgb30;

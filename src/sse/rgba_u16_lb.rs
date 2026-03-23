@@ -36,8 +36,8 @@ use std::arch::x86_64::*;
 #[inline]
 fn conv_horiz_rgba_1_u16(start_x: usize, src: &[u16], w0: __m128i, store: __m128i) -> __m128i {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
         let rgba_pixel = _mm_loadl_epi64(src_ptr.as_ptr() as *const __m128i);
 
         _mm_add_epi32(
@@ -56,8 +56,8 @@ fn conv_horiz_rgba_2_u16(
     store: __m128i,
 ) -> __m128i {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let rgb_pixel = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
 
@@ -83,8 +83,8 @@ fn conv_horiz_rgba_4_u16(
     store: __m128i,
 ) -> __m128i {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let rgba_pixel0 = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
         let rgba_pixel1 = _mm_loadu_si128(src_ptr.get_unchecked(8..).as_ptr() as *const __m128i);
@@ -119,8 +119,8 @@ fn conv_horiz_rgba_8_u16(
     store: __m128i,
 ) -> __m128i {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let zeros = _mm_setzero_si128();
 
@@ -166,7 +166,7 @@ fn conv_horiz_rgba_8_u16(
     }
 }
 
-pub(crate) fn convolve_horizontal_rgba_sse_rows_4_lb_u8(
+pub(crate) fn convolve_horizontal_rgba_sse_rows_4_lb_u16(
     src: &[u16],
     src_stride: usize,
     dst: &mut [u16],
@@ -175,7 +175,7 @@ pub(crate) fn convolve_horizontal_rgba_sse_rows_4_lb_u8(
     bit_depth: u32,
 ) {
     unsafe {
-        convolve_horizontal_rgba_sse_rows_4_lb_u8_impl(
+        convolve_horizontal_rgba_sse_rows_4_lb_u16_impl(
             src,
             src_stride,
             dst,
@@ -187,7 +187,7 @@ pub(crate) fn convolve_horizontal_rgba_sse_rows_4_lb_u8(
 }
 
 #[target_feature(enable = "sse4.1")]
-fn convolve_horizontal_rgba_sse_rows_4_lb_u8_impl(
+fn convolve_horizontal_rgba_sse_rows_4_lb_u16_impl(
     src: &[u16],
     src_stride: usize,
     dst: &mut [u16],
@@ -197,7 +197,7 @@ fn convolve_horizontal_rgba_sse_rows_4_lb_u8_impl(
 ) {
     unsafe {
         assert!((1..=16).contains(&bit_depth));
-        const CHANNELS: usize = 4;
+        const CN: usize = 4;
         let init = _mm_set1_epi32(ROUNDING_CONST);
 
         let v_max_colors = _mm_set1_epi16((1 << bit_depth) - 1);
@@ -206,10 +206,10 @@ fn convolve_horizontal_rgba_sse_rows_4_lb_u8_impl(
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
         let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let iter_row0 = row0_ref.chunks_exact_mut(CHANNELS);
-        let iter_row1 = row1_ref.chunks_exact_mut(CHANNELS);
-        let iter_row2 = row2_ref.chunks_exact_mut(CHANNELS);
-        let iter_row3 = row3_ref.chunks_exact_mut(CHANNELS);
+        let iter_row0 = row0_ref.as_chunks_mut::<CN>().0.iter_mut();
+        let iter_row1 = row1_ref.as_chunks_mut::<CN>().0.iter_mut();
+        let iter_row2 = row2_ref.as_chunks_mut::<CN>().0.iter_mut();
+        let iter_row3 = row3_ref.as_chunks_mut::<CN>().0.iter_mut();
 
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
             .zip(iter_row1)
@@ -323,19 +323,21 @@ pub(crate) fn convolve_horizontal_rgba_sse_u16_lb_row(
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn convolve_horizontal_rgba_sse_u16_lb_row_impl(
+fn convolve_horizontal_rgba_sse_u16_lb_row_impl(
     src: &[u16],
     dst: &mut [u16],
     filter_weights: &FilterWeights<i16>,
     bit_depth: u32,
 ) {
     unsafe {
-        const CHANNELS: usize = 4;
+        const CN: usize = 4;
 
         let v_max_colors = _mm_set1_epi16((1 << bit_depth) - 1);
 
         for ((dst, bounds), weights) in dst
-            .chunks_exact_mut(CHANNELS)
+            .as_chunks_mut::<CN>()
+            .0
+            .iter_mut()
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights

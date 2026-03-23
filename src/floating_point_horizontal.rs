@@ -58,7 +58,9 @@ pub(crate) fn convolve_row_handler_floating_point<
     i32: AsPrimitive<J>,
 {
     for ((chunk, &bounds), weights) in dst
-        .chunks_exact_mut(CN)
+        .as_chunks_mut::<CN>()
+        .0
+        .iter_mut()
         .zip(filter_weights.bounds.iter())
         .zip(
             filter_weights
@@ -75,7 +77,7 @@ pub(crate) fn convolve_row_handler_floating_point<
         let src_ptr0 = &src[px..(px + bounds.size * CN)];
         for (&k_weight, src) in weights
             .iter()
-            .zip(src_ptr0.chunks_exact(CN))
+            .zip(src_ptr0.as_chunks::<CN>().0.iter())
             .take(bounds.size)
         {
             let weight: J = k_weight.as_();
@@ -118,10 +120,10 @@ pub(crate) fn convolve_row_handler_floating_point_4<
     let (row1_ref, rest) = rest.split_at_mut(dst_stride);
     let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-    let iter_row0 = row0_ref.chunks_exact_mut(CN);
-    let iter_row1 = row1_ref.chunks_exact_mut(CN);
-    let iter_row2 = row2_ref.chunks_exact_mut(CN);
-    let iter_row3 = row3_ref.chunks_exact_mut(CN);
+    let iter_row0 = row0_ref.as_chunks_mut::<CN>().0.iter_mut();
+    let iter_row1 = row1_ref.as_chunks_mut::<CN>().0.iter_mut();
+    let iter_row2 = row2_ref.as_chunks_mut::<CN>().0.iter_mut();
+    let iter_row3 = row3_ref.as_chunks_mut::<CN>().0.iter_mut();
 
     for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
         .zip(iter_row1)
@@ -149,10 +151,10 @@ pub(crate) fn convolve_row_handler_floating_point_4<
 
         for ((((&k_weight, src0), src1), src2), src3) in weights
             .iter()
-            .zip(src_ptr0.chunks_exact(CN))
-            .zip(src_ptr1.chunks_exact(CN))
-            .zip(src_ptr2.chunks_exact(CN))
-            .zip(src_ptr3.chunks_exact(CN))
+            .zip(src_ptr0.as_chunks::<CN>().0.iter())
+            .zip(src_ptr1.as_chunks::<CN>().0.iter())
+            .zip(src_ptr2.as_chunks::<CN>().0.iter())
+            .zip(src_ptr3.as_chunks::<CN>().0.iter())
             .take(bounds.size)
         {
             let weight: J = k_weight.as_();

@@ -42,8 +42,8 @@ fn conv_horiz_rgb_4_u8<const D: bool>(
     shuffle: uint8x16_t,
 ) -> int32x4_t {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let px_lo = vld1_u8(src_ptr.as_ptr());
         let px_hi_part = vset_lane_u32::<0>(
@@ -73,8 +73,8 @@ fn conv_horiz_rgba_2_u8<const D: bool>(
     shuffle: uint8x8_t,
 ) -> int32x4_t {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
         let mut rgb_pixel = vld1_lane_u32::<0>(src_ptr.as_ptr() as *const u32, vdup_n_u32(0));
         rgb_pixel = vreinterpret_u32_u16(vset_lane_u16::<2>(
             (src_ptr.get_unchecked(4..).as_ptr() as *const u16).read_unaligned(),
@@ -98,8 +98,8 @@ fn conv_horiz_rgba_1_u8<const D: bool>(
     store: int32x4_t,
 ) -> int32x4_t {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
         let rgb_pixel = load_3b_as_u16x4(src_ptr.as_ptr());
         let lo = vreinterpret_s16_u16(rgb_pixel);
         vxmlal_s16::<D>(store, lo, w0)
@@ -154,16 +154,16 @@ fn convolve_horizontal_rgb_neon_rows_4_impl<const D: bool, const PRECISION: i32>
 
         let rnd_const: i32 = 1 << (PRECISION - 1);
 
-        const CHANNELS: usize = 3;
+        const CN: usize = 3;
         let init = vdupq_n_s32(rnd_const);
         let (row0_ref, rest) = dst.split_at_mut(dst_stride);
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
         let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let iter_row0 = row0_ref.as_chunks_mut::<CHANNELS>().0;
-        let iter_row1 = row1_ref.as_chunks_mut::<CHANNELS>().0;
-        let iter_row2 = row2_ref.as_chunks_mut::<CHANNELS>().0;
-        let iter_row3 = row3_ref.as_chunks_mut::<CHANNELS>().0;
+        let iter_row0 = row0_ref.as_chunks_mut::<CN>().0;
+        let iter_row1 = row1_ref.as_chunks_mut::<CN>().0;
+        let iter_row2 = row2_ref.as_chunks_mut::<CN>().0;
+        let iter_row3 = row3_ref.as_chunks_mut::<CN>().0;
 
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
             .iter_mut()

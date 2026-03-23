@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ * Copyright (c) Radzivon Bartoshyk 3/2026. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -70,14 +70,17 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
             let src_ptr0 = src0.get_unchecked(start_x * 4..);
             let src_ptr1 = src1.get_unchecked(start_x * 4..);
 
-            let l0_0 = _mm_loadu_si128(src_ptr0.as_ptr() as *const _);
-            let l0_1 = _mm_loadu_si128(src_ptr0.get_unchecked(16..).as_ptr() as *const _);
+            let l0 = _mm256_loadu_si256(src_ptr0.as_ptr().cast());
+            let l1 = _mm256_loadu_si256(src_ptr1.as_ptr().cast());
 
-            let l1_0 = _mm_loadu_si128(src_ptr1.as_ptr() as *const _);
-            let l1_1 = _mm_loadu_si128(src_ptr1.get_unchecked(16..).as_ptr() as *const _);
-
-            let rgba_pixel0 = _mm_unzip_4_ar30_separate::<AR_TYPE, AR_ORDER>((l0_0, l0_1));
-            let rgba_pixel1 = _mm_unzip_4_ar30_separate::<AR_TYPE, AR_ORDER>((l1_0, l1_1));
+            let rgba_pixel0 = _mm_unzip_4_ar30_separate::<AR_TYPE, AR_ORDER>((
+                _mm256_castsi256_si128(l0),
+                _mm256_extractf128_si256::<1>(l0),
+            ));
+            let rgba_pixel1 = _mm_unzip_4_ar30_separate::<AR_TYPE, AR_ORDER>((
+                _mm256_castsi256_si128(l1),
+                _mm256_extractf128_si256::<1>(l1),
+            ));
 
             let sh1 = _mm256_setr_epi8(
                 0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15, 0, 1, 8, 9, 2, 3, 10, 11, 4,
@@ -124,10 +127,10 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
             let src_ptr1 = src1.get_unchecked(start_x * 4..);
 
             let rgba_pixel0 = _mm_unzips_4_ar30_separate::<AR_TYPE, AR_ORDER>(_mm_loadu_si128(
-                src_ptr0.as_ptr() as *const _,
+                src_ptr0.as_ptr().cast(),
             ));
             let rgba_pixel1 = _mm_unzips_4_ar30_separate::<AR_TYPE, AR_ORDER>(_mm_loadu_si128(
-                src_ptr1.as_ptr() as *const _,
+                src_ptr1.as_ptr().cast(),
             ));
 
             let sh1 = _mm256_setr_epi8(
@@ -357,8 +360,8 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row1ExecutionUnit<AR_TYPE, AR_
         unsafe {
             let src_ptr = src.get_unchecked(start_x * 4..);
 
-            let l0 = _mm_loadu_si128(src_ptr.as_ptr() as *const _);
-            let l1 = _mm_loadu_si128(src_ptr.as_ptr().add(4 * 4) as *const _);
+            let l0 = _mm_loadu_si128(src_ptr.as_ptr().cast());
+            let l1 = _mm_loadu_si128(src_ptr.as_ptr().add(4 * 4).cast());
 
             let rgba_pixel = _mm_unzip_4_ar30_separate::<AR_TYPE, AR_ORDER>((l0, l1));
 
@@ -390,7 +393,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row1ExecutionUnit<AR_TYPE, AR_
             let src_ptr = src.get_unchecked(start_x * 4..);
 
             let rgba_pixel = _mm_unzips_4_ar30_separate::<AR_TYPE, AR_ORDER>(_mm_loadu_si128(
-                src_ptr.as_ptr() as *const _,
+                src_ptr.as_ptr().cast(),
             ));
 
             let sh1 = _mm_setr_epi8(0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15);

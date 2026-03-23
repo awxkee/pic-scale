@@ -37,7 +37,7 @@ use std::arch::aarch64::*;
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_8_f16(
+fn conv_horiz_rgba_8_f16(
     start_x: usize,
     src: &[f16],
     set1: float32x4_t,
@@ -48,7 +48,7 @@ unsafe fn conv_horiz_rgba_8_f16(
         const CN: usize = 4;
         let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
 
-        let rgb_pixel = xvld1q_u16_x4(src_ptr as *const _);
+        let rgb_pixel = xvld1q_u16_x4(src_ptr.cast());
 
         let mut acc = prefer_vfmaq_laneq_f32::<0>(
             store,
@@ -95,17 +95,17 @@ unsafe fn conv_horiz_rgba_8_f16(
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_4_f16(
+fn conv_horiz_rgba_4_f16(
     start_x: usize,
     src: &[f16],
     set1: float32x4_t,
     store: float32x4_t,
 ) -> float32x4_t {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
 
-        let rgb_pixel = xvld1q_u16_x2(src_ptr as *const _);
+        let rgb_pixel = xvld1q_u16_x2(src_ptr.cast());
 
         let acc = prefer_vfmaq_laneq_f32::<0>(
             store,
@@ -132,7 +132,7 @@ unsafe fn conv_horiz_rgba_4_f16(
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_2_f32(
+fn conv_horiz_rgba_2_f32(
     start_x: usize,
     src: &[f16],
     set: float32x2_t,
@@ -142,7 +142,7 @@ unsafe fn conv_horiz_rgba_2_f32(
         const CN: usize = 4;
         let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
 
-        let rgb_pixel = vld1q_u16(src_ptr as *const _);
+        let rgb_pixel = vld1q_u16(src_ptr.cast());
 
         let acc = prefer_vfmaq_lane_f32::<0>(
             store,
@@ -159,16 +159,16 @@ unsafe fn conv_horiz_rgba_2_f32(
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_1_f16(
+fn conv_horiz_rgba_1_f16(
     start_x: usize,
     src: &[f16],
     set: float32x4_t,
     store: float32x4_t,
 ) -> float32x4_t {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
-        let rgb_pixel = vld1_u16(src_ptr as *const _);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
+        let rgb_pixel = vld1_u16(src_ptr.cast());
         prefer_vfmaq_f32(store, vcvt_f32_f16(vreinterpret_f16_u16(rgb_pixel)), set)
     }
 }

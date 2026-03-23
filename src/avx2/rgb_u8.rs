@@ -170,7 +170,7 @@ struct Row4ExecutionUnit<const HAS_DOT: bool> {}
 
 impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
     #[inline(always)]
-    unsafe fn add_one_weight(
+    fn add_one_weight(
         &self,
         start_x: usize,
         src0: &[u8],
@@ -179,9 +179,9 @@ impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
         store_0: __m256i,
     ) -> __m256i {
         unsafe {
-            const COMPONENTS: usize = 3;
-            let src_ptr0 = src0.get_unchecked((start_x * COMPONENTS)..).as_ptr();
-            let src_ptr1 = src1.get_unchecked((start_x * COMPONENTS)..).as_ptr();
+            const CN: usize = 3;
+            let src_ptr0 = src0.get_unchecked((start_x * CN)..).as_ptr();
+            let src_ptr1 = src1.get_unchecked((start_x * CN)..).as_ptr();
             let base_pixel0 = _mm_loadu_si16(src0.as_ptr());
             let base_pixel1 = _mm_loadu_si16(src1.as_ptr());
             let m_vl0 = _mm_insert_epi8::<2>(base_pixel0, src_ptr0.add(2).read_unaligned() as i32);
@@ -203,7 +203,7 @@ impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
         filter_weights: &FilterWeights<i16>,
     ) {
         unsafe {
-            const CHANNELS: usize = 3;
+            const CN: usize = 3;
 
             let shuffle_lo = _mm256_setr_epi8(
                 0, -1, 3, -1, 1, -1, 4, -1, 2, -1, 5, -1, -1, -1, -1, -1, 0, -1, 3, -1, 1, -1, 4,
@@ -228,10 +228,10 @@ impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
             let (row1_ref, rest) = rest.split_at_mut(dst_stride);
             let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-            let iter_row0 = row0_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
-            let iter_row1 = row1_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
-            let iter_row2 = row2_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
-            let iter_row3 = row3_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
+            let iter_row0 = row0_ref.as_chunks_mut::<CN>().0.iter_mut();
+            let iter_row1 = row1_ref.as_chunks_mut::<CN>().0.iter_mut();
+            let iter_row2 = row2_ref.as_chunks_mut::<CN>().0.iter_mut();
+            let iter_row3 = row3_ref.as_chunks_mut::<CN>().0.iter_mut();
 
             for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
                 .zip(iter_row1)
@@ -297,7 +297,7 @@ impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
                         0,
                     );
 
-                    while jx + 8 < bounds.size {
+                    while jx + 8 <= bounds.size {
                         let w_ptr = weights.get_unchecked(jx..);
                         let full_weights =
                             _mm256_castsi128_si256(_mm_loadu_si128(w_ptr.as_ptr() as *const _));
@@ -311,7 +311,7 @@ impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
                             shuffle_weights,
                         );
 
-                        let bounds_start = (bounds.start + jx) * CHANNELS;
+                        let bounds_start = (bounds.start + jx) * CN;
 
                         let rgb_pixel_0 =
                             load_distr_x8_rgb(src0.get_unchecked(bounds_start..), shuffle_pixels_4);
@@ -335,7 +335,7 @@ impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
                         jx += 8;
                     }
 
-                    while jx + 4 < bounds.size {
+                    while jx + 4 <= bounds.size {
                         let w_ptr = weights.get_unchecked(jx..);
                         let weights = _mm256_shuffle_epi8(
                             _mm256_permutevar8x32_epi32(
@@ -344,7 +344,7 @@ impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
                             ),
                             shuffle_weights,
                         );
-                        let bounds_start = (bounds.start + jx) * CHANNELS;
+                        let bounds_start = (bounds.start + jx) * CN;
 
                         let rgb_pixel_0 =
                             load_distr_x4_rgb(src0.get_unchecked(bounds_start..), shuffle_pixels_4);
@@ -374,9 +374,9 @@ impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
                     );
                 }
 
-                while jx + 2 < bounds.size {
+                while jx + 2 <= bounds.size {
                     let w_ptr = weights.get_unchecked(jx..);
-                    let bounds_start = (bounds.start + jx) * CHANNELS;
+                    let bounds_start = (bounds.start + jx) * CN;
                     let weight01 =
                         _mm256_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
 
@@ -498,8 +498,8 @@ fn add_one_weight<const HAS_DOT: bool>(
     store_0: __m128i,
 ) -> __m128i {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..).as_ptr();
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * CN)..).as_ptr();
         let base_pixel = _mm_loadu_si16(src.as_ptr());
         let m_vl = _mm_insert_epi8::<2>(base_pixel, src_ptr.add(2).read_unaligned() as i32);
         let lo = _mm_unpacklo_epi8(m_vl, _mm_setzero_si128());
@@ -518,7 +518,7 @@ impl<const HAS_DOT: bool> Row1Execution<HAS_DOT> {
     #[inline(always)]
     fn pass(&self, src: &[u8], dst: &mut [u8], filter_weights: &FilterWeights<i16>) {
         unsafe {
-            const CHANNELS: usize = 3;
+            const CN: usize = 3;
 
             let shuffle_lo =
                 _mm_setr_epi8(0, -1, 3, -1, 1, -1, 4, -1, 2, -1, 5, -1, -1, -1, -1, -1);
@@ -541,7 +541,7 @@ impl<const HAS_DOT: bool> Row1Execution<HAS_DOT> {
             // [G5, B5] [R6, G6, B6] [R7, G7, B7]
 
             for ((dst, bounds), weights) in dst
-                .as_chunks_mut::<CHANNELS>()
+                .as_chunks_mut::<CN>()
                 .0
                 .iter_mut()
                 .zip(filter_weights.bounds.iter())
@@ -564,63 +564,60 @@ impl<const HAS_DOT: bool> Row1Execution<HAS_DOT> {
                     0,
                 );
 
-                let mut store = if bounds_size > 4 {
-                    while jx + 8 < bounds.size {
-                        let w_ptr = weights.get_unchecked(jx..);
-                        let full_weights =
-                            _mm256_castsi128_si256(_mm_loadu_si128(w_ptr.as_ptr() as *const _));
+                while jx + 8 <= bounds.size {
+                    let w_ptr = weights.get_unchecked(jx..);
+                    let full_weights =
+                        _mm256_castsi128_si256(_mm_loadu_si128(w_ptr.as_ptr() as *const _));
 
-                        let w0 = _mm256_shuffle_epi8(
-                            _mm256_permutevar8x32_epi32(full_weights, weights_idx),
-                            shuffle_weights01,
-                        );
-                        let w1 = _mm256_shuffle_epi8(
-                            _mm256_permutevar8x32_epi32(full_weights, weights_idx23),
-                            shuffle_weights01,
-                        );
+                    let w0 = _mm256_shuffle_epi8(
+                        _mm256_permutevar8x32_epi32(full_weights, weights_idx),
+                        shuffle_weights01,
+                    );
+                    let w1 = _mm256_shuffle_epi8(
+                        _mm256_permutevar8x32_epi32(full_weights, weights_idx23),
+                        shuffle_weights01,
+                    );
 
-                        let bounds_start = bounds.start + jx;
-                        let src_ptr_0 = src.get_unchecked((bounds_start * CHANNELS)..);
+                    let bounds_start = bounds.start + jx;
+                    let src_ptr_0 = src.get_unchecked((bounds_start * CN)..);
 
-                        let pixel_lo = _mm_loadu_si128(src_ptr_0.as_ptr() as *const _);
-                        let pixel_hi =
-                            _mm_loadu_si64(src_ptr_0.get_unchecked(16..).as_ptr() as *const _);
+                    let pixel_lo = _mm_loadu_si128(src_ptr_0.as_ptr() as *const _);
+                    let pixel_hi =
+                        _mm_loadu_si64(src_ptr_0.get_unchecked(16..).as_ptr() as *const _);
 
-                        let first_4 = make_first_4(pixel_lo, shuffle_pixels_4);
-                        let second_4 = make_second_4(pixel_lo, pixel_hi, shuffle_pixels_4);
+                    let first_4 = make_first_4(pixel_lo, shuffle_pixels_4);
+                    let second_4 = make_second_4(pixel_lo, pixel_hi, shuffle_pixels_4);
 
-                        store = _mm256_dot16_avx_epi32::<HAS_DOT>(store, first_4, w0);
-                        store = _mm256_dot16_avx_epi32::<HAS_DOT>(store, second_4, w1);
+                    store = _mm256_dot16_avx_epi32::<HAS_DOT>(store, first_4, w0);
+                    store = _mm256_dot16_avx_epi32::<HAS_DOT>(store, second_4, w1);
 
-                        jx += 8;
-                    }
+                    jx += 8;
+                }
 
-                    while jx + 4 < bounds.size {
-                        let w_ptr = weights.get_unchecked(jx..);
-                        let weights = _mm256_shuffle_epi8(
-                            _mm256_permutevar8x32_epi32(
-                                _mm256_castsi128_si256(_mm_loadu_si64(w_ptr.as_ptr() as *const u8)),
-                                weights_idx,
-                            ),
-                            shuffle_weights01,
-                        );
+                while jx + 4 <= bounds.size {
+                    let w_ptr = weights.get_unchecked(jx..);
+                    let weights = _mm256_shuffle_epi8(
+                        _mm256_permutevar8x32_epi32(
+                            _mm256_castsi128_si256(_mm_loadu_si64(w_ptr.as_ptr() as *const u8)),
+                            weights_idx,
+                        ),
+                        shuffle_weights01,
+                    );
 
-                        let bounds_start = bounds.start + jx;
-                        let src_ptr_0 = src.get_unchecked((bounds_start * CHANNELS)..);
+                    let bounds_start = bounds.start + jx;
+                    let src_ptr_0 = src.get_unchecked((bounds_start * CN)..);
 
-                        let rgb_pixel = load_distr_x4_rgb(src_ptr_0, shuffle_pixels_4);
-                        store = _mm256_dot16_avx_epi32::<HAS_DOT>(store, rgb_pixel, weights);
-                        jx += 4;
-                    }
-                    _mm_add_epi32(
-                        _mm256_castsi256_si128(store),
-                        _mm256_extracti128_si256::<1>(store),
-                    )
-                } else {
-                    _mm_set1_epi32(ROUNDING_CONST)
-                };
+                    let rgb_pixel = load_distr_x4_rgb(src_ptr_0, shuffle_pixels_4);
+                    store = _mm256_dot16_avx_epi32::<HAS_DOT>(store, rgb_pixel, weights);
+                    jx += 4;
+                }
 
-                while jx + 2 < bounds.size {
+                let mut store = _mm_add_epi32(
+                    _mm256_castsi256_si128(store),
+                    _mm256_extracti128_si256::<1>(store),
+                );
+
+                while jx + 2 <= bounds.size {
                     let w_ptr = weights.get_unchecked(jx..);
                     let weight0 = _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
                     let src_ptr = src.get_unchecked(((bounds.start + jx) * 3)..);

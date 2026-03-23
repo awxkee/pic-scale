@@ -47,21 +47,22 @@ Here is a table which shows what's implemented with SIMD.
 
 `~` - Partially implemented
 
-|                | NEON | SSE | AVX2 | AVX-512    | WASM | 
-|----------------|------|-----|------|------------|------| 
-| RGBA (8 bit)   | x    | x   | x    | x(avxvnni) | x    | 
-| RGB (8 bit)    | x    | x   | x    | x(avxvnni) | x    | 
-| Plane (8 bit)  | x    | x   | ~    | ~          | ~    | 
-| RGBA (8+ bit)  | x    | x   | x    | x(avxvnni) | -    | 
-| RGB (8+ bit)   | x    | ~   | x    | ~          | -    | 
-| Plane (8+ bit) | x    | ~   | x    | ~          | -    | 
-| RGBA (f32)     | x    | x   | x    | -          | -    | 
-| RGB (f32)      | x    | x   | x    | -          | -    | 
-| Plane (f32)    | x    | x   | x    | -          | -    | 
-| RGBA (f16)     | x    | x   | x    | -          | -    | 
-| RGB (f16)      | x    | ~   | ~    | -          | -    | 
-| Plane (f16)    | ~    | ~   | ~    | -          | -    |
-| AR30/RA30      | x    | x   | x    | -          | -    |
+|                 | NEON | SSE | AVX2 | AVX-512    | WASM | 
+|-----------------|------|-----|------|------------|------| 
+| RGBA (8 bit)    | x    | x   | x    | x(avxvnni) | x    | 
+| RGB (8 bit)     | x    | x   | x    | x(avxvnni) | x    | 
+| Plane (8 bit)   | x    | x   | ~    | ~          | ~    | 
+| RGBA (8+ bit)   | x    | x   | x    | x(avxvnni) | -    | 
+| RGB (8+ bit)    | x    | ~   | x    | ~          | -    | 
+| Plane (8+ bit)  | x    | ~   | x    | ~          | -    | 
+| Plane (S8+ bit) | x    | ~   | x    | -          | -    | 
+| RGBA (f32)      | x    | x   | x    | -          | -    | 
+| RGB (f32)       | x    | x   | x    | -          | -    | 
+| Plane (f32)     | x    | x   | x    | -          | -    | 
+| RGBA (f16)      | x    | x   | x    | -          | -    | 
+| RGB (f16)       | x    | ~   | ~    | -          | -    | 
+| Plane (f16)     | ~    | ~   | ~    | -          | -    |
+| AR30/RA30       | x    | ~   | x    | -          | -    |
 
 #### Features
 

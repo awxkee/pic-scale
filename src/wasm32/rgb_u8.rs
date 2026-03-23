@@ -34,7 +34,7 @@ use std::arch::wasm32::*;
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgb_4_u8(
+fn conv_horiz_rgb_4_u8(
     start_x: usize,
     src: &[u8],
     w0: v128,
@@ -45,8 +45,8 @@ unsafe fn conv_horiz_rgb_4_u8(
     shuffle: v128,
 ) -> v128 {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let px_lo = v128_load64_lane::<0>(i32x4_splat(0), src_ptr.as_ptr() as *const _);
         let mut rgb_pixel =
@@ -74,8 +74,8 @@ fn conv_horiz_rgba_2_u8(
     shuffle: v128,
 ) -> v128 {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
         let mut rgb_pixel = v128_load32_lane::<0>(i32x4_splat(0), src_ptr.as_ptr() as *const u32);
         rgb_pixel =
             v128_load16_lane::<2>(rgb_pixel, src_ptr.get_unchecked(4..).as_ptr() as *const u16);
@@ -92,8 +92,8 @@ fn conv_horiz_rgba_2_u8(
 #[inline(always)]
 fn conv_horiz_rgba_1_u8(start_x: usize, src: &[u8], w0: v128, store: v128) -> v128 {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
         let mut rgb_pixel = v128_load16_lane::<0>(i32x4_splat(0), src_ptr.as_ptr() as *const _);
         rgb_pixel = v128_load8_lane::<2>(rgb_pixel, src_ptr.get_unchecked(2..).as_ptr());
         let lo = u16x8_extend_low_u8x16(rgb_pixel);
@@ -145,16 +145,16 @@ fn convolve_horizontal_rgb_neon_rows_4_impl<const PRECISION: i32>(
 
         let rnd_const: i32 = 1 << (PRECISION - 1);
 
-        const CHANNELS: usize = 3;
+        const CN: usize = 3;
         let init = i32x4_splat(rnd_const);
         let (row0_ref, rest) = dst.split_at_mut(dst_stride);
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
         let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let iter_row0 = row0_ref.chunks_exact_mut(CHANNELS);
-        let iter_row1 = row1_ref.chunks_exact_mut(CHANNELS);
-        let iter_row2 = row2_ref.chunks_exact_mut(CHANNELS);
-        let iter_row3 = row3_ref.chunks_exact_mut(CHANNELS);
+        let iter_row0 = row0_ref.as_chunks_mut::<CN>().0.iter_mut();
+        let iter_row1 = row1_ref.as_chunks_mut::<CN>().0.iter_mut();
+        let iter_row2 = row2_ref.as_chunks_mut::<CN>().0.iter_mut();
+        let iter_row3 = row3_ref.as_chunks_mut::<CN>().0.iter_mut();
 
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
             .zip(iter_row1)
@@ -178,7 +178,7 @@ fn convolve_horizontal_rgb_neon_rows_4_impl<const PRECISION: i32>(
             let src2 = src1.get_unchecked(src_stride..);
             let src3 = src2.get_unchecked(src_stride..);
 
-            while jx + 4 < bounds.size {
+            while jx + 4 <= bounds.size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
                 let w0 = v128_load16_splat(w_ptr.as_ptr() as *const _);
@@ -192,7 +192,7 @@ fn convolve_horizontal_rgb_neon_rows_4_impl<const PRECISION: i32>(
                 jx += 4;
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bnds = bounds.start + jx;
                 let w0 = v128_load16_splat(w_ptr.as_ptr() as *const _);
@@ -239,7 +239,7 @@ fn convolve_horizontal_rgb_neon_row_one_impl<const PRECISION: i32>(
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        const CHANNELS: usize = 3;
+        const CN: usize = 3;
 
         let shuf_table_1: [u8; 16] = [0, 1, 2, 255, 3, 4, 5, 255, 6, 7, 8, 255, 9, 10, 11, 255];
         let shuffle = v128_load(shuf_table_1.as_ptr() as *const _);
@@ -247,7 +247,9 @@ fn convolve_horizontal_rgb_neon_row_one_impl<const PRECISION: i32>(
         let rnd_const: i32 = 1 << (PRECISION - 1);
 
         for ((dst, bounds), weights) in dst
-            .chunks_exact_mut(CHANNELS)
+            .as_chunks_mut::<CN>()
+            .0
+            .iter_mut()
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights
@@ -260,7 +262,7 @@ fn convolve_horizontal_rgb_neon_row_one_impl<const PRECISION: i32>(
             let mut jx = 0usize;
             let mut store = i32x4_splat(rnd_const);
 
-            while jx + 4 < bounds_size {
+            while jx + 4 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
                 let w0 = v128_load16_splat(w_ptr.as_ptr() as *const _);
@@ -271,7 +273,7 @@ fn convolve_horizontal_rgb_neon_row_one_impl<const PRECISION: i32>(
                 jx += 4;
             }
 
-            while jx + 2 < bounds_size {
+            while jx + 2 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let w0 = v128_load16_splat(w_ptr.as_ptr() as *const _);

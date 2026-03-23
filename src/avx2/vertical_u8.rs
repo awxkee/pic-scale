@@ -145,8 +145,8 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
                 let src_ptr = src.get_unchecked((src_stride * py + px)..);
                 let s_ptr_next = src_ptr.get_unchecked(src_stride..);
 
-                let item_row_0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
-                let item_row_1 = _mm256_loadu_si256(s_ptr_next.as_ptr() as *const __m256i);
+                let item_row_0 = _mm256_loadu_si256(src_ptr.as_ptr().cast());
+                let item_row_1 = _mm256_loadu_si256(s_ptr_next.as_ptr().cast());
 
                 let interleaved = _mm256_unpacklo_epi8(item_row_0, item_row_1);
                 let pix = _mm256_unpacklo_epi8(interleaved, zeros);
@@ -160,10 +160,8 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
                 let pix = _mm256_unpackhi_epi8(interleaved, zeros);
                 store_3 = _mm256_dot16_avx_epi32::<HAS_DOT>(store_3, pix, v_weight_2);
 
-                let item_row_0 =
-                    _mm256_loadu_si256(src_ptr.get_unchecked(32..).as_ptr() as *const __m256i);
-                let item_row_1 =
-                    _mm256_loadu_si256(s_ptr_next.get_unchecked(32..).as_ptr() as *const __m256i);
+                let item_row_0 = _mm256_loadu_si256(src_ptr.get_unchecked(32..).as_ptr().cast());
+                let item_row_1 = _mm256_loadu_si256(s_ptr_next.get_unchecked(32..).as_ptr().cast());
 
                 let interleaved = _mm256_unpacklo_epi8(item_row_0, item_row_1);
                 let pix = _mm256_unpacklo_epi8(interleaved, zeros);
@@ -186,9 +184,8 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
                 let v_weight = _mm256_set1_epi16(weight);
                 let src_ptr = src.get_unchecked((src_stride * py + px)..);
 
-                let item_row_0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
-                let item_row_1 =
-                    _mm256_loadu_si256(src_ptr.get_unchecked(32..).as_ptr() as *const __m256i);
+                let item_row_0 = _mm256_loadu_si256(src_ptr.as_ptr().cast());
+                let item_row_1 = _mm256_loadu_si256(src_ptr.get_unchecked(32..).as_ptr().cast());
 
                 (store_0, store_1, store_2, store_3) =
                     Self::dot_prod(store_0, store_1, store_2, store_3, item_row_0, v_weight);
@@ -210,14 +207,14 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
             let rgb = _mm256_packus_epi16(rgb0, rgb2);
 
             let dst_ptr = dst.get_unchecked_mut(px..);
-            _mm256_storeu_si256(dst_ptr.as_mut_ptr() as *mut __m256i, rgb);
+            _mm256_storeu_si256(dst_ptr.as_mut_ptr().cast(), rgb);
 
             let rgb0 = _mm256_packs_epi32(store_4, store_5);
             let rgb2 = _mm256_packs_epi32(store_6, store_7);
             let rgb = _mm256_packus_epi16(rgb0, rgb2);
 
             let dst_ptr = dst.get_unchecked_mut((px + 32)..);
-            _mm256_storeu_si256(dst_ptr.as_mut_ptr() as *mut __m256i, rgb);
+            _mm256_storeu_si256(dst_ptr.as_mut_ptr().cast(), rgb);
         }
     }
 
@@ -292,8 +289,8 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
                 let src_ptr0 = src.get_unchecked((src_stride * py + px)..);
                 let src_ptr1 = src.get_unchecked((src_stride * (py + 1) + px)..);
 
-                let item_row0 = _mm256_loadu_si256(src_ptr0.as_ptr() as *const __m256i);
-                let item_row1 = _mm256_loadu_si256(src_ptr1.as_ptr() as *const __m256i);
+                let item_row0 = _mm256_loadu_si256(src_ptr0.as_ptr().cast());
+                let item_row1 = _mm256_loadu_si256(src_ptr1.as_ptr().cast());
 
                 // Interleave rows so dot_prod processes both weights in one pass
                 let zeros = _mm256_setzero_si256();
@@ -319,7 +316,7 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
                 let v_weight = _mm256_set1_epi16(weight);
                 let src_ptr = src.get_unchecked((src_stride * py + px)..);
 
-                let item_row = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
+                let item_row = _mm256_loadu_si256(src_ptr.as_ptr().cast());
 
                 (store_0, store_1, store_2, store_3) =
                     Self::dot_prod(store_0, store_1, store_2, store_3, item_row, v_weight);
@@ -335,7 +332,7 @@ impl<const HAS_DOT: bool> ExecutionUnit<HAS_DOT> {
             let rgb = _mm256_packus_epi16(rgb0, rgb2);
 
             let dst_ptr = dst.get_unchecked_mut(px..);
-            _mm256_storeu_si256(dst_ptr.as_mut_ptr() as *mut __m256i, rgb);
+            _mm256_storeu_si256(dst_ptr.as_mut_ptr().cast(), rgb);
         }
     }
 

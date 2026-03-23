@@ -36,7 +36,6 @@ mod cbcr8;
 mod check_alpha;
 #[cfg(feature = "nightly_f16")]
 mod f16_utils;
-mod horizontal_ar30;
 mod plane_f32;
 mod plane_u8;
 #[cfg(feature = "nightly_f16")]
@@ -52,7 +51,6 @@ mod rgba_u8;
 mod routines;
 mod u8_utils;
 mod utils;
-mod vertical_ar30;
 #[cfg(feature = "nightly_f16")]
 mod vertical_f16;
 mod vertical_f32;
@@ -69,9 +67,6 @@ pub(crate) use alpha_u16::{premultiply_alpha_sse_rgba_u16, unpremultiply_alpha_s
 pub(crate) use cbcr8::{convolve_horizontal_cbcr_sse_row_one, convolve_horizontal_cbcr_sse_rows_4};
 pub(crate) use check_alpha::{
     sse_has_non_constant_cap_alpha_rgba8, sse_has_non_constant_cap_alpha_rgba16,
-};
-pub(crate) use horizontal_ar30::{
-    sse_convolve_horizontal_rgba_rows_4_ar30, sse_convolve_horizontal_rgba_rows_ar30,
 };
 pub(crate) use plane_f32::convolve_horizontal_plane_sse_row_one;
 pub(crate) use plane_f32::convolve_horizontal_plane_sse_rows_4;
@@ -100,12 +95,11 @@ pub(crate) use rgba_u16::{
     convolve_horizontal_rgba_sse_rows_4_u16, convolve_horizontal_rgba_sse_u16_row,
 };
 pub(crate) use rgba_u16_lb::{
-    convolve_horizontal_rgba_sse_rows_4_lb_u8, convolve_horizontal_rgba_sse_u16_lb_row,
+    convolve_horizontal_rgba_sse_rows_4_lb_u16, convolve_horizontal_rgba_sse_u16_lb_row,
 };
 pub(crate) use routines::load_4_weights;
 pub(crate) use u8_utils::*;
 pub(crate) use utils::*;
-pub(crate) use vertical_ar30::sse_column_handler_fixed_point_ar30;
 #[cfg(feature = "nightly_f16")]
 pub(crate) use vertical_f16::convolve_vertical_sse_row_f16;
 pub(crate) use vertical_f32::convolve_vertical_rgb_sse_row_f32;

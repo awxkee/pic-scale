@@ -40,7 +40,7 @@ fn neon_premultiply_alpha_rgba_row_f16_full(dst: &mut [f16], src: &[f16]) {
 
         for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
             let src_ptr = src.as_ptr();
-            let pixel = vld4q_u16(src_ptr as *const u16);
+            let pixel = vld4q_u16(src_ptr.cast());
 
             let low_alpha = vreinterpretq_f16_u16(pixel.3);
             let r_values = vmulq_f16(vreinterpretq_f16_u16(pixel.0), low_alpha);
@@ -54,7 +54,7 @@ fn neon_premultiply_alpha_rgba_row_f16_full(dst: &mut [f16], src: &[f16]) {
                 vreinterpretq_u16_f16(b_values),
                 pixel.3,
             );
-            vst4q_u16(dst_ptr as *mut u16, store_pixel);
+            vst4q_u16(dst_ptr.cast(), store_pixel);
         }
 
         rem = rem.chunks_exact_mut(8 * 4).into_remainder();
@@ -69,7 +69,7 @@ fn neon_premultiply_alpha_rgba_row_f16_full(dst: &mut [f16], src: &[f16]) {
 
             std::ptr::copy_nonoverlapping(src_rem.as_ptr(), transient.as_mut_ptr(), src_rem.len());
 
-            let pixel = vld4q_u16(transient.as_ptr() as *const u16);
+            let pixel = vld4q_u16(transient.as_ptr().cast());
 
             let low_alpha = vreinterpretq_f16_u16(pixel.3);
             let r_values = vmulq_f16(vreinterpretq_f16_u16(pixel.0), low_alpha);
@@ -82,7 +82,7 @@ fn neon_premultiply_alpha_rgba_row_f16_full(dst: &mut [f16], src: &[f16]) {
                 vreinterpretq_u16_f16(b_values),
                 pixel.3,
             );
-            vst4q_u16(transient.as_mut_ptr() as *mut u16, store_pixel);
+            vst4q_u16(transient.as_mut_ptr().cast(), store_pixel);
 
             std::ptr::copy_nonoverlapping(transient.as_ptr(), rem.as_mut_ptr(), rem.len());
         }
@@ -112,7 +112,7 @@ fn neon_unpremultiply_alpha_rgba_f16_row_full(in_place: &mut [f16]) {
 
         for dst in rem.chunks_exact_mut(8 * 4) {
             let src_ptr = dst.as_ptr();
-            let pixel = vld4q_u16(src_ptr as *const u16);
+            let pixel = vld4q_u16(src_ptr.cast());
 
             let alphas = vreinterpretq_f16_u16(pixel.3);
             let zero_mask = vceqzq_f16(alphas);
@@ -140,7 +140,7 @@ fn neon_unpremultiply_alpha_rgba_f16_row_full(in_place: &mut [f16]) {
                 vreinterpretq_u16_f16(b_values),
                 pixel.3,
             );
-            vst4q_u16(dst_ptr as *mut u16, store_pixel);
+            vst4q_u16(dst_ptr.cast(), store_pixel);
         }
 
         rem = rem.chunks_exact_mut(8 * 4).into_remainder();
@@ -149,7 +149,7 @@ fn neon_unpremultiply_alpha_rgba_f16_row_full(in_place: &mut [f16]) {
             assert!(rem.len() <= 4 * 8);
             std::ptr::copy_nonoverlapping(rem.as_ptr(), transient.as_mut_ptr(), rem.len());
 
-            let pixel = vld4q_u16(transient.as_ptr() as *const u16);
+            let pixel = vld4q_u16(transient.as_ptr().cast());
 
             let alphas = vreinterpretq_f16_u16(pixel.3);
             let zero_mask = vceqzq_f16(alphas);
@@ -176,7 +176,7 @@ fn neon_unpremultiply_alpha_rgba_f16_row_full(in_place: &mut [f16]) {
                 vreinterpretq_u16_f16(b_values),
                 pixel.3,
             );
-            vst4q_u16(transient.as_mut_ptr() as *mut u16, store_pixel);
+            vst4q_u16(transient.as_mut_ptr().cast(), store_pixel);
 
             std::ptr::copy_nonoverlapping(transient.as_ptr(), rem.as_mut_ptr(), rem.len());
         }

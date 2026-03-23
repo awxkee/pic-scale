@@ -42,8 +42,8 @@ fn ch_parts_4_rgb_f32_sse<const FMA: bool>(
     store_0: __m128,
 ) -> __m128 {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked(start_x * COMPONENTS..);
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked(start_x * CN..);
 
         let rgb_pixel_0 = _mm_loadu_ps(src_ptr.as_ptr());
         let rgb_pixel_1 = _mm_loadu_ps(src_ptr.get_unchecked(3..).as_ptr());
@@ -70,9 +70,9 @@ fn ch_parts_4_rgb_f32_avx<const FMA: bool>(
     store_0: __m256,
 ) -> __m256 {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr0 = src0.get_unchecked(start_x * COMPONENTS..);
-        let src_ptr1 = src1.get_unchecked(start_x * COMPONENTS..);
+        const CN: usize = 3;
+        let src_ptr0 = src0.get_unchecked(start_x * CN..);
+        let src_ptr1 = src1.get_unchecked(start_x * CN..);
 
         let rgb_pixel_0_0 = _mm_loadu_ps(src_ptr0.as_ptr());
         let rgb_pixel_0_1 = _mm_loadu_ps(src_ptr0.get_unchecked(3..).as_ptr());
@@ -112,9 +112,9 @@ fn ch_parts_2_rgb_f32_avx<const FMA: bool>(
     store_0: __m256,
 ) -> __m256 {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr0 = src0.get_unchecked(start_x * COMPONENTS..);
-        let src_ptr1 = src1.get_unchecked(start_x * COMPONENTS..);
+        const CN: usize = 3;
+        let src_ptr0 = src0.get_unchecked(start_x * CN..);
+        let src_ptr1 = src1.get_unchecked(start_x * CN..);
 
         let orig0 = _mm_loadu_ps(src_ptr0.as_ptr());
         let orig1 = _mm_loadu_ps(src_ptr1.as_ptr());
@@ -147,8 +147,8 @@ fn ch_parts_2_rgb_f32<const FMA: bool>(
     store_0: __m128,
 ) -> __m128 {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked(start_x * COMPONENTS..);
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked(start_x * CN..);
 
         let orig1 = _mm_loadu_ps(src_ptr.as_ptr());
         let rgb_pixel_0 = orig1;
@@ -169,8 +169,8 @@ fn ch_parts_one_rgb_f32<const FMA: bool>(
     store_0: __m128,
 ) -> __m128 {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
         let rgb_pixel = _mm_setr_ps(
             src_ptr.add(0).read_unaligned(),
             src_ptr.add(1).read_unaligned(),
@@ -190,9 +190,9 @@ fn ch_parts_one_rgb_f32_avx<const FMA: bool>(
     store_0: __m256,
 ) -> __m256 {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr0 = src0.get_unchecked(start_x * COMPONENTS..);
-        let src_ptr1 = src1.get_unchecked(start_x * COMPONENTS..);
+        const CN: usize = 3;
+        let src_ptr0 = src0.get_unchecked(start_x * CN..);
+        let src_ptr1 = src1.get_unchecked(start_x * CN..);
 
         let rgb_pixel0 = _mm_setr_ps(
             *src_ptr0.get_unchecked(0),
@@ -214,18 +214,25 @@ fn ch_parts_one_rgb_f32_avx<const FMA: bool>(
     }
 }
 
-pub(crate) fn convolve_horizontal_rgb_avx_row_one_f32<const FMA: bool>(
+pub(crate) fn convolve_horizontal_rgb_avx_row_one_f32_default(
     src: &[f32],
     dst: &mut [f32],
     filter_weights: &FilterWeights<f32>,
     _: u32,
 ) {
     unsafe {
-        if FMA {
-            convolve_horizontal_rgb_avx_row_one_f32_fma(filter_weights, src, dst);
-        } else {
-            convolve_horizontal_rgb_avx_row_one_f32_regular(filter_weights, src, dst);
-        }
+        convolve_horizontal_rgb_avx_row_one_f32_regular(filter_weights, src, dst);
+    }
+}
+
+pub(crate) fn convolve_horizontal_rgb_avx_row_one_f32_fma(
+    src: &[f32],
+    dst: &mut [f32],
+    filter_weights: &FilterWeights<f32>,
+    _: u32,
+) {
+    unsafe {
+        convolve_horizontal_rgb_avx_row_one_f32_fma_impl(filter_weights, src, dst);
     }
 }
 
@@ -242,7 +249,7 @@ fn convolve_horizontal_rgb_avx_row_one_f32_regular(
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch
-fn convolve_horizontal_rgb_avx_row_one_f32_fma(
+fn convolve_horizontal_rgb_avx_row_one_f32_fma_impl(
     filter_weights: &FilterWeights<f32>,
     src: &[f32],
     dst: &mut [f32],
@@ -258,7 +265,7 @@ impl<const FMA: bool> ExecutionUnit1Row<FMA> {
     #[inline(always)]
     fn pass(&self, filter_weights: &FilterWeights<f32>, src: &[f32], dst: &mut [f32]) {
         unsafe {
-            const CHANNELS: usize = 3;
+            const CN: usize = 3;
             let mut filter_offset = 0usize;
             let weights = &filter_weights.weights;
 
@@ -304,7 +311,7 @@ impl<const FMA: bool> ExecutionUnit1Row<FMA> {
                     jx += 1;
                 }
 
-                let px = x * CHANNELS;
+                let px = x * CN;
                 let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
                 _mm_storeu_si64(dest_ptr as *mut u8, _mm_castps_si128(store));
                 (dest_ptr as *mut i32)
@@ -317,7 +324,7 @@ impl<const FMA: bool> ExecutionUnit1Row<FMA> {
     }
 }
 
-pub(crate) fn convolve_horizontal_rgb_avx_rows_4_f32<const FMA: bool>(
+pub(crate) fn convolve_horizontal_rgb_avx_rows_4_f32_default(
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
@@ -326,23 +333,32 @@ pub(crate) fn convolve_horizontal_rgb_avx_rows_4_f32<const FMA: bool>(
     _: u32,
 ) {
     unsafe {
-        if FMA {
-            convolve_horizontal_rgb_avx_rows_4_f32_fma(
-                filter_weights,
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-            );
-        } else {
-            convolve_horizontal_rgb_avx_rows_4_f32_regular(
-                filter_weights,
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-            );
-        }
+        convolve_horizontal_rgb_avx_rows_4_f32_regular(
+            filter_weights,
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+        );
+    }
+}
+
+pub(crate) fn convolve_horizontal_rgb_avx_rows_4_f32_fma(
+    src: &[f32],
+    src_stride: usize,
+    dst: &mut [f32],
+    dst_stride: usize,
+    filter_weights: &FilterWeights<f32>,
+    _: u32,
+) {
+    unsafe {
+        convolve_horizontal_rgb_avx_rows_4_f32_fma_impl(
+            filter_weights,
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+        );
     }
 }
 
@@ -361,7 +377,7 @@ fn convolve_horizontal_rgb_avx_rows_4_f32_regular(
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch
-fn convolve_horizontal_rgb_avx_rows_4_f32_fma(
+fn convolve_horizontal_rgb_avx_rows_4_f32_fma_impl(
     filter_weights: &FilterWeights<f32>,
     src: &[f32],
     src_stride: usize,
@@ -386,7 +402,7 @@ impl<const FMA: bool> ExecutionUnit4Row<FMA> {
         dst_stride: usize,
     ) {
         unsafe {
-            const CHANNELS: usize = 3;
+            const CN: usize = 3;
             let mut filter_offset = 0usize;
 
             let dst_width = filter_weights.bounds.len();
@@ -485,7 +501,7 @@ impl<const FMA: bool> ExecutionUnit4Row<FMA> {
                     jx += 1;
                 }
 
-                let px = x * CHANNELS;
+                let px = x * CN;
                 let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
                 _mm_storeu_si64(
                     dest_ptr as *mut u8,

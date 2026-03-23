@@ -33,7 +33,6 @@ use std::arch::x86_64::*;
 
 #[inline(always)]
 fn load_rgb_u16_1(src: &[u16]) -> __m128i {
-    // Load 3 x u16 = 6 bytes safely
     unsafe {
         let lo = _mm_loadu_si32(src.as_ptr().cast()); // r, g
         let hi = _mm_loadu_si16(src.get_unchecked(2..).as_ptr().cast()); // b
@@ -44,7 +43,6 @@ fn load_rgb_u16_1(src: &[u16]) -> __m128i {
 #[inline(always)]
 fn load_rgb_u16_2(src: &[u16]) -> __m128i {
     unsafe {
-        // Load 2 x RGB = 6 x u16 = 12 bytes
         let lo = _mm_loadu_si64(src.as_ptr().cast()); // [r0,g0,b0,r1]
         let hi = _mm_loadu_si32(src.get_unchecked(4..).as_ptr().cast()); // [g1,b1]
         _mm_unpacklo_epi64(lo, hi) // [r0,g0,b0,r1,g1,b1,0,0]

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ * Copyright (c) Radzivon Bartoshyk 3/2026. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -86,8 +86,8 @@ impl<const AR30_TYPE: usize, const AR30_ORDER: usize> ExecutionUnit<AR30_TYPE, A
                     let offset = src_stride * py + v_start_px;
                     let src_ptr = src.get_unchecked(offset..(offset + 8 * 4));
 
-                    let l0 = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
-                    let l1 = _mm_loadu_si128(src_ptr.as_ptr().add(4 * 4) as *const __m128i);
+                    let l0 = _mm_loadu_si128(src_ptr.as_ptr().cast());
+                    let l1 = _mm_loadu_si128(src_ptr.as_ptr().add(4 * 4).cast());
 
                     let ps = _mm_unzip_3_ar30::<AR30_TYPE, AR30_ORDER>((l0, l1));
 
@@ -130,8 +130,8 @@ impl<const AR30_TYPE: usize, const AR30_ORDER: usize> ExecutionUnit<AR30_TYPE, A
 
                 let vals =
                     _mm_zip_4_ar30::<AR30_TYPE, AR30_ORDER>((r_v, g_v, b_v, _mm_set1_epi16(3)));
-                _mm_storeu_si128(v_dst.as_mut_ptr() as *mut _, vals.0);
-                _mm_storeu_si128(v_dst.as_mut_ptr().add(4 * 4) as *mut _, vals.1);
+                _mm_storeu_si128(v_dst.as_mut_ptr().cast(), vals.0);
+                _mm_storeu_si128(v_dst.as_mut_ptr().add(4 * 4).cast(), vals.1);
 
                 cx += 8;
             }
@@ -162,8 +162,8 @@ impl<const AR30_TYPE: usize, const AR30_ORDER: usize> ExecutionUnit<AR30_TYPE, A
                         diff * 4,
                     );
 
-                    let l0 = _mm_loadu_si128(src_transient.as_ptr() as *const __m128i);
-                    let l1 = _mm_loadu_si128(src_transient.as_ptr().add(4 * 4) as *const __m128i);
+                    let l0 = _mm_loadu_si128(src_transient.as_ptr().cast());
+                    let l1 = _mm_loadu_si128(src_transient.as_ptr().add(4 * 4).cast());
 
                     let ps = _mm_unzip_3_ar30::<AR30_TYPE, AR30_ORDER>((l0, l1));
 
@@ -204,8 +204,8 @@ impl<const AR30_TYPE: usize, const AR30_ORDER: usize> ExecutionUnit<AR30_TYPE, A
 
                 let vals =
                     _mm_zip_4_ar30::<AR30_TYPE, AR30_ORDER>((r_v, g_v, b_v, _mm_set1_epi16(3)));
-                _mm_storeu_si128(dst_transient.as_mut_ptr() as *mut _, vals.0);
-                _mm_storeu_si128(dst_transient.as_mut_ptr().add(4 * 4) as *mut _, vals.1);
+                _mm_storeu_si128(dst_transient.as_mut_ptr().cast(), vals.0);
+                _mm_storeu_si128(dst_transient.as_mut_ptr().add(4 * 4).cast(), vals.1);
 
                 let v_dst = dst.get_unchecked_mut(v_start_px..(v_start_px + diff * 4));
                 std::ptr::copy_nonoverlapping(dst_transient.as_ptr(), v_dst.as_mut_ptr(), diff * 4);

@@ -38,9 +38,9 @@ fn conv_horiz_rgba_1_u16<const FMA: bool>(
     store: __m128,
 ) -> __m128 {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
-        let rgba_pixel = _mm_loadu_si64(src_ptr.as_ptr() as *const u8);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
+        let rgba_pixel = _mm_loadu_si64(src_ptr.as_ptr().cast());
         _mm_prefer_fma_ps::<FMA>(
             store,
             _mm_cvtepi32_ps(_mm_unpacklo_epi16(rgba_pixel, _mm_setzero_si128())),
@@ -58,8 +58,8 @@ fn conv_horiz_rgba_2_u16<const FMA: bool>(
     store: __m128,
 ) -> __m128 {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let rgba_pixel = _mm_loadu_si128(src_ptr.as_ptr().cast());
 
@@ -85,8 +85,8 @@ fn conv_horiz_rgba_4_u16<const FMA: bool>(
     store: __m256,
 ) -> __m256 {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let rgba_pixel = _mm256_loadu_si256(src_ptr.as_ptr().cast());
 
@@ -114,8 +114,8 @@ fn conv_horiz_rgba_8_u16<const FMA: bool>(
     store: __m256,
 ) -> __m256 {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let z = _mm256_setzero_si256();
 
@@ -228,9 +228,9 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
         store: __m256,
     ) -> __m256 {
         unsafe {
-            const COMPONENTS: usize = 4;
-            let src_ptr0 = src0.get_unchecked((start_x * COMPONENTS)..);
-            let src_ptr1 = src1.get_unchecked((start_x * COMPONENTS)..);
+            const CN: usize = 4;
+            let src_ptr0 = src0.get_unchecked((start_x * CN)..);
+            let src_ptr1 = src1.get_unchecked((start_x * CN)..);
 
             let rgba_pixel0 = _mm256_cvtepi32_ps(_mm256_cvtepu16_epi32(_mm_loadu_si128(
                 src_ptr0.as_ptr().cast(),
@@ -263,12 +263,12 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
         store: __m256,
     ) -> __m256 {
         unsafe {
-            const COMPONENTS: usize = 4;
-            let src_ptr0 = src0.get_unchecked((start_x * COMPONENTS)..);
-            let src_ptr1 = src1.get_unchecked((start_x * COMPONENTS)..);
+            const CN: usize = 4;
+            let src_ptr0 = src0.get_unchecked((start_x * CN)..);
+            let src_ptr1 = src1.get_unchecked((start_x * CN)..);
 
-            let rgba_pixel0 = _mm_loadu_si64(src_ptr0.as_ptr() as *const u8);
-            let rgba_pixel1 = _mm_loadu_si64(src_ptr1.as_ptr() as *const u8);
+            let rgba_pixel0 = _mm_loadu_si64(src_ptr0.as_ptr().cast());
+            let rgba_pixel1 = _mm_loadu_si64(src_ptr1.as_ptr().cast());
 
             let full_pixel = _mm256_cvtepu16_epi32(_mm_unpacklo_epi64(rgba_pixel0, rgba_pixel1));
 
@@ -289,7 +289,7 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
         bit_depth: u32,
     ) {
         unsafe {
-            const CHANNELS: usize = 4;
+            const CN: usize = 4;
 
             let v_cap_colors = _mm256_set1_epi16((((1i32 << bit_depth) - 1) as u16) as i16);
 
@@ -297,10 +297,10 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
             let (row1_ref, rest) = rest.split_at_mut(dst_stride);
             let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-            let iter_row0 = row0_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
-            let iter_row1 = row1_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
-            let iter_row2 = row2_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
-            let iter_row3 = row3_ref.as_chunks_mut::<CHANNELS>().0.iter_mut();
+            let iter_row0 = row0_ref.as_chunks_mut::<CN>().0.iter_mut();
+            let iter_row1 = row1_ref.as_chunks_mut::<CN>().0.iter_mut();
+            let iter_row2 = row2_ref.as_chunks_mut::<CN>().0.iter_mut();
+            let iter_row3 = row3_ref.as_chunks_mut::<CN>().0.iter_mut();
 
             for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
                 .zip(iter_row1)
@@ -454,19 +454,19 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                 let store_16_1 = _mm256_min_epu16(_mm256_packus_epi32(v_st1, v_st1), v_cap_colors);
 
                 _mm_storeu_si64(
-                    chunk0.as_mut_ptr() as *mut u8,
+                    chunk0.as_mut_ptr().cast(),
                     _mm256_castsi256_si128(store_16_0),
                 );
                 _mm_storeu_si64(
-                    chunk1.as_mut_ptr() as *mut u8,
+                    chunk1.as_mut_ptr().cast(),
                     _mm256_extracti128_si256::<1>(store_16_0),
                 );
                 _mm_storeu_si64(
-                    chunk2.as_mut_ptr() as *mut u8,
+                    chunk2.as_mut_ptr().cast(),
                     _mm256_castsi256_si128(store_16_1),
                 );
                 _mm_storeu_si64(
-                    chunk3.as_mut_ptr() as *mut u8,
+                    chunk3.as_mut_ptr().cast(),
                     _mm256_extracti128_si256::<1>(store_16_1),
                 );
             }
@@ -534,12 +534,12 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
         bit_depth: u32,
     ) {
         unsafe {
-            const CHANNELS: usize = 4;
+            const CN: usize = 4;
 
             let v_cap_colors = _mm_set1_epi16((((1i32 << bit_depth) - 1) as u16) as i16);
 
             for ((dst, bounds), weights) in dst
-                .as_chunks_mut::<CHANNELS>()
+                .as_chunks_mut::<CN>()
                 .0
                 .iter_mut()
                 .zip(filter_weights.bounds.iter())
@@ -632,7 +632,7 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
                 let v_st = _mm_cvtps_epi32(store);
 
                 let store_16_0 = _mm_min_epu16(_mm_packus_epi32(v_st, v_st), v_cap_colors);
-                _mm_storeu_si64(dst.as_mut_ptr() as *mut u8, store_16_0);
+                _mm_storeu_si64(dst.as_mut_ptr().cast(), store_16_0);
             }
         }
     }

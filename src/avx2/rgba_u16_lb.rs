@@ -41,8 +41,8 @@ fn acc_1_dot<const D: bool>(
     shuffle: __m128i,
 ) -> __m128i {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
         let rgba_pixel = _mm_loadu_si64(src_ptr.as_ptr() as *const u8);
         _mm_dot16_avx_epi32::<D>(store, _mm_shuffle_epi8(rgba_pixel, shuffle), w0)
     }
@@ -57,8 +57,8 @@ fn acc_2_dot<const D: bool>(
     shuffle: __m128i,
 ) -> __m128i {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
         let rgba_pixel = _mm_loadu_si128(src_ptr.as_ptr().cast());
         _mm_dot16_avx_epi32::<D>(store, _mm_shuffle_epi8(rgba_pixel, shuffle), w0)
     }
@@ -73,8 +73,8 @@ fn acc_4_dot<const D: bool>(
     shuffle: __m256i,
 ) -> __m256i {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
         let rgba_pixel = _mm256_loadu_si256(src_ptr.as_ptr().cast());
         _mm256_dot16_avx_epi32::<D>(store, _mm256_shuffle_epi8(rgba_pixel, shuffle), w0)
     }
@@ -90,8 +90,8 @@ fn acc_8_dot<const D: bool>(
     shuffle: __m256i,
 ) -> __m256i {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
         let rgba_pixel0 = _mm256_loadu_si256(src_ptr.as_ptr().cast());
         let rgba_pixel1 = _mm256_loadu_si256(src_ptr.get_unchecked(16..).as_ptr().cast());
 
@@ -109,17 +109,6 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_4_u16(
     bit_depth: u32,
 ) {
     unsafe {
-        #[cfg(feature = "avx512")]
-        if std::arch::is_x86_feature_detected!("avxvnni") {
-            return convolve_horizontal_rgba_avx_rows_4_lb_vn(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                filter_weights,
-                bit_depth,
-            );
-        }
         convolve_horizontal_rgba_avx_rows_4_lb_a(
             src,
             src_stride,
@@ -127,7 +116,28 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_4_u16(
             dst_stride,
             filter_weights,
             bit_depth,
-        );
+        )
+    }
+}
+
+#[cfg(feature = "avx512")]
+pub(crate) fn convolve_horizontal_rgba_avx_rows_4_u16_vnni(
+    src: &[u16],
+    src_stride: usize,
+    dst: &mut [u16],
+    dst_stride: usize,
+    filter_weights: &FilterWeights<i16>,
+    bit_depth: u32,
+) {
+    unsafe {
+        convolve_horizontal_rgba_avx_rows_4_lb_vn(
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+            filter_weights,
+            bit_depth,
+        )
     }
 }
 
@@ -173,10 +183,10 @@ impl<const D: bool> Row4ExecutionHandler<D> {
         shuffle: __m256i,
     ) -> __m256i {
         unsafe {
-            const COMPONENTS: usize = 4;
+            const CN: usize = 4;
 
-            let src_ptr0 = src0.get_unchecked((start_x * COMPONENTS)..);
-            let src_ptr1 = src1.get_unchecked((start_x * COMPONENTS)..);
+            let src_ptr0 = src0.get_unchecked((start_x * CN)..);
+            let src_ptr1 = src1.get_unchecked((start_x * CN)..);
 
             let rgba_pixel0 = _mm_loadu_si64(src_ptr0.as_ptr().cast());
             let rgba_pixel1 = _mm_loadu_si64(src_ptr1.as_ptr().cast());
@@ -199,10 +209,10 @@ impl<const D: bool> Row4ExecutionHandler<D> {
         shuffle: __m256i,
     ) -> __m256i {
         unsafe {
-            const COMPONENTS: usize = 4;
+            const CN: usize = 4;
 
-            let src_ptr0 = src0.get_unchecked((start_x * COMPONENTS)..);
-            let src_ptr1 = src1.get_unchecked((start_x * COMPONENTS)..);
+            let src_ptr0 = src0.get_unchecked((start_x * CN)..);
+            let src_ptr1 = src1.get_unchecked((start_x * CN)..);
 
             let rgba_pixel0 = _mm_loadu_si128(src_ptr0.as_ptr().cast());
             let rgba_pixel1 = _mm_loadu_si128(src_ptr1.as_ptr().cast());
@@ -298,64 +308,55 @@ impl<const D: bool> Row4ExecutionHandler<D> {
 
                 let bounds_size = bounds.size;
 
-                let mut store_0 = init256;
-                let mut store_1 = init256;
-
-                if bounds_size >= 4 {
-                    while jx + 8 <= bounds_size {
-                        let w_ptr = weights.get_unchecked(jx..);
-                        let wl = _mm256_castsi128_si256(_mm_loadu_si128(w_ptr.as_ptr().cast()));
-                        let w0 = _mm256_shuffle_epi8(
-                            _mm256_permutevar8x32_epi32(wl, permute_avx_weights),
-                            a_shuffle_weights_table,
-                        );
-                        let w1 = _mm256_shuffle_epi8(
-                            _mm256_permutevar8x32_epi32(wl, permute_avx_weights_hi),
-                            a_shuffle_weights_table,
-                        );
-                        let bounds_start = bounds.start + jx;
-                        astore_0 =
-                            acc_8_dot::<D>(bounds_start, src0, w0, w1, astore_0, a_shuffle_2_table);
-                        astore_1 =
-                            acc_8_dot::<D>(bounds_start, src1, w0, w1, astore_1, a_shuffle_2_table);
-                        astore_2 =
-                            acc_8_dot::<D>(bounds_start, src2, w0, w1, astore_2, a_shuffle_2_table);
-                        astore_3 =
-                            acc_8_dot::<D>(bounds_start, src3, w0, w1, astore_3, a_shuffle_2_table);
-                        jx += 8;
-                    }
-
-                    while jx + 4 <= bounds_size {
-                        let bounds_start = bounds.start + jx;
-                        let w_ptr = weights.get_unchecked(jx..);
-                        let w0 = _mm256_shuffle_epi8(
-                            _mm256_permutevar8x32_epi32(
-                                _mm256_castsi128_si256(_mm_loadu_si64(w_ptr.as_ptr().cast())),
-                                permute_avx_weights,
-                            ),
-                            a_shuffle_weights_table,
-                        );
-                        astore_0 =
-                            acc_4_dot::<D>(bounds_start, src0, w0, astore_0, a_shuffle_2_table);
-                        astore_1 =
-                            acc_4_dot::<D>(bounds_start, src1, w0, astore_1, a_shuffle_2_table);
-                        astore_2 =
-                            acc_4_dot::<D>(bounds_start, src2, w0, astore_2, a_shuffle_2_table);
-                        astore_3 =
-                            acc_4_dot::<D>(bounds_start, src3, w0, astore_3, a_shuffle_2_table);
-                        jx += 4;
-                    }
-
-                    store_0 = _mm256_add_epi32(
-                        _mm256_permute2x128_si256::<0x20>(astore_0, astore_1),
-                        _mm256_permute2x128_si256::<0x31>(astore_0, astore_1),
+                while jx + 8 <= bounds_size {
+                    let w_ptr = weights.get_unchecked(jx..);
+                    let wl = _mm256_castsi128_si256(_mm_loadu_si128(w_ptr.as_ptr().cast()));
+                    let w0 = _mm256_shuffle_epi8(
+                        _mm256_permutevar8x32_epi32(wl, permute_avx_weights),
+                        a_shuffle_weights_table,
                     );
-
-                    store_1 = _mm256_add_epi32(
-                        _mm256_permute2x128_si256::<0x20>(astore_2, astore_3),
-                        _mm256_permute2x128_si256::<0x31>(astore_2, astore_3),
+                    let w1 = _mm256_shuffle_epi8(
+                        _mm256_permutevar8x32_epi32(wl, permute_avx_weights_hi),
+                        a_shuffle_weights_table,
                     );
+                    let bounds_start = bounds.start + jx;
+                    astore_0 =
+                        acc_8_dot::<D>(bounds_start, src0, w0, w1, astore_0, a_shuffle_2_table);
+                    astore_1 =
+                        acc_8_dot::<D>(bounds_start, src1, w0, w1, astore_1, a_shuffle_2_table);
+                    astore_2 =
+                        acc_8_dot::<D>(bounds_start, src2, w0, w1, astore_2, a_shuffle_2_table);
+                    astore_3 =
+                        acc_8_dot::<D>(bounds_start, src3, w0, w1, astore_3, a_shuffle_2_table);
+                    jx += 8;
                 }
+
+                while jx + 4 <= bounds_size {
+                    let bounds_start = bounds.start + jx;
+                    let w_ptr = weights.get_unchecked(jx..);
+                    let w0 = _mm256_shuffle_epi8(
+                        _mm256_permutevar8x32_epi32(
+                            _mm256_castsi128_si256(_mm_loadu_si64(w_ptr.as_ptr().cast())),
+                            permute_avx_weights,
+                        ),
+                        a_shuffle_weights_table,
+                    );
+                    astore_0 = acc_4_dot::<D>(bounds_start, src0, w0, astore_0, a_shuffle_2_table);
+                    astore_1 = acc_4_dot::<D>(bounds_start, src1, w0, astore_1, a_shuffle_2_table);
+                    astore_2 = acc_4_dot::<D>(bounds_start, src2, w0, astore_2, a_shuffle_2_table);
+                    astore_3 = acc_4_dot::<D>(bounds_start, src3, w0, astore_3, a_shuffle_2_table);
+                    jx += 4;
+                }
+
+                let mut store_0 = _mm256_add_epi32(
+                    _mm256_permute2x128_si256::<0x20>(astore_0, astore_1),
+                    _mm256_permute2x128_si256::<0x31>(astore_0, astore_1),
+                );
+
+                let mut store_1 = _mm256_add_epi32(
+                    _mm256_permute2x128_si256::<0x20>(astore_2, astore_3),
+                    _mm256_permute2x128_si256::<0x31>(astore_2, astore_3),
+                );
 
                 while jx + 2 <= bounds_size {
                     let w_ptr = weights.get_unchecked(jx..);
@@ -408,20 +409,14 @@ impl<const D: bool> Row4ExecutionHandler<D> {
                 let v_st0 = _mm256_min_epi16(store_0, v_max_colors);
                 let v_st1 = _mm256_min_epi16(store_1, v_max_colors);
 
+                _mm_storeu_si64(chunk0.as_mut_ptr().cast(), _mm256_castsi256_si128(v_st0));
                 _mm_storeu_si64(
-                    chunk0.as_mut_ptr() as *mut u8,
-                    _mm256_castsi256_si128(v_st0),
-                );
-                _mm_storeu_si64(
-                    chunk1.as_mut_ptr() as *mut u8,
+                    chunk1.as_mut_ptr().cast(),
                     _mm256_extracti128_si256::<1>(v_st0),
                 );
+                _mm_storeu_si64(chunk2.as_mut_ptr().cast(), _mm256_castsi256_si128(v_st1));
                 _mm_storeu_si64(
-                    chunk2.as_mut_ptr() as *mut u8,
-                    _mm256_castsi256_si128(v_st1),
-                );
-                _mm_storeu_si64(
-                    chunk3.as_mut_ptr() as *mut u8,
+                    chunk3.as_mut_ptr().cast(),
                     _mm256_extracti128_si256::<1>(v_st1),
                 );
             }
@@ -436,12 +431,18 @@ pub(crate) fn convolve_horizontal_rgba_avx_u16lp_row(
     bit_depth: u32,
 ) {
     unsafe {
-        #[cfg(feature = "avx512")]
-        if std::arch::is_x86_feature_detected!("avxvnni") {
-            return convolve_horizontal_rgba_avx_u16_row_vn(src, dst, filter_weights, bit_depth);
-        }
         convolve_horizontal_rgba_avx_u16_row_avx(src, dst, filter_weights, bit_depth);
     }
+}
+
+#[cfg(feature = "avx512")]
+pub(crate) fn convolve_horizontal_rgba_avx_u16lp_row_vnni(
+    src: &[u16],
+    dst: &mut [u16],
+    filter_weights: &FilterWeights<i16>,
+    bit_depth: u32,
+) {
+    unsafe { convolve_horizontal_rgba_avx_u16_row_vn(src, dst, filter_weights, bit_depth) }
 }
 
 #[cfg(feature = "avx512")]
@@ -566,7 +567,7 @@ impl<const D: bool> OneRowExecutionUnit<D> {
                     _mm256_extracti128_si256::<1>(store),
                 );
 
-                while jx + 2 < bounds_size {
+                while jx + 2 <= bounds_size {
                     let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
                     let w0 = _mm_shuffle_epi8(
@@ -589,7 +590,7 @@ impl<const D: bool> OneRowExecutionUnit<D> {
 
                 let v_st = _mm_min_epi16(_mm_packus_epi32(store, store), v_max_colors);
 
-                _mm_storeu_si64(dst.as_mut_ptr() as *mut u8, v_st);
+                _mm_storeu_si64(dst.as_mut_ptr().cast(), v_st);
             }
         }
     }

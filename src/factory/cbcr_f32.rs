@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ * Copyright (c) Radzivon Bartoshyk 3/2026. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -27,8 +27,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::ThreadingPolicy;
-#[cfg(all(target_arch = "x86_64", feature = "avx"))]
-use crate::avx2::convolve_vertical_avx_row_f32;
 use crate::convolution::{
     ColumnFilter, ConvolutionOptions, HorizontalFilterPass, RowFilter, VerticalConvolutionPass,
 };
@@ -36,12 +34,14 @@ use crate::convolve_naive_f32::{
     convolve_horizontal_4_row_f32_f64, convolve_horizontal_native_row_f32,
     convolve_horizontal_native_row_f32_f64, convolve_horizontal_rgba_4_row_f32,
 };
+use crate::factory::rgb_f32::{
+    convolve_vertical_rgb_native_row_f32, convolve_vertical_rgb_native_row_f64,
+};
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::image_store::ImageStore;
 #[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::neon::*;
 use crate::plan::{HorizontalFiltering, VerticalFiltering};
-use crate::rgb_f32::{convolve_vertical_rgb_native_row_f32, convolve_vertical_rgb_native_row_f64};
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::*;
 use std::sync::Arc;
@@ -116,9 +116,11 @@ impl VerticalConvolutionPass<f32, f32, 2> for ImageStore<'_, f32, 2> {
         {
             let has_fma = std::arch::is_x86_feature_detected!("fma");
             if std::arch::is_x86_feature_detected!("avx2") {
-                _dispatcher = convolve_vertical_avx_row_f32::<false>;
+                use crate::avx2::convolve_vertical_avx_row_default_f32;
+                _dispatcher = convolve_vertical_avx_row_default_f32;
                 if has_fma {
-                    _dispatcher = convolve_vertical_avx_row_f32::<true>;
+                    use crate::avx2::convolve_vertical_avx_row_fma_f32;
+                    _dispatcher = convolve_vertical_avx_row_fma_f32;
                 }
             }
         }
@@ -154,11 +156,12 @@ impl VerticalConvolutionPass<f32, f64, 2> for ImageStore<'_, f32, 2> {
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         {
             if std::arch::is_x86_feature_detected!("avx2") {
-                use crate::avx2::convolve_vertical_avx_row_f32_f64;
                 if std::arch::is_x86_feature_detected!("fma") {
-                    _dispatcher = convolve_vertical_avx_row_f32_f64::<true>;
+                    use crate::avx2::convolve_vertical_avx_row_f32_f64_fma;
+                    _dispatcher = convolve_vertical_avx_row_f32_f64_fma;
                 } else {
-                    _dispatcher = convolve_vertical_avx_row_f32_f64::<false>;
+                    use crate::avx2::convolve_vertical_avx_row_f32_f64_default;
+                    _dispatcher = convolve_vertical_avx_row_f32_f64_default;
                 }
             }
         }

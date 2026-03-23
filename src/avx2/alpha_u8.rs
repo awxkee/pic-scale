@@ -311,12 +311,12 @@ impl Avx2DisassociateAlpha {
 impl DisassociateAlpha for Avx2DisassociateAlpha {
     #[target_feature(enable = "avx2")]
     unsafe fn disassociate(&self, in_place: &mut [u8]) {
-        unsafe {
-            if std::arch::is_x86_feature_detected!("fma") {
+        if std::arch::is_x86_feature_detected!("fma") {
+            unsafe {
                 self.disassociate_fma(in_place);
-            } else {
-                self.disassociate_avx2(in_place);
             }
+        } else {
+            self.disassociate_avx2(in_place);
         }
     }
 }

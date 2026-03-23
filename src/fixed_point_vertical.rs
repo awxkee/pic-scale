@@ -317,7 +317,7 @@ pub(crate) fn column_handler_fixed_point<
 
     let total_width = dst.len();
 
-    while cx + 64 < total_width {
+    while cx + 64 <= total_width {
         convolve_column_handler_fixed_point_direct_buffer_four::<T, J, 16>(
             src, src_stride, dst, weight, bounds, bit_depth, cx,
         );
@@ -325,7 +325,7 @@ pub(crate) fn column_handler_fixed_point<
         cx += 64;
     }
 
-    while cx + 32 < total_width {
+    while cx + 32 <= total_width {
         convolve_column_handler_fixed_point_direct_buffer_double::<T, J, 16>(
             src, src_stride, dst, weight, bounds, bit_depth, cx,
         );
@@ -333,7 +333,7 @@ pub(crate) fn column_handler_fixed_point<
         cx += 32;
     }
 
-    while cx + 16 < total_width {
+    while cx + 16 <= total_width {
         convolve_column_handler_fixed_point_direct_buffer::<T, J, 16>(
             src, src_stride, dst, weight, bounds, bit_depth, cx,
         );
@@ -341,7 +341,7 @@ pub(crate) fn column_handler_fixed_point<
         cx += 16;
     }
 
-    while cx + 8 < total_width {
+    while cx + 8 <= total_width {
         convolve_column_handler_fixed_point_direct_buffer::<T, J, 8>(
             src, src_stride, dst, weight, bounds, bit_depth, cx,
         );

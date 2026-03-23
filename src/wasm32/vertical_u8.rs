@@ -32,7 +32,7 @@ use crate::wasm32::utils::{u16x8_pack_sat_u8x16, u32x4_pack_trunc_u16x8, w_zeros
 use std::arch::wasm32::*;
 
 #[inline]
-unsafe fn consume_u8_32(
+fn consume_u8_32(
     start_y: usize,
     start_x: usize,
     src: *const u8,
@@ -118,7 +118,7 @@ unsafe fn consume_u8_32(
 }
 
 #[inline]
-unsafe fn consume_u8_16(
+fn consume_u8_16(
     start_y: usize,
     start_x: usize,
     src: *const u8,
@@ -177,7 +177,7 @@ unsafe fn consume_u8_16(
 }
 
 #[inline]
-unsafe fn consume_u8_8(
+fn consume_u8_8(
     start_y: usize,
     start_x: usize,
     src: *const u8,
@@ -223,7 +223,7 @@ unsafe fn consume_u8_8(
 }
 
 #[inline]
-unsafe fn consume_u8_1(
+fn consume_u8_1(
     start_y: usize,
     start_x: usize,
     src: *const u8,
@@ -286,63 +286,61 @@ fn convolve_vertical_neon_row_impl(
     src_stride: usize,
     weight: &[i16],
 ) {
-    unsafe {
-        let mut cx = 0usize;
-        let dst_width = dst.len();
+    let mut cx = 0usize;
+    let dst_width = dst.len();
 
-        while cx + 32 <= dst_width {
-            consume_u8_32(
-                bounds.start,
-                cx,
-                src.as_ptr(),
-                src_stride,
-                dst.as_mut_ptr(),
-                weight,
-                bounds,
-            );
+    while cx + 32 <= dst_width {
+        consume_u8_32(
+            bounds.start,
+            cx,
+            src.as_ptr(),
+            src_stride,
+            dst.as_mut_ptr(),
+            weight,
+            bounds,
+        );
 
-            cx += 32;
-        }
+        cx += 32;
+    }
 
-        while cx + 16 <= dst_width {
-            consume_u8_16(
-                bounds.start,
-                cx,
-                src.as_ptr(),
-                src_stride,
-                dst.as_mut_ptr(),
-                weight,
-                bounds,
-            );
+    while cx + 16 <= dst_width {
+        consume_u8_16(
+            bounds.start,
+            cx,
+            src.as_ptr(),
+            src_stride,
+            dst.as_mut_ptr(),
+            weight,
+            bounds,
+        );
 
-            cx += 16;
-        }
+        cx += 16;
+    }
 
-        while cx + 8 <= dst_width {
-            consume_u8_8(
-                bounds.start,
-                cx,
-                src.as_ptr(),
-                src_stride,
-                dst.as_mut_ptr(),
-                weight,
-                bounds,
-            );
+    while cx + 8 <= dst_width {
+        consume_u8_8(
+            bounds.start,
+            cx,
+            src.as_ptr(),
+            src_stride,
+            dst.as_mut_ptr(),
+            weight,
+            bounds,
+        );
 
-            cx += 8;
-        }
+        cx += 8;
+    }
 
-        while cx < dst_width {
-            consume_u8_1(
-                bounds.start,
-                cx,
-                src.as_ptr(),
-                src_stride,
-                dst.as_mut_ptr(),
-                weight,
-                bounds,
-            );
-            cx += 1;
-        }
+    while cx < dst_width {
+        consume_u8_1(
+            bounds.start,
+            cx,
+            src.as_ptr(),
+            src_stride,
+            dst.as_mut_ptr(),
+            weight,
+            bounds,
+        );
+        cx += 1;
     }
 }

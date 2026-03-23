@@ -34,13 +34,13 @@ use std::arch::x86_64::*;
 
 #[inline]
 #[cfg(target_feature = "avx2")]
-pub(crate) unsafe fn _mm_srlv_epi32x(c: __m128i, n: __m128i) -> __m128i {
+pub(crate) fn _mm_srlv_epi32x(c: __m128i, n: __m128i) -> __m128i {
     unsafe { _mm_srlv_epi32(c, n) }
 }
 
 #[inline]
 #[cfg(not(target_feature = "avx2"))]
-pub(crate) unsafe fn _mm_srlv_epi32x(c: __m128i, n: __m128i) -> __m128i {
+pub(crate) fn _mm_srlv_epi32x(c: __m128i, n: __m128i) -> __m128i {
     unsafe {
         _mm_setr_epi32(
             _mm_extract_epi32::<0>(c).wrapping_shr(_mm_extract_epi32::<0>(n) as u32),
@@ -53,13 +53,13 @@ pub(crate) unsafe fn _mm_srlv_epi32x(c: __m128i, n: __m128i) -> __m128i {
 
 #[inline]
 #[cfg(target_feature = "avx2")]
-pub(crate) unsafe fn _mm_sllv_epi32x(c: __m128i, n: __m128i) -> __m128i {
+pub(crate) fn _mm_sllv_epi32x(c: __m128i, n: __m128i) -> __m128i {
     unsafe { _mm_sllv_epi32(c, n) }
 }
 
 #[inline]
 #[cfg(not(target_feature = "avx2"))]
-pub(crate) unsafe fn _mm_sllv_epi32x(c: __m128i, n: __m128i) -> __m128i {
+pub(crate) fn _mm_sllv_epi32x(c: __m128i, n: __m128i) -> __m128i {
     unsafe {
         _mm_setr_epi32(
             _mm_extract_epi32::<0>(c).wrapping_shl(_mm_extract_epi32::<0>(n) as u32),
@@ -71,7 +71,7 @@ pub(crate) unsafe fn _mm_sllv_epi32x(c: __m128i, n: __m128i) -> __m128i {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_blendv_epi32(xmm0: __m128i, xmm1: __m128i, mask: __m128i) -> __m128i {
+pub(crate) fn _mm_blendv_epi32(xmm0: __m128i, xmm1: __m128i, mask: __m128i) -> __m128i {
     unsafe {
         _mm_castps_si128(_mm_blendv_ps(
             _mm_castsi128_ps(xmm0),
@@ -83,16 +83,12 @@ pub(crate) unsafe fn _mm_blendv_epi32(xmm0: __m128i, xmm1: __m128i, mask: __m128
 
 #[inline(always)]
 /// If mask then `true_vals` otherwise `false_val`
-pub(crate) unsafe fn _mm_select_epi32(
-    mask: __m128i,
-    true_vals: __m128i,
-    false_vals: __m128i,
-) -> __m128i {
-    unsafe { _mm_blendv_epi32(false_vals, true_vals, mask) }
+pub(crate) fn _mm_select_epi32(mask: __m128i, true_vals: __m128i, false_vals: __m128i) -> __m128i {
+    _mm_blendv_epi32(false_vals, true_vals, mask)
 }
 
 #[inline]
-unsafe fn _mm_cmpneq_epi32(a: __m128i, b: __m128i) -> __m128i {
+fn _mm_cmpneq_epi32(a: __m128i, b: __m128i) -> __m128i {
     unsafe {
         // Compare for equality
         let eq_mask = _mm_cmpeq_epi32(a, b);
@@ -104,7 +100,7 @@ unsafe fn _mm_cmpneq_epi32(a: __m128i, b: __m128i) -> __m128i {
     This is not fully IEEE complaint conversion, only more straight for fallback
 **/
 #[inline]
-unsafe fn _mm_cvtph_ps_fallback(k: __m128i) -> __m128 {
+fn _mm_cvtph_ps_fallback(k: __m128i) -> __m128 {
     unsafe {
         let h = _mm_unpacklo_epi16(k, _mm_setzero_si128());
         // Constants
