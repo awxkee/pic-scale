@@ -227,18 +227,6 @@ impl<const D: bool> Row4ExecutionHandler<D> {
                     jx += 1;
                 }
 
-                // let mut packed = _mm_hadd_epi32(
-                //     _mm_hadd_epi32(store_0, store_1),
-                //     _mm_hadd_epi32(store_2, store_3),
-                // );
-                // packed = _mm_srai_epi32::<PRECISION>(packed);
-                // let mut saturated = _mm_packus_epi32(packed, packed);
-                // saturated = _mm_min_epi16(saturated, v_max_colors);
-                //
-                // _mm_storeu_si16((chunk0 as *mut u16).cast(), saturated);
-                // _mm_storeu_si16((chunk1 as *mut u16).cast(), _mm_srli_si128::<2>(saturated));
-                // _mm_storeu_si16((chunk2 as *mut u16).cast(), _mm_srli_si128::<4>(saturated));
-                // _mm_storeu_si16((chunk3 as *mut u16).cast(), _mm_srli_si128::<6>(saturated));
                 let v_st0 = _mm_reduce_r_epi32::<PRECISION>(store_0);
                 let v_st1 = _mm_reduce_r_epi32::<PRECISION>(store_1);
                 let v_st2 = _mm_reduce_r_epi32::<PRECISION>(store_2);

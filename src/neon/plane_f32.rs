@@ -292,17 +292,16 @@ pub(crate) fn convolve_horizontal_plane_neon_rows_4(
                 jx += 1;
             }
 
+            let packed = vpaddq_f32(vpaddq_f32(store_0, store_1), vpaddq_f32(store_2, store_3));
+
             let dest_ptr0 = dst.get_unchecked_mut(x);
-            *dest_ptr0 = vaddvq_f32(store_0);
-
+            vst1q_lane_f32::<0>(dest_ptr0, packed);
             let dest_ptr1 = dst.get_unchecked_mut(x + dst_stride);
-            *dest_ptr1 = vaddvq_f32(store_1);
-
+            vst1q_lane_f32::<1>(dest_ptr1, packed);
             let dest_ptr2 = dst.get_unchecked_mut(x + dst_stride * 2);
-            *dest_ptr2 = vaddvq_f32(store_2);
-
+            vst1q_lane_f32::<2>(dest_ptr2, packed);
             let dest_ptr3 = dst.get_unchecked_mut(x + dst_stride * 3);
-            *dest_ptr3 = vaddvq_f32(store_3);
+            vst1q_lane_f32::<3>(dest_ptr3, packed);
 
             filter_offset += filter_weights.aligned_size;
         }
