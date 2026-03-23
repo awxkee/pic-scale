@@ -252,8 +252,17 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
                         bit_depth,
                     );
                 } else if CN == 1 {
-                    use crate::avx2::convolve_horizontal_plane_avx_u16_row_f;
-                    return convolve_horizontal_plane_avx_u16_row_f(
+                    if has_fma {
+                        use crate::avx2::convolve_horizontal_plane_avx_u16_row_fma;
+                        return convolve_horizontal_plane_avx_u16_row_fma(
+                            src,
+                            dst,
+                            filter_weights,
+                            bit_depth,
+                        );
+                    }
+                    use crate::avx2::convolve_horizontal_plane_avx_u16_row_default;
+                    return convolve_horizontal_plane_avx_u16_row_default(
                         src,
                         dst,
                         filter_weights,
@@ -350,8 +359,19 @@ impl RowHandlerFloatingPoint<u16, f32, f32> for u16 {
                         bit_depth,
                     );
                 } else if CN == 1 {
-                    use crate::avx2::convolve_horizontal_plane_avx_rows_4_u16_f;
-                    return convolve_horizontal_plane_avx_rows_4_u16_f(
+                    if has_fma {
+                        use crate::avx2::convolve_horizontal_plane_avx_rows_4_u16_fma;
+                        return convolve_horizontal_plane_avx_rows_4_u16_fma(
+                            src,
+                            src_stride,
+                            dst,
+                            dst_stride,
+                            filter_weights,
+                            bit_depth,
+                        );
+                    }
+                    use crate::avx2::convolve_horizontal_plane_avx_rows_4_u16_default;
+                    return convolve_horizontal_plane_avx_rows_4_u16_default(
                         src,
                         src_stride,
                         dst,

@@ -252,7 +252,6 @@ pub(crate) fn convolve_horizontal_plane_avx_u16lp_row(
 ) {
     unsafe {
         #[cfg(feature = "avx512")]
-        #[allow(clippy::incompatible_msrv)]
         if std::arch::is_x86_feature_detected!("avxvnni") {
             return convolve_horizontal_plane_avx_u16_row_vn(src, dst, filter_weights, bit_depth);
         }

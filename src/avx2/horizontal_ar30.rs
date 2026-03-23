@@ -151,7 +151,7 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row4ExecutionUnit<AR_TYPE, AR_
 
     #[inline]
     #[target_feature(enable = "avx2")]
-    unsafe fn conv_horiz_rgba_1_u8_i16(
+    fn conv_horiz_rgba_1_u8_i16(
         &self,
         start_x: usize,
         src0: &[u8],

@@ -48,12 +48,8 @@ fn ch_parts_4_rgb_f32_sse<const FMA: bool>(
         let rgb_pixel_0 = _mm_loadu_ps(src_ptr.as_ptr());
         let rgb_pixel_1 = _mm_loadu_ps(src_ptr.get_unchecked(3..).as_ptr());
         let rgb_pixel_2 = _mm_loadu_ps(src_ptr.get_unchecked(6..).as_ptr());
-        let rgb_pixel_3 = _mm_setr_ps(
-            *src_ptr.get_unchecked(9),
-            *src_ptr.get_unchecked(10),
-            *src_ptr.get_unchecked(11),
-            0.,
-        );
+        let mut rgb_pixel_3 = _mm_loadu_ps(src_ptr.get_unchecked(8..).as_ptr());
+        rgb_pixel_3 = _mm_shuffle_ps::<{ shuffle(0, 3, 2, 1) }>(rgb_pixel_3, rgb_pixel_3);
 
         let acc = _mm_prefer_fma_ps::<FMA>(store_0, rgb_pixel_0, weight0);
         let acc = _mm_prefer_fma_ps::<FMA>(acc, rgb_pixel_1, weight1);
@@ -81,22 +77,14 @@ fn ch_parts_4_rgb_f32_avx<const FMA: bool>(
         let rgb_pixel_0_0 = _mm_loadu_ps(src_ptr0.as_ptr());
         let rgb_pixel_0_1 = _mm_loadu_ps(src_ptr0.get_unchecked(3..).as_ptr());
         let rgb_pixel_0_2 = _mm_loadu_ps(src_ptr0.get_unchecked(6..).as_ptr());
-        let rgb_pixel_0_3 = _mm_setr_ps(
-            *src_ptr0.get_unchecked(9),
-            *src_ptr0.get_unchecked(10),
-            *src_ptr0.get_unchecked(11),
-            0.,
-        );
+        let mut rgb_pixel_0_3 = _mm_loadu_ps(src_ptr0.get_unchecked(8..).as_ptr());
+        rgb_pixel_0_3 = _mm_shuffle_ps::<{ shuffle(0, 3, 2, 1) }>(rgb_pixel_0_3, rgb_pixel_0_3);
 
         let rgb_pixel_1_0 = _mm_loadu_ps(src_ptr1.as_ptr());
         let rgb_pixel_1_1 = _mm_loadu_ps(src_ptr1.get_unchecked(3..).as_ptr());
         let rgb_pixel_1_2 = _mm_loadu_ps(src_ptr1.get_unchecked(6..).as_ptr());
-        let rgb_pixel_1_3 = _mm_setr_ps(
-            *src_ptr1.get_unchecked(9),
-            *src_ptr1.get_unchecked(10),
-            *src_ptr1.get_unchecked(11),
-            0.,
-        );
+        let mut rgb_pixel_1_3 = _mm_loadu_ps(src_ptr1.get_unchecked(8..).as_ptr());
+        rgb_pixel_1_3 = _mm_shuffle_ps::<{ shuffle(0, 3, 2, 1) }>(rgb_pixel_1_3, rgb_pixel_1_3);
 
         let rgb_pixel_0 =
             _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(rgb_pixel_0_0), rgb_pixel_1_0);
@@ -132,20 +120,12 @@ fn ch_parts_2_rgb_f32_avx<const FMA: bool>(
         let orig1 = _mm_loadu_ps(src_ptr1.as_ptr());
 
         let rgb_pixel_0_0 = orig0;
-        let rgb_pixel_0_1 = _mm_setr_ps(
-            *src_ptr0.get_unchecked(3),
-            *src_ptr0.get_unchecked(4),
-            *src_ptr0.get_unchecked(5),
-            0.,
-        );
+        let mut rgb_pixel_0_1 = _mm_loadu_ps(src_ptr0.get_unchecked(2..).as_ptr());
+        rgb_pixel_0_1 = _mm_shuffle_ps::<{ shuffle(0, 3, 2, 1) }>(rgb_pixel_0_1, rgb_pixel_0_1);
 
         let rgb_pixel_1_0 = orig1;
-        let rgb_pixel_1_1 = _mm_setr_ps(
-            *src_ptr1.get_unchecked(3),
-            *src_ptr1.get_unchecked(4),
-            *src_ptr1.get_unchecked(5),
-            0.,
-        );
+        let mut rgb_pixel_1_1 = _mm_loadu_ps(src_ptr1.get_unchecked(2..).as_ptr());
+        rgb_pixel_1_1 = _mm_shuffle_ps::<{ shuffle(0, 3, 2, 1) }>(rgb_pixel_1_1, rgb_pixel_1_1);
 
         let rgb_pixel_0 =
             _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(rgb_pixel_0_0), rgb_pixel_1_0);
@@ -172,12 +152,8 @@ fn ch_parts_2_rgb_f32<const FMA: bool>(
 
         let orig1 = _mm_loadu_ps(src_ptr.as_ptr());
         let rgb_pixel_0 = orig1;
-        let rgb_pixel_1 = _mm_setr_ps(
-            *src_ptr.get_unchecked(3),
-            *src_ptr.get_unchecked(4),
-            *src_ptr.get_unchecked(5),
-            0.,
-        );
+        let mut rgb_pixel_1 = _mm_loadu_ps(src_ptr.get_unchecked(2..).as_ptr());
+        rgb_pixel_1 = _mm_shuffle_ps::<{ shuffle(0, 3, 2, 1) }>(rgb_pixel_1, rgb_pixel_1);
 
         let mut acc = _mm_prefer_fma_ps::<FMA>(store_0, rgb_pixel_0, weight0);
         acc = _mm_prefer_fma_ps::<FMA>(acc, rgb_pixel_1, weight1);

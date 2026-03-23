@@ -82,7 +82,8 @@ pub(crate) use plane_f32_f64::{
     convolve_hor_plane_avx_row_one_f32_f64, convolve_hor_plane_avx_rows_4_f32_f64,
 };
 pub(crate) use plane_u16::{
-    convolve_horizontal_plane_avx_rows_4_u16_f, convolve_horizontal_plane_avx_u16_row_f,
+    convolve_horizontal_plane_avx_rows_4_u16_default, convolve_horizontal_plane_avx_rows_4_u16_fma,
+    convolve_horizontal_plane_avx_u16_row_default, convolve_horizontal_plane_avx_u16_row_fma,
 };
 pub(crate) use plane_u16_lb::{
     convolve_horizontal_plane_avx_rows_4_u16, convolve_horizontal_plane_avx_u16lp_row,

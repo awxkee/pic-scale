@@ -110,7 +110,7 @@ fn conv_horiz_rgba_8_u16<const FMA: bool>(
     }
 }
 
-pub(crate) fn convolve_horizontal_plane_avx_rows_4_u16_f(
+pub(crate) fn convolve_horizontal_plane_avx_rows_4_u16_default(
     src: &[u16],
     src_stride: usize,
     dst: &mut [u16],
@@ -119,25 +119,34 @@ pub(crate) fn convolve_horizontal_plane_avx_rows_4_u16_f(
     bit_depth: u32,
 ) {
     unsafe {
-        if std::arch::is_x86_feature_detected!("fma") {
-            convolve_horizontal_plane_avx_rows_4_u16_fma(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                filter_weights,
-                bit_depth,
-            );
-        } else {
-            convolve_horizontal_plane_avx_rows_4_u16_def(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                filter_weights,
-                bit_depth,
-            );
-        }
+        convolve_horizontal_plane_avx_rows_4_u16_def(
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+            filter_weights,
+            bit_depth,
+        );
+    }
+}
+
+pub(crate) fn convolve_horizontal_plane_avx_rows_4_u16_fma(
+    src: &[u16],
+    src_stride: usize,
+    dst: &mut [u16],
+    dst_stride: usize,
+    filter_weights: &FilterWeights<f32>,
+    bit_depth: u32,
+) {
+    unsafe {
+        convolve_horizontal_plane_avx_rows_4_u16_fma_impl(
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+            filter_weights,
+            bit_depth,
+        );
     }
 }
 
@@ -157,7 +166,7 @@ fn convolve_horizontal_plane_avx_rows_4_u16_def(
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
-fn convolve_horizontal_plane_avx_rows_4_u16_fma(
+fn convolve_horizontal_plane_avx_rows_4_u16_fma_impl(
     src: &[u16],
     src_stride: usize,
     dst: &mut [u16],
@@ -282,18 +291,25 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
     }
 }
 
-pub(crate) fn convolve_horizontal_plane_avx_u16_row_f(
+pub(crate) fn convolve_horizontal_plane_avx_u16_row_fma(
     src: &[u16],
     dst: &mut [u16],
     filter_weights: &FilterWeights<f32>,
     bit_depth: u32,
 ) {
     unsafe {
-        if std::arch::is_x86_feature_detected!("fma") {
-            convolve_horizontal_plane_avx_u16_row_fma(src, dst, filter_weights, bit_depth);
-        } else {
-            convolve_horizontal_plane_avx_u16_row_def(src, dst, filter_weights, bit_depth);
-        }
+        convolve_horizontal_plane_avx_u16_row_fma_impl(src, dst, filter_weights, bit_depth);
+    }
+}
+
+pub(crate) fn convolve_horizontal_plane_avx_u16_row_default(
+    src: &[u16],
+    dst: &mut [u16],
+    filter_weights: &FilterWeights<f32>,
+    bit_depth: u32,
+) {
+    unsafe {
+        convolve_horizontal_plane_avx_u16_row_def(src, dst, filter_weights, bit_depth);
     }
 }
 
@@ -311,7 +327,7 @@ fn convolve_horizontal_plane_avx_u16_row_def(
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
-fn convolve_horizontal_plane_avx_u16_row_fma(
+fn convolve_horizontal_plane_avx_u16_row_fma_impl(
     src: &[u16],
     dst: &mut [u16],
     filter_weights: &FilterWeights<f32>,
