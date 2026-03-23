@@ -215,25 +215,25 @@ fn xconvolve_vertical_rgb_neon_row_f16_impl(
     let mut cx = 0usize;
     let dst_width = dst.len();
 
-    while cx + 48 < dst_width {
+    while cx + 48 <= dst_width {
         conv_vertical_part_neon_48_f16!(bounds.start, cx, src, src_stride, dst, weight_ptr, bounds);
 
         cx += 48;
     }
 
-    while cx + 32 < dst_width {
+    while cx + 32 <= dst_width {
         conv_vertical_part_neon_32_f16!(bounds.start, cx, src, src_stride, dst, weight_ptr, bounds);
 
         cx += 32;
     }
 
-    while cx + 16 < dst_width {
+    while cx + 16 <= dst_width {
         conv_vertical_part_neon_16_f16!(bounds.start, cx, src, src_stride, dst, weight_ptr, bounds);
 
         cx += 16;
     }
 
-    while cx + 8 < dst_width {
+    while cx + 8 <= dst_width {
         xconvolve_vertical_part_neon_8_f16::<false>(
             bounds.start,
             cx,

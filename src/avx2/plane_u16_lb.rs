@@ -157,6 +157,8 @@ impl<const D: bool> Row4ExecutionHandler<D> {
             let iter_row2 = row2_ref.iter_mut();
             let iter_row3 = row3_ref.iter_mut();
 
+            let base_val = _mm_setr_epi32(ROUNDING_CONST, 0, 0, 0);
+
             for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
                 .zip(iter_row1)
                 .zip(iter_row2)
@@ -169,30 +171,10 @@ impl<const D: bool> Row4ExecutionHandler<D> {
                 )
             {
                 let mut jx = 0usize;
-                let mut store_0 = _mm_setr_epi32(
-                    ROUNDING_CONST,
-                    ROUNDING_CONST,
-                    ROUNDING_CONST,
-                    ROUNDING_CONST,
-                );
-                let mut store_1 = _mm_setr_epi32(
-                    ROUNDING_CONST,
-                    ROUNDING_CONST,
-                    ROUNDING_CONST,
-                    ROUNDING_CONST,
-                );
-                let mut store_2 = _mm_setr_epi32(
-                    ROUNDING_CONST,
-                    ROUNDING_CONST,
-                    ROUNDING_CONST,
-                    ROUNDING_CONST,
-                );
-                let mut store_3 = _mm_setr_epi32(
-                    ROUNDING_CONST,
-                    ROUNDING_CONST,
-                    ROUNDING_CONST,
-                    ROUNDING_CONST,
-                );
+                let mut store_0 = base_val;
+                let mut store_1 = base_val;
+                let mut store_2 = base_val;
+                let mut store_3 = base_val;
 
                 let bounds_size = bounds.size;
 
@@ -245,6 +227,18 @@ impl<const D: bool> Row4ExecutionHandler<D> {
                     jx += 1;
                 }
 
+                // let mut packed = _mm_hadd_epi32(
+                //     _mm_hadd_epi32(store_0, store_1),
+                //     _mm_hadd_epi32(store_2, store_3),
+                // );
+                // packed = _mm_srai_epi32::<PRECISION>(packed);
+                // let mut saturated = _mm_packus_epi32(packed, packed);
+                // saturated = _mm_min_epi16(saturated, v_max_colors);
+                //
+                // _mm_storeu_si16((chunk0 as *mut u16).cast(), saturated);
+                // _mm_storeu_si16((chunk1 as *mut u16).cast(), _mm_srli_si128::<2>(saturated));
+                // _mm_storeu_si16((chunk2 as *mut u16).cast(), _mm_srli_si128::<4>(saturated));
+                // _mm_storeu_si16((chunk3 as *mut u16).cast(), _mm_srli_si128::<6>(saturated));
                 let v_st0 = _mm_reduce_r_epi32::<PRECISION>(store_0);
                 let v_st1 = _mm_reduce_r_epi32::<PRECISION>(store_1);
                 let v_st2 = _mm_reduce_r_epi32::<PRECISION>(store_2);
@@ -315,6 +309,7 @@ impl<const D: bool> OneRowExecutionUnit<D> {
     ) {
         unsafe {
             let v_max_colors = _mm_set1_epi16((1 << bit_depth) - 1);
+            let base_val = _mm_setr_epi32(ROUNDING_CONST, 0, 0, 0);
 
             for ((dst, bounds), weights) in dst.iter_mut().zip(filter_weights.bounds.iter()).zip(
                 filter_weights
@@ -323,12 +318,7 @@ impl<const D: bool> OneRowExecutionUnit<D> {
             ) {
                 let bounds_size = bounds.size;
                 let mut jx = 0usize;
-                let mut store = _mm_setr_epi32(
-                    ROUNDING_CONST,
-                    ROUNDING_CONST,
-                    ROUNDING_CONST,
-                    ROUNDING_CONST,
-                );
+                let mut store = base_val;
 
                 while jx + 8 <= bounds_size {
                     let w_ptr = weights.get_unchecked(jx..);
@@ -366,7 +356,7 @@ impl<const D: bool> OneRowExecutionUnit<D> {
 
                 let v_zst1 =
                     _mm_min_epi16(_mm_packus_epi32(v_st0, _mm_setzero_si128()), v_max_colors);
-                _mm_storeu_si16(dst as *mut u16 as *mut _, v_zst1);
+                _mm_storeu_si16((dst as *mut u16).cast(), v_zst1);
             }
         }
     }

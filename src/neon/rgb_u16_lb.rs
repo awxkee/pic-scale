@@ -115,10 +115,6 @@ fn conv_horiz_rgba_8_u16(
         let part1 = vld1q_u16(src_ptr.get_unchecked(8..).as_ptr()); // [b2,r3,g3,b3,r4,g4,b4,r5]
         let part2 = vld1q_u16(src_ptr.get_unchecked(16..).as_ptr()); // [g5,b5,r6,g6,b6,r7,g7,b7]
 
-        // pixel 0: [r0,g0,b0,_] = low(part0)
-        // pixel 1: [r1,g1,b1,_] = vext<3>(low(part0), high(part0))
-        // pixel 2: [r2,g2,b2,_] = vext<2>(high(part0), low(part1))
-        // pixel 3: [r3,g3,b3,_] = vext<1>(low(part1), high(part1))
         let p1 = vext_u16::<3>(vget_low_u16(part0), vget_high_u16(part0));
         let p2 = vext_u16::<2>(vget_high_u16(part0), vget_low_u16(part1));
         let p3 = vext_u16::<1>(vget_low_u16(part1), vget_high_u16(part1));
@@ -129,10 +125,6 @@ fn conv_horiz_rgba_8_u16(
         acc = vmlal_laneq_s16::<2>(acc, vreinterpret_s16_u16(p2), weights);
         acc = vmlal_laneq_s16::<3>(acc, vreinterpret_s16_u16(p3), weights);
 
-        // pixel 4: [r4,g4,b4,_] = vext<0>(high(part1), high(part1)) = high(part1) directly
-        // pixel 5: [r5,g5,b5,_] = vext<3>(high(part1), low(part2))
-        // pixel 6: [r6,g6,b6,_] = vext<2>(low(part2), high(part2))
-        // pixel 7: [r7,g7,b7,_] = vext<1>(high(part2), high(part2))
         let p5 = vext_u16::<3>(vget_high_u16(part1), vget_low_u16(part2));
         let p6 = vext_u16::<2>(vget_low_u16(part2), vget_high_u16(part2));
         let p7 = vext_u16::<1>(vget_high_u16(part2), vget_high_u16(part2));

@@ -274,7 +274,7 @@ fn convolve_column_lb_32<const HAS_DOT: bool>(
                 item1,
             );
 
-            cx = v_dx;
+            cx += 32;
         }
         cx
     }
@@ -330,7 +330,7 @@ fn convolve_column_lb_16<const HAS_DOT: bool>(
 
             _mm256_storeu_si256(dst.as_mut_ptr() as *mut __m256i, item0);
 
-            cx = v_dx;
+            cx += 16;
         }
         cx
     }
@@ -383,7 +383,7 @@ fn convolve_column_lb_8<const HAS_DOT: bool>(
                 _mm256_castsi256_si128(item),
             );
 
-            cx = v_dx;
+            cx += 8;
         }
         cx
     }
@@ -473,7 +473,7 @@ fn convolve_column_lb_avx_u16_impl<const HAS_DOT: bool>(
             let u_store0 = _mm_min_epi16(_mm_packus_epi32(v_st, v_st), v_max_colors_sse);
             _mm_storeu_si64(dst.as_mut_ptr() as *mut u8, u_store0);
 
-            cx = v_dx;
+            cx += 4;
         }
 
         let tail4 = tail8.chunks_exact_mut(4).into_remainder();

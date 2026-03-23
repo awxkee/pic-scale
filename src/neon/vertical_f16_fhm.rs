@@ -79,7 +79,7 @@ pub(crate) fn conv_vertical_part_neon_16_f16(
 
 #[inline]
 #[target_feature(enable = "fp16,fhm")]
-pub(crate) unsafe fn conv_vertical_part_neon_32_f16(
+pub(crate) fn conv_vertical_part_neon_32_f16(
     start_y: usize,
     start_x: usize,
     src: &[f16],
@@ -137,7 +137,7 @@ pub(crate) unsafe fn conv_vertical_part_neon_32_f16(
 
 #[inline]
 #[target_feature(enable = "fp16,fhm")]
-pub(crate) unsafe fn conv_vertical_part_neon_48_f16(
+pub(crate) fn conv_vertical_part_neon_48_f16(
     start_y: usize,
     start_x: usize,
     src: &[f16],
@@ -286,80 +286,54 @@ fn convolve_vertical_rgb_neon_row_f16_impl(
     src_stride: usize,
     weight_ptr: &[f16],
 ) {
-    unsafe {
-        let mut cx = 0usize;
-        let dst_width = dst.len();
+    let mut cx = 0usize;
+    let dst_width = dst.len();
 
-        while cx + 48 < dst_width {
-            conv_vertical_part_neon_48_f16(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
+    while cx + 48 <= dst_width {
+        conv_vertical_part_neon_48_f16(bounds.start, cx, src, src_stride, dst, weight_ptr, bounds);
 
-            cx += 48;
-        }
+        cx += 48;
+    }
 
-        while cx + 32 < dst_width {
-            conv_vertical_part_neon_32_f16(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
+    while cx + 32 <= dst_width {
+        conv_vertical_part_neon_32_f16(bounds.start, cx, src, src_stride, dst, weight_ptr, bounds);
 
-            cx += 32;
-        }
+        cx += 32;
+    }
 
-        while cx + 16 < dst_width {
-            conv_vertical_part_neon_16_f16(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-            );
+    while cx + 16 <= dst_width {
+        conv_vertical_part_neon_16_f16(bounds.start, cx, src, src_stride, dst, weight_ptr, bounds);
 
-            cx += 16;
-        }
+        cx += 16;
+    }
 
-        while cx + 8 < dst_width {
-            convolve_vertical_part_neon_8_f16_fhm::<false>(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-                8,
-            );
+    while cx + 8 <= dst_width {
+        convolve_vertical_part_neon_8_f16_fhm::<false>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+            8,
+        );
 
-            cx += 8;
-        }
+        cx += 8;
+    }
 
-        let left = dst_width - cx;
+    let left = dst_width - cx;
 
-        if left > 0 {
-            convolve_vertical_part_neon_8_f16_fhm::<true>(
-                bounds.start,
-                cx,
-                src,
-                src_stride,
-                dst,
-                weight_ptr,
-                bounds,
-                left,
-            );
-        }
+    if left > 0 {
+        convolve_vertical_part_neon_8_f16_fhm::<true>(
+            bounds.start,
+            cx,
+            src,
+            src_stride,
+            dst,
+            weight_ptr,
+            bounds,
+            left,
+        );
     }
 }

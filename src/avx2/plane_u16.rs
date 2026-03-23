@@ -267,35 +267,16 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                     jx += 1;
                 }
 
-                store_0 = _mm_hsum_ps(store_0);
-                store_1 = _mm_hsum_ps(store_1);
-                store_2 = _mm_hsum_ps(store_2);
-                store_3 = _mm_hsum_ps(store_3);
+                let packed =
+                    _mm_hadd_ps(_mm_hadd_ps(store_0, store_1), _mm_hadd_ps(store_2, store_3));
+                let converted = _mm_cvtps_epi32(packed);
+                let saturated = _mm_min_epi32(converted, v_max_colors);
+                let us16 = _mm_packus_epi32(saturated, saturated);
 
-                let v_st0 = _mm_min_epi32(
-                    _mm_cvtps_epi32(_mm_max_ps(store_0, _mm_setzero_ps())),
-                    v_max_colors,
-                );
-                let v_st1 = _mm_min_epi32(
-                    _mm_cvtps_epi32(_mm_max_ps(store_1, _mm_setzero_ps())),
-                    v_max_colors,
-                );
-                let v_st2 = _mm_min_epi32(
-                    _mm_cvtps_epi32(_mm_max_ps(store_2, _mm_setzero_ps())),
-                    v_max_colors,
-                );
-                let v_st3 = _mm_min_epi32(
-                    _mm_cvtps_epi32(_mm_max_ps(store_3, _mm_setzero_ps())),
-                    v_max_colors,
-                );
-
-                let store_16_0 = _mm_packus_epi32(v_st0, v_st1);
-                let store_16_1 = _mm_packus_epi32(v_st2, v_st3);
-
-                *chunk0 = _mm_extract_epi16::<0>(store_16_0) as u16;
-                *chunk1 = _mm_extract_epi16::<4>(store_16_0) as u16;
-                *chunk2 = _mm_extract_epi16::<0>(store_16_1) as u16;
-                *chunk3 = _mm_extract_epi16::<4>(store_16_1) as u16;
+                _mm_storeu_si16((chunk0 as *mut u16).cast(), us16);
+                _mm_storeu_si16((chunk1 as *mut u16).cast(), _mm_srli_si128::<2>(us16));
+                _mm_storeu_si16((chunk2 as *mut u16).cast(), _mm_srli_si128::<4>(us16));
+                _mm_storeu_si16((chunk3 as *mut u16).cast(), _mm_srli_si128::<6>(us16));
             }
         }
     }
@@ -399,10 +380,7 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
 
                 store = _mm_hsum_ps(store);
 
-                let v_st = _mm_min_epi32(
-                    _mm_cvtps_epi32(_mm_max_ps(store, _mm_setzero_ps())),
-                    v_max_colors,
-                );
+                let v_st = _mm_min_epi32(_mm_cvtps_epi32(store), v_max_colors);
 
                 let store_16_0 = _mm_packus_epi32(v_st, v_st);
                 *dst = _mm_extract_epi16::<0>(store_16_0) as u16;

@@ -42,7 +42,7 @@ pub(crate) fn convolve_column_u16(
 ) {
     unsafe {
         let max_colors = (1u32 << bit_depth) - 1;
-        let mut k_cx = 0usize;
+        let mut cx = 0usize;
 
         let bounds_size = bounds.size;
 
@@ -50,7 +50,7 @@ pub(crate) fn convolve_column_u16(
 
         let v_max_colors = vdupq_n_u16(max_colors as u16);
 
-        let v_px = k_cx;
+        let v_px = cx;
 
         let iter16 = dst.chunks_exact_mut(16);
 
@@ -97,13 +97,13 @@ pub(crate) fn convolve_column_u16(
             );
             vst1q_u16(dst.as_mut_ptr().add(8), item1);
 
-            k_cx = v_dx;
+            cx += 16;
         }
 
         let tail16 = dst.chunks_exact_mut(16).into_remainder();
         let iter8 = tail16.chunks_exact_mut(8);
 
-        let v_px = k_cx;
+        let v_px = cx;
 
         for (x, dst) in iter8.enumerate() {
             let mut store0 = zeros;
@@ -134,13 +134,13 @@ pub(crate) fn convolve_column_u16(
             );
             vst1q_u16(dst.as_mut_ptr(), item);
 
-            k_cx = v_dx;
+            cx += 8;
         }
 
         let tail8 = tail16.chunks_exact_mut(8).into_remainder();
         let iter4 = tail8.chunks_exact_mut(4);
 
-        let v_cx = k_cx;
+        let v_cx = cx;
 
         for (x, dst) in iter4.enumerate() {
             let mut store0 = zeros;
@@ -166,12 +166,12 @@ pub(crate) fn convolve_column_u16(
                 vmin_u16(vqmovn_u32(u_store0), vget_low_u16(v_max_colors)),
             );
 
-            k_cx = v_dx;
+            cx += 4;
         }
 
         let tail4 = tail8.chunks_exact_mut(4).into_remainder();
 
-        let a_px = k_cx;
+        let a_px = cx;
 
         for (x, dst) in tail4.iter_mut().enumerate() {
             let mut store0 = 0.;

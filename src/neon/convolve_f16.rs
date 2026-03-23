@@ -32,7 +32,7 @@ use core::f16;
 use std::arch::aarch64::*;
 
 #[inline(always)]
-pub(crate) unsafe fn convolve_vertical_part_neon_8_f16<const USE_BLENDING: bool>(
+pub(crate) fn convolve_vertical_part_neon_8_f16<const USE_BLENDING: bool>(
     start_y: usize,
     start_x: usize,
     src: &[f16],

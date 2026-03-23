@@ -53,7 +53,7 @@ impl RowFactoryProducer for u16 {
         bit_depth: usize,
         threading_policy: ThreadingPolicy,
     ) -> Arc<dyn RowFilter<u16, CN> + Send + Sync> {
-        if bit_depth < 12 {
+        if bit_depth <= 12 {
             let approx = weights.numerical_approximation_i16::<PRECISION>(0);
             return Arc::new(HorizontalFiltering {
                 filter_weights: approx,
