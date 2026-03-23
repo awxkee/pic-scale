@@ -51,12 +51,8 @@ fn convolve_horizontal_parts_4_rgb_f32<const FMA: bool>(
         let rgb_pixel_0 = _mm_loadu_ps(src_ptr);
         let rgb_pixel_1 = _mm_loadu_ps(src_ptr.add(3));
         let rgb_pixel_2 = _mm_loadu_ps(src_ptr.add(6));
-        let rgb_pixel_3 = _mm_setr_ps(
-            src_ptr.add(9).read_unaligned(),
-            src_ptr.add(10).read_unaligned(),
-            src_ptr.add(11).read_unaligned(),
-            0f32,
-        );
+        let mut rgb_pixel_3 = _mm_loadu_ps(src_ptr.add(8));
+        rgb_pixel_3 = _mm_shuffle_ps::<{ shuffle(0, 3, 2, 1) }>(rgb_pixel_3, rgb_pixel_3);
 
         let acc = _mm_prefer_fma_ps::<FMA>(store_0, rgb_pixel_0, weight0);
         let acc = _mm_prefer_fma_ps::<FMA>(acc, rgb_pixel_1, weight1);
@@ -79,12 +75,8 @@ fn convolve_horizontal_parts_2_rgb_f32<const FMA: bool>(
 
         let orig1 = _mm_loadu_ps(src_ptr);
         let rgb_pixel_0 = orig1;
-        let rgb_pixel_1 = _mm_setr_ps(
-            src_ptr.add(3).read_unaligned(),
-            src_ptr.add(4).read_unaligned(),
-            src_ptr.add(5).read_unaligned(),
-            0f32,
-        );
+        let mut rgb_pixel_1 = _mm_loadu_ps(src_ptr.add(2));
+        rgb_pixel_1 = _mm_shuffle_ps::<{ shuffle(0, 3, 2, 1) }>(rgb_pixel_1, rgb_pixel_1);
 
         let mut acc = _mm_prefer_fma_ps::<FMA>(store_0, rgb_pixel_0, weight0);
         acc = _mm_prefer_fma_ps::<FMA>(acc, rgb_pixel_1, weight1);

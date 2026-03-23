@@ -39,11 +39,7 @@ pub(crate) fn avx_has_non_constant_cap_alpha_rgba8(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn avx_has_non_constant_cap_alpha_rgba8_impl(
-    store: &[u8],
-    width: usize,
-    stride: usize,
-) -> bool {
+fn avx_has_non_constant_cap_alpha_rgba8_impl(store: &[u8], width: usize, stride: usize) -> bool {
     unsafe {
         if store.is_empty() {
             return true;
@@ -138,11 +134,7 @@ pub(crate) fn avx_has_non_constant_cap_alpha_rgba16(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn avx_has_non_constant_cap_alpha_rgba16_impl(
-    store: &[u16],
-    width: usize,
-    stride: usize,
-) -> bool {
+fn avx_has_non_constant_cap_alpha_rgba16_impl(store: &[u16], width: usize, stride: usize) -> bool {
     unsafe {
         if store.is_empty() {
             return true;
