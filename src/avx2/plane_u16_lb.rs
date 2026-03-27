@@ -35,9 +35,9 @@ use std::arch::x86_64::*;
 #[inline(always)]
 fn acc_1_dot<const D: bool>(start_x: usize, src: &[u16], w0: __m128i, store: __m128i) -> __m128i {
     unsafe {
-        const COMPONENTS: usize = 1;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
-        let px = _mm_loadu_si16(src_ptr.as_ptr() as *const _);
+        const CN: usize = 1;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
+        let px = _mm_loadu_si16(src_ptr.as_ptr().cast());
         _mm_dot16_avx_epi32::<D>(store, px, w0)
     }
 }
@@ -45,9 +45,9 @@ fn acc_1_dot<const D: bool>(start_x: usize, src: &[u16], w0: __m128i, store: __m
 #[inline(always)]
 fn acc_2_dot<const D: bool>(start_x: usize, src: &[u16], w0: __m128i, store: __m128i) -> __m128i {
     unsafe {
-        const COMPONENTS: usize = 1;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
-        let px = _mm_loadu_si32(src_ptr.as_ptr() as *const _);
+        const CN: usize = 1;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
+        let px = _mm_loadu_si32(src_ptr.as_ptr().cast());
         _mm_dot16_avx_epi32::<D>(store, px, w0)
     }
 }
@@ -55,9 +55,9 @@ fn acc_2_dot<const D: bool>(start_x: usize, src: &[u16], w0: __m128i, store: __m
 #[inline(always)]
 fn acc_4_dot<const D: bool>(start_x: usize, src: &[u16], w0: __m128i, store: __m128i) -> __m128i {
     unsafe {
-        const COMPONENTS: usize = 1;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
-        let px = _mm_loadu_si64(src_ptr.as_ptr() as *const _);
+        const CN: usize = 1;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
+        let px = _mm_loadu_si64(src_ptr.as_ptr().cast());
         _mm_dot16_avx_epi32::<D>(store, px, w0)
     }
 }
@@ -65,9 +65,9 @@ fn acc_4_dot<const D: bool>(start_x: usize, src: &[u16], w0: __m128i, store: __m
 #[inline(always)]
 fn acc_8_dot<const D: bool>(start_x: usize, src: &[u16], w0: __m128i, store: __m128i) -> __m128i {
     unsafe {
-        const COMPONENTS: usize = 1;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
-        let px = _mm_loadu_si128(src_ptr.as_ptr() as *const _);
+        const CN: usize = 1;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
+        let px = _mm_loadu_si128(src_ptr.as_ptr().cast());
 
         _mm_dot16_avx_epi32::<D>(store, px, w0)
     }
@@ -82,17 +82,6 @@ pub(crate) fn convolve_horizontal_plane_avx_rows_4_u16(
     bit_depth: u32,
 ) {
     unsafe {
-        #[cfg(feature = "avx512")]
-        if std::arch::is_x86_feature_detected!("avxvnni") {
-            return convolve_horizontal_plane_avx_rows_4_lb_vn(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                filter_weights,
-                bit_depth,
-            );
-        }
         convolve_horizontal_plane_avx_rows_4_lb_a(
             src,
             src_stride,
@@ -100,7 +89,28 @@ pub(crate) fn convolve_horizontal_plane_avx_rows_4_u16(
             dst_stride,
             filter_weights,
             bit_depth,
-        );
+        )
+    }
+}
+
+#[cfg(feature = "avx512")]
+pub(crate) fn convolve_horizontal_plane_avx_rows_4_u16_vnni(
+    src: &[u16],
+    src_stride: usize,
+    dst: &mut [u16],
+    dst_stride: usize,
+    filter_weights: &FilterWeights<i16>,
+    bit_depth: u32,
+) {
+    unsafe {
+        convolve_horizontal_plane_avx_rows_4_lb_vn(
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+            filter_weights,
+            bit_depth,
+        )
     }
 }
 
@@ -185,7 +195,7 @@ impl<const D: bool> Row4ExecutionHandler<D> {
 
                 while jx + 8 <= bounds_size {
                     let w_ptr = weights.get_unchecked(jx..);
-                    let wl = _mm_loadu_si128(w_ptr.as_ptr() as *const _);
+                    let wl = _mm_loadu_si128(w_ptr.as_ptr().cast());
                     let bounds_start = bounds.start + jx;
                     store_0 = acc_8_dot::<D>(bounds_start, src0, wl, store_0);
                     store_1 = acc_8_dot::<D>(bounds_start, src1, wl, store_1);
@@ -197,7 +207,7 @@ impl<const D: bool> Row4ExecutionHandler<D> {
                 while jx + 4 <= bounds_size {
                     let bounds_start = bounds.start + jx;
                     let w_ptr = weights.get_unchecked(jx..);
-                    let w0 = _mm_loadu_si64(w_ptr.as_ptr() as *const _);
+                    let w0 = _mm_loadu_si64(w_ptr.as_ptr().cast());
                     store_0 = acc_4_dot::<D>(bounds_start, src0, w0, store_0);
                     store_1 = acc_4_dot::<D>(bounds_start, src1, w0, store_1);
                     store_2 = acc_4_dot::<D>(bounds_start, src2, w0, store_2);
@@ -208,7 +218,7 @@ impl<const D: bool> Row4ExecutionHandler<D> {
                 while jx + 2 <= bounds_size {
                     let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
-                    let w0 = _mm_loadu_si32(w_ptr.as_ptr() as *const _);
+                    let w0 = _mm_loadu_si32(w_ptr.as_ptr().cast());
                     store_0 = acc_2_dot::<D>(bounds_start, src0, w0, store_0);
                     store_1 = acc_2_dot::<D>(bounds_start, src1, w0, store_1);
                     store_2 = acc_2_dot::<D>(bounds_start, src2, w0, store_2);
@@ -219,7 +229,7 @@ impl<const D: bool> Row4ExecutionHandler<D> {
                 while jx < bounds_size {
                     let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
-                    let w0 = _mm_loadu_si16(w_ptr.as_ptr() as *const _);
+                    let w0 = _mm_loadu_si16(w_ptr.as_ptr().cast());
                     store_0 = acc_1_dot::<D>(bounds_start, src0, w0, store_0);
                     store_1 = acc_1_dot::<D>(bounds_start, src1, w0, store_1);
                     store_2 = acc_1_dot::<D>(bounds_start, src2, w0, store_2);
@@ -251,12 +261,18 @@ pub(crate) fn convolve_horizontal_plane_avx_u16lp_row(
     bit_depth: u32,
 ) {
     unsafe {
-        #[cfg(feature = "avx512")]
-        if std::arch::is_x86_feature_detected!("avxvnni") {
-            return convolve_horizontal_plane_avx_u16_row_vn(src, dst, filter_weights, bit_depth);
-        }
         convolve_horizontal_plane_avx_u16_row_avx(src, dst, filter_weights, bit_depth);
     }
+}
+
+#[cfg(feature = "avx512")]
+pub(crate) fn convolve_horizontal_plane_avx_u16lp_row_vnni(
+    src: &[u16],
+    dst: &mut [u16],
+    filter_weights: &FilterWeights<i16>,
+    bit_depth: u32,
+) {
+    unsafe { convolve_horizontal_plane_avx_u16_row_vn(src, dst, filter_weights, bit_depth) }
 }
 
 #[cfg(feature = "avx512")]
@@ -309,7 +325,7 @@ impl<const D: bool> OneRowExecutionUnit<D> {
 
                 while jx + 8 <= bounds_size {
                     let w_ptr = weights.get_unchecked(jx..);
-                    let wl = _mm_loadu_si128(w_ptr.as_ptr() as *const _);
+                    let wl = _mm_loadu_si128(w_ptr.as_ptr().cast());
                     let bounds_start = bounds.start + jx;
                     store = acc_8_dot::<D>(bounds_start, src, wl, store);
                     jx += 8;
@@ -317,7 +333,7 @@ impl<const D: bool> OneRowExecutionUnit<D> {
 
                 while jx + 4 <= bounds_size {
                     let w_ptr = weights.get_unchecked(jx..);
-                    let w0 = _mm_loadu_si64(w_ptr.as_ptr() as *const _);
+                    let w0 = _mm_loadu_si64(w_ptr.as_ptr().cast());
                     let bounds_start = bounds.start + jx;
                     store = acc_4_dot::<D>(bounds_start, src, w0, store);
                     jx += 4;
@@ -326,14 +342,14 @@ impl<const D: bool> OneRowExecutionUnit<D> {
                 while jx + 2 <= bounds_size {
                     let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
-                    let w0 = _mm_loadu_si32(w_ptr.as_ptr() as *const _);
+                    let w0 = _mm_loadu_si32(w_ptr.as_ptr().cast());
                     store = acc_2_dot::<D>(bounds_start, src, w0, store);
                     jx += 2;
                 }
 
                 while jx < bounds_size {
                     let w_ptr = weights.get_unchecked(jx..);
-                    let w0 = _mm_loadu_si16(w_ptr.as_ptr() as *const _);
+                    let w0 = _mm_loadu_si16(w_ptr.as_ptr().cast());
                     let bounds_start = bounds.start + jx;
                     store = acc_1_dot::<D>(bounds_start, src, w0, store);
                     jx += 1;

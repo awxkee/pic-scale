@@ -214,6 +214,12 @@ impl<const N: usize> CheckStoreDensity for ImageStoreMut<'_, u16, N> {
     }
 }
 
+impl<const N: usize> CheckStoreDensity for ImageStoreMut<'_, i16, N> {
+    fn should_have_bit_depth(&self) -> bool {
+        true
+    }
+}
+
 impl<T, const N: usize> ImageStoreMut<'_, T, N> {
     pub(crate) fn validate(&self) -> Result<(), PicScaleError> {
         let expected_size = self.stride() * self.height;
@@ -925,6 +931,8 @@ pub type Rgba8ImageStoreMut<'a> = ImageStoreMut<'a, u8, 4>;
 pub type Rgb8ImageStore<'a> = ImageStore<'a, u8, 3>;
 pub type Rgb8ImageStoreMut<'a> = ImageStoreMut<'a, u8, 3>;
 
+pub type PlanarS16ImageStore<'a> = ImageStore<'a, i16, 1>;
+pub type PlanarS16ImageStoreMut<'a> = ImageStoreMut<'a, i16, 1>;
 pub type Planar16ImageStore<'a> = ImageStore<'a, u16, 1>;
 pub type Planar16ImageStoreMut<'a> = ImageStoreMut<'a, u16, 1>;
 pub type CbCr16ImageStore<'a> = ImageStore<'a, u16, 2>;

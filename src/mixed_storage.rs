@@ -127,6 +127,16 @@ impl MixedStorage<u16> for f64 {
     }
 }
 
+impl MixedStorage<i16> for f32 {
+    #[inline(always)]
+    #[allow(clippy::manual_clamp)]
+    fn to_mixed(self, bit_depth: u32) -> i16 {
+        let max = (1i32 << (bit_depth - 1)) - 1;
+        let min = -(1i32 << (bit_depth - 1));
+        self.cpu_round().min(max as f32).max(min as f32) as i16
+    }
+}
+
 impl MixedStorage<f32> for f32 {
     #[inline(always)]
     #[allow(clippy::manual_clamp)]

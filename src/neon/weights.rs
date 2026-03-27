@@ -32,7 +32,7 @@ use std::arch::aarch64::*;
 
 #[cfg(feature = "nightly_f16")]
 #[target_feature(enable = "fp16")]
-unsafe fn convert_weights_to_f16_impl<J: Default + Clone>(weights: &[f32]) -> Vec<J> {
+fn convert_weights_to_f16_impl<J: Default + Clone>(weights: &[f32]) -> Vec<J> {
     unsafe {
         let mut new_weights = vec![J::default(); weights.len()];
 

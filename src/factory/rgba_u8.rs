@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ * Copyright (c) Radzivon Bartoshyk 3/2026. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -129,18 +129,11 @@ impl HorizontalFilterPass<u8, f32, 4> for ImageStore<'_, u8, 4> {
         {
             let has_avx = std::arch::is_x86_feature_detected!("avx2");
             if has_avx {
-                // if _scale_factor < 8.
-                //     && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
-                // {
-                //     _dispatcher_4_rows = Some(convolve_horizontal_rgba_avx_rows_4_lb);
-                //     _dispatcher_1_row = convolve_horizontal_rgba_avx_rows_one_lb;
-                // } else {
                 use crate::avx2::{
                     convolve_horizontal_rgba_avx_row_1, convolve_horizontal_rgba_row_4,
                 };
                 _dispatcher_4_rows = Some(convolve_horizontal_rgba_row_4);
                 _dispatcher_1_row = convolve_horizontal_rgba_avx_row_1;
-                // }
             }
         }
         #[cfg(all(feature = "avx512", target_arch = "x86_64"))]

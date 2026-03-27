@@ -55,28 +55,21 @@ mod alpha_handle_f16;
 mod alpha_handle_f32;
 mod alpha_handle_u16;
 mod alpha_handle_u8;
-mod ar30;
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 mod avx2;
 #[cfg(all(target_arch = "x86_64", feature = "avx512"))]
 mod avx512;
-mod cbcr16;
-mod cbcr8;
-mod cbcr_f32;
 mod color_group;
 #[cfg(feature = "colorspaces")]
 mod colors;
 mod convolution;
 mod convolve_naive_f32;
-mod dispatch_group_ar30;
-mod dispatch_group_u16;
 #[cfg(feature = "nightly_f16")]
 mod f16;
+mod factory;
 mod filter_weights;
 mod fixed_point_horizontal;
-mod fixed_point_horizontal_ar30;
 mod fixed_point_vertical;
-mod fixed_point_vertical_ar30;
 mod floating_point_horizontal;
 mod floating_point_vertical;
 mod handler_provider;
@@ -88,15 +81,6 @@ mod mlaf;
 #[cfg(all(target_arch = "aarch64", feature = "neon"))]
 mod neon;
 mod plan;
-mod plane_f32;
-mod plane_u16;
-mod plane_u8;
-mod rgb_f32;
-mod rgb_u16;
-mod rgb_u8;
-mod rgba_f32;
-mod rgba_u16;
-mod rgba_u8;
 mod sampler;
 mod saturate_narrow;
 mod scaler;
@@ -111,11 +95,11 @@ mod validation;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 mod wasm32;
 
-pub use ar30::Ar30ByteOrder;
 #[cfg(feature = "colorspaces")]
 pub use colors::*;
 #[cfg(feature = "colorspaces")]
 pub use colorutils_rs::TransferFunction;
+pub use factory::Ar30ByteOrder;
 pub use image_size::ImageSize;
 pub use image_store::{
     BufferStore, CbCr8ImageStore, CbCr8ImageStoreMut, CbCr16ImageStore, CbCr16ImageStoreMut,
@@ -123,9 +107,10 @@ pub use image_store::{
     GrayAlpha16ImageStore, GrayAlpha16ImageStoreMut, GrayAlphaF32ImageStore,
     GrayAlphaF32ImageStoreMut, ImageStore, ImageStoreMut, Planar8ImageStore, Planar8ImageStoreMut,
     Planar16ImageStore, Planar16ImageStoreMut, PlanarF32ImageStore, PlanarF32ImageStoreMut,
-    Rgb8ImageStore, Rgb8ImageStoreMut, Rgb16ImageStore, Rgb16ImageStoreMut, RgbF32ImageStore,
-    RgbF32ImageStoreMut, Rgba8ImageStore, Rgba8ImageStoreMut, Rgba16ImageStore,
-    Rgba16ImageStoreMut, RgbaF32ImageStore, RgbaF32ImageStoreMut,
+    PlanarS16ImageStore, PlanarS16ImageStoreMut, Rgb8ImageStore, Rgb8ImageStoreMut,
+    Rgb16ImageStore, Rgb16ImageStoreMut, RgbF32ImageStore, RgbF32ImageStoreMut, Rgba8ImageStore,
+    Rgba8ImageStoreMut, Rgba16ImageStore, Rgba16ImageStoreMut, RgbaF32ImageStore,
+    RgbaF32ImageStoreMut,
 };
 #[cfg(feature = "nightly_f16")]
 #[cfg_attr(docsrs, doc(cfg(feature = "nightly_f16")))]

@@ -43,7 +43,7 @@ struct AssociateAlphaDefault {}
 
 impl AssociateAlphaDefault {
     #[inline(always)]
-    unsafe fn associate_chunk(&self, dst: &mut [u8], src: &[u8]) {
+    fn associate_chunk(&self, dst: &mut [u8], src: &[u8]) {
         unsafe {
             let working_mask: __mmask64 = if dst.len() == 64 {
                 0xffff_ffff_ffff_ffff
@@ -61,7 +61,7 @@ impl AssociateAlphaDefault {
                 0b0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001;
 
             let src_ptr = src.as_ptr();
-            let rgba0 = _mm512_maskz_loadu_epi8(working_mask, src_ptr as *const _);
+            let rgba0 = _mm512_maskz_loadu_epi8(working_mask, src_ptr.cast());
             let multiplicand = _mm512_shuffle_epi8(rgba0, shuffle);
 
             let zeros = _mm512_setzero_si512();
@@ -78,7 +78,7 @@ impl AssociateAlphaDefault {
             let values = _mm512_mask_blend_epi8(mask, _mm512_packus_epi16(v_ll, v_hi), rgba0);
 
             let dst_ptr = dst.as_mut_ptr();
-            _mm512_mask_storeu_epi8(dst_ptr as *mut _, working_mask, values);
+            _mm512_mask_storeu_epi8(dst_ptr.cast(), working_mask, values);
         }
     }
 }
@@ -86,22 +86,20 @@ impl AssociateAlphaDefault {
 impl AssociateAlpha for AssociateAlphaDefault {
     #[target_feature(enable = "avx512f", enable = "avx512bw")]
     unsafe fn associate(&self, dst: &mut [u8], src: &[u8]) {
-        unsafe {
-            let mut rem = dst;
-            let mut src_rem = src;
+        let mut rem = dst;
+        let mut src_rem = src;
 
-            for (dst, src) in rem.chunks_exact_mut(64).zip(src_rem.chunks_exact(64)) {
-                self.associate_chunk(dst, src);
-            }
+        for (dst, src) in rem.chunks_exact_mut(64).zip(src_rem.chunks_exact(64)) {
+            self.associate_chunk(dst, src);
+        }
 
-            rem = rem.chunks_exact_mut(64).into_remainder();
-            src_rem = src_rem.chunks_exact(64).remainder();
+        rem = rem.chunks_exact_mut(64).into_remainder();
+        src_rem = src_rem.chunks_exact(64).remainder();
 
-            if !rem.is_empty() {
-                assert!(rem.len() <= 64);
-                assert!(src_rem.len() <= 64);
-                self.associate_chunk(rem, src_rem);
-            }
+        if !rem.is_empty() {
+            assert!(rem.len() <= 64);
+            assert!(src_rem.len() <= 64);
+            self.associate_chunk(rem, src_rem);
         }
     }
 }
@@ -141,7 +139,7 @@ struct Avx512DisassociateAlpha<const HAS_VBMI: bool> {}
 
 impl<const HAS_VBMI: bool> Avx512DisassociateAlpha<HAS_VBMI> {
     #[inline(always)]
-    unsafe fn avx512_unpremultiply_row(&self, x: __m512i, a: __m512i) -> __m512i {
+    fn avx512_unpremultiply_row(&self, x: __m512i, a: __m512i) -> __m512i {
         unsafe {
             let zeros = _mm512_setzero_si512();
             let lo = _mm512_unpacklo_epi8(x, zeros);
@@ -189,13 +187,13 @@ impl<const HAS_VBMI: bool> Avx512DisassociateAlpha<HAS_VBMI> {
     }
 
     #[inline(always)]
-    unsafe fn disassociate_chunk(&self, in_place: &mut [u8]) {
+    fn disassociate_chunk(&self, in_place: &mut [u8]) {
         unsafe {
             let src_ptr = in_place.as_ptr();
-            let rgba0 = _mm512_loadu_si512(src_ptr as *const _);
-            let rgba1 = _mm512_loadu_si512(src_ptr.add(64) as *const _);
-            let rgba2 = _mm512_loadu_si512(src_ptr.add(128) as *const _);
-            let rgba3 = _mm512_loadu_si512(src_ptr.add(64 + 128) as *const _);
+            let rgba0 = _mm512_loadu_si512(src_ptr.cast());
+            let rgba1 = _mm512_loadu_si512(src_ptr.add(64).cast());
+            let rgba2 = _mm512_loadu_si512(src_ptr.add(128).cast());
+            let rgba3 = _mm512_loadu_si512(src_ptr.add(64 + 128).cast());
 
             let (rrr, ggg, bbb, aaa) =
                 avx512_deinterleave_rgba::<HAS_VBMI>(rgba0, rgba1, rgba2, rgba3);
@@ -208,10 +206,10 @@ impl<const HAS_VBMI: bool> Avx512DisassociateAlpha<HAS_VBMI> {
                 avx512_interleave_rgba::<HAS_VBMI>(rrr, ggg, bbb, aaa);
 
             let dst_ptr = in_place.as_mut_ptr();
-            _mm512_storeu_si512(dst_ptr as *mut _, rgba0);
-            _mm512_storeu_si512(dst_ptr.add(64) as *mut _, rgba1);
-            _mm512_storeu_si512(dst_ptr.add(128) as *mut _, rgba2);
-            _mm512_storeu_si512(dst_ptr.add(128 + 64) as *mut _, rgba3);
+            _mm512_storeu_si512(dst_ptr.cast(), rgba0);
+            _mm512_storeu_si512(dst_ptr.add(64).cast(), rgba1);
+            _mm512_storeu_si512(dst_ptr.add(128).cast(), rgba2);
+            _mm512_storeu_si512(dst_ptr.add(128 + 64).cast(), rgba3);
         }
     }
 }
@@ -280,7 +278,7 @@ struct Avx512DisassociateAlphaFloat16<const HAS_VBMI: bool> {}
 #[cfg(feature = "nightly_avx512fp16")]
 impl<const HAS_VBMI: bool> Avx512DisassociateAlphaFloat16<HAS_VBMI> {
     #[inline(always)]
-    unsafe fn avx512_unpremultiply_row(&self, x: __m512i, a: __m512i) -> __m512i {
+    fn avx512_unpremultiply_row(&self, x: __m512i, a: __m512i) -> __m512i {
         unsafe {
             let zeros = _mm512_setzero_si512();
             let lo = _mm512_unpacklo_epi8(x, zeros);
@@ -308,13 +306,13 @@ impl<const HAS_VBMI: bool> Avx512DisassociateAlphaFloat16<HAS_VBMI> {
     }
 
     #[inline(always)]
-    unsafe fn disassociate_chunk(&self, in_place: &mut [u8]) {
+    fn disassociate_chunk(&self, in_place: &mut [u8]) {
         unsafe {
             let src_ptr = in_place.as_ptr();
-            let rgba0 = _mm512_loadu_si512(src_ptr as *const _);
-            let rgba1 = _mm512_loadu_si512(src_ptr.add(64) as *const _);
-            let rgba2 = _mm512_loadu_si512(src_ptr.add(128) as *const _);
-            let rgba3 = _mm512_loadu_si512(src_ptr.add(64 + 128) as *const _);
+            let rgba0 = _mm512_loadu_si512(src_ptr.cast());
+            let rgba1 = _mm512_loadu_si512(src_ptr.add(64).cast());
+            let rgba2 = _mm512_loadu_si512(src_ptr.add(128).cast());
+            let rgba3 = _mm512_loadu_si512(src_ptr.add(64 + 128).cast());
 
             let (rrr, ggg, bbb, aaa) =
                 avx512_deinterleave_rgba::<HAS_VBMI>(rgba0, rgba1, rgba2, rgba3);
@@ -327,10 +325,10 @@ impl<const HAS_VBMI: bool> Avx512DisassociateAlphaFloat16<HAS_VBMI> {
                 avx512_interleave_rgba::<HAS_VBMI>(rrr, ggg, bbb, aaa);
 
             let dst_ptr = in_place.as_mut_ptr();
-            _mm512_storeu_si512(dst_ptr as *mut _, rgba0);
-            _mm512_storeu_si512(dst_ptr.add(64) as *mut _, rgba1);
-            _mm512_storeu_si512(dst_ptr.add(128) as *mut _, rgba2);
-            _mm512_storeu_si512(dst_ptr.add(128 + 64) as *mut _, rgba3);
+            _mm512_storeu_si512(dst_ptr.cast(), rgba0);
+            _mm512_storeu_si512(dst_ptr.add(64).cast(), rgba1);
+            _mm512_storeu_si512(dst_ptr.add(128).cast(), rgba2);
+            _mm512_storeu_si512(dst_ptr.add(128 + 64).cast(), rgba3);
         }
     }
 }
@@ -399,7 +397,7 @@ impl DisassociateAlpha for Avx512DisassociateAlphaFloat16<true> {
 }
 
 #[target_feature(enable = "avx512f", enable = "avx512bw")]
-unsafe fn avx512_unp_row(in_place: &mut [u8], executor: impl DisassociateAlpha) {
+fn avx512_unp_row(in_place: &mut [u8], executor: impl DisassociateAlpha) {
     unsafe {
         executor.disassociate(in_place);
     }

@@ -45,7 +45,7 @@ fn conv_horiz_rgba_8_f16(
         const CN: usize = 4;
         let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
 
-        let rgb_pixel = xvld1q_u16_x4(src_ptr as *const _);
+        let rgb_pixel = xvld1q_u16_x4(src_ptr.cast());
 
         let mut acc = vfmlalq_laneq_low_f16::<0>(store, vreinterpretq_f16_u16(rgb_pixel.0), w);
         acc = vfmlalq_laneq_high_f16::<1>(acc, vreinterpretq_f16_u16(rgb_pixel.0), w);
@@ -71,7 +71,7 @@ fn conv_horiz_rgba_4_f16(
         const CN: usize = 4;
         let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
 
-        let rgb_pixel = xvld1q_u16_x2(src_ptr as *const _);
+        let rgb_pixel = xvld1q_u16_x2(src_ptr.cast());
 
         let acc = vfmlalq_lane_low_f16::<0>(store, vreinterpretq_f16_u16(rgb_pixel.0), set1);
         let acc = vfmlalq_lane_high_f16::<1>(acc, vreinterpretq_f16_u16(rgb_pixel.0), set1);
@@ -93,7 +93,7 @@ fn conv_horiz_rgba_2_f32(
         const CN: usize = 4;
         let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
 
-        let rgb_pixel = vld1q_u16(src_ptr as *const _);
+        let rgb_pixel = vld1q_u16(src_ptr.cast());
 
         let acc = vfmlalq_lane_low_f16::<0>(store, vreinterpretq_f16_u16(rgb_pixel), set);
         vfmlalq_lane_high_f16::<1>(acc, vreinterpretq_f16_u16(rgb_pixel), set)
@@ -112,7 +112,7 @@ fn conv_horiz_rgba_1_f16(
     unsafe {
         const CN: usize = 4;
         let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
-        let rgb_pixel = vld1_u16(src_ptr as *const _);
+        let rgb_pixel = vld1_u16(src_ptr.cast());
         vfmlalq_lane_low_f16::<0>(
             store,
             vreinterpretq_f16_u16(vcombine_u16(rgb_pixel, rgb_pixel)),
@@ -160,7 +160,7 @@ fn convolve_horizontal_rgba_neon_row_one_f16_impl(
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let read_weights =
-                    vreinterpret_f16_u16(vreinterpret_u16_u32(vld1_dup_u32(ptr as *const _)));
+                    vreinterpret_f16_u16(vreinterpret_u16_u32(vld1_dup_u32(ptr.cast())));
                 store = conv_horiz_rgba_2_f32(bounds_start, src, read_weights, store);
                 jx += 2;
             }
@@ -168,7 +168,7 @@ fn convolve_horizontal_rgba_neon_row_one_f16_impl(
             while jx < bounds.size {
                 let bounds_start = bounds.start + jx;
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = vreinterpret_f16_u16(vld1_dup_u16(ptr as *const _));
+                let weight0 = vreinterpret_f16_u16(vld1_dup_u16(ptr.cast()));
                 store = conv_horiz_rgba_1_f16(bounds_start, src, weight0, store);
                 jx += 1;
             }
@@ -256,7 +256,7 @@ fn convolve_horizontal_rgba_neon_rows_4_f16_impl(
             while jx + 2 <= bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
                 let read_weights =
-                    vreinterpret_f16_u16(vreinterpret_u16_u32(vld1_dup_u32(ptr as *const _)));
+                    vreinterpret_f16_u16(vreinterpret_u16_u32(vld1_dup_u32(ptr.cast())));
                 let bounds_start = bounds.start + jx;
                 store_0 = conv_horiz_rgba_2_f32(bounds_start, src, read_weights, store_0);
                 let ptr_1 = src.get_unchecked(src_stride..);
@@ -270,7 +270,7 @@ fn convolve_horizontal_rgba_neon_rows_4_f16_impl(
 
             while jx < bounds.size {
                 let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = vreinterpret_f16_u16(vld1_dup_u16(ptr as *const _));
+                let weight0 = vreinterpret_f16_u16(vld1_dup_u16(ptr.cast()));
                 let bounds_start = bounds.start + jx;
                 store_0 = conv_horiz_rgba_1_f16(bounds_start, src, weight0, store_0);
                 let ptr_1 = src.get_unchecked(src_stride..);

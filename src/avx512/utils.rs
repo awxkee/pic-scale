@@ -30,7 +30,7 @@ use crate::avx512::avx512_setr::{_v512_set_epu8, _v512_set_epu32};
 use std::arch::x86_64::*;
 
 #[inline(always)]
-pub(crate) unsafe fn avx512_deinterleave_rgba<const HAS_VBMI: bool>(
+pub(crate) fn avx512_deinterleave_rgba<const HAS_VBMI: bool>(
     bgra0: __m512i,
     bgra1: __m512i,
     bgra2: __m512i,
@@ -86,10 +86,7 @@ pub(crate) unsafe fn avx512_deinterleave_rgba<const HAS_VBMI: bool>(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn avx512_zip_epi8<const HAS_VBMI: bool>(
-    a: __m512i,
-    b: __m512i,
-) -> (__m512i, __m512i) {
+pub(crate) fn avx512_zip_epi8<const HAS_VBMI: bool>(a: __m512i, b: __m512i) -> (__m512i, __m512i) {
     unsafe {
         if HAS_VBMI {
             let mask0 = _v512_set_epu8(
@@ -119,24 +116,22 @@ pub(crate) unsafe fn avx512_zip_epi8<const HAS_VBMI: bool>(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn avx512_interleave_rgba<const HAS_VBMI: bool>(
+pub(crate) fn avx512_interleave_rgba<const HAS_VBMI: bool>(
     a: __m512i,
     b: __m512i,
     c: __m512i,
     d: __m512i,
 ) -> (__m512i, __m512i, __m512i, __m512i) {
-    unsafe {
-        let (br01, br23) = avx512_zip_epi8::<HAS_VBMI>(a, c);
-        let (ga01, ga23) = avx512_zip_epi8::<HAS_VBMI>(b, d);
-        let (bgra0, bgra1) = avx512_zip_epi8::<HAS_VBMI>(br01, ga01);
-        let (bgra2, bgra3) = avx512_zip_epi8::<HAS_VBMI>(br23, ga23);
-        (bgra0, bgra1, bgra2, bgra3)
-    }
+    let (br01, br23) = avx512_zip_epi8::<HAS_VBMI>(a, c);
+    let (ga01, ga23) = avx512_zip_epi8::<HAS_VBMI>(b, d);
+    let (bgra0, bgra1) = avx512_zip_epi8::<HAS_VBMI>(br01, ga01);
+    let (bgra2, bgra3) = avx512_zip_epi8::<HAS_VBMI>(br23, ga23);
+    (bgra0, bgra1, bgra2, bgra3)
 }
 
 /// Exact division by 255 with rounding to nearest
 #[inline(always)]
-pub(crate) unsafe fn avx512_div_by255(v: __m512i) -> __m512i {
+pub(crate) fn avx512_div_by255(v: __m512i) -> __m512i {
     unsafe {
         let addition = _mm512_set1_epi16(127);
         _mm512_srli_epi16::<8>(_mm512_add_epi16(
@@ -147,7 +142,7 @@ pub(crate) unsafe fn avx512_div_by255(v: __m512i) -> __m512i {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm512_dot16_epi32<const HAS_DOT: bool>(
+pub(crate) fn _mm512_dot16_epi32<const HAS_DOT: bool>(
     a: __m512i,
     b: __m512i,
     c: __m512i,

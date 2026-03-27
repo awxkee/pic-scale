@@ -45,7 +45,7 @@ fn conv_horiz_8_rgba_f16(
         const CN: usize = 4;
         let src_ptr = src.get_unchecked(start_x * CN..);
 
-        let rgb_pixel = vld1q_u16_x4(src_ptr.as_ptr() as *const _);
+        let rgb_pixel = vld1q_u16_x4(src_ptr.as_ptr().cast());
 
         let mut acc = vfma_laneq_f16::<0>(
             store,
@@ -104,7 +104,7 @@ fn conv_horiz_4_rgba_f16(
         const CN: usize = 4;
         let src_ptr = src.get_unchecked(start_x * CN..);
 
-        let rgb_pixel = vld1q_u16_x2(src_ptr.as_ptr() as *const _);
+        let rgb_pixel = vld1q_u16_x2(src_ptr.as_ptr().cast());
 
         let acc = vfma_lane_f16::<0>(
             store,
@@ -139,8 +139,8 @@ fn conv_horiz_rgba_2_f32(
     store: float16x4_t,
 ) -> float16x4_t {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked(start_x * COMPONENTS..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked(start_x * CN..);
 
         let rgb_pixel = vld1q_f16(src_ptr.as_ptr());
 

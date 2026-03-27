@@ -39,8 +39,8 @@ fn convolve_horizontal_parts_one_rgba_f32<const FMA: bool>(
     store_0: __m256,
 ) -> __m256 {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked(start_x * COMPONENTS..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked(start_x * CN..);
         let rgb_pixel = _mm_loadu_ps(src_ptr.as_ptr());
         _mm256_fma_ps::<FMA>(
             store_0,
@@ -59,8 +59,8 @@ fn convolve_horizontal_parts_4_rgba_f32<const FMA: bool>(
     store_0: __m256,
 ) -> __m256 {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
 
         let rgb_pixel_0 = _mm256_loadu_ps(src_ptr);
         let rgb_pixel_1 = _mm256_loadu_ps(src_ptr.add(8));
@@ -82,8 +82,8 @@ fn convolve_horizontal_parts_8_rgba_f32<const FMA: bool>(
     store_0: __m256,
 ) -> __m256 {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
 
         let rgb_pixel_0 = _mm256_loadu_ps(src_ptr);
         let rgb_pixel_1 = _mm256_loadu_ps(src_ptr.add(8));
@@ -106,8 +106,8 @@ fn convolve_horizontal_parts_2_rgba_f32<const FMA: bool>(
     store_0: __m256,
 ) -> __m256 {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked(start_x * COMPONENTS..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked(start_x * CN..);
 
         let rgb_pixel = _mm256_loadu_ps(src_ptr.as_ptr());
 
@@ -115,7 +115,7 @@ fn convolve_horizontal_parts_2_rgba_f32<const FMA: bool>(
     }
 }
 
-pub(crate) fn convolve_horizontal_rgba_avx_rows_4_f32<const FMA: bool>(
+pub(crate) fn convolve_horizontal_rgba_avx_rows_4_f32_fma(
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
@@ -124,23 +124,32 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_4_f32<const FMA: bool>(
     _: u32,
 ) {
     unsafe {
-        if FMA {
-            convolve_horizontal_rgba_avx_rows_4_f32_fma(
-                filter_weights,
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-            );
-        } else {
-            convolve_horizontal_rgba_avx_rows_4_f32_regular(
-                filter_weights,
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-            );
-        }
+        convolve_horizontal_rgba_avx_rows_4_f32_fma_impl(
+            filter_weights,
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+        );
+    }
+}
+
+pub(crate) fn convolve_horizontal_rgba_avx_rows_4_f32_default(
+    src: &[f32],
+    src_stride: usize,
+    dst: &mut [f32],
+    dst_stride: usize,
+    filter_weights: &FilterWeights<f32>,
+    _: u32,
+) {
+    unsafe {
+        convolve_horizontal_rgba_avx_rows_4_f32_regular(
+            filter_weights,
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+        );
     }
 }
 
@@ -159,7 +168,7 @@ fn convolve_horizontal_rgba_avx_rows_4_f32_regular(
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch
-fn convolve_horizontal_rgba_avx_rows_4_f32_fma(
+fn convolve_horizontal_rgba_avx_rows_4_f32_fma_impl(
     filter_weights: &FilterWeights<f32>,
     src: &[f32],
     src_stride: usize,
@@ -184,7 +193,7 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
         dst_stride: usize,
     ) {
         unsafe {
-            const CHANNELS: usize = 4;
+            const CN: usize = 4;
             let mut filter_offset = 0usize;
             let zeros = _mm256_setzero_ps();
             let weights_ptr = &filter_weights.weights;
@@ -369,7 +378,7 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
                     jx += 1;
                 }
 
-                let px = x * CHANNELS;
+                let px = x * CN;
                 let dest_ptr = dst.get_unchecked_mut(px..);
                 _mm_storeu_ps(
                     dest_ptr.as_mut_ptr(),
@@ -412,18 +421,25 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
     }
 }
 
-pub(crate) fn convolve_horizontal_rgba_avx_row_one_f32<const FMA: bool>(
+pub(crate) fn convolve_horizontal_rgba_avx_row_one_f32_fma(
     src: &[f32],
     dst: &mut [f32],
     filter_weights: &FilterWeights<f32>,
     _: u32,
 ) {
     unsafe {
-        if FMA {
-            convolve_horizontal_rgba_avx_row_one_f32_fma(filter_weights, src, dst);
-        } else {
-            convolve_horizontal_rgba_avx_row_one_f32_regular(filter_weights, src, dst);
-        }
+        convolve_horizontal_rgba_avx_row_one_f32_fma_impl(filter_weights, src, dst);
+    }
+}
+
+pub(crate) fn convolve_horizontal_rgba_avx_row_one_f32_default(
+    src: &[f32],
+    dst: &mut [f32],
+    filter_weights: &FilterWeights<f32>,
+    _: u32,
+) {
+    unsafe {
+        convolve_horizontal_rgba_avx_row_one_f32_regular(filter_weights, src, dst);
     }
 }
 
@@ -438,7 +454,7 @@ fn convolve_horizontal_rgba_avx_row_one_f32_regular(
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
-fn convolve_horizontal_rgba_avx_row_one_f32_fma(
+fn convolve_horizontal_rgba_avx_row_one_f32_fma_impl(
     filter_weights: &FilterWeights<f32>,
     src: &[f32],
     dst: &mut [f32],
@@ -454,7 +470,7 @@ impl<const FMA: bool> OneRowExecutionUnit<FMA> {
     #[inline(always)]
     fn pass(&self, filter_weights: &FilterWeights<f32>, src: &[f32], dst: &mut [f32]) {
         unsafe {
-            const CHANNELS: usize = 4;
+            const CN: usize = 4;
             let mut filter_offset = 0usize;
             let weights_ptr = &filter_weights.weights;
 
@@ -551,7 +567,7 @@ impl<const FMA: bool> OneRowExecutionUnit<FMA> {
                     jx += 1;
                 }
 
-                let px = x * CHANNELS;
+                let px = x * CN;
                 let dest_ptr = dst.get_unchecked_mut(px..);
                 _mm_storeu_ps(
                     dest_ptr.as_mut_ptr(),

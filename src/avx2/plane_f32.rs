@@ -139,18 +139,25 @@ fn conv_horiz_plane_1_f32_avx<const FMA: bool>(
     }
 }
 
-pub(crate) fn convolve_horizontal_plane_avx_row_one_f32<const FMA: bool>(
+pub(crate) fn convolve_horizontal_plane_avx_row_one_f32_default(
     src: &[f32],
     dst: &mut [f32],
     filter_weights: &FilterWeights<f32>,
     _: u32,
 ) {
     unsafe {
-        if FMA {
-            convolve_horizontal_plane_avx_row_one_fma(filter_weights, src, dst);
-        } else {
-            convolve_horizontal_plane_avx_row_one_regular(filter_weights, src, dst);
-        }
+        convolve_horizontal_plane_avx_row_one_regular(filter_weights, src, dst);
+    }
+}
+
+pub(crate) fn convolve_horizontal_plane_avx_row_one_f32_fma(
+    src: &[f32],
+    dst: &mut [f32],
+    filter_weights: &FilterWeights<f32>,
+    _: u32,
+) {
+    unsafe {
+        convolve_horizontal_plane_avx_row_one_fma_impl(filter_weights, src, dst);
     }
 }
 
@@ -166,7 +173,7 @@ fn convolve_horizontal_plane_avx_row_one_regular(
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
-fn convolve_horizontal_plane_avx_row_one_fma(
+fn convolve_horizontal_plane_avx_row_one_fma_impl(
     filter_weights: &FilterWeights<f32>,
     src: &[f32],
     dst: &mut [f32],
@@ -216,7 +223,7 @@ fn convolve_horizontal_plane_avx_row_one_impl<const FMA: bool>(
             while jx + 2 <= bounds.size {
                 let bounds_start = bounds.start + jx;
                 let w = local_filters.get_unchecked(jx..);
-                let weights = _mm_castsi128_ps(_mm_loadu_si64(w.as_ptr() as *const _));
+                let weights = _mm_castsi128_ps(_mm_loadu_si64(w.as_ptr().cast()));
                 store = conv_horiz_plane_2_f32::<FMA>(bounds_start, src, weights, store);
                 jx += 2;
             }
@@ -237,7 +244,7 @@ fn convolve_horizontal_plane_avx_row_one_impl<const FMA: bool>(
     }
 }
 
-pub(crate) fn convolve_horizontal_plane_avx_rows_4_f32<const FMA: bool>(
+pub(crate) fn convolve_horizontal_plane_avx_rows_4_f32_default(
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
@@ -246,23 +253,32 @@ pub(crate) fn convolve_horizontal_plane_avx_rows_4_f32<const FMA: bool>(
     _: u32,
 ) {
     unsafe {
-        if FMA {
-            convolve_horizontal_plane_avx_rows_4_fma(
-                filter_weights,
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-            );
-        } else {
-            convolve_horizontal_plane_avx_rows_4_regular(
-                filter_weights,
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-            );
-        }
+        convolve_horizontal_plane_avx_rows_4_regular(
+            filter_weights,
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+        );
+    }
+}
+
+pub(crate) fn convolve_horizontal_plane_avx_rows_4_f32_fma(
+    src: &[f32],
+    src_stride: usize,
+    dst: &mut [f32],
+    dst_stride: usize,
+    filter_weights: &FilterWeights<f32>,
+    _: u32,
+) {
+    unsafe {
+        convolve_horizontal_plane_avx_rows_4_fma_impl(
+            filter_weights,
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+        );
     }
 }
 
@@ -286,7 +302,7 @@ fn convolve_horizontal_plane_avx_rows_4_regular(
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch.
-fn convolve_horizontal_plane_avx_rows_4_fma(
+fn convolve_horizontal_plane_avx_rows_4_fma_impl(
     filter_weights: &FilterWeights<f32>,
     src: &[f32],
     src_stride: usize,
@@ -377,7 +393,7 @@ fn convolve_horizontal_plane_avx_rows_4_impl<const FMA: bool>(
 
             while jx + 2 <= bounds.size {
                 let w = local_filters.get_unchecked(jx..);
-                let w0 = _mm_castsi128_ps(_mm_loadu_si64(w.as_ptr() as *const _));
+                let w0 = _mm_castsi128_ps(_mm_loadu_si64(w.as_ptr().cast()));
                 let weights = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w0);
                 let bounds_start = bounds.start + jx;
                 let s_ptr_1 = src.get_unchecked(src_stride..);

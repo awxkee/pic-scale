@@ -195,6 +195,7 @@ fn convolve_vertical_rgb_native_row_f16(
     let transient_src = src.iter().map(|&x| x as f32).collect::<Vec<f32>>();
     let mut transient_dst = vec![0f32; dst.len()];
     column_handler_floating_point::<f32, f32, f32>(
+        0,
         bounds,
         &transient_src,
         &mut transient_dst,

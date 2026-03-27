@@ -32,7 +32,7 @@ use crate::filter_weights::FilterBounds;
 use crate::mlaf::mlaf;
 use std::arch::x86_64::*;
 
-pub(crate) fn convolve_column_avx_u16(
+pub(crate) fn convolve_column_avx_u16_fma(
     _: usize,
     bounds: &FilterBounds,
     src: &[u16],
@@ -42,11 +42,21 @@ pub(crate) fn convolve_column_avx_u16(
     bit_depth: u32,
 ) {
     unsafe {
-        if std::arch::is_x86_feature_detected!("fma") {
-            convolve_column_lb_u16_fma(bounds, src, dst, src_stride, weight, bit_depth);
-        } else {
-            convolve_column_lb_u16_def(bounds, src, dst, src_stride, weight, bit_depth);
-        }
+        convolve_column_lb_u16_fma(bounds, src, dst, src_stride, weight, bit_depth);
+    }
+}
+
+pub(crate) fn convolve_column_avx_u16_default(
+    _: usize,
+    bounds: &FilterBounds,
+    src: &[u16],
+    dst: &mut [u16],
+    src_stride: usize,
+    weight: &[f32],
+    bit_depth: u32,
+) {
+    unsafe {
+        convolve_column_lb_u16_def(bounds, src, dst, src_stride, weight, bit_depth);
     }
 }
 
@@ -120,37 +130,34 @@ fn convolve_32_items<const FMA: bool>(
                 let w2 = _mm256_setr_m128(xw2, xw2);
                 let w3 = _mm256_setr_m128(xw3, xw3);
 
-                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
+                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr().cast());
+                let item_row1 = _mm256_loadu_si256(src_ptr.get_unchecked(16..).as_ptr().cast());
+
+                store0 = _mm256_prefer_fma_ps::<FMA>(
+                    store0,
+                    _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(item_row0, _mm256_setzero_si256())),
+                    w0,
+                );
+                store1 = _mm256_prefer_fma_ps::<FMA>(
+                    store1,
+                    _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(item_row0, _mm256_setzero_si256())),
+                    w0,
+                );
+                store2 = _mm256_prefer_fma_ps::<FMA>(
+                    store2,
+                    _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(item_row1, _mm256_setzero_si256())),
+                    w0,
+                );
+                store3 = _mm256_prefer_fma_ps::<FMA>(
+                    store3,
+                    _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(item_row1, _mm256_setzero_si256())),
+                    w0,
+                );
+
+                let item_row0 =
+                    _mm256_loadu_si256(src_ptr.get_unchecked(src_stride..).as_ptr().cast());
                 let item_row1 =
-                    _mm256_loadu_si256(src_ptr.get_unchecked(16..).as_ptr() as *const __m256i);
-
-                store0 = _mm256_prefer_fma_ps::<FMA>(
-                    store0,
-                    _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(item_row0, _mm256_setzero_si256())),
-                    w0,
-                );
-                store1 = _mm256_prefer_fma_ps::<FMA>(
-                    store1,
-                    _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(item_row0, _mm256_setzero_si256())),
-                    w0,
-                );
-                store2 = _mm256_prefer_fma_ps::<FMA>(
-                    store2,
-                    _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(item_row1, _mm256_setzero_si256())),
-                    w0,
-                );
-                store3 = _mm256_prefer_fma_ps::<FMA>(
-                    store3,
-                    _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(item_row1, _mm256_setzero_si256())),
-                    w0,
-                );
-
-                let item_row0 = _mm256_loadu_si256(
-                    src_ptr.get_unchecked(src_stride..).as_ptr() as *const __m256i
-                );
-                let item_row1 = _mm256_loadu_si256(
-                    src_ptr.get_unchecked(src_stride + 16..).as_ptr() as *const __m256i,
-                );
+                    _mm256_loadu_si256(src_ptr.get_unchecked(src_stride + 16..).as_ptr().cast());
 
                 store0 = _mm256_prefer_fma_ps::<FMA>(
                     store0,
@@ -173,11 +180,10 @@ fn convolve_32_items<const FMA: bool>(
                     w1,
                 );
 
-                let item_row0 = _mm256_loadu_si256(
-                    src_ptr.get_unchecked(src_stride * 2..).as_ptr() as *const __m256i,
-                );
+                let item_row0 =
+                    _mm256_loadu_si256(src_ptr.get_unchecked(src_stride * 2..).as_ptr().cast());
                 let item_row1 = _mm256_loadu_si256(
-                    src_ptr.get_unchecked(src_stride * 2 + 16..).as_ptr() as *const __m256i,
+                    src_ptr.get_unchecked(src_stride * 2 + 16..).as_ptr().cast(),
                 );
 
                 store0 = _mm256_prefer_fma_ps::<FMA>(
@@ -201,11 +207,10 @@ fn convolve_32_items<const FMA: bool>(
                     w2,
                 );
 
-                let item_row0 = _mm256_loadu_si256(
-                    src_ptr.get_unchecked(src_stride * 3..).as_ptr() as *const __m256i,
-                );
+                let item_row0 =
+                    _mm256_loadu_si256(src_ptr.get_unchecked(src_stride * 3..).as_ptr().cast());
                 let item_row1 = _mm256_loadu_si256(
-                    src_ptr.get_unchecked(src_stride * 3 + 16..).as_ptr() as *const __m256i,
+                    src_ptr.get_unchecked(src_stride * 3 + 16..).as_ptr().cast(),
                 );
 
                 store0 = _mm256_prefer_fma_ps::<FMA>(
@@ -245,9 +250,8 @@ fn convolve_32_items<const FMA: bool>(
                 let w0 = _mm256_setr_m128(xw0, xw0);
                 let w1 = _mm256_setr_m128(xw1, xw1);
 
-                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
-                let item_row1 =
-                    _mm256_loadu_si256(src_ptr.get_unchecked(16..).as_ptr() as *const __m256i);
+                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr().cast());
+                let item_row1 = _mm256_loadu_si256(src_ptr.get_unchecked(16..).as_ptr().cast());
 
                 store0 = _mm256_prefer_fma_ps::<FMA>(
                     store0,
@@ -270,12 +274,10 @@ fn convolve_32_items<const FMA: bool>(
                     w0,
                 );
 
-                let item_row0 = _mm256_loadu_si256(
-                    src_ptr.get_unchecked(src_stride..).as_ptr() as *const __m256i
-                );
-                let item_row1 = _mm256_loadu_si256(
-                    src_ptr.get_unchecked(src_stride + 16..).as_ptr() as *const __m256i,
-                );
+                let item_row0 =
+                    _mm256_loadu_si256(src_ptr.get_unchecked(src_stride..).as_ptr().cast());
+                let item_row1 =
+                    _mm256_loadu_si256(src_ptr.get_unchecked(src_stride + 16..).as_ptr().cast());
 
                 store0 = _mm256_prefer_fma_ps::<FMA>(
                     store0,
@@ -310,9 +312,8 @@ fn convolve_32_items<const FMA: bool>(
 
                 let v_weight = _mm256_set1_ps(k_weight);
 
-                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
-                let item_row1 =
-                    _mm256_loadu_si256(src_ptr.get_unchecked(16..).as_ptr() as *const __m256i);
+                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr().cast());
+                let item_row1 = _mm256_loadu_si256(src_ptr.get_unchecked(16..).as_ptr().cast());
 
                 store0 = _mm256_prefer_fma_ps::<FMA>(
                     store0,
@@ -388,7 +389,7 @@ fn convolve_16_items<const FMA: bool>(
 
                 let v_weight = _mm256_set1_ps(k_weight);
 
-                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
+                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr().cast());
 
                 store0 = _mm256_prefer_fma_ps::<FMA>(
                     store0,

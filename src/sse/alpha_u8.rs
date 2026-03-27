@@ -134,7 +134,7 @@ struct Sse41PremultiplyExecutor8Default {}
 
 impl Sse41PremultiplyExecutor8Default {
     #[inline(always)]
-    unsafe fn premultiply_chunk(&self, dst: &mut [u8], src: &[u8]) {
+    fn premultiply_chunk(&self, dst: &mut [u8], src: &[u8]) {
         unsafe {
             let zeros = _mm_setzero_si128();
             let src_ptr = src.as_ptr();

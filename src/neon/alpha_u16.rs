@@ -30,29 +30,27 @@ use novtb::{ParallelZonedIterator, TbSliceMut};
 use std::arch::aarch64::*;
 
 #[inline]
-unsafe fn neon_div_by_1023_n(v: uint32x4_t) -> uint16x4_t {
+fn neon_div_by_1023_n(v: uint32x4_t) -> uint16x4_t {
     unsafe { vqrshrn_n_u32::<10>(vrsraq_n_u32::<10>(v, v)) }
 }
 
 #[inline]
-unsafe fn neon_div_by_4095_n(v: uint32x4_t) -> uint16x4_t {
+fn neon_div_by_4095_n(v: uint32x4_t) -> uint16x4_t {
     unsafe { vqrshrn_n_u32::<12>(vrsraq_n_u32::<12>(v, v)) }
 }
 
 #[inline]
-unsafe fn neon_div_by_65535_n(v: uint32x4_t) -> uint16x4_t {
+fn neon_div_by_65535_n(v: uint32x4_t) -> uint16x4_t {
     unsafe { vqrshrn_n_u32::<16>(vrsraq_n_u32::<16>(v, v)) }
 }
 
 #[inline(always)]
-unsafe fn neon_div_by<const BIT_DEPTH: usize>(v: uint32x4_t) -> uint16x4_t {
-    unsafe {
-        match BIT_DEPTH {
-            10 => neon_div_by_1023_n(v),
-            12 => neon_div_by_4095_n(v),
-            16 => neon_div_by_65535_n(v),
-            _ => neon_div_by_1023_n(v),
-        }
+fn neon_div_by<const BIT_DEPTH: usize>(v: uint32x4_t) -> uint16x4_t {
+    match BIT_DEPTH {
+        10 => neon_div_by_1023_n(v),
+        12 => neon_div_by_4095_n(v),
+        16 => neon_div_by_65535_n(v),
+        _ => neon_div_by_1023_n(v),
     }
 }
 
@@ -266,11 +264,7 @@ pub(crate) fn neon_premultiply_alpha_rgba_u16(
 }
 
 #[inline]
-unsafe fn v_scale_by_alpha(
-    px: uint16x8_t,
-    low_low_a: float32x4_t,
-    low_high_a: float32x4_t,
-) -> uint16x8_t {
+fn v_scale_by_alpha(px: uint16x8_t, low_low_a: float32x4_t, low_high_a: float32x4_t) -> uint16x8_t {
     unsafe {
         let low_px_u = vmovl_u16(vget_low_u16(px));
         let high_px_u = vmovl_high_u16(px);
@@ -390,16 +384,14 @@ impl DisassociateAlpha for NeonDisassociateAlpha {
 }
 
 #[inline]
-unsafe fn neon_un_row(in_place: &mut [u16], bit_depth: usize, handler: impl DisassociateAlpha) {
+fn neon_un_row(in_place: &mut [u16], bit_depth: usize, handler: impl DisassociateAlpha) {
     unsafe {
         handler.disassociate(in_place, bit_depth);
     }
 }
 
 fn neon_unpremultiply_alpha_rgba_row_u16(in_place: &mut [u16], bit_depth: usize) {
-    unsafe {
-        neon_un_row(in_place, bit_depth, NeonDisassociateAlpha::default());
-    }
+    neon_un_row(in_place, bit_depth, NeonDisassociateAlpha::default());
 }
 
 pub(crate) fn neon_unpremultiply_alpha_rgba_u16(

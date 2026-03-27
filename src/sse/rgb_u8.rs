@@ -83,7 +83,7 @@ fn convolve_horizontal_rgb_sse_rows_4_impl(
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        const CHANNELS: usize = 3;
+        const CN: usize = 3;
 
         #[rustfmt::skip]
         let shuffle_lo = _mm_setr_epi8(0, -1,
@@ -111,10 +111,10 @@ fn convolve_horizontal_rgb_sse_rows_4_impl(
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
         let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let iter_row0 = row0_ref.chunks_exact_mut(CHANNELS);
-        let iter_row1 = row1_ref.chunks_exact_mut(CHANNELS);
-        let iter_row2 = row2_ref.chunks_exact_mut(CHANNELS);
-        let iter_row3 = row3_ref.chunks_exact_mut(CHANNELS);
+        let iter_row0 = row0_ref.as_chunks_mut::<CN>().0.iter_mut();
+        let iter_row1 = row1_ref.as_chunks_mut::<CN>().0.iter_mut();
+        let iter_row2 = row2_ref.as_chunks_mut::<CN>().0.iter_mut();
+        let iter_row3 = row3_ref.as_chunks_mut::<CN>().0.iter_mut();
 
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
             .zip(iter_row1)
@@ -146,7 +146,7 @@ fn convolve_horizontal_rgb_sse_rows_4_impl(
                 let weight01 = _mm_shuffle_epi32::<SHUFFLE_01>(weights);
                 const SHUFFLE_23: i32 = shuffle(1, 1, 1, 1);
                 let weight23 = _mm_shuffle_epi32::<SHUFFLE_23>(weights);
-                let bounds_start = (bounds.start + jx) * CHANNELS;
+                let bounds_start = (bounds.start + jx) * CN;
 
                 let rgb_pixel_0 = load_rgb_x4(src0.get_unchecked(bounds_start..));
                 let rgb_pixel_1 = load_rgb_x4(src1.get_unchecked(bounds_start..));
@@ -178,7 +178,7 @@ fn convolve_horizontal_rgb_sse_rows_4_impl(
 
             while jx + 2 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 2));
-                let bounds_start = (bounds.start + jx) * CHANNELS;
+                let bounds_start = (bounds.start + jx) * CN;
                 let weight01 = _mm_set1_epi32((w_ptr.as_ptr() as *const i32).read_unaligned());
 
                 let rgb_pixel_0 = load_rgb_x2(src0.get_unchecked(bounds_start..));
@@ -273,14 +273,16 @@ fn convolve_horizontal_rgb_sse_row_one_impl(
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        const CHANNELS: usize = 3;
+        const CN: usize = 3;
 
         let shuffle_lo = _mm_setr_epi8(0, -1, 3, -1, 1, -1, 4, -1, 2, -1, 5, -1, -1, -1, -1, -1);
 
         let shuffle_hi = _mm_setr_epi8(6, -1, 9, -1, 7, -1, 10, -1, 8, -1, 11, -1, -1, -1, -1, -1);
 
         for ((dst, bounds), weights) in dst
-            .chunks_exact_mut(CHANNELS)
+            .as_chunks_mut::<CN>()
+            .0
+            .iter_mut()
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights
@@ -300,7 +302,7 @@ fn convolve_horizontal_rgb_sse_row_one_impl(
                 const SHUFFLE_23: i32 = shuffle(1, 1, 1, 1);
                 let weight23 = _mm_shuffle_epi32::<SHUFFLE_23>(weights);
                 let bounds_start = bounds.start + jx;
-                let src_ptr_0 = src.get_unchecked((bounds_start * CHANNELS)..);
+                let src_ptr_0 = src.get_unchecked((bounds_start * CN)..);
 
                 let rgb_pixel = load_rgb_x4(src_ptr_0);
 

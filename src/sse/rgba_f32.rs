@@ -42,8 +42,8 @@ fn convolve_horizontal_parts_one_rgba_f32<const FMA: bool>(
     store_0: __m128,
 ) -> __m128 {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
         let rgb_pixel = _mm_loadu_ps(src_ptr);
         _mm_prefer_fma_ps::<FMA>(store_0, rgb_pixel, weight0)
     }
@@ -77,7 +77,7 @@ fn convolve_horizontal_rgba_sse_row_one_f32_impl<const FMA: bool>(
     dst: &mut [f32],
 ) {
     unsafe {
-        const CHANNELS: usize = 4;
+        const CN: usize = 4;
         let mut filter_offset = 0usize;
         let weights_ptr = filter_weights.weights.as_ptr();
 
@@ -137,7 +137,7 @@ fn convolve_horizontal_rgba_sse_row_one_f32_impl<const FMA: bool>(
                 jx += 1;
             }
 
-            let px = x * CHANNELS;
+            let px = x * CN;
             let dest_ptr = dst.get_unchecked_mut(px..);
             _mm_storeu_ps(dest_ptr.as_mut_ptr(), store);
 
@@ -157,8 +157,8 @@ fn convolve_horizontal_parts_4_rgba_f32<const FMA: bool>(
     store_0: __m128,
 ) -> __m128 {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
 
         let rgb_pixel_0 = _mm_loadu_ps(src_ptr);
         let rgb_pixel_1 = _mm_loadu_ps(src_ptr.add(4));
@@ -181,8 +181,8 @@ fn convolve_horizontal_parts_2_rgba_f32<const FMA: bool>(
     store_0: __m128,
 ) -> __m128 {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
 
         let rgb_pixel_0 = _mm_loadu_ps(src_ptr);
         let rgb_pixel_1 = _mm_loadu_ps(src_ptr.add(4));
@@ -238,7 +238,7 @@ fn convolve_horizontal_rgba_sse_rows_4_f32_impl<const FMA: bool>(
     dst_stride: usize,
 ) {
     unsafe {
-        const CHANNELS: usize = 4;
+        const CN: usize = 4;
         let mut filter_offset = 0usize;
         let zeros = _mm_setzero_ps();
         let weights_ptr = filter_weights.weights.as_ptr();
@@ -369,7 +369,7 @@ fn convolve_horizontal_rgba_sse_rows_4_f32_impl<const FMA: bool>(
                 jx += 1;
             }
 
-            let px = x * CHANNELS;
+            let px = x * CN;
             let dest_ptr = dst.get_unchecked_mut(px..);
             _mm_storeu_ps(dest_ptr.as_mut_ptr(), store_0);
 

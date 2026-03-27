@@ -43,8 +43,8 @@ fn conv_horiz_rgba_8_u8<const D: bool>(
     store: int32x4_t,
 ) -> int32x4_t {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let rgba_pixel = xvld1q_u8_x2(src_ptr.as_ptr());
 
@@ -75,8 +75,8 @@ fn conv_horiz_rgba_2_u8<const D: bool>(
     store: int32x4_t,
 ) -> int32x4_t {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let rgb_pixel = vld1_u8(src_ptr.as_ptr());
         let wide = vreinterpretq_s16_u16(vmovl_u8(rgb_pixel));
@@ -95,8 +95,8 @@ fn conv_horiz_rgba_4_u8<const D: bool>(
     store: int32x4_t,
 ) -> int32x4_t {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let rgba_pixel = vld1q_u8(src_ptr.as_ptr());
 
@@ -119,8 +119,8 @@ fn conv_horiz_rgba_1_u8<const D: bool>(
     store: int32x4_t,
 ) -> int32x4_t {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
         let rgba_pixel = load_4b_as_u16x4(src_ptr.as_ptr());
         let lo = vreinterpret_s16_u16(rgba_pixel);
         vxmlal_s16::<D>(store, lo, w0)
@@ -192,7 +192,7 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_impl<const D: bool, const PRECISION: 
 
             while jx + 8 < bounds_size {
                 let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                let w_ptr = weights.get_unchecked(jx..);
                 let weights_set = vld1q_s16(w_ptr.as_ptr());
                 store_0 = conv_horiz_rgba_8_u8::<D>(bounds_start, src0, weights_set, store_0);
                 store_1 = conv_horiz_rgba_8_u8::<D>(bounds_start, src1, weights_set, store_1);
@@ -203,7 +203,7 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_impl<const D: bool, const PRECISION: 
 
             while jx + 4 < bounds_size {
                 let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1_s16(w_ptr.as_ptr());
                 store_0 = conv_horiz_rgba_4_u8::<D>(bounds_start, src0, weights, store_0);
                 store_1 = conv_horiz_rgba_4_u8::<D>(bounds_start, src1, weights, store_1);
@@ -213,7 +213,7 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_impl<const D: bool, const PRECISION: 
             }
 
             while jx + 2 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 2));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let mut v_weight = vld1_dup_s16(w_ptr.as_ptr());
                 v_weight = vld1_lane_s16::<1>(w_ptr.as_ptr().add(1), v_weight);
@@ -225,7 +225,7 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_impl<const D: bool, const PRECISION: 
             }
 
             while jx < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let weight0 = vld1_dup_s16(w_ptr.as_ptr());
                 store_0 = conv_horiz_rgba_1_u8::<D>(bounds_start, src0, weight0, store_0);
@@ -246,21 +246,18 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_impl<const D: bool, const PRECISION: 
             let store_16_8 = vqmovn_u16(vcombine_u16(store_16_3, store_16_3));
 
             vst1_lane_u32::<0>(
-                chunk0.as_mut_ptr() as *mut u32,
+                chunk0.as_mut_ptr().cast(),
                 vreinterpret_u32_u8(store_16_8_0),
             );
             vst1_lane_u32::<0>(
-                chunk1.as_mut_ptr() as *mut u32,
+                chunk1.as_mut_ptr().cast(),
                 vreinterpret_u32_u8(store_16_8_1),
             );
             vst1_lane_u32::<0>(
-                chunk2.as_mut_ptr() as *mut u32,
+                chunk2.as_mut_ptr().cast(),
                 vreinterpret_u32_u8(store_16_8_2),
             );
-            vst1_lane_u32::<0>(
-                chunk3.as_mut_ptr() as *mut u32,
-                vreinterpret_u32_u8(store_16_8),
-            );
+            vst1_lane_u32::<0>(chunk3.as_mut_ptr().cast(), vreinterpret_u32_u8(store_16_8));
         }
     }
 }
@@ -280,11 +277,11 @@ fn convolve_horizontal_rgba_neon_row_impl<const D: bool, const PRECISION: i32>(
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        const CHANNELS: usize = 4;
+        const CN: usize = 4;
         let rnd_const: i32 = 1 << (PRECISION - 1);
 
         for ((dst, bounds), weights) in dst
-            .as_chunks_mut::<CHANNELS>()
+            .as_chunks_mut::<CN>()
             .0
             .iter_mut()
             .zip(filter_weights.bounds.iter())
@@ -300,14 +297,14 @@ fn convolve_horizontal_rgba_neon_row_impl<const D: bool, const PRECISION: i32>(
 
             while jx + 8 < bounds_size {
                 let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..(jx + 8));
+                let w_ptr = weights.get_unchecked(jx..);
                 let weights_set = vld1q_s16(w_ptr.as_ptr());
                 store = conv_horiz_rgba_8_u8::<D>(bounds_start, src, weights_set, store);
                 jx += 8;
             }
 
             while jx + 4 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 4));
+                let w_ptr = weights.get_unchecked(jx..);
                 let weights = vld1_s16(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
                 store = conv_horiz_rgba_4_u8::<D>(bounds_start, src, weights, store);
@@ -315,7 +312,7 @@ fn convolve_horizontal_rgba_neon_row_impl<const D: bool, const PRECISION: i32>(
             }
 
             while jx + 2 < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 2));
+                let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let mut v_weight = vld1_dup_s16(w_ptr.as_ptr());
                 v_weight = vld1_lane_s16::<1>(w_ptr.as_ptr().add(1), v_weight);
@@ -324,7 +321,7 @@ fn convolve_horizontal_rgba_neon_row_impl<const D: bool, const PRECISION: i32>(
             }
 
             while jx < bounds_size {
-                let w_ptr = weights.get_unchecked(jx..(jx + 1));
+                let w_ptr = weights.get_unchecked(jx..);
                 let weight0 = vld1_dup_s16(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
                 store = conv_horiz_rgba_1_u8::<D>(bounds_start, src, weight0, store);
@@ -334,10 +331,7 @@ fn convolve_horizontal_rgba_neon_row_impl<const D: bool, const PRECISION: i32>(
             let store_16 = vqshrun_n_s32::<PRECISION>(store);
             let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
 
-            vst1_lane_u32::<0>(
-                dst.as_mut_ptr() as *mut u32,
-                vreinterpret_u32_u8(store_16_8),
-            );
+            vst1_lane_u32::<0>(dst.as_mut_ptr().cast(), vreinterpret_u32_u8(store_16_8));
         }
     }
 }

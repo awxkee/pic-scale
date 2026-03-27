@@ -39,7 +39,7 @@ fn neon_premultiply_alpha_rgba_row_f16(dst: &mut [f16], src: &[f16]) {
 
         for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
             let src_ptr = src.as_ptr();
-            let pixel = vld4q_u16(src_ptr as *const u16);
+            let pixel = vld4q_u16(src_ptr.cast());
 
             let low_alpha = vcvt_f32_f16(vreinterpret_f16_u16(vget_low_u16(pixel.3)));
             let low_r = vmulq_f32(
@@ -115,7 +115,7 @@ fn neon_unpremultiply_alpha_rgba_row_f16(in_place: &mut [f16]) {
 
         for dst in rem.chunks_exact_mut(8 * 4) {
             let src_ptr = dst.as_ptr();
-            let pixel = vld4q_u16(src_ptr as *const u16);
+            let pixel = vld4q_u16(src_ptr.cast());
 
             let zero_mask = vceqzq_u16(pixel.3);
 

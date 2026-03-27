@@ -102,7 +102,7 @@ where
     let mut row_sums: J = 0u32.as_();
     for row in store.chunks_exact(stride) {
         let row = &row[..width * CN];
-        for color in row.chunks_exact(CN) {
+        for color in row.as_chunks::<CN>().0.iter() {
             row_sums += color[ALPHA_CHANNEL_INDEX].bitxor(first).as_();
         }
         if row_sums != 0.as_() {
@@ -130,7 +130,7 @@ fn has_non_constant_cap_alpha_f32_impl<const ALPHA_CHANNEL_INDEX: usize, const C
     let mut row_sums: u64 = 0u64;
     for row in store.chunks_exact(stride) {
         let row = &row[..width * CN];
-        for color in row.chunks_exact(CN) {
+        for color in row.as_chunks::<CN>().0.iter() {
             row_sums += color[ALPHA_CHANNEL_INDEX].to_bits().bitxor(first) as u64;
         }
         if row_sums != 0 {

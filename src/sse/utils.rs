@@ -45,7 +45,7 @@ pub(crate) fn _mm_prefer_fma_ps<const FMA: bool>(a: __m128, b: __m128, c: __m128
 }
 
 #[inline]
-unsafe fn _mm_fma_psx(a: __m128, b: __m128, c: __m128) -> __m128 {
+fn _mm_fma_psx(a: __m128, b: __m128, c: __m128) -> __m128 {
     unsafe { _mm_fmadd_ps(b, c, a) }
 }
 
@@ -298,7 +298,7 @@ pub(crate) fn _mm_extract_epi64x<const IMM: i32>(d: __m128i) -> i64 {
 }
 
 #[inline]
-pub(crate) unsafe fn _mm_store3_u16(ptr: *mut u16, a: __m128i) {
+pub(crate) fn _mm_store3_u16(ptr: *mut u16, a: __m128i) {
     unsafe {
         let low_pixel = _mm_extract_epi32::<0>(a);
         (ptr as *mut i32).write_unaligned(low_pixel);

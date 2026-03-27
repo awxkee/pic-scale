@@ -335,6 +335,15 @@ pub(crate) fn avx2_pack_u32(s_1: __m256i, s_2: __m256i) -> __m256i {
 }
 
 #[inline(always)]
+pub(crate) fn avx2_pack_s32(s_1: __m256i, s_2: __m256i) -> __m256i {
+    unsafe {
+        let packed = _mm256_packs_epi32(s_1, s_2);
+        const MASK: i32 = shuffle(3, 1, 2, 0);
+        _mm256_permute4x64_epi64::<MASK>(packed)
+    }
+}
+
+#[inline(always)]
 #[allow(dead_code)]
 pub(crate) fn avx_combine_ps(lo: __m128, hi: __m128) -> __m256 {
     unsafe { _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(lo), hi) }
@@ -353,7 +362,7 @@ pub(crate) fn avx_combine_epi(lo: __m128i, hi: __m128i) -> __m256i {
 
 #[inline]
 /// Arithmetic shift for i64, shifting with sign bits
-pub(crate) unsafe fn _mm256_srai_epi64x<const IMM8: i32>(a: __m256i) -> __m256i {
+pub(crate) fn _mm256_srai_epi64x<const IMM8: i32>(a: __m256i) -> __m256i {
     unsafe {
         let m = _mm256_set1_epi64x(1 << (64 - 1));
         let x = _mm256_srli_epi64::<IMM8>(a);
@@ -436,11 +445,7 @@ pub(crate) fn _mm_dot16_avx_epi32<const HAS_DOT: bool>(
 
 #[allow(dead_code)]
 #[inline(always)]
-pub(crate) unsafe fn _mm_udot8_epi16<const DOT: bool>(
-    a: __m128i,
-    b: __m128i,
-    c: __m128i,
-) -> __m128i {
+pub(crate) fn _mm_udot8_epi16<const DOT: bool>(a: __m128i, b: __m128i, c: __m128i) -> __m128i {
     unsafe {
         #[cfg(feature = "avx512")]
         if DOT {

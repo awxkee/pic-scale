@@ -127,12 +127,7 @@ struct DisassociateAlphaDefault {}
 
 impl DisassociateAlphaDefault {
     #[inline(always)]
-    unsafe fn disassociate_chunk(
-        &self,
-        in_place: &mut [u16],
-        v_max_colors: __m128,
-        bit_depth: usize,
-    ) {
+    fn disassociate_chunk(&self, in_place: &mut [u16], v_max_colors: __m128, bit_depth: usize) {
         unsafe {
             let src_ptr = in_place.as_ptr();
 
@@ -298,7 +293,7 @@ struct Sse41PremultiplyExecutorDefault<const BIT_DEPTH: usize> {}
 impl<const BIT_DEPTH: usize> Sse41PremultiplyExecutorDefault<BIT_DEPTH> {
     #[inline]
     #[target_feature(enable = "sse4.1")]
-    unsafe fn premultiply_chunk(&self, dst: &mut [u16], src: &[u16]) {
+    fn premultiply_chunk(&self, dst: &mut [u16], src: &[u16]) {
         unsafe {
             let zeros = _mm_setzero_si128();
             let src_ptr = src.as_ptr();
@@ -375,7 +370,7 @@ struct Sse41PremultiplyExecutorAny {}
 
 impl Sse41PremultiplyExecutorAny {
     #[inline(always)]
-    unsafe fn premultiply_chunk(&self, dst: &mut [u16], src: &[u16], scale: __m128) {
+    fn premultiply_chunk(&self, dst: &mut [u16], src: &[u16], scale: __m128) {
         unsafe {
             let src_ptr = src.as_ptr();
             let row0 = _mm_loadu_si128(src_ptr as *const __m128i);

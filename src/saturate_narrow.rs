@@ -64,3 +64,12 @@ impl SaturateNarrow<u16> for i64 {
         (self >> PRECISION).max(0).min((1 << bit_depth) - 1) as u16
     }
 }
+
+impl SaturateNarrow<i16> for i32 {
+    #[inline(always)]
+    fn saturate_narrow(self, bit_depth: u32) -> i16 {
+        let max = (1i32 << (bit_depth - 1)) - 1;
+        let min = -(1i32 << (bit_depth - 1));
+        (self >> PRECISION).max(min).min(max) as i16
+    }
+}

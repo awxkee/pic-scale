@@ -95,7 +95,7 @@ fn premultiply_vec(pixel: v128, alpha: v128) -> v128 {
 
 #[target_feature(enable = "simd128")]
 fn wasm_unpremultiply_alpha_rgba_impl(in_place: &mut [u8], width: usize, stride: usize) {
-    in_place.chunks_exact_mut(stride).for_each(|row| unsafe {
+    in_place.chunks_exact_mut(stride).for_each(|row| {
         let mut rem = &mut row[..width * 4];
 
         for dst in rem.chunks_exact_mut(16 * 4) {
@@ -144,7 +144,7 @@ fn wasm_premultiply_alpha_rgba_impl(
 ) {
     dst.chunks_exact_mut(dst_stride)
         .zip(src.chunks_exact(src_stride))
-        .for_each(|(dst, src)| unsafe {
+        .for_each(|(dst, src)| {
             let mut rem = &mut dst[..width * 4];
             let mut src_rem = src;
 

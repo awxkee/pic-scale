@@ -158,7 +158,7 @@ where
                 .chunks_exact(dst_store.stride())
                 .zip(dst_slice.chunks_exact_mut(dst_stride))
             {
-                for (src, dst) in src.iter().zip(dst.chunks_exact_mut(N)) {
+                for (src, dst) in src.iter().zip(dst.as_chunks_mut::<N>().0.iter_mut()) {
                     let dst_ptr = dst.as_mut_ptr() as *mut T;
                     dst_ptr.write_unaligned(*src);
                 }

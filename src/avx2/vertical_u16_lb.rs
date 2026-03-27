@@ -42,12 +42,22 @@ pub(crate) fn convolve_column_lb_avx2_u16(
     bit_depth: u32,
 ) {
     unsafe {
-        #[cfg(feature = "avx512")]
-        if std::arch::is_x86_feature_detected!("avxvnni") {
-            convolve_column_lb_avx_u16_dot(bounds, src, dst, src_stride, weight, bit_depth);
-            return;
-        }
         convolve_column_lb_avx_u16_reg(bounds, src, dst, src_stride, weight, bit_depth);
+    }
+}
+
+#[cfg(feature = "avx512")]
+pub(crate) fn convolve_column_lb_avx2_u16_vnni(
+    _: usize,
+    bounds: &FilterBounds,
+    src: &[u16],
+    dst: &mut [u16],
+    src_stride: usize,
+    weight: &[i16],
+    bit_depth: u32,
+) {
+    unsafe {
+        convolve_column_lb_avx_u16_dot(bounds, src, dst, src_stride, weight, bit_depth);
     }
 }
 
@@ -113,37 +123,34 @@ fn convolve_column_lb_32<const HAS_DOT: bool>(
                 let w2 = _mm256_broadcastw_epi16(_mm_srli_si128::<4>(weights)); // elem 2
                 let w3 = _mm256_broadcastw_epi16(_mm_srli_si128::<6>(weights)); // elem 3
 
-                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
+                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr().cast());
+                let item_row1 = _mm256_loadu_si256(src_ptr.get_unchecked(16..).as_ptr().cast());
+
+                store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(
+                    store0,
+                    _mm256_unpacklo_epi16(item_row0, _mm256_setzero_si256()),
+                    w0,
+                );
+                store1 = _mm256_dot16_avx_epi32::<HAS_DOT>(
+                    store1,
+                    _mm256_unpackhi_epi16(item_row0, _mm256_setzero_si256()),
+                    w0,
+                );
+                store2 = _mm256_dot16_avx_epi32::<HAS_DOT>(
+                    store2,
+                    _mm256_unpacklo_epi16(item_row1, _mm256_setzero_si256()),
+                    w0,
+                );
+                store3 = _mm256_dot16_avx_epi32::<HAS_DOT>(
+                    store3,
+                    _mm256_unpackhi_epi16(item_row1, _mm256_setzero_si256()),
+                    w0,
+                );
+
+                let item_row0 =
+                    _mm256_loadu_si256(src_ptr.get_unchecked(src_stride..).as_ptr().cast());
                 let item_row1 =
-                    _mm256_loadu_si256(src_ptr.get_unchecked(16..).as_ptr() as *const __m256i);
-
-                store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store0,
-                    _mm256_unpacklo_epi16(item_row0, _mm256_setzero_si256()),
-                    w0,
-                );
-                store1 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store1,
-                    _mm256_unpackhi_epi16(item_row0, _mm256_setzero_si256()),
-                    w0,
-                );
-                store2 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store2,
-                    _mm256_unpacklo_epi16(item_row1, _mm256_setzero_si256()),
-                    w0,
-                );
-                store3 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store3,
-                    _mm256_unpackhi_epi16(item_row1, _mm256_setzero_si256()),
-                    w0,
-                );
-
-                let item_row0 = _mm256_loadu_si256(
-                    src_ptr.get_unchecked(src_stride..).as_ptr() as *const __m256i
-                );
-                let item_row1 = _mm256_loadu_si256(
-                    src_ptr.get_unchecked(src_stride + 16..).as_ptr() as *const __m256i,
-                );
+                    _mm256_loadu_si256(src_ptr.get_unchecked(src_stride + 16..).as_ptr().cast());
 
                 store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(
                     store0,
@@ -166,11 +173,10 @@ fn convolve_column_lb_32<const HAS_DOT: bool>(
                     w1,
                 );
 
-                let item_row0 = _mm256_loadu_si256(
-                    src_ptr.get_unchecked(src_stride * 2..).as_ptr() as *const __m256i,
-                );
+                let item_row0 =
+                    _mm256_loadu_si256(src_ptr.get_unchecked(src_stride * 2..).as_ptr().cast());
                 let item_row1 = _mm256_loadu_si256(
-                    src_ptr.get_unchecked(src_stride * 2 + 16..).as_ptr() as *const __m256i,
+                    src_ptr.get_unchecked(src_stride * 2 + 16..).as_ptr().cast(),
                 );
 
                 store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(
@@ -194,11 +200,10 @@ fn convolve_column_lb_32<const HAS_DOT: bool>(
                     w2,
                 );
 
-                let item_row0 = _mm256_loadu_si256(
-                    src_ptr.get_unchecked(src_stride * 3..).as_ptr() as *const __m256i,
-                );
+                let item_row0 =
+                    _mm256_loadu_si256(src_ptr.get_unchecked(src_stride * 3..).as_ptr().cast());
                 let item_row1 = _mm256_loadu_si256(
-                    src_ptr.get_unchecked(src_stride * 3 + 16..).as_ptr() as *const __m256i,
+                    src_ptr.get_unchecked(src_stride * 3 + 16..).as_ptr().cast(),
                 );
 
                 store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(
@@ -234,9 +239,8 @@ fn convolve_column_lb_32<const HAS_DOT: bool>(
 
                 let v_weight = _mm256_set1_epi16(k_weight);
 
-                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
-                let item_row1 =
-                    _mm256_loadu_si256(src_ptr.get_unchecked(16..).as_ptr() as *const __m256i);
+                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr().cast());
+                let item_row1 = _mm256_loadu_si256(src_ptr.get_unchecked(16..).as_ptr().cast());
 
                 store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(
                     store0,
@@ -268,11 +272,8 @@ fn convolve_column_lb_32<const HAS_DOT: bool>(
             let item0 = _mm256_min_epi16(_mm256_packus_epi32(v_st0, v_st1), v_max_colors);
             let item1 = _mm256_min_epi16(_mm256_packus_epi32(v_st2, v_st3), v_max_colors);
 
-            _mm256_storeu_si256(dst.as_mut_ptr() as *mut __m256i, item0);
-            _mm256_storeu_si256(
-                dst.get_unchecked_mut(16..).as_mut_ptr() as *mut __m256i,
-                item1,
-            );
+            _mm256_storeu_si256(dst.as_mut_ptr().cast(), item0);
+            _mm256_storeu_si256(dst.get_unchecked_mut(16..).as_mut_ptr().cast(), item1);
 
             cx += 32;
         }
@@ -309,7 +310,7 @@ fn convolve_column_lb_16<const HAS_DOT: bool>(
 
                 let v_weight = _mm256_set1_epi16(k_weight);
 
-                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr() as *const __m256i);
+                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr().cast());
 
                 store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(
                     store0,
@@ -328,7 +329,7 @@ fn convolve_column_lb_16<const HAS_DOT: bool>(
 
             let item0 = _mm256_min_epi16(_mm256_packus_epi32(v_st0, v_st1), v_max_colors);
 
-            _mm256_storeu_si256(dst.as_mut_ptr() as *mut __m256i, item0);
+            _mm256_storeu_si256(dst.as_mut_ptr().cast(), item0);
 
             cx += 16;
         }
@@ -365,7 +366,7 @@ fn convolve_column_lb_8<const HAS_DOT: bool>(
                 let v_weight = _mm256_set1_epi16(k_weight);
 
                 let item_row = _mm256_permute4x64_epi64::<0x50>(_mm256_castsi128_si256(
-                    _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i),
+                    _mm_loadu_si128(src_ptr.as_ptr().cast()),
                 ));
 
                 store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(
@@ -378,10 +379,7 @@ fn convolve_column_lb_8<const HAS_DOT: bool>(
             let v_st0 = _mm256_srai_epi32::<PRECISION>(store0);
 
             let item = _mm256_min_epi16(avx2_pack_u32(v_st0, _mm256_setzero_si256()), v_max_colors);
-            _mm_storeu_si128(
-                dst.as_mut_ptr() as *mut __m128i,
-                _mm256_castsi256_si128(item),
-            );
+            _mm_storeu_si128(dst.as_mut_ptr().cast(), _mm256_castsi256_si128(item));
 
             cx += 8;
         }
@@ -444,7 +442,7 @@ fn convolve_column_lb_avx_u16_impl<const HAS_DOT: bool>(
         );
 
         let tail8 = rem.as_chunks_mut::<8>().1;
-        let iter4 = tail8.chunks_exact_mut(4);
+        let iter4 = tail8.as_chunks_mut::<4>().0.iter_mut();
 
         let v_cx = cx;
 
@@ -476,7 +474,7 @@ fn convolve_column_lb_avx_u16_impl<const HAS_DOT: bool>(
             cx += 4;
         }
 
-        let tail4 = tail8.chunks_exact_mut(4).into_remainder();
+        let tail4 = tail8.as_chunks_mut::<4>().1;
 
         let a_px = cx;
 

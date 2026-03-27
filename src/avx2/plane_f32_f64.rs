@@ -31,18 +31,25 @@ use crate::avx2::utils::{_mm_fma_pd, _mm_hsum_pd, _mm256_fma_pd};
 use crate::filter_weights::FilterWeights;
 use std::arch::x86_64::*;
 
-pub(crate) fn convolve_hor_plane_avx_row_one_f32_f64<const FMA: bool>(
+pub(crate) fn convolve_hor_plane_avx_row_one_f32_f64_default(
     src: &[f32],
     dst: &mut [f32],
     filter_weights: &FilterWeights<f64>,
     _: u32,
 ) {
     unsafe {
-        if FMA {
-            convolve_hor_plane_avx_row_one_fma_f32_f64(filter_weights, src, dst);
-        } else {
-            convolve_hor_plane_avx_row_one_regular_f32_f64(filter_weights, src, dst);
-        }
+        convolve_hor_plane_avx_row_one_regular_f32_f64(filter_weights, src, dst);
+    }
+}
+
+pub(crate) fn convolve_hor_plane_avx_row_one_f32_f64_fma(
+    src: &[f32],
+    dst: &mut [f32],
+    filter_weights: &FilterWeights<f64>,
+    _: u32,
+) {
+    unsafe {
+        convolve_hor_plane_avx_row_one_fma_f32_f64(filter_weights, src, dst);
     }
 }
 
@@ -89,7 +96,7 @@ impl<const FMA: bool> Row1ExecutorUnit<FMA> {
                     let bounds_start = bounds.start + jx;
                     let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
                     let w0 = _mm256_loadu_pd(ptr.as_ptr());
-                    let px0 = _mm_loadu_ps(src.get_unchecked(bounds_start..).as_ptr() as *const _);
+                    let px0 = _mm_loadu_ps(src.get_unchecked(bounds_start..).as_ptr().cast());
                     store = _mm256_fma_pd::<FMA>(store, _mm256_cvtps_pd(px0), w0);
                     jx += 4;
                 }
@@ -102,9 +109,9 @@ impl<const FMA: bool> Row1ExecutorUnit<FMA> {
                 while jx + 2 <= bounds.size {
                     let bounds_start = bounds.start + jx;
                     let w = weights_ptr.get_unchecked(jx + filter_offset..);
-                    let w0 = _mm_loadu_pd(w.as_ptr() as *const _);
+                    let w0 = _mm_loadu_pd(w.as_ptr().cast());
                     let px0 = _mm_castsi128_ps(_mm_loadu_si64(
-                        src.get_unchecked(bounds_start..).as_ptr() as *const _,
+                        src.get_unchecked(bounds_start..).as_ptr().cast(),
                     ));
                     store = _mm_fma_pd::<FMA>(store, _mm_cvtps_pd(px0), w0);
                     jx += 2;
@@ -128,7 +135,8 @@ impl<const FMA: bool> Row1ExecutorUnit<FMA> {
         }
     }
 }
-pub(crate) fn convolve_hor_plane_avx_rows_4_f32_f64<const FMA: bool>(
+
+pub(crate) fn convolve_hor_plane_avx_rows_4_f32_f64_default(
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
@@ -137,23 +145,32 @@ pub(crate) fn convolve_hor_plane_avx_rows_4_f32_f64<const FMA: bool>(
     _: u32,
 ) {
     unsafe {
-        if FMA {
-            convolve_horizontal_plane_avx_rows_4_fma_f32_f64(
-                filter_weights,
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-            );
-        } else {
-            convolve_horizontal_plane_avx_rows_4_regular_f32_f64(
-                filter_weights,
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-            );
-        }
+        convolve_horizontal_plane_avx_rows_4_regular_f32_f64(
+            filter_weights,
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+        );
+    }
+}
+
+pub(crate) fn convolve_hor_plane_avx_rows_4_f32_f64_fma(
+    src: &[f32],
+    src_stride: usize,
+    dst: &mut [f32],
+    dst_stride: usize,
+    filter_weights: &FilterWeights<f64>,
+    _: u32,
+) {
+    unsafe {
+        convolve_horizontal_plane_avx_rows_4_fma_f32_f64(
+            filter_weights,
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+        );
     }
 }
 
@@ -214,16 +231,16 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
                 let src2 = src.get_unchecked(src_stride * 2..);
                 let src3 = src.get_unchecked(src_stride * 3..);
 
-                while jx + 4 < bounds.size {
+                while jx + 4 <= bounds.size {
                     let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
 
                     let bounds_start = bounds.start + jx;
                     let w0 = _mm256_loadu_pd(ptr.as_ptr());
 
-                    let px0 = _mm_loadu_ps(src.get_unchecked(bounds_start..).as_ptr() as *const _);
-                    let px1 = _mm_loadu_ps(src1.get_unchecked(bounds_start..).as_ptr() as *const _);
-                    let px2 = _mm_loadu_ps(src2.get_unchecked(bounds_start..).as_ptr() as *const _);
-                    let px3 = _mm_loadu_ps(src3.get_unchecked(bounds_start..).as_ptr() as *const _);
+                    let px0 = _mm_loadu_ps(src.get_unchecked(bounds_start..).as_ptr().cast());
+                    let px1 = _mm_loadu_ps(src1.get_unchecked(bounds_start..).as_ptr().cast());
+                    let px2 = _mm_loadu_ps(src2.get_unchecked(bounds_start..).as_ptr().cast());
+                    let px3 = _mm_loadu_ps(src3.get_unchecked(bounds_start..).as_ptr().cast());
 
                     store_0 = _mm256_fma_pd::<FMA>(store_0, _mm256_cvtps_pd(px0), w0);
                     store_1 = _mm256_fma_pd::<FMA>(store_1, _mm256_cvtps_pd(px1), w0);
@@ -255,24 +272,24 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
                     )),
                 );
 
-                while jx + 2 < bounds.size {
+                while jx + 2 <= bounds.size {
                     let w = weights_ptr.get_unchecked(jx + filter_offset..);
                     let bounds_start = bounds.start + jx;
-                    let wh = _mm_loadu_pd(w.as_ptr() as *const _);
+                    let wh = _mm_loadu_pd(w.as_ptr().cast());
 
                     let w0 = _mm256_insertf128_pd::<1>(_mm256_castpd128_pd256(wh), wh);
 
                     let px0 = _mm_castsi128_ps(_mm_loadu_si64(
-                        src.get_unchecked(bounds_start..).as_ptr() as *const _,
+                        src.get_unchecked(bounds_start..).as_ptr().cast(),
                     ));
                     let px1 = _mm_castsi128_ps(_mm_loadu_si64(
-                        src1.get_unchecked(bounds_start..).as_ptr() as *const _,
+                        src1.get_unchecked(bounds_start..).as_ptr().cast(),
                     ));
                     let px2 = _mm_castsi128_ps(_mm_loadu_si64(
-                        src2.get_unchecked(bounds_start..).as_ptr() as *const _,
+                        src2.get_unchecked(bounds_start..).as_ptr().cast(),
                     ));
                     let px3 = _mm_castsi128_ps(_mm_loadu_si64(
-                        src3.get_unchecked(bounds_start..).as_ptr() as *const _,
+                        src3.get_unchecked(bounds_start..).as_ptr().cast(),
                     ));
 
                     let px01 = _mm256_cvtps_pd(_mm_movelh_ps(px0, px1));

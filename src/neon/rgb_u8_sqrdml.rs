@@ -48,10 +48,8 @@ fn conv_horiz_rgb_4(
         let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let px_lo = vld1_u8(src_ptr.as_ptr());
-        let px_hi_part = vld1_lane_u32::<0>(
-            src_ptr.get_unchecked(8..).as_ptr() as *const u32,
-            vdup_n_u32(0),
-        );
+        let px_hi_part =
+            vld1_lane_u32::<0>(src_ptr.get_unchecked(8..).as_ptr().cast(), vdup_n_u32(0));
 
         let rgb_pixel = vcombine_u8(px_lo, vreinterpret_u8_u32(px_hi_part));
 
@@ -76,7 +74,7 @@ fn conv_horiz_rgb_2(
     unsafe {
         const CN: usize = 3;
         let src_ptr = src.get_unchecked((start_x * CN)..);
-        let mut rgb_pixel = vld1q_lane_u32::<0>(src_ptr.as_ptr() as *const u32, vdupq_n_u32(0));
+        let mut rgb_pixel = vld1q_lane_u32::<0>(src_ptr.as_ptr().cast(), vdupq_n_u32(0));
         rgb_pixel = vreinterpretq_u32_u16(vld1q_lane_u16::<2>(
             src_ptr.get_unchecked(4..).as_ptr() as *const u16,
             vreinterpretq_u16_u32(rgb_pixel),
@@ -227,7 +225,7 @@ fn convolve_horizontal_rgb_neon_rdm_rows_4_impl(
             while jx + 2 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bnds = bounds.start + jx;
-                let ld_w = vld1q_dup_s32(w_ptr.as_ptr() as *const _);
+                let ld_w = vld1q_dup_s32(w_ptr.as_ptr().cast());
                 let v_weight = vreinterpretq_s16_u8(vqtbl1q_u8(vreinterpretq_u8_s32(ld_w), w01));
                 store_0 = conv_horiz_rgb_2(bnds, src0, v_weight, store_0, shuffle_lo);
                 store_1 = conv_horiz_rgb_2(bnds, src1, v_weight, store_1, shuffle_lo);
@@ -328,7 +326,7 @@ fn convolve_horizontal_rgb_neon_row_rdm_one_impl(
             while jx + 2 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
-                let ld_w = vld1q_dup_s32(w_ptr.as_ptr() as *const _);
+                let ld_w = vld1q_dup_s32(w_ptr.as_ptr().cast());
                 let v_weight = vreinterpretq_s16_u8(vqtbl1q_u8(vreinterpretq_u8_s32(ld_w), w01));
                 store = conv_horiz_rgb_2(bounds_start, src, v_weight, store, shuffle_lo);
                 jx += 2;

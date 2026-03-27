@@ -31,7 +31,7 @@ use crate::avx2::utils::_mm256_fma_pd;
 use crate::filter_weights::FilterWeights;
 use std::arch::x86_64::*;
 
-pub(crate) fn convolve_horizontal_rgba_avx_rows_4_f32_f64<const FMA: bool>(
+pub(crate) fn convolve_horizontal_rgba_avx_rows_4_f32_f64_default(
     src: &[f32],
     src_stride: usize,
     dst: &mut [f32],
@@ -40,23 +40,32 @@ pub(crate) fn convolve_horizontal_rgba_avx_rows_4_f32_f64<const FMA: bool>(
     _: u32,
 ) {
     unsafe {
-        if FMA {
-            convolve_horizontal_rgba_avx_rows_4_f32_f64_fma(
-                filter_weights,
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-            );
-        } else {
-            convolve_horizontal_rgba_avx_rows_4_f32_f64_regular(
-                filter_weights,
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-            );
-        }
+        convolve_horizontal_rgba_avx_rows_4_f32_f64_regular(
+            filter_weights,
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+        );
+    }
+}
+
+pub(crate) fn convolve_horizontal_rgba_avx_rows_4_f32_f64_fma(
+    src: &[f32],
+    src_stride: usize,
+    dst: &mut [f32],
+    dst_stride: usize,
+    filter_weights: &FilterWeights<f64>,
+    _: u32,
+) {
+    unsafe {
+        convolve_horizontal_rgba_avx_rows_4_f32_f64_fma_impl(
+            filter_weights,
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+        );
     }
 }
 
@@ -75,7 +84,7 @@ fn convolve_horizontal_rgba_avx_rows_4_f32_f64_regular(
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch
-fn convolve_horizontal_rgba_avx_rows_4_f32_f64_fma(
+fn convolve_horizontal_rgba_avx_rows_4_f32_f64_fma_impl(
     filter_weights: &FilterWeights<f64>,
     src: &[f32],
     src_stride: usize,
@@ -214,18 +223,25 @@ impl<const FMA: bool> Row4ExecutionUnit<FMA> {
     }
 }
 
-pub(crate) fn convolve_horizontal_rgba_avx_row_one_f32_f64<const FMA: bool>(
+pub(crate) fn convolve_horizontal_rgba_avx_row_one_f32_f64_default(
     src: &[f32],
     dst: &mut [f32],
     filter_weights: &FilterWeights<f64>,
     _: u32,
 ) {
     unsafe {
-        if FMA {
-            convolve_horizontal_rgba_avx_row_one_f32_f64_fma(filter_weights, src, dst);
-        } else {
-            convolve_horizontal_rgba_avx_row_one_f32_f64_regular(filter_weights, src, dst);
-        }
+        convolve_horizontal_rgba_avx_row_one_f32_f64_regular(filter_weights, src, dst);
+    }
+}
+
+pub(crate) fn convolve_horizontal_rgba_avx_row_one_f32_f64_fma(
+    src: &[f32],
+    dst: &mut [f32],
+    filter_weights: &FilterWeights<f64>,
+    _: u32,
+) {
+    unsafe {
+        convolve_horizontal_rgba_avx_row_one_f32_f64_fma_impl(filter_weights, src, dst);
     }
 }
 
@@ -240,7 +256,7 @@ fn convolve_horizontal_rgba_avx_row_one_f32_f64_regular(
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
-fn convolve_horizontal_rgba_avx_row_one_f32_f64_fma(
+fn convolve_horizontal_rgba_avx_row_one_f32_f64_fma_impl(
     filter_weights: &FilterWeights<f64>,
     src: &[f32],
     dst: &mut [f32],

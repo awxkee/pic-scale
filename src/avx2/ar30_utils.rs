@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::ar30::Rgb30;
+use crate::factory::Rgb30;
 use std::arch::x86_64::*;
 
 #[inline]

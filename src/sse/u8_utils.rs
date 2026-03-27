@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::ar30::Rgb30;
+use crate::factory::Rgb30;
 use crate::support::PRECISION;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
@@ -50,8 +50,8 @@ pub(crate) fn convolve_horizontal_parts_one_sse_rgb(
     store_0: __m128i,
 ) -> __m128i {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..).as_ptr();
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked((start_x * CN)..).as_ptr();
         let base_pixel = _mm_loadu_si16(src_ptr);
         let m_vl = _mm_insert_epi8::<2>(base_pixel, src_ptr.add(2).read_unaligned() as i32);
         let lo = _mm_unpacklo_epi8(m_vl, _mm_setzero_si128());
@@ -226,7 +226,7 @@ pub(crate) fn _mm_extract_ar30<const AR30_TYPE: usize, const AR30_ORDER: usize>(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_ld1_ar30_s16<const AR30_TYPE: usize, const AR30_ORDER: usize>(
+pub(crate) fn _mm_ld1_ar30_s16<const AR30_TYPE: usize, const AR30_ORDER: usize>(
     arr: &[u8],
 ) -> __m128i {
     unsafe {

@@ -33,16 +33,10 @@ use std::arch::wasm32::*;
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_2_u8(
-    start_x: usize,
-    src: &[u8],
-    w0: v128,
-    w1: v128,
-    store: v128,
-) -> v128 {
+fn conv_horiz_rgba_2_u8(start_x: usize, src: &[u8], w0: v128, w1: v128, store: v128) -> v128 {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let rgb_pixel = v128_load64_lane::<0>(i32x4_splat(0), src_ptr.as_ptr() as *const _);
         let wide = u16x8_extend_low_u8x16(rgb_pixel);
@@ -54,7 +48,7 @@ unsafe fn conv_horiz_rgba_2_u8(
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_4_u8(
+fn conv_horiz_rgba_4_u8(
     start_x: usize,
     src: &[u8],
     w0: v128,
@@ -64,8 +58,8 @@ unsafe fn conv_horiz_rgba_4_u8(
     store: v128,
 ) -> v128 {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let rgba_pixel = v128_load(src_ptr.as_ptr() as *const _);
 
@@ -81,10 +75,10 @@ unsafe fn conv_horiz_rgba_4_u8(
 
 #[must_use]
 #[inline(always)]
-unsafe fn conv_horiz_rgba_1_u8(start_x: usize, src: &[u8], w0: v128, store: v128) -> v128 {
+fn conv_horiz_rgba_1_u8(start_x: usize, src: &[u8], w0: v128, store: v128) -> v128 {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
         let rgba_pixel = v128_load32_lane::<0>(i32x4_splat(0), src_ptr.as_ptr() as *const _);
         let lo = u16x8_extend_low_u8x16(rgba_pixel);
         i32x4_add(store, i32x4_extmul_low_i16x8(lo, w0))
@@ -117,7 +111,7 @@ fn convolve_horizontal_rgba_wasm_rows_4_u8_impl<const PRECISION: i32>(
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        const CHANNELS: usize = 4;
+        const CN: usize = 4;
         let rnd_const: i32 = 1 << (PRECISION - 1);
         let init = i32x4_splat(rnd_const);
 
@@ -125,10 +119,10 @@ fn convolve_horizontal_rgba_wasm_rows_4_u8_impl<const PRECISION: i32>(
         let (row1_ref, rest) = rest.split_at_mut(dst_stride);
         let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let iter_row0 = row0_ref.chunks_exact_mut(CHANNELS);
-        let iter_row1 = row1_ref.chunks_exact_mut(CHANNELS);
-        let iter_row2 = row2_ref.chunks_exact_mut(CHANNELS);
-        let iter_row3 = row3_ref.chunks_exact_mut(CHANNELS);
+        let iter_row0 = row0_ref.as_chunks_mut::<CN>().0.iter_mut();
+        let iter_row1 = row1_ref.as_chunks_mut::<CN>().0.iter_mut();
+        let iter_row2 = row2_ref.as_chunks_mut::<CN>().0.iter_mut();
+        let iter_row3 = row3_ref.as_chunks_mut::<CN>().0.iter_mut();
 
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
             .zip(iter_row1)
@@ -228,11 +222,13 @@ fn convolve_horizontal_rgba_wasm_row_impl<const PRECISION: i32>(
     filter_weights: &FilterWeights<i16>,
 ) {
     unsafe {
-        const CHANNELS: usize = 4;
+        const CN: usize = 4;
         let rnd_const: i32 = 1 << (PRECISION - 1);
 
         for ((dst, bounds), weights) in dst
-            .chunks_exact_mut(CHANNELS)
+            .as_chunks_mut::<CN>()
+            .0
+            .iter_mut()
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights

@@ -126,10 +126,10 @@ impl<const BIT_DEPTH: usize> Avx2PremultiplyExecutorDefault<BIT_DEPTH> {
     fn premultiply_chunk(&self, dst: &mut [u16], src: &[u16]) {
         unsafe {
             let src_ptr = src.as_ptr();
-            let lane0 = _mm256_loadu_si256(src_ptr as *const __m256i);
-            let lane1 = _mm256_loadu_si256(src_ptr.add(16) as *const __m256i);
-            let lane2 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
-            let lane3 = _mm256_loadu_si256(src_ptr.add(48) as *const __m256i);
+            let lane0 = _mm256_loadu_si256(src_ptr.cast());
+            let lane1 = _mm256_loadu_si256(src_ptr.add(16).cast());
+            let lane2 = _mm256_loadu_si256(src_ptr.add(32).cast());
+            let lane3 = _mm256_loadu_si256(src_ptr.add(48).cast());
 
             let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
 
@@ -168,10 +168,10 @@ impl<const BIT_DEPTH: usize> Avx2PremultiplyExecutorDefault<BIT_DEPTH> {
             let (d_lane0, d_lane1, d_lane2, d_lane3) =
                 avx_interleave_rgba_epi16(new_rrr, new_ggg, new_bbb, pixel.3);
 
-            _mm256_storeu_si256(dst_ptr as *mut __m256i, d_lane0);
-            _mm256_storeu_si256(dst_ptr.add(16) as *mut __m256i, d_lane1);
-            _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, d_lane2);
-            _mm256_storeu_si256(dst_ptr.add(48) as *mut __m256i, d_lane3);
+            _mm256_storeu_si256(dst_ptr.cast(), d_lane0);
+            _mm256_storeu_si256(dst_ptr.add(16).cast(), d_lane1);
+            _mm256_storeu_si256(dst_ptr.add(32).cast(), d_lane2);
+            _mm256_storeu_si256(dst_ptr.add(48).cast(), d_lane3);
         }
     }
 }
@@ -214,13 +214,13 @@ struct Avx2PremultiplyExecutorAnyBit {}
 
 impl Avx2PremultiplyExecutorAnyBit {
     #[inline(always)]
-    unsafe fn premultiply_chunk(&self, dst: &mut [u16], src: &[u16], scale: __m256) {
+    fn premultiply_chunk(&self, dst: &mut [u16], src: &[u16], scale: __m256) {
         unsafe {
             let src_ptr = src.as_ptr();
-            let lane0 = _mm256_loadu_si256(src_ptr as *const __m256i);
-            let lane1 = _mm256_loadu_si256(src_ptr.add(16) as *const __m256i);
-            let lane2 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
-            let lane3 = _mm256_loadu_si256(src_ptr.add(48) as *const __m256i);
+            let lane0 = _mm256_loadu_si256(src_ptr.cast());
+            let lane1 = _mm256_loadu_si256(src_ptr.add(16).cast());
+            let lane2 = _mm256_loadu_si256(src_ptr.add(32).cast());
+            let lane3 = _mm256_loadu_si256(src_ptr.add(48).cast());
 
             let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
 
@@ -244,15 +244,15 @@ impl Avx2PremultiplyExecutorAnyBit {
             let (d_lane0, d_lane1, d_lane2, d_lane3) =
                 avx_interleave_rgba_epi16(new_rrr, new_ggg, new_bbb, pixel.3);
 
-            _mm256_storeu_si256(dst_ptr as *mut __m256i, d_lane0);
-            _mm256_storeu_si256(dst_ptr.add(16) as *mut __m256i, d_lane1);
-            _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, d_lane2);
-            _mm256_storeu_si256(dst_ptr.add(48) as *mut __m256i, d_lane3);
+            _mm256_storeu_si256(dst_ptr.cast(), d_lane0);
+            _mm256_storeu_si256(dst_ptr.add(16).cast(), d_lane1);
+            _mm256_storeu_si256(dst_ptr.add(32).cast(), d_lane2);
+            _mm256_storeu_si256(dst_ptr.add(48).cast(), d_lane3);
         }
     }
 
     #[inline(always)]
-    unsafe fn premultiply_work(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
+    fn premultiply_work(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
         unsafe {
             let max_colors = (1 << bit_depth) - 1;
 
@@ -287,19 +287,15 @@ impl Avx2PremultiplyExecutorAnyBit {
     }
 
     #[target_feature(enable = "avx2")]
-    unsafe fn premultiply_avx(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
-        unsafe {
-            self.premultiply_work(dst, src, bit_depth);
-        }
+    fn premultiply_avx(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
+        self.premultiply_work(dst, src, bit_depth);
     }
 }
 
 impl Avx2PremultiplyExecutor for Avx2PremultiplyExecutorAnyBit {
     #[target_feature(enable = "avx2")]
     unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
-        unsafe {
-            self.premultiply_avx(dst, src, bit_depth);
-        }
+        self.premultiply_avx(dst, src, bit_depth);
     }
 }
 
@@ -388,10 +384,10 @@ fn avx_unpremultiply_alpha_rgba_u16_row_impl(in_place: &mut [u16], bit_depth: us
 
         for dst in rem.chunks_exact_mut(16 * 4) {
             let src_ptr = dst.as_ptr();
-            let lane0 = _mm256_loadu_si256(src_ptr as *const __m256i);
-            let lane1 = _mm256_loadu_si256(src_ptr.add(16) as *const __m256i);
-            let lane2 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
-            let lane3 = _mm256_loadu_si256(src_ptr.add(48) as *const __m256i);
+            let lane0 = _mm256_loadu_si256(src_ptr.cast());
+            let lane1 = _mm256_loadu_si256(src_ptr.add(16).cast());
+            let lane2 = _mm256_loadu_si256(src_ptr.add(32).cast());
+            let lane3 = _mm256_loadu_si256(src_ptr.add(48).cast());
 
             let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
 
@@ -424,10 +420,10 @@ fn avx_unpremultiply_alpha_rgba_u16_row_impl(in_place: &mut [u16], bit_depth: us
             let (d_lane0, d_lane1, d_lane2, d_lane3) =
                 avx_interleave_rgba_epi16(new_rrr, new_ggg, new_bbb, pixel.3);
 
-            _mm256_storeu_si256(dst_ptr as *mut __m256i, d_lane0);
-            _mm256_storeu_si256(dst_ptr.add(16) as *mut __m256i, d_lane1);
-            _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, d_lane2);
-            _mm256_storeu_si256(dst_ptr.add(48) as *mut __m256i, d_lane3);
+            _mm256_storeu_si256(dst_ptr.cast(), d_lane0);
+            _mm256_storeu_si256(dst_ptr.add(16).cast(), d_lane1);
+            _mm256_storeu_si256(dst_ptr.add(32).cast(), d_lane2);
+            _mm256_storeu_si256(dst_ptr.add(48).cast(), d_lane3);
         }
 
         rem = rem.chunks_exact_mut(16 * 4).into_remainder();
@@ -438,10 +434,10 @@ fn avx_unpremultiply_alpha_rgba_u16_row_impl(in_place: &mut [u16], bit_depth: us
             let mut dst_buffer: [u16; 16 * 4] = [0u16; 16 * 4];
             std::ptr::copy_nonoverlapping(rem.as_ptr(), dst_buffer.as_mut_ptr(), rem.len());
 
-            let lane0 = _mm256_loadu_si256(dst_buffer.as_ptr() as *const __m256i);
-            let lane1 = _mm256_loadu_si256(dst_buffer.as_ptr().add(16) as *const __m256i);
-            let lane2 = _mm256_loadu_si256(dst_buffer.as_ptr().add(32) as *const __m256i);
-            let lane3 = _mm256_loadu_si256(dst_buffer.as_ptr().add(48) as *const __m256i);
+            let lane0 = _mm256_loadu_si256(dst_buffer.as_ptr().cast());
+            let lane1 = _mm256_loadu_si256(dst_buffer.as_ptr().add(16).cast());
+            let lane2 = _mm256_loadu_si256(dst_buffer.as_ptr().add(32).cast());
+            let lane3 = _mm256_loadu_si256(dst_buffer.as_ptr().add(48).cast());
 
             let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
 
@@ -473,10 +469,10 @@ fn avx_unpremultiply_alpha_rgba_u16_row_impl(in_place: &mut [u16], bit_depth: us
             let (d_lane0, d_lane1, d_lane2, d_lane3) =
                 avx_interleave_rgba_epi16(new_rrr, new_ggg, new_bbb, pixel.3);
 
-            _mm256_storeu_si256(dst_buffer.as_mut_ptr() as *mut __m256i, d_lane0);
-            _mm256_storeu_si256(dst_buffer.as_mut_ptr().add(16) as *mut __m256i, d_lane1);
-            _mm256_storeu_si256(dst_buffer.as_mut_ptr().add(32) as *mut __m256i, d_lane2);
-            _mm256_storeu_si256(dst_buffer.as_mut_ptr().add(48) as *mut __m256i, d_lane3);
+            _mm256_storeu_si256(dst_buffer.as_mut_ptr().cast(), d_lane0);
+            _mm256_storeu_si256(dst_buffer.as_mut_ptr().add(16).cast(), d_lane1);
+            _mm256_storeu_si256(dst_buffer.as_mut_ptr().add(32).cast(), d_lane2);
+            _mm256_storeu_si256(dst_buffer.as_mut_ptr().add(48).cast(), d_lane3);
 
             std::ptr::copy_nonoverlapping(dst_buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
         }

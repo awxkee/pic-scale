@@ -69,8 +69,8 @@ macro_rules! conv_horiz_rgba_4_f32 {
 
 macro_rules! conv_horiz_rgba_2_f32 {
     ($start_x: expr, $src: expr, $set: expr,  $store: expr) => {{
-        const COMPONENTS: usize = 4;
-        let src_ptr = $src.add($start_x * COMPONENTS);
+        const CN: usize = 4;
+        let src_ptr = $src.add($start_x * CN);
 
         let rgb_pixel = xvld1q_f32_x2(src_ptr);
 

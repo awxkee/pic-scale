@@ -33,15 +33,15 @@ use std::arch::aarch64::*;
 #[must_use]
 #[inline]
 #[target_feature(enable = "rdm")]
-unsafe fn conv_horiz_rgba_1_u16(
+fn conv_horiz_rgba_1_u16(
     start_x: usize,
     src: &[u16],
     w0: int32x4_t,
     store: int32x4_t,
 ) -> int32x4_t {
     unsafe {
-        const COMPONENTS: usize = 4;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 4;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
         let rgba_pixel = vld1_u16(src_ptr.as_ptr());
         let lo = vreinterpretq_s32_u32(vshll_n_u16::<6>(rgba_pixel));
         vqrdmlahq_s32(store, lo, w0)

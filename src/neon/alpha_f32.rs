@@ -39,7 +39,7 @@ macro_rules! unpremultiply_vec_f32 {
     }};
 }
 
-unsafe fn neon_premultiply_alpha_rgba_row_f32(dst: &mut [f32], src: &[f32]) {
+fn neon_premultiply_alpha_rgba_row_f32(dst: &mut [f32], src: &[f32]) {
     unsafe {
         let mut rem = dst;
         let mut src_rem = src;
@@ -71,13 +71,13 @@ pub(crate) fn neon_premultiply_alpha_rgba_f32(
     pool: &novtb::ThreadPool,
 ) {
     dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| unsafe {
+        .for_each_enumerated(pool, |y, dst| {
             let src = &src[y * src_stride..(y + 1) * src_stride];
             neon_premultiply_alpha_rgba_row_f32(&mut dst[..width * 4], &src[..width * 4]);
         });
 }
 
-unsafe fn neon_unpremultiply_alpha_rgba_f32_row(in_place: &mut [f32]) {
+fn neon_unpremultiply_alpha_rgba_f32_row(in_place: &mut [f32]) {
     unsafe {
         let mut rem = in_place;
 
@@ -106,7 +106,7 @@ pub(crate) fn neon_unpremultiply_alpha_rgba_f32(
 ) {
     in_place
         .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| unsafe {
+        .for_each(pool, |row| {
             neon_unpremultiply_alpha_rgba_f32_row(&mut row[..width * 4]);
         });
 }

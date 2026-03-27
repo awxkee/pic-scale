@@ -32,7 +32,7 @@ use novtb::{ParallelZonedIterator, TbSliceMut};
 use std::arch::aarch64::*;
 
 #[inline]
-pub unsafe fn neon_div_by_255_n(v: uint16x8_t) -> uint8x8_t {
+pub fn neon_div_by_255_n(v: uint16x8_t) -> uint8x8_t {
     unsafe { vqrshrn_n_u16::<8>(vrsraq_n_u16::<8>(v, v)) }
 }
 

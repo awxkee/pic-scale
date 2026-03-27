@@ -36,7 +36,7 @@ fn conv_horiz_1_u16(start_x: usize, src: &[u16], w0: int32x4_t, store: int32x4_t
     unsafe {
         const CN: usize = 1;
         let src_ptr = src.get_unchecked((start_x * CN)..);
-        let px = vld1_lane_u16::<0>(src_ptr.as_ptr() as *const _, vdup_n_u16(0));
+        let px = vld1_lane_u16::<0>(src_ptr.as_ptr().cast(), vdup_n_u16(0));
         let lo = vreinterpretq_s32_u32(vshll_n_u16::<6>(px));
         vqrdmlahq_s32(store, lo, w0)
     }
@@ -50,10 +50,7 @@ fn conv_horiz_2_u16(start_x: usize, src: &[u16], w0: int32x4_t, store: int32x4_t
         const CN: usize = 1;
         let src_ptr = src.get_unchecked((start_x * CN)..);
 
-        let px = vreinterpret_u16_u32(vld1_lane_u32::<0>(
-            src_ptr.as_ptr() as *const _,
-            vdup_n_u32(0),
-        ));
+        let px = vreinterpret_u16_u32(vld1_lane_u32::<0>(src_ptr.as_ptr().cast(), vdup_n_u32(0)));
 
         vqrdmlahq_s32(store, vreinterpretq_s32_u32(vshll_n_u16::<6>(px)), w0)
     }
@@ -69,8 +66,8 @@ fn conv_horiz_4_u16(
     store: int32x4_t,
 ) -> int32x4_t {
     unsafe {
-        const COMPONENTS: usize = 1;
-        let src_ptr = src.get_unchecked((start_x * COMPONENTS)..);
+        const CN: usize = 1;
+        let src_ptr = src.get_unchecked((start_x * CN)..);
 
         let px = vld1_u16(src_ptr.as_ptr());
 

@@ -45,8 +45,8 @@ fn convolve_horizontal_parts_4_rgb_f32<const FMA: bool>(
     store_0: __m128,
 ) -> __m128 {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
 
         let rgb_pixel_0 = _mm_loadu_ps(src_ptr);
         let rgb_pixel_1 = _mm_loadu_ps(src_ptr.add(3));
@@ -70,8 +70,8 @@ fn convolve_horizontal_parts_2_rgb_f32<const FMA: bool>(
     store_0: __m128,
 ) -> __m128 {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
 
         let orig1 = _mm_loadu_ps(src_ptr);
         let rgb_pixel_0 = orig1;
@@ -92,8 +92,8 @@ fn convolve_horizontal_parts_one_rgb_f32<const FMA: bool>(
     store_0: __m128,
 ) -> __m128 {
     unsafe {
-        const COMPONENTS: usize = 3;
-        let src_ptr = src.get_unchecked(start_x * COMPONENTS..).as_ptr();
+        const CN: usize = 3;
+        let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
         let rgb_pixel = _mm_setr_ps(
             src_ptr.add(0).read_unaligned(),
             src_ptr.add(1).read_unaligned(),
@@ -133,7 +133,7 @@ impl<const FMA: bool> ExecutionUnit1Row<FMA> {
     #[inline(always)]
     fn pass(&self, filter_weights: &FilterWeights<f32>, src: &[f32], dst: &mut [f32]) {
         unsafe {
-            const CHANNELS: usize = 3;
+            const CN: usize = 3;
             let mut filter_offset = 0usize;
             let weights_ptr = filter_weights.weights.as_ptr();
 
@@ -193,7 +193,7 @@ impl<const FMA: bool> ExecutionUnit1Row<FMA> {
                     jx += 1;
                 }
 
-                let px = x * CHANNELS;
+                let px = x * CN;
                 let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
                 _mm_storeu_si64(dest_ptr as *mut u8, _mm_castps_si128(store));
                 (dest_ptr as *mut i32)
@@ -252,7 +252,7 @@ impl<const FMA: bool> ExecutionUnit4Row<FMA> {
         dst_stride: usize,
     ) {
         unsafe {
-            const CHANNELS: usize = 3;
+            const CN: usize = 3;
             let mut filter_offset = 0usize;
             let zeros = _mm_setzero_ps();
             let weights_ptr = filter_weights.weights.as_ptr();
@@ -382,7 +382,7 @@ impl<const FMA: bool> ExecutionUnit4Row<FMA> {
                     jx += 1;
                 }
 
-                let px = x * CHANNELS;
+                let px = x * CN;
                 let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
                 _mm_storeu_si64(dest_ptr as *mut u8, _mm_castps_si128(store_0));
                 (dest_ptr as *mut i32)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ * Copyright (c) Radzivon Bartoshyk 3/2026. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -26,66 +26,83 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#[cfg(all(target_arch = "x86_64", feature = "avx"))]
-use crate::avx2::convolve_vertical_avx_row_f32;
 use crate::convolution::{
     ColumnFilter, ConvolutionOptions, HorizontalFilterPass, RowFilter, VerticalConvolutionPass,
 };
-use crate::convolve_naive_f32::{
-    convolve_horizontal_4_row_f32_f64, convolve_horizontal_native_row_f32,
-    convolve_horizontal_native_row_f32_f64, convolve_horizontal_rgba_4_row_f32,
-};
+use crate::convolve_naive_f32::*;
 use crate::filter_weights::{FilterBounds, FilterWeights};
+use crate::floating_point_vertical::column_handler_floating_point;
+use crate::image_store::ImageStore;
 #[cfg(all(target_arch = "aarch64", feature = "neon",))]
-use crate::neon::{
-    convolve_horizontal_plane_neon_row_one, convolve_horizontal_plane_neon_rows_4,
-    convolve_vertical_rgb_neon_row_f32,
-};
+use crate::neon::*;
 use crate::plan::{HorizontalFiltering, VerticalFiltering};
-use crate::rgb_f32::{convolve_vertical_rgb_native_row_f32, convolve_vertical_rgb_native_row_f64};
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
-use crate::sse::{
-    convolve_horizontal_plane_sse_row_one, convolve_horizontal_plane_sse_rows_4,
-    convolve_vertical_rgb_sse_row_f32,
-};
-use crate::{ImageStore, ThreadingPolicy};
+use crate::sse::*;
+use crate::{ThreadingPolicy, WorkloadStrategy};
 use std::sync::Arc;
 
-impl HorizontalFilterPass<f32, f32, 1> for ImageStore<'_, f32, 1> {
+pub(crate) fn convolve_vertical_rgb_native_row_f32(
+    q: usize,
+    bounds: &FilterBounds,
+    src: &[f32],
+    dst: &mut [f32],
+    src_stride: usize,
+    weight: &[f32],
+    _: u32,
+) {
+    column_handler_floating_point::<f32, f32, f32>(q, bounds, src, dst, src_stride, weight, 8);
+}
+
+pub(crate) fn convolve_vertical_rgb_native_row_f64(
+    q: usize,
+    bounds: &FilterBounds,
+    src: &[f32],
+    dst: &mut [f32],
+    src_stride: usize,
+    weight: &[f64],
+    _: u32,
+) {
+    column_handler_floating_point::<f32, f64, f64>(q, bounds, src, dst, src_stride, weight, 8);
+}
+
+impl HorizontalFilterPass<f32, f32, 3> for ImageStore<'_, f32, 3> {
     fn horizontal_plan(
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
         _: ConvolutionOptions,
-    ) -> Arc<dyn RowFilter<f32, 1> + Send + Sync> {
+    ) -> Arc<dyn RowFilter<f32, 3> + Send + Sync> {
         let mut _dispatcher_4_rows: Option<
             fn(&[f32], usize, &mut [f32], usize, &FilterWeights<f32>, u32),
-        > = Some(convolve_horizontal_rgba_4_row_f32::<1>);
+        > = Some(convolve_horizontal_rgba_4_row_f32::<3>);
         let mut _dispatcher_row: fn(&[f32], &mut [f32], &FilterWeights<f32>, u32) =
-            convolve_horizontal_native_row_f32::<1>;
+            convolve_horizontal_native_row_f32::<3>;
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
-            _dispatcher_4_rows = Some(convolve_horizontal_plane_neon_rows_4);
-            _dispatcher_row = convolve_horizontal_plane_neon_row_one;
+            _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rows_4_f32);
+            _dispatcher_row = convolve_horizontal_rgb_neon_row_one_f32;
         }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             if std::arch::is_x86_feature_detected!("sse4.1") {
-                _dispatcher_4_rows = Some(convolve_horizontal_plane_sse_rows_4);
-                _dispatcher_row = convolve_horizontal_plane_sse_row_one;
+                _dispatcher_4_rows = Some(convolve_horizontal_rgb_sse_rows_4_f32);
+                _dispatcher_row = convolve_horizontal_rgb_sse_row_one_f32;
             }
         }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         {
             use crate::avx2::{
-                convolve_horizontal_plane_avx_row_one_f32, convolve_horizontal_plane_avx_rows_4_f32,
+                convolve_horizontal_rgb_avx_row_one_f32_default,
+                convolve_horizontal_rgb_avx_row_one_f32_fma,
+                convolve_horizontal_rgb_avx_rows_4_f32_default,
+                convolve_horizontal_rgb_avx_rows_4_f32_fma,
             };
             let has_fma = std::arch::is_x86_feature_detected!("fma");
             if std::arch::is_x86_feature_detected!("avx2") {
-                _dispatcher_4_rows = Some(convolve_horizontal_plane_avx_rows_4_f32::<false>);
-                _dispatcher_row = convolve_horizontal_plane_avx_row_one_f32::<false>;
+                _dispatcher_4_rows = Some(convolve_horizontal_rgb_avx_rows_4_f32_default);
+                _dispatcher_row = convolve_horizontal_rgb_avx_row_one_f32_default;
                 if has_fma {
-                    _dispatcher_4_rows = Some(convolve_horizontal_plane_avx_rows_4_f32::<true>);
-                    _dispatcher_row = convolve_horizontal_plane_avx_row_one_f32::<true>;
+                    _dispatcher_4_rows = Some(convolve_horizontal_rgb_avx_rows_4_f32_fma);
+                    _dispatcher_row = convolve_horizontal_rgb_avx_row_one_f32_fma;
                 }
             }
         }
@@ -98,37 +115,41 @@ impl HorizontalFilterPass<f32, f32, 1> for ImageStore<'_, f32, 1> {
     }
 }
 
-impl HorizontalFilterPass<f32, f64, 1> for ImageStore<'_, f32, 1> {
+impl HorizontalFilterPass<f32, f64, 3> for ImageStore<'_, f32, 3> {
     fn horizontal_plan(
         filter_weights: FilterWeights<f64>,
         threading_policy: ThreadingPolicy,
         _: ConvolutionOptions,
-    ) -> Arc<dyn RowFilter<f32, 1> + Send + Sync> {
+    ) -> Arc<dyn RowFilter<f32, 3> + Send + Sync> {
         let mut _dispatcher_4_rows: Option<
             fn(&[f32], usize, &mut [f32], usize, &FilterWeights<f64>, u32),
-        > = Some(convolve_horizontal_4_row_f32_f64::<1>);
+        > = Some(convolve_horizontal_4_row_f32_f64::<3>);
         let mut _dispatcher_row: fn(&[f32], &mut [f32], &FilterWeights<f64>, u32) =
-            convolve_horizontal_native_row_f32_f64::<1>;
+            convolve_horizontal_native_row_f32_f64::<3>;
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             use crate::neon::{
-                convolve_horizontal_plane_neon_row_one_f32_f64,
-                convolve_horizontal_plane_neon_rows_4_f32_f64,
+                convolve_horizontal_rgb_neon_row_one_f32_f64,
+                convolve_horizontal_rgb_neon_rows_4_f32_f64,
             };
-            _dispatcher_4_rows = Some(convolve_horizontal_plane_neon_rows_4_f32_f64);
-            _dispatcher_row = convolve_horizontal_plane_neon_row_one_f32_f64;
+            _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rows_4_f32_f64);
+            _dispatcher_row = convolve_horizontal_rgb_neon_row_one_f32_f64;
         }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         {
+            use crate::avx2::{
+                convolve_horizontal_rgb_avx_row_one_f32_f64_default,
+                convolve_horizontal_rgb_avx_row_one_f32_f64_fma,
+                convolve_horizontal_rgb_avx_rows_4_f32_f64_default,
+                convolve_horizontal_rgb_avx_rows_4_f32_f64_fma,
+            };
+            let has_fma = std::arch::is_x86_feature_detected!("fma");
             if std::arch::is_x86_feature_detected!("avx2") {
-                use crate::avx2::{
-                    convolve_hor_plane_avx_row_one_f32_f64, convolve_hor_plane_avx_rows_4_f32_f64,
-                };
-                _dispatcher_4_rows = Some(convolve_hor_plane_avx_rows_4_f32_f64::<false>);
-                _dispatcher_row = convolve_hor_plane_avx_row_one_f32_f64::<false>;
-                if std::arch::is_x86_feature_detected!("fma") {
-                    _dispatcher_4_rows = Some(convolve_hor_plane_avx_rows_4_f32_f64::<true>);
-                    _dispatcher_row = convolve_hor_plane_avx_row_one_f32_f64::<true>;
+                _dispatcher_4_rows = Some(convolve_horizontal_rgb_avx_rows_4_f32_f64_default);
+                _dispatcher_row = convolve_horizontal_rgb_avx_row_one_f32_f64_default;
+                if has_fma {
+                    _dispatcher_4_rows = Some(convolve_horizontal_rgb_avx_rows_4_f32_f64_fma);
+                    _dispatcher_row = convolve_horizontal_rgb_avx_row_one_f32_f64_fma;
                 }
             }
         }
@@ -141,12 +162,12 @@ impl HorizontalFilterPass<f32, f64, 1> for ImageStore<'_, f32, 1> {
     }
 }
 
-impl VerticalConvolutionPass<f32, f32, 1> for ImageStore<'_, f32, 1> {
+impl VerticalConvolutionPass<f32, f32, 3> for ImageStore<'_, f32, 3> {
     fn vertical_plan(
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
         _: ConvolutionOptions,
-    ) -> Arc<dyn ColumnFilter<f32, 1> + Send + Sync> {
+    ) -> Arc<dyn ColumnFilter<f32, 3> + Send + Sync> {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(
             usize,
@@ -171,9 +192,11 @@ impl VerticalConvolutionPass<f32, f32, 1> for ImageStore<'_, f32, 1> {
         {
             let has_fma = std::arch::is_x86_feature_detected!("fma");
             if std::arch::is_x86_feature_detected!("avx2") {
-                _dispatcher = convolve_vertical_avx_row_f32::<false>;
+                use crate::avx2::convolve_vertical_avx_row_default_f32;
+                _dispatcher = convolve_vertical_avx_row_default_f32;
                 if has_fma {
-                    _dispatcher = convolve_vertical_avx_row_f32::<true>;
+                    use crate::avx2::convolve_vertical_avx_row_fma_f32;
+                    _dispatcher = convolve_vertical_avx_row_fma_f32;
                 }
             }
         }
@@ -185,12 +208,12 @@ impl VerticalConvolutionPass<f32, f32, 1> for ImageStore<'_, f32, 1> {
     }
 }
 
-impl VerticalConvolutionPass<f32, f64, 1> for ImageStore<'_, f32, 1> {
+impl VerticalConvolutionPass<f32, f64, 3> for ImageStore<'_, f32, 3> {
     fn vertical_plan(
         filter_weights: FilterWeights<f64>,
         threading_policy: ThreadingPolicy,
-        _: ConvolutionOptions,
-    ) -> Arc<dyn ColumnFilter<f32, 1> + Send + Sync> {
+        options: ConvolutionOptions,
+    ) -> Arc<dyn ColumnFilter<f32, 3> + Send + Sync> {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(
             usize,
@@ -201,10 +224,26 @@ impl VerticalConvolutionPass<f32, f64, 1> for ImageStore<'_, f32, 1> {
             &[f64],
             u32,
         ) = convolve_vertical_rgb_native_row_f64;
+        if options.workload_strategy == WorkloadStrategy::PreferQuality {
+            use crate::factory::rgb_f32::convolve_vertical_rgb_native_row_f64;
+            _dispatcher = convolve_vertical_rgb_native_row_f64;
+        }
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             use crate::neon::convolve_vertical_neon_row_f32_f64;
             _dispatcher = convolve_vertical_neon_row_f32_f64;
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            if std::arch::is_x86_feature_detected!("avx2") {
+                if std::arch::is_x86_feature_detected!("fma") {
+                    use crate::avx2::convolve_vertical_avx_row_f32_f64_fma;
+                    _dispatcher = convolve_vertical_avx_row_f32_f64_fma;
+                } else {
+                    use crate::avx2::convolve_vertical_avx_row_f32_f64_default;
+                    _dispatcher = convolve_vertical_avx_row_f32_f64_default;
+                }
+            }
         }
         Arc::new(VerticalFiltering {
             filter_weights,

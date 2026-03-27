@@ -31,7 +31,7 @@ use crate::avx2::utils::{_mm_prefer_fma_pd, _mm256_fma_pd};
 use crate::filter_weights::FilterBounds;
 use std::arch::x86_64::*;
 
-pub(crate) fn convolve_vertical_avx_row_f32_f64<const FMA: bool>(
+pub(crate) fn convolve_vertical_avx_row_f32_f64_default(
     width: usize,
     bounds: &FilterBounds,
     src: &[f32],
@@ -41,11 +41,21 @@ pub(crate) fn convolve_vertical_avx_row_f32_f64<const FMA: bool>(
     _: u32,
 ) {
     unsafe {
-        if FMA {
-            convolve_vertical_avx_row_f32_f64_fma(width, bounds, src, dst, src_stride, weights);
-        } else {
-            convolve_vertical_avx_row_f32_f64_regular(width, bounds, src, dst, src_stride, weights);
-        }
+        convolve_vertical_avx_row_f32_f64_regular(width, bounds, src, dst, src_stride, weights);
+    }
+}
+
+pub(crate) fn convolve_vertical_avx_row_f32_f64_fma(
+    width: usize,
+    bounds: &FilterBounds,
+    src: &[f32],
+    dst: &mut [f32],
+    src_stride: usize,
+    weights: &[f64],
+    _: u32,
+) {
+    unsafe {
+        convolve_vertical_avx_row_f32_f64_fma_impl(width, bounds, src, dst, src_stride, weights);
     }
 }
 
@@ -65,7 +75,7 @@ fn convolve_vertical_avx_row_f32_f64_regular(
 
 #[target_feature(enable = "avx2", enable = "fma")]
 /// This inlining is required to activate all features for runtime dispatch
-fn convolve_vertical_avx_row_f32_f64_fma(
+fn convolve_vertical_avx_row_f32_f64_fma_impl(
     width: usize,
     bounds: &FilterBounds,
     src: &[f32],

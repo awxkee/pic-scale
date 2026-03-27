@@ -206,7 +206,7 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_impl_dot(
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
                 let mut v_weight = vreinterpretq_s8_s32(vld1q_lane_s32::<0>(
-                    w_ptr.as_ptr() as *const _,
+                    w_ptr.as_ptr().cast(),
                     vdupq_n_s32(0),
                 ));
                 v_weight = vqtbl1q_s8(v_weight, v_weights);
@@ -227,7 +227,7 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_impl_dot(
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let mut v_weight = vreinterpretq_s8_s16(vld1q_lane_s16::<0>(
-                    w_ptr.as_ptr() as *const _,
+                    w_ptr.as_ptr().cast(),
                     vdupq_n_s16(0),
                 ));
                 v_weight = vqtbl1q_s8(v_weight, v_weights);
@@ -286,19 +286,19 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_impl_dot(
             let store_16_8_1 = vqmovn_u16(vcombine_u16(store_16_2, store_16_3));
 
             vst1_lane_u32::<0>(
-                chunk0.as_mut_ptr() as *mut u32,
+                chunk0.as_mut_ptr().cast(),
                 vreinterpret_u32_u8(store_16_8_0),
             );
             vst1_lane_u32::<1>(
-                chunk1.as_mut_ptr() as *mut u32,
+                chunk1.as_mut_ptr().cast(),
                 vreinterpret_u32_u8(store_16_8_0),
             );
             vst1_lane_u32::<0>(
-                chunk2.as_mut_ptr() as *mut u32,
+                chunk2.as_mut_ptr().cast(),
                 vreinterpret_u32_u8(store_16_8_1),
             );
             vst1_lane_u32::<1>(
-                chunk3.as_mut_ptr() as *mut u32,
+                chunk3.as_mut_ptr().cast(),
                 vreinterpret_u32_u8(store_16_8_1),
             );
         }
@@ -365,7 +365,7 @@ fn convolve_horizontal_rgba_neon_row_impl(
             while jx + 4 <= bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let mut v_weight = vreinterpretq_s8_s32(vld1q_lane_s32::<0>(
-                    w_ptr.as_ptr() as *const _,
+                    w_ptr.as_ptr().cast(),
                     vdupq_n_s32(0),
                 ));
                 v_weight = vqtbl1q_s8(v_weight, v_weights);
@@ -380,7 +380,7 @@ fn convolve_horizontal_rgba_neon_row_impl(
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
                 let mut v_weight = vreinterpretq_s8_s16(vld1q_lane_s16::<0>(
-                    w_ptr.as_ptr() as *const _,
+                    w_ptr.as_ptr().cast(),
                     vdupq_n_s16(0),
                 ));
                 v_weight = vqtbl1q_s8(v_weight, v_weights);
@@ -393,7 +393,7 @@ fn convolve_horizontal_rgba_neon_row_impl(
                 jx += 2;
             }
 
-            while jx <= bounds_size {
+            while jx < bounds_size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let weight0 = vld1q_dup_s8(w_ptr.as_ptr());
                 let bounds_start = bounds.start + jx;
@@ -405,10 +405,7 @@ fn convolve_horizontal_rgba_neon_row_impl(
             let store_16 = vqshrun_n_s32::<7>(store);
             let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
 
-            vst1_lane_u32::<0>(
-                dst.as_mut_ptr() as *mut u32,
-                vreinterpret_u32_u8(store_16_8),
-            );
+            vst1_lane_u32::<0>(dst.as_mut_ptr().cast(), vreinterpret_u32_u8(store_16_8));
         }
     }
 }
