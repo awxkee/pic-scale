@@ -28,34 +28,39 @@ fn main() {
         .unwrap();
     // img.save("top_right.tga").unwrap();
     let dimensions = img.dimensions();
-    let transient = img.to_rgb16();
-    let mut bytes = transient.to_vec();
+    let transient = img.to_luma16();
+    let mut bytes = transient
+        .to_vec()
+        .iter()
+        .map(|&x| x >> 6)
+        .collect::<Vec<_>>();
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
 
-    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3)
+    let mut scaler = Scaler::new(ResamplingFunction::MitchellNetravalli)
         .set_threading_policy(ThreadingPolicy::Single)
         .set_workload_strategy(WorkloadStrategy::PreferSpeed)
         .set_supersampling(true);
     // scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
-    let mut t_size = ImageSize::new(dimensions.0 as usize, dimensions.1 as usize) / 4;
-    t_size.height += 1;
+    let mut t_size = ImageSize::new(dimensions.0 as usize - 1, dimensions.1 as usize - 1);
+    // t_size.height += 1;
     let resizing_plan = scaler
-        .plan_rgb_resampling16(
+        .plan_planar_resampling16(
             ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
             t_size,
-            16,
+            10,
         )
         .unwrap();
 
     let mut store =
-        Rgb16ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
-    store.bit_depth = 16;
-    let mut dst_store = Rgb16ImageStoreMut::alloc_with_depth(
-        dimensions.0 as usize / 4,
-        dimensions.1 as usize / 4 + 1,
-        16,
+        Planar16ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize)
+            .unwrap();
+    store.bit_depth = 10;
+    let mut dst_store = Planar16ImageStoreMut::alloc_with_depth(
+        dimensions.0 as usize - 1,
+        dimensions.1 as usize - 1,
+        10,
     );
     resizing_plan.resample(&store, &mut dst_store).unwrap();
     // scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
@@ -110,7 +115,7 @@ fn main() {
         .as_bytes()
         .iter()
         // .map(|&x| x)
-        .map(|&x| (((x) >> 8) as u8).min(255))
+        .map(|&x| (((x) >> 2) as u8).min(255))
         // .map(|&x| (x as f32 * 255.).round() as u8)
         .collect::<Vec<_>>();
 
