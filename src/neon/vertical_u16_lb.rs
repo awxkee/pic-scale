@@ -29,6 +29,174 @@
 use crate::filter_weights::FilterBounds;
 use std::arch::aarch64::*;
 
+// ── 4-tap specializations ─────────────────────────────────────────────────────
+// Lanczos2, Mitchell, Catmull-Rom, and any other filter with support=4 all
+// produce exactly 4 weights per output sample. Hardcoding the tap count lets
+// the compiler use compile-time lane indices (vmlal_lane_s16::<N>) and
+// eliminates the loop counter / branch overhead entirely.
+
+#[inline]
+#[target_feature(enable = "neon")]
+fn convolve_4tap_16(
+    dst: &mut [u16; 16],
+    bounds: &FilterBounds,
+    src: &[u16],
+    src_stride: usize,
+    weights: int16x4_t,
+    initial_store: int32x4_t,
+    v_max_colors: uint16x8_t,
+    v_dx: usize,
+) {
+    let mut store0 = initial_store;
+    let mut store1 = initial_store;
+    let mut store2 = initial_store;
+    let mut store3 = initial_store;
+
+    unsafe {
+        let src0 = src.get_unchecked((src_stride * bounds.start + v_dx)..);
+        let r0 = vreinterpretq_s16_u16(vld1q_u16(src0.as_ptr()));
+        let r1 = vreinterpretq_s16_u16(vld1q_u16(src0.get_unchecked(8..).as_ptr()));
+        store0 = vmlal_lane_s16::<0>(store0, vget_low_s16(r0), weights);
+        store1 = vmlal_high_lane_s16::<0>(store1, r0, weights);
+        store2 = vmlal_lane_s16::<0>(store2, vget_low_s16(r1), weights);
+        store3 = vmlal_high_lane_s16::<0>(store3, r1, weights);
+
+        let src1 = src.get_unchecked((src_stride * (bounds.start + 1) + v_dx)..);
+        let r0 = vreinterpretq_s16_u16(vld1q_u16(src1.as_ptr()));
+        let r1 = vreinterpretq_s16_u16(vld1q_u16(src1.get_unchecked(8..).as_ptr()));
+        store0 = vmlal_lane_s16::<1>(store0, vget_low_s16(r0), weights);
+        store1 = vmlal_high_lane_s16::<1>(store1, r0, weights);
+        store2 = vmlal_lane_s16::<1>(store2, vget_low_s16(r1), weights);
+        store3 = vmlal_high_lane_s16::<1>(store3, r1, weights);
+
+        let src2 = src.get_unchecked((src_stride * (bounds.start + 2) + v_dx)..);
+        let r0 = vreinterpretq_s16_u16(vld1q_u16(src2.as_ptr()));
+        let r1 = vreinterpretq_s16_u16(vld1q_u16(src2.get_unchecked(8..).as_ptr()));
+        store0 = vmlal_lane_s16::<2>(store0, vget_low_s16(r0), weights);
+        store1 = vmlal_high_lane_s16::<2>(store1, r0, weights);
+        store2 = vmlal_lane_s16::<2>(store2, vget_low_s16(r1), weights);
+        store3 = vmlal_high_lane_s16::<2>(store3, r1, weights);
+
+        let src3 = src.get_unchecked((src_stride * (bounds.start + 3) + v_dx)..);
+        let r0 = vreinterpretq_s16_u16(vld1q_u16(src3.as_ptr()));
+        let r1 = vreinterpretq_s16_u16(vld1q_u16(src3.get_unchecked(8..).as_ptr()));
+        store0 = vmlal_lane_s16::<3>(store0, vget_low_s16(r0), weights);
+        store1 = vmlal_high_lane_s16::<3>(store1, r0, weights);
+        store2 = vmlal_lane_s16::<3>(store2, vget_low_s16(r1), weights);
+        store3 = vmlal_high_lane_s16::<3>(store3, r1, weights);
+    }
+
+    let s0 = vqshrun_n_s32::<{ crate::support::PRECISION }>(store0);
+    let s1 = vqshrun_n_s32::<{ crate::support::PRECISION }>(store1);
+    let s2 = vqshrun_n_s32::<{ crate::support::PRECISION }>(store2);
+    let s3 = vqshrun_n_s32::<{ crate::support::PRECISION }>(store3);
+
+    let item0 = vminq_u16(vcombine_u16(s0, s1), v_max_colors);
+    let item1 = vminq_u16(vcombine_u16(s2, s3), v_max_colors);
+    unsafe {
+        vst1q_u16(dst.as_mut_ptr(), item0);
+        vst1q_u16(dst.get_unchecked_mut(8..).as_mut_ptr(), item1);
+    }
+}
+
+#[inline]
+#[target_feature(enable = "neon")]
+fn convolve_4tap_8(
+    dst: &mut [u16; 8],
+    bounds: &FilterBounds,
+    src: &[u16],
+    src_stride: usize,
+    weights: int16x4_t,
+    initial_store: int32x4_t,
+    v_max_colors: uint16x8_t,
+    v_dx: usize,
+) {
+    let mut store0 = initial_store;
+    let mut store1 = initial_store;
+
+    unsafe {
+        let src0 = src.get_unchecked((src_stride * bounds.start + v_dx)..);
+        let r = vreinterpretq_s16_u16(vld1q_u16(src0.as_ptr()));
+        store0 = vmlal_lane_s16::<0>(store0, vget_low_s16(r), weights);
+        store1 = vmlal_high_lane_s16::<0>(store1, r, weights);
+
+        let src1 = src.get_unchecked((src_stride * (bounds.start + 1) + v_dx)..);
+        let r = vreinterpretq_s16_u16(vld1q_u16(src1.as_ptr()));
+        store0 = vmlal_lane_s16::<1>(store0, vget_low_s16(r), weights);
+        store1 = vmlal_high_lane_s16::<1>(store1, r, weights);
+
+        let src2 = src.get_unchecked((src_stride * (bounds.start + 2) + v_dx)..);
+        let r = vreinterpretq_s16_u16(vld1q_u16(src2.as_ptr()));
+        store0 = vmlal_lane_s16::<2>(store0, vget_low_s16(r), weights);
+        store1 = vmlal_high_lane_s16::<2>(store1, r, weights);
+
+        let src3 = src.get_unchecked((src_stride * (bounds.start + 3) + v_dx)..);
+        let r = vreinterpretq_s16_u16(vld1q_u16(src3.as_ptr()));
+        store0 = vmlal_lane_s16::<3>(store0, vget_low_s16(r), weights);
+        store1 = vmlal_high_lane_s16::<3>(store1, r, weights);
+    }
+
+    let item = vminq_u16(
+        vcombine_u16(
+            vqshrun_n_s32::<{ crate::support::PRECISION }>(store0),
+            vqshrun_n_s32::<{ crate::support::PRECISION }>(store1),
+        ),
+        v_max_colors,
+    );
+    unsafe {
+        vst1q_u16(dst.as_mut_ptr(), item);
+    }
+}
+
+#[inline]
+#[target_feature(enable = "neon")]
+fn convolve_4tap_4(
+    dst: &mut [u16; 4],
+    bounds: &FilterBounds,
+    src: &[u16],
+    src_stride: usize,
+    weights: int16x4_t,
+    initial_store: int32x4_t,
+    v_max_colors: uint16x8_t,
+    v_dx: usize,
+) {
+    let mut store0 = initial_store;
+    unsafe {
+        let src0 = src.get_unchecked((src_stride * bounds.start + v_dx)..);
+        store0 = vmlal_lane_s16::<0>(
+            store0,
+            vreinterpret_s16_u16(vld1_u16(src0.as_ptr())),
+            weights,
+        );
+
+        let src1 = src.get_unchecked((src_stride * (bounds.start + 1) + v_dx)..);
+        store0 = vmlal_lane_s16::<1>(
+            store0,
+            vreinterpret_s16_u16(vld1_u16(src1.as_ptr())),
+            weights,
+        );
+
+        let src2 = src.get_unchecked((src_stride * (bounds.start + 2) + v_dx)..);
+        store0 = vmlal_lane_s16::<2>(
+            store0,
+            vreinterpret_s16_u16(vld1_u16(src2.as_ptr())),
+            weights,
+        );
+
+        let src3 = src.get_unchecked((src_stride * (bounds.start + 3) + v_dx)..);
+        store0 = vmlal_lane_s16::<3>(
+            store0,
+            vreinterpret_s16_u16(vld1_u16(src3.as_ptr())),
+            weights,
+        );
+
+        vst1_u16(
+            dst.as_mut_ptr(),
+            vmin_u16(vqshrun_n_s32::<15>(store0), vget_low_u16(v_max_colors)),
+        );
+    }
+}
+
 #[inline(never)]
 #[target_feature(enable = "neon")]
 fn convolve_chunks_16(
@@ -53,6 +221,24 @@ fn convolve_chunks_16(
     let v_max_colors = vdupq_n_u16(max_colors as u16);
 
     let v_px = cx;
+
+    if bounds_size == 4 {
+        let weights4 = unsafe { vld1_s16(weights.as_ptr()) };
+        for (x, dst) in chunks.iter_mut().enumerate() {
+            convolve_4tap_16(
+                dst,
+                bounds,
+                src,
+                src_stride,
+                weights4,
+                initial_store,
+                v_max_colors,
+                v_px + x * 16,
+            );
+            cx += 16;
+        }
+        return cx;
+    }
 
     for (x, dst) in chunks.iter_mut().enumerate() {
         let mut store0 = initial_store;
@@ -218,6 +404,24 @@ fn convolve_chunks_8(
 
     let v_px = cx;
 
+    if bounds.size == 4 {
+        let weights4 = unsafe { vld1_s16(weights.as_ptr()) };
+        for (x, dst) in chunks.iter_mut().enumerate() {
+            convolve_4tap_8(
+                dst,
+                bounds,
+                src,
+                src_stride,
+                weights4,
+                initial_store,
+                v_max_colors,
+                v_px + x * 8,
+            );
+            cx += 8;
+        }
+        return cx;
+    }
+
     for (x, dst) in chunks.iter_mut().enumerate() {
         let mut store0 = initial_store;
         let mut store1 = initial_store;
@@ -274,6 +478,24 @@ fn convolve_chunks_4(
     let v_max_colors = vdupq_n_u16(max_colors as u16);
 
     let v_px = cx;
+
+    if bounds.size == 4 {
+        let weights4 = unsafe { vld1_s16(weights.as_ptr()) };
+        for (x, dst) in chunks.iter_mut().enumerate() {
+            convolve_4tap_4(
+                dst,
+                bounds,
+                src,
+                src_stride,
+                weights4,
+                initial_store,
+                v_max_colors,
+                v_px + x * 4,
+            );
+            cx += 4;
+        }
+        return cx;
+    }
 
     for (x, dst) in chunks.iter_mut().enumerate() {
         let mut store0 = initial_store;

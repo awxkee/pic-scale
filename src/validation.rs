@@ -180,8 +180,8 @@ macro_rules! validate_sizes {
         }
         if $into.width != $dst_size.width && $into.height != $dst_size.height {
             return Err(PicScaleError::InvalidDestinationSize {
-                expected: $src_size,
-                size: $store.size(),
+                expected: $dst_size,
+                size: $into.size(),
             });
         }
         if $store.width == $into.width && $store.height == $into.height {
