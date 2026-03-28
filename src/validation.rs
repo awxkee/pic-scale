@@ -63,6 +63,7 @@ pub enum PicScaleError {
         expected: ImageSize,
         size: ImageSize,
     },
+    EmptyPlan,
 }
 
 impl PicScaleError {
@@ -81,6 +82,7 @@ impl PicScaleError {
             PicScaleError::InvalidScratchSize { .. } => 9,
             PicScaleError::InvalidSourceSize { .. } => 10,
             PicScaleError::InvalidDestinationSize { .. } => 11,
+            PicScaleError::EmptyPlan => 12,
         }
     }
 }
@@ -128,6 +130,9 @@ impl Display for PicScaleError {
                 "Destination size must be at least {:?} bytes, but received {:?}",
                 expected, size
             )),
+            PicScaleError::EmptyPlan => {
+                f.write_str("Multi-step scaling appeared to be an empty one")
+            }
         }
     }
 }

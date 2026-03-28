@@ -78,27 +78,31 @@ where
     f32: AsPrimitive<V>,
 {
     let x = d;
-    let a = (-0.5).as_();
+    let a: V = (-0.5f32).as_();
     let modulo = x.abs();
     if modulo >= 2f32.as_() {
         return 0f32.as_();
     }
-    let floatd = modulo * modulo;
-    let triplet = floatd * modulo;
+    let floatd = modulo * modulo; // |x|²
+    let triplet = floatd * modulo; // |x|³
     if modulo <= 1f32.as_() {
+        // (a+2)|x|³ - (a+3)|x|² + 1   with a = -0.5:
+        // = 1.5|x|³ - 2.5|x|² + 1
         return mla(
             a + 2f32.as_(),
             triplet,
             mla(-(a + 3f32.as_()), floatd, 1f32.as_()),
         );
     }
+    // a|x|³ - 5a|x|² + 8a|x| - 4a   with a = -0.5:
+    // = -0.5|x|³ + 2.5|x|² - 4|x| + 2
     mla(
         a,
         triplet,
         mla(
-            -5f32.as_(),
-            a,
-            mla(-4f32.as_(), a, mla(8f32.as_() * a, modulo, floatd)),
+            -(5f32.as_() * a),
+            floatd,
+            mla(8f32.as_() * a, modulo, -(4f32.as_() * a)),
         ),
     )
 }

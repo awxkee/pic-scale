@@ -47,6 +47,11 @@ pub(crate) struct AlphaConvolvePlan<T: Send + Sync, const N: usize> {
     pub(crate) should_do_horizontal: bool,
     pub(crate) should_do_vertical: bool,
     pub(crate) workload_strategy: WorkloadStrategy,
+    // When needs_alpha_forward and needs_alpha_backward is different we'll always do premultiplication
+    // to avoid the situations when it was somewhere applied, somewhere don't or source image
+    // is scanned for alpha many times
+    pub(crate) needs_alpha_forward: bool,
+    pub(crate) needs_alpha_backward: bool,
 }
 
 impl<T: Copy + Send + Sync + Clone + Debug + Default + 'static, const N: usize> ResamplingPlan<T, N>
@@ -77,7 +82,7 @@ where
             return Err(PicScaleError::UnsupportedBitDepth(into.bit_depth));
         }
 
-        let (alpha_scratch, rem) =
+        let (alpha_scratch, scratch_rem) =
             scratch.split_at_mut(self.source_size.width * self.source_size.height * N);
 
         let pool = self.threading_policy.get_nova_pool(ImageSize::new(
@@ -90,8 +95,14 @@ where
 
         let mut has_alpha_premultiplied = false;
 
-        let is_alpha_premultiplication_reasonable = store.is_alpha_premultiplication_needed();
-        if is_alpha_premultiplication_reasonable {
+        // Associate alpha if:
+        // - forward flag is set AND backward is also set (normal single-step):
+        //   only if the source actually needs it
+        // - forward flag is set BUT backward is not (first step of multi-step):
+        //   always — the next step expects premultiplied data regardless
+        if self.needs_alpha_forward
+            && (!self.needs_alpha_backward || store.is_alpha_premultiplication_needed())
+        {
             let mut new_store = ImageStoreMut::<T, N>::from_slice(
                 alpha_scratch,
                 self.source_size.width,
@@ -112,10 +123,10 @@ where
 
         if self.should_do_vertical && self.should_do_horizontal {
             if self.threading_policy == ThreadingPolicy::Single {
-                self.trampoline_filter.filter(store, into, scratch);
+                self.trampoline_filter.filter(&src_store, into, scratch_rem);
             } else {
                 let (scratch, _) =
-                    rem.split_at_mut(self.source_size.width * self.target_size.height * N);
+                    scratch_rem.split_at_mut(self.source_size.width * self.target_size.height * N);
                 let mut new_image_vertical = ImageStoreMut::<T, N>::from_slice(
                     scratch,
                     src_store.width,
@@ -134,7 +145,10 @@ where
             self.horizontal_filter.filter(src_store.as_ref(), into);
         }
 
-        if has_alpha_premultiplied {
+        // Unassociate alpha if we premultiplied above, OR if we're the last step
+        // of a multi-step chain (backward=true, forward=false — data arrived
+        // already premultiplied from the previous step).
+        if has_alpha_premultiplied || (self.needs_alpha_backward && !self.needs_alpha_forward) {
             into.unpremultiply_alpha(&pool, self.workload_strategy);
         }
 

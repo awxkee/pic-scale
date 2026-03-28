@@ -45,6 +45,8 @@ pub struct SrcImage {
     pub use_quality: bool,
     pub premultiply_alpha: bool,
     pub threading: bool,
+    pub supersampling: bool,
+    pub multi_stage_upsampling: bool,
 }
 
 fuzz_target!(|data: SrcImage| {
@@ -66,6 +68,8 @@ fuzz_target!(|data: SrcImage| {
         } else {
             ThreadingPolicy::Single
         },
+        data.supersampling,
+        data.multi_stage_upsampling,
     )
 });
 
@@ -78,11 +82,13 @@ fn resize_rgba(
     sampler: ResamplingFunction,
     workload_strategy: WorkloadStrategy,
     threading_policy: ThreadingPolicy,
+    supersampling: bool,
+    multi_stage_upsampling: bool,
 ) {
     if src_width == 0
-        || src_width > 2000
+        || src_width > 2500
         || src_height == 0
-        || src_height > 2000
+        || src_height > 2500
         || dst_width == 0
         || dst_width > 512
         || dst_height == 0
@@ -99,7 +105,9 @@ fn resize_rgba(
     let mut target = ImageStoreMut::alloc(dst_width, dst_height);
     let scaler = Scaler::new(sampler)
         .set_workload_strategy(workload_strategy)
-        .set_threading_policy(threading_policy);
+        .set_threading_policy(threading_policy)
+        .set_supersampling(supersampling)
+        .set_multi_step_upsampling(multi_stage_upsampling);
     let planned = scaler
         .plan_rgba_resampling(store.size(), target.size(), false)
         .unwrap();
