@@ -29,6 +29,7 @@
 mod alpha_plan;
 mod ar30_plan;
 mod horizontal_filtering;
+mod multi_step_plan;
 mod nearest_plan;
 mod non_alpha_plan;
 mod planner;
@@ -39,6 +40,7 @@ pub(crate) use alpha_plan::AlphaConvolvePlan;
 #[allow(unused_imports)]
 pub(crate) use ar30_plan::{Ar30Destructuring, Ar30DestructuringImpl, Ar30Plan};
 pub(crate) use horizontal_filtering::HorizontalFiltering;
+pub(crate) use multi_step_plan::MultiStepResamplePlan;
 pub(crate) use nearest_plan::ResampleNearestPlan;
 pub(crate) use non_alpha_plan::NonAlphaConvolvePlan;
 pub use planner::{Resampling, ResamplingPlan};

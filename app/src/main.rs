@@ -35,7 +35,8 @@ fn main() {
 
     let mut scaler = Scaler::new(ResamplingFunction::Lanczos3)
         .set_threading_policy(ThreadingPolicy::Single)
-        .set_workload_strategy(WorkloadStrategy::PreferSpeed);
+        .set_workload_strategy(WorkloadStrategy::PreferSpeed)
+        .set_supersampling(true);
     // scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
     let mut t_size = ImageSize::new(dimensions.0 as usize, dimensions.1 as usize) / 4;
@@ -142,7 +143,7 @@ fn main() {
         .unwrap();
     } else {
         image::save_buffer(
-            "converted1.png",
+            "converted.png",
             &dst,
             dst_store.width as u32,
             dst_store.height as u32,
