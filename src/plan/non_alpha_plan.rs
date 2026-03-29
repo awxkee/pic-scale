@@ -28,24 +28,19 @@
  */
 use crate::convolution::{ColumnFilter, RowFilter, TrampolineFilter};
 use crate::image_store::CheckStoreDensity;
-use crate::validation::{validate_scratch, validate_sizes};
+use crate::validation::{try_vec, validate_scratch, validate_sizes};
 use crate::{ImageSize, ImageStore, ImageStoreMut, PicScaleError, ResamplingPlan, ThreadingPolicy};
 use std::fmt::Debug;
 use std::sync::Arc;
 
-pub(crate) struct NonAlphaConvolvePlan<T: Send + Sync, const N: usize> {
+pub(crate) struct VerticalConvolvePlan<T: Send + Sync, const N: usize> {
     pub(crate) source_size: ImageSize,
     pub(crate) target_size: ImageSize,
-    pub(crate) horizontal_filter: Arc<dyn RowFilter<T, N> + Send + Sync>,
     pub(crate) vertical_filter: Arc<dyn ColumnFilter<T, N> + Send + Sync>,
-    pub(crate) trampoline_filter: Arc<dyn TrampolineFilter<T, N> + Send + Sync>,
-    pub(crate) threading_policy: ThreadingPolicy,
-    pub(crate) should_do_horizontal: bool,
-    pub(crate) should_do_vertical: bool,
 }
 
 impl<T: Copy + Send + Sync + Clone + Debug + Default, const N: usize> ResamplingPlan<T, N>
-    for NonAlphaConvolvePlan<T, N>
+    for VerticalConvolvePlan<T, N>
 where
     for<'a> ImageStoreMut<'a, T, N>: CheckStoreDensity,
 {
@@ -54,7 +49,110 @@ where
         store: &ImageStore<'_, T, N>,
         into: &mut ImageStoreMut<'_, T, N>,
     ) -> Result<(), PicScaleError> {
-        let mut scratch = self.alloc_scratch();
+        validate_sizes!(store, into, self.source_size, self.target_size);
+        if into.should_have_bit_depth() && !(1..=16).contains(&into.bit_depth) {
+            return Err(PicScaleError::UnsupportedBitDepth(into.bit_depth));
+        }
+        self.vertical_filter.filter(store, into);
+        Ok(())
+    }
+
+    fn resample_with_scratch(
+        &self,
+        store: &ImageStore<'_, T, N>,
+        into: &mut ImageStoreMut<'_, T, N>,
+        _scratch: &mut [T],
+    ) -> Result<(), PicScaleError> {
+        self.resample(store, into)
+    }
+
+    fn alloc_scratch(&self) -> Vec<T> {
+        vec![]
+    }
+
+    fn scratch_size(&self) -> usize {
+        0
+    }
+
+    fn target_size(&self) -> ImageSize {
+        self.target_size
+    }
+
+    fn source_size(&self) -> ImageSize {
+        self.source_size
+    }
+}
+
+pub(crate) struct HorizontalConvolvePlan<T: Send + Sync, const N: usize> {
+    pub(crate) source_size: ImageSize,
+    pub(crate) target_size: ImageSize,
+    pub(crate) horizontal_filter: Arc<dyn RowFilter<T, N> + Send + Sync>,
+}
+
+impl<T: Copy + Send + Sync + Clone + Debug + Default, const N: usize> ResamplingPlan<T, N>
+    for HorizontalConvolvePlan<T, N>
+where
+    for<'a> ImageStoreMut<'a, T, N>: CheckStoreDensity,
+{
+    fn resample(
+        &self,
+        store: &ImageStore<'_, T, N>,
+        into: &mut ImageStoreMut<'_, T, N>,
+    ) -> Result<(), PicScaleError> {
+        validate_sizes!(store, into, self.source_size, self.target_size);
+        if into.should_have_bit_depth() && !(1..=16).contains(&into.bit_depth) {
+            return Err(PicScaleError::UnsupportedBitDepth(into.bit_depth));
+        }
+        self.horizontal_filter.filter(store, into);
+        Ok(())
+    }
+
+    fn resample_with_scratch(
+        &self,
+        store: &ImageStore<'_, T, N>,
+        into: &mut ImageStoreMut<'_, T, N>,
+        _scratch: &mut [T],
+    ) -> Result<(), PicScaleError> {
+        self.resample(store, into)
+    }
+
+    fn alloc_scratch(&self) -> Vec<T> {
+        vec![]
+    }
+
+    fn scratch_size(&self) -> usize {
+        0
+    }
+
+    fn target_size(&self) -> ImageSize {
+        self.target_size
+    }
+
+    fn source_size(&self) -> ImageSize {
+        self.source_size
+    }
+}
+
+pub(crate) struct BothAxesConvolvePlan<T: Send + Sync, const N: usize> {
+    pub(crate) source_size: ImageSize,
+    pub(crate) target_size: ImageSize,
+    pub(crate) horizontal_filter: Arc<dyn RowFilter<T, N> + Send + Sync>,
+    pub(crate) vertical_filter: Arc<dyn ColumnFilter<T, N> + Send + Sync>,
+    pub(crate) trampoline_filter: Arc<dyn TrampolineFilter<T, N> + Send + Sync>,
+    pub(crate) threading_policy: ThreadingPolicy,
+}
+
+impl<T: Copy + Send + Sync + Clone + Debug + Default, const N: usize> ResamplingPlan<T, N>
+    for BothAxesConvolvePlan<T, N>
+where
+    for<'a> ImageStoreMut<'a, T, N>: CheckStoreDensity,
+{
+    fn resample(
+        &self,
+        store: &ImageStore<'_, T, N>,
+        into: &mut ImageStoreMut<'_, T, N>,
+    ) -> Result<(), PicScaleError> {
+        let mut scratch = try_vec![T::default(); self.scratch_size()];
         self.resample_with_scratch(store, into, &mut scratch)
     }
 
@@ -69,48 +167,28 @@ where
         if into.should_have_bit_depth() && !(1..=16).contains(&into.bit_depth) {
             return Err(PicScaleError::UnsupportedBitDepth(into.bit_depth));
         }
-        if self.should_do_vertical && self.should_do_horizontal {
-            if self.threading_policy == ThreadingPolicy::Single {
-                self.trampoline_filter.filter(store, into, scratch);
-            } else {
-                let mut new_image_vertical = ImageStoreMut::<T, N>::from_slice(
-                    scratch,
-                    store.width,
-                    self.target_size.height,
-                )?;
-                new_image_vertical.bit_depth = into.bit_depth;
-                self.vertical_filter.filter(store, &mut new_image_vertical);
-                let new_immutable_store = new_image_vertical.to_immutable();
-                self.horizontal_filter.filter(&new_immutable_store, into);
-            }
-            Ok(())
-        } else if self.should_do_vertical {
-            self.vertical_filter.filter(store, into);
-            Ok(())
+        if self.threading_policy == ThreadingPolicy::Single {
+            self.trampoline_filter.filter(store, into, scratch);
         } else {
-            assert!(self.should_do_horizontal, "This should not happen.");
-            self.horizontal_filter.filter(store, into);
-            Ok(())
+            let mut new_image_vertical =
+                ImageStoreMut::<T, N>::from_slice(scratch, store.width, self.target_size.height)?;
+            new_image_vertical.bit_depth = into.bit_depth;
+            self.vertical_filter.filter(store, &mut new_image_vertical);
+            let new_immutable_store = new_image_vertical.to_immutable();
+            self.horizontal_filter.filter(&new_immutable_store, into);
         }
+        Ok(())
     }
 
     fn alloc_scratch(&self) -> Vec<T> {
-        if self.should_do_horizontal && self.should_do_vertical {
-            vec![T::default(); self.scratch_size()]
-        } else {
-            vec![]
-        }
+        vec![T::default(); self.scratch_size()]
     }
 
     fn scratch_size(&self) -> usize {
-        if self.should_do_horizontal && self.should_do_vertical {
-            if self.threading_policy == ThreadingPolicy::Single {
-                self.trampoline_filter.scratch_size()
-            } else {
-                self.source_size.width * self.target_size.height * N
-            }
+        if self.threading_policy == ThreadingPolicy::Single {
+            self.trampoline_filter.scratch_size()
         } else {
-            0
+            self.source_size.width * self.target_size.height * N
         }
     }
 

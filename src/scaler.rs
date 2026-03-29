@@ -27,7 +27,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
-use crate::convolution::{ConvolutionOptions, HorizontalFilterPass, VerticalConvolutionPass};
+use crate::convolution::{
+    ConvolutionOptions, HorizontalFilterPass, TrampolineFilter, VerticalConvolutionPass,
+};
 use crate::factory::{Ar30ByteOrder, Rgb30};
 use crate::image_size::ImageSize;
 use crate::image_store::{
@@ -35,8 +37,9 @@ use crate::image_store::{
 };
 use crate::math::WeightsGenerator;
 use crate::plan::{
-    AlphaConvolvePlan, Ar30Destructuring, Ar30DestructuringImpl, Ar30Plan, MultiStepResamplePlan,
-    NonAlphaConvolvePlan, ResampleNearestPlan, Resampling, TrampolineFiltering,
+    Ar30Destructuring, Ar30DestructuringImpl, Ar30Plan, BothAxesConvolvePlan,
+    HorizontalConvolvePlan, MultiStepResamplePlan, NoopPlan, ResampleNearestPlan, Resampling,
+    TrampolineFiltering, VerticalConvolvePlan, make_alpha_plan,
 };
 use crate::threading_policy::ThreadingPolicy;
 use crate::validation::PicScaleError;
@@ -355,41 +358,76 @@ impl Scaler {
                 _phantom_data: PhantomData,
             }));
         }
-        let vertical_filters =
-            T::make_weights(self.function, source_size.height, destination_size.height)?;
-        let horizontal_filters =
-            T::make_weights(self.function, source_size.width, destination_size.width)?;
+
+        let should_do_horizontal = source_size.width != destination_size.width;
+        let should_do_vertical = source_size.height != destination_size.height;
+
         let options = ConvolutionOptions {
             workload_strategy: self.workload_strategy,
             bit_depth,
             src_size: source_size,
             dst_size: destination_size,
         };
-        let vertical_plan =
-            ImageStore::<T, N>::vertical_plan(vertical_filters, self.threading_policy, options);
-        let horizontal_plan =
-            ImageStore::<T, N>::horizontal_plan(horizontal_filters, self.threading_policy, options);
 
-        let should_do_horizontal = source_size.width != destination_size.width;
-        let should_do_vertical = source_size.height != destination_size.height;
+        let vertical_plan = if should_do_vertical {
+            let vertical_filters =
+                T::make_weights(self.function, source_size.height, destination_size.height)?;
+            Some(ImageStore::<T, N>::vertical_plan(
+                vertical_filters,
+                self.threading_policy,
+                options,
+            ))
+        } else {
+            None
+        };
 
-        let trampoline_filter = Arc::new(TrampolineFiltering {
-            horizontal_filter: horizontal_plan.clone(),
-            vertical_filter: vertical_plan.clone(),
-            source_size,
-            target_size: destination_size,
-        });
+        let horizontal_plan = if should_do_horizontal {
+            let horizontal_filters =
+                T::make_weights(self.function, source_size.width, destination_size.width)?;
+            Some(ImageStore::<T, N>::horizontal_plan(
+                horizontal_filters,
+                self.threading_policy,
+                options,
+            ))
+        } else {
+            None
+        };
 
-        Ok(Arc::new(NonAlphaConvolvePlan {
-            source_size,
-            target_size: destination_size,
-            horizontal_filter: horizontal_plan,
-            vertical_filter: vertical_plan,
-            trampoline_filter,
-            should_do_vertical,
-            should_do_horizontal,
-            threading_policy: self.threading_policy,
-        }))
+        match (should_do_vertical, should_do_horizontal) {
+            (true, true) => {
+                let v = vertical_plan.expect("Should have a vertical filter");
+                let h = horizontal_plan.expect("Should have a horizontal filter");
+                let trampoline = Arc::new(TrampolineFiltering {
+                    horizontal_filter: h.clone(),
+                    vertical_filter: v.clone(),
+                    source_size,
+                    target_size: destination_size,
+                });
+                Ok(Arc::new(BothAxesConvolvePlan {
+                    source_size,
+                    target_size: destination_size,
+                    horizontal_filter: h,
+                    vertical_filter: v,
+                    trampoline_filter: trampoline,
+                    threading_policy: self.threading_policy,
+                }))
+            }
+            (true, false) => Ok(Arc::new(VerticalConvolvePlan {
+                source_size,
+                target_size: destination_size,
+                vertical_filter: vertical_plan.expect("Should have a vertical filter"),
+            })),
+            (false, true) => Ok(Arc::new(HorizontalConvolvePlan {
+                source_size,
+                target_size: destination_size,
+                horizontal_filter: horizontal_plan.expect("Should have a horizontal filter"),
+            })),
+            (false, false) => Ok(Arc::new(NoopPlan {
+                source_size,
+                target_size: destination_size,
+                _phantom: PhantomData,
+            })),
+        }
     }
 
     pub(crate) fn plan_generic_resize_with_alpha<
@@ -585,44 +623,72 @@ impl Scaler {
         if !needs_alpha_premultiplication_backward && !needs_alpha_premultiplication_forward {
             return self.plan_generic_resize(source_size, destination_size, bit_depth);
         }
-        let vertical_filters =
-            T::make_weights(self.function, source_size.height, destination_size.height)?;
-        let horizontal_filters =
-            T::make_weights(self.function, source_size.width, destination_size.width)?;
+
+        let should_do_horizontal = source_size.width != destination_size.width;
+        let should_do_vertical = source_size.height != destination_size.height;
+
+        if !should_do_vertical && !should_do_horizontal {
+            return Ok(Arc::new(NoopPlan {
+                source_size,
+                target_size: destination_size,
+                _phantom: PhantomData,
+            }));
+        }
+
         let options = ConvolutionOptions {
             workload_strategy: self.workload_strategy,
             bit_depth,
             src_size: source_size,
             dst_size: destination_size,
         };
-        let vertical_plan =
-            ImageStore::<T, N>::vertical_plan(vertical_filters, self.threading_policy, options);
-        let horizontal_plan =
-            ImageStore::<T, N>::horizontal_plan(horizontal_filters, self.threading_policy, options);
 
-        let should_do_horizontal = source_size.width != destination_size.width;
-        let should_do_vertical = source_size.height != destination_size.height;
+        let vertical_plan = if should_do_vertical {
+            let vertical_filters =
+                T::make_weights(self.function, source_size.height, destination_size.height)?;
+            Some(ImageStore::<T, N>::vertical_plan(
+                vertical_filters,
+                self.threading_policy,
+                options,
+            ))
+        } else {
+            None
+        };
 
-        let trampoline_filter = Arc::new(TrampolineFiltering {
-            horizontal_filter: horizontal_plan.clone(),
-            vertical_filter: vertical_plan.clone(),
+        let horizontal_plan = if should_do_horizontal {
+            let horizontal_filters =
+                T::make_weights(self.function, source_size.width, destination_size.width)?;
+            Some(ImageStore::<T, N>::horizontal_plan(
+                horizontal_filters,
+                self.threading_policy,
+                options,
+            ))
+        } else {
+            None
+        };
+
+        let trampoline = if should_do_vertical && should_do_horizontal {
+            Some(Arc::new(TrampolineFiltering {
+                horizontal_filter: horizontal_plan.as_ref().unwrap().clone(),
+                vertical_filter: vertical_plan.as_ref().unwrap().clone(),
+                source_size,
+                target_size: destination_size,
+            })
+                as Arc<dyn TrampolineFilter<T, N> + Send + Sync>)
+        } else {
+            None
+        };
+
+        Ok(make_alpha_plan(
             source_size,
-            target_size: destination_size,
-        });
-
-        Ok(Arc::new(AlphaConvolvePlan {
-            source_size,
-            target_size: destination_size,
-            threading_policy: self.threading_policy,
-            horizontal_filter: horizontal_plan,
-            vertical_filter: vertical_plan,
-            trampoline_filter,
-            should_do_vertical,
-            should_do_horizontal,
-            workload_strategy: self.workload_strategy,
-            needs_alpha_forward: needs_alpha_premultiplication_forward,
-            needs_alpha_backward: needs_alpha_premultiplication_backward,
-        }))
+            destination_size,
+            horizontal_plan,
+            vertical_plan,
+            trampoline,
+            self.threading_policy,
+            self.workload_strategy,
+            needs_alpha_premultiplication_forward,
+            needs_alpha_premultiplication_backward,
+        ))
     }
 
     /// Creates a resampling plan for a single-channel (planar/grayscale) `u8` image.
@@ -1207,88 +1273,118 @@ impl Scaler {
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         {
             if std::arch::is_x86_feature_detected!("avx2") {
-                let vertical_filters =
-                    u8::make_weights(self.function, source_size.height, destination_size.height)?;
-                let horizontal_filters =
-                    u8::make_weights(self.function, source_size.width, destination_size.width)?;
                 use crate::avx2::{
                     avx_column_handler_fixed_point_ar30, avx_convolve_horizontal_rgba_rows_4_ar30,
                     avx_convolve_horizontal_rgba_rows_ar30,
                 };
                 use crate::plan::{HorizontalFiltering, VerticalFiltering};
-                let vertical_plan = Arc::new(VerticalFiltering {
-                    filter_row: match ar30_type {
-                        Rgb30::Ar30 => {
-                            avx_column_handler_fixed_point_ar30::<
-                                { Rgb30::Ar30 as usize },
-                                AR30_ORDER,
-                            >
-                        }
-                        Rgb30::Ra30 => {
-                            avx_column_handler_fixed_point_ar30::<
-                                { Rgb30::Ra30 as usize },
-                                AR30_ORDER,
-                            >
-                        }
-                    },
-                    filter_weights: vertical_filters
-                        .numerical_approximation_i16::<{ crate::support::PRECISION }>(0),
-                    threading_policy: self.threading_policy,
-                });
-                let horizontal_plan = Arc::new(HorizontalFiltering {
-                    filter_row: match ar30_type {
-                        Rgb30::Ar30 => {
-                            avx_convolve_horizontal_rgba_rows_ar30::<
-                                { Rgb30::Ar30 as usize },
-                                AR30_ORDER,
-                            >
-                        }
-                        Rgb30::Ra30 => {
-                            avx_convolve_horizontal_rgba_rows_ar30::<
-                                { Rgb30::Ra30 as usize },
-                                AR30_ORDER,
-                            >
-                        }
-                    },
-                    filter_4_rows: Some(match ar30_type {
-                        Rgb30::Ar30 => {
-                            avx_convolve_horizontal_rgba_rows_4_ar30::<
-                                { Rgb30::Ar30 as usize },
-                                AR30_ORDER,
-                            >
-                        }
-                        Rgb30::Ra30 => {
-                            avx_convolve_horizontal_rgba_rows_4_ar30::<
-                                { Rgb30::Ra30 as usize },
-                                AR30_ORDER,
-                            >
-                        }
-                    }),
-                    threading_policy: self.threading_policy,
-                    filter_weights: horizontal_filters
-                        .numerical_approximation_i16::<{ crate::support::PRECISION }>(0),
-                });
-
                 let should_do_horizontal = source_size.width != destination_size.width;
                 let should_do_vertical = source_size.height != destination_size.height;
 
-                let trampoline_filter = Arc::new(TrampolineFiltering {
-                    horizontal_filter: horizontal_plan.clone(),
-                    vertical_filter: vertical_plan.clone(),
-                    source_size,
-                    target_size: destination_size,
-                });
+                let vertical_plan = if should_do_vertical {
+                    let vertical_filters = u8::make_weights(
+                        self.function,
+                        source_size.height,
+                        destination_size.height,
+                    )?;
+                    Some(Arc::new(VerticalFiltering {
+                        filter_row: match ar30_type {
+                            Rgb30::Ar30 => {
+                                avx_column_handler_fixed_point_ar30::<
+                                    { Rgb30::Ar30 as usize },
+                                    AR30_ORDER,
+                                >
+                            }
+                            Rgb30::Ra30 => {
+                                avx_column_handler_fixed_point_ar30::<
+                                    { Rgb30::Ra30 as usize },
+                                    AR30_ORDER,
+                                >
+                            }
+                        },
+                        filter_weights: vertical_filters
+                            .numerical_approximation_i16::<{ crate::support::PRECISION }>(0),
+                        threading_policy: self.threading_policy,
+                    }))
+                } else {
+                    None
+                };
 
-                return Ok(Arc::new(NonAlphaConvolvePlan {
-                    source_size,
-                    target_size: destination_size,
-                    horizontal_filter: horizontal_plan,
-                    vertical_filter: vertical_plan,
-                    trampoline_filter,
-                    should_do_vertical,
-                    should_do_horizontal,
-                    threading_policy: self.threading_policy,
-                }));
+                let horizontal_plan = if should_do_horizontal {
+                    let horizontal_filters =
+                        u8::make_weights(self.function, source_size.width, destination_size.width)?;
+                    Some(Arc::new(HorizontalFiltering {
+                        filter_row: match ar30_type {
+                            Rgb30::Ar30 => {
+                                avx_convolve_horizontal_rgba_rows_ar30::<
+                                    { Rgb30::Ar30 as usize },
+                                    AR30_ORDER,
+                                >
+                            }
+                            Rgb30::Ra30 => {
+                                avx_convolve_horizontal_rgba_rows_ar30::<
+                                    { Rgb30::Ra30 as usize },
+                                    AR30_ORDER,
+                                >
+                            }
+                        },
+                        filter_4_rows: Some(match ar30_type {
+                            Rgb30::Ar30 => {
+                                avx_convolve_horizontal_rgba_rows_4_ar30::<
+                                    { Rgb30::Ar30 as usize },
+                                    AR30_ORDER,
+                                >
+                            }
+                            Rgb30::Ra30 => {
+                                avx_convolve_horizontal_rgba_rows_4_ar30::<
+                                    { Rgb30::Ra30 as usize },
+                                    AR30_ORDER,
+                                >
+                            }
+                        }),
+                        threading_policy: self.threading_policy,
+                        filter_weights: horizontal_filters
+                            .numerical_approximation_i16::<{ crate::support::PRECISION }>(0),
+                    }))
+                } else {
+                    None
+                };
+
+                return Ok(match (should_do_vertical, should_do_horizontal) {
+                    (true, true) => {
+                        let v = vertical_plan.expect("Should have vertical plan");
+                        let h = horizontal_plan.expect("Should have horizontal plan");
+                        let trampoline = Arc::new(TrampolineFiltering {
+                            horizontal_filter: h.clone(),
+                            vertical_filter: v.clone(),
+                            source_size,
+                            target_size: destination_size,
+                        });
+                        Arc::new(BothAxesConvolvePlan {
+                            source_size,
+                            target_size: destination_size,
+                            horizontal_filter: h,
+                            vertical_filter: v,
+                            trampoline_filter: trampoline,
+                            threading_policy: self.threading_policy,
+                        })
+                    }
+                    (true, false) => Arc::new(VerticalConvolvePlan {
+                        source_size,
+                        target_size: destination_size,
+                        vertical_filter: vertical_plan.expect("Should have vertical plan"),
+                    }),
+                    (false, true) => Arc::new(HorizontalConvolvePlan {
+                        source_size,
+                        target_size: destination_size,
+                        horizontal_filter: horizontal_plan.expect("Should have horizontal plan"),
+                    }),
+                    (false, false) => Arc::new(NoopPlan {
+                        source_size,
+                        target_size: destination_size,
+                        _phantom: PhantomData,
+                    }),
+                });
             }
         }
         Ok(Arc::new(Ar30Plan {

@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::image_store::CheckStoreDensity;
-use crate::validation::{validate_scratch, validate_sizes};
+use crate::validation::{try_vec, validate_scratch, validate_sizes};
 use crate::{ImageSize, ImageStore, ImageStoreMut, PicScaleError, Resampling, ResamplingPlan};
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -103,7 +103,7 @@ where
         store: &ImageStore<'_, T, N>,
         into: &mut ImageStoreMut<'_, T, N>,
     ) -> Result<(), PicScaleError> {
-        let mut scratch = self.alloc_scratch();
+        let mut scratch = try_vec![T::default(); self.scratch_size()];
         self.resample_with_scratch(store, into, &mut scratch)
     }
 

@@ -26,27 +26,58 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-mod alpha_plan;
-mod ar30_plan;
-mod horizontal_filtering;
-mod multi_step_plan;
-mod nearest_plan;
-mod non_alpha_plan;
-mod noop_plan;
-mod planner;
-mod trampoline_filtering;
-mod vertical_filtering;
+use crate::image_store::CheckStoreDensity;
+use crate::validation::validate_sizes;
+use crate::{ImageSize, ImageStore, ImageStoreMut, PicScaleError, ResamplingPlan};
+use std::fmt::Debug;
+use std::marker::PhantomData;
 
-pub(crate) use alpha_plan::make_alpha_plan;
-#[allow(unused_imports)]
-pub(crate) use ar30_plan::{Ar30Destructuring, Ar30DestructuringImpl, Ar30Plan};
-pub(crate) use horizontal_filtering::HorizontalFiltering;
-pub(crate) use multi_step_plan::MultiStepResamplePlan;
-pub(crate) use nearest_plan::ResampleNearestPlan;
-pub(crate) use non_alpha_plan::{
-    BothAxesConvolvePlan, HorizontalConvolvePlan, VerticalConvolvePlan,
-};
-pub(crate) use noop_plan::NoopPlan;
-pub use planner::{Resampling, ResamplingPlan};
-pub(crate) use trampoline_filtering::TrampolineFiltering;
-pub(crate) use vertical_filtering::VerticalFiltering;
+pub(crate) struct NoopPlan<T: Send + Sync, const N: usize> {
+    pub(crate) source_size: ImageSize,
+    pub(crate) target_size: ImageSize,
+    pub(crate) _phantom: PhantomData<T>,
+}
+
+impl<T: Copy + Send + Sync + Clone + Debug + Default, const N: usize> ResamplingPlan<T, N>
+    for NoopPlan<T, N>
+where
+    for<'a> ImageStoreMut<'a, T, N>: CheckStoreDensity,
+{
+    fn resample(
+        &self,
+        store: &ImageStore<'_, T, N>,
+        into: &mut ImageStoreMut<'_, T, N>,
+    ) -> Result<(), PicScaleError> {
+        validate_sizes!(store, into, self.source_size, self.target_size);
+        // validate size has copying
+        if into.should_have_bit_depth() && !(1..=16).contains(&into.bit_depth) {
+            return Err(PicScaleError::UnsupportedBitDepth(into.bit_depth));
+        }
+        Ok(())
+    }
+
+    fn resample_with_scratch(
+        &self,
+        store: &ImageStore<'_, T, N>,
+        into: &mut ImageStoreMut<'_, T, N>,
+        _scratch: &mut [T],
+    ) -> Result<(), PicScaleError> {
+        self.resample(store, into)
+    }
+
+    fn alloc_scratch(&self) -> Vec<T> {
+        vec![]
+    }
+
+    fn scratch_size(&self) -> usize {
+        0
+    }
+
+    fn target_size(&self) -> ImageSize {
+        self.target_size
+    }
+
+    fn source_size(&self) -> ImageSize {
+        self.source_size
+    }
+}
