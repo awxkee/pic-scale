@@ -28,7 +28,7 @@
  */
 use crate::factory::Rgb30;
 use crate::image_store::CheckStoreDensity;
-use crate::validation::{validate_scratch, validate_sizes};
+use crate::validation::{try_vec, validate_scratch, validate_sizes};
 use crate::{BufferStore, ImageSize, ImageStore, ImageStoreMut, PicScaleError, ResamplingPlan};
 use std::sync::Arc;
 
@@ -164,7 +164,7 @@ impl ResamplingPlan<u8, 4> for Ar30Plan {
         store: &ImageStore<'_, u8, 4>,
         into: &mut ImageStoreMut<'_, u8, 4>,
     ) -> Result<(), PicScaleError> {
-        let mut scratch = self.alloc_scratch();
+        let mut scratch = try_vec![u8::default(); self.scratch_size()];
         self.resample_with_scratch(store, into, &mut scratch)
     }
 
