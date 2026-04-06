@@ -33,7 +33,6 @@ use crate::filter_weights::{DefaultWeightsConverter, FilterWeights, WeightsConve
 use crate::floating_point_horizontal::{
     convolve_row_handler_floating_point, convolve_row_handler_floating_point_4,
 };
-use crate::floating_point_vertical::column_handler_floating_point;
 use crate::plan::{HorizontalFiltering, VerticalFiltering};
 use crate::{ImageStore, ThreadingPolicy};
 use std::sync::Arc;
@@ -55,6 +54,22 @@ impl HorizontalFilterPass<i16, f32, 1> for ImageStore<'_, i16, 1> {
         let weights_q0_15 = DefaultWeightsConverter::default().prepare_weights(&filter_weights);
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
+            #[cfg(feature = "rdm")]
+            {
+                if std::arch::is_aarch64_feature_detected!("rdm") {
+                    let approx_num_q031 = filter_weights.numerical_approximation::<i32, 31>(0);
+                    use crate::neon::{
+                        convolve_horizontal_plane_neon_rows_4_hb_s16,
+                        convolve_horizontal_plane_neon_s16_hb_row,
+                    };
+                    return Arc::new(HorizontalFiltering {
+                        filter_weights: approx_num_q031,
+                        filter_4_rows: Some(convolve_horizontal_plane_neon_rows_4_hb_s16),
+                        filter_row: convolve_horizontal_plane_neon_s16_hb_row,
+                        threading_policy,
+                    });
+                }
+            }
             use crate::neon::{
                 convolve_horizontal_plane_neon_i16_lb_row,
                 convolve_horizontal_plane_neon_rows_4_lb_i16,
@@ -105,6 +120,22 @@ impl VerticalConvolutionPass<i16, f32, 1> for ImageStore<'_, i16, 1> {
         options: ConvolutionOptions,
     ) -> Arc<dyn ColumnFilter<i16, 1> + Send + Sync> {
         if options.bit_depth > 12 {
+            #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+            {
+                #[cfg(feature = "rdm")]
+                {
+                    if std::arch::is_aarch64_feature_detected!("rdm") {
+                        let approx_num_q031 = filter_weights.numerical_approximation::<i32, 31>(0);
+                        use crate::neon::convolve_column_hb_s16;
+                        return Arc::new(VerticalFiltering {
+                            filter_weights: approx_num_q031,
+                            threading_policy,
+                            filter_row: convolve_column_hb_s16,
+                        });
+                    }
+                }
+            }
+            use crate::floating_point_vertical::column_handler_floating_point;
             return Arc::new(VerticalFiltering {
                 filter_weights,
                 threading_policy,
