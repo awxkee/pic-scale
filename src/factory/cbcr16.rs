@@ -44,26 +44,57 @@ impl HorizontalFilterPass<u16, f32, 2> for ImageStore<'_, u16, 2> {
         if options.bit_depth <= 12 {
             let approx =
                 filter_weights.numerical_approximation_i16::<{ crate::support::PRECISION }>(0);
-            use crate::fixed_point_horizontal::{
-                convolve_row_handler_fixed_point, convolve_row_handler_fixed_point_4,
-            };
-            return Arc::new(HorizontalFiltering {
-                filter_weights: approx,
-                filter_4_rows: Some(convolve_row_handler_fixed_point_4::<u16, i32, 2>),
-                filter_row: convolve_row_handler_fixed_point::<u16, i32, 2>,
-                threading_policy,
-            });
+            #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+            {
+                use crate::neon::{
+                    convolve_horizontal_gray_alpha_neon_rows_4_lb_u16,
+                    convolve_horizontal_gray_alpha_neon_u16_lb_row,
+                };
+                return Arc::new(HorizontalFiltering {
+                    filter_weights: approx,
+                    filter_4_rows: Some(convolve_horizontal_gray_alpha_neon_rows_4_lb_u16),
+                    filter_row: convolve_horizontal_gray_alpha_neon_u16_lb_row,
+                    threading_policy,
+                });
+            }
+            #[cfg(not(all(target_arch = "aarch64", feature = "neon")))]
+            {
+                use crate::fixed_point_horizontal::{
+                    convolve_row_handler_fixed_point, convolve_row_handler_fixed_point_4,
+                };
+                return Arc::new(HorizontalFiltering {
+                    filter_weights: approx,
+                    filter_4_rows: Some(convolve_row_handler_fixed_point_4::<u16, i32, 2>),
+                    filter_row: convolve_row_handler_fixed_point::<u16, i32, 2>,
+                    threading_policy,
+                });
+            }
         }
-
-        use crate::floating_point_horizontal::{
-            convolve_row_handler_floating_point, convolve_row_handler_floating_point_4,
-        };
-        Arc::new(HorizontalFiltering {
-            filter_weights,
-            filter_4_rows: Some(convolve_row_handler_floating_point_4::<u16, f32, f32, 2>),
-            filter_row: convolve_row_handler_floating_point::<u16, f32, f32, 2>,
-            threading_policy,
-        })
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+        {
+            use crate::neon::{
+                convolve_horizontal_cbcr_neon_f32_u16_row,
+                convolve_horizontal_cbcr_neon_rows_4_f32_u16,
+            };
+            Arc::new(HorizontalFiltering {
+                filter_weights,
+                filter_4_rows: Some(convolve_horizontal_cbcr_neon_rows_4_f32_u16),
+                filter_row: convolve_horizontal_cbcr_neon_f32_u16_row,
+                threading_policy,
+            })
+        }
+        #[cfg(not(all(target_arch = "aarch64", feature = "neon")))]
+        {
+            use crate::floating_point_horizontal::{
+                convolve_row_handler_floating_point, convolve_row_handler_floating_point_4,
+            };
+            Arc::new(HorizontalFiltering {
+                filter_weights,
+                filter_4_rows: Some(convolve_row_handler_floating_point_4::<u16, f32, f32, 2>),
+                filter_row: convolve_row_handler_floating_point::<u16, f32, f32, 2>,
+                threading_policy,
+            })
+        }
     }
 }
 

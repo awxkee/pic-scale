@@ -27,3 +27,7 @@ harness = false
 [[bench]]
 name = "resize_plane"
 harness = false
+
+[[bench]]
+name = "resize_cbcr"
+harness = false
