@@ -145,7 +145,6 @@ fn convolve_chunks_16_i16(
             j += 2;
         }
 
-        // Scalar tail — one row at a time
         for (jj, &k_weight) in weights[j..bounds_size].iter().enumerate() {
             let py = bounds.start + j + jj;
             let src_ptr = unsafe { src.get_unchecked((src_stride * py + v_dx)..) };

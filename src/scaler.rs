@@ -1757,8 +1757,8 @@ mod tests {
             dst[3] = 77;
         }
         image[3] = 78;
-        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let scaler =
+            Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
         let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 10);
@@ -1782,8 +1782,8 @@ mod tests {
             dst[1] = 41;
             dst[2] = 99;
         }
-        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let scaler =
+            Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
         let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 10);
@@ -1832,8 +1832,8 @@ mod tests {
             dst[1] = 41;
             dst[2] = 99;
         }
-        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let scaler =
+            Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
         let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 16);
@@ -1858,8 +1858,8 @@ mod tests {
             dst[2] = 99;
             dst[3] = 255;
         }
-        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
-        scaler.set_threading_policy(ThreadingPolicy::Single);
+        let scaler =
+            Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
         let mut src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         src_store.bit_depth = 10;
         let mut target_store = ImageStoreMut::alloc_with_depth(image_width, image_height / 2, 16);
@@ -1935,8 +1935,8 @@ mod tests {
             dst[2] = 99;
             dst[3] = 77;
         }
-        let mut scaler = Scaler::new(ResamplingFunction::Nearest);
-        scaler.set_threading_policy(ThreadingPolicy::Adaptive);
+        let scaler = Scaler::new(ResamplingFunction::Nearest)
+            .set_threading_policy(ThreadingPolicy::Adaptive);
         let src_store = ImageStore::from_slice(&image, image_width, image_height).unwrap();
         let mut target_store = ImageStoreMut::alloc(image_width, image_height / 2);
         let planned = scaler
@@ -1946,5 +1946,216 @@ mod tests {
         let target_data = target_store.buffer.borrow();
 
         check_rgba8!(target_data, image_width, 80);
+    }
+
+    #[test]
+    fn check_plane_s16_10bit_resizing_horizontal() {
+        let image_width = 8;
+        let image_height = 1;
+        const CN: usize = 1;
+        let mut image = vec![0i16; image_height * image_width * CN];
+        for (i, px) in image.iter_mut().enumerate() {
+            *px = (100 + i as i16 * 10).min(511);
+        }
+        image[0] = -200;
+
+        let scaler =
+            Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
+
+        let src_store =
+            ImageStore::<i16, CN>::from_slice(&image, image_width, image_height).unwrap();
+        let mut target_store =
+            ImageStoreMut::<i16, CN>::alloc_with_depth(image_width / 2, image_height, 10);
+
+        let planned = scaler
+            .plan_planar_resampling_s16(src_store.size(), target_store.size(), 10)
+            .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
+
+        let target_data = target_store.buffer.borrow();
+        // All output pixels must stay within signed 10-bit bounds [-512, 511]
+        for &px in target_data.iter() {
+            assert!(
+                px >= -512 && px <= 511,
+                "pixel {px} out of 10-bit signed range"
+            );
+        }
+    }
+
+    #[test]
+    fn check_plane_s16_10bit_resizing_vertical() {
+        let image_width = 8;
+        let image_height = 8;
+        const CN: usize = 1;
+        let mut image = vec![0i16; image_height * image_width * CN];
+        for px in image.iter_mut() {
+            *px = 124;
+        }
+        image[0] = -200;
+
+        let scaler =
+            Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
+
+        let src_store =
+            ImageStore::<i16, CN>::from_slice(&image, image_width, image_height).unwrap();
+        let mut target_store =
+            ImageStoreMut::<i16, CN>::alloc_with_depth(image_width, image_height / 2, 10);
+
+        let planned = scaler
+            .plan_planar_resampling_s16(src_store.size(), target_store.size(), 10)
+            .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
+
+        let target_data = target_store.buffer.borrow();
+        for &px in target_data.iter() {
+            assert!(
+                px >= -512 && px <= 511,
+                "pixel {px} out of 10-bit signed range"
+            );
+        }
+        for &px in target_data.iter().skip(1) {
+            assert!(
+                (px - 124).abs() < 30,
+                "flat region drifted: got {px}, expected ~124"
+            );
+        }
+    }
+
+    #[test]
+    fn check_plane_s16_16bit_resizing_horizontal() {
+        let image_width = 8;
+        let image_height = 1;
+        const CN: usize = 1;
+        let mut image = vec![0i16; image_height * image_width * CN];
+        for (i, px) in image.iter_mut().enumerate() {
+            *px = (1000 + i as i16 * 500).min(i16::MAX);
+        }
+        image[0] = i16::MIN;
+
+        let scaler =
+            Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
+
+        let src_store =
+            ImageStore::<i16, CN>::from_slice(&image, image_width, image_height).unwrap();
+        let mut target_store =
+            ImageStoreMut::<i16, CN>::alloc_with_depth(image_width / 2, image_height, 16);
+
+        let planned = scaler
+            .plan_planar_resampling_s16(src_store.size(), target_store.size(), 16)
+            .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
+
+        let target_data = target_store.buffer.borrow();
+        for &px in target_data.iter() {
+            assert!(
+                px >= i16::MIN && px <= i16::MAX,
+                "pixel {px} out of 16-bit signed range"
+            );
+        }
+    }
+
+    #[test]
+    fn check_plane_s16_16bit_resizing_vertical() {
+        let image_width = 8;
+        let image_height = 8;
+        const CN: usize = 1;
+        let mut image = vec![0i16; image_height * image_width * CN];
+        for px in image.iter_mut() {
+            *px = 5000;
+        }
+
+        let scaler =
+            Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
+
+        let src_store =
+            ImageStore::<i16, CN>::from_slice(&image, image_width, image_height).unwrap();
+        let mut target_store =
+            ImageStoreMut::<i16, CN>::alloc_with_depth(image_width, image_height / 2, 16);
+
+        let planned = scaler
+            .plan_planar_resampling_s16(src_store.size(), target_store.size(), 16)
+            .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
+
+        let target_data = target_store.buffer.borrow();
+        for &px in target_data.iter() {
+            assert!(
+                px >= i16::MIN && px <= i16::MAX,
+                "pixel {px} out of 16-bit signed range"
+            );
+        }
+        // Flat region check — skip pixel influenced by the outlier at [0]
+        for &px in target_data.iter().skip(1) {
+            assert!(
+                (px as i32 - 5000).abs() < 500,
+                "flat region drifted: got {px}, expected ~5000"
+            );
+        }
+    }
+
+    #[test]
+    fn check_plane_s16_10bit_both_axes() {
+        let image_width = 8;
+        let image_height = 8;
+        const CN: usize = 1;
+        let mut image = vec![0i16; image_height * image_width * CN];
+        for px in image.iter_mut() {
+            *px = 200;
+        }
+        image[0] = -300;
+
+        let scaler =
+            Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
+
+        let src_store =
+            ImageStore::<i16, CN>::from_slice(&image, image_width, image_height).unwrap();
+        let mut target_store =
+            ImageStoreMut::<i16, CN>::alloc_with_depth(image_width / 2, image_height / 2, 10);
+
+        let planned = scaler
+            .plan_planar_resampling_s16(src_store.size(), target_store.size(), 10)
+            .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
+
+        let target_data = target_store.buffer.borrow();
+        for &px in target_data.iter() {
+            assert!(
+                px >= -512 && px <= 511,
+                "pixel {px} out of 10-bit signed range"
+            );
+        }
+    }
+
+    #[test]
+    fn check_plane_s16_16bit_both_axes() {
+        let image_width = 8;
+        let image_height = 8;
+        const CN: usize = 1;
+        let mut image = vec![0i16; image_height * image_width * CN];
+        for px in image.iter_mut() {
+            *px = 10000;
+        }
+        image[0] = i16::MIN;
+
+        let scaler =
+            Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
+
+        let src_store =
+            ImageStore::<i16, CN>::from_slice(&image, image_width, image_height).unwrap();
+        let mut target_store =
+            ImageStoreMut::<i16, CN>::alloc_with_depth(image_width / 2, image_height / 2, 16);
+
+        let planned = scaler
+            .plan_planar_resampling_s16(src_store.size(), target_store.size(), 16)
+            .unwrap();
+        planned.resample(&src_store, &mut target_store).unwrap();
+
+        let target_data = target_store.buffer.borrow();
+        for &px in target_data.iter() {
+            assert!(
+                px >= i16::MIN && px <= i16::MAX,
+                "pixel {px} out of 16-bit signed range"
+            );
+        }
     }
 }

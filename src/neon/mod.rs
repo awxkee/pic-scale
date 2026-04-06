@@ -45,6 +45,8 @@ mod check_alpha;
 mod convolve_f16;
 mod plane_f32;
 mod plane_f32_f64;
+#[cfg(feature = "rdm")]
+mod plane_s16_hb;
 mod plane_s16_lb;
 mod plane_u16;
 #[cfg(feature = "rdm")]
@@ -96,6 +98,8 @@ mod vertical_f16_fhm;
 mod vertical_f16_full;
 mod vertical_f32;
 mod vertical_f32_f64;
+#[cfg(feature = "rdm")]
+mod vertical_s16_hb;
 mod vertical_s16_lb;
 mod vertical_u16;
 #[cfg(feature = "rdm")]
@@ -144,6 +148,10 @@ pub(crate) use plane_f32::convolve_horizontal_plane_neon_row_one;
 pub(crate) use plane_f32::convolve_horizontal_plane_neon_rows_4;
 pub(crate) use plane_f32_f64::{
     convolve_horizontal_plane_neon_row_one_f32_f64, convolve_horizontal_plane_neon_rows_4_f32_f64,
+};
+#[cfg(feature = "rdm")]
+pub(crate) use plane_s16_hb::{
+    convolve_horizontal_plane_neon_rows_4_hb_s16, convolve_horizontal_plane_neon_s16_hb_row,
 };
 pub(crate) use plane_s16_lb::{
     convolve_horizontal_plane_neon_i16_lb_row, convolve_horizontal_plane_neon_rows_4_lb_i16,
@@ -251,6 +259,8 @@ pub(crate) use vertical_f16_fhm::convolve_vertical_rgb_neon_row_f16_fhm;
 pub(crate) use vertical_f16_full::xconvolve_vertical_rgb_neon_row_f16;
 pub(crate) use vertical_f32::convolve_vertical_rgb_neon_row_f32;
 pub(crate) use vertical_f32_f64::convolve_vertical_neon_row_f32_f64;
+#[cfg(feature = "rdm")]
+pub(crate) use vertical_s16_hb::convolve_column_hb_s16;
 pub(crate) use vertical_s16_lb::convolve_column_lb_i16;
 pub(crate) use vertical_u8::convolve_vertical_neon_i32_precision;
 #[cfg(feature = "nightly_i8mm")]
