@@ -33,11 +33,11 @@ use libfuzzer_sys::fuzz_target;
 use pic_scale::{
     ImageSize, ImageStore, ImageStoreMut, JzazbzScaler, LChScaler, LabScaler, LinearApproxScaler,
     LinearScaler, LuvScaler, OklabScaler, PicScaleError, Resampling, ResamplingFunction,
-    ResamplingPlan, SigmoidalScaler, TransferFunction, XYZScaler,
+    SigmoidalScaler, TransferFunction, XYZScaler,
 };
 use std::sync::Arc;
 
-fuzz_target!(|data: (u16, u16, u16, u16, u8, bool)| {
+fuzz_target!(|data: (u16, u16, u16, u16, u8, bool, u8)| {
     resize_rgba(
         data.4,
         data.0 as usize,
@@ -46,6 +46,7 @@ fuzz_target!(|data: (u16, u16, u16, u16, u8, bool)| {
         data.3 as usize,
         ResamplingFunction::Bilinear,
         data.5,
+        data.6,
     );
     resize_rgba16(
         data.4,
@@ -143,6 +144,7 @@ fn resize_rgba(
     dst_height: usize,
     sampler: ResamplingFunction,
     mul_alpha: bool,
+    scaler: u8,
 ) {
     if src_width == 0
         || src_width > 2000
@@ -168,26 +170,26 @@ fn resize_rgba(
         Scaler::XYZ(XYZScaler::new(sampler)),
     ];
 
+    let scaler = &scalers[scaler as usize % scalers.len()];
+
     let source_size = ImageSize::new(src_width, src_height);
     let target_size = ImageSize::new(dst_width, dst_height);
 
-    for scaler in &scalers {
-        if mul_alpha {
-            let plan = scaler.plan_rgba(source_size, target_size, true).unwrap();
-            let mut src_data_rgba = vec![data; src_width * src_height * 4];
-            src_data_rgba[3] = 18;
-            let store =
-                ImageStore::<u8, 4>::from_slice(&mut src_data_rgba, src_width, src_height).unwrap();
-            let mut target_store = ImageStoreMut::alloc(dst_width, dst_height);
-            plan.resample(&store, &mut target_store).unwrap();
-        } else {
-            let plan = scaler.plan_rgb(source_size, target_size).unwrap();
-            let mut src_data_rgb = vec![data; src_width * src_height * 3];
-            let store =
-                ImageStore::<u8, 3>::from_slice(&mut src_data_rgb, src_width, src_height).unwrap();
-            let mut target_store = ImageStoreMut::alloc(dst_width, dst_height);
-            plan.resample(&store, &mut target_store).unwrap();
-        }
+    if mul_alpha {
+        let plan = scaler.plan_rgba(source_size, target_size, true).unwrap();
+        let mut src_data_rgba = vec![data; src_width * src_height * 4];
+        src_data_rgba[3] = 18;
+        let store =
+            ImageStore::<u8, 4>::from_slice(&mut src_data_rgba, src_width, src_height).unwrap();
+        let mut target_store = ImageStoreMut::alloc(dst_width, dst_height);
+        plan.resample(&store, &mut target_store).unwrap();
+    } else {
+        let plan = scaler.plan_rgb(source_size, target_size).unwrap();
+        let mut src_data_rgb = vec![data; src_width * src_height * 3];
+        let store =
+            ImageStore::<u8, 3>::from_slice(&mut src_data_rgb, src_width, src_height).unwrap();
+        let mut target_store = ImageStoreMut::alloc(dst_width, dst_height);
+        plan.resample(&store, &mut target_store).unwrap();
     }
 }
 

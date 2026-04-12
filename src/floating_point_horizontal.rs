@@ -75,10 +75,9 @@ pub(crate) fn convolve_row_handler_floating_point<
         let px = start_x * CN;
 
         let src_ptr0 = &src[px..(px + bounds.size * CN)];
-        for (&k_weight, src) in weights
+        for (&k_weight, src) in weights[..bounds.size]
             .iter()
             .zip(src_ptr0.as_chunks::<CN>().0.iter())
-            .take(bounds.size)
         {
             let weight: J = k_weight.as_();
             let new_px = ld_g!(src, CN, J);
@@ -149,13 +148,12 @@ pub(crate) fn convolve_row_handler_floating_point_4<
         let src_ptr2 = &src[(px + src_stride * 2)..(px + src_stride * 2 + bounds.size * CN)];
         let src_ptr3 = &src[(px + src_stride * 3)..(px + src_stride * 3 + bounds.size * CN)];
 
-        for ((((&k_weight, src0), src1), src2), src3) in weights
+        for ((((&k_weight, src0), src1), src2), src3) in weights[..bounds.size]
             .iter()
             .zip(src_ptr0.as_chunks::<CN>().0.iter())
             .zip(src_ptr1.as_chunks::<CN>().0.iter())
             .zip(src_ptr2.as_chunks::<CN>().0.iter())
             .zip(src_ptr3.as_chunks::<CN>().0.iter())
-            .take(bounds.size)
         {
             let weight: J = k_weight.as_();
 

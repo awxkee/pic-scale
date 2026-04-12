@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ * Copyright (c) Radzivon Bartoshyk 4/2026. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -26,25 +26,39 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::{ImageStore, ImageStoreMut};
+use std::fmt::Debug;
 
-mod common_splitter;
-mod cvt;
-mod jzazbz_scaler;
-mod lab_scaler;
-mod lch_scaler;
-mod linear_precise_scaler;
-mod linear_scaler;
-mod luv_scaler;
-mod oklab_scaler;
-mod sigmoidal_scaler;
-mod xyz_scaler;
+impl<F: Clone + Debug + Copy, const CN: usize> ImageStore<'_, F, CN>
+where
+    [F]: ToOwned<Owned = Vec<F>>,
+{
+    pub(crate) fn to_colorutils_buffer(&self) -> colorutils_rs::ImageBuffer<'_, F> {
+        colorutils_rs::ImageBuffer {
+            data: std::borrow::Cow::Borrowed(self.as_bytes()),
+            width: self.width as u32,
+            height: self.height as u32,
+            stride: self.stride as u32,
+            channels: self.channels as u32,
+        }
+    }
+}
 
-pub use jzazbz_scaler::JzazbzScaler;
-pub use lab_scaler::*;
-pub use lch_scaler::*;
-pub use linear_precise_scaler::*;
-pub use linear_scaler::*;
-pub use luv_scaler::*;
-pub use oklab_scaler::OklabScaler;
-pub use sigmoidal_scaler::*;
-pub use xyz_scaler::*;
+impl<F: Copy + Debug, const CN: usize> ImageStoreMut<'_, F, CN>
+where
+    [F]: ToOwned<Owned = Vec<F>>,
+{
+    pub(crate) fn to_colorutils_buffer_mut(&mut self) -> colorutils_rs::ImageBufferMut<'_, F> {
+        let dst_width = self.width;
+        let dst_height = self.height;
+        let dst_stride = self.stride;
+        let dst_channels = self.channels;
+        colorutils_rs::ImageBufferMut {
+            data: colorutils_rs::BufferStore::Borrowed(self.buffer.borrow_mut()),
+            width: dst_width as u32,
+            height: dst_height as u32,
+            stride: dst_stride as u32,
+            channels: dst_channels as u32,
+        }
+    }
+}
