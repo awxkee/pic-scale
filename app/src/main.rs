@@ -22,10 +22,7 @@ use pic_scale::{
 };
 
 fn main() {
-    resize_rgba(0,   143,
-                35,
-                143,
-                35, ResamplingFunction::Bilinear, false);
+    resize_rgba(0, 143, 35, 143, 35, ResamplingFunction::Bilinear, false);
     // resize_rgba(0, 1, 256, 79, 256, ResamplingFunction::Bilinear, false);
     #[allow(overflowing_literals)]
     // test_fast_image();

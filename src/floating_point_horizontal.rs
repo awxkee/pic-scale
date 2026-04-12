@@ -32,7 +32,6 @@ use crate::mixed_storage::MixedStorage;
 use num_traits::{AsPrimitive, Float, MulAdd};
 use std::ops::{Add, Mul};
 
-#[inline(always)]
 /// # Generics
 /// `T` - template buffer type
 /// `J` - accumulator type
@@ -88,7 +87,6 @@ pub(crate) fn convolve_row_handler_floating_point<
     }
 }
 
-#[inline(always)]
 /// # Generics
 /// `T` - template buffer type
 /// `J` - accumulator type

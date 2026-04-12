@@ -34,7 +34,6 @@ use crate::support::ROUNDING_CONST;
 use num_traits::{AsPrimitive, WrappingAdd, WrappingMul};
 use std::ops::{Add, AddAssign, Mul};
 
-#[inline(always)]
 pub(crate) fn convolve_row_handler_fixed_point<
     T: Copy + 'static + AsPrimitive<J> + Default,
     J: Copy
@@ -89,7 +88,6 @@ pub(crate) fn convolve_row_handler_fixed_point<
     }
 }
 
-#[inline(always)]
 pub(crate) fn convolve_row_handler_fixed_point_4<
     T: Copy + 'static + AsPrimitive<J> + Default,
     J: Copy
