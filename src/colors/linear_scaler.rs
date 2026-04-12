@@ -218,8 +218,9 @@ fn make_linearization16(
 }
 
 impl LinearApproxScaler {
-    pub fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy) {
+    pub fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy) -> Self {
         self.scaler.threading_policy = threading_policy;
+        *self
     }
 
     pub fn plan_planar_resampling(
