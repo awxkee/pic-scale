@@ -70,7 +70,11 @@ struct Common8BitSplitter<const N: usize> {
 }
 
 impl<const N: usize> Splitter<u8, u16, N> for Common8BitSplitter<N> {
-    fn split(&self, from: &ImageStore<'_, u8, N>, into: &mut ImageStoreMut<'_, u16, N>) {
+    fn split(
+        &self,
+        from: &ImageStore<'_, u8, N>,
+        into: &mut ImageStoreMut<'_, u16, N>,
+    ) -> Result<(), PicScaleError> {
         into.bit_depth = 12;
         if N == 4 {
             for (src, dst) in from
@@ -97,9 +101,14 @@ impl<const N: usize> Splitter<u8, u16, N> for Common8BitSplitter<N> {
                 *dst = self.linearization[src as usize];
             }
         }
+        Ok(())
     }
 
-    fn merge(&self, from: &ImageStore<'_, u16, N>, into: &mut ImageStoreMut<'_, u8, N>) {
+    fn merge(
+        &self,
+        from: &ImageStore<'_, u16, N>,
+        into: &mut ImageStoreMut<'_, u8, N>,
+    ) -> Result<(), PicScaleError> {
         into.bit_depth = 8;
         let lut_cap = (1 << 12) - 1;
         if N == 4 {
@@ -127,6 +136,7 @@ impl<const N: usize> Splitter<u8, u16, N> for Common8BitSplitter<N> {
                 *dst = self.gamma[(src as usize).min(lut_cap)];
             }
         }
+        Ok(())
     }
 
     fn bit_depth(&self) -> usize {
@@ -331,7 +341,11 @@ struct Common16BitSplitter<const N: usize> {
 }
 
 impl<const N: usize> Splitter<u16, u16, N> for Common16BitSplitter<N> {
-    fn split(&self, from: &ImageStore<'_, u16, N>, into: &mut ImageStoreMut<'_, u16, N>) {
+    fn split(
+        &self,
+        from: &ImageStore<'_, u16, N>,
+        into: &mut ImageStoreMut<'_, u16, N>,
+    ) -> Result<(), PicScaleError> {
         into.bit_depth = 16;
         if N == 4 {
             let max_bit_depth_value = ((1u32 << into.bit_depth) - 1) as f32;
@@ -366,9 +380,14 @@ impl<const N: usize> Splitter<u16, u16, N> for Common16BitSplitter<N> {
                 *dst = self.linearization[src as usize];
             }
         }
+        Ok(())
     }
 
-    fn merge(&self, from: &ImageStore<'_, u16, N>, into: &mut ImageStoreMut<'_, u16, N>) {
+    fn merge(
+        &self,
+        from: &ImageStore<'_, u16, N>,
+        into: &mut ImageStoreMut<'_, u16, N>,
+    ) -> Result<(), PicScaleError> {
         if N == 4 {
             let max_bit_depth_value = ((1u32 << self.bit_depth) - 1) as f32;
             let a_r_scale = max_bit_depth_value / 65535.;
@@ -404,6 +423,7 @@ impl<const N: usize> Splitter<u16, u16, N> for Common16BitSplitter<N> {
                 *dst = self.gamma[src as usize];
             }
         }
+        Ok(())
     }
 
     fn bit_depth(&self) -> usize {

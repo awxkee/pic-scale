@@ -17,7 +17,7 @@ exclude = ["*.jpg", "/assets", "*.png", "*.sh", "/assets/*", "/.github"]
 rust-version = "1.89.0"
 
 [dependencies]
-colorutils-rs = { version = "0.7", optional = true }
+colorutils-rs = { version = "0.8.0", optional = true }
 num-traits = { version = "0.2", features = ["std"] }
 rayon = "1.10"
 novtb = "^0.1.6"

@@ -45,31 +45,31 @@ pub struct LabScaler {
 struct LabRgbSplitter {}
 
 impl Splitter<u8, f32, 3> for LabRgbSplitter {
-    fn split(&self, from: &ImageStore<'_, u8, 3>, into: &mut ImageStoreMut<'_, f32, 3>) {
-        let lab_stride = into.width as u32 * 3u32 * size_of::<f32>() as u32;
+    fn split(
+        &self,
+        from: &ImageStore<'_, u8, 3>,
+        into: &mut ImageStoreMut<'_, f32, 3>,
+    ) -> Result<(), PicScaleError> {
+        let mut dst_buffer = into.to_colorutils_buffer_mut();
 
         rgb_to_lab(
-            from.buffer.as_ref(),
-            from.width as u32 * 3u32,
-            into.buffer.borrow_mut(),
-            lab_stride,
-            into.width as u32,
-            into.height as u32,
+            &from.to_colorutils_buffer(),
+            &mut dst_buffer,
             &SRGB_TO_XYZ_D65,
             TransferFunction::Srgb,
-        );
+        )
+        .map_err(|x| PicScaleError::Generic(x.to_string()))
     }
 
-    fn merge(&self, from: &ImageStore<'_, f32, 3>, into: &mut ImageStoreMut<'_, u8, 3>) {
-        let new_lab_stride = into.width as u32 * 3 * size_of::<f32>() as u32;
-        lab_to_srgb(
-            from.buffer.as_ref(),
-            new_lab_stride,
-            into.buffer.borrow_mut(),
-            into.width as u32 * 3,
-            into.width as u32,
-            into.height as u32,
-        );
+    fn merge(
+        &self,
+        from: &ImageStore<'_, f32, 3>,
+        into: &mut ImageStoreMut<'_, u8, 3>,
+    ) -> Result<(), PicScaleError> {
+        let mut dst_buffer = into.to_colorutils_buffer_mut();
+
+        lab_to_srgb(&from.to_colorutils_buffer(), &mut dst_buffer)
+            .map_err(|x| PicScaleError::Generic(x.to_string()))
     }
     fn bit_depth(&self) -> usize {
         8
@@ -79,33 +79,34 @@ impl Splitter<u8, f32, 3> for LabRgbSplitter {
 struct LabRgbaSplitter {}
 
 impl Splitter<u8, f32, 4> for LabRgbaSplitter {
-    fn split(&self, from: &ImageStore<'_, u8, 4>, into: &mut ImageStoreMut<'_, f32, 4>) {
-        let lab_stride = into.width as u32 * 4u32 * size_of::<f32>() as u32;
-
+    fn split(
+        &self,
+        from: &ImageStore<'_, u8, 4>,
+        into: &mut ImageStoreMut<'_, f32, 4>,
+    ) -> Result<(), PicScaleError> {
+        let mut dst_buffer = into.to_colorutils_buffer_mut();
         rgba_to_lab_with_alpha(
-            from.buffer.as_ref(),
-            from.width as u32 * 4u32,
-            into.buffer.borrow_mut(),
-            lab_stride,
-            into.width as u32,
-            into.height as u32,
+            &from.to_colorutils_buffer(),
+            &mut dst_buffer,
             &SRGB_TO_XYZ_D65,
             TransferFunction::Srgb,
-        );
+        )
+        .map_err(|x| PicScaleError::Generic(x.to_string()))
     }
 
-    fn merge(&self, from: &ImageStore<'_, f32, 4>, into: &mut ImageStoreMut<'_, u8, 4>) {
-        let new_lab_stride = into.width as u32 * 4 * size_of::<f32>() as u32;
+    fn merge(
+        &self,
+        from: &ImageStore<'_, f32, 4>,
+        into: &mut ImageStoreMut<'_, u8, 4>,
+    ) -> Result<(), PicScaleError> {
+        let mut dst_buffer = into.to_colorutils_buffer_mut();
         lab_with_alpha_to_rgba(
-            from.buffer.as_ref(),
-            new_lab_stride,
-            into.buffer.borrow_mut(),
-            into.width as u32 * 4,
-            into.width as u32,
-            into.height as u32,
+            &from.to_colorutils_buffer(),
+            &mut dst_buffer,
             &XYZ_TO_SRGB_D65,
             TransferFunction::Srgb,
-        );
+        )
+        .map_err(|x| PicScaleError::Generic(x.to_string()))
     }
 
     fn bit_depth(&self) -> usize {
@@ -122,8 +123,9 @@ impl LabScaler {
 }
 
 impl LabScaler {
-    pub fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy) {
+    pub fn set_threading_policy(&mut self, threading_policy: ThreadingPolicy) -> LabScaler {
         self.scaler.threading_policy = threading_policy;
+        *self
     }
 
     pub fn plan_rgb_resampling(

@@ -51,6 +51,7 @@ pub enum PicScaleError {
     UnsupportedBitDepth(usize),
     UnknownResizingFilter,
     OutOfMemory(usize),
+    Generic(String),
     InvalidScratchSize {
         expected: usize,
         size: usize,
@@ -83,6 +84,7 @@ impl PicScaleError {
             PicScaleError::InvalidSourceSize { .. } => 10,
             PicScaleError::InvalidDestinationSize { .. } => 11,
             PicScaleError::EmptyPlan => 12,
+            PicScaleError::Generic(_) => 13,
         }
     }
 }
@@ -133,6 +135,7 @@ impl Display for PicScaleError {
             PicScaleError::EmptyPlan => {
                 f.write_str("Multi-step scaling appeared to be an empty one")
             }
+            PicScaleError::Generic(x) => f.write_str(x),
         }
     }
 }

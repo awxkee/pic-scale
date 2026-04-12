@@ -95,7 +95,6 @@ pub(crate) fn convolve_column_handler_floating_point_4<
     st_g_mixed!(sums3, &mut v_dst[CN * 3..CN * 4], CN, bit_depth);
 }
 
-#[inline(always)]
 /// # Generics
 /// `T` - template buffer type
 /// `J` - accumulator type
@@ -149,7 +148,6 @@ pub(crate) fn convolve_column_handler_floating_point<
     );
 }
 
-#[inline(always)]
 /// # Generics
 /// `T` - template buffer type
 /// `J` - accumulator type

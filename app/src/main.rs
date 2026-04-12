@@ -6,6 +6,7 @@ mod split;
 
 use std::time::Instant;
 
+use crate::fuzzer_explore::resize_rgba;
 use core::f16;
 use fast_image_resize::images::Image;
 use fast_image_resize::{
@@ -13,12 +14,18 @@ use fast_image_resize::{
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
-    CbCr16ImageStore, CbCr16ImageStoreMut, ImageSize, ImageStoreScaling, Planar16ImageStore,
-    Planar16ImageStoreMut, ResamplingFunction, Rgb16ImageStore, Rgb16ImageStoreMut,
-    Rgba16ImageStore, Rgba16ImageStoreMut, Scaler, ThreadingPolicy, WorkloadStrategy,
+    CbCr16ImageStore, CbCr16ImageStoreMut, ImageSize, ImageStoreScaling, JzazbzScaler, LChScaler,
+    LabScaler, LuvScaler, Planar16ImageStore, Planar16ImageStoreMut, ResamplingFunction,
+    Rgb16ImageStore, Rgb16ImageStoreMut, Rgb8ImageStore, Rgb8ImageStoreMut, Rgba16ImageStore,
+    Rgba16ImageStoreMut, Scaler, SigmoidalScaler, ThreadingPolicy, TransferFunction,
+    WorkloadStrategy, XYZScaler,
 };
 
 fn main() {
+    resize_rgba(0,   143,
+                35,
+                143,
+                35, ResamplingFunction::Bilinear, false);
     // resize_rgba(0, 1, 256, 79, 256, ResamplingFunction::Bilinear, false);
     #[allow(overflowing_literals)]
     // test_fast_image();
@@ -28,31 +35,28 @@ fn main() {
         .unwrap();
     // img.save("top_right.tga").unwrap();
     let dimensions = img.dimensions();
-    let transient = img.to_luma_alpha16();
+    let transient = img.to_rgb8();
     let mut bytes = transient.to_vec().iter().map(|&x| x).collect::<Vec<_>>();
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
 
-    let mut scaler = Scaler::new(ResamplingFunction::MitchellNetravalli)
-        .set_threading_policy(ThreadingPolicy::Single)
-        .set_workload_strategy(WorkloadStrategy::PreferSpeed)
-        .set_supersampling(true);
+    let mut scaler = SigmoidalScaler::new(ResamplingFunction::MitchellNetravalli)
+        .set_threading_policy(ThreadingPolicy::Single);
     // scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
     let mut t_size = ImageSize::new(dimensions.0 as usize - 1, dimensions.1 as usize - 1);
     // t_size.height += 1;
     let resizing_plan = scaler
-        .plan_cbcr_resampling16(
+        .plan_rgb_resampling(
             ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
             t_size,
-            16,
         )
         .unwrap();
 
     let mut store =
-        CbCr16ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
+        Rgb8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     store.bit_depth = 16;
-    let mut dst_store = CbCr16ImageStoreMut::alloc_with_depth(
+    let mut dst_store = Rgb8ImageStoreMut::alloc_with_depth(
         dimensions.0 as usize - 1,
         dimensions.1 as usize - 1,
         16,
@@ -109,8 +113,8 @@ fn main() {
     let dst = dst_store
         .as_bytes()
         .iter()
-        // .map(|&x| x)
-        .map(|&x| (((x) >> 8) as u8).min(255))
+        .map(|&x| x)
+        // .map(|&x| (((x) >> 8) as u8).min(255))
         // .map(|&x| (x as f32 * 255.).round() as u8)
         .collect::<Vec<_>>();
 

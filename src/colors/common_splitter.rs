@@ -38,8 +38,16 @@ where
     [T]: ToOwned<Owned = Vec<T>>,
     [R]: ToOwned<Owned = Vec<R>>,
 {
-    fn split(&self, from: &ImageStore<'_, T, N>, into: &mut ImageStoreMut<'_, R, N>);
-    fn merge(&self, from: &ImageStore<'_, R, N>, into: &mut ImageStoreMut<'_, T, N>);
+    fn split(
+        &self,
+        from: &ImageStore<'_, T, N>,
+        into: &mut ImageStoreMut<'_, R, N>,
+    ) -> Result<(), PicScaleError>;
+    fn merge(
+        &self,
+        from: &ImageStore<'_, R, N>,
+        into: &mut ImageStoreMut<'_, T, N>,
+    ) -> Result<(), PicScaleError>;
     fn bit_depth(&self) -> usize;
 }
 
@@ -94,7 +102,7 @@ impl<T: Default + Clone + Copy + Debug, R: Default + Clone + Copy + Debug, const
             ImageStoreMut::<R, N>::from_slice(scratch_target, store.width, store.height)?;
         intermediate_store.bit_depth = self.splitter.bit_depth();
 
-        self.splitter.split(store, &mut intermediate_store);
+        self.splitter.split(store, &mut intermediate_store)?;
 
         let new_immutable_store = ImageStore::<R, N> {
             buffer: std::borrow::Cow::Borrowed(scratch_target),
@@ -117,7 +125,7 @@ impl<T: Default + Clone + Copy + Debug, R: Default + Clone + Copy + Debug, const
             scratch2,
         )?;
 
-        self.splitter.merge(&scaled_im_store.to_immutable(), into);
+        self.splitter.merge(&scaled_im_store.to_immutable(), into)?;
         Ok(())
     }
 
