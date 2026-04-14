@@ -28,7 +28,7 @@
  */
 #![forbid(unsafe_code)]
 use crate::image_store::ImageStoreMut;
-use crate::plan::Resampling;
+use crate::plan::{AlphaPlanner, DefaultPlanner, Resampling};
 use crate::scaler::ScalingOptions;
 use crate::validation::PicScaleError;
 use crate::{
@@ -63,7 +63,7 @@ impl Scaler {
         source_size: ImageSize,
         target_size: ImageSize,
     ) -> Result<Arc<Resampling<f16, 1>>, PicScaleError> {
-        self.plan_generic_resize::<f16, f32, 1>(source_size, target_size, 8)
+        DefaultPlanner::plan_generic_resize::<f16, f32, 1>(self, source_size, target_size, 8)
     }
 
     /// Creates a resampling plan for a two-channel chroma (`CbCr`) `f16` image.
@@ -89,7 +89,7 @@ impl Scaler {
         source_size: ImageSize,
         target_size: ImageSize,
     ) -> Result<Arc<Resampling<f16, 2>>, PicScaleError> {
-        self.plan_generic_resize::<f16, f32, 2>(source_size, target_size, 8)
+        DefaultPlanner::plan_generic_resize::<f16, f32, 2>(self, source_size, target_size, 8)
     }
 
     /// Creates a resampling plan for a three-channel RGB `f16` image.
@@ -115,7 +115,7 @@ impl Scaler {
         source_size: ImageSize,
         target_size: ImageSize,
     ) -> Result<Arc<Resampling<f16, 3>>, PicScaleError> {
-        self.plan_generic_resize::<f16, f32, 3>(source_size, target_size, 8)
+        DefaultPlanner::plan_generic_resize::<f16, f32, 3>(self, source_size, target_size, 8)
     }
 
     /// Creates a resampling plan for a four-channel RGBA `f16` image.
@@ -142,7 +142,8 @@ impl Scaler {
         target_size: ImageSize,
         premultiply_alpha: bool,
     ) -> Result<Arc<Resampling<f16, 4>>, PicScaleError> {
-        self.plan_generic_resize_with_alpha::<f16, f32, 4>(
+        AlphaPlanner::plan_generic_resize_with_alpha::<f16, f32, 4>(
+            self,
             source_size,
             target_size,
             8,
@@ -158,9 +159,14 @@ impl<'b> ImageStoreScaling<'b, f16, 1> for PlanarF16ImageStore<'b> {
         store: &mut ImageStoreMut<'b, f16, 1>,
         options: ScalingOptions,
     ) -> Result<(), PicScaleError> {
-        let mut scaler = Scaler::new(options.resampling_function);
-        scaler.set_threading_policy(options.threading_policy);
-        let plan = scaler.plan_generic_resize(self.size(), store.size(), store.bit_depth)?;
+        let scaler =
+            Scaler::new(options.resampling_function).set_threading_policy(options.threading_policy);
+        let plan = DefaultPlanner::plan_generic_resize(
+            &scaler,
+            self.size(),
+            store.size(),
+            store.bit_depth,
+        )?;
         plan.resample(self, store)
     }
 }
@@ -172,9 +178,14 @@ impl<'b> ImageStoreScaling<'b, f16, 2> for CbCrF16ImageStore<'b> {
         store: &mut ImageStoreMut<'b, f16, 2>,
         options: ScalingOptions,
     ) -> Result<(), PicScaleError> {
-        let mut scaler = Scaler::new(options.resampling_function);
-        scaler.set_threading_policy(options.threading_policy);
-        let plan = scaler.plan_generic_resize(self.size(), store.size(), store.bit_depth)?;
+        let scaler =
+            Scaler::new(options.resampling_function).set_threading_policy(options.threading_policy);
+        let plan = DefaultPlanner::plan_generic_resize(
+            &scaler,
+            self.size(),
+            store.size(),
+            store.bit_depth,
+        )?;
         plan.resample(self, store)
     }
 }
@@ -186,9 +197,14 @@ impl<'b> ImageStoreScaling<'b, f16, 3> for RgbF16ImageStore<'b> {
         store: &mut ImageStoreMut<'b, f16, 3>,
         options: ScalingOptions,
     ) -> Result<(), PicScaleError> {
-        let mut scaler = Scaler::new(options.resampling_function);
-        scaler.set_threading_policy(options.threading_policy);
-        let plan = scaler.plan_generic_resize(self.size(), store.size(), store.bit_depth)?;
+        let scaler =
+            Scaler::new(options.resampling_function).set_threading_policy(options.threading_policy);
+        let plan = DefaultPlanner::plan_generic_resize(
+            &scaler,
+            self.size(),
+            store.size(),
+            store.bit_depth,
+        )?;
         plan.resample(self, store)
     }
 }
@@ -200,9 +216,10 @@ impl<'b> ImageStoreScaling<'b, f16, 4> for RgbaF16ImageStore<'b> {
         store: &mut ImageStoreMut<'b, f16, 4>,
         options: ScalingOptions,
     ) -> Result<(), PicScaleError> {
-        let mut scaler = Scaler::new(options.resampling_function);
-        scaler.set_threading_policy(options.threading_policy);
-        let plan = scaler.plan_generic_resize_with_alpha(
+        let scaler =
+            Scaler::new(options.resampling_function).set_threading_policy(options.threading_policy);
+        let plan = AlphaPlanner::plan_generic_resize_with_alpha(
+            &scaler,
             self.size(),
             store.size(),
             store.bit_depth,
