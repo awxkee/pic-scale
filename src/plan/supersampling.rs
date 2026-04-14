@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Radzivon Bartoshyk 3/2026. All rights reserved.
+ * Copyright (c) Radzivon Bartoshyk 4/2026. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -26,33 +26,32 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-mod alpha_plan;
-mod alpha_planner;
-mod ar30_plan;
-mod default_planner;
-mod horizontal_filtering;
-mod multi_step_plan;
-mod nearest_plan;
-mod non_alpha_plan;
-mod noop_plan;
-mod planner;
-mod superresolution;
-mod supersampling;
-mod trampoline_filtering;
-mod vertical_filtering;
+use crate::{ImageSize, ResamplingFunction};
 
-pub(crate) use alpha_plan::make_alpha_plan;
-pub(crate) use alpha_planner::AlphaPlanner;
-#[allow(unused_imports)]
-pub(crate) use ar30_plan::{Ar30Destructuring, Ar30DestructuringImpl, Ar30Plan};
-pub(crate) use default_planner::DefaultPlanner;
-pub(crate) use horizontal_filtering::HorizontalFiltering;
-pub(crate) use multi_step_plan::MultiStepResamplePlan;
-pub(crate) use nearest_plan::ResampleNearestPlan;
-pub(crate) use non_alpha_plan::{
-    BothAxesConvolvePlan, HorizontalConvolvePlan, VerticalConvolvePlan,
-};
-pub(crate) use noop_plan::NoopPlan;
-pub use planner::{Resampling, ResamplingPlan};
-pub(crate) use trampoline_filtering::TrampolineFiltering;
-pub(crate) use vertical_filtering::VerticalFiltering;
+/// Choose the cheapest pre-filter for the supersampling first pass.
+///
+/// The goal is to rapidly reduce the source to ~2× the target size so the
+/// final quality filter has a manageable input. The pre-filter does not need
+/// to be high quality — it just needs to be fast and not alias badly.
+pub(crate) fn supersampling_prefilter(ratio_w: f64, ratio_h: f64) -> Option<ResamplingFunction> {
+    let ratio = ratio_w.max(ratio_h);
+    if ratio >= 4.0 {
+        Some(ResamplingFunction::Nearest)
+    } else if ratio >= 3.0 {
+        Some(ResamplingFunction::Box)
+    } else {
+        None
+    }
+}
+
+/// Compute the intermediate size for a supersampling pre-pass.
+///
+/// We target ~2× the destination in each axis, clamped to [dst, src].
+/// This gives the quality filter a ~2× downscale to work with, which is
+/// within every filter's optimal range.
+pub(crate) fn supersampling_intermediate_size(src: ImageSize, dst: ImageSize) -> ImageSize {
+    // 2× the destination, but never larger than source or smaller than dst.
+    let w = (dst.width * 2).min(src.width).max(dst.width);
+    let h = (dst.height * 2).min(src.height).max(dst.height);
+    ImageSize::new(w, h)
+}

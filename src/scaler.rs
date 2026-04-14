@@ -27,19 +27,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
-use crate::convolution::{
-    ConvolutionOptions, HorizontalFilterPass, TrampolineFilter, VerticalConvolutionPass,
-};
+use crate::convolution::{ConvolutionOptions, HorizontalFilterPass, VerticalConvolutionPass};
 use crate::factory::{Ar30ByteOrder, Rgb30};
 use crate::image_size::ImageSize;
-use crate::image_store::{
-    AssociateAlpha, CheckStoreDensity, ImageStore, ImageStoreMut, UnassociateAlpha,
-};
+use crate::image_store::{CheckStoreDensity, ImageStore, ImageStoreMut};
 use crate::math::WeightsGenerator;
 use crate::plan::{
-    Ar30Destructuring, Ar30DestructuringImpl, Ar30Plan, BothAxesConvolvePlan,
-    HorizontalConvolvePlan, MultiStepResamplePlan, NoopPlan, ResampleNearestPlan, Resampling,
-    TrampolineFiltering, VerticalConvolvePlan, make_alpha_plan,
+    AlphaPlanner, Ar30Destructuring, Ar30DestructuringImpl, Ar30Plan, BothAxesConvolvePlan,
+    DefaultPlanner, HorizontalConvolvePlan, NoopPlan, ResampleNearestPlan, Resampling,
+    TrampolineFiltering, VerticalConvolvePlan,
 };
 use crate::threading_policy::ThreadingPolicy;
 use crate::validation::PicScaleError;
@@ -70,34 +66,6 @@ pub enum WorkloadStrategy {
     /// Prefers speed to quality
     #[default]
     PreferSpeed,
-}
-
-/// Choose the cheapest pre-filter for the supersampling first pass.
-///
-/// The goal is to rapidly reduce the source to ~2× the target size so the
-/// final quality filter has a manageable input. The pre-filter does not need
-/// to be high quality — it just needs to be fast and not alias badly.
-fn supersampling_prefilter(ratio_w: f64, ratio_h: f64) -> Option<ResamplingFunction> {
-    let ratio = ratio_w.max(ratio_h);
-    if ratio >= 4.0 {
-        Some(ResamplingFunction::Nearest)
-    } else if ratio >= 3.0 {
-        Some(ResamplingFunction::Box)
-    } else {
-        None
-    }
-}
-
-/// Compute the intermediate size for a supersampling pre-pass.
-///
-/// We target ~2× the destination in each axis, clamped to [dst, src].
-/// This gives the quality filter a ~2× downscale to work with, which is
-/// within every filter's optimal range.
-fn supersampling_intermediate_size(src: ImageSize, dst: ImageSize) -> ImageSize {
-    // 2× the destination, but never larger than source or smaller than dst.
-    let w = (dst.width * 2).min(src.width).max(dst.width);
-    let h = (dst.height * 2).min(src.height).max(dst.height);
-    ImageSize::new(w, h)
 }
 
 impl Scaler {
@@ -169,172 +137,6 @@ impl Scaler {
 }
 
 impl Scaler {
-    /// Compute the chain of intermediate sizes between `src` and `dst`.
-    /// Returns only the intermediate sizes — the final `dst` is not included
-    /// since the last plan targets it directly.
-    pub(crate) fn plan_intermediate_sizes(
-        src: ImageSize,
-        dst: ImageSize,
-        function: ResamplingFunction,
-    ) -> Vec<ImageSize> {
-        let max_ratio = function
-            .get_resampling_filter::<f32>()
-            .min_kernel_size
-            .max(1.5)
-            .min(4.0) as f64;
-
-        // For filters with no effective ratio limit just do a single step.
-        if max_ratio == f64::MAX {
-            return Vec::new();
-        }
-
-        // Number of steps needed per axis.
-        let steps_w = if dst.width > src.width {
-            let ratio = dst.width as f64 / src.width as f64;
-            (ratio.log2() / max_ratio.log2()).ceil() as usize
-        } else {
-            0
-        };
-        let steps_h = if dst.height > src.height {
-            let ratio = dst.height as f64 / src.height as f64;
-            (ratio.log2() / max_ratio.log2()).ceil() as usize
-        } else {
-            0
-        };
-        let steps = steps_w.max(steps_h);
-
-        if steps <= 1 {
-            return Vec::new();
-        }
-
-        // Distribute steps evenly in log space.
-        let mut sizes = Vec::with_capacity(steps - 1);
-        for i in 1..steps {
-            let t = i as f64 / steps as f64;
-            let w = if dst.width > src.width {
-                (src.width as f64 * (dst.width as f64 / src.width as f64).powf(t)).round() as usize
-            } else {
-                dst.width
-            };
-            let h = if dst.height > src.height {
-                (src.height as f64 * (dst.height as f64 / src.height as f64).powf(t)).round()
-                    as usize
-            } else {
-                dst.height
-            };
-            let w = w.max(src.width).min(dst.width);
-            let h = h.max(src.height).min(dst.height);
-            sizes.push(ImageSize::new(w, h));
-        }
-
-        sizes.dedup_by(|a, b| a.width == b.width && a.height == b.height);
-
-        sizes
-    }
-
-    pub(crate) fn plan_generic_resize<
-        T: Clone + Copy + Debug + Send + Sync + Default + WeightsGenerator<W> + 'static,
-        W,
-        const N: usize,
-    >(
-        &self,
-        source_size: ImageSize,
-        destination_size: ImageSize,
-        bit_depth: usize,
-    ) -> Result<Arc<Resampling<T, N>>, PicScaleError>
-    where
-        for<'a> ImageStore<'a, T, N>:
-            VerticalConvolutionPass<T, W, N> + HorizontalFilterPass<T, W, N>,
-        for<'a> ImageStoreMut<'a, T, N>: CheckStoreDensity,
-    {
-        if self.function == ResamplingFunction::Nearest {
-            return Ok(Arc::new(ResampleNearestPlan {
-                source_size,
-                target_size: destination_size,
-                threading_policy: self.threading_policy,
-                _phantom_data: PhantomData,
-            }));
-        }
-
-        // Only applies when both axes are upscaling and the flag is set.
-        let is_upscale = destination_size.width >= source_size.width
-            && destination_size.height >= source_size.height;
-
-        if self.multi_step_upscaling && is_upscale {
-            let intermediates =
-                Scaler::plan_intermediate_sizes(source_size, destination_size, self.function);
-
-            if !intermediates.is_empty() {
-                // Build one sub-plan per step.
-                let mut steps: Vec<Arc<Resampling<T, N>>> = Vec::new();
-                let mut prev_size = source_size;
-
-                for &next_size in intermediates
-                    .iter()
-                    .chain(std::iter::once(&destination_size))
-                {
-                    let sub_plan =
-                        self.build_single_step_plan::<T, W, N>(prev_size, next_size, bit_depth)?;
-                    steps.push(sub_plan);
-                    prev_size = next_size;
-                }
-
-                return Ok(Arc::new(MultiStepResamplePlan::new(
-                    steps,
-                    source_size,
-                    destination_size,
-                )));
-            }
-        }
-
-        // ── Supersampling for large downscales ────────────────────────────────────
-        let is_downscale = destination_size.width <= source_size.width
-            && destination_size.height <= source_size.height;
-
-        if self.supersampling && is_downscale {
-            let ratio_w = source_size.width as f64 / destination_size.width as f64;
-            let ratio_h = source_size.height as f64 / destination_size.height as f64;
-
-            if let Some(prefilter) = supersampling_prefilter(ratio_w, ratio_h) {
-                let intermediate = supersampling_intermediate_size(source_size, destination_size);
-
-                // Only insert the pre-pass if the intermediate is strictly
-                // between source and destination (avoids a no-op step).
-                if intermediate.width < source_size.width
-                    || intermediate.height < source_size.height
-                {
-                    // Pre-filter: fast cheap reduction to ~2× target.
-                    let pre_scaler = Scaler {
-                        function: prefilter,
-                        threading_policy: self.threading_policy,
-                        workload_strategy: self.workload_strategy,
-                        multi_step_upscaling: false,
-                        supersampling: false, // no recursion
-                    };
-                    let pre_plan = pre_scaler.build_single_step_plan::<T, W, N>(
-                        source_size,
-                        intermediate,
-                        bit_depth,
-                    )?;
-
-                    let quality_plan = self.build_single_step_plan::<T, W, N>(
-                        intermediate,
-                        destination_size,
-                        bit_depth,
-                    )?;
-
-                    return Ok(Arc::new(MultiStepResamplePlan::new(
-                        vec![pre_plan, quality_plan],
-                        source_size,
-                        destination_size,
-                    )));
-                }
-            }
-        }
-
-        self.build_single_step_plan::<T, W, N>(source_size, destination_size, bit_depth)
-    }
-
     pub(crate) fn build_single_step_plan<
         T: Clone + Copy + Debug + Send + Sync + Default + WeightsGenerator<W> + 'static,
         W,
@@ -430,267 +232,6 @@ impl Scaler {
         }
     }
 
-    pub(crate) fn plan_generic_resize_with_alpha<
-        T: Clone + Copy + Debug + Send + Sync + Default + WeightsGenerator<W> + 'static,
-        W,
-        const N: usize,
-    >(
-        &self,
-        source_size: ImageSize,
-        destination_size: ImageSize,
-        bit_depth: usize,
-        needs_alpha_premultiplication: bool,
-    ) -> Result<Arc<Resampling<T, N>>, PicScaleError>
-    where
-        for<'a> ImageStore<'a, T, N>:
-            VerticalConvolutionPass<T, W, N> + HorizontalFilterPass<T, W, N> + AssociateAlpha<T, N>,
-        for<'a> ImageStoreMut<'a, T, N>: CheckStoreDensity + UnassociateAlpha<T, N>,
-    {
-        if self.function == ResamplingFunction::Nearest {
-            return Ok(Arc::new(ResampleNearestPlan {
-                source_size,
-                target_size: destination_size,
-                threading_policy: self.threading_policy,
-                _phantom_data: PhantomData,
-            }));
-        }
-
-        let is_upscale = destination_size.width >= source_size.width
-            && destination_size.height >= source_size.height;
-
-        if self.multi_step_upscaling && is_upscale {
-            let intermediates =
-                Scaler::plan_intermediate_sizes(source_size, destination_size, self.function);
-
-            if !intermediates.is_empty() {
-                let mut steps: Vec<Arc<Resampling<T, N>>> = Vec::new();
-                let mut prev_size = source_size;
-
-                let all_sizes: Vec<ImageSize> = intermediates
-                    .iter()
-                    .copied()
-                    .chain(std::iter::once(destination_size))
-                    .collect();
-                let last_idx = all_sizes.len() - 1;
-
-                for (idx, &next_size) in all_sizes.iter().enumerate() {
-                    let is_first = idx == 0;
-                    let is_last = idx == last_idx;
-
-                    // Alpha premultiplication rules across steps:
-                    //   step 0       : associate alpha before filtering
-                    //                  (only if needs_alpha_premultiplication)
-                    //   steps 1..N-2 : data is already premultiplied — plain
-                    //                  convolution only, no alpha handling
-                    //   step N-1     : unassociate alpha after final filter pass
-                    //                  (only if needs_alpha_premultiplication)
-                    //
-                    let sub_plan = self.build_single_step_plan_with_alpha::<T, W, N>(
-                        prev_size, next_size, bit_depth, is_first, is_last,
-                    )?;
-                    steps.push(sub_plan);
-                    prev_size = next_size;
-                }
-
-                return Ok(Arc::new(MultiStepResamplePlan::new(
-                    steps,
-                    source_size,
-                    destination_size,
-                )));
-            }
-        }
-
-        // ── Supersampling for large downscales ────────────────────────────────────
-        let is_downscale = destination_size.width <= source_size.width
-            && destination_size.height <= source_size.height;
-
-        if self.supersampling && is_downscale {
-            let ratio_w = source_size.width as f64 / destination_size.width as f64;
-            let ratio_h = source_size.height as f64 / destination_size.height as f64;
-
-            if let Some(prefilter) = supersampling_prefilter(ratio_w, ratio_h) {
-                let intermediate = supersampling_intermediate_size(source_size, destination_size);
-
-                if intermediate.width < source_size.width
-                    || intermediate.height < source_size.height
-                {
-                    // ── Alpha rules for the two-step downscale ────────────────────
-                    //
-                    // Nearest: pixel selection only, no blending — premultiplication
-                    //   has no effect on output. Skip alpha handling in the pre-pass;
-                    //
-                    // Box: blends pixels together so
-                    //   premultiplied alpha is required for correct color blending
-                    //   across transparent edges. Associate before the pre-pass,
-                    //   keep data premultiplied through the quality pass, unassociate
-                    //   only at the very end.
-                    let prefilter_needs_alpha =
-                        needs_alpha_premultiplication && prefilter != ResamplingFunction::Nearest;
-
-                    let pre_scaler = Scaler {
-                        function: prefilter,
-                        threading_policy: self.threading_policy,
-                        workload_strategy: self.workload_strategy,
-                        multi_step_upscaling: false,
-                        supersampling: false, // no recursion
-                    };
-
-                    let pre_plan = if prefilter_needs_alpha {
-                        // Associate alpha before the averaging pre-pass.
-                        // Do NOT unassociate — data stays premultiplied for the
-                        // quality pass.
-                        pre_scaler.build_single_step_plan_with_alpha::<T, W, N>(
-                            source_size,
-                            intermediate,
-                            bit_depth,
-                            true,  // forward: associate
-                            false, // backward: keep premultiplied
-                        )?
-                    } else {
-                        // Nearest pre-pass or alpha not needed: plain resize.
-                        pre_scaler.build_single_step_plan::<T, W, N>(
-                            source_size,
-                            intermediate,
-                            bit_depth,
-                        )?
-                    };
-
-                    let quality_plan = if prefilter_needs_alpha {
-                        // Data arrives premultiplied from the pre-pass.
-                        // Do NOT associate again — just unassociate at the end.
-                        self.build_single_step_plan_with_alpha::<T, W, N>(
-                            intermediate,
-                            destination_size,
-                            bit_depth,
-                            false, // forward: already premultiplied
-                            true,  // backward: unassociate
-                        )?
-                    } else {
-                        // Nearest pre-pass left data as straight alpha — the quality
-                        // pass handles associate+unassociate as a normal single step.
-                        self.build_single_step_plan_with_alpha::<T, W, N>(
-                            intermediate,
-                            destination_size,
-                            bit_depth,
-                            needs_alpha_premultiplication,
-                            needs_alpha_premultiplication,
-                        )?
-                    };
-
-                    return Ok(Arc::new(MultiStepResamplePlan::new(
-                        vec![pre_plan, quality_plan],
-                        source_size,
-                        destination_size,
-                    )));
-                }
-            }
-        }
-
-        self.build_single_step_plan_with_alpha::<T, W, N>(
-            source_size,
-            destination_size,
-            bit_depth,
-            needs_alpha_premultiplication,
-            needs_alpha_premultiplication,
-        )
-    }
-
-    pub(crate) fn build_single_step_plan_with_alpha<
-        T: Clone + Copy + Debug + Send + Sync + Default + WeightsGenerator<W> + 'static,
-        W,
-        const N: usize,
-    >(
-        &self,
-        source_size: ImageSize,
-        destination_size: ImageSize,
-        bit_depth: usize,
-        needs_alpha_premultiplication_forward: bool,
-        needs_alpha_premultiplication_backward: bool,
-    ) -> Result<Arc<Resampling<T, N>>, PicScaleError>
-    where
-        for<'a> ImageStore<'a, T, N>:
-            VerticalConvolutionPass<T, W, N> + HorizontalFilterPass<T, W, N> + AssociateAlpha<T, N>,
-        for<'a> ImageStoreMut<'a, T, N>: CheckStoreDensity + UnassociateAlpha<T, N>,
-    {
-        if self.function == ResamplingFunction::Nearest {
-            return Ok(Arc::new(ResampleNearestPlan {
-                source_size,
-                target_size: destination_size,
-                threading_policy: self.threading_policy,
-                _phantom_data: PhantomData,
-            }));
-        }
-        if !needs_alpha_premultiplication_backward && !needs_alpha_premultiplication_forward {
-            return self.plan_generic_resize(source_size, destination_size, bit_depth);
-        }
-
-        let should_do_horizontal = source_size.width != destination_size.width;
-        let should_do_vertical = source_size.height != destination_size.height;
-
-        if !should_do_vertical && !should_do_horizontal {
-            return Ok(Arc::new(NoopPlan {
-                source_size,
-                target_size: destination_size,
-                _phantom: PhantomData,
-            }));
-        }
-
-        let options = ConvolutionOptions {
-            workload_strategy: self.workload_strategy,
-            bit_depth,
-            src_size: source_size,
-            dst_size: destination_size,
-        };
-
-        let vertical_plan = if should_do_vertical {
-            let vertical_filters =
-                T::make_weights(self.function, source_size.height, destination_size.height)?;
-            Some(ImageStore::<T, N>::vertical_plan(
-                vertical_filters,
-                self.threading_policy,
-                options,
-            ))
-        } else {
-            None
-        };
-
-        let horizontal_plan = if should_do_horizontal {
-            let horizontal_filters =
-                T::make_weights(self.function, source_size.width, destination_size.width)?;
-            Some(ImageStore::<T, N>::horizontal_plan(
-                horizontal_filters,
-                self.threading_policy,
-                options,
-            ))
-        } else {
-            None
-        };
-
-        let trampoline = if should_do_vertical && should_do_horizontal {
-            Some(Arc::new(TrampolineFiltering {
-                horizontal_filter: horizontal_plan.as_ref().unwrap().clone(),
-                vertical_filter: vertical_plan.as_ref().unwrap().clone(),
-                source_size,
-                target_size: destination_size,
-            })
-                as Arc<dyn TrampolineFilter<T, N> + Send + Sync>)
-        } else {
-            None
-        };
-
-        Ok(make_alpha_plan(
-            source_size,
-            destination_size,
-            horizontal_plan,
-            vertical_plan,
-            trampoline,
-            self.threading_policy,
-            self.workload_strategy,
-            needs_alpha_premultiplication_forward,
-            needs_alpha_premultiplication_backward,
-        ))
-    }
-
     /// Creates a resampling plan for a single-channel (planar/grayscale) `u8` image.
     ///
     /// The returned [`Arc<Resampling<u8, 1>>`] can be executed repeatedly against images
@@ -711,7 +252,7 @@ impl Scaler {
         source_size: ImageSize,
         target_size: ImageSize,
     ) -> Result<Arc<Resampling<u8, 1>>, PicScaleError> {
-        self.plan_generic_resize(source_size, target_size, 8)
+        DefaultPlanner::plan_generic_resize(self, source_size, target_size, 8)
     }
 
     /// Creates a resampling plan for a two-channel grayscale + alpha (`GA`) `u8` image.
@@ -739,9 +280,15 @@ impl Scaler {
         premultiply_alpha: bool,
     ) -> Result<Arc<Resampling<u8, 2>>, PicScaleError> {
         if premultiply_alpha {
-            self.plan_generic_resize_with_alpha(source_size, target_size, 8, premultiply_alpha)
+            AlphaPlanner::plan_generic_resize_with_alpha(
+                self,
+                source_size,
+                target_size,
+                8,
+                premultiply_alpha,
+            )
         } else {
-            self.plan_generic_resize(source_size, target_size, 8)
+            DefaultPlanner::plan_generic_resize(self, source_size, target_size, 8)
         }
     }
 
@@ -767,7 +314,7 @@ impl Scaler {
         source_size: ImageSize,
         target_size: ImageSize,
     ) -> Result<Arc<Resampling<u8, 2>>, PicScaleError> {
-        self.plan_generic_resize(source_size, target_size, 8)
+        DefaultPlanner::plan_generic_resize(self, source_size, target_size, 8)
     }
 
     /// Creates a resampling plan for a three-channel RGB `u8` image.
@@ -792,7 +339,7 @@ impl Scaler {
         source_size: ImageSize,
         target_size: ImageSize,
     ) -> Result<Arc<Resampling<u8, 3>>, PicScaleError> {
-        self.plan_generic_resize(source_size, target_size, 8)
+        DefaultPlanner::plan_generic_resize(self, source_size, target_size, 8)
     }
 
     /// Creates a resampling plan for a four-channel RGBA `u8` image.
@@ -820,9 +367,15 @@ impl Scaler {
         premultiply_alpha: bool,
     ) -> Result<Arc<Resampling<u8, 4>>, PicScaleError> {
         if premultiply_alpha {
-            self.plan_generic_resize_with_alpha(source_size, target_size, 8, premultiply_alpha)
+            AlphaPlanner::plan_generic_resize_with_alpha(
+                self,
+                source_size,
+                target_size,
+                8,
+                premultiply_alpha,
+            )
         } else {
-            self.plan_generic_resize(source_size, target_size, 8)
+            DefaultPlanner::plan_generic_resize(self, source_size, target_size, 8)
         }
     }
 
@@ -850,7 +403,7 @@ impl Scaler {
         target_size: ImageSize,
         bit_depth: usize,
     ) -> Result<Arc<Resampling<u16, 1>>, PicScaleError> {
-        self.plan_generic_resize(source_size, target_size, bit_depth)
+        DefaultPlanner::plan_generic_resize(self, source_size, target_size, bit_depth)
     }
 
     /// Creates a resampling plan for a single-channel (planar/grayscale) `i16` image.
@@ -877,7 +430,7 @@ impl Scaler {
         target_size: ImageSize,
         bit_depth: usize,
     ) -> Result<Arc<Resampling<i16, 1>>, PicScaleError> {
-        self.plan_generic_resize(source_size, target_size, bit_depth)
+        DefaultPlanner::plan_generic_resize(self, source_size, target_size, bit_depth)
     }
 
     /// Creates a resampling plan for a two-channel chroma (`CbCr`) `u16` image.
@@ -905,7 +458,7 @@ impl Scaler {
         target_size: ImageSize,
         bit_depth: usize,
     ) -> Result<Arc<Resampling<u16, 2>>, PicScaleError> {
-        self.plan_generic_resize(source_size, target_size, bit_depth)
+        DefaultPlanner::plan_generic_resize(self, source_size, target_size, bit_depth)
     }
 
     /// Creates a resampling plan for a two-channel grayscale + alpha (`GA`) `u16` image.
@@ -936,7 +489,8 @@ impl Scaler {
         bit_depth: usize,
     ) -> Result<Arc<Resampling<u16, 2>>, PicScaleError> {
         if premultiply_alpha {
-            self.plan_generic_resize_with_alpha(
+            AlphaPlanner::plan_generic_resize_with_alpha(
+                self,
                 source_size,
                 target_size,
                 bit_depth,
@@ -972,7 +526,7 @@ impl Scaler {
         target_size: ImageSize,
         bit_depth: usize,
     ) -> Result<Arc<Resampling<u16, 3>>, PicScaleError> {
-        self.plan_generic_resize(source_size, target_size, bit_depth)
+        DefaultPlanner::plan_generic_resize(self, source_size, target_size, bit_depth)
     }
 
     /// Creates a resampling plan for a four-channel RGBA `u16` image.
@@ -1003,14 +557,15 @@ impl Scaler {
         bit_depth: usize,
     ) -> Result<Arc<Resampling<u16, 4>>, PicScaleError> {
         if premultiply_alpha {
-            self.plan_generic_resize_with_alpha(
+            AlphaPlanner::plan_generic_resize_with_alpha(
+                self,
                 source_size,
                 target_size,
                 bit_depth,
                 premultiply_alpha,
             )
         } else {
-            self.plan_generic_resize(source_size, target_size, bit_depth)
+            DefaultPlanner::plan_generic_resize(self, source_size, target_size, bit_depth)
         }
     }
 
@@ -1043,12 +598,18 @@ impl Scaler {
         target_size: ImageSize,
     ) -> Result<Arc<Resampling<f32, 1>>, PicScaleError> {
         match self.workload_strategy {
-            WorkloadStrategy::PreferQuality => {
-                self.plan_generic_resize::<f32, f64, 1>(source_size, target_size, 8)
-            }
-            WorkloadStrategy::PreferSpeed => {
-                self.plan_generic_resize::<f32, f32, 1>(source_size, target_size, 8)
-            }
+            WorkloadStrategy::PreferQuality => DefaultPlanner::plan_generic_resize::<f32, f64, 1>(
+                self,
+                source_size,
+                target_size,
+                8,
+            ),
+            WorkloadStrategy::PreferSpeed => DefaultPlanner::plan_generic_resize::<f32, f32, 1>(
+                self,
+                source_size,
+                target_size,
+                8,
+            ),
         }
     }
 
@@ -1082,12 +643,18 @@ impl Scaler {
         target_size: ImageSize,
     ) -> Result<Arc<dyn ResamplingPlan<f32, 2> + Send + Sync>, PicScaleError> {
         match self.workload_strategy {
-            WorkloadStrategy::PreferQuality => {
-                self.plan_generic_resize::<f32, f64, 2>(source_size, target_size, 8)
-            }
-            WorkloadStrategy::PreferSpeed => {
-                self.plan_generic_resize::<f32, f32, 2>(source_size, target_size, 8)
-            }
+            WorkloadStrategy::PreferQuality => DefaultPlanner::plan_generic_resize::<f32, f64, 2>(
+                self,
+                source_size,
+                target_size,
+                8,
+            ),
+            WorkloadStrategy::PreferSpeed => DefaultPlanner::plan_generic_resize::<f32, f32, 2>(
+                self,
+                source_size,
+                target_size,
+                8,
+            ),
         }
     }
 
@@ -1126,20 +693,24 @@ impl Scaler {
     ) -> Result<Arc<Resampling<f32, 2>>, PicScaleError> {
         if premultiply_alpha {
             match self.workload_strategy {
-                WorkloadStrategy::PreferQuality => self
-                    .plan_generic_resize_with_alpha::<f32, f64, 2>(
+                WorkloadStrategy::PreferQuality => {
+                    AlphaPlanner::plan_generic_resize_with_alpha::<f32, f64, 2>(
+                        self,
                         source_size,
                         target_size,
                         8,
                         premultiply_alpha,
-                    ),
-                WorkloadStrategy::PreferSpeed => self
-                    .plan_generic_resize_with_alpha::<f32, f32, 2>(
+                    )
+                }
+                WorkloadStrategy::PreferSpeed => {
+                    AlphaPlanner::plan_generic_resize_with_alpha::<f32, f32, 2>(
+                        self,
                         source_size,
                         target_size,
                         8,
                         premultiply_alpha,
-                    ),
+                    )
+                }
             }
         } else {
             self.plan_cbcr_resampling_f32(source_size, target_size)
@@ -1176,12 +747,18 @@ impl Scaler {
         target_size: ImageSize,
     ) -> Result<Arc<Resampling<f32, 3>>, PicScaleError> {
         match self.workload_strategy {
-            WorkloadStrategy::PreferQuality => {
-                self.plan_generic_resize::<f32, f64, 3>(source_size, target_size, 8)
-            }
-            WorkloadStrategy::PreferSpeed => {
-                self.plan_generic_resize::<f32, f32, 3>(source_size, target_size, 8)
-            }
+            WorkloadStrategy::PreferQuality => DefaultPlanner::plan_generic_resize::<f32, f64, 3>(
+                self,
+                source_size,
+                target_size,
+                8,
+            ),
+            WorkloadStrategy::PreferSpeed => DefaultPlanner::plan_generic_resize::<f32, f32, 3>(
+                self,
+                source_size,
+                target_size,
+                8,
+            ),
         }
     }
 
@@ -1219,28 +796,42 @@ impl Scaler {
     ) -> Result<Arc<Resampling<f32, 4>>, PicScaleError> {
         if premultiply_alpha {
             match self.workload_strategy {
-                WorkloadStrategy::PreferQuality => self
-                    .plan_generic_resize_with_alpha::<f32, f64, 4>(
+                WorkloadStrategy::PreferQuality => {
+                    AlphaPlanner::plan_generic_resize_with_alpha::<f32, f64, 4>(
+                        self,
                         source_size,
                         target_size,
                         8,
                         premultiply_alpha,
-                    ),
-                WorkloadStrategy::PreferSpeed => self
-                    .plan_generic_resize_with_alpha::<f32, f32, 4>(
+                    )
+                }
+                WorkloadStrategy::PreferSpeed => {
+                    AlphaPlanner::plan_generic_resize_with_alpha::<f32, f32, 4>(
+                        self,
                         source_size,
                         target_size,
                         8,
                         premultiply_alpha,
-                    ),
+                    )
+                }
             }
         } else {
             match self.workload_strategy {
                 WorkloadStrategy::PreferQuality => {
-                    self.plan_generic_resize::<f32, f64, 4>(source_size, target_size, 8)
+                    DefaultPlanner::plan_generic_resize::<f32, f64, 4>(
+                        self,
+                        source_size,
+                        target_size,
+                        8,
+                    )
                 }
                 WorkloadStrategy::PreferSpeed => {
-                    self.plan_generic_resize::<f32, f32, 4>(source_size, target_size, 8)
+                    DefaultPlanner::plan_generic_resize::<f32, f32, 4>(
+                        self,
+                        source_size,
+                        target_size,
+                        8,
+                    )
                 }
             }
         }
@@ -1508,7 +1099,8 @@ macro_rules! def_image_scaling_alpha {
             ) -> Result<(), PicScaleError> {
                 let scaler = Scaler::new(options.resampling_function)
                     .set_threading_policy(options.threading_policy);
-                let plan = scaler.plan_generic_resize_with_alpha::<$fx_type, f32, $cn>(
+                let plan = AlphaPlanner::plan_generic_resize_with_alpha::<$fx_type, f32, $cn>(
+                    &scaler,
                     self.size(),
                     store.size(),
                     store.bit_depth,
@@ -1530,7 +1122,8 @@ macro_rules! def_image_scaling {
             ) -> Result<(), PicScaleError> {
                 let scaler = Scaler::new(options.resampling_function)
                     .set_threading_policy(options.threading_policy);
-                let plan = scaler.plan_generic_resize::<$fx_type, f32, $cn>(
+                let plan = DefaultPlanner::plan_generic_resize::<$fx_type, f32, $cn>(
+                    &scaler,
                     self.size(),
                     store.size(),
                     store.bit_depth,
