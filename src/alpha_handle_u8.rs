@@ -38,6 +38,7 @@ use crate::sse::*;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128",))]
 use crate::wasm32::{wasm_premultiply_alpha_rgba, wasm_unpremultiply_alpha_rgba};
 use novtb::{ParallelZonedIterator, TbSliceMut};
+use std::sync::OnceLock;
 
 #[inline]
 /// Divides value by 255 with rounding to nearest
@@ -93,45 +94,45 @@ fn premultiply_alpha_gray_alpha_impl(
         });
 }
 
-const fn make_unpremultiplication_table() -> [u8; 65536] {
-    let mut alpha = 0usize;
-    let mut buf = [0u8; 65536];
-    while alpha < 256 {
-        let mut pixel = 0usize;
-        while pixel < 256 {
-            #[allow(clippy::manual_checked_ops)]
-            if alpha == 0 {
-                buf[alpha * 255 + pixel] = 0;
-            } else {
-                let value = (pixel * 255 + alpha / 2) / alpha;
-                buf[alpha * 255 + pixel] = if value > 255 { 255 } else { value as u8 };
-            }
-            pixel += 1;
-        }
-        alpha += 1;
-    }
-    buf
-}
+static UNPREMULTIPLICATION_TABLE: OnceLock<Box<[u8; 65536]>> = OnceLock::new();
 
-pub(crate) static UNPREMULTIPLICATION_TABLE: [u8; 65536] = make_unpremultiplication_table();
+pub(crate) fn unpremultiplication_table() -> &'static [u8; 65536] {
+    UNPREMULTIPLICATION_TABLE.get_or_init(|| {
+        let mut buf = Box::new([0u8; 65536]);
+        for alpha in 0..256 {
+            for pixel in 0..256 {
+                #[allow(clippy::manual_checked_ops)]
+                if alpha == 0 {
+                    buf[alpha * 255 + pixel] = 0;
+                } else {
+                    let value = (pixel * 255 + alpha / 2) / alpha;
+                    buf[alpha * 255 + pixel] = if value > 255 { 255 } else { value as u8 };
+                }
+            }
+        }
+        buf
+    })
+}
 
 #[inline]
 pub(crate) fn unpremultiply_alpha_rgba_row_impl(in_place: &mut [u8]) {
+    let table = unpremultiplication_table();
     for dst in in_place.as_chunks_mut::<4>().0.iter_mut() {
         let a = dst[3];
         let z = a as u16 * 255;
-        dst[0] = UNPREMULTIPLICATION_TABLE[(z + dst[0] as u16) as usize];
-        dst[1] = UNPREMULTIPLICATION_TABLE[(z + dst[1] as u16) as usize];
-        dst[2] = UNPREMULTIPLICATION_TABLE[(z + dst[2] as u16) as usize];
+        dst[0] = table[(z + dst[0] as u16) as usize];
+        dst[1] = table[(z + dst[1] as u16) as usize];
+        dst[2] = table[(z + dst[2] as u16) as usize];
     }
 }
 
 #[inline]
 pub(crate) fn unpremultiply_alpha_gray_alpha_row_impl(in_place: &mut [u8]) {
+    let table = unpremultiplication_table();
     for dst in in_place.as_chunks_mut::<2>().0.iter_mut() {
         let a = dst[1];
         let z = a as u16 * 255;
-        dst[0] = UNPREMULTIPLICATION_TABLE[(z + dst[0] as u16) as usize];
+        dst[0] = table[(z + dst[0] as u16) as usize];
     }
 }
 
