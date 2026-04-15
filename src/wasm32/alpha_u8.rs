@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::WorkloadStrategy;
-use crate::alpha_handle_u8::{UNPREMULTIPLICATION_TABLE, premultiply_alpha_rgba_row_impl};
+use crate::alpha_handle_u8::{premultiply_alpha_rgba_row_impl, unpremultiplication_table};
 use crate::wasm32::transpose::{wasm_load_deinterleave_u8x4, wasm_store_interleave_u8x4};
 use crate::wasm32::utils::*;
 use std::arch::wasm32::*;
@@ -103,12 +103,14 @@ fn wasm_unpremultiply_alpha_rgba_impl(in_place: &mut [u8]) {
 
     rem = rem.chunks_exact_mut(16 * 4).into_remainder();
 
+    let table = unpremultiplication_table();
+
     for dst in rem.chunks_exact_mut(4) {
         let a = dst[3];
         let z = a as u16 * 255;
-        dst[0] = UNPREMULTIPLICATION_TABLE[(z + dst[0] as u16) as usize];
-        dst[1] = UNPREMULTIPLICATION_TABLE[(z + dst[1] as u16) as usize];
-        dst[2] = UNPREMULTIPLICATION_TABLE[(z + dst[2] as u16) as usize];
+        dst[0] = table[(z + dst[0] as u16) as usize];
+        dst[1] = table[(z + dst[1] as u16) as usize];
+        dst[2] = table[(z + dst[2] as u16) as usize];
     }
 }
 
