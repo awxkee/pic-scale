@@ -60,57 +60,66 @@ where
 
         let src_stride = source.stride();
         let dst_stride = destination.stride();
+        let dst_width = destination.width;
 
         let mut processed_4 = false;
 
-        if let Some(dispatcher) = self.filter_4_rows {
-            let src = source.buffer.as_ref();
-            destination
-                .buffer
-                .borrow_mut()
-                .tb_par_chunks_exact_mut(dst_stride * 4)
-                .for_each_enumerated(&pool, |y, dst| {
-                    let src = &src[y * src_stride * 4..(y + 1) * src_stride * 4];
+        let dst_height = destination.height;
+        let dst_bit_depth = destination.bit_depth as u32;
+        let dst_buffer = destination.projected();
+        let src = source.projected();
 
+        if let Some(dispatcher) = self.filter_4_rows {
+            dst_buffer
+                .tb_par_chunks_mut(dst_stride * 4)
+                .take(dst_height / 4)
+                .zip(src.chunks(src_stride * 4).take(dst_height / 4))
+                .for_each(&pool, |(dst, src)| {
                     dispatcher(
                         src,
                         src_stride,
                         dst,
                         dst_stride,
                         &self.filter_weights,
-                        destination.bit_depth as u32,
+                        dst_bit_depth,
                     );
                 });
             processed_4 = true;
         }
 
-        let left_src_rows = if processed_4 {
-            source
-                .buffer
-                .as_ref()
-                .chunks_exact(src_stride * 4)
-                .remainder()
-        } else {
-            source.buffer.as_ref()
-        };
-        let left_dst_rows = if processed_4 {
-            destination
-                .buffer
-                .borrow_mut()
-                .chunks_exact_mut(dst_stride * 4)
-                .into_remainder()
-        } else {
-            destination.buffer.borrow_mut()
-        };
+        let safe_4_chunks = (dst_height / 4) * 4;
 
-        let one_row_filter = self.filter_row;
+        let already_processed_y = safe_4_chunks * 4;
 
-        left_dst_rows
-            .tb_par_chunks_exact_mut(dst_stride)
-            .for_each_enumerated(&pool, |y, dst| {
-                let src = &left_src_rows[y * src_stride..(y + 1) * src_stride];
-                one_row_filter(src, dst, &self.filter_weights, destination.bit_depth as u32);
-            });
+        if already_processed_y < dst_height {
+            let left_src = if processed_4 {
+                &src[already_processed_y * src_stride..]
+            } else {
+                src
+            };
+
+            let max_length = dst_buffer.len();
+            let left_dst = if processed_4 {
+                let offset = (already_processed_y * dst_stride).min(max_length);
+                &mut dst_buffer[offset..]
+            } else {
+                dst_buffer
+            };
+
+            let one_row_filter = self.filter_row;
+
+            left_dst
+                .tb_par_chunks_mut(dst_stride)
+                .zip(left_src.chunks(src_stride))
+                .for_each(&pool, |(dst, src)| {
+                    one_row_filter(
+                        src,
+                        &mut dst[..dst_width * N],
+                        &self.filter_weights,
+                        dst_bit_depth,
+                    );
+                });
+        }
     }
 
     fn can_do_4_rows(&self) -> bool {

@@ -63,7 +63,8 @@ pub(crate) fn div_by_65535(v: u32) -> u16 {
     (((v >> 16) + v) >> 16) as u16
 }
 
-pub(crate) fn premultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], max_colors: u32) {
+pub(crate) fn premultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], bit_depth: usize) {
+    let max_colors = (1u32 << bit_depth) - 1;
     if max_colors == 1023 {
         for (dst, src) in dst
             .as_chunks_mut::<4>()
@@ -121,7 +122,7 @@ pub(crate) fn premultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], max_color
             dst[2] = (((src[2] as u32).wrapping_mul(a) as f32 * recip_max_colors).cpu_round()
                 as u32)
                 .min(max_colors) as u16;
-            dst[3] = ((a.wrapping_mul(a) as f32 * recip_max_colors).cpu_round() as u32)
+            dst[3] = ((a.wrapping_mul(max_colors) as f32 * recip_max_colors).cpu_round() as u32)
                 .min(max_colors) as u16;
         }
     }
@@ -173,13 +174,14 @@ pub(crate) fn premultiply_alpha_gray_alpha_row(dst: &mut [u16], src: &[u16], max
             dst[0] = (((src[0] as u32).wrapping_mul(a) as f32 * recip_max_colors).cpu_round()
                 as u32)
                 .min(max_colors) as u16;
-            dst[1] = ((a.wrapping_mul(a) as f32 * recip_max_colors).cpu_round() as u32)
+            dst[1] = ((a.wrapping_mul(max_colors) as f32 * recip_max_colors).cpu_round() as u32)
                 .min(max_colors) as u16;
         }
     }
 }
 
-pub(crate) fn unpremultiply_alpha_rgba_row(in_place: &mut [u16], max_colors: u32) {
+pub(crate) fn unpremultiply_alpha_rgba_row(in_place: &mut [u16], bit_depth: usize) {
+    let max_colors = (1 << bit_depth) - 1;
     for dst in in_place.as_chunks_mut::<4>().0.iter_mut() {
         let a = dst[3] as u32;
         if a != 0 {
@@ -187,7 +189,6 @@ pub(crate) fn unpremultiply_alpha_rgba_row(in_place: &mut [u16], max_colors: u32
             dst[0] = (dst[0] as f32 * a_recip).cpu_round().min(max_colors as f32) as u16;
             dst[1] = (dst[1] as f32 * a_recip).cpu_round().min(max_colors as f32) as u16;
             dst[2] = (dst[2] as f32 * a_recip).cpu_round().min(max_colors as f32) as u16;
-            dst[3] = (a as f32 * a_recip).cpu_round().min(max_colors as f32) as u16;
         }
     }
 }
@@ -203,24 +204,6 @@ pub(crate) fn unpremultiply_alpha_gray_alpha_row(in_place: &mut [u16], max_color
     }
 }
 
-fn premultiply_alpha_rgba_impl(
-    dst: &mut [u16],
-    dst_stride: usize,
-    src: &[u16],
-    width: usize,
-    _: usize,
-    src_stride: usize,
-    bit_depth: usize,
-    pool: &novtb::ThreadPool,
-) {
-    let max_colors = (1 << bit_depth) - 1;
-    dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| {
-            let src = &src[y * src_stride..(y + 1) * src_stride];
-            premultiply_alpha_rgba_row(&mut dst[..width * 4], &src[..width * 4], max_colors);
-        });
-}
-
 fn premultiply_alpha_gray_alpha_impl(
     dst: &mut [u16],
     dst_stride: usize,
@@ -232,26 +215,10 @@ fn premultiply_alpha_gray_alpha_impl(
     pool: &novtb::ThreadPool,
 ) {
     let max_colors = (1 << bit_depth) - 1;
-    dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| {
-            let src = &src[y * src_stride..(y + 1) * src_stride];
+    dst.tb_par_chunks_mut(dst_stride)
+        .zip(src.chunks(src_stride))
+        .for_each(pool, |(dst, src)| {
             premultiply_alpha_gray_alpha_row(&mut dst[..width * 2], &src[..width * 2], max_colors);
-        });
-}
-
-fn unpremultiply_alpha_rgba_impl(
-    in_place: &mut [u16],
-    src_stride: usize,
-    width: usize,
-    _: usize,
-    bit_depth: usize,
-    pool: &novtb::ThreadPool,
-) {
-    let max_colors = (1 << bit_depth) - 1;
-    in_place
-        .tb_par_chunks_exact_mut(src_stride)
-        .for_each(pool, |row| {
-            unpremultiply_alpha_rgba_row(&mut row[..width * 4], max_colors);
         });
 }
 
@@ -265,7 +232,7 @@ fn unpremultiply_alpha_gray_alpha_impl(
 ) {
     let max_colors = (1 << bit_depth) - 1;
     in_place
-        .tb_par_chunks_exact_mut(src_stride)
+        .tb_par_chunks_mut(src_stride)
         .for_each(pool, |row| {
             unpremultiply_alpha_gray_alpha_row(&mut row[..width * 2], max_colors);
         });
@@ -276,22 +243,13 @@ pub(crate) fn premultiply_alpha_rgba_u16(
     dst_stride: usize,
     src: &[u16],
     width: usize,
-    height: usize,
+    _: usize,
     src_stride: usize,
     bit_depth: usize,
     pool: &novtb::ThreadPool,
 ) {
     #[allow(clippy::type_complexity)]
-    let mut _dispatcher: fn(
-        &mut [u16],
-        usize,
-        &[u16],
-        usize,
-        usize,
-        usize,
-        usize,
-        &novtb::ThreadPool,
-    ) = premultiply_alpha_rgba_impl;
+    let mut _dispatcher: fn(&mut [u16], &[u16], usize) = premultiply_alpha_rgba_row;
     #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
     {
         if std::arch::is_x86_feature_detected!("sse4.1") {
@@ -308,9 +266,11 @@ pub(crate) fn premultiply_alpha_rgba_u16(
     {
         _dispatcher = neon_premultiply_alpha_rgba_u16;
     }
-    _dispatcher(
-        dst, dst_stride, src, width, height, src_stride, bit_depth, pool,
-    );
+    dst.tb_par_chunks_mut(dst_stride)
+        .zip(src.chunks(src_stride))
+        .for_each(pool, |(dst, src)| {
+            _dispatcher(&mut dst[..width * 4], &src[..width * 4], bit_depth);
+        });
 }
 
 pub(crate) fn premultiply_alpha_gray_alpha_u16(
@@ -343,13 +303,12 @@ pub(crate) fn unpremultiply_alpha_rgba_u16(
     in_place: &mut [u16],
     src_stride: usize,
     width: usize,
-    height: usize,
+    _: usize,
     bit_depth: usize,
     pool: &novtb::ThreadPool,
 ) {
     #[allow(clippy::type_complexity)]
-    let mut _dispatcher: fn(&mut [u16], usize, usize, usize, usize, &novtb::ThreadPool) =
-        unpremultiply_alpha_rgba_impl;
+    let mut _dispatcher: fn(&mut [u16], usize) = unpremultiply_alpha_rgba_row;
     #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
     {
         if std::arch::is_x86_feature_detected!("sse4.1") {
@@ -366,7 +325,11 @@ pub(crate) fn unpremultiply_alpha_rgba_u16(
     {
         _dispatcher = neon_unpremultiply_alpha_rgba_u16;
     }
-    _dispatcher(in_place, src_stride, width, height, bit_depth, pool);
+    in_place
+        .tb_par_chunks_mut(src_stride)
+        .for_each(pool, |row| {
+            _dispatcher(&mut row[..width * 4], bit_depth);
+        });
 }
 
 pub(crate) fn unpremultiply_alpha_gray_alpha_u16(

@@ -209,7 +209,7 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        feature: [ rdm, "" ]
+        feature: [ rdm, neon ]
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
@@ -261,6 +261,9 @@ jobs:
   fuzz_rgba_high_bit_arm:
     name: Fuzzing High bit-depth ARM
     runs-on: macos-latest
+    strategy:
+      matrix:
+        feature: [ neon ]
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly

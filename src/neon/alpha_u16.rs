@@ -26,7 +26,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use novtb::{ParallelZonedIterator, TbSliceMut};
 use std::arch::aarch64::*;
 
 #[inline]
@@ -198,6 +197,7 @@ impl NeonPremultiplyExecutor for NeonPremultiplyExecutorAnyBitDepth {
     }
 }
 
+#[target_feature(enable = "neon")]
 fn neon_premultiply_alpha_rgba_row_u16(dst: &mut [u16], src: &[u16], bit_depth: usize) {
     assert_ne!(bit_depth, 0, "Something goes wrong!");
 
@@ -233,6 +233,7 @@ fn neon_premultiply_alpha_rgba_row_u16(dst: &mut [u16], src: &[u16], bit_depth: 
 }
 
 #[inline]
+#[target_feature(enable = "neon")]
 fn neon_pa_dispatch(
     dst: &mut [u16],
     src: &[u16],
@@ -242,25 +243,10 @@ fn neon_pa_dispatch(
     unsafe { dispatch.premultiply(dst, src, bit_depth) }
 }
 
-pub(crate) fn neon_premultiply_alpha_rgba_u16(
-    dst: &mut [u16],
-    dst_stride: usize,
-    src: &[u16],
-    width: usize,
-    _: usize,
-    src_stride: usize,
-    bit_depth: usize,
-    pool: &novtb::ThreadPool,
-) {
-    dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| {
-            let src = &src[y * src_stride..(y + 1) * src_stride];
-            neon_premultiply_alpha_rgba_row_u16(
-                &mut dst[..width * 4],
-                &src[..width * 4],
-                bit_depth,
-            );
-        });
+pub(crate) fn neon_premultiply_alpha_rgba_u16(dst: &mut [u16], src: &[u16], bit_depth: usize) {
+    unsafe {
+        neon_premultiply_alpha_rgba_row_u16(dst, src, bit_depth);
+    }
 }
 
 #[inline]
@@ -394,17 +380,6 @@ fn neon_unpremultiply_alpha_rgba_row_u16(in_place: &mut [u16], bit_depth: usize)
     neon_un_row(in_place, bit_depth, NeonDisassociateAlpha::default());
 }
 
-pub(crate) fn neon_unpremultiply_alpha_rgba_u16(
-    in_place: &mut [u16],
-    src_stride: usize,
-    width: usize,
-    _: usize,
-    bit_depth: usize,
-    pool: &novtb::ThreadPool,
-) {
-    in_place
-        .tb_par_chunks_exact_mut(src_stride)
-        .for_each(pool, |row| {
-            neon_unpremultiply_alpha_rgba_row_u16(&mut row[..width * 4], bit_depth);
-        });
+pub(crate) fn neon_unpremultiply_alpha_rgba_u16(in_place: &mut [u16], bit_depth: usize) {
+    neon_unpremultiply_alpha_rgba_row_u16(in_place, bit_depth);
 }

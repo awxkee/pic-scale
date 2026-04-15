@@ -58,8 +58,8 @@ fn avx512_has_non_constant_cap_alpha_rgba8_impl(store: &[u8], width: usize, stri
         let base_mask = _mm512_set1_epi8(first_alpha as i8);
         let def_alpha = _mm512_set1_epi32(first_alpha as i32);
 
-        for row in store.chunks_exact(stride) {
-            let row = &row[0..width * 4];
+        for row in store.chunks(stride) {
+            let row = &row[..width * 4];
             let mut sums = _mm512_set1_epi32(0);
 
             for chunk in row.chunks_exact(64) {

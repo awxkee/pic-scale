@@ -29,7 +29,6 @@
 
 use crate::WorkloadStrategy;
 use crate::sse::{sse_deinterleave_rgba, sse_interleave_rgba};
-use novtb::{ParallelZonedIterator, TbSliceMut};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -111,17 +110,9 @@ pub(crate) fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
     }
 }
 
-pub(crate) fn sse_premultiply_alpha_rgba(
-    dst: &mut [u8],
-    dst_stride: usize,
-    src: &[u8],
-    width: usize,
-    height: usize,
-    src_stride: usize,
-    pool: &novtb::ThreadPool,
-) {
+pub(crate) fn sse_premultiply_alpha_rgba(dst: &mut [u8], src: &[u8]) {
     unsafe {
-        sse_premultiply_alpha_rgba_impl(dst, dst_stride, src, width, height, src_stride, pool);
+        sse_premultiply_alpha_rgba_impl(dst, src);
     }
 }
 
@@ -234,36 +225,13 @@ fn sse_premultiply_alpha_rgba_impl_row(
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
-fn sse_premultiply_alpha_rgba_impl(
-    dst: &mut [u8],
-    dst_stride: usize,
-    src: &[u8],
-    width: usize,
-    _: usize,
-    src_stride: usize,
-    pool: &novtb::ThreadPool,
-) {
-    dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| {
-            let src = &src[y * src_stride..(y + 1) * src_stride];
-            sse_premultiply_alpha_rgba_impl_row(
-                &mut dst[..width * 4],
-                &src[..width * 4],
-                Sse41PremultiplyExecutor8Default::default(),
-            );
-        });
+fn sse_premultiply_alpha_rgba_impl(dst: &mut [u8], src: &[u8]) {
+    sse_premultiply_alpha_rgba_impl_row(dst, src, Sse41PremultiplyExecutor8Default::default());
 }
 
-pub(crate) fn sse_unpremultiply_alpha_rgba(
-    in_place: &mut [u8],
-    width: usize,
-    height: usize,
-    stride: usize,
-    pool: &novtb::ThreadPool,
-    _: WorkloadStrategy,
-) {
+pub(crate) fn sse_unpremultiply_alpha_rgba(in_place: &mut [u8], _: WorkloadStrategy) {
     unsafe {
-        sse_unpremultiply_alpha_rgba_impl(in_place, width, height, stride, pool);
+        sse_unpremultiply_alpha_rgba_impl(in_place);
     }
 }
 
@@ -336,19 +304,6 @@ fn sse_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8], executor: impl Dis
 }
 
 #[target_feature(enable = "sse4.1")]
-fn sse_unpremultiply_alpha_rgba_impl(
-    in_place: &mut [u8],
-    width: usize,
-    _: usize,
-    stride: usize,
-    pool: &novtb::ThreadPool,
-) {
-    in_place
-        .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| {
-            sse_unpremultiply_alpha_rgba_impl_row(
-                &mut row[..width * 4],
-                DisassociateAlphaDefault::default(),
-            );
-        });
+fn sse_unpremultiply_alpha_rgba_impl(in_place: &mut [u8]) {
+    sse_unpremultiply_alpha_rgba_impl_row(in_place, DisassociateAlphaDefault::default());
 }

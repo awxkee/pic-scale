@@ -28,7 +28,6 @@
  */
 use crate::WorkloadStrategy;
 use crate::avx512::utils::{avx512_deinterleave_rgba, avx512_div_by255, avx512_interleave_rgba};
-use novtb::{ParallelZonedIterator, TbSliceMut};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -110,24 +109,12 @@ fn avx_premultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8], executor: imp
     }
 }
 
-pub(crate) fn avx512_premultiply_alpha_rgba(
-    dst: &mut [u8],
-    dst_stride: usize,
-    src: &[u8],
-    width: usize,
-    _: usize,
-    src_stride: usize,
-    pool: &novtb::ThreadPool,
-) {
+pub(crate) fn avx512_premultiply_alpha_rgba(dst: &mut [u8], src: &[u8]) {
     let executor: fn(&mut [u8], &[u8]) = |dst: &mut [u8], src: &[u8]| {
         avx_premultiply_alpha_rgba_impl_row(dst, src, AssociateAlphaDefault::default());
     };
 
-    dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| {
-            let src = &src[y * src_stride..(y + 1) * src_stride];
-            executor(&mut dst[..width * 4], &src[..width * 4]);
-        });
+    executor(dst, src);
 }
 
 trait DisassociateAlpha {
@@ -403,14 +390,7 @@ fn avx512_unp_row(in_place: &mut [u8], executor: impl DisassociateAlpha) {
     }
 }
 
-pub(crate) fn avx512_unpremultiply_alpha_rgba(
-    in_place: &mut [u8],
-    width: usize,
-    _: usize,
-    stride: usize,
-    pool: &novtb::ThreadPool,
-    _: WorkloadStrategy,
-) {
+pub(crate) fn avx512_unpremultiply_alpha_rgba(in_place: &mut [u8], _: WorkloadStrategy) {
     let has_vbmi = std::arch::is_x86_feature_detected!("avx512vbmi");
     let mut executor: fn(&mut [u8]) = |row: &mut [u8]| unsafe {
         avx512_unp_row(row, Avx512DisassociateAlpha::<false>::default());
@@ -434,9 +414,5 @@ pub(crate) fn avx512_unpremultiply_alpha_rgba(
         }
     }
 
-    in_place
-        .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| {
-            executor(&mut row[..width * 4]);
-        });
+    executor(in_place);
 }

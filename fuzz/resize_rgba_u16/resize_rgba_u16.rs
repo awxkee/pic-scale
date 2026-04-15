@@ -32,9 +32,10 @@
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use pic_scale::{
-    Ar30ByteOrder, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy,
-    WorkloadStrategy,
+    Ar30ByteOrder, BufferStore, ImageStore, ImageStoreMut, ResamplingFunction, Scaler,
+    ThreadingPolicy, WorkloadStrategy,
 };
+use rand::RngExt;
 
 #[derive(Clone, Debug, Arbitrary)]
 pub struct SrcImage {
@@ -94,25 +95,54 @@ fn resize_rgba(
         return;
     }
 
-    let mut src_data = vec![data; src_width * src_height * 4];
+    let src_stride = (src_width + rand::rng().random_range(0..100)) * 4;
+
+    let mut src_data = vec![data; src_stride * src_height];
     src_data[0] = 255;
     src_data[3] = 17;
 
-    let store = ImageStore::<u16, 4>::borrow(&src_data, src_width, src_height).unwrap();
+    let src_valid_size = src_stride * (src_height - 1) + src_width * 4;
 
-    let mut target = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 10);
+    let store = ImageStore {
+        buffer: std::borrow::Cow::Borrowed(&src_data[..src_valid_size]),
+        channels: 4,
+        width: src_width,
+        height: src_height,
+        stride: src_stride,
+        bit_depth: 10,
+    };
 
-    let mut scaler = Scaler::new(sampler);
-    scaler.set_workload_strategy(workload_strategy);
-    scaler.set_threading_policy(threading_policy);
+    let dst_stride = (dst_width + rand::rng().random_range(0..100)) * 4;
+    let mut dst_data_full = vec![0u16; dst_stride * dst_height];
+
+    let dst_valid_size = dst_stride * (dst_height - 1) + dst_width * 4;
+
+    let mut target = ImageStoreMut {
+        buffer: BufferStore::Borrowed(&mut dst_data_full[..dst_valid_size]),
+        channels: 4,
+        width: dst_width,
+        height: dst_height,
+        stride: dst_stride,
+        bit_depth: 10,
+    };
+
+    let scaler = Scaler::new(sampler)
+        .set_workload_strategy(workload_strategy)
+        .set_threading_policy(threading_policy);
     let planned = scaler
         .plan_rgba_resampling16(store.size(), target.size(), premultiply_alpha, 10)
         .unwrap();
     planned.resample(&store, &mut target).unwrap();
 
-    let mut target = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
+    let mut target = ImageStoreMut {
+        buffer: BufferStore::Borrowed(&mut dst_data_full[..dst_valid_size]),
+        channels: 4,
+        width: dst_width,
+        height: dst_height,
+        stride: dst_stride,
+        bit_depth: 16,
+    };
 
-    let store = ImageStore::<u16, 4>::borrow(&src_data, src_width, src_height).unwrap();
     let planned = scaler
         .plan_rgba_resampling16(store.size(), target.size(), premultiply_alpha, 16)
         .unwrap();

@@ -30,7 +30,6 @@
 use crate::avx2::utils::{
     _mm256_select_si256, avx_deinterleave_rgba_epi16, avx_interleave_rgba_epi16,
 };
-use novtb::{ParallelZonedIterator, TbSliceMut};
 use std::arch::x86_64::*;
 
 #[inline(always)]
@@ -97,20 +96,9 @@ fn _mm256_div_by_epi32<const BIT_DEPTH: usize>(v: __m256i) -> __m256i {
     }
 }
 
-pub(crate) fn avx_premultiply_alpha_rgba_u16(
-    dst: &mut [u16],
-    dst_stride: usize,
-    src: &[u16],
-    width: usize,
-    height: usize,
-    src_stride: usize,
-    bit_depth: usize,
-    pool: &novtb::ThreadPool,
-) {
+pub(crate) fn avx_premultiply_alpha_rgba_u16(dst: &mut [u16], src: &[u16], bit_depth: usize) {
     unsafe {
-        avx_premultiply_alpha_rgba_u16_impl(
-            dst, dst_stride, src, width, height, src_stride, bit_depth, pool,
-        );
+        avx_premultiply_alpha_rgba_u16_row(dst, src, bit_depth);
     }
 }
 
@@ -340,34 +328,9 @@ fn avx_pa_dispatch(
     }
 }
 
-#[target_feature(enable = "avx2")]
-fn avx_premultiply_alpha_rgba_u16_impl(
-    dst: &mut [u16],
-    dst_stride: usize,
-    src: &[u16],
-    width: usize,
-    _: usize,
-    src_stride: usize,
-    bit_depth: usize,
-    pool: &novtb::ThreadPool,
-) {
-    dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| {
-            let src = &src[y * src_stride..(y + 1) * src_stride];
-            avx_premultiply_alpha_rgba_u16_row(&mut dst[..width * 4], &src[..width * 4], bit_depth);
-        });
-}
-
-pub(crate) fn avx_unpremultiply_alpha_rgba_u16(
-    in_place: &mut [u16],
-    stride: usize,
-    width: usize,
-    height: usize,
-    bit_depth: usize,
-    pool: &novtb::ThreadPool,
-) {
+pub(crate) fn avx_unpremultiply_alpha_rgba_u16(in_place: &mut [u16], bit_depth: usize) {
     unsafe {
-        avx_unpremultiply_alpha_rgba_u16_impl(in_place, stride, width, height, bit_depth, pool);
+        avx_unpremultiply_alpha_rgba_u16_row_avx(in_place, bit_depth);
     }
 }
 
@@ -483,22 +446,4 @@ fn avx_unpremultiply_alpha_rgba_u16_row_impl(in_place: &mut [u16], bit_depth: us
 /// This inlining is required to activate all features for runtime dispatch
 fn avx_unpremultiply_alpha_rgba_u16_row_avx(in_place: &mut [u16], bit_depth: usize) {
     avx_unpremultiply_alpha_rgba_u16_row_impl(in_place, bit_depth);
-}
-
-#[target_feature(enable = "avx2")]
-fn avx_unpremultiply_alpha_rgba_u16_impl(
-    in_place: &mut [u16],
-    stride: usize,
-    width: usize,
-    _: usize,
-    bit_depth: usize,
-    pool: &novtb::ThreadPool,
-) {
-    let dispatch = avx_unpremultiply_alpha_rgba_u16_row_avx;
-
-    in_place
-        .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| {
-            dispatch(&mut row[..width * 4], bit_depth);
-        });
 }

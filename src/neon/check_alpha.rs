@@ -43,8 +43,8 @@ pub(crate) fn neon_has_non_constant_cap_alpha_rgba8(
 
         let v_first_alpha = vdupq_n_u8(first_alpha);
 
-        for row in store.chunks_exact(stride) {
-            let row = &row[0..width * 4];
+        for row in store.chunks(stride) {
+            let row = &row[..width * 4];
             let mut sums = vdupq_n_u32(0);
             for chunk in row.chunks_exact(16 * 4) {
                 let loaded = vld4q_u8(chunk.as_ptr());
@@ -93,8 +93,8 @@ pub(crate) fn neon_has_non_constant_cap_alpha_rgba16(
         let first_alpha = store[3];
         let def_alpha = vdupq_n_u16(first_alpha);
 
-        for row in store.chunks_exact(stride) {
-            let row = &row[0..width * 4];
+        for row in store.chunks(stride) {
+            let row = &row[..width * 4];
             let mut sums = vdupq_n_u32(0);
             for chunk in row.chunks_exact(8 * 4) {
                 let r0 = vld4q_u16(chunk.as_ptr());

@@ -31,20 +31,11 @@ use crate::WorkloadStrategy;
 use crate::avx2::utils::{
     _mm256_select_si256, avx2_deinterleave_rgba, avx2_div_by255, avx2_interleave_rgba,
 };
-use novtb::{ParallelZonedIterator, TbSliceMut};
 use std::arch::x86_64::*;
 
-pub(crate) fn avx_premultiply_alpha_rgba(
-    dst: &mut [u8],
-    dst_stride: usize,
-    src: &[u8],
-    width: usize,
-    height: usize,
-    src_stride: usize,
-    pool: &novtb::ThreadPool,
-) {
+pub(crate) fn avx_premultiply_alpha_rgba(dst: &mut [u8], src: &[u8]) {
     unsafe {
-        avx_premultiply_alpha_rgba_impl(dst, dst_stride, src, width, height, src_stride, pool);
+        avx_premultiply_alpha_rgba_impl(dst, src);
     }
 }
 
@@ -133,36 +124,13 @@ fn avx_premultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8], executor: imp
 }
 
 #[target_feature(enable = "avx2")]
-fn avx_premultiply_alpha_rgba_impl(
-    dst: &mut [u8],
-    dst_stride: usize,
-    src: &[u8],
-    width: usize,
-    _: usize,
-    src_stride: usize,
-    pool: &novtb::ThreadPool,
-) {
-    dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| {
-            let src = &src[y * src_stride..(y + 1) * src_stride];
-            avx_premultiply_alpha_rgba_impl_row(
-                &mut dst[..width * 4],
-                &src[..width * 4],
-                AssociateAlphaDefault::default(),
-            );
-        });
+fn avx_premultiply_alpha_rgba_impl(dst: &mut [u8], src: &[u8]) {
+    avx_premultiply_alpha_rgba_impl_row(dst, src, AssociateAlphaDefault::default());
 }
 
-pub(crate) fn avx_unpremultiply_alpha_rgba(
-    in_place: &mut [u8],
-    width: usize,
-    height: usize,
-    stride: usize,
-    pool: &novtb::ThreadPool,
-    _: WorkloadStrategy,
-) {
+pub(crate) fn avx_unpremultiply_alpha_rgba(in_place: &mut [u8], _: WorkloadStrategy) {
     unsafe {
-        avx_unpremultiply_alpha_rgba_impl(in_place, width, height, stride, pool);
+        avx_unpremultiply_alpha_rgba_impl(in_place);
     }
 }
 
@@ -329,19 +297,6 @@ fn avx_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8], executor: impl Dis
 }
 
 #[target_feature(enable = "avx2")]
-fn avx_unpremultiply_alpha_rgba_impl(
-    in_place: &mut [u8],
-    width: usize,
-    _: usize,
-    stride: usize,
-    pool: &novtb::ThreadPool,
-) {
-    in_place
-        .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| {
-            avx_unpremultiply_alpha_rgba_impl_row(
-                &mut row[..width * 4],
-                Avx2DisassociateAlpha::default(),
-            );
-        });
+fn avx_unpremultiply_alpha_rgba_impl(in_place: &mut [u8]) {
+    avx_unpremultiply_alpha_rgba_impl_row(in_place, Avx2DisassociateAlpha::default());
 }

@@ -65,6 +65,14 @@ pub enum PicScaleError {
         size: ImageSize,
     },
     EmptyPlan,
+    CropOutOfBounds {
+        x: usize,
+        y: usize,
+        width: usize,
+        height: usize,
+        image_width: usize,
+        image_height: usize,
+    },
 }
 
 impl PicScaleError {
@@ -85,6 +93,7 @@ impl PicScaleError {
             PicScaleError::InvalidDestinationSize { .. } => 11,
             PicScaleError::EmptyPlan => 12,
             PicScaleError::Generic(_) => 13,
+            PicScaleError::CropOutOfBounds { .. } => 14,
         }
     }
 }
@@ -136,6 +145,17 @@ impl Display for PicScaleError {
                 f.write_str("Multi-step scaling appeared to be an empty one")
             }
             PicScaleError::Generic(x) => f.write_str(x),
+            PicScaleError::CropOutOfBounds {
+                x,
+                y,
+                width,
+                height,
+                image_width,
+                image_height,
+            } => write!(
+                f,
+                "Crop region ({x}, {y}, {width}x{height}) exceeds image bounds ({image_width}x{image_height})"
+            ),
         }
     }
 }
