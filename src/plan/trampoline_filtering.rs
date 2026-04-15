@@ -58,22 +58,26 @@ where
         let dst_stride = destination.stride();
         let dst_width = destination.width;
 
-        let mut dst_target = destination.buffer.borrow_mut();
+        let dst_height = destination.height;
+        let dst_bit_depth = destination.bit_depth as u32;
+        let mut dst_target = destination.projected();
 
         let mut already_processed_y = 0usize;
 
+        let source_buffer = source.projected();
+
         if self.horizontal_filter.can_do_4_rows() && self.target_size.height >= 4 {
-            let dst = dst_target.chunks_exact_mut(dst_stride * 4);
+            let dst = dst_target.chunks_mut(dst_stride * 4).take(dst_height / 4);
             for (y, dst) in dst.enumerate() {
                 let real_y = y * 4;
-                for (i, scratch_row) in scratch.chunks_exact_mut(source.width * N).enumerate() {
+                for (i, scratch_row) in scratch.chunks_mut(source.width * N).enumerate() {
                     self.vertical_filter.run_on_row(
-                        source.buffer.as_ref(),
+                        source_buffer,
                         scratch_row,
                         source.width,
                         source.stride(),
                         real_y + i,
-                        destination.bit_depth as u32,
+                        dst_bit_depth,
                     );
                 }
                 self.horizontal_filter.run_on_4_rows(
@@ -81,30 +85,28 @@ where
                     source.width * N,
                     dst,
                     dst_stride,
-                    destination.bit_depth as u32,
+                    dst_bit_depth,
                 )
             }
-            already_processed_y = dst_target.chunks_exact_mut(dst_stride * 4).len() * 4;
-            dst_target = dst_target.chunks_exact_mut(dst_stride * 4).into_remainder();
+            already_processed_y = (dst_height / 4) * 4;
+            let max_length = dst_target.len();
+            dst_target = &mut dst_target[(already_processed_y * dst_stride).min(max_length)..];
         }
 
-        let dst = dst_target.chunks_exact_mut(dst_stride);
+        let dst = dst_target.chunks_mut(dst_stride);
 
         for (y, dst) in dst.enumerate() {
             let (scratch_row, _) = scratch.split_at_mut(source.width * N);
             self.vertical_filter.run_on_row(
-                source.buffer.as_ref(),
+                source_buffer,
                 scratch_row,
                 source.width,
                 source.stride(),
                 y + already_processed_y,
-                destination.bit_depth as u32,
+                dst_bit_depth,
             );
-            self.horizontal_filter.run_on_row(
-                scratch_row,
-                &mut dst[..dst_width * N],
-                destination.bit_depth as u32,
-            )
+            self.horizontal_filter
+                .run_on_row(scratch_row, &mut dst[..dst_width * N], dst_bit_depth)
         }
     }
 

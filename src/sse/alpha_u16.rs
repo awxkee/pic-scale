@@ -29,7 +29,6 @@
 
 use crate::sse::alpha_u8::_mm_select_si128;
 use crate::sse::{sse_deinterleave_rgba_epi16, sse_interleave_rgba_epi16};
-use novtb::{ParallelZonedIterator, TbSliceMut};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -105,16 +104,13 @@ fn _mm_div_by<const BIT_DEPTH: usize>(v: __m128i) -> __m128i {
     }
 }
 
-pub(crate) fn unpremultiply_alpha_sse_rgba_u16(
-    in_place: &mut [u16],
-    stride: usize,
-    width: usize,
-    height: usize,
-    bit_depth: usize,
-    pool: &novtb::ThreadPool,
-) {
+pub(crate) fn unpremultiply_alpha_sse_rgba_u16(in_place: &mut [u16], bit_depth: usize) {
     unsafe {
-        unpremultiply_alpha_sse_rgba_u16_impl(in_place, stride, width, height, bit_depth, pool);
+        unpremultiply_alpha_sse_rgba_u16_row_impl(
+            in_place,
+            bit_depth,
+            DisassociateAlphaDefault::default(),
+        );
     }
 }
 
@@ -217,26 +213,6 @@ fn unpremultiply_alpha_sse_rgba_u16_row_impl(
     }
 }
 
-#[target_feature(enable = "sse4.1")]
-fn unpremultiply_alpha_sse_rgba_u16_impl(
-    in_place: &mut [u16],
-    stride: usize,
-    width: usize,
-    _: usize,
-    bit_depth: usize,
-    pool: &novtb::ThreadPool,
-) {
-    in_place
-        .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| {
-            unpremultiply_alpha_sse_rgba_u16_row_impl(
-                &mut row[..width * 4],
-                bit_depth,
-                DisassociateAlphaDefault::default(),
-            );
-        });
-}
-
 #[inline(always)]
 fn sse_premultiply_row_u16(
     x: __m128i,
@@ -262,25 +238,10 @@ fn sse_premultiply_row_u16(
     }
 }
 
-pub(crate) fn premultiply_alpha_sse_rgba_u16(
-    dst: &mut [u16],
-    dst_stride: usize,
-    src: &[u16],
-    width: usize,
-    _: usize,
-    src_stride: usize,
-    bit_depth: usize,
-    pool: &novtb::ThreadPool,
-) {
-    dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| unsafe {
-            let src = &src[y * src_stride..(y + 1) * src_stride];
-            premultiply_alpha_sse_rgba_u16_row_impl(
-                &mut dst[..width * 4],
-                &src[..width * 4],
-                bit_depth,
-            );
-        });
+pub(crate) fn premultiply_alpha_sse_rgba_u16(dst: &mut [u16], src: &[u16], bit_depth: usize) {
+    unsafe {
+        premultiply_alpha_sse_rgba_u16_row_impl(dst, src, bit_depth);
+    }
 }
 
 trait Sse41PremultiplyExecutor {

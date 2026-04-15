@@ -31,60 +31,20 @@ use crate::alpha_handle_f16::{premultiply_pixel_f16_row, unpremultiply_pixel_f16
 use crate::sse::f16_utils::{_mm_cvtph_psx, _mm_cvtps_phx};
 use crate::sse::{sse_deinterleave_rgba_epi16, sse_interleave_rgba_epi16};
 use core::f16;
-use novtb::{ParallelZonedIterator, TbSliceMut};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-pub(crate) fn sse_premultiply_alpha_rgba_f16(
-    dst: &mut [f16],
-    dst_stride: usize,
-    src: &[f16],
-    src_stride: usize,
-    width: usize,
-    height: usize,
-    pool: &novtb::ThreadPool,
-) {
+pub(crate) fn sse_premultiply_alpha_rgba_f16(dst: &mut [f16], src: &[f16]) {
     unsafe {
-        if std::arch::is_x86_feature_detected!("f16c") {
-            sse_premultiply_alpha_rgba_f16c(dst, dst_stride, src, src_stride, width, height, pool);
-        } else {
-            sse_premultiply_alpha_rgba_f16_regular(
-                dst, dst_stride, src, src_stride, width, height, pool,
-            );
-        }
+        sse_premultiply_alpha_rgba_f16_regular(dst, src);
     }
 }
 
 #[target_feature(enable = "sse4.1")]
-fn sse_premultiply_alpha_rgba_f16_regular(
-    dst: &mut [f16],
-    dst_stride: usize,
-    src: &[f16],
-    src_stride: usize,
-    width: usize,
-    height: usize,
-    pool: &novtb::ThreadPool,
-) {
-    sse_premultiply_alpha_rgba_f16_impl::<false>(
-        dst, dst_stride, src, src_stride, width, height, pool,
-    );
-}
-
-#[target_feature(enable = "sse4.1", enable = "f16c")]
-fn sse_premultiply_alpha_rgba_f16c(
-    dst: &mut [f16],
-    dst_stride: usize,
-    src: &[f16],
-    src_stride: usize,
-    width: usize,
-    height: usize,
-    pool: &novtb::ThreadPool,
-) {
-    sse_premultiply_alpha_rgba_f16_impl::<true>(
-        dst, dst_stride, src, src_stride, width, height, pool,
-    );
+fn sse_premultiply_alpha_rgba_f16_regular(dst: &mut [f16], src: &[f16]) {
+    sse_premultiply_alpha_rgba_row_f16_impl::<false>(dst, src);
 }
 
 #[inline(always)]
@@ -141,62 +101,24 @@ fn sse_premultiply_alpha_rgba_row_f16_impl<const F16C: bool>(dst: &mut [f16], sr
     }
 }
 
-#[inline(always)]
-fn sse_premultiply_alpha_rgba_f16_impl<const F16C: bool>(
-    dst: &mut [f16],
-    dst_stride: usize,
-    src: &[f16],
-    src_stride: usize,
-    width: usize,
-    _: usize,
-    pool: &novtb::ThreadPool,
-) {
-    dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| {
-            let src = &src[y * src_stride..(y + 1) * src_stride];
-            sse_premultiply_alpha_rgba_row_f16_impl::<F16C>(
-                &mut dst[..width * 4],
-                &src[..width * 4],
-            );
-        });
-}
-
-pub(crate) fn sse_unpremultiply_alpha_rgba_f16(
-    in_place: &mut [f16],
-    stride: usize,
-    width: usize,
-    height: usize,
-    pool: &novtb::ThreadPool,
-) {
+pub(crate) fn sse_unpremultiply_alpha_rgba_f16(in_place: &mut [f16]) {
     unsafe {
         if is_x86_feature_detected!("f16c") {
-            sse_unpremultiply_alpha_rgba_f16c(in_place, stride, width, height, pool);
+            sse_unpremultiply_alpha_rgba_f16_regular(in_place);
         } else {
-            sse_unpremultiply_alpha_rgba_f16_regular(in_place, stride, width, height, pool);
+            sse_unpremultiply_alpha_rgba_f16c(in_place);
         }
     }
 }
 
 #[target_feature(enable = "sse4.1")]
-fn sse_unpremultiply_alpha_rgba_f16_regular(
-    in_place: &mut [f16],
-    stride: usize,
-    width: usize,
-    height: usize,
-    pool: &novtb::ThreadPool,
-) {
-    sse_unpremultiply_alpha_rgba_f16_impl::<false>(in_place, stride, width, height, pool);
+fn sse_unpremultiply_alpha_rgba_f16_regular(in_place: &mut [f16]) {
+    sse_unpremultiply_alpha_rgba_f16_row_impl::<false>(in_place);
 }
 
 #[target_feature(enable = "sse4.1", enable = "f16c")]
-fn sse_unpremultiply_alpha_rgba_f16c(
-    in_place: &mut [f16],
-    stride: usize,
-    width: usize,
-    height: usize,
-    pool: &novtb::ThreadPool,
-) {
-    sse_unpremultiply_alpha_rgba_f16_impl::<true>(in_place, stride, width, height, pool);
+fn sse_unpremultiply_alpha_rgba_f16c(in_place: &mut [f16]) {
+    sse_unpremultiply_alpha_rgba_f16_row_impl::<true>(in_place);
 }
 
 #[inline(always)]
@@ -276,19 +198,4 @@ fn sse_unpremultiply_alpha_rgba_f16_row_impl<const F16C: bool>(in_place: &mut [f
 
         unpremultiply_pixel_f16_row(rem);
     }
-}
-
-#[inline(always)]
-fn sse_unpremultiply_alpha_rgba_f16_impl<const F16C: bool>(
-    in_place: &mut [f16],
-    stride: usize,
-    width: usize,
-    _: usize,
-    pool: &novtb::ThreadPool,
-) {
-    in_place
-        .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| {
-            sse_unpremultiply_alpha_rgba_f16_row_impl::<F16C>(&mut row[..width * 4]);
-        });
 }

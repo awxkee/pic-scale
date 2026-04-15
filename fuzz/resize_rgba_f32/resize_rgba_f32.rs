@@ -32,8 +32,10 @@
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use pic_scale::{
-    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy, WorkloadStrategy,
+    BufferStore, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy,
+    WorkloadStrategy,
 };
+use rand::RngExt;
 
 #[derive(Clone, Debug, Arbitrary)]
 pub struct SrcImage {
@@ -88,12 +90,36 @@ fn resize_rgba(
         return;
     }
 
-    let mut src_data = vec![data; src_width * src_height * 4];
+    let src_stride = (src_width + rand::rng().random_range(0..100)) * 4;
+
+    let mut src_data = vec![data; src_stride * src_height];
     src_data[0] = 0.32f32;
     src_data[3] = 0.6543432f32;
 
-    let store = ImageStore::<f32, 4>::borrow(&src_data, src_width, src_height).unwrap();
-    let mut target = ImageStoreMut::alloc(dst_width, dst_height);
+    let src_valid_size = src_stride * (src_height - 1) + src_width * 4;
+
+    let store = ImageStore {
+        buffer: std::borrow::Cow::Borrowed(&src_data[..src_valid_size]),
+        channels: 4,
+        width: src_width,
+        height: src_height,
+        stride: src_stride,
+        bit_depth: 8,
+    };
+
+    let dst_stride = (dst_width + rand::rng().random_range(0..100)) * 4;
+    let mut dst_data_full = vec![0f32; dst_stride * dst_height];
+
+    let dst_valid_size = dst_stride * (dst_height - 1) + dst_width * 4;
+
+    let mut target = ImageStoreMut {
+        buffer: BufferStore::Borrowed(&mut dst_data_full[..dst_valid_size]),
+        channels: 4,
+        width: dst_width,
+        height: dst_height,
+        stride: dst_stride,
+        bit_depth: 8,
+    };
 
     let scaler = Scaler::new(sampler)
         .set_workload_strategy(if use_quality {

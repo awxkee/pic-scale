@@ -30,20 +30,11 @@
 use crate::alpha_handle_f16::{premultiply_pixel_f16_row, unpremultiply_pixel_f16_row};
 use crate::avx2::utils::{avx_combine_epi, avx_deinterleave_rgba_epi16, avx_interleave_rgba_epi16};
 use core::f16;
-use novtb::{ParallelZonedIterator, TbSliceMut};
 use std::arch::x86_64::*;
 
-pub(crate) fn avx_premultiply_alpha_rgba_f16(
-    dst: &mut [f16],
-    dst_stride: usize,
-    src: &[f16],
-    src_stride: usize,
-    width: usize,
-    height: usize,
-    pool: &novtb::ThreadPool,
-) {
+pub(crate) fn avx_premultiply_alpha_rgba_f16(dst: &mut [f16], src: &[f16]) {
     unsafe {
-        avx_premultiply_alpha_rgba_f16_impl(dst, dst_stride, src, src_stride, width, height, pool);
+        avx_premultiply_alpha_rgba_f16_row_impl(dst, src);
     }
 }
 
@@ -111,33 +102,9 @@ fn avx_premultiply_alpha_rgba_f16_row_impl(dst: &mut [f16], src: &[f16]) {
     }
 }
 
-#[target_feature(enable = "avx2", enable = "f16c")]
-/// This inlining is required to activate all features for runtime dispatch
-fn avx_premultiply_alpha_rgba_f16_impl(
-    dst: &mut [f16],
-    dst_stride: usize,
-    src: &[f16],
-    src_stride: usize,
-    width: usize,
-    _: usize,
-    pool: &novtb::ThreadPool,
-) {
-    dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| {
-            let src = &src[y * src_stride..(y + 1) * src_stride];
-            avx_premultiply_alpha_rgba_f16_row_impl(&mut dst[..width * 4], &src[..width * 4]);
-        });
-}
-
-pub(crate) fn avx_unpremultiply_alpha_rgba_f16(
-    in_place: &mut [f16],
-    stride: usize,
-    width: usize,
-    height: usize,
-    pool: &novtb::ThreadPool,
-) {
+pub(crate) fn avx_unpremultiply_alpha_rgba_f16(in_place: &mut [f16]) {
     unsafe {
-        avx_unpremultiply_alpha_rgba_f16_impl(in_place, stride, width, height, pool);
+        avx_unpremultiply_alpha_rgba_f16_row_impl(in_place);
     }
 }
 
@@ -225,20 +192,4 @@ fn avx_unpremultiply_alpha_rgba_f16_row_impl(in_place: &mut [f16]) {
 
         unpremultiply_pixel_f16_row(rem);
     }
-}
-
-#[target_feature(enable = "avx2", enable = "f16c")]
-/// This inlining is required to activate all features for runtime dispatch
-fn avx_unpremultiply_alpha_rgba_f16_impl(
-    in_place: &mut [f16],
-    stride: usize,
-    width: usize,
-    _: usize,
-    pool: &novtb::ThreadPool,
-) {
-    in_place
-        .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| {
-            avx_unpremultiply_alpha_rgba_f16_row_impl(&mut row[..width * 4]);
-        });
 }

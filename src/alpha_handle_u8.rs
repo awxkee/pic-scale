@@ -73,35 +73,23 @@ pub(crate) fn premultiply_alpha_gray_alpha_row_impl(dst: &mut [u8], src: &[u8]) 
     }
 }
 
-fn premultiply_alpha_rgba_impl(
-    dst: &mut [u8],
-    dst_stride: usize,
-    src: &[u8],
-    width: usize,
-    _: usize,
-    stride: usize,
-    pool: &novtb::ThreadPool,
-) {
-    dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| {
-            let src = &src[y * stride..(y + 1) * stride];
-            premultiply_alpha_rgba_row_impl(&mut dst[..width * 4], &src[..width * 4]);
-        });
+fn premultiply_alpha_rgba_impl(dst: &mut [u8], src: &[u8]) {
+    premultiply_alpha_rgba_row_impl(dst, src);
 }
 
 fn premultiply_alpha_gray_alpha_impl(
     dst: &mut [u8],
     dst_stride: usize,
     src: &[u8],
-    width: usize,
+    _: usize,
     _: usize,
     stride: usize,
     pool: &novtb::ThreadPool,
 ) {
-    dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| {
-            let src = &src[y * stride..(y + 1) * stride];
-            premultiply_alpha_gray_alpha_row_impl(&mut dst[..width * 2], &src[..width * 2]);
+    dst.tb_par_chunks_mut(dst_stride)
+        .zip(src.chunks(stride))
+        .for_each(pool, |(dst, src)| {
+            premultiply_alpha_gray_alpha_row_impl(dst, src);
         });
 }
 
@@ -147,19 +135,8 @@ pub(crate) fn unpremultiply_alpha_gray_alpha_row_impl(in_place: &mut [u8]) {
     }
 }
 
-fn unpremultiply_alpha_rgba_impl(
-    in_place: &mut [u8],
-    width: usize,
-    _: usize,
-    stride: usize,
-    pool: &novtb::ThreadPool,
-    _: WorkloadStrategy,
-) {
-    in_place
-        .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| {
-            unpremultiply_alpha_rgba_row_impl(&mut row[..width * 4]);
-        });
+fn unpremultiply_alpha_rgba_impl(in_place: &mut [u8], _: WorkloadStrategy) {
+    unpremultiply_alpha_rgba_row_impl(in_place);
 }
 
 pub(crate) fn premultiply_alpha_rgba(
@@ -167,13 +144,11 @@ pub(crate) fn premultiply_alpha_rgba(
     dst_stride: usize,
     src: &[u8],
     width: usize,
-    height: usize,
+    _: usize,
     src_stride: usize,
     pool: &novtb::ThreadPool,
 ) {
-    #[allow(clippy::type_complexity)]
-    let mut _dispatcher: fn(&mut [u8], usize, &[u8], usize, usize, usize, &novtb::ThreadPool) =
-        premultiply_alpha_rgba_impl;
+    let mut _dispatcher: fn(&mut [u8], &[u8]) = premultiply_alpha_rgba_impl;
     #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     {
         _dispatcher = neon_premultiply_alpha_rgba;
@@ -201,7 +176,11 @@ pub(crate) fn premultiply_alpha_rgba(
     {
         _dispatcher = wasm_premultiply_alpha_rgba;
     }
-    _dispatcher(dst, dst_stride, src, width, height, src_stride, pool);
+    dst.tb_par_chunks_mut(dst_stride)
+        .zip(src.chunks(src_stride))
+        .for_each(pool, |(dst, src)| {
+            _dispatcher(&mut dst[..width * 4], &src[..width * 4]);
+        });
 }
 
 pub(crate) fn premultiply_alpha_gray_alpha(
@@ -222,13 +201,12 @@ pub(crate) fn premultiply_alpha_gray_alpha(
 pub(crate) fn unpremultiply_alpha_rgba(
     in_place: &mut [u8],
     width: usize,
-    height: usize,
+    _: usize,
     stride: usize,
     pool: &novtb::ThreadPool,
     workload_strategy: WorkloadStrategy,
 ) {
-    let mut _dispatcher: fn(&mut [u8], usize, usize, usize, &novtb::ThreadPool, WorkloadStrategy) =
-        unpremultiply_alpha_rgba_impl;
+    let mut _dispatcher: fn(&mut [u8], WorkloadStrategy) = unpremultiply_alpha_rgba_impl;
     #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     {
         _dispatcher = neon_unpremultiply_alpha_rgba;
@@ -256,7 +234,9 @@ pub(crate) fn unpremultiply_alpha_rgba(
     {
         _dispatcher = wasm_unpremultiply_alpha_rgba;
     }
-    _dispatcher(in_place, width, height, stride, pool, workload_strategy);
+    in_place.tb_par_chunks_mut(stride).for_each(pool, |row| {
+        _dispatcher(&mut row[..width * 4], workload_strategy);
+    });
 }
 
 fn unpremultiply_alpha_gray_alpha_impl(
@@ -267,11 +247,9 @@ fn unpremultiply_alpha_gray_alpha_impl(
     pool: &novtb::ThreadPool,
     _: WorkloadStrategy,
 ) {
-    in_place
-        .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| {
-            unpremultiply_alpha_gray_alpha_row_impl(&mut row[..width * 2]);
-        });
+    in_place.tb_par_chunks_mut(stride).for_each(pool, |row| {
+        unpremultiply_alpha_gray_alpha_row_impl(&mut row[..width * 2]);
+    });
 }
 
 pub(crate) fn unpremultiply_alpha_gray_alpha(

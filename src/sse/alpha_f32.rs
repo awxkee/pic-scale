@@ -28,7 +28,6 @@
  */
 use crate::alpha_handle_f32::{premultiply_rgba_f32_row, unpremultiply_rgba_f32_row};
 use crate::sse::{sse_deinterleave_rgba_ps, sse_interleave_rgba_ps};
-use novtb::{ParallelZonedIterator, TbSliceMut};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -43,15 +42,9 @@ fn sse_unpremultiply_row_f32(x: __m128, a: __m128) -> __m128 {
     }
 }
 
-pub(crate) fn sse_unpremultiply_alpha_rgba_f32(
-    in_place: &mut [f32],
-    stride: usize,
-    width: usize,
-    height: usize,
-    pool: &novtb::ThreadPool,
-) {
+pub(crate) fn sse_unpremultiply_alpha_rgba_f32(in_place: &mut [f32]) {
     unsafe {
-        sse_unpremultiply_alpha_rgba_f32_impl(in_place, stride, width, height, pool);
+        sse_unpremultiply_alpha_rgba_f32_row_impl(in_place);
     }
 }
 
@@ -86,32 +79,9 @@ fn sse_unpremultiply_alpha_rgba_f32_row_impl(in_place: &mut [f32]) {
     }
 }
 
-#[target_feature(enable = "sse4.1")]
-fn sse_unpremultiply_alpha_rgba_f32_impl(
-    in_place: &mut [f32],
-    stride: usize,
-    width: usize,
-    _: usize,
-    pool: &novtb::ThreadPool,
-) {
-    in_place
-        .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| {
-            sse_unpremultiply_alpha_rgba_f32_row_impl(&mut row[..width * 4]);
-        });
-}
-
-pub(crate) fn sse_premultiply_alpha_rgba_f32(
-    dst: &mut [f32],
-    dst_stride: usize,
-    src: &[f32],
-    src_stride: usize,
-    width: usize,
-    height: usize,
-    pool: &novtb::ThreadPool,
-) {
+pub(crate) fn sse_premultiply_alpha_rgba_f32(dst: &mut [f32], src: &[f32]) {
     unsafe {
-        sse_premultiply_alpha_rgba_f32_impl(dst, dst_stride, src, src_stride, width, height, pool);
+        sse_premultiply_alpha_rgba_f32_row_impl(dst, src);
     }
 }
 
@@ -147,22 +117,4 @@ fn sse_premultiply_alpha_rgba_f32_row_impl(dst: &mut [f32], src: &[f32]) {
 
         premultiply_rgba_f32_row(rem, src_rem);
     }
-}
-
-#[inline]
-#[target_feature(enable = "sse4.1")]
-fn sse_premultiply_alpha_rgba_f32_impl(
-    dst: &mut [f32],
-    dst_stride: usize,
-    src: &[f32],
-    src_stride: usize,
-    width: usize,
-    _: usize,
-    pool: &novtb::ThreadPool,
-) {
-    dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| {
-            let src = &src[y * src_stride..(y + 1) * src_stride];
-            sse_premultiply_alpha_rgba_f32_row_impl(&mut dst[..width * 4], &src[..width * 4]);
-        });
 }

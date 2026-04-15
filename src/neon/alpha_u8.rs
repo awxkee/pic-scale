@@ -28,7 +28,6 @@
  */
 
 use crate::WorkloadStrategy;
-use novtb::{ParallelZonedIterator, TbSliceMut};
 use std::arch::aarch64::*;
 
 #[inline]
@@ -115,20 +114,8 @@ fn neon_premultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8]) {
     }
 }
 
-pub(crate) fn neon_premultiply_alpha_rgba(
-    dst: &mut [u8],
-    dst_stride: usize,
-    src: &[u8],
-    width: usize,
-    _: usize,
-    src_stride: usize,
-    pool: &novtb::ThreadPool,
-) {
-    dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| {
-            let src = &src[y * src_stride..(y + 1) * src_stride];
-            neon_premultiply_alpha_rgba_impl_row(&mut dst[..width * 4], &src[..width * 4]);
-        });
+pub(crate) fn neon_premultiply_alpha_rgba(dst: &mut [u8], src: &[u8]) {
+    neon_premultiply_alpha_rgba_impl_row(dst, src);
 }
 
 trait DisassociateAlpha {
@@ -373,26 +360,17 @@ fn neon_unpremultiply_alpha_rgba_impl_row_rdm(in_place: &mut [u8]) {
     neon_dis_dispatch(in_place, NeonDisassociateAlphaFast::default());
 }
 
-pub(crate) fn neon_unpremultiply_alpha_rgba(
-    in_place: &mut [u8],
-    width: usize,
-    _: usize,
-    stride: usize,
-    pool: &novtb::ThreadPool,
-    _strategy: WorkloadStrategy,
-) {
-    let mut _executor: unsafe fn(&mut [u8]) = neon_unpremultiply_alpha_rgba_impl_row;
+pub(crate) fn neon_unpremultiply_alpha_rgba(in_place: &mut [u8], _strategy: WorkloadStrategy) {
+    let mut executor: unsafe fn(&mut [u8]) = neon_unpremultiply_alpha_rgba_impl_row;
     #[cfg(feature = "rdm")]
     {
         if _strategy == WorkloadStrategy::PreferSpeed
             && std::arch::is_aarch64_feature_detected!("rdm")
         {
-            _executor = neon_unpremultiply_alpha_rgba_impl_row_rdm;
+            executor = neon_unpremultiply_alpha_rgba_impl_row_rdm;
         }
     }
-    in_place
-        .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| unsafe {
-            _executor(&mut row[..width * 4]);
-        });
+    unsafe {
+        executor(in_place);
+    }
 }

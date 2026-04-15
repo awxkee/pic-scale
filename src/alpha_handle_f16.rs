@@ -83,53 +83,17 @@ pub(crate) fn premultiply_pixel_f16_row(dst: &mut [f16], src: &[f16]) {
     }
 }
 
-fn premultiply_alpha_rgba_impl_f16(
-    dst: &mut [f16],
-    dst_stride: usize,
-    src: &[f16],
-    src_stride: usize,
-    width: usize,
-    _: usize,
-    pool: &novtb::ThreadPool,
-) {
-    dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| {
-            let src = &src[y * src_stride..(y + 1) * src_stride];
-            premultiply_pixel_f16_row(&mut dst[..width * 4], &src[..width * 4]);
-        });
-}
-
-fn unpremultiply_alpha_rgba_impl_f16(
-    dst: &mut [f16],
-    stride: usize,
-    width: usize,
-    _: usize,
-    pool: &novtb::ThreadPool,
-) {
-    dst.tb_par_chunks_exact_mut(stride).for_each(pool, |row| {
-        unpremultiply_pixel_f16_row(&mut row[..width * 4]);
-    });
-}
-
 pub(crate) fn premultiply_alpha_rgba_f16(
     dst: &mut [f16],
     dst_stride: usize,
     src: &[f16],
     src_stride: usize,
     width: usize,
-    height: usize,
+    _: usize,
     pool: &novtb::ThreadPool,
 ) {
     #[allow(clippy::type_complexity)]
-    let mut _dispatcher: fn(
-        &mut [f16],
-        usize,
-        &[f16],
-        usize,
-        usize,
-        usize,
-        &novtb::ThreadPool,
-    ) = premultiply_alpha_rgba_impl_f16;
+    let mut _dispatcher: fn(&mut [f16], &[f16]) = premultiply_pixel_f16_row;
     #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     {
         _dispatcher = neon_premultiply_alpha_rgba_f16;
@@ -151,18 +115,21 @@ pub(crate) fn premultiply_alpha_rgba_f16(
             _dispatcher = avx_premultiply_alpha_rgba_f16;
         }
     }
-    _dispatcher(dst, dst_stride, src, src_stride, width, height, pool);
+    dst.tb_par_chunks_mut(dst_stride)
+        .zip(src.chunks(src_stride))
+        .for_each(pool, |(dst, src)| {
+            _dispatcher(&mut dst[..width * 4], &src[..width * 4]);
+        });
 }
 
 pub(crate) fn unpremultiply_alpha_rgba_f16(
     in_place: &mut [f16],
     stride: usize,
     width: usize,
-    height: usize,
+    _: usize,
     pool: &novtb::ThreadPool,
 ) {
-    let mut _dispatcher: fn(&mut [f16], usize, usize, usize, &novtb::ThreadPool) =
-        unpremultiply_alpha_rgba_impl_f16;
+    let mut _dispatcher: fn(&mut [f16]) = unpremultiply_pixel_f16_row;
     #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     {
         _dispatcher = neon_unpremultiply_alpha_rgba_f16;
@@ -184,5 +151,7 @@ pub(crate) fn unpremultiply_alpha_rgba_f16(
             _dispatcher = avx_unpremultiply_alpha_rgba_f16;
         }
     }
-    _dispatcher(in_place, stride, width, height, pool);
+    in_place.tb_par_chunks_mut(stride).for_each(pool, |row| {
+        _dispatcher(&mut row[..width * 4]);
+    });
 }

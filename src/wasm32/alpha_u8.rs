@@ -32,15 +32,8 @@ use crate::wasm32::transpose::{wasm_load_deinterleave_u8x4, wasm_store_interleav
 use crate::wasm32::utils::*;
 use std::arch::wasm32::*;
 
-pub fn wasm_unpremultiply_alpha_rgba(
-    in_place: &mut [u8],
-    width: usize,
-    _: usize,
-    stride: usize,
-    _: &novtb::ThreadPool,
-    _: WorkloadStrategy,
-) {
-    wasm_unpremultiply_alpha_rgba_impl(in_place, width, stride);
+pub(crate) fn wasm_unpremultiply_alpha_rgba(in_place: &mut [u8], _: WorkloadStrategy) {
+    wasm_unpremultiply_alpha_rgba_impl(in_place);
 }
 
 #[inline]
@@ -94,74 +87,54 @@ fn premultiply_vec(pixel: v128, alpha: v128) -> v128 {
 }
 
 #[target_feature(enable = "simd128")]
-fn wasm_unpremultiply_alpha_rgba_impl(in_place: &mut [u8], width: usize, stride: usize) {
-    in_place.chunks_exact_mut(stride).for_each(|row| {
-        let mut rem = &mut row[..width * 4];
+fn wasm_unpremultiply_alpha_rgba_impl(in_place: &mut [u8]) {
+    let mut rem = in_place;
 
-        for dst in rem.chunks_exact_mut(16 * 4) {
-            let src_ptr = dst.as_ptr();
-            let mut pixel = wasm_load_deinterleave_u8x4(src_ptr);
+    for dst in rem.chunks_exact_mut(16 * 4) {
+        let src_ptr = dst.as_ptr();
+        let mut pixel = wasm_load_deinterleave_u8x4(src_ptr);
 
-            pixel.0 = unpremultiply_vec(pixel.0, pixel.3);
-            pixel.1 = unpremultiply_vec(pixel.1, pixel.3);
-            pixel.2 = unpremultiply_vec(pixel.2, pixel.3);
-            let dst_ptr = dst.as_mut_ptr();
-            wasm_store_interleave_u8x4(dst_ptr, pixel);
-        }
+        pixel.0 = unpremultiply_vec(pixel.0, pixel.3);
+        pixel.1 = unpremultiply_vec(pixel.1, pixel.3);
+        pixel.2 = unpremultiply_vec(pixel.2, pixel.3);
+        let dst_ptr = dst.as_mut_ptr();
+        wasm_store_interleave_u8x4(dst_ptr, pixel);
+    }
 
-        rem = rem.chunks_exact_mut(16 * 4).into_remainder();
+    rem = rem.chunks_exact_mut(16 * 4).into_remainder();
 
-        for dst in rem.chunks_exact_mut(4) {
-            let a = dst[3];
-            let z = a as u16 * 255;
-            dst[0] = UNPREMULTIPLICATION_TABLE[(z + dst[0] as u16) as usize];
-            dst[1] = UNPREMULTIPLICATION_TABLE[(z + dst[1] as u16) as usize];
-            dst[2] = UNPREMULTIPLICATION_TABLE[(z + dst[2] as u16) as usize];
-        }
-    });
+    for dst in rem.chunks_exact_mut(4) {
+        let a = dst[3];
+        let z = a as u16 * 255;
+        dst[0] = UNPREMULTIPLICATION_TABLE[(z + dst[0] as u16) as usize];
+        dst[1] = UNPREMULTIPLICATION_TABLE[(z + dst[1] as u16) as usize];
+        dst[2] = UNPREMULTIPLICATION_TABLE[(z + dst[2] as u16) as usize];
+    }
 }
 
-pub fn wasm_premultiply_alpha_rgba(
-    dst: &mut [u8],
-    dst_stride: usize,
-    src: &[u8],
-    width: usize,
-    _: usize,
-    stride: usize,
-    _: &novtb::ThreadPool,
-) {
-    wasm_premultiply_alpha_rgba_impl(dst, dst_stride, src, stride, width);
+pub(crate) fn wasm_premultiply_alpha_rgba(dst: &mut [u8], src: &[u8]) {
+    wasm_premultiply_alpha_rgba_impl(dst, src);
 }
 
 #[inline]
 #[target_feature(enable = "simd128")]
-fn wasm_premultiply_alpha_rgba_impl(
-    dst: &mut [u8],
-    dst_stride: usize,
-    src: &[u8],
-    src_stride: usize,
-    width: usize,
-) {
-    dst.chunks_exact_mut(dst_stride)
-        .zip(src.chunks_exact(src_stride))
-        .for_each(|(dst, src)| {
-            let mut rem = &mut dst[..width * 4];
-            let mut src_rem = src;
+fn wasm_premultiply_alpha_rgba_impl(dst: &mut [u8], src: &[u8]) {
+    let mut rem = dst;
+    let mut src_rem = src;
 
-            for (dst, src) in rem
-                .chunks_exact_mut(16 * 4)
-                .zip(src_rem.chunks_exact(16 * 4))
-            {
-                let mut pixel = wasm_load_deinterleave_u8x4(src.as_ptr());
-                pixel.0 = premultiply_vec(pixel.0, pixel.3);
-                pixel.1 = premultiply_vec(pixel.1, pixel.3);
-                pixel.2 = premultiply_vec(pixel.2, pixel.3);
-                wasm_store_interleave_u8x4(dst.as_mut_ptr(), pixel);
-            }
+    for (dst, src) in rem
+        .chunks_exact_mut(16 * 4)
+        .zip(src_rem.chunks_exact(16 * 4))
+    {
+        let mut pixel = wasm_load_deinterleave_u8x4(src.as_ptr());
+        pixel.0 = premultiply_vec(pixel.0, pixel.3);
+        pixel.1 = premultiply_vec(pixel.1, pixel.3);
+        pixel.2 = premultiply_vec(pixel.2, pixel.3);
+        wasm_store_interleave_u8x4(dst.as_mut_ptr(), pixel);
+    }
 
-            rem = rem.chunks_exact_mut(16 * 4).into_remainder();
-            src_rem = src_rem.chunks_exact(16 * 4).remainder();
+    rem = rem.chunks_exact_mut(16 * 4).into_remainder();
+    src_rem = src_rem.chunks_exact(16 * 4).remainder();
 
-            premultiply_alpha_rgba_row_impl(rem, src_rem);
-        });
+    premultiply_alpha_rgba_row_impl(rem, src_rem);
 }

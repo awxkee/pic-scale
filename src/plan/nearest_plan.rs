@@ -66,17 +66,19 @@ impl<T: Copy + Send + Sync + Clone + Debug, const N: usize> ResamplingPlan<T, N>
         let dst_stride = into.stride();
         let src_stride = store.stride();
 
-        let dst = into.buffer.borrow_mut();
+        let dst_width = into.width;
+        let dst = into.projected();
 
         let pool = self.threading_policy.get_nova_pool(ImageSize::new(
             self.target_size.width,
             self.target_size.height,
         ));
 
-        let src = store.buffer.as_ref();
+        let src = store.projected();
 
-        dst.tb_par_chunks_exact_mut(dst_stride)
+        dst.tb_par_chunks_mut(dst_stride)
             .for_each_enumerated(&pool, |y, dst_chunk| {
+                let dst_chunk = &mut dst_chunk[..dst_width * N];
                 let src_y = ((y as u64 * k_y + k_y_half) >> SCALE) as usize;
                 let src_offset_y = src_y * src_stride;
 

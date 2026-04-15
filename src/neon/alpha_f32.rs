@@ -28,7 +28,6 @@
  */
 
 use crate::alpha_handle_f32::{premultiply_rgba_f32_row, unpremultiply_rgba_f32_row};
-use novtb::{ParallelZonedIterator, TbSliceMut};
 use std::arch::aarch64::*;
 
 macro_rules! unpremultiply_vec_f32 {
@@ -61,20 +60,8 @@ fn neon_premultiply_alpha_rgba_row_f32(dst: &mut [f32], src: &[f32]) {
     }
 }
 
-pub(crate) fn neon_premultiply_alpha_rgba_f32(
-    dst: &mut [f32],
-    dst_stride: usize,
-    src: &[f32],
-    src_stride: usize,
-    width: usize,
-    _: usize,
-    pool: &novtb::ThreadPool,
-) {
-    dst.tb_par_chunks_exact_mut(dst_stride)
-        .for_each_enumerated(pool, |y, dst| {
-            let src = &src[y * src_stride..(y + 1) * src_stride];
-            neon_premultiply_alpha_rgba_row_f32(&mut dst[..width * 4], &src[..width * 4]);
-        });
+pub(crate) fn neon_premultiply_alpha_rgba_f32(dst: &mut [f32], src: &[f32]) {
+    neon_premultiply_alpha_rgba_row_f32(dst, src);
 }
 
 fn neon_unpremultiply_alpha_rgba_f32_row(in_place: &mut [f32]) {
@@ -97,16 +84,6 @@ fn neon_unpremultiply_alpha_rgba_f32_row(in_place: &mut [f32]) {
     }
 }
 
-pub(crate) fn neon_unpremultiply_alpha_rgba_f32(
-    in_place: &mut [f32],
-    stride: usize,
-    width: usize,
-    _: usize,
-    pool: &novtb::ThreadPool,
-) {
-    in_place
-        .tb_par_chunks_exact_mut(stride)
-        .for_each(pool, |row| {
-            neon_unpremultiply_alpha_rgba_f32_row(&mut row[..width * 4]);
-        });
+pub(crate) fn neon_unpremultiply_alpha_rgba_f32(in_place: &mut [f32]) {
+    neon_unpremultiply_alpha_rgba_f32_row(in_place);
 }

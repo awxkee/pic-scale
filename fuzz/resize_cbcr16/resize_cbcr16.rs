@@ -32,8 +32,11 @@
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use pic_scale::{
-    ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy, WorkloadStrategy,
+    BufferStore, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy,
+    WorkloadStrategy,
 };
+use rand::RngExt;
+use std::hint::black_box;
 
 #[derive(Clone, Debug, Arbitrary)]
 pub struct SrcImage {
@@ -88,12 +91,36 @@ fn resize_cbcr16(
         return;
     }
 
-    let mut src_data = vec![value; src_width * src_height * 2];
+    let src_stride = (src_width + rand::rng().random_range(0..100)) * 2;
+
+    let mut src_data = vec![black_box(value); src_stride * src_height];
     src_data[0] = 255;
     src_data[1] = 17;
 
-    let store = ImageStore::<u16, 2>::borrow(&src_data, src_width, src_height).unwrap();
-    let mut target = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 10);
+    let src_valid_size = src_stride * (src_height - 1) + src_width * 2;
+
+    let store = ImageStore {
+        buffer: std::borrow::Cow::Borrowed(&src_data[..src_valid_size]),
+        channels: 2,
+        width: src_width,
+        height: src_height,
+        stride: src_stride,
+        bit_depth: 10,
+    };
+
+    let dst_stride = (dst_width + rand::rng().random_range(0..100)) * 2;
+    let mut dst_data_full = vec![black_box(0u16); dst_stride * dst_height];
+
+    let dst_valid_size = dst_stride * (dst_height - 1) + dst_width * 2;
+
+    let mut target = ImageStoreMut {
+        buffer: BufferStore::Borrowed(&mut dst_data_full[..dst_valid_size]),
+        channels: 2,
+        width: dst_width,
+        height: dst_height,
+        stride: dst_stride,
+        bit_depth: 10,
+    };
 
     target.buffer.borrow_mut()[0] = 16;
     target.buffer.borrow_mut()[1] = 17;
@@ -117,7 +144,18 @@ fn resize_cbcr16(
     planner.resample(&store, &mut target).unwrap();
 
     let store = ImageStore::<u16, 2>::borrow(&src_data, src_width, src_height).unwrap();
-    let mut target16 = ImageStoreMut::alloc_with_depth(dst_width, dst_height, 16);
+    let mut dst_data_full = vec![black_box(0u16); dst_stride * dst_height];
+    let mut target16 = ImageStoreMut {
+        buffer: BufferStore::Borrowed(&mut dst_data_full[..dst_valid_size]),
+        channels: 2,
+        width: dst_width,
+        height: dst_height,
+        stride: dst_stride,
+        bit_depth: 16,
+    };
+    target16.buffer.borrow_mut()[0] = 16;
+    target16.buffer.borrow_mut()[1] = 17;
+
     let planner = if mul_alpha {
         scaler
             .plan_gray_alpha_resampling16(store.size(), target.size(), true, 16)

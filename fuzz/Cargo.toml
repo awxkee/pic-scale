@@ -11,10 +11,12 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 pic-scale = { path = "../", features = ["nightly_f16"], default-features = false }
 arbitrary = { version = "1.4.1", features = ["derive"] }
+rand = "0.10.1"
 
 [features]
 nightly_avx512 = ["pic-scale/avx512"]
 rdm = ["pic-scale/rdm"]
+neon = ["pic-scale/neon"]
 sse = ["pic-scale/sse"]
 avx = ["pic-scale/avx"]
 nightly_i8mm = ["pic-scale/nightly_i8mm"]

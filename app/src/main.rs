@@ -14,15 +14,99 @@ use fast_image_resize::{
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
-    CbCr16ImageStore, CbCr16ImageStoreMut, ImageSize, ImageStoreScaling, JzazbzScaler, LChScaler,
-    LabScaler, LuvScaler, Planar16ImageStore, Planar16ImageStoreMut, ResamplingFunction,
-    Rgb16ImageStore, Rgb16ImageStoreMut, Rgb8ImageStore, Rgb8ImageStoreMut, Rgba16ImageStore,
-    Rgba16ImageStoreMut, Scaler, SigmoidalScaler, ThreadingPolicy, TransferFunction,
-    WorkloadStrategy, XYZScaler,
+    BufferStore, CbCr16ImageStore, CbCr16ImageStoreMut, ImageSize, ImageStore, ImageStoreMut,
+    ImageStoreScaling, JzazbzScaler, LChScaler, LabScaler, LuvScaler, Planar16ImageStore,
+    Planar16ImageStoreMut, ResamplingFunction, Rgb16ImageStore, Rgb16ImageStoreMut, Rgb8ImageStore,
+    Rgb8ImageStoreMut, Rgba16ImageStore, Rgba16ImageStoreMut, Scaler, SigmoidalScaler,
+    ThreadingPolicy, TransferFunction, WorkloadStrategy, XYZScaler,
 };
+use rand::RngExt;
+
+fn resize_rgba_fuzz(
+    data: u8,
+    src_width: usize,
+    src_height: usize,
+    dst_width: usize,
+    dst_height: usize,
+    sampler: ResamplingFunction,
+    workload_strategy: WorkloadStrategy,
+    threading_policy: ThreadingPolicy,
+    supersampling: bool,
+    multi_stage_upsampling: bool,
+) {
+    if src_width == 0
+        || src_width > 2500
+        || src_height == 0
+        || src_height > 2500
+        || dst_width == 0
+        || dst_width > 512
+        || dst_height == 0
+        || dst_height > 512
+    {
+        return;
+    }
+
+    let src_stride = (src_width + rand::rng().random_range(0..100)) * 4;
+
+    let mut src_data = vec![data; src_stride * src_height];
+    src_data[0] = 255;
+    src_data[3] = 17;
+
+    let src_valid_size = src_stride * (src_height - 1) + src_width * 4;
+
+    let store = ImageStore {
+        buffer: std::borrow::Cow::Borrowed(&src_data[..src_valid_size]),
+        channels: 4,
+        width: src_width,
+        height: src_height,
+        stride: src_stride,
+        bit_depth: 8,
+    };
+
+    let dst_stride = (dst_width + rand::rng().random_range(0..100)) * 4;
+    let mut dst_data_full = vec![0u8; dst_stride * dst_height];
+
+    let dst_valid_size = dst_stride * (dst_height - 1) + dst_width * 4;
+
+    let mut target = ImageStoreMut {
+        buffer: BufferStore::Borrowed(&mut dst_data_full[..dst_valid_size]),
+        channels: 4,
+        width: dst_width,
+        height: dst_height,
+        stride: dst_stride,
+        bit_depth: 8,
+    };
+
+    let scaler = Scaler::new(sampler)
+        .set_workload_strategy(workload_strategy)
+        .set_threading_policy(threading_policy)
+        .set_supersampling(supersampling)
+        .set_multi_step_upsampling(multi_stage_upsampling);
+    let planned = scaler
+        .plan_rgba_resampling(store.size(), target.size(), false)
+        .unwrap();
+    planned.resample(&store, &mut target).unwrap();
+    let store = ImageStore::<u8, 4>::borrow(&src_data, src_width, src_height).unwrap();
+    let planned = scaler
+        .plan_rgba_resampling(store.size(), target.size(), true)
+        .unwrap();
+    planned.resample(&store, &mut target).unwrap();
+}
 
 fn main() {
-    resize_rgba(0, 143, 35, 143, 35, ResamplingFunction::Bilinear, false);
+    // resize_rgba_fuzz(
+    //     17,
+    //     1023,
+    //     5,
+    //     6,
+    //     5,
+    //     ResamplingFunction::Bilinear,
+    //     WorkloadStrategy::PreferSpeed,
+    //     ThreadingPolicy::Single,
+    //     false,
+    //     true,
+    // );
+    // resize_rgba(0, 143, 35, 143, 35, ResamplingFunction::Bilinear, false);
     // resize_rgba(0, 1, 256, 79, 256, ResamplingFunction::Bilinear, false);
     #[allow(overflowing_literals)]
     // test_fast_image();
@@ -37,11 +121,16 @@ fn main() {
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
 
-    let mut scaler = SigmoidalScaler::new(ResamplingFunction::MitchellNetravalli)
-        .set_threading_policy(ThreadingPolicy::Single);
+    let mut scaler = Scaler::new(ResamplingFunction::Bilinear)
+        .set_threading_policy(ThreadingPolicy::Single)
+        .set_supersampling(true);
     // scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
-    let mut t_size = ImageSize::new(dimensions.0 as usize - 1, dimensions.1 as usize - 1);
+    let mut store =
+        Rgb8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
+    store.bit_depth = 16;
+
+    let mut t_size = ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
     // t_size.height += 1;
     let resizing_plan = scaler
         .plan_rgb_resampling(
@@ -49,13 +138,9 @@ fn main() {
             t_size,
         )
         .unwrap();
-
-    let mut store =
-        Rgb8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
-    store.bit_depth = 16;
     let mut dst_store = Rgb8ImageStoreMut::alloc_with_depth(
-        dimensions.0 as usize - 1,
-        dimensions.1 as usize - 1,
+        dimensions.0 as usize / 4,
+        dimensions.1 as usize / 4,
         16,
     );
     resizing_plan.resample(&store, &mut dst_store).unwrap();

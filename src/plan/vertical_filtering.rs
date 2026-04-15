@@ -53,15 +53,20 @@ where
 
         let row_filter = self.filter_row;
 
-        destination
-            .buffer
-            .borrow_mut()
-            .tb_par_chunks_exact_mut(dst_stride)
+        let dst_bit_depth = destination.bit_depth as u32;
+        let dst_buffer = destination.projected();
+
+        let source_buffer = source.projected();
+
+        dst_buffer
+            .tb_par_chunks_mut(dst_stride)
             .for_each_enumerated(&pool, |y, row| {
+                if row.is_empty() {
+                    return;
+                }
                 let bounds = self.filter_weights.bounds[y];
                 let filter_offset = y * self.filter_weights.aligned_size;
                 let weights = &self.filter_weights.weights[filter_offset..];
-                let source_buffer = source.buffer.as_ref();
                 row_filter(
                     dst_width,
                     &bounds,
@@ -69,7 +74,7 @@ where
                     &mut row[..dst_width * N],
                     src_stride,
                     weights,
-                    destination.bit_depth as u32,
+                    dst_bit_depth,
                 );
             });
     }
