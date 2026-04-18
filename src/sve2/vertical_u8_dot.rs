@@ -100,6 +100,9 @@ fn convolve_vertical_sve2_row(
     let len = dst.len();
 
     let pg4 = svwhilelt_b8_u32(0u32, 4u32);
+    let pg2 = svwhilelt_b8_u32(0u32, 2u32);
+    let pg1 = svwhilelt_b8_u32(0u32, 1u32);
+
     static SPLIT: [u8; 16] = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3];
     let shuf4 = unsafe { svld1_u8(svptrue_b8(), SPLIT.as_ptr()) };
 
@@ -112,10 +115,10 @@ fn convolve_vertical_sve2_row(
         let pg32_3 = svwhilelt_b32_u64((cx + 3 * (vl / 4)) as u64, len as u64);
 
         let rounding = svdup_n_s32(ROUNDING);
-        let mut acc_0 = svsel_s32(pg32_0, rounding, svdup_n_s32(0));
-        let mut acc_1 = svsel_s32(pg32_1, rounding, svdup_n_s32(0));
-        let mut acc_2 = svsel_s32(pg32_2, rounding, svdup_n_s32(0));
-        let mut acc_3 = svsel_s32(pg32_3, rounding, svdup_n_s32(0));
+        let mut acc_0 = rounding;
+        let mut acc_1 = rounding;
+        let mut acc_2 = rounding;
+        let mut acc_3 = rounding;
 
         let mut j = 0usize;
 
@@ -147,11 +150,7 @@ fn convolve_vertical_sve2_row(
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j..) };
 
-            let w32 = unsafe {
-                i32::from_le_bytes([*w.get_unchecked(0) as u8, *w.get_unchecked(1) as u8, 0, 0])
-            };
-
-            let vw = svreinterpret_s8_s32(svdup_n_s32(w32));
+            let vw = svtbl_s8(unsafe { svld1_s8(pg2, w.as_ptr()) }, shuf4);
 
             let base0 = src_stride * py + cx;
             let row0 = unsafe { svld1_u8(pg, src.get_unchecked(base0..).as_ptr()) };
@@ -170,13 +169,13 @@ fn convolve_vertical_sve2_row(
 
         while j < bounds.size {
             let py = bounds.start + j;
-            let w = unsafe { *weights.get_unchecked(j) };
+            let w = unsafe { weights.get_unchecked(j) };
+            let vw = svtbl_s8(unsafe { svld1_s8(pg1, w) }, shuf4);
 
             let base0 = src_stride * py + cx;
             let row = unsafe { svld1_u8(pg, src.get_unchecked(base0..).as_ptr()) };
-            let zero = svdup_n_u8(0);
 
-            let vw = svdup_n_s8(w);
+            let zero = svdup_n_u8(0);
 
             let [packed0, packed1, packed2, packed3] = pack_4_rows_sve(row, zero, zero, zero);
 
