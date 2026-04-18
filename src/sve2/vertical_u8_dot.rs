@@ -99,6 +99,10 @@ fn convolve_vertical_sve2_row(
 
     let len = dst.len();
 
+    let pg4 = svwhilelt_b8_u32(0u32, 4u32);
+    static SPLIT: [u8; 16] = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3];
+    let shuf4 = unsafe { svld1_u8(svptrue_b8(), SPLIT.as_ptr()) };
+
     while cx < dst.len() {
         let pg = svwhilelt_b8_u64(cx as u64, len as u64);
 
@@ -119,15 +123,7 @@ fn convolve_vertical_sve2_row(
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j..) };
 
-            let w32 = unsafe {
-                i32::from_le_bytes([
-                    *w.get_unchecked(0) as u8,
-                    *w.get_unchecked(1) as u8,
-                    *w.get_unchecked(2) as u8,
-                    *w.get_unchecked(3) as u8,
-                ])
-            };
-            let vw = svreinterpret_s8_s32(svdup_n_s32(w32));
+            let vw = svtbl_s8(unsafe { svld1_s8(pg4, w.as_ptr()) }, shuf4);
 
             let base0 = src_stride * py + cx;
             let row0 = unsafe { svld1_u8(pg, src.get_unchecked(base0..).as_ptr()) };
@@ -154,6 +150,7 @@ fn convolve_vertical_sve2_row(
             let w32 = unsafe {
                 i32::from_le_bytes([*w.get_unchecked(0) as u8, *w.get_unchecked(1) as u8, 0, 0])
             };
+
             let vw = svreinterpret_s8_s32(svdup_n_s32(w32));
 
             let base0 = src_stride * py + cx;
