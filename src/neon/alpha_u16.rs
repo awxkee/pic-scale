@@ -61,74 +61,114 @@ trait NeonPremultiplyExecutor {
 struct NeonPremultiplyExecutorDefault<const BIT_DEPTH: usize> {}
 
 impl<const BIT_DEPTH: usize> NeonPremultiplyExecutor for NeonPremultiplyExecutorDefault<BIT_DEPTH> {
+    #[target_feature(enable = "neon")]
     unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
-        unsafe {
-            assert_ne!(bit_depth, 0, "Something goes wrong!");
-            assert!((1..=16).contains(&bit_depth));
+        assert_ne!(bit_depth, 0, "Something goes wrong!");
+        assert!((1..=16).contains(&bit_depth));
 
-            let mut rem = dst;
-            let mut src_rem = src;
-            for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
-                let pixel = vld4q_u16(src.as_ptr());
+        static TBL: [u8; 16] = [6, 7, 6, 7, 6, 7, 6, 7, 14, 15, 14, 15, 14, 15, 14, 15];
+        let shuf_tbl = unsafe { vld1q_u8(TBL.as_ptr()) };
+        let alpha_mask = vreinterpretq_u16_u64(vdupq_n_u64(u64::from_ne_bytes([
+            0, 0, 0, 0, 0, 0, 255, 255,
+        ])));
 
-                let low_a = vget_low_u16(pixel.3);
+        let mut rem = dst;
+        let mut src_rem = src;
 
-                let new_r = vcombine_u16(
-                    neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel.0), low_a)),
-                    neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel.0, pixel.3)),
-                );
+        for (dst, src) in rem
+            .as_chunks_mut::<32>()
+            .0
+            .iter_mut()
+            .zip(src_rem.as_chunks::<32>().0.iter())
+        {
+            let pixel0 = unsafe { vld1q_u16(src.as_ptr()) };
+            let pixel1 = unsafe { vld1q_u16(src[8..].as_ptr()) };
+            let pixel2 = unsafe { vld1q_u16(src[16..].as_ptr()) };
+            let pixel3 = unsafe { vld1q_u16(src[24..].as_ptr()) };
 
-                let new_g = vcombine_u16(
-                    neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel.1), low_a)),
-                    neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel.1, pixel.3)),
-                );
+            let alpha0 = vreinterpretq_u16_u8(vqtbl1q_u8(vreinterpretq_u8_u16(pixel0), shuf_tbl));
+            let alpha1 = vreinterpretq_u16_u8(vqtbl1q_u8(vreinterpretq_u8_u16(pixel1), shuf_tbl));
+            let alpha2 = vreinterpretq_u16_u8(vqtbl1q_u8(vreinterpretq_u8_u16(pixel2), shuf_tbl));
+            let alpha3 = vreinterpretq_u16_u8(vqtbl1q_u8(vreinterpretq_u8_u16(pixel3), shuf_tbl));
 
-                let new_b = vcombine_u16(
-                    neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel.2), low_a)),
-                    neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel.2, pixel.3)),
-                );
+            let mut new_px0 = vcombine_u16(
+                neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel0), vget_low_u16(alpha0))),
+                neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel0, alpha0)),
+            );
+            let mut new_px1 = vcombine_u16(
+                neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel1), vget_low_u16(alpha1))),
+                neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel1, alpha1)),
+            );
+            let mut new_px2 = vcombine_u16(
+                neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel2), vget_low_u16(alpha2))),
+                neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel2, alpha2)),
+            );
+            let mut new_px3 = vcombine_u16(
+                neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel3), vget_low_u16(alpha3))),
+                neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel3, alpha3)),
+            );
 
-                let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
+            new_px0 = vbslq_u16(alpha_mask, pixel0, new_px0);
+            new_px1 = vbslq_u16(alpha_mask, pixel1, new_px1);
+            new_px2 = vbslq_u16(alpha_mask, pixel2, new_px2);
+            new_px3 = vbslq_u16(alpha_mask, pixel3, new_px3);
 
-                vst4q_u16(dst.as_mut_ptr(), new_px);
+            unsafe {
+                vst1q_u16(dst.as_mut_ptr(), new_px0);
+                vst1q_u16(dst[8..].as_mut_ptr(), new_px1);
+                vst1q_u16(dst[16..].as_mut_ptr(), new_px2);
+                vst1q_u16(dst[24..].as_mut_ptr(), new_px3);
+            }
+        }
+
+        rem = rem.as_chunks_mut::<32>().1;
+        src_rem = src_rem.as_chunks::<32>().1;
+
+        for (dst, src) in rem
+            .as_chunks_mut::<8>()
+            .0
+            .iter_mut()
+            .zip(src_rem.as_chunks::<8>().0.iter())
+        {
+            let pixel = unsafe { vld1q_u16(src.as_ptr()) };
+
+            let alpha = vreinterpretq_u16_u8(vqtbl1q_u8(vreinterpretq_u8_u16(pixel), shuf_tbl));
+
+            let new_px = vcombine_u16(
+                neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel), vget_low_u16(alpha))),
+                neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel, alpha)),
+            );
+
+            let new_px = vbslq_u16(alpha_mask, pixel, new_px);
+
+            unsafe {
+                vst1q_u16(dst.as_mut_ptr(), new_px);
+            }
+        }
+
+        rem = rem.as_chunks_mut::<8>().1;
+        src_rem = src_rem.as_chunks::<8>().1;
+
+        if !rem.is_empty() {
+            let mut buffer: [u16; 8] = [0u16; 8];
+            buffer[..src_rem.len()].copy_from_slice(src_rem);
+
+            let pixel = unsafe { vld1q_u16(buffer.as_ptr()) };
+
+            let alpha = vreinterpretq_u16_u8(vqtbl1q_u8(vreinterpretq_u8_u16(pixel), shuf_tbl));
+
+            let new_px = vcombine_u16(
+                neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel), vget_low_u16(alpha))),
+                neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel, alpha)),
+            );
+
+            let new_px = vbslq_u16(alpha_mask, pixel, new_px);
+
+            unsafe {
+                vst1q_u16(buffer.as_mut_ptr(), new_px);
             }
 
-            rem = rem.chunks_exact_mut(8 * 4).into_remainder();
-            src_rem = src_rem.chunks_exact(8 * 4).remainder();
-
-            if !rem.is_empty() {
-                assert!(src_rem.len() < 8 * 4);
-                assert!(rem.len() < 8 * 4);
-                assert_eq!(src_rem.len(), rem.len());
-
-                let mut buffer: [u16; 8 * 4] = [0u16; 8 * 4];
-                std::ptr::copy_nonoverlapping(src_rem.as_ptr(), buffer.as_mut_ptr(), src_rem.len());
-
-                let pixel = vld4q_u16(buffer.as_ptr());
-
-                let low_a = vget_low_u16(pixel.3);
-
-                let new_r = vcombine_u16(
-                    neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel.0), low_a)),
-                    neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel.0, pixel.3)),
-                );
-
-                let new_g = vcombine_u16(
-                    neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel.1), low_a)),
-                    neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel.1, pixel.3)),
-                );
-
-                let new_b = vcombine_u16(
-                    neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel.2), low_a)),
-                    neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel.2, pixel.3)),
-                );
-
-                let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
-
-                vst4q_u16(buffer.as_mut_ptr(), new_px);
-
-                std::ptr::copy_nonoverlapping(buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
-            }
+            rem.copy_from_slice(&buffer[..rem.len()]);
         }
     }
 }
