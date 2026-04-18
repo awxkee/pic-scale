@@ -63,22 +63,10 @@ macro_rules! pack_4_rows_sve {
         let cd_lo = svzip1_u8($c, $d);
         let cd_hi = svzip2_u8($c, $d);
 
-        let lo0 = svreinterpret_u8_u16(svzip1_u16(
-            svreinterpret_u16_u8(ab_lo),
-            svreinterpret_u16_u8(cd_lo),
-        ));
-        let lo1 = svreinterpret_u8_u16(svzip2_u16(
-            svreinterpret_u16_u8(ab_lo),
-            svreinterpret_u16_u8(cd_lo),
-        ));
-        let hi0 = svreinterpret_u8_u16(svzip1_u16(
-            svreinterpret_u16_u8(ab_hi),
-            svreinterpret_u16_u8(cd_hi),
-        ));
-        let hi1 = svreinterpret_u8_u16(svzip2_u16(
-            svreinterpret_u16_u8(ab_hi),
-            svreinterpret_u16_u8(cd_hi),
-        ));
+        let lo0 = svzip1_u8(ab_lo, cd_lo);
+        let lo1 = svzip2_u8(ab_lo, cd_lo);
+        let hi0 = svzip1_u8(ab_hi, cd_hi);
+        let hi1 = svzip2_u8(ab_hi, cd_hi);
 
         [lo0, lo1, hi0, hi1]
     }};
@@ -102,7 +90,7 @@ fn work_32_chunks(
     let pg2 = svwhilelt_b8_u32(0u32, 2u32);
     let pg1 = svwhilelt_b8_u32(0u32, 1u32);
 
-    let shuf4 = svreinterpret_u8_s32(svdup_n_s32(i32::from_ne_bytes([0, 1, 2, 3])));
+    let shuf4 = svreinterpret_u8_s32(svdup_n_s32(i32::from_ne_bytes([0, 2, 1, 3])));
 
     let pg_full = svptrue_b8();
 
@@ -288,7 +276,7 @@ fn convolve_vertical_sve2_row(
     let pg2 = svwhilelt_b8_u32(0u32, 2u32);
     let pg1 = svwhilelt_b8_u32(0u32, 1u32);
 
-    let shuf4 = svreinterpret_u8_s32(svdup_n_s32(i32::from_ne_bytes([0, 1, 2, 3])));
+    let shuf4 = svreinterpret_u8_s32(svdup_n_s32(i32::from_ne_bytes([0, 2, 1, 3])));
 
     while cx < dst.len() {
         let pg = svwhilelt_b8_u64(cx as u64, len as u64);
