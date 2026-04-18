@@ -140,15 +140,32 @@ fn convolve_horizontal_rgb_neon_rows_4_impl(
             store_3 = svusdot_s32(store_3, svtbl_u8(rgb_pixel3, v_tbl), vw);
         }
 
-        let v0 = pack_s32x4_to_u8!(store_0);
-        let v1 = pack_s32x4_to_u8!(store_1);
-        let v2 = pack_s32x4_to_u8!(store_2);
-        let v3 = pack_s32x4_to_u8!(store_3);
+        let n0 = svqshrunb_n_s32::<7>(store_0);
+        let n1 = svqshrunb_n_s32::<7>(store_1);
+        let n2 = svqshrunb_n_s32::<7>(store_2);
+        let n3 = svqshrunb_n_s32::<7>(store_3);
+
+        let s01 = svuzp1_u16(n0, n1);
+        let s23 = svuzp1_u16(n2, n3);
+        let packed = svuzp1_u8(svqxtnb_u16(s01), svqxtnb_u16(s23));
+
         unsafe {
-            svst1_u8(pg3, chunk0.as_mut_ptr(), v0);
-            svst1_u8(pg3, chunk1.as_mut_ptr(), v1);
-            svst1_u8(pg3, chunk2.as_mut_ptr(), v2);
-            svst1_u8(pg3, chunk3.as_mut_ptr(), v3);
+            svst1_u8(pg3, chunk0.as_mut_ptr(), packed);
+            svst1_u8(
+                pg3,
+                chunk1.as_mut_ptr(),
+                svext_u8::<4>(packed, svdup_n_u8(0)),
+            );
+            svst1_u8(
+                pg3,
+                chunk2.as_mut_ptr(),
+                svext_u8::<8>(packed, svdup_n_u8(0)),
+            );
+            svst1_u8(
+                pg3,
+                chunk3.as_mut_ptr(),
+                svext_u8::<12>(packed, svdup_n_u8(0)),
+            );
         }
     }
 }
