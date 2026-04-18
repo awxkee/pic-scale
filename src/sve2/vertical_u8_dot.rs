@@ -103,16 +103,10 @@ fn convolve_vertical_sve2_row(
     let pg2 = svwhilelt_b8_u32(0u32, 2u32);
     let pg1 = svwhilelt_b8_u32(0u32, 1u32);
 
-    static SPLIT: [u8; 16] = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3];
-    let shuf4 = unsafe { svld1_u8(svptrue_b8(), SPLIT.as_ptr()) };
+    let shuf4 = svreinterpret_u8_s32(svdup_n_s32(i32::from_ne_bytes([0, 1, 2, 3])));
 
     while cx < dst.len() {
         let pg = svwhilelt_b8_u64(cx as u64, len as u64);
-
-        let pg32_0 = svwhilelt_b32_u64(cx as u64, len as u64);
-        let pg32_1 = svwhilelt_b32_u64((cx + vl / 4) as u64, len as u64);
-        let pg32_2 = svwhilelt_b32_u64((cx + vl / 2) as u64, len as u64);
-        let pg32_3 = svwhilelt_b32_u64((cx + 3 * (vl / 4)) as u64, len as u64);
 
         let rounding = svdup_n_s32(ROUNDING);
         let mut acc_0 = rounding;
@@ -187,15 +181,10 @@ fn convolve_vertical_sve2_row(
             j += 1;
         }
 
-        let shifted0 = svasr_n_s32_x(pg32_0, acc_0, SCALE as u32);
-        let shifted1 = svasr_n_s32_x(pg32_1, acc_1, SCALE as u32);
-        let shifted2 = svasr_n_s32_x(pg32_2, acc_2, SCALE as u32);
-        let shifted3 = svasr_n_s32_x(pg32_3, acc_3, SCALE as u32);
-
-        let n0 = svqxtunb_s32(shifted0);
-        let n1 = svqxtunb_s32(shifted1);
-        let n2 = svqxtunb_s32(shifted2);
-        let n3 = svqxtunb_s32(shifted3);
+        let n0 = svqshrunb_n_s32::<SCALE>(acc_0);
+        let n1 = svqshrunb_n_s32::<SCALE>(acc_1);
+        let n2 = svqshrunb_n_s32::<SCALE>(acc_2);
+        let n3 = svqshrunb_n_s32::<SCALE>(acc_3);
 
         let s01_packed = svuzp1_u16(n0, n1);
         let s23_packed = svuzp1_u16(n2, n3);
