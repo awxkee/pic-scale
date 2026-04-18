@@ -48,6 +48,10 @@
     feature(stdarch_neon_f16)
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(
+    all(feature = "sve", target_arch = "aarch64"),
+    feature(stdarch_aarch64_sve)
+)]
 
 mod alpha_check;
 #[cfg(feature = "nightly_f16")]
@@ -90,6 +94,8 @@ mod scaler_f16;
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 mod sse;
 mod support;
+#[cfg(all(target_arch = "aarch64", feature = "sve"))]
+mod sve2;
 mod threading_policy;
 mod validation;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
