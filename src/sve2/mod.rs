@@ -28,3 +28,5 @@
  */
 
 mod vertical_u8_dot;
+
+pub(crate) use vertical_u8_dot::convolve_vertical_sve2_i8_dot;

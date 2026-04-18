@@ -123,14 +123,14 @@ fn main() {
 
     let mut scaler = Scaler::new(ResamplingFunction::Bilinear)
         .set_threading_policy(ThreadingPolicy::Single)
-        .set_supersampling(true);
+        .set_supersampling(false);
     // scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
     let mut store =
         Rgb8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     store.bit_depth = 16;
 
-    let mut t_size = ImageSize::new(dimensions.0 as usize / 4, dimensions.1 as usize / 4);
+    let mut t_size = ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2);
     // t_size.height += 1;
     let resizing_plan = scaler
         .plan_rgb_resampling(
@@ -139,8 +139,8 @@ fn main() {
         )
         .unwrap();
     let mut dst_store = Rgb8ImageStoreMut::alloc_with_depth(
-        dimensions.0 as usize / 4,
-        dimensions.1 as usize / 4,
+        dimensions.0 as usize / 2,
+        dimensions.1 as usize / 2,
         16,
     );
     resizing_plan.resample(&store, &mut dst_store).unwrap();
@@ -211,7 +211,7 @@ fn main() {
         .unwrap();
     } else if dst_store.channels == 2 {
         image::save_buffer(
-            "converted.png",
+            "../../converted_del.png",
             &dst,
             dst_store.width as u32,
             dst_store.height as u32,

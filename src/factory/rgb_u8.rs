@@ -164,6 +164,18 @@ impl VerticalConvolutionPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
                 }
                 crate::WorkloadStrategy::PreferSpeed => {
                     // For more downscaling better to use more precise version
+                    #[cfg(feature = "sve")]
+                    if std::arch::is_aarch64_feature_detected!("sve2")
+                        && std::arch::is_aarch64_feature_detected!("i8mm")
+                    {
+                        use crate::sve2::convolve_vertical_sve2_i8_dot;
+                        let i_weights = filter_weights.numerical_approximation_q0_7(0);
+                        return Arc::new(VerticalFiltering {
+                            filter_weights: i_weights,
+                            filter_row: convolve_vertical_sve2_i8_dot,
+                            threading_policy,
+                        });
+                    }
                     #[cfg(feature = "rdm")]
                     if _scale_factor < 8. && std::arch::is_aarch64_feature_detected!("rdm") {
                         use crate::neon::convolve_vertical_neon_i16_precision;
@@ -175,11 +187,10 @@ impl VerticalConvolutionPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
                     #[cfg(feature = "nightly_i8mm")]
                     if _scale_factor < 10. && std::arch::is_aarch64_feature_detected!("i8mm") {
                         use crate::neon::convolve_vertical_neon_i8_dot;
-                        let _dispatcher = convolve_vertical_neon_i8_dot;
                         let i_weights = filter_weights.numerical_approximation_q0_7(0);
                         return Arc::new(VerticalFiltering {
                             filter_weights: i_weights,
-                            filter_row: _dispatcher,
+                            filter_row: convolve_vertical_neon_i8_dot,
                             threading_policy,
                         });
                     }

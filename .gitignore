@@ -2,7 +2,7 @@
 app/target
 .DS_Store
 .idea
-converted*
+converted_del.png
 fast_image.*
 cross/
 converted_risc_o.png
