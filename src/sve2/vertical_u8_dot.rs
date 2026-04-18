@@ -55,35 +55,6 @@ pub(crate) fn convolve_vertical_sve2_i8_dot(
     }
 }
 
-#[inline]
-#[target_feature(enable = "sve,sve2")]
-fn pack_4_rows_sve(a: svuint8_t, b: svuint8_t, c: svuint8_t, d: svuint8_t) -> [svuint8_t; 4] {
-    let ab_lo = svzip1_u8(a, b);
-    let ab_hi = svzip2_u8(a, b);
-
-    let cd_lo = svzip1_u8(c, d);
-    let cd_hi = svzip2_u8(c, d);
-
-    let lo0 = svreinterpret_u8_u16(svzip1_u16(
-        svreinterpret_u16_u8(ab_lo),
-        svreinterpret_u16_u8(cd_lo),
-    ));
-    let lo1 = svreinterpret_u8_u16(svzip2_u16(
-        svreinterpret_u16_u8(ab_lo),
-        svreinterpret_u16_u8(cd_lo),
-    ));
-    let hi0 = svreinterpret_u8_u16(svzip1_u16(
-        svreinterpret_u16_u8(ab_hi),
-        svreinterpret_u16_u8(cd_hi),
-    ));
-    let hi1 = svreinterpret_u8_u16(svzip2_u16(
-        svreinterpret_u16_u8(ab_hi),
-        svreinterpret_u16_u8(cd_hi),
-    ));
-
-    [lo0, lo1, hi0, hi1]
-}
-
 macro_rules! pack_4_rows_sve {
     ($a:expr, $b:expr, $c:expr, $d:expr) => {{
         let ab_lo = svzip1_u8($a, $b);
@@ -134,7 +105,7 @@ fn work_32_chunks(
     let shuf4 = svreinterpret_u8_s32(svdup_n_s32(i32::from_ne_bytes([0, 1, 2, 3])));
 
     let pg_full = svptrue_b8();
-    while cx + 32 <= len {
+    while cx + vl * 2 <= len {
         let rounding = svdup_n_s32(ROUNDING);
         let mut acc_0 = rounding;
         let mut acc_1 = rounding;
@@ -292,7 +263,7 @@ fn work_32_chunks(
             )
         };
 
-        cx += 32;
+        cx += vl * 2;
     }
     cx
 }
