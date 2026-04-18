@@ -159,19 +159,24 @@ fn convolve_horizontal_rgba_avx_row_one_f16_impl<const FMA: bool>(
 ) {
     unsafe {
         const CN: usize = 4;
-        let mut filter_offset = 0usize;
-        let weights_ptr = &filter_weights.weights;
 
-        let dst_width = filter_weights.bounds.len();
-
-        for x in 0..dst_width {
-            let bounds = filter_weights.bounds.get_unchecked(x);
+        for ((dst, bounds), weights) in dst
+            .as_chunks_mut::<CN>()
+            .0
+            .iter_mut()
+            .zip(filter_weights.bounds.iter())
+            .zip(
+                filter_weights
+                    .weights
+                    .chunks_exact(filter_weights.aligned_size),
+            )
+        {
             let mut jx = 0usize;
             let mut store = _mm256_setzero_ps();
 
             while jx + 8 <= bounds.size {
-                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
-                let (weight0, weight1, weight2, weight3) = load_8_weights_group_4_avx!(ptr);
+                let w_s = weights.get_unchecked(jx..);
+                let (weight0, weight1, weight2, weight3) = load_8_weights_group_4_avx!(w_s);
                 let filter_start = jx + bounds.start;
                 store = convolve_horizontal_parts_8_rgba_f16::<FMA>(
                     filter_start,
@@ -186,8 +191,8 @@ fn convolve_horizontal_rgba_avx_row_one_f16_impl<const FMA: bool>(
             }
 
             while jx + 4 <= bounds.size {
-                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
-                let (weight0, weight1) = load_4_weights_group_2_avx!(ptr);
+                let w_s = weights.get_unchecked(jx..);
+                let (weight0, weight1) = load_4_weights_group_2_avx!(w_s);
                 let filter_start = jx + bounds.start;
                 store = convolve_horizontal_parts_4_rgba_f16::<FMA>(
                     filter_start,
@@ -200,9 +205,9 @@ fn convolve_horizontal_rgba_avx_row_one_f16_impl<const FMA: bool>(
             }
 
             while jx + 2 <= bounds.size {
-                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
-                let weight0 = _mm_broadcast_ss(ptr.get_unchecked(0));
-                let weight1 = _mm_broadcast_ss(ptr.get_unchecked(1));
+                let w_s = weights.get_unchecked(jx..);
+                let weight0 = _mm_broadcast_ss(w_s.get_unchecked(0));
+                let weight1 = _mm_broadcast_ss(w_s.get_unchecked(1));
                 let weight = avx_combine_ps(weight0, weight1);
                 let filter_start = jx + bounds.start;
                 store = convolve_horizontal_parts_2_rgba_f16::<FMA>(
@@ -215,8 +220,8 @@ fn convolve_horizontal_rgba_avx_row_one_f16_impl<const FMA: bool>(
             }
 
             while jx < bounds.size {
-                let ptr = weights_ptr.get_unchecked(jx + filter_offset);
-                let weight0 = _mm256_set1_ps(*ptr);
+                let w_s = weights.get_unchecked(jx);
+                let weight0 = _mm256_broadcast_ss(w_s);
                 let filter_start = jx + bounds.start;
                 store = convolve_horizontal_parts_one_rgba_f16::<FMA>(
                     filter_start,
@@ -227,15 +232,11 @@ fn convolve_horizontal_rgba_avx_row_one_f16_impl<const FMA: bool>(
                 jx += 1;
             }
 
-            let px = x * CN;
-            let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
             let converted_f16 = _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(_mm_add_ps(
                 _mm256_castps256_ps128(store),
                 _mm256_extractf128_ps::<1>(store),
             ));
-            _mm_storeu_si64(dest_ptr as *mut u8, converted_f16);
-
-            filter_offset += filter_weights.aligned_size;
+            _mm_storeu_si64(dst.as_mut_ptr().cast(), converted_f16);
         }
     }
 }
@@ -315,14 +316,29 @@ fn convolve_horizontal_rgba_avx_rows_4_f16_impl<const FMA: bool>(
 ) {
     unsafe {
         const CN: usize = 4;
-        let mut filter_offset = 0usize;
         let zeros = _mm256_setzero_ps();
-        let weights_ptr = &filter_weights.weights;
 
-        let dst_width = filter_weights.bounds.len();
+        let (row0_ref, rest) = dst.split_at_mut(dst_stride);
+        let (row1_ref, rest) = rest.split_at_mut(dst_stride);
+        let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        for x in 0..dst_width {
-            let bounds = filter_weights.bounds.get_unchecked(x);
+        let iter_row0 = row0_ref.as_chunks_mut::<CN>().0;
+        let iter_row1 = row1_ref.as_chunks_mut::<CN>().0;
+        let iter_row2 = row2_ref.as_chunks_mut::<CN>().0;
+        let iter_row3 = row3_ref.as_chunks_mut::<CN>().0;
+
+        for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
+            .iter_mut()
+            .zip(iter_row1.iter_mut())
+            .zip(iter_row2.iter_mut())
+            .zip(iter_row3.iter_mut())
+            .zip(filter_weights.bounds.iter())
+            .zip(
+                filter_weights
+                    .weights
+                    .chunks_exact(filter_weights.aligned_size),
+            )
+        {
             let mut jx = 0usize;
             let mut store_0 = zeros;
             let mut store_1 = zeros;
@@ -330,8 +346,8 @@ fn convolve_horizontal_rgba_avx_rows_4_f16_impl<const FMA: bool>(
             let mut store_3 = zeros;
 
             while jx + 8 <= bounds.size {
-                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
-                let (weight0, weight1, weight2, weight3) = load_8_weights_group_4_avx!(ptr);
+                let w_s = weights.get_unchecked(jx..);
+                let (weight0, weight1, weight2, weight3) = load_8_weights_group_4_avx!(w_s);
                 let filter_start = jx + bounds.start;
 
                 store_0 = convolve_horizontal_parts_8_rgba_f16::<FMA>(
@@ -374,8 +390,8 @@ fn convolve_horizontal_rgba_avx_rows_4_f16_impl<const FMA: bool>(
             }
 
             while jx + 4 <= bounds.size {
-                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
-                let (weight0, weight1) = load_4_weights_group_2_avx!(ptr);
+                let w_s = weights.get_unchecked(jx..);
+                let (weight0, weight1) = load_4_weights_group_2_avx!(w_s);
                 let filter_start = jx + bounds.start;
 
                 store_0 = convolve_horizontal_parts_4_rgba_f16::<FMA>(
@@ -410,9 +426,9 @@ fn convolve_horizontal_rgba_avx_rows_4_f16_impl<const FMA: bool>(
             }
 
             while jx + 2 <= bounds.size {
-                let ptr = weights_ptr.get_unchecked(jx + filter_offset..);
-                let weight0 = _mm_broadcast_ss(ptr.get_unchecked(0));
-                let weight1 = _mm_broadcast_ss(ptr.get_unchecked(1));
+                let w_s = weights.get_unchecked(jx..);
+                let weight0 = _mm_broadcast_ss(w_s.get_unchecked(0));
+                let weight1 = _mm_broadcast_ss(w_s.get_unchecked(1));
                 let weight = avx_combine_ps(weight0, weight1);
                 let filter_start = jx + bounds.start;
                 store_0 = convolve_horizontal_parts_2_rgba_f16::<FMA>(
@@ -443,9 +459,9 @@ fn convolve_horizontal_rgba_avx_rows_4_f16_impl<const FMA: bool>(
             }
 
             while jx < bounds.size {
-                let ptr = weights_ptr.get_unchecked(jx + filter_offset);
+                let w_s = weights.get_unchecked(jx);
                 let filter_start = jx + bounds.start;
-                let weight0 = _mm256_set1_ps(*ptr);
+                let weight0 = _mm256_broadcast_ss(w_s);
                 store_0 = convolve_horizontal_parts_one_rgba_f16::<FMA>(
                     filter_start,
                     src.as_ptr(),
@@ -473,36 +489,29 @@ fn convolve_horizontal_rgba_avx_rows_4_f16_impl<const FMA: bool>(
                 jx += 1;
             }
 
-            let px = x * CN;
-            let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
             let converted_f16_0 = _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(_mm_add_ps(
                 _mm256_castps256_ps128(store_0),
                 _mm256_extractf128_ps::<1>(store_0),
             ));
-            _mm_storeu_si64(dest_ptr as *mut u8, converted_f16_0);
+            _mm_storeu_si64(chunk0.as_mut_ptr().cast(), converted_f16_0);
 
-            let dest_ptr = dst.get_unchecked_mut(px + dst_stride..).as_mut_ptr();
             let converted_f16_1 = _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(_mm_add_ps(
                 _mm256_castps256_ps128(store_1),
                 _mm256_extractf128_ps::<1>(store_1),
             ));
-            _mm_storeu_si64(dest_ptr as *mut u8, converted_f16_1);
+            _mm_storeu_si64(chunk1.as_mut_ptr().cast(), converted_f16_1);
 
-            let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 2..).as_mut_ptr();
             let converted_f16_2 = _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(_mm_add_ps(
                 _mm256_castps256_ps128(store_2),
                 _mm256_extractf128_ps::<1>(store_2),
             ));
-            _mm_storeu_si64(dest_ptr as *mut u8, converted_f16_2);
+            _mm_storeu_si64(chunk2.as_mut_ptr().cast(), converted_f16_2);
 
-            let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 3..).as_mut_ptr();
             let converted_f16_3 = _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(_mm_add_ps(
                 _mm256_castps256_ps128(store_3),
                 _mm256_extractf128_ps::<1>(store_3),
             ));
-            _mm_storeu_si64(dest_ptr as *mut u8, converted_f16_3);
-
-            filter_offset += filter_weights.aligned_size;
+            _mm_storeu_si64(chunk3.as_mut_ptr().cast(), converted_f16_3);
         }
     }
 }

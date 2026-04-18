@@ -62,6 +62,24 @@ impl HorizontalFilterPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
         let mut _dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i16>, u32) =
             handle_fixed_row_u8::<3>;
 
+        #[cfg(all(target_arch = "aarch64", feature = "sve"))]
+        if _scale_factor < 10.
+            && std::arch::is_aarch64_feature_detected!("sve2")
+            && std::arch::is_aarch64_feature_detected!("i8mm")
+        {
+            use crate::sve2::{
+                sve_convolve_horizontal_rgb_neon_row_one_dot,
+                sve_convolve_horizontal_rgb_neon_rows_4_dot,
+            };
+
+            let i_weights = filter_weights.numerical_approximation_q0_7(0);
+            return Arc::new(HorizontalFiltering {
+                filter_weights: i_weights,
+                filter_4_rows: Some(sve_convolve_horizontal_rgb_neon_rows_4_dot),
+                filter_row: sve_convolve_horizontal_rgb_neon_row_one_dot,
+                threading_policy,
+            });
+        }
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             match _options.workload_strategy {
@@ -87,15 +105,11 @@ impl HorizontalFilterPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
                             convolve_horizontal_rgb_neon_row_one_dot,
                             convolve_horizontal_rgb_neon_rows_4_dot,
                         };
-                        let _dispatcher_4_rows: Option<
-                            fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i8>, u32),
-                        > = Some(convolve_horizontal_rgb_neon_rows_4_dot);
-                        let _dispatcher_1_row = convolve_horizontal_rgb_neon_row_one_dot;
                         let i_weights = filter_weights.numerical_approximation_q0_7(0);
                         return Arc::new(HorizontalFiltering {
                             filter_weights: i_weights,
-                            filter_4_rows: _dispatcher_4_rows,
-                            filter_row: _dispatcher_1_row,
+                            filter_4_rows: Some(convolve_horizontal_rgb_neon_rows_4_dot),
+                            filter_row: convolve_horizontal_rgb_neon_row_one_dot,
                             threading_policy,
                         });
                     }
@@ -142,77 +156,94 @@ impl VerticalConvolutionPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
     fn vertical_plan(
         filter_weights: FilterWeights<f32>,
         threading_policy: ThreadingPolicy,
-        _options: ConvolutionOptions,
+        options: ConvolutionOptions,
     ) -> Arc<dyn ColumnFilter<u8, 3> + Send + Sync> {
-        let _scale_factor = _options.src_size.height as f32 / _options.dst_size.height as f32;
-        #[allow(clippy::type_complexity)]
-        let mut _dispatcher: fn(
-            usize,
-            &FilterBounds,
-            &[u8],
-            &mut [u8],
-            usize,
-            &[i16],
-            u32,
-        ) = handle_fixed_column_u8;
-        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
-        {
-            match _options.workload_strategy {
-                crate::WorkloadStrategy::PreferQuality => {
+        vertical_strategy_u8(filter_weights, threading_policy, options)
+    }
+}
+
+pub(crate) fn vertical_strategy_u8<const N: usize>(
+    filter_weights: FilterWeights<f32>,
+    threading_policy: ThreadingPolicy,
+    _options: ConvolutionOptions,
+) -> Arc<dyn ColumnFilter<u8, N> + Send + Sync> {
+    let _scale_factor = _options.src_size.height as f32 / _options.dst_size.height as f32;
+    #[allow(clippy::type_complexity)]
+    let mut _dispatcher: fn(usize, &FilterBounds, &[u8], &mut [u8], usize, &[i16], u32) =
+        handle_fixed_column_u8;
+    // For more downscaling better to use more precise version
+    #[cfg(all(target_arch = "aarch64", feature = "sve"))]
+    match _options.workload_strategy {
+        crate::WorkloadStrategy::PreferQuality => {}
+        crate::WorkloadStrategy::PreferSpeed => {
+            if std::arch::is_aarch64_feature_detected!("sve2")
+                && std::arch::is_aarch64_feature_detected!("i8mm")
+            {
+                use crate::sve2::convolve_vertical_sve2_i8_dot;
+                let i_weights = filter_weights.numerical_approximation_q0_7(0);
+                return Arc::new(VerticalFiltering {
+                    filter_weights: i_weights,
+                    filter_row: convolve_vertical_sve2_i8_dot,
+                    threading_policy,
+                });
+            }
+        }
+    }
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+    {
+        match _options.workload_strategy {
+            crate::WorkloadStrategy::PreferQuality => {
+                use crate::neon::convolve_vertical_neon_i32_precision;
+                _dispatcher = convolve_vertical_neon_i32_precision;
+            }
+            crate::WorkloadStrategy::PreferSpeed => {
+                #[cfg(feature = "rdm")]
+                if _scale_factor < 8. && std::arch::is_aarch64_feature_detected!("rdm") {
+                    use crate::neon::convolve_vertical_neon_i16_precision;
+                    _dispatcher = convolve_vertical_neon_i16_precision;
+                } else {
                     use crate::neon::convolve_vertical_neon_i32_precision;
                     _dispatcher = convolve_vertical_neon_i32_precision;
                 }
-                crate::WorkloadStrategy::PreferSpeed => {
-                    // For more downscaling better to use more precise version
-                    #[cfg(feature = "rdm")]
-                    if _scale_factor < 8. && std::arch::is_aarch64_feature_detected!("rdm") {
-                        use crate::neon::convolve_vertical_neon_i16_precision;
-                        _dispatcher = convolve_vertical_neon_i16_precision;
-                    } else {
-                        use crate::neon::convolve_vertical_neon_i32_precision;
-                        _dispatcher = convolve_vertical_neon_i32_precision;
-                    }
-                    #[cfg(feature = "nightly_i8mm")]
-                    if _scale_factor < 10. && std::arch::is_aarch64_feature_detected!("i8mm") {
-                        use crate::neon::convolve_vertical_neon_i8_dot;
-                        let _dispatcher = convolve_vertical_neon_i8_dot;
-                        let i_weights = filter_weights.numerical_approximation_q0_7(0);
-                        return Arc::new(VerticalFiltering {
-                            filter_weights: i_weights,
-                            filter_row: _dispatcher,
-                            threading_policy,
-                        });
-                    }
-                    #[cfg(not(feature = "rdm"))]
-                    {
-                        use crate::neon::convolve_vertical_neon_i32_precision;
-                        _dispatcher = convolve_vertical_neon_i32_precision;
-                    }
+                #[cfg(feature = "nightly_i8mm")]
+                if _scale_factor < 10. && std::arch::is_aarch64_feature_detected!("i8mm") {
+                    use crate::neon::convolve_vertical_neon_i8_dot;
+                    let i_weights = filter_weights.numerical_approximation_q0_7(0);
+                    return Arc::new(VerticalFiltering {
+                        filter_weights: i_weights,
+                        filter_row: convolve_vertical_neon_i8_dot,
+                        threading_policy,
+                    });
+                }
+                #[cfg(not(feature = "rdm"))]
+                {
+                    use crate::neon::convolve_vertical_neon_i32_precision;
+                    _dispatcher = convolve_vertical_neon_i32_precision;
                 }
             }
         }
-        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
-        {
-            if std::arch::is_x86_feature_detected!("sse4.1") {
-                _dispatcher = convolve_vertical_sse_row;
-            }
-        }
-        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
-        {
-            if std::arch::is_x86_feature_detected!("avx2") {
-                _dispatcher = convolve_vertical_avx_row;
-            }
-        }
-        #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-        {
-            _dispatcher = wasm_vertical_neon_row;
-        }
-        use crate::support::PRECISION;
-        let i_weights = filter_weights.numerical_approximation::<i16, PRECISION>(0);
-        Arc::new(VerticalFiltering {
-            filter_weights: i_weights,
-            filter_row: _dispatcher,
-            threading_policy,
-        })
     }
+    #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+    {
+        if std::arch::is_x86_feature_detected!("sse4.1") {
+            _dispatcher = convolve_vertical_sse_row;
+        }
+    }
+    #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+    {
+        if std::arch::is_x86_feature_detected!("avx2") {
+            _dispatcher = convolve_vertical_avx_row;
+        }
+    }
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    {
+        _dispatcher = wasm_vertical_neon_row;
+    }
+    use crate::support::PRECISION;
+    let i_weights = filter_weights.numerical_approximation::<i16, PRECISION>(0);
+    Arc::new(VerticalFiltering {
+        filter_weights: i_weights,
+        filter_row: _dispatcher,
+        threading_policy,
+    })
 }

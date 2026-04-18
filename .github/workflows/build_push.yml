@@ -64,7 +64,7 @@ jobs:
     name: Testing x86
     strategy:
       matrix:
-        os: [ avx, sse, "", nightly_f16 ]
+        feature: [ avx, sse, "", nightly_f16 ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -195,10 +195,10 @@ jobs:
 
   tests_arm:
     name: Testing ARM
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
-        os: [ "", "rdm,nightly_i8mm,nightly_f16" ]
-    runs-on: macos-latest
+        feature: [ "", "neon", "neon,rdm,nightly_i8mm,nightly_f16", "sve" ]
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
@@ -234,6 +234,29 @@ jobs:
       - run: cargo fuzz run resize_rgb --features ${{ matrix.feature }} -- -max_total_time=15
       - run: cargo fuzz run resize_cbcr8 --features ${{ matrix.feature }} -- -max_total_time=15
 
+  fuzz_nightly_arm_sve:
+    name: Fuzzing SVE2
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      matrix:
+        feature: [ sve ]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Verify SVE2 available
+        run: |
+          python3 ./assets/sve_vl.py
+          grep -m1 "sve2" /proc/cpuinfo || (echo "SVE2 not available on this runner" && exit 1)
+
+      - uses: dtolnay/rust-toolchain@nightly
+
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz run resize_rgba  --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_rgb   --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_cbcr8 --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_rgb_u16 --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_rgba_u16 --features ${{ matrix.feature }} -- -max_total_time=15
+
   fuzz_rgba_8bit_x86_64:
     name: Fuzzing 8bit x86_64
     strategy:
@@ -263,18 +286,18 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        feature: [ neon ]
+        feature: [ neon, "neon,nightly_f16" ]
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
-      - run: cargo fuzz run resize_rgba_u16 -- -max_total_time=15
-      - run: cargo fuzz run resize_rgba_f16 -- -max_total_time=15
-      - run: cargo fuzz run resize_rgb_u16 -- -max_total_time=15
-      - run: cargo fuzz run resize_rgb_f16 -- -max_total_time=15
-      - run: cargo fuzz run resize_cbcr16 -- -max_total_time=15
-      - run: cargo fuzz run resize_cbcr_f16 -- -max_total_time=15
-      - run: cargo fuzz run resize_plane_u16 -- -max_total_time=15
+      - run: cargo fuzz run resize_rgba_u16 --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_rgba_f16 --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_rgb_u16 --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_rgb_f16 --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_cbcr16 --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_cbcr_f16 --features ${{ matrix.feature }} -- -max_total_time=15
+      - run: cargo fuzz run resize_plane_u16 --features ${{ matrix.feature }} -- -max_total_time=15
   
   fuzz_rgba_high_bit_arm_rdm:
     name: Fuzzing High bit-depth RDM
@@ -291,7 +314,7 @@ jobs:
     name: Fuzzing High bit-depth
     strategy:
       matrix:
-        feature: [ sse, avx, "" ]
+        feature: [ "sse,nightly_f16", "avx,nightly_f16", "" ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

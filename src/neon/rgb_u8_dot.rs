@@ -100,10 +100,9 @@ fn convolve_horizontal_rgb_neon_rows_4_impl(
     filter_weights: &FilterWeights<i8>,
 ) {
     unsafe {
-        let tbl: [u8; 16] = [0, 3, 6, 9, 1, 4, 7, 10, 2, 5, 8, 11, 255, 255, 255, 255];
-        let v_tbl = vld1q_u8(tbl.as_ptr());
-        let weights_tbl: [u8; 16] = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3];
-        let v_weights = vld1q_u8(weights_tbl.as_ptr());
+        static TBL0: [u8; 16] = [0, 3, 6, 9, 1, 4, 7, 10, 2, 5, 8, 11, 255, 255, 255, 255];
+        let v_tbl = vld1q_u8(TBL0.as_ptr());
+        let v_weights = vreinterpretq_u8_u32(vdupq_n_u32(u32::from_ne_bytes([0, 1, 2, 3])));
 
         // (r0 g0 b0 r1) (g2 b2 r3 g3) (b3 r4 g4 b4) (r5 g5 b5 r6)
 
@@ -226,8 +225,7 @@ fn convolve_horizontal_rgb_neon_row_one_impl_dot(
 
         let tbl: [u8; 16] = [0, 3, 6, 9, 1, 4, 7, 10, 2, 5, 8, 11, 255, 255, 255, 255];
         let v_tbl = vld1q_u8(tbl.as_ptr());
-        let weights_tbl: [u8; 16] = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3];
-        let v_weights = vld1q_u8(weights_tbl.as_ptr());
+        let v_weights = vreinterpretq_u8_u32(vdupq_n_u32(u32::from_ne_bytes([0, 1, 2, 3])));
 
         let rnd_const: i32 = 1 << 6;
 

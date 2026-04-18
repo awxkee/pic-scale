@@ -185,28 +185,33 @@ fn xconvolve_horizontal_rgba_neon_row_one_f16_impl(
 ) {
     unsafe {
         const CN: usize = 4;
-        let mut filter_offset = 0usize;
-        let weights_ptr = filter_weights.weights.as_ptr();
 
-        let dst_width = filter_weights.weights.len();
-
-        for x in 0..dst_width {
-            let bounds = filter_weights.bounds.get_unchecked(x);
+        for ((dst, bounds), weights) in dst
+            .as_chunks_mut::<CN>()
+            .0
+            .iter_mut()
+            .zip(filter_weights.bounds.iter())
+            .zip(
+                filter_weights
+                    .weights
+                    .chunks_exact(filter_weights.aligned_size),
+            )
+        {
             let mut jx = 0usize;
             let mut store = vdup_n_f16(0.);
 
             while jx + 4 <= bounds.size {
                 let bounds_start = bounds.start + jx;
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let read_weights = vcvt_f16_f32(vld1q_f32(ptr));
+                let w_s = weights.get_unchecked(jx);
+                let read_weights = vcvt_f16_f32(vld1q_f32(w_s));
                 store = conv_horiz_4_rgba_f16(bounds_start, src, read_weights, store);
                 jx += 4;
             }
 
             while jx + 2 <= bounds.size {
                 let bounds_start = bounds.start + jx;
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let read_weights_h = vld1_f32(ptr);
+                let w_s = weights.get_unchecked(jx);
+                let read_weights_h = vld1_f32(w_s);
                 let read_weights = vcvt_f16_f32(vcombine_f32(read_weights_h, read_weights_h));
                 store = conv_horiz_rgba_2_f32(bounds_start, src, read_weights, store);
                 jx += 2;
@@ -214,17 +219,13 @@ fn xconvolve_horizontal_rgba_neon_row_one_f16_impl(
 
             while jx < bounds.size {
                 let bounds_start = bounds.start + jx;
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = vcvt_f16_f32(vld1q_dup_f32(ptr));
+                let w_s = weights.get_unchecked(jx);
+                let weight0 = vcvt_f16_f32(vld1q_dup_f32(w_s));
                 store = conv_horiz_rgba_1_f16(bounds_start, src, weight0, store);
                 jx += 1;
             }
 
-            let px = x * CN;
-            let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-            vst1_f16(dest_ptr, store);
-
-            filter_offset += filter_weights.aligned_size;
+            vst1_f16(dst.as_mut_ptr(), store);
         }
     }
 }
@@ -258,14 +259,28 @@ fn xconvolve_horizontal_rgba_neon_rows_4_f16_impl(
 ) {
     unsafe {
         const CN: usize = 4;
-        let mut filter_offset = 0usize;
 
-        let weights_ptr = filter_weights.weights.as_ptr();
+        let (row0_ref, rest) = dst.split_at_mut(dst_stride);
+        let (row1_ref, rest) = rest.split_at_mut(dst_stride);
+        let (row2_ref, row3_ref) = rest.split_at_mut(dst_stride);
 
-        let dst_width = filter_weights.bounds.len();
+        let iter_row0 = row0_ref.as_chunks_mut::<CN>().0;
+        let iter_row1 = row1_ref.as_chunks_mut::<CN>().0;
+        let iter_row2 = row2_ref.as_chunks_mut::<CN>().0;
+        let iter_row3 = row3_ref.as_chunks_mut::<CN>().0;
 
-        for x in 0..dst_width {
-            let bounds = filter_weights.bounds.get_unchecked(x);
+        for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
+            .iter_mut()
+            .zip(iter_row1.iter_mut())
+            .zip(iter_row2.iter_mut())
+            .zip(iter_row3.iter_mut())
+            .zip(filter_weights.bounds.iter())
+            .zip(
+                filter_weights
+                    .weights
+                    .chunks_exact(filter_weights.aligned_size),
+            )
+        {
             let mut jx = 0usize;
             let mut store_0 = vdup_n_f16(0.);
             let mut store_1 = vdup_n_f16(0.);
@@ -273,8 +288,8 @@ fn xconvolve_horizontal_rgba_neon_rows_4_f16_impl(
             let mut store_3 = vdup_n_f16(0.);
 
             while jx + 8 <= bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let read_weights_h = xvld1q_f32_x2(ptr);
+                let w_s = weights.get_unchecked(jx);
+                let read_weights_h = xvld1q_f32_x2(w_s);
                 let read_weights = vcombine_f16(
                     vcvt_f16_f32(read_weights_h.0),
                     vcvt_f16_f32(read_weights_h.1),
@@ -291,8 +306,8 @@ fn xconvolve_horizontal_rgba_neon_rows_4_f16_impl(
             }
 
             while jx + 4 <= bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let read_weights = vcvt_f16_f32(vld1q_f32(ptr));
+                let w_s = weights.get_unchecked(jx);
+                let read_weights = vcvt_f16_f32(vld1q_f32(w_s));
                 let bounds_start = bounds.start + jx;
                 store_0 = conv_horiz_4_rgba_f16(bounds_start, src, read_weights, store_0);
                 let s_ptr_1 = src.get_unchecked(src_stride..);
@@ -305,8 +320,8 @@ fn xconvolve_horizontal_rgba_neon_rows_4_f16_impl(
             }
 
             while jx + 2 <= bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let read_weights_h = vld1_f32(ptr);
+                let w_s = weights.get_unchecked(jx);
+                let read_weights_h = vld1_f32(w_s);
                 let read_weights = vcvt_f16_f32(vcombine_f32(read_weights_h, read_weights_h));
                 let bounds_start = bounds.start + jx;
                 store_0 = conv_horiz_rgba_2_f32(bounds_start, src, read_weights, store_0);
@@ -320,8 +335,8 @@ fn xconvolve_horizontal_rgba_neon_rows_4_f16_impl(
             }
 
             while jx < bounds.size {
-                let ptr = weights_ptr.add(jx + filter_offset);
-                let weight0 = vcvt_f16_f32(vld1q_dup_f32(ptr));
+                let w_s = weights.get_unchecked(jx);
+                let weight0 = vcvt_f16_f32(vld1q_dup_f32(w_s));
                 let bounds_start = bounds.start + jx;
                 store_0 = conv_horiz_rgba_1_f16(bounds_start, src, weight0, store_0);
                 let ptr_1 = src.get_unchecked(src_stride..);
@@ -333,20 +348,10 @@ fn xconvolve_horizontal_rgba_neon_rows_4_f16_impl(
                 jx += 1;
             }
 
-            let px = x * CN;
-            let dest_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();
-            vst1_f16(dest_ptr, store_0);
-
-            let dest_ptr = dst.get_unchecked_mut(px + dst_stride..).as_mut_ptr();
-            vst1_f16(dest_ptr, store_1);
-
-            let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 2..).as_mut_ptr();
-            vst1_f16(dest_ptr, store_2);
-
-            let dest_ptr = dst.get_unchecked_mut(px + dst_stride * 3..).as_mut_ptr();
-            vst1_f16(dest_ptr, store_3);
-
-            filter_offset += filter_weights.aligned_size;
+            vst1_f16(chunk0.as_mut_ptr(), store_0);
+            vst1_f16(chunk1.as_mut_ptr(), store_1);
+            vst1_f16(chunk2.as_mut_ptr(), store_2);
+            vst1_f16(chunk3.as_mut_ptr(), store_3);
         }
     }
 }

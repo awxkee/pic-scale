@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ * Copyright (c) Radzivon Bartoshyk 4/2026. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -26,12 +26,13 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-mod avx512_setr;
-mod check_alpha;
-mod rgba_u8_dot_vnni;
-mod utils;
 
-pub(crate) use check_alpha::avx512_has_non_constant_cap_alpha_rgba8;
-pub(crate) use rgba_u8_dot_vnni::{
-    convolve_horizontal_rgba_vnni_row_1, convolve_horizontal_rgba_vnni_row_4,
+mod rgb_u8_dot;
+mod vertical_u16_dot;
+mod vertical_u8_dot;
+
+pub(crate) use rgb_u8_dot::{
+    sve_convolve_horizontal_rgb_neon_row_one_dot, sve_convolve_horizontal_rgb_neon_rows_4_dot,
 };
+pub(crate) use vertical_u8_dot::convolve_vertical_sve2_i8_dot;
+pub(crate) use vertical_u16_dot::convolve_vertical_sve2_u16_dot;

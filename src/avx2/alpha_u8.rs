@@ -28,9 +28,7 @@
  */
 
 use crate::WorkloadStrategy;
-use crate::avx2::utils::{
-    _mm256_select_si256, avx2_deinterleave_rgba, avx2_div_by255, avx2_interleave_rgba,
-};
+use crate::avx2::utils::avx2_div_by255;
 use std::arch::x86_64::*;
 
 pub(crate) fn avx_premultiply_alpha_rgba(dst: &mut [u8], src: &[u8]) {
@@ -48,7 +46,7 @@ struct AssociateAlphaDefault {}
 
 impl AssociateAlphaDefault {
     #[inline(always)]
-    fn associate_chunk(&self, dst: &mut [u8], src: &[u8]) {
+    fn associate_chunk(&self, dst: &mut [u8; 32], src: &[u8; 32]) {
         unsafe {
             let shuffle = _mm256_setr_epi8(
                 3, 3, 3, 3, 7, 7, 7, 7, 11, 11, 11, 11, 15, 15, 15, 15, 3, 3, 3, 3, 7, 7, 7, 7, 11,
@@ -87,31 +85,34 @@ impl AssociateAlphaDefault {
 impl AssociateAlpha for AssociateAlphaDefault {
     #[target_feature(enable = "avx2")]
     unsafe fn associate(&self, dst: &mut [u8], src: &[u8]) {
-        unsafe {
-            let mut rem = dst;
-            let mut src_rem = src;
+        let mut rem = dst;
+        let mut src_rem = src;
 
-            for (dst, src) in rem.chunks_exact_mut(32).zip(src_rem.chunks_exact(32)) {
-                self.associate_chunk(dst, src);
-            }
+        for (dst, src) in rem
+            .as_chunks_mut::<32>()
+            .0
+            .iter_mut()
+            .zip(src_rem.as_chunks::<32>().0.iter())
+        {
+            self.associate_chunk(dst, src);
+        }
 
-            rem = rem.chunks_exact_mut(32).into_remainder();
-            src_rem = src_rem.chunks_exact(32).remainder();
+        rem = rem.as_chunks_mut::<32>().1;
+        src_rem = src_rem.as_chunks::<32>().1;
 
-            if !rem.is_empty() {
-                const PART_SIZE: usize = 32;
-                assert!(src_rem.len() < PART_SIZE);
-                assert!(rem.len() < PART_SIZE);
-                assert_eq!(src_rem.len(), rem.len());
+        if !rem.is_empty() {
+            const PART_SIZE: usize = 32;
+            assert!(src_rem.len() < PART_SIZE);
+            assert!(rem.len() < PART_SIZE);
+            assert_eq!(src_rem.len(), rem.len());
 
-                let mut buffer: [u8; PART_SIZE] = [0u8; PART_SIZE];
-                let mut dst_buffer: [u8; PART_SIZE] = [0u8; PART_SIZE];
-                std::ptr::copy_nonoverlapping(src_rem.as_ptr(), buffer.as_mut_ptr(), src_rem.len());
+            let mut buffer: [u8; PART_SIZE] = [0u8; PART_SIZE];
+            let mut dst_buffer: [u8; PART_SIZE] = [0u8; PART_SIZE];
+            buffer[..rem.len()].copy_from_slice(rem);
 
-                self.associate_chunk(&mut dst_buffer, &buffer);
+            self.associate_chunk(&mut dst_buffer, &buffer);
 
-                std::ptr::copy_nonoverlapping(dst_buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
-            }
+            rem.copy_from_slice(&dst_buffer[..rem.len()]);
         }
     }
 }
@@ -128,9 +129,17 @@ fn avx_premultiply_alpha_rgba_impl(dst: &mut [u8], src: &[u8]) {
     avx_premultiply_alpha_rgba_impl_row(dst, src, AssociateAlphaDefault::default());
 }
 
-pub(crate) fn avx_unpremultiply_alpha_rgba(in_place: &mut [u8], _: WorkloadStrategy) {
+pub(crate) fn avx_unpremultiply_alpha_rgba(in_place: &mut [u8], strategy: WorkloadStrategy) {
     unsafe {
-        avx_unpremultiply_alpha_rgba_impl(in_place);
+        match strategy {
+            WorkloadStrategy::PreferQuality => {
+                avx_unpremultiply_alpha_rgba_impl_row(in_place, Avx2DisassociateAlpha::default())
+            }
+            WorkloadStrategy::PreferSpeed => avx_unpremultiply_alpha_rgba_impl_row(
+                in_place,
+                Avx2DisassociateAlphaFast::default(),
+            ),
+        }
     }
 }
 
@@ -142,149 +151,174 @@ trait DisassociateAlpha {
 struct Avx2DisassociateAlpha {}
 
 impl Avx2DisassociateAlpha {
-    #[inline(always)]
-    fn avx2_unpremultiply_row(&self, x: __m256i, is_zero_mask: __m256i, a: [__m256; 4]) -> __m256i {
-        unsafe {
-            let zeros = _mm256_setzero_si256();
-            let lo = _mm256_unpacklo_epi8(x, zeros);
-            let hi = _mm256_unpackhi_epi8(x, zeros);
-
-            let scale_ps = _mm256_set1_ps(255.);
-
-            let llw = _mm256_unpacklo_epi16(lo, zeros);
-            let lhw = _mm256_unpackhi_epi16(lo, zeros);
-            let hlw = _mm256_unpacklo_epi16(hi, zeros);
-            let hhw = _mm256_unpackhi_epi16(hi, zeros);
-
-            let llwc = _mm256_cvtepi32_ps(llw);
-            let lhwc = _mm256_cvtepi32_ps(lhw);
-            let hlwc = _mm256_cvtepi32_ps(hlw);
-            let hhwc = _mm256_cvtepi32_ps(hhw);
-
-            let lo_lo = _mm256_mul_ps(llwc, scale_ps);
-            let lo_hi = _mm256_mul_ps(lhwc, scale_ps);
-            let hi_lo = _mm256_mul_ps(hlwc, scale_ps);
-            let hi_hi = _mm256_mul_ps(hhwc, scale_ps);
-
-            let fllw = _mm256_mul_ps(lo_lo, a[0]);
-            let flhw = _mm256_mul_ps(lo_hi, a[1]);
-            let fhlw = _mm256_mul_ps(hi_lo, a[2]);
-            let fhhw = _mm256_mul_ps(hi_hi, a[3]);
-
-            let lo_lo = _mm256_cvtps_epi32(fllw);
-            let lo_hi = _mm256_cvtps_epi32(flhw);
-            let hi_lo = _mm256_cvtps_epi32(fhlw);
-            let hi_hi = _mm256_cvtps_epi32(fhhw);
-
-            let packed0 = _mm256_packus_epi32(lo_lo, lo_hi);
-            let packed1 = _mm256_packus_epi32(hi_lo, hi_hi);
-
-            _mm256_select_si256(is_zero_mask, zeros, _mm256_packus_epi16(packed0, packed1))
-        }
-    }
-
-    #[inline(always)]
-    fn disassociate_chunk<const FMA: bool>(&self, in_place: &mut [u8]) {
-        unsafe {
-            let src_ptr = in_place.as_ptr();
-            let rgba0 = _mm256_loadu_si256(src_ptr as *const __m256i);
-            let rgba1 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
-            let rgba2 = _mm256_loadu_si256(src_ptr.add(64) as *const __m256i);
-            let rgba3 = _mm256_loadu_si256(src_ptr.add(96) as *const __m256i);
-            let (rrr, ggg, bbb, aaa) = avx2_deinterleave_rgba(rgba0, rgba1, rgba2, rgba3);
-
-            let is_zero_mask = _mm256_cmpeq_epi8(aaa, _mm256_setzero_si256());
-
-            let a_lo = _mm256_unpacklo_epi8(aaa, _mm256_setzero_si256());
-            let a_hi = _mm256_unpackhi_epi8(aaa, _mm256_setzero_si256());
-
-            let allw = _mm256_unpacklo_epi16(a_lo, _mm256_setzero_si256());
-            let alhw = _mm256_unpackhi_epi16(a_lo, _mm256_setzero_si256());
-            let ahlw = _mm256_unpacklo_epi16(a_hi, _mm256_setzero_si256());
-            let ahhw = _mm256_unpackhi_epi16(a_hi, _mm256_setzero_si256());
-
-            let allf = _mm256_cvtepi32_ps(allw);
-            let alhf = _mm256_cvtepi32_ps(alhw);
-            let ahlf = _mm256_cvtepi32_ps(ahlw);
-            let ahhf = _mm256_cvtepi32_ps(ahhw);
-
-            let a_lo_lo = _mm256_rcp_ps(allf);
-            let a_lo_hi = _mm256_rcp_ps(alhf);
-            let a_hi_lo = _mm256_rcp_ps(ahlf);
-            let a_hi_hi = _mm256_rcp_ps(ahhf);
-
-            let rrr = self.avx2_unpremultiply_row(
-                rrr,
-                is_zero_mask,
-                [a_lo_lo, a_lo_hi, a_hi_lo, a_hi_hi],
-            );
-            let ggg = self.avx2_unpremultiply_row(
-                ggg,
-                is_zero_mask,
-                [a_lo_lo, a_lo_hi, a_hi_lo, a_hi_hi],
-            );
-            let bbb = self.avx2_unpremultiply_row(
-                bbb,
-                is_zero_mask,
-                [a_lo_lo, a_lo_hi, a_hi_lo, a_hi_hi],
-            );
-
-            let (rgba0, rgba1, rgba2, rgba3) = avx2_interleave_rgba(rrr, ggg, bbb, aaa);
-
-            let dst_ptr = in_place.as_mut_ptr();
-            _mm256_storeu_si256(dst_ptr as *mut __m256i, rgba0);
-            _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, rgba1);
-            _mm256_storeu_si256(dst_ptr.add(64) as *mut __m256i, rgba2);
-            _mm256_storeu_si256(dst_ptr.add(96) as *mut __m256i, rgba3);
-        }
-    }
-
-    #[inline(always)]
-    fn disassociate_work<const FMA: bool>(&self, in_place: &mut [u8]) {
-        unsafe {
-            let mut rem = in_place;
-
-            for dst in rem.chunks_exact_mut(32 * 4) {
-                self.disassociate_chunk::<FMA>(dst);
-            }
-
-            rem = rem.chunks_exact_mut(32 * 4).into_remainder();
-
-            if !rem.is_empty() {
-                const PART_SIZE: usize = 32 * 4;
-                assert!(rem.len() < PART_SIZE);
-
-                let mut buffer: [u8; PART_SIZE] = [0u8; PART_SIZE];
-
-                std::ptr::copy_nonoverlapping(rem.as_ptr(), buffer.as_mut_ptr(), rem.len());
-
-                self.disassociate_chunk::<FMA>(&mut buffer);
-
-                std::ptr::copy_nonoverlapping(buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
-            }
-        }
-    }
-
+    #[inline]
     #[target_feature(enable = "avx2")]
-    fn disassociate_avx2(&self, in_place: &mut [u8]) {
-        self.disassociate_work::<false>(in_place);
-    }
+    fn disassociate_chunk(&self, in_place: &mut [u8; 32]) {
+        let alpha_mask = _mm256_setr_epi8(
+            3, -1, -1, -1, 7, -1, -1, -1, 11, -1, -1, -1, 15, -1, -1, -1, 3, -1, -1, -1, 7, -1, -1,
+            -1, 11, -1, -1, -1, 15, -1, -1, -1,
+        );
+        let rgba = unsafe { _mm256_loadu_si256(in_place.as_ptr().cast()) };
+        let alpha_u32 = _mm256_shuffle_epi8(rgba, alpha_mask);
+        let alpha_f32 = _mm256_mul_ps(
+            _mm256_rcp_ps(_mm256_cvtepi32_ps(alpha_u32)),
+            _mm256_set1_ps(255.),
+        );
+        let is_zero_mask = _mm256_cmpeq_epi32(alpha_u32, _mm256_setzero_si256());
 
-    #[target_feature(enable = "avx2", enable = "fma")]
-    fn disassociate_fma(&self, in_place: &mut [u8]) {
-        self.disassociate_work::<true>(in_place);
+        let a_lo = _mm256_unpacklo_epi8(rgba, _mm256_setzero_si256());
+        let a_hi = _mm256_unpackhi_epi8(rgba, _mm256_setzero_si256());
+
+        let p0 = _mm256_unpacklo_epi16(a_lo, _mm256_setzero_si256());
+        let p1 = _mm256_unpackhi_epi16(a_lo, _mm256_setzero_si256());
+        let p2 = _mm256_unpacklo_epi16(a_hi, _mm256_setzero_si256());
+        let p3 = _mm256_unpackhi_epi16(a_hi, _mm256_setzero_si256());
+
+        let mut v0 = _mm256_cvtepi32_ps(p0);
+        let mut v1 = _mm256_cvtepi32_ps(p1);
+        let mut v2 = _mm256_cvtepi32_ps(p2);
+        let mut v3 = _mm256_cvtepi32_ps(p3);
+
+        let a0 = _mm256_permutevar8x32_ps(alpha_f32, _mm256_setr_epi32(0, 0, 0, 0, 4, 4, 4, 4));
+        let a1 = _mm256_permutevar8x32_ps(alpha_f32, _mm256_setr_epi32(1, 1, 1, 1, 5, 5, 5, 5));
+        let a2 = _mm256_permutevar8x32_ps(alpha_f32, _mm256_setr_epi32(2, 2, 2, 2, 6, 6, 6, 6));
+        let a3 = _mm256_permutevar8x32_ps(alpha_f32, _mm256_setr_epi32(3, 3, 3, 3, 7, 7, 7, 7));
+
+        v0 = _mm256_mul_ps(v0, a0);
+        v1 = _mm256_mul_ps(v1, a1);
+        v2 = _mm256_mul_ps(v2, a2);
+        v3 = _mm256_mul_ps(v3, a3);
+
+        let s0 = _mm256_cvtps_epi32(v0);
+        let s1 = _mm256_cvtps_epi32(v1);
+        let s2 = _mm256_cvtps_epi32(v2);
+        let s3 = _mm256_cvtps_epi32(v3);
+
+        let packed16_0 = _mm256_packus_epi32(s0, s1);
+        let packed16_1 = _mm256_packus_epi32(s2, s3);
+
+        let mut packed = _mm256_packus_epi16(packed16_0, packed16_1);
+        packed = _mm256_blendv_epi8(packed, _mm256_setzero_si256(), is_zero_mask);
+        packed = _mm256_blendv_epi8(
+            packed,
+            rgba,
+            _mm256_set1_epi32(i32::from_ne_bytes([0, 0, 0, 255])),
+        );
+        unsafe {
+            _mm256_storeu_si256(in_place.as_mut_ptr().cast(), packed);
+        }
     }
 }
 
 impl DisassociateAlpha for Avx2DisassociateAlpha {
     #[target_feature(enable = "avx2")]
     unsafe fn disassociate(&self, in_place: &mut [u8]) {
-        if std::arch::is_x86_feature_detected!("fma") {
-            unsafe {
-                self.disassociate_fma(in_place);
-            }
-        } else {
-            self.disassociate_avx2(in_place);
+        let mut rem = in_place;
+
+        for dst in rem.as_chunks_mut::<32>().0.iter_mut() {
+            self.disassociate_chunk(dst);
+        }
+
+        rem = rem.as_chunks_mut::<32>().1;
+
+        if !rem.is_empty() {
+            const PART_SIZE: usize = 32;
+            assert!(rem.len() < PART_SIZE);
+
+            let mut buffer: [u8; PART_SIZE] = [0u8; PART_SIZE];
+
+            buffer[..rem.len()].copy_from_slice(rem);
+
+            self.disassociate_chunk(&mut buffer);
+
+            rem.copy_from_slice(&buffer[..rem.len()]);
+        }
+    }
+}
+
+#[derive(Default)]
+struct Avx2DisassociateAlphaFast {}
+
+impl Avx2DisassociateAlphaFast {
+    #[inline]
+    #[target_feature(enable = "avx2")]
+    fn disassociate_chunk(&self, in_place: &mut [u8; 32]) {
+        let alpha_mask = _mm256_setr_epi8(
+            3, -1, -1, -1, 7, -1, -1, -1, 11, -1, -1, -1, 15, -1, -1, -1, 3, -1, -1, -1, 7, -1, -1,
+            -1, 11, -1, -1, -1, 15, -1, -1, -1,
+        );
+
+        let rgba = unsafe { _mm256_loadu_si256(in_place.as_ptr().cast()) };
+
+        let alpha_u32 = _mm256_shuffle_epi8(rgba, alpha_mask);
+        let is_zero_mask = _mm256_cmpeq_epi32(alpha_u32, _mm256_setzero_si256());
+        let alpha_f32 = _mm256_cvtepi32_ps(alpha_u32);
+
+        let recip_f32 = _mm256_mul_ps(_mm256_set1_ps(65536.0), _mm256_rcp_ps(alpha_f32));
+        let recip_i32 = _mm256_cvtps_epi32(recip_f32);
+
+        let lo = _mm256_mullo_epi16(
+            _mm256_unpacklo_epi8(rgba, _mm256_setzero_si256()),
+            _mm256_set1_epi16(255),
+        );
+        let hi = _mm256_mullo_epi16(
+            _mm256_unpackhi_epi8(rgba, _mm256_setzero_si256()),
+            _mm256_set1_epi16(255),
+        );
+
+        let recip_packed = _mm256_packus_epi32(recip_i32, recip_i32);
+        let shuf_lo = _mm256_setr_epi8(
+            0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3, 0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2,
+            3, 2, 3,
+        );
+        let shuf_hi = _mm256_setr_epi8(
+            4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6, 7, 6, 7, 4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6,
+            7, 6, 7,
+        );
+
+        let recip_lo_full = _mm256_shuffle_epi8(recip_packed, shuf_lo);
+        let recip_hi_full = _mm256_shuffle_epi8(recip_packed, shuf_hi);
+
+        let res_lo = _mm256_mulhi_epu16(lo, recip_lo_full);
+        let res_hi = _mm256_mulhi_epu16(hi, recip_hi_full);
+
+        let mut packed = _mm256_packus_epi16(res_lo, res_hi);
+
+        packed = _mm256_blendv_epi8(packed, _mm256_setzero_si256(), is_zero_mask);
+        packed = _mm256_blendv_epi8(
+            packed,
+            rgba,
+            _mm256_set1_epi32(i32::from_ne_bytes([0, 0, 0, 255])),
+        );
+
+        unsafe {
+            _mm256_storeu_si256(in_place.as_mut_ptr().cast(), packed);
+        }
+    }
+}
+
+impl DisassociateAlpha for Avx2DisassociateAlphaFast {
+    #[target_feature(enable = "avx2")]
+    unsafe fn disassociate(&self, in_place: &mut [u8]) {
+        let mut rem = in_place;
+
+        for dst in rem.as_chunks_mut::<32>().0.iter_mut() {
+            self.disassociate_chunk(dst);
+        }
+
+        rem = rem.as_chunks_mut::<32>().1;
+
+        if !rem.is_empty() {
+            const PART_SIZE: usize = 32;
+            assert!(rem.len() < PART_SIZE);
+
+            let mut buffer: [u8; PART_SIZE] = [0u8; PART_SIZE];
+
+            buffer[..rem.len()].copy_from_slice(rem);
+
+            self.disassociate_chunk(&mut buffer);
+
+            rem.copy_from_slice(&buffer[..rem.len()]);
         }
     }
 }
@@ -294,9 +328,4 @@ fn avx_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8], executor: impl Dis
     unsafe {
         executor.disassociate(in_place);
     }
-}
-
-#[target_feature(enable = "avx2")]
-fn avx_unpremultiply_alpha_rgba_impl(in_place: &mut [u8]) {
-    avx_unpremultiply_alpha_rgba_impl_row(in_place, Avx2DisassociateAlpha::default());
 }

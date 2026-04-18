@@ -84,16 +84,10 @@ fn convolve_horizontal_rgba_neon_rows_4_u8_impl_dot(
 
         let tbl: [u8; 16] = [0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15];
         let v_tbl = vld1q_u8(tbl.as_ptr());
-        let weights_tbl: [u8; 16] = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3];
-        let v_weights = vld1q_u8(weights_tbl.as_ptr());
-        let weights_tbl1: [u8; 16] = [4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7];
-        let v_weights_hi = vld1q_u8(weights_tbl1.as_ptr());
-        let weights_tbl2: [u8; 16] = [8, 9, 10, 11, 8, 9, 10, 11, 8, 9, 10, 11, 8, 9, 10, 11];
-        let v_weights_hi2 = vld1q_u8(weights_tbl2.as_ptr());
-        let weights_tbl3: [u8; 16] = [
-            12, 13, 14, 15, 12, 13, 14, 15, 12, 13, 14, 15, 12, 13, 14, 15,
-        ];
-        let v_weights_hi3 = vld1q_u8(weights_tbl3.as_ptr());
+        let v_weights = vreinterpretq_u8_u32(vdupq_n_u32(u32::from_ne_bytes([0, 1, 2, 3])));
+        let v_weights_hi = vreinterpretq_u8_u32(vdupq_n_u32(u32::from_ne_bytes([4, 5, 6, 7])));
+        let v_weights_hi2 = vreinterpretq_u8_u32(vdupq_n_u32(u32::from_ne_bytes([8, 9, 10, 11])));
+        let v_weights_hi3 = vreinterpretq_u8_u32(vdupq_n_u32(u32::from_ne_bytes([12, 13, 14, 15])));
 
         for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
             .iter_mut()
@@ -328,10 +322,8 @@ fn convolve_horizontal_rgba_neon_row_impl(
 
         let tbl: [u8; 16] = [0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15];
         let v_tbl = vld1q_u8(tbl.as_ptr());
-        let weights_tbl: [u8; 16] = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3];
-        let v_weights = vld1q_u8(weights_tbl.as_ptr());
-        let weights_tbl1: [u8; 16] = [4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7];
-        let v_weights_hi = vld1q_u8(weights_tbl1.as_ptr());
+        let v_weights = vreinterpretq_u8_u32(vdupq_n_u32(u32::from_ne_bytes([0, 1, 2, 3])));
+        let v_weights_hi = vreinterpretq_u8_u32(vdupq_n_u32(u32::from_ne_bytes([4, 5, 6, 7])));
 
         for ((dst, bounds), weights) in dst
             .as_chunks_mut::<CN>()
