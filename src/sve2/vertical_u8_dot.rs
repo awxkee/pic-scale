@@ -279,7 +279,7 @@ fn convolve_vertical_sve2_row(
 ) {
     let vl = svcntb() as usize;
 
-    let mut cx = work_32_chunks(bounds, src, dst, src_stride, weights);
+    let mut cx = 0usize;//work_32_chunks(bounds, src, dst, src_stride, weights);
 
     let len = dst.len();
 
