@@ -84,7 +84,6 @@ fn pack_4_rows_sve(a: svuint8_t, b: svuint8_t, c: svuint8_t, d: svuint8_t) -> [s
     [lo0, lo1, hi0, hi1]
 }
 
-#[inline(never)]
 #[target_feature(enable = "sve2,i8mm")]
 fn convolve_vertical_sve2_row(
     _: usize,
