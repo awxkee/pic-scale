@@ -105,6 +105,7 @@ fn work_32_chunks(
     let shuf4 = svreinterpret_u8_s32(svdup_n_s32(i32::from_ne_bytes([0, 1, 2, 3])));
 
     let pg_full = svptrue_b8();
+
     while cx + vl * 2 <= len {
         let rounding = svdup_n_s32(ROUNDING);
         let mut acc_0 = rounding;

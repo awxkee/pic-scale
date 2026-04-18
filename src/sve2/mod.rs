@@ -27,6 +27,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+mod rgb_u8_dot;
 mod vertical_u8_dot;
 
+pub(crate) use rgb_u8_dot::{
+    sve_convolve_horizontal_rgb_neon_row_one_dot, sve_convolve_horizontal_rgb_neon_rows_4_dot,
+};
 pub(crate) use vertical_u8_dot::convolve_vertical_sve2_i8_dot;

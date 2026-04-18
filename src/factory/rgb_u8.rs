@@ -81,21 +81,35 @@ impl HorizontalFilterPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
                         _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rdm_rows_4);
                         _dispatcher_1_row = convolve_horizontal_rgb_neon_rdm_row_one;
                     }
+                    #[cfg(feature = "sve")]
+                    if _scale_factor < 5.5
+                        && std::arch::is_aarch64_feature_detected!("sve2")
+                        && std::arch::is_aarch64_feature_detected!("i8mm")
+                    {
+                        use crate::sve2::{
+                            sve_convolve_horizontal_rgb_neon_row_one_dot,
+                            sve_convolve_horizontal_rgb_neon_rows_4_dot,
+                        };
+
+                        let i_weights = filter_weights.numerical_approximation_q0_7(0);
+                        return Arc::new(HorizontalFiltering {
+                            filter_weights: i_weights,
+                            filter_4_rows: Some(sve_convolve_horizontal_rgb_neon_rows_4_dot),
+                            filter_row: sve_convolve_horizontal_rgb_neon_row_one_dot,
+                            threading_policy,
+                        });
+                    }
                     #[cfg(feature = "nightly_i8mm")]
                     if _scale_factor < 5.5 && std::arch::is_aarch64_feature_detected!("i8mm") {
                         use crate::neon::{
                             convolve_horizontal_rgb_neon_row_one_dot,
                             convolve_horizontal_rgb_neon_rows_4_dot,
                         };
-                        let _dispatcher_4_rows: Option<
-                            fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i8>, u32),
-                        > = Some(convolve_horizontal_rgb_neon_rows_4_dot);
-                        let _dispatcher_1_row = convolve_horizontal_rgb_neon_row_one_dot;
                         let i_weights = filter_weights.numerical_approximation_q0_7(0);
                         return Arc::new(HorizontalFiltering {
                             filter_weights: i_weights,
-                            filter_4_rows: _dispatcher_4_rows,
-                            filter_row: _dispatcher_1_row,
+                            filter_4_rows: Some(convolve_horizontal_rgb_neon_rows_4_dot),
+                            filter_row: convolve_horizontal_rgb_neon_row_one_dot,
                             threading_policy,
                         });
                     }
