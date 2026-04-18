@@ -56,7 +56,7 @@ pub(crate) fn convolve_vertical_sve2_i8_dot(
 }
 
 #[inline]
-#[target_feature(enable = "sve2")]
+#[target_feature(enable = "sve,sve2")]
 fn pack_4_rows_sve(a: svuint8_t, b: svuint8_t, c: svuint8_t, d: svuint8_t) -> [svuint8_t; 4] {
     let ab_lo = svzip1_u8(a, b);
     let ab_hi = svzip2_u8(a, b);
@@ -84,7 +84,7 @@ fn pack_4_rows_sve(a: svuint8_t, b: svuint8_t, c: svuint8_t, d: svuint8_t) -> [s
     [lo0, lo1, hi0, hi1]
 }
 
-#[target_feature(enable = "sve2,i8mm")]
+#[target_feature(enable = "sve,sve2,i8mm")]
 fn convolve_vertical_sve2_row(
     _: usize,
     bounds: &FilterBounds,
