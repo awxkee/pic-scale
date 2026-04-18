@@ -143,7 +143,7 @@ fn convolve_vertical_sve2_row(
 
         while j + 2 <= bounds.size {
             let py = bounds.start + j;
-            let w = unsafe { weights.get_unchecked(j..) };
+            let w = unsafe { weights.get_unchecked(j..j + 2) };
 
             let w32 = i32::from_le_bytes([w[0] as u8, w[1] as u8, 0, 0]);
             let vw = svreinterpret_s8_s32(svdup_n_s32(w32));
