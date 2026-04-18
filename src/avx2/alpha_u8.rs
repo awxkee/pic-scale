@@ -29,10 +29,9 @@
 
 use crate::WorkloadStrategy;
 use crate::avx2::utils::{
-    _mm256_select_si256, avx2_deinterleave_rgba, avx2_div_by255, avx2_interleave_rgba, shuffle,
+    _mm256_select_si256, avx2_deinterleave_rgba, avx2_div_by255, avx2_interleave_rgba,
 };
 use std::arch::x86_64::*;
-use std::sync::OnceLock;
 
 pub(crate) fn avx_premultiply_alpha_rgba(dst: &mut [u8], src: &[u8]) {
     unsafe {
@@ -129,18 +128,6 @@ fn avx_premultiply_alpha_rgba_impl(dst: &mut [u8], src: &[u8]) {
     avx_premultiply_alpha_rgba_impl_row(dst, src, AssociateAlphaDefault::default());
 }
 
-static RECIP_TABLE_U32: OnceLock<[u32; 256]> = OnceLock::new();
-
-fn get_recip_table() -> &'static [u32; 256] {
-    RECIP_TABLE_U32.get_or_init(|| {
-        let mut table = [0u32; 256];
-        for i in 1..256 {
-            table[i] = ((65536u32 + i as u32 / 2) / i as u32).min(65535);
-        }
-        table
-    })
-}
-
 pub(crate) fn avx_unpremultiply_alpha_rgba(in_place: &mut [u8], _: WorkloadStrategy) {
     unsafe {
         avx_unpremultiply_alpha_rgba_impl(in_place);
@@ -197,55 +184,58 @@ impl Avx2DisassociateAlpha {
     }
 
     #[inline(always)]
-    fn disassociate_chunk<const FMA: bool>(&self, in_place: &mut [u8], table: &[u32; 256]) {
+    fn disassociate_chunk<const FMA: bool>(&self, in_place: &mut [u8]) {
         unsafe {
-            static ALPHA_IDX_SHUF: [u8; 32] = [
-                3, 255, 255, 255, 7, 255, 255, 255, 11, 255, 255, 255, 15, 255, 255, 255, 3, 255,
-                255, 255, 7, 255, 255, 255, 11, 255, 255, 255, 15, 255, 255, 255,
-            ];
+            let src_ptr = in_place.as_ptr();
+            let rgba0 = _mm256_loadu_si256(src_ptr as *const __m256i);
+            let rgba1 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
+            let rgba2 = _mm256_loadu_si256(src_ptr.add(64) as *const __m256i);
+            let rgba3 = _mm256_loadu_si256(src_ptr.add(96) as *const __m256i);
+            let (rrr, ggg, bbb, aaa) = avx2_deinterleave_rgba(rgba0, rgba1, rgba2, rgba3);
 
-            static RECIP_BCAST_LO: [u8; 32] = [
-                0, 1, 0, 1, 0, 1, 0, 1, 4, 5, 4, 5, 4, 5, 4, 5, 8, 9, 8, 9, 8, 9, 8, 9, 12, 13, 12,
-                13, 12, 13, 12, 13,
-            ];
+            let is_zero_mask = _mm256_cmpeq_epi8(aaa, _mm256_setzero_si256());
 
-            let bcast_lo = _mm256_loadu_si256(RECIP_BCAST_LO.as_ptr() as *const __m256i);
+            let a_lo = _mm256_unpacklo_epi8(aaa, _mm256_setzero_si256());
+            let a_hi = _mm256_unpackhi_epi8(aaa, _mm256_setzero_si256());
 
-            let shuf = _mm256_loadu_si256(ALPHA_IDX_SHUF.as_ptr() as *const __m256i);
+            let allw = _mm256_unpacklo_epi16(a_lo, _mm256_setzero_si256());
+            let alhw = _mm256_unpackhi_epi16(a_lo, _mm256_setzero_si256());
+            let ahlw = _mm256_unpacklo_epi16(a_hi, _mm256_setzero_si256());
+            let ahhw = _mm256_unpackhi_epi16(a_hi, _mm256_setzero_si256());
 
-            let rgba = _mm256_loadu_si256(in_place.as_ptr() as *const __m256i);
+            let allf = _mm256_cvtepi32_ps(allw);
+            let alhf = _mm256_cvtepi32_ps(alhw);
+            let ahlf = _mm256_cvtepi32_ps(ahlw);
+            let ahhf = _mm256_cvtepi32_ps(ahhw);
 
-            let idx = _mm256_shuffle_epi8(rgba, shuf);
+            let a_lo_lo = _mm256_rcp_ps(allf);
+            let a_lo_hi = _mm256_rcp_ps(alhf);
+            let a_hi_lo = _mm256_rcp_ps(ahlf);
+            let a_hi_hi = _mm256_rcp_ps(ahhf);
 
-            let recip = _mm256_i32gather_epi32::<4>(table.as_ptr().cast(), idx);
+            let rrr = self.avx2_unpremultiply_row(
+                rrr,
+                is_zero_mask,
+                [a_lo_lo, a_lo_hi, a_hi_lo, a_hi_hi],
+            );
+            let ggg = self.avx2_unpremultiply_row(
+                ggg,
+                is_zero_mask,
+                [a_lo_lo, a_lo_hi, a_hi_lo, a_hi_hi],
+            );
+            let bbb = self.avx2_unpremultiply_row(
+                bbb,
+                is_zero_mask,
+                [a_lo_lo, a_lo_hi, a_hi_lo, a_hi_hi],
+            );
 
-            const HI_HI: i32 = 0b0011_0001;
-            const LO_LO: i32 = 0b0010_0000;
+            let (rgba0, rgba1, rgba2, rgba3) = avx2_interleave_rgba(rrr, ggg, bbb, aaa);
 
-            let recip_lo =
-                _mm256_shuffle_epi8(_mm256_permute2x128_si256::<LO_LO>(recip, recip), bcast_lo);
-            let recip_hi =
-                _mm256_shuffle_epi8(_mm256_permute2x128_si256::<HI_HI>(recip, recip), bcast_lo);
-
-            let lo16 = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(rgba));
-            let hi16 = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(rgba));
-
-            let lo_mul =
-                _mm256_mulhi_epu16(_mm256_mullo_epi16(lo16, _mm256_set1_epi16(255)), recip_lo);
-            let hi_mul =
-                _mm256_mulhi_epu16(_mm256_mullo_epi16(hi16, _mm256_set1_epi16(255)), recip_hi);
-
-            let mut packed = _mm256_packus_epi16(lo_mul, hi_mul);
-
-            packed = _mm256_permute4x64_epi64::<{ shuffle(3, 1, 2, 0) }>(packed);
-
-            let alpha_mask = _mm256_set1_epi32(0xFF000000u32 as i32);
-            packed = _mm256_blendv_epi8(packed, rgba, alpha_mask);
-
-            let is_zero = _mm256_cmpeq_epi32(idx, _mm256_setzero_si256());
-            let result = _mm256_blendv_epi8(packed, rgba, is_zero);
-
-            _mm256_storeu_si256(in_place.as_mut_ptr().cast(), result);
+            let dst_ptr = in_place.as_mut_ptr();
+            _mm256_storeu_si256(dst_ptr as *mut __m256i, rgba0);
+            _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, rgba1);
+            _mm256_storeu_si256(dst_ptr.add(64) as *mut __m256i, rgba2);
+            _mm256_storeu_si256(dst_ptr.add(96) as *mut __m256i, rgba3);
         }
     }
 
@@ -254,22 +244,23 @@ impl Avx2DisassociateAlpha {
         unsafe {
             let mut rem = in_place;
 
-            let table = get_recip_table();
-
-            for dst in rem.chunks_exact_mut(32) {
-                self.disassociate_chunk::<FMA>(dst, table);
+            for dst in rem.chunks_exact_mut(32 * 4) {
+                self.disassociate_chunk::<FMA>(dst);
             }
 
-            rem = rem.chunks_exact_mut(32).into_remainder();
+            rem = rem.chunks_exact_mut(32 * 4).into_remainder();
 
             if !rem.is_empty() {
-                let mut buffer: [u8; 32] = [0u8; 32];
+                const PART_SIZE: usize = 32 * 4;
+                assert!(rem.len() < PART_SIZE);
 
-                buffer[..rem.len()].copy_from_slice(rem);
+                let mut buffer: [u8; PART_SIZE] = [0u8; PART_SIZE];
 
-                self.disassociate_chunk::<FMA>(&mut buffer, table);
+                std::ptr::copy_nonoverlapping(rem.as_ptr(), buffer.as_mut_ptr(), rem.len());
 
-                rem.copy_from_slice(&buffer[..rem.len()]);
+                self.disassociate_chunk::<FMA>(&mut buffer);
+
+                std::ptr::copy_nonoverlapping(buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
             }
         }
     }
