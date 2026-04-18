@@ -17,8 +17,8 @@ use pic_scale::{
     BufferStore, CbCr16ImageStore, CbCr16ImageStoreMut, ImageSize, ImageStore, ImageStoreMut,
     ImageStoreScaling, JzazbzScaler, LChScaler, LabScaler, LuvScaler, Planar16ImageStore,
     Planar16ImageStoreMut, ResamplingFunction, Rgb16ImageStore, Rgb16ImageStoreMut, Rgb8ImageStore,
-    Rgb8ImageStoreMut, Rgba16ImageStore, Rgba16ImageStoreMut, Scaler, SigmoidalScaler,
-    ThreadingPolicy, TransferFunction, WorkloadStrategy, XYZScaler,
+    Rgb8ImageStoreMut, Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore, Rgba8ImageStoreMut,
+    Scaler, SigmoidalScaler, ThreadingPolicy, TransferFunction, WorkloadStrategy, XYZScaler,
 };
 use rand::RngExt;
 
@@ -110,13 +110,13 @@ fn main() {
     // resize_rgba(0, 1, 256, 79, 256, ResamplingFunction::Bilinear, false);
     #[allow(overflowing_literals)]
     // test_fast_image();
-    let img = ImageReader::open("./assets/sample_fhd.jpg")
+    let img = ImageReader::open("./assets/abstract_alpha.png")
         .unwrap()
         .decode()
         .unwrap();
     // img.save("top_right.tga").unwrap();
     let dimensions = img.dimensions();
-    let transient = img.to_rgb8();
+    let transient = img.to_rgba8();
     let mut bytes = transient.to_vec().iter().map(|&x| x).collect::<Vec<_>>();
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
@@ -127,21 +127,22 @@ fn main() {
     // scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
     let mut store =
-        Rgb8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
+        Rgba8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     store.bit_depth = 16;
 
     let mut t_size = ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2);
     // t_size.height += 1;
     let resizing_plan = scaler
-        .plan_rgb_resampling(
+        .plan_rgba_resampling(
             ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
             t_size,
+            true,
         )
         .unwrap();
-    let mut dst_store = Rgb8ImageStoreMut::alloc_with_depth(
+    let mut dst_store = Rgba8ImageStoreMut::alloc_with_depth(
         dimensions.0 as usize / 2,
         dimensions.1 as usize / 2,
-        16,
+        8,
     );
     resizing_plan.resample(&store, &mut dst_store).unwrap();
     // scaler.resize_rgba(&store, &mut dst_store, true).unwrap();

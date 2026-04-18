@@ -45,77 +45,89 @@ macro_rules! premultiply_vec {
     }};
 }
 
+#[target_feature(enable = "neon")]
 fn neon_premultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8]) {
-    unsafe {
-        let mut rem = dst;
-        let mut src_rem = src;
+    let mut rem = dst;
+    let mut src_rem = src;
 
-        for (dst, src) in rem
-            .chunks_exact_mut(64 * 4)
-            .zip(src_rem.chunks_exact(64 * 4))
-        {
-            let src_ptr = src.as_ptr();
-            let mut pixel0 = vld4q_u8(src_ptr);
-            let mut pixel1 = vld4q_u8(src_ptr.add(16 * 4));
-            let mut pixel2 = vld4q_u8(src_ptr.add(16 * 4 * 2));
-            let mut pixel3 = vld4q_u8(src_ptr.add(16 * 4 * 3));
-            pixel0.0 = premultiply_vec!(pixel0.0, pixel0.3);
-            pixel0.1 = premultiply_vec!(pixel0.1, pixel0.3);
-            pixel0.2 = premultiply_vec!(pixel0.2, pixel0.3);
+    static TBL: [u8; 16] = [3, 3, 3, 3, 7, 7, 7, 7, 11, 11, 11, 11, 15, 15, 15, 15];
+    let shuf_tbl = unsafe { vld1q_u8(TBL.as_ptr()) };
+    let alpha_mask = vreinterpretq_u8_u32(vdupq_n_u32(u32::from_ne_bytes([0, 0, 0, 255])));
 
-            pixel1.0 = premultiply_vec!(pixel1.0, pixel1.3);
-            pixel1.1 = premultiply_vec!(pixel1.1, pixel1.3);
-            pixel1.2 = premultiply_vec!(pixel1.2, pixel1.3);
+    for (dst, src) in rem
+        .as_chunks_mut::<64>()
+        .0
+        .iter_mut()
+        .zip(src_rem.as_chunks::<64>().0.iter())
+    {
+        let pixel0 = unsafe { vld1q_u8(src.as_ptr()) };
+        let pixel1 = unsafe { vld1q_u8(src[16..].as_ptr()) };
+        let pixel2 = unsafe { vld1q_u8(src[32..].as_ptr()) };
+        let pixel3 = unsafe { vld1q_u8(src[48..].as_ptr()) };
 
-            pixel2.0 = premultiply_vec!(pixel2.0, pixel2.3);
-            pixel2.1 = premultiply_vec!(pixel2.1, pixel2.3);
-            pixel2.2 = premultiply_vec!(pixel2.2, pixel2.3);
+        let alpha0 = vqtbl1q_u8(pixel0, shuf_tbl);
+        let alpha1 = vqtbl1q_u8(pixel1, shuf_tbl);
+        let alpha2 = vqtbl1q_u8(pixel2, shuf_tbl);
+        let alpha3 = vqtbl1q_u8(pixel3, shuf_tbl);
 
-            pixel3.0 = premultiply_vec!(pixel3.0, pixel3.3);
-            pixel3.1 = premultiply_vec!(pixel3.1, pixel3.3);
-            pixel3.2 = premultiply_vec!(pixel3.2, pixel3.3);
-            let dst_ptr = dst.as_mut_ptr();
-            vst4q_u8(dst_ptr, pixel0);
-            vst4q_u8(dst_ptr.add(16 * 4), pixel1);
-            vst4q_u8(dst_ptr.add(16 * 4 * 2), pixel2);
-            vst4q_u8(dst_ptr.add(16 * 4 * 3), pixel3);
+        let mut new_px0 = premultiply_vec!(pixel0, alpha0);
+        let mut new_px1 = premultiply_vec!(pixel1, alpha1);
+        let mut new_px2 = premultiply_vec!(pixel2, alpha2);
+        let mut new_px3 = premultiply_vec!(pixel3, alpha3);
+
+        new_px0 = vbslq_u8(alpha_mask, pixel0, new_px0);
+        new_px1 = vbslq_u8(alpha_mask, pixel1, new_px1);
+        new_px2 = vbslq_u8(alpha_mask, pixel2, new_px2);
+        new_px3 = vbslq_u8(alpha_mask, pixel3, new_px3);
+
+        unsafe {
+            vst1q_u8(dst.as_mut_ptr(), new_px0);
+            vst1q_u8(dst[16..].as_mut_ptr(), new_px1);
+            vst1q_u8(dst[32..].as_mut_ptr(), new_px2);
+            vst1q_u8(dst[48..].as_mut_ptr(), new_px3);
         }
+    }
 
-        rem = rem.chunks_exact_mut(64 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(64 * 4).remainder();
+    rem = rem.as_chunks_mut::<64>().1;
+    src_rem = src_rem.as_chunks::<64>().1;
 
-        for (dst, src) in rem
-            .chunks_exact_mut(16 * 4)
-            .zip(src_rem.chunks_exact(16 * 4))
-        {
-            let src_ptr = src.as_ptr();
-            let mut pixel = vld4q_u8(src_ptr);
-            pixel.0 = premultiply_vec!(pixel.0, pixel.3);
-            pixel.1 = premultiply_vec!(pixel.1, pixel.3);
-            pixel.2 = premultiply_vec!(pixel.2, pixel.3);
-            let dst_ptr = dst.as_mut_ptr();
-            vst4q_u8(dst_ptr, pixel);
+    for (dst, src) in rem
+        .as_chunks_mut::<16>()
+        .0
+        .iter_mut()
+        .zip(src_rem.as_chunks::<16>().0.iter())
+    {
+        let pixel = unsafe { vld1q_u8(src.as_ptr()) };
+        let alpha = vqtbl1q_u8(pixel, shuf_tbl);
+        let mut new_px = premultiply_vec!(pixel, alpha);
+        new_px = vbslq_u8(alpha_mask, pixel, new_px);
+        unsafe {
+            vst1q_u8(dst.as_mut_ptr(), new_px);
         }
+    }
 
-        rem = rem.chunks_exact_mut(16 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(16 * 4).remainder();
+    rem = rem.as_chunks_mut::<16>().1;
+    src_rem = src_rem.as_chunks::<16>().1;
 
-        if !rem.is_empty() && !src_rem.is_empty() {
-            assert!(rem.len() < 16 * 4);
-            let mut buffer: [u8; 16 * 4] = [0u8; 16 * 4];
-            std::ptr::copy_nonoverlapping(rem.as_ptr(), buffer.as_mut_ptr(), rem.len());
-            let mut pixel = vld4q_u8(buffer.as_ptr());
-            pixel.0 = premultiply_vec!(pixel.0, pixel.3);
-            pixel.1 = premultiply_vec!(pixel.1, pixel.3);
-            pixel.2 = premultiply_vec!(pixel.2, pixel.3);
-            vst4q_u8(buffer.as_mut_ptr(), pixel);
-            std::ptr::copy_nonoverlapping(buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
+    if !rem.is_empty() && !src_rem.is_empty() {
+        assert!(rem.len() < 16);
+        let mut buffer: [u8; 16] = [0u8; 16];
+        buffer[..src_rem.len()].copy_from_slice(src_rem);
+        let pixel = unsafe { vld1q_u8(buffer.as_ptr()) };
+        let alpha = vqtbl1q_u8(pixel, shuf_tbl);
+        let mut new_px = premultiply_vec!(pixel, alpha);
+        new_px = vbslq_u8(alpha_mask, pixel, new_px);
+        unsafe {
+            vst1q_u8(buffer.as_mut_ptr(), new_px);
         }
+        rem.copy_from_slice(&buffer[..rem.len()]);
     }
 }
 
 pub(crate) fn neon_premultiply_alpha_rgba(dst: &mut [u8], src: &[u8]) {
-    neon_premultiply_alpha_rgba_impl_row(dst, src);
+    unsafe {
+        neon_premultiply_alpha_rgba_impl_row(dst, src);
+    }
 }
 
 trait DisassociateAlpha {
