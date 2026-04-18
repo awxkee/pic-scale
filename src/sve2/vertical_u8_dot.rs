@@ -55,33 +55,34 @@ pub(crate) fn convolve_vertical_sve2_i8_dot(
     }
 }
 
-#[inline]
-#[target_feature(enable = "sve,sve2")]
+#[inline(always)]
 fn pack_4_rows_sve(a: svuint8_t, b: svuint8_t, c: svuint8_t, d: svuint8_t) -> [svuint8_t; 4] {
-    let ab_lo = svzip1_u8(a, b);
-    let ab_hi = svzip2_u8(a, b);
+    unsafe {
+        let ab_lo = svzip1_u8(a, b);
+        let ab_hi = svzip2_u8(a, b);
 
-    let cd_lo = svzip1_u8(c, d);
-    let cd_hi = svzip2_u8(c, d);
+        let cd_lo = svzip1_u8(c, d);
+        let cd_hi = svzip2_u8(c, d);
 
-    let lo0 = svreinterpret_u8_u16(svzip1_u16(
-        svreinterpret_u16_u8(ab_lo),
-        svreinterpret_u16_u8(cd_lo),
-    ));
-    let lo1 = svreinterpret_u8_u16(svzip2_u16(
-        svreinterpret_u16_u8(ab_lo),
-        svreinterpret_u16_u8(cd_lo),
-    ));
-    let hi0 = svreinterpret_u8_u16(svzip1_u16(
-        svreinterpret_u16_u8(ab_hi),
-        svreinterpret_u16_u8(cd_hi),
-    ));
-    let hi1 = svreinterpret_u8_u16(svzip2_u16(
-        svreinterpret_u16_u8(ab_hi),
-        svreinterpret_u16_u8(cd_hi),
-    ));
+        let lo0 = svreinterpret_u8_u16(svzip1_u16(
+            svreinterpret_u16_u8(ab_lo),
+            svreinterpret_u16_u8(cd_lo),
+        ));
+        let lo1 = svreinterpret_u8_u16(svzip2_u16(
+            svreinterpret_u16_u8(ab_lo),
+            svreinterpret_u16_u8(cd_lo),
+        ));
+        let hi0 = svreinterpret_u8_u16(svzip1_u16(
+            svreinterpret_u16_u8(ab_hi),
+            svreinterpret_u16_u8(cd_hi),
+        ));
+        let hi1 = svreinterpret_u8_u16(svzip2_u16(
+            svreinterpret_u16_u8(ab_hi),
+            svreinterpret_u16_u8(cd_hi),
+        ));
 
-    [lo0, lo1, hi0, hi1]
+        [lo0, lo1, hi0, hi1]
+    }
 }
 
 #[target_feature(enable = "sve,sve2,i8mm")]
