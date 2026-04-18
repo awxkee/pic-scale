@@ -18,7 +18,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let dimensions = img.dimensions();
     let src_bytes = img.as_bytes();
 
-    /*c.bench_function("Pic scale RGBA with alpha: Lanczos 3", |b| {
+    c.bench_function("Pic scale RGBA with alpha: Lanczos 3", |b| {
         let copied: Vec<u8> = Vec::from(src_bytes);
         let store =
             ImageStore::<u8, 4>::from_slice(&copied, dimensions.0 as usize, dimensions.1 as usize)
@@ -338,7 +338,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 )
                 .unwrap();
         })
-    });*/
+    });
 
     c.bench_function("Pic scale RGBA10 with alpha: Lanczos 3", |b| {
         let mut copied: Vec<u16> = Vec::from(
