@@ -87,10 +87,12 @@ fn work_32_chunks(
     let len = dst.len();
 
     let pg4 = svwhilelt_b8_u32(0u32, 4u32);
+    let pg8 = svwhilelt_b8_u32(0u32, 8u32);
     let pg2 = svwhilelt_b8_u32(0u32, 2u32);
     let pg1 = svwhilelt_b8_u32(0u32, 1u32);
 
     let shuf4 = svreinterpret_u8_s32(svdup_n_s32(i32::from_ne_bytes([0, 2, 1, 3])));
+    let shuf4_hi = svreinterpret_u8_s32(svdup_n_s32(i32::from_ne_bytes([4, 6, 5, 7])));
 
     let pg_full = svptrue_b8();
 
@@ -106,6 +108,117 @@ fn work_32_chunks(
         let mut acc_7 = rounding;
 
         let mut j = 0usize;
+
+        while j + 8 <= bounds.size {
+            let py = bounds.start + j;
+            let w = unsafe { weights.get_unchecked(j..) };
+            let vw = unsafe { svld1_s8(pg8, w.as_ptr()) };
+            let vw0 = svtbl_s8(vw, shuf4);
+            let vw1 = svtbl_s8(vw, shuf4_hi);
+
+            let base0 = src_stride * py + cx;
+            let base1 = src_stride * (py + 4) + cx;
+
+            let row0_lo = unsafe { svld1_u8(pg_full, src.get_unchecked(base0..).as_ptr()) };
+            let row1_lo =
+                unsafe { svld1_u8(pg_full, src.get_unchecked(base0 + src_stride..).as_ptr()) };
+            let row2_lo = unsafe {
+                svld1_u8(
+                    pg_full,
+                    src.get_unchecked(base0 + src_stride * 2..).as_ptr(),
+                )
+            };
+            let row3_lo = unsafe {
+                svld1_u8(
+                    pg_full,
+                    src.get_unchecked(base0 + src_stride * 3..).as_ptr(),
+                )
+            };
+            let row0_hi = unsafe { svld1_u8(pg_full, src.get_unchecked(base0 + vl..).as_ptr()) };
+            let row1_hi = unsafe {
+                svld1_u8(
+                    pg_full,
+                    src.get_unchecked(base0 + src_stride + vl..).as_ptr(),
+                )
+            };
+            let row2_hi = unsafe {
+                svld1_u8(
+                    pg_full,
+                    src.get_unchecked(base0 + src_stride * 2 + vl..).as_ptr(),
+                )
+            };
+            let row3_hi = unsafe {
+                svld1_u8(
+                    pg_full,
+                    src.get_unchecked(base0 + src_stride * 3 + vl..).as_ptr(),
+                )
+            };
+
+            let [packed0, packed1, packed2, packed3] =
+                pack_4_rows_sve!(row0_lo, row1_lo, row2_lo, row3_lo);
+            let [packed4, packed5, packed6, packed7] =
+                pack_4_rows_sve!(row0_hi, row1_hi, row2_hi, row3_hi);
+
+            acc_0 = svusdot_s32(acc_0, packed0, vw0);
+            acc_1 = svusdot_s32(acc_1, packed1, vw0);
+            acc_2 = svusdot_s32(acc_2, packed2, vw0);
+            acc_3 = svusdot_s32(acc_3, packed3, vw0);
+            acc_4 = svusdot_s32(acc_4, packed4, vw0);
+            acc_5 = svusdot_s32(acc_5, packed5, vw0);
+            acc_6 = svusdot_s32(acc_6, packed6, vw0);
+            acc_7 = svusdot_s32(acc_7, packed7, vw0);
+
+            let row0_lo = unsafe { svld1_u8(pg_full, src.get_unchecked(base1..).as_ptr()) };
+            let row1_lo =
+                unsafe { svld1_u8(pg_full, src.get_unchecked(base1 + src_stride..).as_ptr()) };
+            let row2_lo = unsafe {
+                svld1_u8(
+                    pg_full,
+                    src.get_unchecked(base1 + src_stride * 2..).as_ptr(),
+                )
+            };
+            let row3_lo = unsafe {
+                svld1_u8(
+                    pg_full,
+                    src.get_unchecked(base1 + src_stride * 3..).as_ptr(),
+                )
+            };
+            let row0_hi = unsafe { svld1_u8(pg_full, src.get_unchecked(base1 + vl..).as_ptr()) };
+            let row1_hi = unsafe {
+                svld1_u8(
+                    pg_full,
+                    src.get_unchecked(base1 + src_stride + vl..).as_ptr(),
+                )
+            };
+            let row2_hi = unsafe {
+                svld1_u8(
+                    pg_full,
+                    src.get_unchecked(base1 + src_stride * 2 + vl..).as_ptr(),
+                )
+            };
+            let row3_hi = unsafe {
+                svld1_u8(
+                    pg_full,
+                    src.get_unchecked(base1 + src_stride * 3 + vl..).as_ptr(),
+                )
+            };
+
+            let [packed0, packed1, packed2, packed3] =
+                pack_4_rows_sve!(row0_lo, row1_lo, row2_lo, row3_lo);
+            let [packed4, packed5, packed6, packed7] =
+                pack_4_rows_sve!(row0_hi, row1_hi, row2_hi, row3_hi);
+
+            acc_0 = svusdot_s32(acc_0, packed0, vw1);
+            acc_1 = svusdot_s32(acc_1, packed1, vw1);
+            acc_2 = svusdot_s32(acc_2, packed2, vw1);
+            acc_3 = svusdot_s32(acc_3, packed3, vw1);
+            acc_4 = svusdot_s32(acc_4, packed4, vw1);
+            acc_5 = svusdot_s32(acc_5, packed5, vw1);
+            acc_6 = svusdot_s32(acc_6, packed6, vw1);
+            acc_7 = svusdot_s32(acc_7, packed7, vw1);
+
+            j += 8;
+        }
 
         while j + 4 <= bounds.size {
             let py = bounds.start + j;
