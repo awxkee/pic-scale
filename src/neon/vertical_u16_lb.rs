@@ -29,12 +29,6 @@
 use crate::filter_weights::FilterBounds;
 use std::arch::aarch64::*;
 
-// ── 4-tap specializations ─────────────────────────────────────────────────────
-// Lanczos2, Mitchell, Catmull-Rom, and any other filter with support=4 all
-// produce exactly 4 weights per output sample. Hardcoding the tap count lets
-// the compiler use compile-time lane indices (vmlal_lane_s16::<N>) and
-// eliminates the loop counter / branch overhead entirely.
-
 #[inline]
 #[target_feature(enable = "neon")]
 fn convolve_4tap_16(

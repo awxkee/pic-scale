@@ -27,9 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::avx2::utils::{
-    _mm256_select_si256, avx_deinterleave_rgba_epi16, avx_interleave_rgba_epi16,
-};
+use crate::avx2::utils::shuffle;
 use std::arch::x86_64::*;
 
 #[inline(always)]
@@ -110,89 +108,64 @@ trait Avx2PremultiplyExecutor {
 struct Avx2PremultiplyExecutorDefault<const BIT_DEPTH: usize> {}
 
 impl<const BIT_DEPTH: usize> Avx2PremultiplyExecutorDefault<BIT_DEPTH> {
-    #[inline(always)]
-    fn premultiply_chunk(&self, dst: &mut [u16], src: &[u16]) {
+    #[inline]
+    #[target_feature(enable = "avx2")]
+    fn premultiply_chunk(&self, dst: &mut [u16; 16], src: &[u16; 16]) {
+        let shuffle_alpha_mask = _mm256_setr_epi8(
+            6, 7, 6, 7, 6, 7, 6, 7, 14, 15, 14, 15, 14, 15, 14, 15, 6, 7, 6, 7, 6, 7, 6, 7, 14, 15,
+            14, 15, 14, 15, 14, 15,
+        );
+        let rgba = unsafe { _mm256_loadu_si256(src.as_ptr().cast()) };
+        let copy_alpha_mask = _mm256_set1_epi64x(i64::from_ne_bytes([0, 0, 0, 0, 0, 0, 255, 255]));
+
+        let alpha = _mm256_shuffle_epi8(rgba, shuffle_alpha_mask);
+
+        let p0 = _mm256_unpacklo_epi16(rgba, _mm256_setzero_si256());
+        let p1 = _mm256_unpackhi_epi16(rgba, _mm256_setzero_si256());
+
+        let a0 = _mm256_unpacklo_epi16(alpha, _mm256_setzero_si256());
+        let a1 = _mm256_unpackhi_epi16(alpha, _mm256_setzero_si256());
+
+        let mut s0 = _mm256_madd_epi16(p0, a0);
+        let mut s1 = _mm256_madd_epi16(p1, a1);
+
+        s0 = _mm256_div_by_epi32::<BIT_DEPTH>(s0);
+        s1 = _mm256_div_by_epi32::<BIT_DEPTH>(s1);
+
+        let u0 = _mm256_packus_epi32(s0, s1);
+        let q0 = _mm256_blendv_epi8(u0, rgba, copy_alpha_mask);
+
         unsafe {
-            let src_ptr = src.as_ptr();
-            let lane0 = _mm256_loadu_si256(src_ptr.cast());
-            let lane1 = _mm256_loadu_si256(src_ptr.add(16).cast());
-            let lane2 = _mm256_loadu_si256(src_ptr.add(32).cast());
-            let lane3 = _mm256_loadu_si256(src_ptr.add(48).cast());
-
-            let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
-
-            let zeros = _mm256_setzero_si256();
-            let low_alpha = _mm256_unpacklo_epi16(pixel.3, zeros);
-            let high_alpha = _mm256_unpackhi_epi16(pixel.3, zeros);
-
-            let rl32 = _mm256_unpacklo_epi16(pixel.0, zeros);
-            let rh32 = _mm256_unpackhi_epi16(pixel.0, zeros);
-            let gl32 = _mm256_unpacklo_epi16(pixel.1, zeros);
-            let gh32 = _mm256_unpackhi_epi16(pixel.1, zeros);
-            let bl32 = _mm256_unpacklo_epi16(pixel.2, zeros);
-            let bh32 = _mm256_unpackhi_epi16(pixel.2, zeros);
-
-            let rl32 = _mm256_madd_epi16(rl32, low_alpha);
-            let rh32 = _mm256_madd_epi16(rh32, high_alpha);
-            let gl32 = _mm256_madd_epi16(gl32, low_alpha);
-            let gh32 = _mm256_madd_epi16(gh32, high_alpha);
-            let bl32 = _mm256_madd_epi16(bl32, low_alpha);
-            let bh32 = _mm256_madd_epi16(bh32, high_alpha);
-
-            let lr32 = _mm256_div_by_epi32::<BIT_DEPTH>(rl32);
-            let hr32 = _mm256_div_by_epi32::<BIT_DEPTH>(rh32);
-            let lg32 = _mm256_div_by_epi32::<BIT_DEPTH>(gl32);
-            let hg32 = _mm256_div_by_epi32::<BIT_DEPTH>(gh32);
-            let lb32 = _mm256_div_by_epi32::<BIT_DEPTH>(bl32);
-            let hb32 = _mm256_div_by_epi32::<BIT_DEPTH>(bh32);
-
-            let new_rrr = _mm256_packus_epi32(lr32, hr32);
-
-            let new_ggg = _mm256_packus_epi32(lg32, hg32);
-            let new_bbb = _mm256_packus_epi32(lb32, hb32);
-
-            let dst_ptr = dst.as_mut_ptr();
-
-            let (d_lane0, d_lane1, d_lane2, d_lane3) =
-                avx_interleave_rgba_epi16(new_rrr, new_ggg, new_bbb, pixel.3);
-
-            _mm256_storeu_si256(dst_ptr.cast(), d_lane0);
-            _mm256_storeu_si256(dst_ptr.add(16).cast(), d_lane1);
-            _mm256_storeu_si256(dst_ptr.add(32).cast(), d_lane2);
-            _mm256_storeu_si256(dst_ptr.add(48).cast(), d_lane3);
+            _mm256_storeu_si256(dst.as_mut_ptr().cast(), q0);
         }
     }
 }
 impl<const BIT_DEPTH: usize> Avx2PremultiplyExecutor for Avx2PremultiplyExecutorDefault<BIT_DEPTH> {
     #[target_feature(enable = "avx2")]
     unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], _: usize) {
-        unsafe {
-            let mut rem = dst;
-            let mut src_rem = src;
+        let mut rem = dst;
+        let mut src_rem = src;
 
-            for (dst, src) in rem
-                .chunks_exact_mut(16 * 4)
-                .zip(src_rem.chunks_exact(16 * 4))
-            {
-                self.premultiply_chunk(dst, src);
-            }
+        for (dst, src) in rem
+            .as_chunks_mut::<16>()
+            .0
+            .iter_mut()
+            .zip(src_rem.as_chunks::<16>().0.iter())
+        {
+            self.premultiply_chunk(dst, src);
+        }
 
-            rem = rem.chunks_exact_mut(16 * 4).into_remainder();
-            src_rem = src_rem.chunks_exact(16 * 4).remainder();
+        rem = rem.as_chunks_mut::<16>().1;
+        src_rem = src_rem.as_chunks::<16>().1;
 
-            if !rem.is_empty() {
-                assert!(src_rem.len() < 16 * 4);
-                assert!(rem.len() < 16 * 4);
-                assert_eq!(src_rem.len(), rem.len());
+        if !rem.is_empty() {
+            let mut buffer: [u16; 16] = [0u16; 16];
+            let mut dst_buffer: [u16; 16] = [0u16; 16];
+            buffer[..src_rem.len()].copy_from_slice(src_rem);
 
-                let mut buffer: [u16; 16 * 4] = [0u16; 16 * 4];
-                let mut dst_buffer: [u16; 16 * 4] = [0u16; 16 * 4];
-                std::ptr::copy_nonoverlapping(src_rem.as_ptr(), buffer.as_mut_ptr(), src_rem.len());
+            self.premultiply_chunk(&mut dst_buffer, &buffer);
 
-                self.premultiply_chunk(&mut dst_buffer, &buffer);
-
-                std::ptr::copy_nonoverlapping(dst_buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
-            }
+            rem.copy_from_slice(&dst_buffer[..rem.len()]);
         }
     }
 }
@@ -201,89 +174,73 @@ impl<const BIT_DEPTH: usize> Avx2PremultiplyExecutor for Avx2PremultiplyExecutor
 struct Avx2PremultiplyExecutorAnyBit {}
 
 impl Avx2PremultiplyExecutorAnyBit {
-    #[inline(always)]
-    fn premultiply_chunk(&self, dst: &mut [u16], src: &[u16], scale: __m256) {
-        unsafe {
-            let src_ptr = src.as_ptr();
-            let lane0 = _mm256_loadu_si256(src_ptr.cast());
-            let lane1 = _mm256_loadu_si256(src_ptr.add(16).cast());
-            let lane2 = _mm256_loadu_si256(src_ptr.add(32).cast());
-            let lane3 = _mm256_loadu_si256(src_ptr.add(48).cast());
-
-            let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
-
-            let zeros = _mm256_setzero_si256();
-
-            let la = _mm256_unpacklo_epi16(pixel.3, zeros);
-            let ha = _mm256_unpackhi_epi16(pixel.3, zeros);
-
-            let lla = _mm256_cvtepi32_ps(la);
-            let hla = _mm256_cvtepi32_ps(ha);
-
-            let low_alpha = _mm256_mul_ps(lla, scale);
-            let high_alpha = _mm256_mul_ps(hla, scale);
-
-            let new_rrr = _mm256_scale_by_alpha(pixel.0, low_alpha, high_alpha);
-            let new_ggg = _mm256_scale_by_alpha(pixel.1, low_alpha, high_alpha);
-            let new_bbb = _mm256_scale_by_alpha(pixel.2, low_alpha, high_alpha);
-
-            let dst_ptr = dst.as_mut_ptr();
-
-            let (d_lane0, d_lane1, d_lane2, d_lane3) =
-                avx_interleave_rgba_epi16(new_rrr, new_ggg, new_bbb, pixel.3);
-
-            _mm256_storeu_si256(dst_ptr.cast(), d_lane0);
-            _mm256_storeu_si256(dst_ptr.add(16).cast(), d_lane1);
-            _mm256_storeu_si256(dst_ptr.add(32).cast(), d_lane2);
-            _mm256_storeu_si256(dst_ptr.add(48).cast(), d_lane3);
-        }
-    }
-
-    #[inline(always)]
-    fn premultiply_work(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
-        unsafe {
-            let max_colors = (1 << bit_depth) - 1;
-
-            let mut rem = dst;
-            let mut src_rem = src;
-
-            let v_scale_colors = _mm256_set1_ps((1. / max_colors as f64) as f32);
-            for (dst, src) in rem
-                .chunks_exact_mut(16 * 4)
-                .zip(src_rem.chunks_exact(16 * 4))
-            {
-                self.premultiply_chunk(dst, src, v_scale_colors);
-            }
-
-            rem = rem.chunks_exact_mut(16 * 4).into_remainder();
-            src_rem = src_rem.chunks_exact(16 * 4).remainder();
-
-            if !rem.is_empty() {
-                assert!(src_rem.len() < 16 * 4);
-                assert!(rem.len() < 16 * 4);
-                assert_eq!(src_rem.len(), rem.len());
-
-                let mut buffer: [u16; 16 * 4] = [0u16; 16 * 4];
-                let mut dst_buffer: [u16; 16 * 4] = [0u16; 16 * 4];
-                std::ptr::copy_nonoverlapping(src_rem.as_ptr(), buffer.as_mut_ptr(), src_rem.len());
-
-                self.premultiply_chunk(&mut dst_buffer, &buffer, v_scale_colors);
-
-                std::ptr::copy_nonoverlapping(dst_buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
-            }
-        }
-    }
-
+    #[inline]
     #[target_feature(enable = "avx2")]
-    fn premultiply_avx(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
-        self.premultiply_work(dst, src, bit_depth);
+    fn premultiply_chunk(&self, dst: &mut [u16; 16], src: &[u16; 16], scale: __m256) {
+        let shuffle_alpha_mask = _mm256_setr_epi8(
+            6, 7, 6, 7, 6, 7, 6, 7, 14, 15, 14, 15, 14, 15, 14, 15, 6, 7, 6, 7, 6, 7, 6, 7, 14, 15,
+            14, 15, 14, 15, 14, 15,
+        );
+        let rgba = unsafe { _mm256_loadu_si256(src.as_ptr().cast()) };
+        let copy_alpha_mask = _mm256_set1_epi64x(i64::from_ne_bytes([0, 0, 0, 0, 0, 0, 255, 255]));
+
+        let alpha = _mm256_shuffle_epi8(rgba, shuffle_alpha_mask);
+
+        let p0 = _mm256_unpacklo_epi16(rgba, _mm256_setzero_si256());
+        let p1 = _mm256_unpackhi_epi16(rgba, _mm256_setzero_si256());
+
+        let a0 = _mm256_unpacklo_epi16(alpha, _mm256_setzero_si256());
+        let a1 = _mm256_unpackhi_epi16(alpha, _mm256_setzero_si256());
+
+        let mut s0 = _mm256_mul_ps(_mm256_cvtepi32_ps(p0), _mm256_cvtepi32_ps(a0));
+        let mut s1 = _mm256_mul_ps(_mm256_cvtepi32_ps(p1), _mm256_cvtepi32_ps(a1));
+
+        s0 = _mm256_mul_ps(s0, scale);
+        s1 = _mm256_mul_ps(s1, scale);
+
+        let e0 = _mm256_cvtps_epi32(s0);
+        let e1 = _mm256_cvtps_epi32(s1);
+
+        let u0 = _mm256_packus_epi32(e0, e1);
+        let q0 = _mm256_blendv_epi8(u0, rgba, copy_alpha_mask);
+
+        unsafe {
+            _mm256_storeu_si256(dst.as_mut_ptr().cast(), q0);
+        }
     }
 }
 
 impl Avx2PremultiplyExecutor for Avx2PremultiplyExecutorAnyBit {
     #[target_feature(enable = "avx2")]
     unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
-        self.premultiply_avx(dst, src, bit_depth);
+        let max_colors = (1 << bit_depth) - 1;
+
+        let mut rem = dst;
+        let mut src_rem = src;
+
+        let v_scale_colors = _mm256_set1_ps((1. / max_colors as f64) as f32);
+        for (dst, src) in rem
+            .as_chunks_mut::<16>()
+            .0
+            .iter_mut()
+            .zip(src_rem.as_chunks::<16>().0.iter())
+        {
+            self.premultiply_chunk(dst, src, v_scale_colors);
+        }
+
+        rem = rem.as_chunks_mut::<16>().1;
+        src_rem = src_rem.as_chunks::<16>().1;
+
+        if !rem.is_empty() {
+            let mut buffer: [u16; 16] = [0u16; 16];
+            let mut dst_buffer: [u16; 16] = [0u16; 16];
+
+            buffer[..src_rem.len()].copy_from_slice(src_rem);
+
+            self.premultiply_chunk(&mut dst_buffer, &buffer, v_scale_colors);
+
+            rem.copy_from_slice(&dst_buffer[..rem.len()]);
+        }
     }
 }
 
@@ -334,116 +291,180 @@ pub(crate) fn avx_unpremultiply_alpha_rgba_u16(in_place: &mut [u16], bit_depth: 
     }
 }
 
-/// This inlining is required to activate all features for runtime dispatch
-#[inline(always)]
-fn avx_unpremultiply_alpha_rgba_u16_row_impl(in_place: &mut [u16], bit_depth: usize) {
-    unsafe {
-        let max_colors = (1u32 << bit_depth) - 1;
+#[target_feature(enable = "avx2")]
+fn avx_unpremultiply_alpha_rgba_u16_row_avx(in_place: &mut [u16], bit_depth: usize) {
+    let max_colors = (1u32 << bit_depth) - 1;
 
-        let v_scale_colors = _mm256_set1_ps(max_colors as f32);
-        let v_max_test = _mm256_set1_epi16(max_colors as i16);
+    let v_scale_colors = _mm256_set1_ps(max_colors as f32);
+    let v_max_test = _mm256_set1_epi16(max_colors as i16);
 
-        let mut rem = in_place;
+    let shuffle_alphas_mask = _mm256_setr_epi8(
+        6, 7, 6, 7, 6, 7, 6, 7, 14, 15, 14, 15, 14, 15, 14, 15, 6, 7, 6, 7, 6, 7, 6, 7, 14, 15, 14,
+        15, 14, 15, 14, 15,
+    );
+    let prepare_alphas_mask = _mm256_setr_epi8(
+        6, 7, 14, 15, 6, 7, 6, 7, 14, 15, 14, 15, 14, 15, 14, 15, 6, 7, 14, 15, 6, 7, 6, 7, 14, 15,
+        14, 15, 14, 15, 14, 15,
+    );
+    let copy_alpha_mask = _mm256_set1_epi64x(i64::from_ne_bytes([0, 0, 0, 0, 0, 0, 255, 255]));
 
-        for dst in rem.chunks_exact_mut(16 * 4) {
-            let src_ptr = dst.as_ptr();
-            let lane0 = _mm256_loadu_si256(src_ptr.cast());
-            let lane1 = _mm256_loadu_si256(src_ptr.add(16).cast());
-            let lane2 = _mm256_loadu_si256(src_ptr.add(32).cast());
-            let lane3 = _mm256_loadu_si256(src_ptr.add(48).cast());
+    let mut rem = in_place;
 
-            let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
+    for dst in rem.as_chunks_mut::<32>().0.iter_mut() {
+        let rgba0 = unsafe { _mm256_loadu_si256(dst.as_ptr().cast()) };
+        let rgba1 = unsafe { _mm256_loadu_si256(dst[16..].as_ptr().cast()) };
 
-            let zeros = _mm256_setzero_si256();
+        let is_zero_alpha_mask0 = _mm256_cmpeq_epi16(
+            _mm256_shuffle_epi8(rgba0, shuffle_alphas_mask),
+            _mm256_setzero_si256(),
+        );
 
-            let is_zero_alpha_mask = _mm256_cmpeq_epi16(pixel.3, zeros);
+        let is_zero_alpha_mask1 = _mm256_cmpeq_epi16(
+            _mm256_shuffle_epi8(rgba1, shuffle_alphas_mask),
+            _mm256_setzero_si256(),
+        );
 
-            let mut low_alpha =
-                _mm256_rcp_ps(_mm256_cvtepi32_ps(_mm256_unpacklo_epi16(pixel.3, zeros)));
+        let alphas32_0 = _mm256_shuffle_epi8(rgba0, prepare_alphas_mask);
+        let alphas32_1 = _mm256_shuffle_epi8(rgba1, prepare_alphas_mask);
 
-            low_alpha = _mm256_mul_ps(low_alpha, v_scale_colors);
+        let ua = _mm256_permute4x64_epi64::<{ shuffle(3, 1, 2, 0) }>(_mm256_unpacklo_epi32(
+            alphas32_0, alphas32_1,
+        ));
+        let ua32 = _mm256_cvtepu16_epi32(_mm256_castsi256_si128(ua));
 
-            let mut high_alpha =
-                _mm256_rcp_ps(_mm256_cvtepi32_ps(_mm256_unpackhi_epi16(pixel.3, zeros)));
+        let prepared_alpha = _mm256_cvtepi32_ps(ua32);
+        let alphas_f32 = _mm256_div_ps(v_scale_colors, prepared_alpha);
 
-            high_alpha = _mm256_mul_ps(high_alpha, v_scale_colors);
+        let mut lo0 = _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(rgba0, _mm256_setzero_si256()));
+        let mut hi0 = _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(rgba0, _mm256_setzero_si256()));
 
-            let mut new_rrr = _mm256_scale_by_alpha(pixel.0, low_alpha, high_alpha);
-            new_rrr = _mm256_select_si256(is_zero_alpha_mask, pixel.0, new_rrr);
-            let mut new_ggg = _mm256_scale_by_alpha(pixel.1, low_alpha, high_alpha);
-            new_ggg = _mm256_select_si256(is_zero_alpha_mask, pixel.1, new_ggg);
-            let mut new_bbb = _mm256_scale_by_alpha(pixel.2, low_alpha, high_alpha);
-            new_bbb = _mm256_select_si256(is_zero_alpha_mask, pixel.2, new_bbb);
+        let mut lo1 = _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(rgba1, _mm256_setzero_si256()));
+        let mut hi1 = _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(rgba1, _mm256_setzero_si256()));
 
-            new_rrr = _mm256_min_epu16(new_rrr, v_max_test);
-            new_ggg = _mm256_min_epu16(new_ggg, v_max_test);
-            new_bbb = _mm256_min_epu16(new_bbb, v_max_test);
+        lo0 = _mm256_mul_ps(
+            lo0,
+            _mm256_shuffle_ps::<{ shuffle(0, 0, 0, 0) }>(alphas_f32, alphas_f32),
+        );
+        hi0 = _mm256_mul_ps(
+            hi0,
+            _mm256_shuffle_ps::<{ shuffle(1, 1, 1, 1) }>(alphas_f32, alphas_f32),
+        );
 
-            let dst_ptr = dst.as_mut_ptr();
-            let (d_lane0, d_lane1, d_lane2, d_lane3) =
-                avx_interleave_rgba_epi16(new_rrr, new_ggg, new_bbb, pixel.3);
+        lo1 = _mm256_mul_ps(
+            lo1,
+            _mm256_shuffle_ps::<{ shuffle(2, 2, 2, 2) }>(alphas_f32, alphas_f32),
+        );
+        hi1 = _mm256_mul_ps(
+            hi1,
+            _mm256_shuffle_ps::<{ shuffle(3, 3, 3, 3) }>(alphas_f32, alphas_f32),
+        );
 
-            _mm256_storeu_si256(dst_ptr.cast(), d_lane0);
-            _mm256_storeu_si256(dst_ptr.add(16).cast(), d_lane1);
-            _mm256_storeu_si256(dst_ptr.add(32).cast(), d_lane2);
-            _mm256_storeu_si256(dst_ptr.add(48).cast(), d_lane3);
-        }
+        let lo_u0 = _mm256_cvtps_epi32(lo0);
+        let hi_u0 = _mm256_cvtps_epi32(hi0);
 
-        rem = rem.chunks_exact_mut(16 * 4).into_remainder();
+        let lo_u1 = _mm256_cvtps_epi32(lo1);
+        let hi_u1 = _mm256_cvtps_epi32(hi1);
 
-        if !rem.is_empty() {
-            assert!(rem.len() < 16 * 4);
+        let mut packed0 = _mm256_packus_epi32(lo_u0, hi_u0);
+        let mut packed1 = _mm256_packus_epi32(lo_u1, hi_u1);
 
-            let mut dst_buffer: [u16; 16 * 4] = [0u16; 16 * 4];
-            std::ptr::copy_nonoverlapping(rem.as_ptr(), dst_buffer.as_mut_ptr(), rem.len());
+        packed0 = _mm256_min_epu16(packed0, v_max_test);
+        packed0 = _mm256_blendv_epi8(packed0, _mm256_setzero_si256(), is_zero_alpha_mask0);
+        packed0 = _mm256_blendv_epi8(packed0, rgba0, copy_alpha_mask);
 
-            let lane0 = _mm256_loadu_si256(dst_buffer.as_ptr().cast());
-            let lane1 = _mm256_loadu_si256(dst_buffer.as_ptr().add(16).cast());
-            let lane2 = _mm256_loadu_si256(dst_buffer.as_ptr().add(32).cast());
-            let lane3 = _mm256_loadu_si256(dst_buffer.as_ptr().add(48).cast());
+        packed1 = _mm256_min_epu16(packed1, v_max_test);
+        packed1 = _mm256_blendv_epi8(packed1, _mm256_setzero_si256(), is_zero_alpha_mask1);
+        packed1 = _mm256_blendv_epi8(packed1, rgba1, copy_alpha_mask);
 
-            let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
-
-            let zeros = _mm256_setzero_si256();
-
-            let is_zero_alpha_mask = _mm256_cmpeq_epi16(pixel.3, zeros);
-
-            let mut low_alpha =
-                _mm256_rcp_ps(_mm256_cvtepi32_ps(_mm256_unpacklo_epi16(pixel.3, zeros)));
-
-            low_alpha = _mm256_mul_ps(low_alpha, v_scale_colors);
-
-            let mut high_alpha =
-                _mm256_rcp_ps(_mm256_cvtepi32_ps(_mm256_unpackhi_epi16(pixel.3, zeros)));
-
-            high_alpha = _mm256_mul_ps(high_alpha, v_scale_colors);
-
-            let mut new_rrr = _mm256_scale_by_alpha(pixel.0, low_alpha, high_alpha);
-            new_rrr = _mm256_select_si256(is_zero_alpha_mask, pixel.0, new_rrr);
-            let mut new_ggg = _mm256_scale_by_alpha(pixel.1, low_alpha, high_alpha);
-            new_ggg = _mm256_select_si256(is_zero_alpha_mask, pixel.1, new_ggg);
-            let mut new_bbb = _mm256_scale_by_alpha(pixel.2, low_alpha, high_alpha);
-            new_bbb = _mm256_select_si256(is_zero_alpha_mask, pixel.2, new_bbb);
-
-            new_rrr = _mm256_min_epu16(new_rrr, v_max_test);
-            new_ggg = _mm256_min_epu16(new_ggg, v_max_test);
-            new_bbb = _mm256_min_epu16(new_bbb, v_max_test);
-
-            let (d_lane0, d_lane1, d_lane2, d_lane3) =
-                avx_interleave_rgba_epi16(new_rrr, new_ggg, new_bbb, pixel.3);
-
-            _mm256_storeu_si256(dst_buffer.as_mut_ptr().cast(), d_lane0);
-            _mm256_storeu_si256(dst_buffer.as_mut_ptr().add(16).cast(), d_lane1);
-            _mm256_storeu_si256(dst_buffer.as_mut_ptr().add(32).cast(), d_lane2);
-            _mm256_storeu_si256(dst_buffer.as_mut_ptr().add(48).cast(), d_lane3);
-
-            std::ptr::copy_nonoverlapping(dst_buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
+        unsafe {
+            _mm256_storeu_si256(dst.as_mut_ptr().cast(), packed0);
+            _mm256_storeu_si256(dst[16..].as_mut_ptr().cast(), packed1);
         }
     }
-}
 
-#[target_feature(enable = "avx2")]
-/// This inlining is required to activate all features for runtime dispatch
-fn avx_unpremultiply_alpha_rgba_u16_row_avx(in_place: &mut [u16], bit_depth: usize) {
-    avx_unpremultiply_alpha_rgba_u16_row_impl(in_place, bit_depth);
+    rem = rem.as_chunks_mut::<32>().1;
+
+    for dst in rem.as_chunks_mut::<16>().0.iter_mut() {
+        let rgba = unsafe { _mm256_loadu_si256(dst.as_ptr().cast()) };
+
+        let alphas = _mm256_shuffle_epi8(rgba, shuffle_alphas_mask);
+        let alphas32 = _mm256_unpacklo_epi16(
+            _mm256_shuffle_epi8(rgba, prepare_alphas_mask),
+            _mm256_setzero_si256(),
+        );
+        let is_zero_alpha_mask = _mm256_cmpeq_epi16(alphas, _mm256_setzero_si256());
+
+        let alphas_f32 = _mm256_div_ps(v_scale_colors, _mm256_cvtepi32_ps(alphas32));
+
+        let mut lo = _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(rgba, _mm256_setzero_si256()));
+        let mut hi = _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(rgba, _mm256_setzero_si256()));
+
+        lo = _mm256_mul_ps(
+            lo,
+            _mm256_shuffle_ps::<{ shuffle(0, 0, 0, 0) }>(alphas_f32, alphas_f32),
+        );
+        hi = _mm256_mul_ps(
+            hi,
+            _mm256_shuffle_ps::<{ shuffle(1, 1, 1, 1) }>(alphas_f32, alphas_f32),
+        );
+
+        let lo_u = _mm256_cvtps_epi32(lo);
+        let hi_u = _mm256_cvtps_epi32(hi);
+
+        let mut packed = _mm256_packus_epi32(lo_u, hi_u);
+
+        packed = _mm256_min_epu16(packed, v_max_test);
+        packed = _mm256_blendv_epi8(packed, _mm256_setzero_si256(), is_zero_alpha_mask);
+        packed = _mm256_blendv_epi8(packed, rgba, copy_alpha_mask);
+
+        unsafe {
+            _mm256_storeu_si256(dst.as_mut_ptr().cast(), packed);
+        }
+    }
+
+    rem = rem.as_chunks_mut::<16>().1;
+
+    if !rem.is_empty() {
+        let mut dst_buffer: [u16; 16] = [0u16; 16];
+        dst_buffer[..rem.len()].copy_from_slice(rem);
+
+        let rgba = unsafe { _mm256_loadu_si256(dst_buffer.as_ptr().cast()) };
+
+        let alphas = _mm256_shuffle_epi8(rgba, shuffle_alphas_mask);
+        let alphas32 = _mm256_unpacklo_epi16(
+            _mm256_shuffle_epi8(rgba, prepare_alphas_mask),
+            _mm256_setzero_si256(),
+        );
+        let is_zero_alpha_mask = _mm256_cmpeq_epi16(alphas, _mm256_setzero_si256());
+
+        let alphas_f32 = _mm256_div_ps(v_scale_colors, _mm256_cvtepi32_ps(alphas32));
+
+        let mut lo = _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(rgba, _mm256_setzero_si256()));
+        let mut hi = _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(rgba, _mm256_setzero_si256()));
+
+        lo = _mm256_mul_ps(
+            lo,
+            _mm256_shuffle_ps::<{ shuffle(0, 0, 0, 0) }>(alphas_f32, alphas_f32),
+        );
+        hi = _mm256_mul_ps(
+            hi,
+            _mm256_shuffle_ps::<{ shuffle(1, 1, 1, 1) }>(alphas_f32, alphas_f32),
+        );
+
+        let lo_u = _mm256_cvtps_epi32(lo);
+        let hi_u = _mm256_cvtps_epi32(hi);
+
+        let mut packed = _mm256_packus_epi32(lo_u, hi_u);
+
+        packed = _mm256_min_epu16(packed, v_max_test);
+
+        packed = _mm256_blendv_epi8(packed, _mm256_setzero_si256(), is_zero_alpha_mask);
+        packed = _mm256_blendv_epi8(packed, rgba, copy_alpha_mask);
+
+        unsafe {
+            _mm256_storeu_si256(dst_buffer.as_mut_ptr().cast(), packed);
+        }
+
+        rem.copy_from_slice(&dst_buffer[..rem.len()]);
+    }
 }

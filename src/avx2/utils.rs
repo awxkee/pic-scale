@@ -97,101 +97,7 @@ pub(crate) fn avx2_div_by255(v: __m256i) -> __m256i {
     }
 }
 
-#[inline(always)]
-pub(crate) fn avx2_deinterleave_rgba(
-    rgba0: __m256i,
-    rgba1: __m256i,
-    rgba2: __m256i,
-    rgba3: __m256i,
-) -> (__m256i, __m256i, __m256i, __m256i) {
-    unsafe {
-        #[rustfmt::skip]
-    let sh = _mm256_setr_epi8(
-        0, 4, 8, 12, 1, 5,
-        9, 13, 2, 6, 10, 14,
-        3, 7, 11, 15, 0, 4,
-        8, 12, 1, 5, 9, 13,
-        2, 6, 10, 14, 3, 7,
-        11, 15,
-    );
-
-        let p0 = _mm256_shuffle_epi8(rgba0, sh);
-        let p1 = _mm256_shuffle_epi8(rgba1, sh);
-        let p2 = _mm256_shuffle_epi8(rgba2, sh);
-        let p3 = _mm256_shuffle_epi8(rgba3, sh);
-
-        let p01l = _mm256_unpacklo_epi32(p0, p1);
-        let p01h = _mm256_unpackhi_epi32(p0, p1);
-        let p23l = _mm256_unpacklo_epi32(p2, p3);
-        let p23h = _mm256_unpackhi_epi32(p2, p3);
-
-        let pll = _mm256_permute2x128_si256::<32>(p01l, p23l);
-        let plh = _mm256_permute2x128_si256::<49>(p01l, p23l);
-        let phl = _mm256_permute2x128_si256::<32>(p01h, p23h);
-        let phh = _mm256_permute2x128_si256::<49>(p01h, p23h);
-
-        let b0 = _mm256_unpacklo_epi32(pll, plh);
-        let g0 = _mm256_unpackhi_epi32(pll, plh);
-        let r0 = _mm256_unpacklo_epi32(phl, phh);
-        let a0 = _mm256_unpackhi_epi32(phl, phh);
-
-        (b0, g0, r0, a0)
-    }
-}
-
-#[inline(always)]
-pub(crate) fn avx_deinterleave_rgba_epi32(
-    p0: __m256i,
-    p1: __m256i,
-    p2: __m256i,
-    p3: __m256i,
-) -> (__m256i, __m256i, __m256i, __m256i) {
-    unsafe {
-        let p01l = _mm256_unpacklo_epi32(p0, p1);
-        let p01h = _mm256_unpackhi_epi32(p0, p1);
-        let p23l = _mm256_unpacklo_epi32(p2, p3);
-        let p23h = _mm256_unpackhi_epi32(p2, p3);
-
-        let pll = _mm256_permute2x128_si256::<32>(p01l, p23l);
-        let plh = _mm256_permute2x128_si256::<49>(p01l, p23l);
-        let phl = _mm256_permute2x128_si256::<32>(p01h, p23h);
-        let phh = _mm256_permute2x128_si256::<49>(p01h, p23h);
-
-        let b0 = _mm256_unpacklo_epi32(pll, plh);
-        let g0 = _mm256_unpackhi_epi32(pll, plh);
-        let r0 = _mm256_unpacklo_epi32(phl, phh);
-        let a0 = _mm256_unpackhi_epi32(phl, phh);
-        (b0, g0, r0, a0)
-    }
-}
-
-#[inline(always)]
-pub(crate) fn avx_interleave_rgba_epi32(
-    p0: __m256i,
-    p1: __m256i,
-    p2: __m256i,
-    p3: __m256i,
-) -> (__m256i, __m256i, __m256i, __m256i) {
-    unsafe {
-        let bg0 = _mm256_unpacklo_epi32(p0, p1);
-        let bg1 = _mm256_unpackhi_epi32(p0, p1);
-        let ra0 = _mm256_unpacklo_epi32(p2, p3);
-        let ra1 = _mm256_unpackhi_epi32(p2, p3);
-
-        let bgra0_ = _mm256_unpacklo_epi64(bg0, ra0);
-        let bgra1_ = _mm256_unpackhi_epi64(bg0, ra0);
-        let bgra2_ = _mm256_unpacklo_epi64(bg1, ra1);
-        let bgra3_ = _mm256_unpackhi_epi64(bg1, ra1);
-
-        let bgra0 = _mm256_permute2x128_si256::<32>(bgra0_, bgra1_);
-        let bgra2 = _mm256_permute2x128_si256::<49>(bgra0_, bgra1_);
-        let bgra1 = _mm256_permute2x128_si256::<32>(bgra2_, bgra3_);
-        let bgra3 = _mm256_permute2x128_si256::<49>(bgra2_, bgra3_);
-
-        (bgra0, bgra1, bgra2, bgra3)
-    }
-}
-
+#[cfg(feature = "nightly_f16")]
 #[inline(always)]
 pub(crate) fn avx_interleave_rgba_epi16(
     a: __m256i,
@@ -218,6 +124,7 @@ pub(crate) fn avx_interleave_rgba_epi16(
     }
 }
 
+#[cfg(feature = "nightly_f16")]
 #[inline(always)]
 pub(crate) fn avx_deinterleave_rgba_epi16(
     a: __m256i,
@@ -250,78 +157,6 @@ pub(crate) fn avx_deinterleave_rgba_epi16(
         let r0 = _mm256_unpacklo_epi32(phl, phh);
         let a0 = _mm256_unpackhi_epi32(phl, phh);
         (b0, g0, r0, a0)
-    }
-}
-
-#[inline(always)]
-pub(crate) fn avx_deinterleave_rgba_ps(
-    p0: __m256,
-    p1: __m256,
-    p2: __m256,
-    p3: __m256,
-) -> (__m256, __m256, __m256, __m256) {
-    unsafe {
-        let reshaped = avx_deinterleave_rgba_epi32(
-            _mm256_castps_si256(p0),
-            _mm256_castps_si256(p1),
-            _mm256_castps_si256(p2),
-            _mm256_castps_si256(p3),
-        );
-        (
-            _mm256_castsi256_ps(reshaped.0),
-            _mm256_castsi256_ps(reshaped.1),
-            _mm256_castsi256_ps(reshaped.2),
-            _mm256_castsi256_ps(reshaped.3),
-        )
-    }
-}
-
-#[inline(always)]
-pub(crate) fn avx_interleave_rgba_ps(
-    p0: __m256,
-    p1: __m256,
-    p2: __m256,
-    p3: __m256,
-) -> (__m256, __m256, __m256, __m256) {
-    unsafe {
-        let reshaped = avx_interleave_rgba_epi32(
-            _mm256_castps_si256(p0),
-            _mm256_castps_si256(p1),
-            _mm256_castps_si256(p2),
-            _mm256_castps_si256(p3),
-        );
-        (
-            _mm256_castsi256_ps(reshaped.0),
-            _mm256_castsi256_ps(reshaped.1),
-            _mm256_castsi256_ps(reshaped.2),
-            _mm256_castsi256_ps(reshaped.3),
-        )
-    }
-}
-
-#[inline(always)]
-pub(crate) fn avx2_interleave_rgba(
-    r: __m256i,
-    g: __m256i,
-    b: __m256i,
-    a: __m256i,
-) -> (__m256i, __m256i, __m256i, __m256i) {
-    unsafe {
-        let bg0 = _mm256_unpacklo_epi8(r, g);
-        let bg1 = _mm256_unpackhi_epi8(r, g);
-        let ra0 = _mm256_unpacklo_epi8(b, a);
-        let ra1 = _mm256_unpackhi_epi8(b, a);
-
-        let rgba0_ = _mm256_unpacklo_epi16(bg0, ra0);
-        let rgba1_ = _mm256_unpackhi_epi16(bg0, ra0);
-        let rgba2_ = _mm256_unpacklo_epi16(bg1, ra1);
-        let rgba3_ = _mm256_unpackhi_epi16(bg1, ra1);
-
-        let rgba0 = _mm256_permute2x128_si256::<32>(rgba0_, rgba1_);
-        let rgba2 = _mm256_permute2x128_si256::<49>(rgba0_, rgba1_);
-        let rgba1 = _mm256_permute2x128_si256::<32>(rgba2_, rgba3_);
-        let rgba3 = _mm256_permute2x128_si256::<49>(rgba2_, rgba3_);
-        (rgba0, rgba1, rgba2, rgba3)
     }
 }
 

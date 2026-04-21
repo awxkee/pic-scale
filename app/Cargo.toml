@@ -5,12 +5,11 @@ edition = "2021"
 
 [dependencies]
 image = { version = "0.25", features = ["default"] }
-pic-scale = { path = "..", features = ["nightly_f16", "rdm", "nightly_i8mm", "avx", "sse", "colorspaces", "avx512"], default-features = false }
+pic-scale = { path = "..", features = ["nightly_f16", "rdm", "nightly_i8mm", "avx", "sse", "colorspaces", "avx512", "sve"], default-features = false }
 fast_image_resize = { version = "6.0.0", features = [] }
 accelerate = { path = "accelerate/" }
-yuv = "0.8.3"
-libc = "0.2.169"
 rand = "0.10.1"
+libc = "0.2.185"
 
 [dev-dependencies]
 criterion = "0.8.2"

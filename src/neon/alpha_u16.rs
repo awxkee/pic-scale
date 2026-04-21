@@ -61,74 +61,114 @@ trait NeonPremultiplyExecutor {
 struct NeonPremultiplyExecutorDefault<const BIT_DEPTH: usize> {}
 
 impl<const BIT_DEPTH: usize> NeonPremultiplyExecutor for NeonPremultiplyExecutorDefault<BIT_DEPTH> {
+    #[target_feature(enable = "neon")]
     unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
-        unsafe {
-            assert_ne!(bit_depth, 0, "Something goes wrong!");
-            assert!((1..=16).contains(&bit_depth));
+        assert_ne!(bit_depth, 0, "Something goes wrong!");
+        assert!((1..=16).contains(&bit_depth));
 
-            let mut rem = dst;
-            let mut src_rem = src;
-            for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
-                let pixel = vld4q_u16(src.as_ptr());
+        static TBL: [u8; 16] = [6, 7, 6, 7, 6, 7, 6, 7, 14, 15, 14, 15, 14, 15, 14, 15];
+        let shuf_tbl = unsafe { vld1q_u8(TBL.as_ptr()) };
+        let alpha_mask = vreinterpretq_u16_u64(vdupq_n_u64(u64::from_ne_bytes([
+            0, 0, 0, 0, 0, 0, 255, 255,
+        ])));
 
-                let low_a = vget_low_u16(pixel.3);
+        let mut rem = dst;
+        let mut src_rem = src;
 
-                let new_r = vcombine_u16(
-                    neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel.0), low_a)),
-                    neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel.0, pixel.3)),
-                );
+        for (dst, src) in rem
+            .as_chunks_mut::<32>()
+            .0
+            .iter_mut()
+            .zip(src_rem.as_chunks::<32>().0.iter())
+        {
+            let pixel0 = unsafe { vld1q_u16(src.as_ptr()) };
+            let pixel1 = unsafe { vld1q_u16(src[8..].as_ptr()) };
+            let pixel2 = unsafe { vld1q_u16(src[16..].as_ptr()) };
+            let pixel3 = unsafe { vld1q_u16(src[24..].as_ptr()) };
 
-                let new_g = vcombine_u16(
-                    neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel.1), low_a)),
-                    neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel.1, pixel.3)),
-                );
+            let alpha0 = vreinterpretq_u16_u8(vqtbl1q_u8(vreinterpretq_u8_u16(pixel0), shuf_tbl));
+            let alpha1 = vreinterpretq_u16_u8(vqtbl1q_u8(vreinterpretq_u8_u16(pixel1), shuf_tbl));
+            let alpha2 = vreinterpretq_u16_u8(vqtbl1q_u8(vreinterpretq_u8_u16(pixel2), shuf_tbl));
+            let alpha3 = vreinterpretq_u16_u8(vqtbl1q_u8(vreinterpretq_u8_u16(pixel3), shuf_tbl));
 
-                let new_b = vcombine_u16(
-                    neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel.2), low_a)),
-                    neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel.2, pixel.3)),
-                );
+            let mut new_px0 = vcombine_u16(
+                neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel0), vget_low_u16(alpha0))),
+                neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel0, alpha0)),
+            );
+            let mut new_px1 = vcombine_u16(
+                neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel1), vget_low_u16(alpha1))),
+                neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel1, alpha1)),
+            );
+            let mut new_px2 = vcombine_u16(
+                neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel2), vget_low_u16(alpha2))),
+                neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel2, alpha2)),
+            );
+            let mut new_px3 = vcombine_u16(
+                neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel3), vget_low_u16(alpha3))),
+                neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel3, alpha3)),
+            );
 
-                let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
+            new_px0 = vbslq_u16(alpha_mask, pixel0, new_px0);
+            new_px1 = vbslq_u16(alpha_mask, pixel1, new_px1);
+            new_px2 = vbslq_u16(alpha_mask, pixel2, new_px2);
+            new_px3 = vbslq_u16(alpha_mask, pixel3, new_px3);
 
-                vst4q_u16(dst.as_mut_ptr(), new_px);
+            unsafe {
+                vst1q_u16(dst.as_mut_ptr(), new_px0);
+                vst1q_u16(dst[8..].as_mut_ptr(), new_px1);
+                vst1q_u16(dst[16..].as_mut_ptr(), new_px2);
+                vst1q_u16(dst[24..].as_mut_ptr(), new_px3);
+            }
+        }
+
+        rem = rem.as_chunks_mut::<32>().1;
+        src_rem = src_rem.as_chunks::<32>().1;
+
+        for (dst, src) in rem
+            .as_chunks_mut::<8>()
+            .0
+            .iter_mut()
+            .zip(src_rem.as_chunks::<8>().0.iter())
+        {
+            let pixel = unsafe { vld1q_u16(src.as_ptr()) };
+
+            let alpha = vreinterpretq_u16_u8(vqtbl1q_u8(vreinterpretq_u8_u16(pixel), shuf_tbl));
+
+            let new_px = vcombine_u16(
+                neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel), vget_low_u16(alpha))),
+                neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel, alpha)),
+            );
+
+            let new_px = vbslq_u16(alpha_mask, pixel, new_px);
+
+            unsafe {
+                vst1q_u16(dst.as_mut_ptr(), new_px);
+            }
+        }
+
+        rem = rem.as_chunks_mut::<8>().1;
+        src_rem = src_rem.as_chunks::<8>().1;
+
+        if !rem.is_empty() {
+            let mut buffer: [u16; 8] = [0u16; 8];
+            buffer[..src_rem.len()].copy_from_slice(src_rem);
+
+            let pixel = unsafe { vld1q_u16(buffer.as_ptr()) };
+
+            let alpha = vreinterpretq_u16_u8(vqtbl1q_u8(vreinterpretq_u8_u16(pixel), shuf_tbl));
+
+            let new_px = vcombine_u16(
+                neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel), vget_low_u16(alpha))),
+                neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel, alpha)),
+            );
+
+            let new_px = vbslq_u16(alpha_mask, pixel, new_px);
+
+            unsafe {
+                vst1q_u16(buffer.as_mut_ptr(), new_px);
             }
 
-            rem = rem.chunks_exact_mut(8 * 4).into_remainder();
-            src_rem = src_rem.chunks_exact(8 * 4).remainder();
-
-            if !rem.is_empty() {
-                assert!(src_rem.len() < 8 * 4);
-                assert!(rem.len() < 8 * 4);
-                assert_eq!(src_rem.len(), rem.len());
-
-                let mut buffer: [u16; 8 * 4] = [0u16; 8 * 4];
-                std::ptr::copy_nonoverlapping(src_rem.as_ptr(), buffer.as_mut_ptr(), src_rem.len());
-
-                let pixel = vld4q_u16(buffer.as_ptr());
-
-                let low_a = vget_low_u16(pixel.3);
-
-                let new_r = vcombine_u16(
-                    neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel.0), low_a)),
-                    neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel.0, pixel.3)),
-                );
-
-                let new_g = vcombine_u16(
-                    neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel.1), low_a)),
-                    neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel.1, pixel.3)),
-                );
-
-                let new_b = vcombine_u16(
-                    neon_div_by::<BIT_DEPTH>(vmull_u16(vget_low_u16(pixel.2), low_a)),
-                    neon_div_by::<BIT_DEPTH>(vmull_high_u16(pixel.2, pixel.3)),
-                );
-
-                let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
-
-                vst4q_u16(buffer.as_mut_ptr(), new_px);
-
-                std::ptr::copy_nonoverlapping(buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
-            }
+            rem.copy_from_slice(&buffer[..rem.len()]);
         }
     }
 }
@@ -137,62 +177,76 @@ impl<const BIT_DEPTH: usize> NeonPremultiplyExecutor for NeonPremultiplyExecutor
 struct NeonPremultiplyExecutorAnyBitDepth {}
 
 impl NeonPremultiplyExecutor for NeonPremultiplyExecutorAnyBitDepth {
+    #[target_feature(enable = "neon")]
     unsafe fn premultiply(&self, dst: &mut [u16], src: &[u16], bit_depth: usize) {
-        unsafe {
-            assert_ne!(bit_depth, 0, "Something goes wrong!");
-            assert!((1..=16).contains(&bit_depth));
-            let max_colors = (1u32 << bit_depth) - 1;
-            let mut rem = dst;
-            let mut src_rem = src;
+        assert_ne!(bit_depth, 0, "Something goes wrong!");
+        assert!((1..=16).contains(&bit_depth));
+        let max_colors = (1u32 << bit_depth) - 1;
+        let mut rem = dst;
+        let mut src_rem = src;
 
-            let v_max_colors_scale = vdupq_n_f32((1. / max_colors as f64) as f32);
+        let v_max_colors_scale = vdupq_n_f32((1. / max_colors as f64) as f32);
+        let vmax_colors = vdupq_n_u16(max_colors as u16);
 
-            for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
-                let pixel = vld4q_u16(src.as_ptr());
+        static TBL: [u8; 16] = [6, 7, 6, 7, 6, 7, 6, 7, 14, 15, 14, 15, 14, 15, 14, 15];
+        let shuf_tbl = unsafe { vld1q_u8(TBL.as_ptr()) };
+        let alpha_mask = vreinterpretq_u16_u64(vdupq_n_u64(u64::from_ne_bytes([
+            0, 0, 0, 0, 0, 0, 255, 255,
+        ])));
 
-                let low_a = vmovl_u16(vget_low_u16(pixel.3));
-                let high_a = vmovl_high_u16(pixel.3);
+        for (dst, src) in rem
+            .as_chunks_mut::<8>()
+            .0
+            .iter_mut()
+            .zip(src_rem.as_chunks::<8>().0.iter())
+        {
+            let pixel = unsafe { vld1q_u16(src.as_ptr()) };
 
-                let low_a = vmulq_f32(vcvtq_f32_u32(low_a), v_max_colors_scale);
-                let hi_a = vmulq_f32(vcvtq_f32_u32(high_a), v_max_colors_scale);
+            let alpha = vreinterpretq_u16_u8(vqtbl1q_u8(vreinterpretq_u8_u16(pixel), shuf_tbl));
 
-                let new_r = v_scale_by_alpha(pixel.0, low_a, hi_a);
-                let new_g = v_scale_by_alpha(pixel.1, low_a, hi_a);
-                let new_b = v_scale_by_alpha(pixel.2, low_a, hi_a);
+            let low_a = vmull_u16(vget_low_u16(pixel), vget_low_u16(alpha));
+            let high_a = vmull_high_u16(pixel, alpha);
 
-                let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
+            let p0 = vcvtaq_u32_f32(vmulq_f32(vcvtq_f32_u32(low_a), v_max_colors_scale));
+            let p1 = vcvtaq_u32_f32(vmulq_f32(vcvtq_f32_u32(high_a), v_max_colors_scale));
 
-                vst4q_u16(dst.as_mut_ptr(), new_px);
+            let mut packed = vcombine_u16(vqmovn_u32(p0), vqmovn_u32(p1));
+            packed = vminq_u16(packed, vmax_colors);
+
+            let new_px = vbslq_u16(alpha_mask, pixel, packed);
+
+            unsafe {
+                vst1q_u16(dst.as_mut_ptr(), new_px);
+            }
+        }
+
+        rem = rem.as_chunks_mut::<8>().1;
+        src_rem = src_rem.as_chunks::<8>().1;
+
+        if !rem.is_empty() {
+            let mut buffer: [u16; 8] = [0u16; 8];
+            buffer[..src_rem.len()].copy_from_slice(src_rem);
+
+            let pixel = unsafe { vld1q_u16(buffer.as_ptr()) };
+
+            let alpha = vreinterpretq_u16_u8(vqtbl1q_u8(vreinterpretq_u8_u16(pixel), shuf_tbl));
+
+            let low_a = vmull_u16(vget_low_u16(pixel), vget_low_u16(alpha));
+            let high_a = vmull_high_u16(pixel, alpha);
+
+            let p0 = vcvtaq_u32_f32(vmulq_f32(vcvtq_f32_u32(low_a), v_max_colors_scale));
+            let p1 = vcvtaq_u32_f32(vmulq_f32(vcvtq_f32_u32(high_a), v_max_colors_scale));
+
+            let mut packed = vcombine_u16(vqmovn_u32(p0), vqmovn_u32(p1));
+            packed = vminq_u16(packed, vmax_colors);
+
+            let new_px = vbslq_u16(alpha_mask, pixel, packed);
+
+            unsafe {
+                vst1q_u16(buffer.as_mut_ptr(), new_px);
             }
 
-            rem = rem.chunks_exact_mut(8 * 4).into_remainder();
-            src_rem = src_rem.chunks_exact(8 * 4).remainder();
-
-            if !rem.is_empty() {
-                assert!(src_rem.len() < 8 * 4);
-                assert!(rem.len() < 8 * 4);
-                assert_eq!(src_rem.len(), rem.len());
-                let mut buffer: [u16; 8 * 4] = [0u16; 8 * 4];
-                std::ptr::copy_nonoverlapping(src_rem.as_ptr(), buffer.as_mut_ptr(), src_rem.len());
-
-                let pixel = vld4q_u16(buffer.as_ptr());
-
-                let low_a = vmovl_u16(vget_low_u16(pixel.3));
-                let high_a = vmovl_high_u16(pixel.3);
-
-                let low_a = vmulq_f32(vcvtq_f32_u32(low_a), v_max_colors_scale);
-                let hi_a = vmulq_f32(vcvtq_f32_u32(high_a), v_max_colors_scale);
-
-                let new_r = v_scale_by_alpha(pixel.0, low_a, hi_a);
-                let new_g = v_scale_by_alpha(pixel.1, low_a, hi_a);
-                let new_b = v_scale_by_alpha(pixel.2, low_a, hi_a);
-
-                let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
-
-                vst4q_u16(buffer.as_mut_ptr(), new_px);
-
-                std::ptr::copy_nonoverlapping(buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
-            }
+            rem.copy_from_slice(&buffer[..rem.len()]);
         }
     }
 }
@@ -249,22 +303,6 @@ pub(crate) fn neon_premultiply_alpha_rgba_u16(dst: &mut [u16], src: &[u16], bit_
     }
 }
 
-#[inline]
-fn v_scale_by_alpha(px: uint16x8_t, low_low_a: float32x4_t, low_high_a: float32x4_t) -> uint16x8_t {
-    unsafe {
-        let low_px_u = vmovl_u16(vget_low_u16(px));
-        let high_px_u = vmovl_high_u16(px);
-
-        let low_px = vcvtq_f32_u32(low_px_u);
-        let high_px = vcvtq_f32_u32(high_px_u);
-
-        let new_ll = vcvtaq_u32_f32(vmulq_f32(low_px, low_low_a));
-        let new_lh = vcvtaq_u32_f32(vmulq_f32(high_px, low_high_a));
-
-        vcombine_u16(vqmovn_u32(new_ll), vqmovn_u32(new_lh))
-    }
-}
-
 trait DisassociateAlpha {
     unsafe fn disassociate(&self, in_place: &mut [u16], bit_depth: usize);
 }
@@ -273,98 +311,147 @@ trait DisassociateAlpha {
 struct NeonDisassociateAlpha {}
 
 impl DisassociateAlpha for NeonDisassociateAlpha {
+    #[target_feature(enable = "neon")]
     unsafe fn disassociate(&self, in_place: &mut [u16], bit_depth: usize) {
-        unsafe {
-            let max_colors = (1u32 << bit_depth) - 1;
+        let max_colors = (1u32 << bit_depth) - 1;
 
-            let mut rem = in_place;
+        static TBL: [u8; 16] = [6, 7, 6, 7, 6, 7, 6, 7, 14, 15, 14, 15, 14, 15, 14, 15];
+        let shuf_tbl = unsafe { vld1q_u8(TBL.as_ptr()) };
+        let copy_alpha_mask = vreinterpretq_u16_u64(vdupq_n_u64(u64::from_ne_bytes([
+            0, 0, 0, 0, 0, 0, 255, 255,
+        ])));
 
-            let v_max_colors_f = vdupq_n_f32(max_colors as f32);
-            let ones = vdupq_n_f32(1.);
-            let v_max_test = vdupq_n_u16(max_colors as u16);
+        let mut rem = in_place;
 
-            for dst in rem.chunks_exact_mut(8 * 4) {
-                let pixel = vld4q_u16(dst.as_ptr());
+        let v_max_colors_f = vdupq_n_f32(max_colors as f32);
+        let v_max_test = vdupq_n_u16(max_colors as u16);
 
-                let is_alpha_zero_mask = vceqzq_u16(pixel.3);
+        for dst in rem.as_chunks_mut::<16>().0.iter_mut() {
+            let pixel0 = unsafe { vld1q_u16(dst.as_ptr()) };
+            let pixel1 = unsafe { vld1q_u16(dst[8..].as_ptr()) };
 
-                let low_a = vmovl_u16(vget_low_u16(pixel.3));
-                let high_a = vmovl_high_u16(pixel.3);
+            let alpha0 = vreinterpretq_u16_u8(vqtbl1q_u8(vreinterpretq_u8_u16(pixel0), shuf_tbl));
+            let alpha1 = vreinterpretq_u16_u8(vqtbl1q_u8(vreinterpretq_u8_u16(pixel1), shuf_tbl));
 
-                let low_a = vmulq_f32(vdivq_f32(ones, vcvtq_f32_u32(low_a)), v_max_colors_f);
-                let hi_a = vmulq_f32(vdivq_f32(ones, vcvtq_f32_u32(high_a)), v_max_colors_f);
+            let pa0 = vzip1_u16(vget_low_u16(alpha0), vget_high_u16(alpha0));
+            let pa1 = vzip1_u16(vget_low_u16(alpha1), vget_high_u16(alpha1));
+            let pa_full = vreinterpret_u16_u32(vzip2_u32(
+                vreinterpret_u32_u16(pa0),
+                vreinterpret_u32_u16(pa1),
+            ));
 
-                let mut new_r = vbslq_u16(
-                    is_alpha_zero_mask,
-                    pixel.0,
-                    v_scale_by_alpha(pixel.0, low_a, hi_a),
-                );
+            let packed_alpha = vcvtq_f32_u32(vmovl_u16(pa_full));
 
-                let mut new_g = vbslq_u16(
-                    is_alpha_zero_mask,
-                    pixel.1,
-                    v_scale_by_alpha(pixel.1, low_a, hi_a),
-                );
+            let recip_alphas = vdivq_f32(v_max_colors_f, packed_alpha);
 
-                let mut new_b = vbslq_u16(
-                    is_alpha_zero_mask,
-                    pixel.2,
-                    v_scale_by_alpha(pixel.2, low_a, hi_a),
-                );
+            let is_alpha_zero_mask0 = vceqzq_u16(alpha0);
+            let is_alpha_zero_mask1 = vceqzq_u16(alpha1);
 
-                new_r = vminq_u16(new_r, v_max_test);
-                new_g = vminq_u16(new_g, v_max_test);
-                new_b = vminq_u16(new_b, v_max_test);
+            let low0 = vmovl_u16(vget_low_u16(pixel0));
+            let high0 = vmovl_high_u16(pixel0);
 
-                let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
+            let low1 = vmovl_u16(vget_low_u16(pixel1));
+            let high1 = vmovl_high_u16(pixel1);
 
-                vst4q_u16(dst.as_mut_ptr(), new_px);
+            let low0 = vmulq_laneq_f32::<0>(vcvtq_f32_u32(low0), recip_alphas);
+            let hi0 = vmulq_laneq_f32::<1>(vcvtq_f32_u32(high0), recip_alphas);
+            let low1 = vmulq_laneq_f32::<2>(vcvtq_f32_u32(low1), recip_alphas);
+            let hi1 = vmulq_laneq_f32::<3>(vcvtq_f32_u32(high1), recip_alphas);
+
+            let mut packed0 = vcombine_u16(
+                vqmovn_u32(vcvtaq_u32_f32(low0)),
+                vqmovn_u32(vcvtaq_u32_f32(hi0)),
+            );
+            let mut packed1 = vcombine_u16(
+                vqmovn_u32(vcvtaq_u32_f32(low1)),
+                vqmovn_u32(vcvtaq_u32_f32(hi1)),
+            );
+
+            packed0 = vminq_u16(packed0, v_max_test);
+            packed0 = vbslq_u16(is_alpha_zero_mask0, vdupq_n_u16(0), packed0);
+            packed0 = vbslq_u16(copy_alpha_mask, pixel0, packed0);
+
+            packed1 = vminq_u16(packed1, v_max_test);
+            packed1 = vbslq_u16(is_alpha_zero_mask1, vdupq_n_u16(0), packed1);
+            packed1 = vbslq_u16(copy_alpha_mask, pixel1, packed1);
+
+            unsafe {
+                vst1q_u16(dst.as_mut_ptr(), packed0);
+                vst1q_u16(dst[8..].as_mut_ptr(), packed1);
             }
-            rem = rem.chunks_exact_mut(8 * 4).into_remainder();
+        }
 
-            if !rem.is_empty() {
-                assert!(rem.len() < 8 * 4);
-                let mut buffer: [u16; 8 * 4] = [0u16; 8 * 4];
-                std::ptr::copy_nonoverlapping(rem.as_ptr(), buffer.as_mut_ptr(), rem.len());
+        rem = rem.as_chunks_mut::<16>().1;
 
-                let pixel = vld4q_u16(buffer.as_ptr());
+        for dst in rem.as_chunks_mut::<8>().0.iter_mut() {
+            let pixel = unsafe { vld1q_u16(dst.as_ptr()) };
 
-                let is_alpha_zero_mask = vceqzq_u16(pixel.3);
+            let alpha = vreinterpretq_u16_u8(vqtbl1q_u8(vreinterpretq_u8_u16(pixel), shuf_tbl));
+            let packed_alpha = vcvtq_f32_u32(vmovl_u16(vzip1_u16(
+                vget_low_u16(alpha),
+                vget_high_u16(alpha),
+            )));
+            let recip_alphas = vdivq_f32(v_max_colors_f, packed_alpha);
 
-                let low_a = vmovl_u16(vget_low_u16(pixel.3));
-                let high_a = vmovl_high_u16(pixel.3);
+            let is_alpha_zero_mask = vceqzq_u16(alpha);
 
-                let low_a = vmulq_f32(vdivq_f32(ones, vcvtq_f32_u32(low_a)), v_max_colors_f);
-                let hi_a = vmulq_f32(vdivq_f32(ones, vcvtq_f32_u32(high_a)), v_max_colors_f);
+            let low = vmovl_u16(vget_low_u16(pixel));
+            let high = vmovl_high_u16(pixel);
 
-                let mut new_r = vbslq_u16(
-                    is_alpha_zero_mask,
-                    pixel.0,
-                    v_scale_by_alpha(pixel.0, low_a, hi_a),
-                );
+            let low = vmulq_laneq_f32::<0>(vcvtq_f32_u32(low), recip_alphas);
+            let hi = vmulq_laneq_f32::<1>(vcvtq_f32_u32(high), recip_alphas);
 
-                let mut new_g = vbslq_u16(
-                    is_alpha_zero_mask,
-                    pixel.1,
-                    v_scale_by_alpha(pixel.1, low_a, hi_a),
-                );
+            let mut packed = vcombine_u16(
+                vqmovn_u32(vcvtaq_u32_f32(low)),
+                vqmovn_u32(vcvtaq_u32_f32(hi)),
+            );
 
-                let mut new_b = vbslq_u16(
-                    is_alpha_zero_mask,
-                    pixel.2,
-                    v_scale_by_alpha(pixel.2, low_a, hi_a),
-                );
+            packed = vminq_u16(packed, v_max_test);
+            packed = vbslq_u16(is_alpha_zero_mask, vdupq_n_u16(0), packed);
+            packed = vbslq_u16(copy_alpha_mask, pixel, packed);
 
-                new_r = vminq_u16(new_r, v_max_test);
-                new_g = vminq_u16(new_g, v_max_test);
-                new_b = vminq_u16(new_b, v_max_test);
-
-                let new_px = uint16x8x4_t(new_r, new_g, new_b, pixel.3);
-
-                vst4q_u16(buffer.as_mut_ptr(), new_px);
-
-                std::ptr::copy_nonoverlapping(buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
+            unsafe {
+                vst1q_u16(dst.as_mut_ptr(), packed);
             }
+        }
+
+        rem = rem.as_chunks_mut::<8>().1;
+
+        if !rem.is_empty() {
+            let mut buffer: [u16; 8] = [0u16; 8];
+            buffer[..rem.len()].copy_from_slice(rem);
+
+            let pixel = unsafe { vld1q_u16(buffer.as_ptr()) };
+
+            let alpha = vreinterpretq_u16_u8(vqtbl1q_u8(vreinterpretq_u8_u16(pixel), shuf_tbl));
+            let packed_alpha = vcvtq_f32_u32(vmovl_u16(vzip1_u16(
+                vget_low_u16(alpha),
+                vget_high_u16(alpha),
+            )));
+            let recip_alphas = vdivq_f32(v_max_colors_f, packed_alpha);
+
+            let is_alpha_zero_mask = vceqzq_u16(alpha);
+
+            let low = vmovl_u16(vget_low_u16(pixel));
+            let high = vmovl_high_u16(pixel);
+
+            let low = vmulq_laneq_f32::<0>(vcvtq_f32_u32(low), recip_alphas);
+            let hi = vmulq_laneq_f32::<1>(vcvtq_f32_u32(high), recip_alphas);
+
+            let mut packed = vcombine_u16(
+                vqmovn_u32(vcvtaq_u32_f32(low)),
+                vqmovn_u32(vcvtaq_u32_f32(hi)),
+            );
+
+            packed = vminq_u16(packed, v_max_test);
+            packed = vbslq_u16(is_alpha_zero_mask, vdupq_n_u16(0), packed);
+            packed = vbslq_u16(copy_alpha_mask, pixel, packed);
+
+            unsafe {
+                vst1q_u16(buffer.as_mut_ptr(), packed);
+            }
+
+            rem.copy_from_slice(&buffer[..rem.len()]);
         }
     }
 }

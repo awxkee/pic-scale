@@ -19,6 +19,8 @@ rdm = ["pic-scale/rdm"]
 neon = ["pic-scale/neon"]
 sse = ["pic-scale/sse"]
 avx = ["pic-scale/avx"]
+sve = ["pic-scale/sve"]
+nightly_f16 = ["pic-scale/nightly_f16"]
 nightly_i8mm = ["pic-scale/nightly_i8mm"]
 colorspaces = ["pic-scale/colorspaces"]
 

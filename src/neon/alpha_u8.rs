@@ -45,77 +45,89 @@ macro_rules! premultiply_vec {
     }};
 }
 
+#[target_feature(enable = "neon")]
 fn neon_premultiply_alpha_rgba_impl_row(dst: &mut [u8], src: &[u8]) {
-    unsafe {
-        let mut rem = dst;
-        let mut src_rem = src;
+    let mut rem = dst;
+    let mut src_rem = src;
 
-        for (dst, src) in rem
-            .chunks_exact_mut(64 * 4)
-            .zip(src_rem.chunks_exact(64 * 4))
-        {
-            let src_ptr = src.as_ptr();
-            let mut pixel0 = vld4q_u8(src_ptr);
-            let mut pixel1 = vld4q_u8(src_ptr.add(16 * 4));
-            let mut pixel2 = vld4q_u8(src_ptr.add(16 * 4 * 2));
-            let mut pixel3 = vld4q_u8(src_ptr.add(16 * 4 * 3));
-            pixel0.0 = premultiply_vec!(pixel0.0, pixel0.3);
-            pixel0.1 = premultiply_vec!(pixel0.1, pixel0.3);
-            pixel0.2 = premultiply_vec!(pixel0.2, pixel0.3);
+    static TBL: [u8; 16] = [3, 3, 3, 3, 7, 7, 7, 7, 11, 11, 11, 11, 15, 15, 15, 15];
+    let shuf_tbl = unsafe { vld1q_u8(TBL.as_ptr()) };
+    let alpha_mask = vreinterpretq_u8_u32(vdupq_n_u32(u32::from_ne_bytes([0, 0, 0, 255])));
 
-            pixel1.0 = premultiply_vec!(pixel1.0, pixel1.3);
-            pixel1.1 = premultiply_vec!(pixel1.1, pixel1.3);
-            pixel1.2 = premultiply_vec!(pixel1.2, pixel1.3);
+    for (dst, src) in rem
+        .as_chunks_mut::<64>()
+        .0
+        .iter_mut()
+        .zip(src_rem.as_chunks::<64>().0.iter())
+    {
+        let pixel0 = unsafe { vld1q_u8(src.as_ptr()) };
+        let pixel1 = unsafe { vld1q_u8(src[16..].as_ptr()) };
+        let pixel2 = unsafe { vld1q_u8(src[32..].as_ptr()) };
+        let pixel3 = unsafe { vld1q_u8(src[48..].as_ptr()) };
 
-            pixel2.0 = premultiply_vec!(pixel2.0, pixel2.3);
-            pixel2.1 = premultiply_vec!(pixel2.1, pixel2.3);
-            pixel2.2 = premultiply_vec!(pixel2.2, pixel2.3);
+        let alpha0 = vqtbl1q_u8(pixel0, shuf_tbl);
+        let alpha1 = vqtbl1q_u8(pixel1, shuf_tbl);
+        let alpha2 = vqtbl1q_u8(pixel2, shuf_tbl);
+        let alpha3 = vqtbl1q_u8(pixel3, shuf_tbl);
 
-            pixel3.0 = premultiply_vec!(pixel3.0, pixel3.3);
-            pixel3.1 = premultiply_vec!(pixel3.1, pixel3.3);
-            pixel3.2 = premultiply_vec!(pixel3.2, pixel3.3);
-            let dst_ptr = dst.as_mut_ptr();
-            vst4q_u8(dst_ptr, pixel0);
-            vst4q_u8(dst_ptr.add(16 * 4), pixel1);
-            vst4q_u8(dst_ptr.add(16 * 4 * 2), pixel2);
-            vst4q_u8(dst_ptr.add(16 * 4 * 3), pixel3);
+        let mut new_px0 = premultiply_vec!(pixel0, alpha0);
+        let mut new_px1 = premultiply_vec!(pixel1, alpha1);
+        let mut new_px2 = premultiply_vec!(pixel2, alpha2);
+        let mut new_px3 = premultiply_vec!(pixel3, alpha3);
+
+        new_px0 = vbslq_u8(alpha_mask, pixel0, new_px0);
+        new_px1 = vbslq_u8(alpha_mask, pixel1, new_px1);
+        new_px2 = vbslq_u8(alpha_mask, pixel2, new_px2);
+        new_px3 = vbslq_u8(alpha_mask, pixel3, new_px3);
+
+        unsafe {
+            vst1q_u8(dst.as_mut_ptr(), new_px0);
+            vst1q_u8(dst[16..].as_mut_ptr(), new_px1);
+            vst1q_u8(dst[32..].as_mut_ptr(), new_px2);
+            vst1q_u8(dst[48..].as_mut_ptr(), new_px3);
         }
+    }
 
-        rem = rem.chunks_exact_mut(64 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(64 * 4).remainder();
+    rem = rem.as_chunks_mut::<64>().1;
+    src_rem = src_rem.as_chunks::<64>().1;
 
-        for (dst, src) in rem
-            .chunks_exact_mut(16 * 4)
-            .zip(src_rem.chunks_exact(16 * 4))
-        {
-            let src_ptr = src.as_ptr();
-            let mut pixel = vld4q_u8(src_ptr);
-            pixel.0 = premultiply_vec!(pixel.0, pixel.3);
-            pixel.1 = premultiply_vec!(pixel.1, pixel.3);
-            pixel.2 = premultiply_vec!(pixel.2, pixel.3);
-            let dst_ptr = dst.as_mut_ptr();
-            vst4q_u8(dst_ptr, pixel);
+    for (dst, src) in rem
+        .as_chunks_mut::<16>()
+        .0
+        .iter_mut()
+        .zip(src_rem.as_chunks::<16>().0.iter())
+    {
+        let pixel = unsafe { vld1q_u8(src.as_ptr()) };
+        let alpha = vqtbl1q_u8(pixel, shuf_tbl);
+        let mut new_px = premultiply_vec!(pixel, alpha);
+        new_px = vbslq_u8(alpha_mask, pixel, new_px);
+        unsafe {
+            vst1q_u8(dst.as_mut_ptr(), new_px);
         }
+    }
 
-        rem = rem.chunks_exact_mut(16 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(16 * 4).remainder();
+    rem = rem.as_chunks_mut::<16>().1;
+    src_rem = src_rem.as_chunks::<16>().1;
 
-        if !rem.is_empty() && !src_rem.is_empty() {
-            assert!(rem.len() < 16 * 4);
-            let mut buffer: [u8; 16 * 4] = [0u8; 16 * 4];
-            std::ptr::copy_nonoverlapping(rem.as_ptr(), buffer.as_mut_ptr(), rem.len());
-            let mut pixel = vld4q_u8(buffer.as_ptr());
-            pixel.0 = premultiply_vec!(pixel.0, pixel.3);
-            pixel.1 = premultiply_vec!(pixel.1, pixel.3);
-            pixel.2 = premultiply_vec!(pixel.2, pixel.3);
-            vst4q_u8(buffer.as_mut_ptr(), pixel);
-            std::ptr::copy_nonoverlapping(buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
+    if !rem.is_empty() && !src_rem.is_empty() {
+        assert!(rem.len() < 16);
+        let mut buffer: [u8; 16] = [0u8; 16];
+        buffer[..src_rem.len()].copy_from_slice(src_rem);
+        let pixel = unsafe { vld1q_u8(buffer.as_ptr()) };
+        let alpha = vqtbl1q_u8(pixel, shuf_tbl);
+        let mut new_px = premultiply_vec!(pixel, alpha);
+        new_px = vbslq_u8(alpha_mask, pixel, new_px);
+        unsafe {
+            vst1q_u8(buffer.as_mut_ptr(), new_px);
         }
+        rem.copy_from_slice(&buffer[..rem.len()]);
     }
 }
 
 pub(crate) fn neon_premultiply_alpha_rgba(dst: &mut [u8], src: &[u8]) {
-    neon_premultiply_alpha_rgba_impl_row(dst, src);
+    unsafe {
+        neon_premultiply_alpha_rgba_impl_row(dst, src);
+    }
 }
 
 trait DisassociateAlpha {
@@ -129,217 +141,195 @@ struct NeonDisassociateAlpha {}
 #[derive(Default)]
 struct NeonDisassociateAlphaFast {}
 
-impl NeonDisassociateAlpha {
-    #[inline(always)]
-    fn get_reciprocal(a_values: uint8x16_t) -> float32x4x4_t {
-        unsafe {
-            let a_hi = vmovl_high_u8(a_values);
-            let a_lo = vmovl_u8(vget_low_u8(a_values));
-            let a_lo_lo = vrecpeq_f32(vcvtq_f32_u32(vmovl_u16(vget_low_u16(a_lo))));
-            let a_lo_hi = vrecpeq_f32(vcvtq_f32_u32(vmovl_high_u16(a_lo)));
-            let a_hi_lo = vrecpeq_f32(vcvtq_f32_u32(vmovl_u16(vget_low_u16(a_hi))));
-            let a_hi_ho = vrecpeq_f32(vcvtq_f32_u32(vmovl_high_u16(a_hi)));
-            float32x4x4_t(a_lo_lo, a_lo_hi, a_hi_lo, a_hi_ho)
-        }
-    }
+impl DisassociateAlpha for NeonDisassociateAlpha {
+    #[target_feature(enable = "neon")]
+    unsafe fn disassociate(&self, in_place: &mut [u8]) {
+        let mut rem = in_place;
 
-    #[inline(always)]
-    fn get_reciprocalh(a_values: uint8x8_t) -> float32x4x2_t {
-        unsafe {
-            let a_lo = vmovl_u8(a_values);
-            let a_lo_lo = vrecpeq_f32(vcvtq_f32_u32(vmovl_u16(vget_low_u16(a_lo))));
-            let a_lo_hi = vrecpeq_f32(vcvtq_f32_u32(vmovl_high_u16(a_lo)));
-            float32x4x2_t(a_lo_lo, a_lo_hi)
-        }
-    }
+        static ALPHA_MASK: [u8; 16] = [
+            3, 255, 255, 255, 7, 255, 255, 255, 11, 255, 255, 255, 15, 255, 255, 255,
+        ];
+        let alpha_mask = unsafe { vld1q_u8(ALPHA_MASK.as_ptr()) };
 
-    #[inline(always)]
-    fn unpremultiply_vec(v: uint8x16_t, mask: uint8x16_t, recip: float32x4x4_t) -> uint8x16_t {
-        unsafe {
-            let scale = vdupq_n_u8(255);
-            let hi = vmull_high_u8(v, scale);
-            let lo = vmull_u8(vget_low_u8(v), vget_low_u8(scale));
-            let lo_lo = vcvtq_f32_u32(vmovl_u16(vget_low_u16(lo)));
-            let lo_hi = vcvtq_f32_u32(vmovl_high_u16(lo));
-            let hi_lo = vcvtq_f32_u32(vmovl_u16(vget_low_u16(hi)));
-            let hi_hi = vcvtq_f32_u32(vmovl_high_u16(hi));
+        let recip_divider = vdupq_n_f32(1.);
+        let scale = vdupq_n_u8(255);
+        let copy_alpha_mask = vreinterpretq_u8_u32(vdupq_n_u32(u32::from_ne_bytes([0, 0, 0, 255])));
 
-            let lo_lo = vcvtaq_u32_f32(vmulq_f32(lo_lo, recip.0));
-            let lo_hi = vcvtaq_u32_f32(vmulq_f32(lo_hi, recip.1));
-            let hi_lo = vcvtaq_u32_f32(vmulq_f32(hi_lo, recip.2));
-            let hi_hi = vcvtaq_u32_f32(vmulq_f32(hi_hi, recip.3));
-            let lo = vcombine_u16(vmovn_u32(lo_lo), vmovn_u32(lo_hi));
-            let hi = vcombine_u16(vmovn_u32(hi_lo), vmovn_u32(hi_hi));
-            vbslq_u8(
-                mask,
-                vdupq_n_u8(0),
-                vcombine_u8(vqmovn_u16(lo), vqmovn_u16(hi)),
-            )
-        }
-    }
+        for dst in rem.as_chunks_mut::<16>().0.iter_mut() {
+            let src_ptr = dst.as_ptr();
+            let pixel = unsafe { vld1q_u8(src_ptr) };
+            let alpha_u32 = vreinterpretq_u32_u8(vqtbl1q_u8(pixel, alpha_mask));
+            let alpha_f32 = vdivq_f32(recip_divider, vcvtq_f32_u32(alpha_u32));
+            let lo16 = vmull_u8(vget_low_u8(pixel), vget_low_u8(scale));
+            let hi16 = vmull_high_u8(pixel, scale);
 
-    #[inline(always)]
-    fn unpremultiply_vech(v: uint8x8_t, mask: uint8x8_t, reciprocal: float32x4x2_t) -> uint8x8_t {
-        unsafe {
-            let scale = vdupq_n_u8(255);
-            let lo = vmull_u8(v, vget_low_u8(scale));
-            let lo_lo = vcvtq_f32_u32(vmovl_u16(vget_low_u16(lo)));
-            let lo_hi = vcvtq_f32_u32(vmovl_high_u16(lo));
+            let is_alpha_zero = vreinterpretq_u8_u32(vceqzq_u32(alpha_u32));
 
-            let lo_lo = vcvtaq_u32_f32(vmulq_f32(lo_lo, reciprocal.0));
-            let lo_hi = vcvtaq_u32_f32(vmulq_f32(lo_hi, reciprocal.1));
-            let lo = vcombine_u16(vmovn_u32(lo_lo), vmovn_u32(lo_hi));
-            vbsl_u8(mask, vdup_n_u8(0), vqmovn_u16(lo))
-        }
-    }
-}
+            let mut p0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(lo16)));
+            let mut p1 = vcvtq_f32_u32(vmovl_high_u16(lo16));
+            let mut p2 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(hi16)));
+            let mut p3 = vcvtq_f32_u32(vmovl_high_u16(hi16));
 
-macro_rules! define_execution_rule {
-    ($exec_name: ident) => {
-        impl DisassociateAlpha for $exec_name {
-            unsafe fn disassociate(&self, in_place: &mut [u8]) {
-                unsafe {
-                    let mut rem = in_place;
+            p0 = vmulq_laneq_f32::<0>(p0, alpha_f32);
+            p1 = vmulq_laneq_f32::<1>(p1, alpha_f32);
+            p2 = vmulq_laneq_f32::<2>(p2, alpha_f32);
+            p3 = vmulq_laneq_f32::<3>(p3, alpha_f32);
 
-                    for dst in rem.chunks_exact_mut(16 * 4) {
-                        let src_ptr = dst.as_ptr();
-                        let mut pixel = vld4q_u8(src_ptr);
-                        let reciprocal = Self::get_reciprocal(pixel.3);
-                        let mask = vceqzq_u8(pixel.3);
-                        pixel.0 = Self::unpremultiply_vec(pixel.0, mask, reciprocal);
-                        pixel.1 = Self::unpremultiply_vec(pixel.1, mask, reciprocal);
-                        pixel.2 = Self::unpremultiply_vec(pixel.2, mask, reciprocal);
-                        let dst_ptr = dst.as_mut_ptr();
-                        vst4q_u8(dst_ptr, pixel);
-                    }
+            let packed0 = vcombine_u16(
+                vqmovn_u32(vcvtaq_u32_f32(p0)),
+                vqmovn_u32(vcvtaq_u32_f32(p1)),
+            );
+            let packed1 = vcombine_u16(
+                vqmovn_u32(vcvtaq_u32_f32(p2)),
+                vqmovn_u32(vcvtaq_u32_f32(p3)),
+            );
+            let mut packed = vcombine_u8(vqmovn_u16(packed0), vqmovn_u16(packed1));
 
-                    rem = rem.chunks_exact_mut(16 * 4).into_remainder();
+            packed = vbslq_u8(is_alpha_zero, vdupq_n_u8(0), packed);
+            packed = vbslq_u8(copy_alpha_mask, pixel, packed);
 
-                    for dst in rem.chunks_exact_mut(8 * 4) {
-                        let src_ptr = dst.as_ptr();
-                        let mut pixel = vld4_u8(src_ptr);
-                        let mask = vceqz_u8(pixel.3);
-                        let reciprocal = Self::get_reciprocalh(pixel.3);
-                        pixel.0 = Self::unpremultiply_vech(pixel.0, mask, reciprocal);
-                        pixel.1 = Self::unpremultiply_vech(pixel.1, mask, reciprocal);
-                        pixel.2 = Self::unpremultiply_vech(pixel.2, mask, reciprocal);
-                        vst4_u8(dst.as_mut_ptr(), pixel);
-                    }
-
-                    rem = rem.chunks_exact_mut(8 * 4).into_remainder();
-
-                    if !rem.is_empty() {
-                        assert!(rem.len() < 8 * 4);
-                        let mut buffer: [u8; 8 * 4] = [0u8; 8 * 4];
-                        std::ptr::copy_nonoverlapping(rem.as_ptr(), buffer.as_mut_ptr(), rem.len());
-
-                        let mut pixel = vld4_u8(buffer.as_ptr());
-                        let mask = vceqz_u8(pixel.3);
-                        let reciprocal = Self::get_reciprocalh(pixel.3);
-                        pixel.0 = Self::unpremultiply_vech(pixel.0, mask, reciprocal);
-                        pixel.1 = Self::unpremultiply_vech(pixel.1, mask, reciprocal);
-                        pixel.2 = Self::unpremultiply_vech(pixel.2, mask, reciprocal);
-                        vst4_u8(buffer.as_mut_ptr(), pixel);
-
-                        std::ptr::copy_nonoverlapping(buffer.as_ptr(), rem.as_mut_ptr(), rem.len());
-                    }
-                }
+            unsafe {
+                vst1q_u8(dst.as_mut_ptr(), packed);
             }
         }
-    };
+
+        rem = rem.as_chunks_mut::<16>().1;
+
+        if !rem.is_empty() {
+            assert!(rem.len() < 16);
+            let mut buffer: [u8; 16] = [0u8; 16];
+            buffer[..rem.len()].copy_from_slice(rem);
+
+            let pixel = unsafe { vld1q_u8(buffer.as_ptr()) };
+
+            let alpha_u32 = vreinterpretq_u32_u8(vqtbl1q_u8(pixel, alpha_mask));
+            let alpha_f32 = vdivq_f32(recip_divider, vcvtq_f32_u32(alpha_u32));
+            let lo16 = vmull_u8(vget_low_u8(pixel), vget_low_u8(scale));
+            let hi16 = vmull_high_u8(pixel, scale);
+
+            let is_alpha_zero = vreinterpretq_u8_u32(vceqzq_u32(alpha_u32));
+
+            let mut p0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(lo16)));
+            let mut p1 = vcvtq_f32_u32(vmovl_high_u16(lo16));
+            let mut p2 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(hi16)));
+            let mut p3 = vcvtq_f32_u32(vmovl_high_u16(hi16));
+
+            p0 = vmulq_laneq_f32::<0>(p0, alpha_f32);
+            p1 = vmulq_laneq_f32::<1>(p1, alpha_f32);
+            p2 = vmulq_laneq_f32::<2>(p2, alpha_f32);
+            p3 = vmulq_laneq_f32::<3>(p3, alpha_f32);
+
+            let packed0 = vcombine_u16(
+                vqmovn_u32(vcvtaq_u32_f32(p0)),
+                vqmovn_u32(vcvtaq_u32_f32(p1)),
+            );
+            let packed1 = vcombine_u16(
+                vqmovn_u32(vcvtaq_u32_f32(p2)),
+                vqmovn_u32(vcvtaq_u32_f32(p3)),
+            );
+            let mut packed = vcombine_u8(vqmovn_u16(packed0), vqmovn_u16(packed1));
+
+            packed = vbslq_u8(is_alpha_zero, vdupq_n_u8(0), packed);
+            packed = vbslq_u8(copy_alpha_mask, pixel, packed);
+
+            unsafe {
+                vst1q_u8(buffer.as_mut_ptr(), packed);
+            }
+
+            rem.copy_from_slice(&buffer[..rem.len()]);
+        }
+    }
 }
 
-define_execution_rule!(NeonDisassociateAlpha);
 #[cfg(feature = "rdm")]
-define_execution_rule!(NeonDisassociateAlphaFast);
-
-#[cfg(feature = "rdm")]
-impl NeonDisassociateAlphaFast {
-    #[inline]
+impl DisassociateAlpha for NeonDisassociateAlphaFast {
     #[target_feature(enable = "rdm")]
-    fn get_reciprocal(alpha: uint8x16_t) -> int32x4x4_t {
+    unsafe fn disassociate(&self, in_place: &mut [u8]) {
+        let mut rem = in_place;
+
+        static ALPHA_MASK: [u8; 16] = [
+            3, 255, 255, 255, 7, 255, 255, 255, 11, 255, 255, 255, 15, 255, 255, 255,
+        ];
+        let alpha_mask = unsafe { vld1q_u8(ALPHA_MASK.as_ptr()) };
+
         const Q: f32 = ((1i64 << 31) - 1) as f32;
 
         let q0_31_divider = vdupq_n_f32(Q);
-
-        let a_hi = vmovl_high_u8(alpha);
-        let a_lo = vmovl_u8(vget_low_u8(alpha));
-
-        let a_lo_lo = vcvtq_s32_f32(vdivq_f32(
-            q0_31_divider,
-            vcvtq_f32_u32(vmovl_u16(vget_low_u16(a_lo))),
-        ));
-        let a_lo_hi = vcvtq_s32_f32(vdivq_f32(
-            q0_31_divider,
-            vcvtq_f32_u32(vmovl_high_u16(a_lo)),
-        ));
-        let a_hi_lo = vcvtq_s32_f32(vdivq_f32(
-            q0_31_divider,
-            vcvtq_f32_u32(vmovl_u16(vget_low_u16(a_hi))),
-        ));
-        let a_hi_ho = vcvtq_s32_f32(vdivq_f32(
-            q0_31_divider,
-            vcvtq_f32_u32(vmovl_high_u16(a_hi)),
-        ));
-        int32x4x4_t(a_lo_lo, a_lo_hi, a_hi_lo, a_hi_ho)
-    }
-
-    #[inline]
-    #[target_feature(enable = "rdm")]
-    fn get_reciprocalh(alpha: uint8x8_t) -> int32x4x2_t {
-        const Q: f32 = ((1i64 << 31) - 1) as f32;
-
-        let q0_31_divider = vdupq_n_f32(Q);
-
-        let a_lo = vmovl_u8(alpha);
-
-        let a_lo_lo = vcvtq_s32_f32(vdivq_f32(
-            q0_31_divider,
-            vcvtq_f32_u32(vmovl_u16(vget_low_u16(a_lo))),
-        ));
-        let a_lo_hi = vcvtq_s32_f32(vdivq_f32(
-            q0_31_divider,
-            vcvtq_f32_u32(vmovl_high_u16(a_lo)),
-        ));
-        int32x4x2_t(a_lo_lo, a_lo_hi)
-    }
-
-    #[inline]
-    #[target_feature(enable = "rdm")]
-    fn unpremultiply_vec(v: uint8x16_t, mask: uint8x16_t, reciprocal: int32x4x4_t) -> uint8x16_t {
         let scale = vdupq_n_u8(255);
-        let hi = vmull_high_u8(v, scale);
-        let lo = vmull_u8(vget_low_u8(v), vget_low_u8(scale));
-        let lo_lo = vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(lo)));
-        let lo_hi = vreinterpretq_s32_u32(vmovl_high_u16(lo));
-        let hi_lo = vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(hi)));
-        let hi_hi = vreinterpretq_s32_u32(vmovl_high_u16(hi));
+        let copy_alpha_mask = vreinterpretq_u8_u32(vdupq_n_u32(u32::from_ne_bytes([0, 0, 0, 255])));
 
-        let lo_lo = vqrdmulhq_s32(lo_lo, reciprocal.0);
-        let lo_hi = vqrdmulhq_s32(lo_hi, reciprocal.1);
-        let hi_lo = vqrdmulhq_s32(hi_lo, reciprocal.2);
-        let hi_hi = vqrdmulhq_s32(hi_hi, reciprocal.3);
-        let lo = vcombine_u16(vqmovun_s32(lo_lo), vqmovun_s32(lo_hi));
-        let hi = vcombine_u16(vqmovun_s32(hi_lo), vqmovun_s32(hi_hi));
-        vbslq_u8(
-            mask,
-            vdupq_n_u8(0),
-            vcombine_u8(vqmovn_u16(lo), vqmovn_u16(hi)),
-        )
-    }
+        for dst in rem.as_chunks_mut::<16>().0.iter_mut() {
+            let src_ptr = dst.as_ptr();
+            let pixel = unsafe { vld1q_u8(src_ptr) };
+            let alpha_u32 = vreinterpretq_u32_u8(vqtbl1q_u8(pixel, alpha_mask));
+            let alpha_f32 = vdivq_f32(q0_31_divider, vcvtq_f32_u32(alpha_u32));
+            let reciprocal = vcvtq_s32_f32(alpha_f32);
+            let lo16 = vmull_u8(vget_low_u8(pixel), vget_low_u8(scale));
+            let hi16 = vmull_high_u8(pixel, scale);
 
-    #[inline]
-    #[target_feature(enable = "rdm")]
-    fn unpremultiply_vech(v: uint8x8_t, mask: uint8x8_t, reciprocal: int32x4x2_t) -> uint8x8_t {
-        let scale = vdupq_n_u8(255);
-        let lo = vmull_u8(v, vget_low_u8(scale));
-        let lo_lo = vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(lo)));
-        let lo_hi = vreinterpretq_s32_u32(vmovl_high_u16(lo));
+            let is_alpha_zero = vreinterpretq_u8_u32(vceqzq_u32(alpha_u32));
 
-        let lo_lo = vqrdmulhq_s32(lo_lo, reciprocal.0);
-        let lo_hi = vqrdmulhq_s32(lo_hi, reciprocal.1);
-        let lo = vcombine_u16(vqmovun_s32(lo_lo), vqmovun_s32(lo_hi));
-        vbsl_u8(mask, vdup_n_u8(0), vqmovn_u16(lo))
+            let mut p0 = vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(lo16)));
+            let mut p1 = vreinterpretq_s32_u32(vmovl_high_u16(lo16));
+            let mut p2 = vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(hi16)));
+            let mut p3 = vreinterpretq_s32_u32(vmovl_high_u16(hi16));
+
+            p0 = vqrdmulhq_laneq_s32::<0>(p0, reciprocal);
+            p1 = vqrdmulhq_laneq_s32::<1>(p1, reciprocal);
+            p2 = vqrdmulhq_laneq_s32::<2>(p2, reciprocal);
+            p3 = vqrdmulhq_laneq_s32::<3>(p3, reciprocal);
+
+            let packed0 = vcombine_u16(vqmovun_s32(p0), vqmovun_s32(p1));
+            let packed1 = vcombine_u16(vqmovun_s32(p2), vqmovun_s32(p3));
+            let mut packed = vcombine_u8(vqmovn_u16(packed0), vqmovn_u16(packed1));
+
+            packed = vbslq_u8(is_alpha_zero, vdupq_n_u8(0), packed);
+            packed = vbslq_u8(copy_alpha_mask, pixel, packed);
+
+            unsafe {
+                vst1q_u8(dst.as_mut_ptr(), packed);
+            }
+        }
+
+        rem = rem.as_chunks_mut::<16>().1;
+
+        if !rem.is_empty() {
+            assert!(rem.len() < 16);
+            let mut buffer: [u8; 16] = [0u8; 16];
+            buffer[..rem.len()].copy_from_slice(rem);
+
+            let pixel = unsafe { vld1q_u8(buffer.as_ptr()) };
+            let alpha_u32 = vreinterpretq_u32_u8(vqtbl1q_u8(pixel, alpha_mask));
+            let alpha_f32 = vdivq_f32(q0_31_divider, vcvtq_f32_u32(alpha_u32));
+            let reciprocal = vcvtq_s32_f32(alpha_f32);
+            let lo16 = vmull_u8(vget_low_u8(pixel), vget_low_u8(scale));
+            let hi16 = vmull_high_u8(pixel, scale);
+
+            let is_alpha_zero = vreinterpretq_u8_u32(vceqzq_u32(alpha_u32));
+
+            let mut p0 = vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(lo16)));
+            let mut p1 = vreinterpretq_s32_u32(vmovl_high_u16(lo16));
+            let mut p2 = vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(hi16)));
+            let mut p3 = vreinterpretq_s32_u32(vmovl_high_u16(hi16));
+
+            p0 = vqrdmulhq_laneq_s32::<0>(p0, reciprocal);
+            p1 = vqrdmulhq_laneq_s32::<1>(p1, reciprocal);
+            p2 = vqrdmulhq_laneq_s32::<2>(p2, reciprocal);
+            p3 = vqrdmulhq_laneq_s32::<3>(p3, reciprocal);
+
+            let packed0 = vcombine_u16(vqmovun_s32(p0), vqmovun_s32(p1));
+            let packed1 = vcombine_u16(vqmovun_s32(p2), vqmovun_s32(p3));
+            let mut packed = vcombine_u8(vqmovn_u16(packed0), vqmovn_u16(packed1));
+
+            packed = vbslq_u8(is_alpha_zero, vdupq_n_u8(0), packed);
+            packed = vbslq_u8(copy_alpha_mask, pixel, packed);
+
+            unsafe {
+                vst1q_u8(buffer.as_mut_ptr(), packed);
+            }
+
+            rem.copy_from_slice(&buffer[..rem.len()]);
+        }
     }
 }
 
@@ -361,16 +351,16 @@ fn neon_unpremultiply_alpha_rgba_impl_row_rdm(in_place: &mut [u8]) {
 }
 
 pub(crate) fn neon_unpremultiply_alpha_rgba(in_place: &mut [u8], _strategy: WorkloadStrategy) {
-    let mut executor: unsafe fn(&mut [u8]) = neon_unpremultiply_alpha_rgba_impl_row;
+    let mut _executor: unsafe fn(&mut [u8]) = neon_unpremultiply_alpha_rgba_impl_row;
     #[cfg(feature = "rdm")]
     {
         if _strategy == WorkloadStrategy::PreferSpeed
             && std::arch::is_aarch64_feature_detected!("rdm")
         {
-            executor = neon_unpremultiply_alpha_rgba_impl_row_rdm;
+            _executor = neon_unpremultiply_alpha_rgba_impl_row_rdm;
         }
     }
     unsafe {
-        executor(in_place);
+        _executor(in_place);
     }
 }

@@ -1,4 +1,4 @@
-workspace = { members = ["app", "wasm", "app/accelerate", "speedtest", "fuzz"], exclude = ["picscale"] }
+workspace = { members = ["app", "wasm", "app/accelerate", "speedtest"], exclude = ["picscale", "fuzz"] }
 
 [package]
 name = "pic-scale"
@@ -42,6 +42,8 @@ avx = []
 sse = []
 # Allows to use ARM i8mm when available
 nightly_i8mm = ["neon"]
+# Allows use nightly SVE2
+sve = []
 
 [package.metadata.docs.rs]
 # To build locally:
