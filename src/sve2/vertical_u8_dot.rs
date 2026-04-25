@@ -72,6 +72,37 @@ macro_rules! pack_4_rows_sve {
     }};
 }
 
+macro_rules! pack_8_rows_sve {
+    ($a:expr, $b:expr, $c:expr, $d:expr,
+     $e:expr, $f:expr, $g:expr, $h:expr) => {{
+        let ab_lo = svzip1_u8($a, $b);
+        let ef_lo = svzip1_u8($e, $f);
+
+        let ab_hi = svzip2_u8($a, $b);
+        let ef_hi = svzip2_u8($e, $f);
+
+        let cd_lo = svzip1_u8($c, $d);
+        let gh_lo = svzip1_u8($g, $h);
+
+        let cd_hi = svzip2_u8($c, $d);
+        let gh_hi = svzip2_u8($g, $h);
+
+        let lo0 = svzip1_u8(ab_lo, cd_lo);
+        let lo4 = svzip1_u8(ef_lo, gh_lo);
+
+        let lo1 = svzip2_u8(ab_lo, cd_lo);
+        let lo5 = svzip2_u8(ef_lo, gh_lo);
+
+        let hi0 = svzip1_u8(ab_hi, cd_hi);
+        let hi4 = svzip1_u8(ef_hi, gh_hi);
+
+        let hi1 = svzip2_u8(ab_hi, cd_hi);
+        let hi5 = svzip2_u8(ef_hi, gh_hi);
+
+        [lo0, lo1, hi0, hi1, lo4, lo5, hi4, hi5]
+    }};
+}
+
 #[target_feature(enable = "sve,sve2,i8mm")]
 fn work_32_chunks(
     bounds: &FilterBounds,
@@ -113,8 +144,6 @@ fn work_32_chunks(
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j..) };
             let vw = unsafe { svld1_s8(pg8, w.as_ptr()) };
-            let vw0 = svtbl_s8(vw, shuf4);
-            let vw1 = svtbl_s8(vw, shuf4_hi);
 
             let base0 = src_stride * py + cx;
             let base1 = src_stride * (py + 4) + cx;
@@ -154,10 +183,21 @@ fn work_32_chunks(
                 )
             };
 
-            let [packed0, packed1, packed2, packed3] =
-                pack_4_rows_sve!(row0_lo, row1_lo, row2_lo, row3_lo);
-            let [packed4, packed5, packed6, packed7] =
-                pack_4_rows_sve!(row0_hi, row1_hi, row2_hi, row3_hi);
+            let vw0 = svtbl_s8(vw, shuf4);
+            let vw1 = svtbl_s8(vw, shuf4_hi);
+
+            let [
+                packed0,
+                packed1,
+                packed2,
+                packed3,
+                packed4,
+                packed5,
+                packed6,
+                packed7,
+            ] = pack_8_rows_sve!(
+                row0_lo, row1_lo, row2_lo, row3_lo, row0_hi, row1_hi, row2_hi, row3_hi
+            );
 
             acc_0 = svusdot_s32(acc_0, packed0, vw0);
             acc_1 = svusdot_s32(acc_1, packed1, vw0);
@@ -203,10 +243,18 @@ fn work_32_chunks(
                 )
             };
 
-            let [packed0, packed1, packed2, packed3] =
-                pack_4_rows_sve!(row0_lo, row1_lo, row2_lo, row3_lo);
-            let [packed4, packed5, packed6, packed7] =
-                pack_4_rows_sve!(row0_hi, row1_hi, row2_hi, row3_hi);
+            let [
+                packed0,
+                packed1,
+                packed2,
+                packed3,
+                packed4,
+                packed5,
+                packed6,
+                packed7,
+            ] = pack_8_rows_sve!(
+                row0_lo, row1_lo, row2_lo, row3_lo, row0_hi, row1_hi, row2_hi, row3_hi
+            );
 
             acc_0 = svusdot_s32(acc_0, packed0, vw1);
             acc_1 = svusdot_s32(acc_1, packed1, vw1);
@@ -223,7 +271,7 @@ fn work_32_chunks(
         while j + 4 <= bounds.size {
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j..) };
-            let vw = svtbl_s8(unsafe { svld1_s8(pg4, w.as_ptr()) }, shuf4);
+            let w_ld = unsafe { svld1_s8(pg4, w.as_ptr()) };
 
             let base0 = src_stride * py + cx;
             let row0_lo = unsafe { svld1_u8(pg_full, src.get_unchecked(base0..).as_ptr()) };
@@ -262,10 +310,20 @@ fn work_32_chunks(
                 )
             };
 
-            let [packed0, packed1, packed2, packed3] =
-                pack_4_rows_sve!(row0_lo, row1_lo, row2_lo, row3_lo);
-            let [packed4, packed5, packed6, packed7] =
-                pack_4_rows_sve!(row0_hi, row1_hi, row2_hi, row3_hi);
+            let vw = svtbl_s8(w_ld, shuf4);
+
+            let [
+                packed0,
+                packed1,
+                packed2,
+                packed3,
+                packed4,
+                packed5,
+                packed6,
+                packed7,
+            ] = pack_8_rows_sve!(
+                row0_lo, row1_lo, row2_lo, row3_lo, row0_hi, row1_hi, row2_hi, row3_hi
+            );
 
             acc_0 = svusdot_s32(acc_0, packed0, vw);
             acc_1 = svusdot_s32(acc_1, packed1, vw);
@@ -282,7 +340,7 @@ fn work_32_chunks(
         while j + 2 <= bounds.size {
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j..) };
-            let vw = svtbl_s8(unsafe { svld1_s8(pg2, w.as_ptr()) }, shuf4);
+            let w_ld = unsafe { svld1_s8(pg2, w.as_ptr()) };
 
             let base0 = src_stride * py + cx;
             let row0_lo = unsafe { svld1_u8(pg_full, src.get_unchecked(base0..).as_ptr()) };
@@ -296,6 +354,8 @@ fn work_32_chunks(
                 )
             };
             let zero = svdup_n_u8(0);
+
+            let vw = svtbl_s8(w_ld, shuf4);
 
             let [packed0, packed1, packed2, packed3] =
                 pack_4_rows_sve!(row0_lo, row1_lo, zero, zero);
@@ -405,8 +465,7 @@ fn convolve_vertical_sve2_row(
         while j + 4 <= bounds.size {
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j..) };
-
-            let vw = svtbl_s8(unsafe { svld1_s8(pg4, w.as_ptr()) }, shuf4);
+            let w_ld = unsafe { svld1_s8(pg4, w.as_ptr()) };
 
             let base0 = src_stride * py + cx;
             let row0 = unsafe { svld1_u8(pg, src.get_unchecked(base0..).as_ptr()) };
@@ -415,6 +474,8 @@ fn convolve_vertical_sve2_row(
                 unsafe { svld1_u8(pg, src.get_unchecked(base0 + src_stride * 2..).as_ptr()) };
             let row3 =
                 unsafe { svld1_u8(pg, src.get_unchecked(base0 + src_stride * 3..).as_ptr()) };
+
+            let vw = svtbl_s8(w_ld, shuf4);
 
             let [packed0, packed1, packed2, packed3] = pack_4_rows_sve!(row0, row1, row2, row3);
 
@@ -429,13 +490,15 @@ fn convolve_vertical_sve2_row(
         while j + 2 <= bounds.size {
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j..) };
-
-            let vw = svtbl_s8(unsafe { svld1_s8(pg2, w.as_ptr()) }, shuf4);
+            let w_ld = unsafe { svld1_s8(pg2, w.as_ptr()) };
 
             let base0 = src_stride * py + cx;
             let row0 = unsafe { svld1_u8(pg, src.get_unchecked(base0..).as_ptr()) };
             let row1 = unsafe { svld1_u8(pg, src.get_unchecked(base0 + src_stride..).as_ptr()) };
+
             let zero = svdup_n_u8(0);
+
+            let vw = svtbl_s8(w_ld, shuf4);
 
             let [packed0, packed1, packed2, packed3] = pack_4_rows_sve!(row0, row1, zero, zero);
 
