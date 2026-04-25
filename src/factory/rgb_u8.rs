@@ -61,25 +61,6 @@ impl HorizontalFilterPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
         > = Some(handle_fixed_rows_4_u8::<3>);
         let mut _dispatcher_1_row: fn(&[u8], &mut [u8], &FilterWeights<i16>, u32) =
             handle_fixed_row_u8::<3>;
-
-        #[cfg(all(target_arch = "aarch64", feature = "sve"))]
-        if _scale_factor < 10.
-            && std::arch::is_aarch64_feature_detected!("sve2")
-            && std::arch::is_aarch64_feature_detected!("i8mm")
-        {
-            use crate::sve2::{
-                sve_convolve_horizontal_rgb_neon_row_one_dot,
-                sve_convolve_horizontal_rgb_neon_rows_4_dot,
-            };
-
-            let i_weights = filter_weights.numerical_approximation_q0_7(0);
-            return Arc::new(HorizontalFiltering {
-                filter_weights: i_weights,
-                filter_4_rows: Some(sve_convolve_horizontal_rgb_neon_rows_4_dot),
-                filter_row: sve_convolve_horizontal_rgb_neon_row_one_dot,
-                threading_policy,
-            });
-        }
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             match _options.workload_strategy {
@@ -90,6 +71,24 @@ impl HorizontalFilterPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
                 crate::WorkloadStrategy::PreferSpeed => {
                     _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rows_4);
                     _dispatcher_1_row = convolve_horizontal_rgb_neon_row_one;
+                    #[cfg(all(target_arch = "aarch64", feature = "sve"))]
+                    if _scale_factor < 10.
+                        && std::arch::is_aarch64_feature_detected!("sve2")
+                        && std::arch::is_aarch64_feature_detected!("i8mm")
+                    {
+                        use crate::sve2::{
+                            sve_convolve_horizontal_rgb_neon_row_one_dot,
+                            sve_convolve_horizontal_rgb_neon_rows_4_dot,
+                        };
+
+                        let i_weights = filter_weights.numerical_approximation_q0_7(0);
+                        return Arc::new(HorizontalFiltering {
+                            filter_weights: i_weights,
+                            filter_4_rows: Some(sve_convolve_horizontal_rgb_neon_rows_4_dot),
+                            filter_row: sve_convolve_horizontal_rgb_neon_row_one_dot,
+                            threading_policy,
+                        });
+                    }
                     #[cfg(feature = "rdm")]
                     if _scale_factor < 8.0 && std::arch::is_aarch64_feature_detected!("rdm") {
                         use crate::neon::{

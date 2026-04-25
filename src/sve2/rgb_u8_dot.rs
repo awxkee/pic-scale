@@ -109,16 +109,25 @@ fn convolve_horizontal_rgb_neon_rows_4_impl(
         while jx + 4 <= bounds.size {
             let bounds_start = bounds.start + jx;
             let w_ptr = unsafe { weights.get_unchecked(jx..) };
-            let vw = svtbl_s8(unsafe { svld1_s8(pg4, w_ptr.as_ptr()) }, v_weights);
+            let w_ld = unsafe { svld1_s8(pg4, w_ptr.as_ptr()) };
 
             let rgb_pixel0 = unsafe { svld1_u8(pg12, src0.get_unchecked(bounds_start * CN)) };
             let rgb_pixel1 = unsafe { svld1_u8(pg12, src1.get_unchecked(bounds_start * CN)) };
+
+            let vw = svtbl_s8(w_ld, v_weights);
+
             let rgb_pixel2 = unsafe { svld1_u8(pg12, src2.get_unchecked(bounds_start * CN)) };
             let rgb_pixel3 = unsafe { svld1_u8(pg12, src3.get_unchecked(bounds_start * CN)) };
-            store_0 = svusdot_s32(store_0, svtbl_u8(rgb_pixel0, v_tbl), vw);
-            store_1 = svusdot_s32(store_1, svtbl_u8(rgb_pixel1, v_tbl), vw);
-            store_2 = svusdot_s32(store_2, svtbl_u8(rgb_pixel2, v_tbl), vw);
-            store_3 = svusdot_s32(store_3, svtbl_u8(rgb_pixel3, v_tbl), vw);
+
+            let r0 = svtbl_u8(rgb_pixel0, v_tbl);
+            let r1 = svtbl_u8(rgb_pixel1, v_tbl);
+            let r2 = svtbl_u8(rgb_pixel2, v_tbl);
+            let r3 = svtbl_u8(rgb_pixel3, v_tbl);
+
+            store_0 = svusdot_s32(store_0, r0, vw);
+            store_1 = svusdot_s32(store_1, r1, vw);
+            store_2 = svusdot_s32(store_2, r2, vw);
+            store_3 = svusdot_s32(store_3, r3, vw);
             jx += 4;
         }
 
@@ -128,16 +137,24 @@ fn convolve_horizontal_rgb_neon_rows_4_impl(
 
             let bounds_start = bounds.start + jx;
             let w_ptr = unsafe { weights.get_unchecked(jx..) };
-            let vw = svtbl_s8(unsafe { svld1_s8(pq, w_ptr.as_ptr()) }, v_weights);
+            let w_ld = unsafe { svld1_s8(pq, w_ptr.as_ptr()) };
 
             let rgb_pixel0 = unsafe { svld1_u8(pqb, src0.get_unchecked(bounds_start * CN)) };
             let rgb_pixel1 = unsafe { svld1_u8(pqb, src1.get_unchecked(bounds_start * CN)) };
+
+            let vw = svtbl_s8(w_ld, v_weights);
+
             let rgb_pixel2 = unsafe { svld1_u8(pqb, src2.get_unchecked(bounds_start * CN)) };
             let rgb_pixel3 = unsafe { svld1_u8(pqb, src3.get_unchecked(bounds_start * CN)) };
-            store_0 = svusdot_s32(store_0, svtbl_u8(rgb_pixel0, v_tbl), vw);
-            store_1 = svusdot_s32(store_1, svtbl_u8(rgb_pixel1, v_tbl), vw);
-            store_2 = svusdot_s32(store_2, svtbl_u8(rgb_pixel2, v_tbl), vw);
-            store_3 = svusdot_s32(store_3, svtbl_u8(rgb_pixel3, v_tbl), vw);
+
+            let r0 = svtbl_u8(rgb_pixel0, v_tbl);
+            let r1 = svtbl_u8(rgb_pixel1, v_tbl);
+            let r2 = svtbl_u8(rgb_pixel2, v_tbl);
+            let r3 = svtbl_u8(rgb_pixel3, v_tbl);
+            store_0 = svusdot_s32(store_0, r0, vw);
+            store_1 = svusdot_s32(store_1, r1, vw);
+            store_2 = svusdot_s32(store_2, r2, vw);
+            store_3 = svusdot_s32(store_3, r3, vw);
         }
 
         let n0 = svqshrunb_n_s32::<7>(store_0);
@@ -150,22 +167,14 @@ fn convolve_horizontal_rgb_neon_rows_4_impl(
         let packed = svuzp1_u8(svqxtnb_u16(s01), svqxtnb_u16(s23));
 
         unsafe {
+            let sq1 = svext_u8::<4>(packed, svdup_n_u8(0));
+            let sq2 = svext_u8::<8>(packed, svdup_n_u8(0));
+            let sq3 = svext_u8::<12>(packed, svdup_n_u8(0));
+
             svst1_u8(pg3, chunk0.as_mut_ptr(), packed);
-            svst1_u8(
-                pg3,
-                chunk1.as_mut_ptr(),
-                svext_u8::<4>(packed, svdup_n_u8(0)),
-            );
-            svst1_u8(
-                pg3,
-                chunk2.as_mut_ptr(),
-                svext_u8::<8>(packed, svdup_n_u8(0)),
-            );
-            svst1_u8(
-                pg3,
-                chunk3.as_mut_ptr(),
-                svext_u8::<12>(packed, svdup_n_u8(0)),
-            );
+            svst1_u8(pg3, chunk1.as_mut_ptr(), sq1);
+            svst1_u8(pg3, chunk2.as_mut_ptr(), sq2);
+            svst1_u8(pg3, chunk3.as_mut_ptr(), sq3);
         }
     }
 }
