@@ -38,7 +38,7 @@ jobs:
     name: Clippy
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        os: [ ubuntu-latest, ubuntu-24.04-arm ]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
@@ -50,7 +50,7 @@ jobs:
     name: Clippy Nightly
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        os: [ ubuntu-latest, ubuntu-24.04-arm ]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
@@ -206,7 +206,7 @@ jobs:
 
   fuzz_rgba_8bit:
     name: Fuzzing 8bit
-    runs-on: macos-latest
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         feature: [ rdm, neon ]
@@ -222,7 +222,7 @@ jobs:
 
   fuzz_nightly_arm:
     name: Fuzzing 8bit
-    runs-on: macos-latest
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         feature: [ nightly_i8mm ]
@@ -283,7 +283,7 @@ jobs:
 
   fuzz_rgba_high_bit_arm:
     name: Fuzzing High bit-depth ARM
-    runs-on: macos-latest
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         feature: [ neon, "neon,nightly_f16" ]
@@ -301,7 +301,7 @@ jobs:
   
   fuzz_rgba_high_bit_arm_rdm:
     name: Fuzzing High bit-depth RDM
-    runs-on: macos-latest
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
@@ -330,7 +330,7 @@ jobs:
 
   fuzz_rgba_f32_arm:
     name: Fuzzing floating point ARM
-    runs-on: macos-latest
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
