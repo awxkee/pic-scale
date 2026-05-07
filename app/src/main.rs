@@ -112,41 +112,37 @@ fn main() {
     // resize_rgba(0, 1, 256, 79, 256, ResamplingFunction::Bilinear, false);
     #[allow(overflowing_literals)]
     // test_fast_image();
-    let img = ImageReader::open("./assets/sample_fhd.jpg")
+    let img = ImageReader::open("./assets/asset_5.png")
         .unwrap()
         .decode()
         .unwrap();
     // img.save("top_right.tga").unwrap();
     let dimensions = img.dimensions();
     let transient = img.to_rgb8();
-    let mut bytes = transient
-        .to_vec()
-        .iter()
-        .map(|&x| x as f32 / 255.)
-        .collect::<Vec<_>>();
+    let mut bytes = transient.to_vec().iter().map(|&x| x).collect::<Vec<_>>();
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
 
-    let mut scaler = Scaler::new(ResamplingFunction::Bilinear)
-        .set_threading_policy(ThreadingPolicy::Adaptive)
+    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3)
+        .set_threading_policy(ThreadingPolicy::Single)
         .set_supersampling(false);
     // scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
     let mut store =
-        RgbF32ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
+        Rgb8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     store.bit_depth = 10;
 
-    let mut t_size = ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2);
+    let mut t_size = ImageSize::new(dimensions.0 as usize / 6, dimensions.1 as usize / 6);
     // t_size.height += 1;
     let resizing_plan = scaler
-        .plan_rgb_resampling_f32(
+        .plan_rgb_resampling(
             ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
             t_size,
         )
         .unwrap();
-    let mut dst_store = RgbF32ImageStoreMut::alloc_with_depth(
-        dimensions.0 as usize / 2,
-        dimensions.1 as usize / 2,
+    let mut dst_store = Rgb8ImageStoreMut::alloc_with_depth(
+        dimensions.0 as usize / 6,
+        dimensions.1 as usize / 6,
         10,
     );
     resizing_plan.resample(&store, &mut dst_store).unwrap();
@@ -201,9 +197,9 @@ fn main() {
     let dst = dst_store
         .as_bytes()
         .iter()
-        // .map(|&x| x)
+        .map(|&x| x)
         // .map(|&x| (((x) >> 2) as u8).min(255))
-        .map(|&x| (x as f32 * 255.).round() as u8)
+        // .map(|&x| (x as f32 * 255.).round() as u8)
         .collect::<Vec<_>>();
 
     if dst_store.channels == 4 {

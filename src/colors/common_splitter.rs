@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::plan::Resampling;
-use crate::support::check_image_size_overflow;
+use crate::support::check_image_size_overflow_with_stride;
 use crate::validation::try_vec;
 use crate::{ImageSize, ImageStore, ImageStoreMut, PicScaleError, ResamplingPlan};
 use std::fmt::Debug;
@@ -81,11 +81,23 @@ impl<T: Default + Clone + Copy + Debug, R: Default + Clone + Copy + Debug, const
             return Err(PicScaleError::ZeroImageDimensions);
         }
 
-        if check_image_size_overflow(store.width, store.height, store.channels) {
+        if check_image_size_overflow_with_stride(
+            store.width,
+            store.height,
+            store.stride(),
+            store.channels,
+            size_of::<T>() as isize,
+        ) {
             return Err(PicScaleError::SourceImageIsTooLarge);
         }
 
-        if check_image_size_overflow(new_size.width, new_size.height, store.channels) {
+        if check_image_size_overflow_with_stride(
+            new_size.width,
+            new_size.height,
+            into.stride(),
+            store.channels,
+            size_of::<T>() as isize,
+        ) {
             return Err(PicScaleError::DestinationImageIsTooLarge);
         }
 
