@@ -30,11 +30,68 @@
 pub(crate) const PRECISION: i32 = 15;
 pub(crate) const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
 
-pub(crate) fn check_image_size_overflow(width: usize, height: usize, chan: usize) -> bool {
-    let (stride, is_overflowed) = (width as isize).overflowing_mul(chan as isize);
-    if is_overflowed {
+pub(crate) fn check_image_size_overflow(
+    width: usize,
+    height: usize,
+    chan: usize,
+    t_size: isize,
+) -> bool {
+    let Ok(w) = isize::try_from(width) else {
         return true;
-    }
-    let (_, is_overflowed) = (height as isize).overflowing_mul(stride);
-    is_overflowed
+    };
+    let Ok(h) = isize::try_from(height) else {
+        return true;
+    };
+    let Ok(n) = isize::try_from(chan) else {
+        return true;
+    };
+    let Some(stride) = w.checked_mul(n) else {
+        return true;
+    };
+
+    // stride * (height - 1) + width * N
+    let Some(h_minus_1) = h.checked_sub(1) else {
+        return true;
+    };
+    let Some(lhs) = stride.checked_mul(h_minus_1) else {
+        return true;
+    };
+    lhs.checked_add(stride)
+        .and_then(|x| x.checked_mul(t_size))
+        .is_none()
+}
+
+pub(crate) fn check_image_size_overflow_with_stride(
+    width: usize,
+    height: usize,
+    stride: usize,
+    chan: usize,
+    t_size: isize,
+) -> bool {
+    let Ok(w) = isize::try_from(width) else {
+        return true;
+    };
+    let Ok(h) = isize::try_from(height) else {
+        return true;
+    };
+    let Ok(n) = isize::try_from(chan) else {
+        return true;
+    };
+    let Ok(stride) = isize::try_from(stride) else {
+        return true;
+    };
+
+    // stride * (height - 1) + width * N
+    let Some(h_minus_1) = h.checked_sub(1) else {
+        return true;
+    };
+    let Some(lhs) = stride.checked_mul(h_minus_1) else {
+        return true;
+    };
+    let Some(rhs) = w.checked_mul(n) else {
+        return true;
+    };
+    lhs.checked_add(rhs)
+        .and_then(|x| x.checked_mul(t_size))
+        .is_none()
 }

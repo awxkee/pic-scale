@@ -32,7 +32,7 @@ use crate::alpha_handle_f16::{premultiply_alpha_rgba_f16, unpremultiply_alpha_rg
 use crate::alpha_handle_f32::{premultiply_alpha_rgba_f32, unpremultiply_alpha_rgba_f32};
 use crate::alpha_handle_u8::{premultiply_alpha_rgba, unpremultiply_alpha_rgba};
 use crate::alpha_handle_u16::{premultiply_alpha_rgba_u16, unpremultiply_alpha_rgba_u16};
-use crate::support::check_image_size_overflow;
+use crate::support::{check_image_size_overflow, check_image_size_overflow_with_stride};
 use crate::validation::{PicScaleBufferMismatch, PicScaleError, try_vec};
 use crate::{ImageSize, WorkloadStrategy};
 #[cfg(feature = "nightly_f16")]
@@ -226,6 +226,25 @@ impl<T, const N: usize> ImageStoreMut<'_, T, N> {
             return Err(PicScaleError::ZeroImageDimensions);
         }
 
+        if check_image_size_overflow(
+            self.width,
+            self.height,
+            self.channels,
+            size_of::<T>() as isize,
+        ) {
+            return Err(PicScaleError::SourceImageIsTooLarge);
+        }
+
+        if check_image_size_overflow_with_stride(
+            self.width,
+            self.height,
+            self.stride(),
+            self.channels,
+            size_of::<T>() as isize,
+        ) {
+            return Err(PicScaleError::SourceImageIsTooLarge);
+        }
+
         let valid_size = self.stride() * (self.height - 1) + self.width * N;
 
         if self.stride() < self.width * N {
@@ -240,9 +259,6 @@ impl<T, const N: usize> ImageStoreMut<'_, T, N> {
                 channels: N,
                 slice_len: self.buffer.borrow().len(),
             }));
-        }
-        if check_image_size_overflow(self.width, self.height, self.channels) {
-            return Err(PicScaleError::SourceImageIsTooLarge);
         }
         Ok(())
     }
@@ -262,6 +278,25 @@ where
             return Err(PicScaleError::ZeroImageDimensions);
         }
 
+        if check_image_size_overflow(
+            self.width,
+            self.height,
+            self.channels,
+            size_of::<T>() as isize,
+        ) {
+            return Err(PicScaleError::DestinationImageIsTooLarge);
+        }
+
+        if check_image_size_overflow_with_stride(
+            self.width,
+            self.height,
+            self.stride(),
+            self.channels,
+            size_of::<T>() as isize,
+        ) {
+            return Err(PicScaleError::DestinationImageIsTooLarge);
+        }
+
         let valid_size = self.stride() * (self.height - 1) + self.width * N;
 
         if self.stride() < self.width * N {
@@ -276,10 +311,6 @@ where
                 channels: N,
                 slice_len: self.buffer.as_ref().len(),
             }));
-        }
-
-        if check_image_size_overflow(self.width, self.height, self.channels) {
-            return Err(PicScaleError::DestinationImageIsTooLarge);
         }
 
         Ok(())
