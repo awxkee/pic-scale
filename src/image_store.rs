@@ -511,6 +511,49 @@ where
     }
 }
 
+impl<'a, T: Default + Clone + Copy, const N: usize> ImageStore<'a, T, N>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
+    pub fn crop_with_copy(
+        &self,
+        x: usize,
+        y: usize,
+        width: usize,
+        height: usize,
+    ) -> Result<ImageStore<'static, T, N>, PicScaleError> {
+        self.validate()?;
+        if x + width > self.width || y + height > self.height {
+            return Err(PicScaleError::CropOutOfBounds {
+                x,
+                y,
+                width,
+                height,
+                image_width: self.width,
+                image_height: self.height,
+            });
+        }
+
+        let src_stride = self.stride();
+        let dst_stride = width * N;
+        let mut buffer = try_vec![T::default(); height * dst_stride];
+
+        buffer
+            .chunks_exact_mut(dst_stride)
+            .zip(self.buffer[y * src_stride + x * N..].chunks_exact(src_stride))
+            .for_each(|(dst, src)| dst.copy_from_slice(&src[..dst_stride]));
+
+        Ok(ImageStore {
+            buffer: std::borrow::Cow::Owned(buffer),
+            channels: self.channels,
+            width,
+            height,
+            stride: dst_stride,
+            bit_depth: self.bit_depth,
+        })
+    }
+}
+
 impl<'a, T, const N: usize> ImageStore<'a, T, N>
 where
     T: Clone + Copy + Debug,
@@ -679,6 +722,46 @@ where
             width,
             height,
             stride,
+            bit_depth: self.bit_depth,
+        })
+    }
+}
+
+impl<'a, T: Clone + Default + Copy, const N: usize> ImageStoreMut<'a, T, N> {
+    pub fn crop_with_copy(
+        &self,
+        x: usize,
+        y: usize,
+        width: usize,
+        height: usize,
+    ) -> Result<ImageStoreMut<'static, T, N>, PicScaleError> {
+        self.validate()?;
+        if x + width > self.width || y + height > self.height {
+            return Err(PicScaleError::CropOutOfBounds {
+                x,
+                y,
+                width,
+                height,
+                image_width: self.width,
+                image_height: self.height,
+            });
+        }
+
+        let src_stride = self.stride();
+        let dst_stride = width * N;
+        let mut buffer = try_vec![T::default(); height * dst_stride];
+
+        buffer
+            .chunks_exact_mut(dst_stride)
+            .zip(self.buffer.borrow()[y * src_stride + x * N..].chunks_exact(src_stride))
+            .for_each(|(dst, src)| dst.copy_from_slice(&src[..dst_stride]));
+
+        Ok(ImageStoreMut {
+            buffer: BufferStore::Owned(buffer),
+            channels: self.channels,
+            width,
+            height,
+            stride: dst_stride,
             bit_depth: self.bit_depth,
         })
     }
