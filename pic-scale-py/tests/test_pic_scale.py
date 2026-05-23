@@ -39,6 +39,7 @@ def noise(mode: str, w: int, h: int) -> Image.Image:
 # ─── solid-colour preservation ────────────────────────────────────────────────
 
 @pytest.mark.parametrize("mode,color", [
+    ("L",    128),
     ("RGB",  (100, 150, 200)),
     ("RGBA", (100, 150, 200, 255)),
 ])

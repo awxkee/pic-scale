@@ -225,7 +225,9 @@ fn do_resize(
     if is_u16 {
         // Pillow stores I;16 as little-endian u16 bytes
         let pixels: Vec<u16> = raw
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|b| u16::from_le_bytes([b[0], b[1]]))
             .collect();
         let store = ImageStore::<u16, 1>::from_slice(&pixels, src_w, src_h).map_err(ps_err)?;
@@ -242,7 +244,9 @@ fn do_resize(
     // ── f32 mode (F) ─────────────────────────────────────────────────────────
     // Pillow stores F as little-endian f32 bytes
     let pixels: Vec<f32> = raw
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
         .collect();
     let store = ImageStore::<f32, 1>::from_slice(&pixels, src_w, src_h).map_err(ps_err)?;
