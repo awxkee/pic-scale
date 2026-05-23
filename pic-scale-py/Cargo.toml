@@ -15,7 +15,7 @@ exclude = ["*.jpg", "/assets", "*.png", "*.sh", "/assets/*", "/.github"]
 rust-version = "1.89.0"
 
 [dependencies]
-pic-scale = { version = "0.7.6" }
+pic-scale = { path = "../" }
 pyo3 = { version = "0.28.3", features = ["extension-module"] }
 
 [features]
