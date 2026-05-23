@@ -2,8 +2,7 @@
 pic-scale — High-performance image resampling for Python
 =========================================================
 
-Drop-in replacement for Pillow's ``Image.resize`` backed by a SIMD-optimised
-Rust engine (AVX2/FMA on x86-64, NEON on AArch64).
+Drop-in replacement for Pillow's ``Image.resize``.
 
 Quick start
 -----------

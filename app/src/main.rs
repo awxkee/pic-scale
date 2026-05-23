@@ -110,9 +110,9 @@ fn main() {
     // );
     // resize_rgba(0, 143, 35, 143, 35, ResamplingFunction::Bilinear, false);
     // resize_rgba(0, 1, 256, 79, 256, ResamplingFunction::Bilinear, false);
-    let src_image = vec![128; 128 * 128];
-    let src_img = Planar8ImageStore::borrow(&src_image, 128, 128).unwrap();
-    let mut dst_image = Planar8ImageStoreMut::alloc(64, 64);
+    let src_image = vec![128; 256 * 256];
+    let src_img = Planar8ImageStore::borrow(&src_image, 256, 256).unwrap();
+    let mut dst_image = Planar8ImageStoreMut::alloc(128, 128);
     let resizing_plan = Scaler::new(ResamplingFunction::Lanczos3)
         .set_workload_strategy(WorkloadStrategy::PreferSpeed)
         .plan_planar_resampling(src_img.size(), dst_image.size())

@@ -1,7 +1,7 @@
 # pic-scale
 
 [![PyPI](https://img.shields.io/pypi/v/pic-scale)](https://pypi.org/project/pic-scale/)
-[![CI](https://github.com/awxkee/pic-scale/actions/workflows/ci.yml/badge.svg)](https://github.com/awxkee/pic-scale/actions)
+[![CI](https://github.com/awxkee/pic-scale/actions/workflows/publish_pypi.yml/badge.svg)]([https://github.com/awxkee/pic-scale/actions](https://github.com/awxkee/pic-scale/actions/workflows/publish_pypi.yml))
 [![Python](https://img.shields.io/pypi/pyversions/pic-scale)](https://pypi.org/project/pic-scale/)
 
 High-performance image resampling for Python — a drop-in replacement for
