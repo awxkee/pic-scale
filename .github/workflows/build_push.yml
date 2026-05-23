@@ -354,3 +354,24 @@ jobs:
       - run: cargo fuzz run resize_rgb_f32 --features "${{ matrix.feature }}" -- -max_total_time=15
       - run: cargo fuzz run resize_cbcr_f32 --features "${{ matrix.feature }}" -- -max_total_time=15
       - run: cargo fuzz run resize_plane_f32 --features "${{ matrix.feature }}" -- -max_total_time=15
+        
+  python_bindings:
+    name: Python bindings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Create venv and install dependencies
+        run: |
+          python -m venv pic-scale-py/.venv
+          pic-scale-py/.venv/bin/pip install --upgrade pip
+          pic-scale-py/.venv/bin/pip install maturin pytest numpy Pillow
+      - name: Build and install zaft
+        working-directory: pic-scale-py
+        run: .venv/bin/maturin develop --release
+      - name: Run Python tests
+        working-directory: pic-scale-py
+        run: .venv/bin/pytest tests/test_pic_scale.py -v

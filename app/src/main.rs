@@ -16,11 +16,11 @@ use image::{EncodableLayout, GenericImageView, ImageReader};
 use pic_scale::{
     BufferStore, CbCr16ImageStore, CbCr16ImageStoreMut, ImageSize, ImageStore, ImageStoreMut,
     ImageStoreScaling, JzazbzScaler, LChScaler, LabScaler, LuvScaler, Planar16ImageStore,
-    Planar16ImageStoreMut, ResamplingFunction, Rgb16ImageStore, Rgb16ImageStoreMut, Rgb8ImageStore,
-    Rgb8ImageStoreMut, RgbF32ImageStore, RgbF32ImageStoreMut, Rgba16ImageStore,
-    Rgba16ImageStoreMut, Rgba8ImageStore, Rgba8ImageStoreMut, RgbaF32ImageStore,
-    RgbaF32ImageStoreMut, Scaler, SigmoidalScaler, ThreadingPolicy, TransferFunction,
-    WorkloadStrategy, XYZScaler,
+    Planar16ImageStoreMut, Planar8ImageStore, Planar8ImageStoreMut, ResamplingFunction,
+    Rgb16ImageStore, Rgb16ImageStoreMut, Rgb8ImageStore, Rgb8ImageStoreMut, RgbF32ImageStore,
+    RgbF32ImageStoreMut, Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore,
+    Rgba8ImageStoreMut, RgbaF32ImageStore, RgbaF32ImageStoreMut, Scaler, SigmoidalScaler,
+    ThreadingPolicy, TransferFunction, WorkloadStrategy, XYZScaler,
 };
 use rand::RngExt;
 
@@ -110,6 +110,24 @@ fn main() {
     // );
     // resize_rgba(0, 143, 35, 143, 35, ResamplingFunction::Bilinear, false);
     // resize_rgba(0, 1, 256, 79, 256, ResamplingFunction::Bilinear, false);
+    let src_image = vec![128; 128 * 128];
+    let src_img = Planar8ImageStore::borrow(&src_image, 128, 128).unwrap();
+    let mut dst_image = Planar8ImageStoreMut::alloc(64, 64);
+    let resizing_plan = Scaler::new(ResamplingFunction::Lanczos3)
+        .set_workload_strategy(WorkloadStrategy::PreferSpeed)
+        .plan_planar_resampling(src_img.size(), dst_image.size())
+        .unwrap();
+    resizing_plan.resample(&src_img, &mut dst_image).unwrap();
+    dst_image
+        .buffer
+        .borrow()
+        .iter()
+        .zip(src_image.iter())
+        .for_each(|(&dst, &src)| {
+            assert!(((src as i64 - dst as i64).unsigned_abs() as u16) < 3);
+        });
+    println!("{:?}", &dst_image.buffer.borrow()[..10]);
+
     #[allow(overflowing_literals)]
     // test_fast_image();
     let img = ImageReader::open("./assets/asset_5.png")

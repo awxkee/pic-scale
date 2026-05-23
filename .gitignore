@@ -12,3 +12,5 @@ wasm/target/
 wasm/pkg/
 Cargo.lock
 app/Cargo.lock
+pic-scale-py/.venv
+*.so

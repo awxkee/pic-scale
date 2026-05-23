@@ -1,0 +1,41 @@
+[build-system]
+requires = ["maturin>=1.5,<2"]
+build-backend = "maturin"
+
+[project]
+name = "pic_scale"
+version = "0.7.7"
+description = "High-performance image resampling with a Pillow-compatible API"
+readme = "README.md"
+license = { text = "BSD-3-Clause" }
+requires-python = ">=3.9"
+keywords = ["image", "resize", "resampling", "pillow", "simd", "lanczos", "bicubic"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Rust",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Software Development :: Libraries",
+]
+dependencies = ["Pillow>=9.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "Pillow>=9.0"]
+
+[project.urls]
+Repository = "https://github.com/awxkee/pic-scale"
+
+[tool.maturin]
+python-source = "python"
+module-name = "pic_scale._pic_scale"
+features = ["pyo3/extension-module"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
