@@ -8,33 +8,22 @@ from pic_scale import resize, Resampling, Plan
 # ─── helpers ──────────────────────────────────────────────────────────────────
 
 def solid(mode: str, w: int, h: int, color) -> Image.Image:
-    if mode == "L":
-        arr = np.full((h, w), color, dtype=np.uint8)
-    elif mode == "LA":
-        arr = np.full((h, w, 2), color, dtype=np.uint8)
-    elif mode == "RGB":
-        arr = np.full((h, w, 3), color, dtype=np.uint8)
-    elif mode == "RGBA":
-        arr = np.full((h, w, 4), color, dtype=np.uint8)
-    elif mode == "F":
-        arr = np.full((h, w), color, dtype=np.float32)
-    elif mode == "I;16":
-        arr = np.full((h, w), color, dtype=np.uint16)
-    else:
-        raise ValueError(f"Unsupported mode {mode}")
-    return Image.fromarray(arr, mode=mode)
+    img = Image.new(mode, (w, h), color)
+    return img
 
 def noise(mode: str, w: int, h: int) -> Image.Image:
     rng = np.random.default_rng(42)
     if mode == "F":
-        arr = rng.random((h, w), dtype=np.float32)
-        return Image.fromarray(arr, mode="F")
+        # fromarray with F mode requires float32 — no mode param deprecation here
+        arr = rng.random((h, w)).astype(np.float32)
+        return Image.fromarray(arr)
     if mode == "I;16":
-        arr = (rng.integers(0, 65535, (h, w), dtype=np.uint16))
-        return Image.fromarray(arr, mode="I;16")
+        # frombytes avoids the deprecated mode parameter in fromarray
+        arr = rng.integers(0, 65535, (h, w), dtype=np.uint16)
+        return Image.frombytes("I;16", (w, h), arr.tobytes())
     channels = {"L": 1, "LA": 2, "RGB": 3, "RGBA": 4}[mode]
     arr = rng.integers(0, 255, (h, w, channels), dtype=np.uint8).squeeze()
-    return Image.fromarray(arr, mode=mode)
+    return Image.fromarray(arr)
 
 # ─── solid-colour preservation ────────────────────────────────────────────────
 
@@ -45,27 +34,12 @@ def noise(mode: str, w: int, h: int) -> Image.Image:
 ])
 def test_solid_preserved(mode, color):
     """Resizing a solid colour image should keep all pixels identical."""
-    img = solid(mode, 256, 256, color)
-    out = resize(img, (128, 128), Resampling.LANCZOS)
+    img = solid(mode, 128, 128, color)
+    out = resize(img, (64, 64), Resampling.LANCZOS)
     assert out.mode == mode
     arr = np.array(out)
-
-    # Check only the interior — skip 8px border where edge ringing can occur
-    border = 8
-    interior = arr[border:-border, border:-border]
-
-    channels = len(color) if isinstance(color, tuple) else 1
-    if channels == 1:
-        diff = np.abs(interior.astype(int) - color).max()
-        assert diff < 3, f"L interior max diff {diff}, values: {np.unique(interior)}"
-    else:
-        expected = np.array(color, dtype=int)
-        for c in range(channels):
-            diff = np.abs(interior[:, :, c].astype(int) - expected[c]).max()
-            assert diff < 3, (
-                f"Channel {c} max diff {diff} >= 3 "
-                f"(expected ~{expected[c]}, unique values: {np.unique(interior[:,:,c])})"
-            )
+    expected = np.array(color)
+    assert np.abs(arr.astype(int) - expected).max() < 3
 
 # ─── size correctness ─────────────────────────────────────────────────────────
 
