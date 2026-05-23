@@ -231,22 +231,22 @@ fn convolve_horizontal_plane_neon_rows_4_u8_impl<const D: bool, const PRECISION:
                 jx += 1;
             }
 
-            let sums = vaddvq_s32(vmaxq_s32(vdupq_n_s32(0), store0));
+            let sums = vaddvq_s32(store0).max(0);
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
             *chunk0 = value;
 
-            let sums = vaddvq_s32(vmaxq_s32(vdupq_n_s32(0), store1));
+            let sums = vaddvq_s32(store1).max(0);
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
             *chunk1 = value;
 
-            let sums = vaddvq_s32(vmaxq_s32(vdupq_n_s32(0), store2));
+            let sums = vaddvq_s32(store2).max(0);
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
             *chunk2 = value;
 
-            let sums = vaddvq_s32(vmaxq_s32(vdupq_n_s32(0), store3));
+            let sums = vaddvq_s32(store3).max(0);
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
             *chunk3 = value;
@@ -327,7 +327,7 @@ fn convolve_horizontal_plane_neon_row_impl<const D: bool, const PRECISION: i32>(
                 jx += 1;
             }
 
-            let sums = vaddvq_s32(vmaxq_s32(vdupq_n_s32(0), store));
+            let sums = vaddvq_s32(store).max(0);
             let shifted = sums >> PRECISION;
             let value = shifted.min(255) as u8;
             *dst = value;
