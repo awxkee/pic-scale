@@ -113,7 +113,7 @@ jobs:
           VCPKG_ROOT: ${{ matrix.runner == 'windows-latest' && 'C:\vcpkg' || '' }}
           VCPKG_TARGET_TRIPLET: ${{ matrix.runner == 'windows-latest' && 'x64-windows-static-md' || '' }}
         run: |
-          napi build --release --target ${{ matrix.target }} --features "napi,${{ matrix.features }}" --output-dir dist/
+          napi build --release --platform --target ${{ matrix.target }} --features "napi,${{ matrix.features }}" --output-dir dist/
 
       - uses: actions/upload-artifact@v6
         with:
@@ -210,20 +210,9 @@ jobs:
           # napi-rs CLI generates index.js / index.d.ts / index.mjs that load
           # the right platform binary at runtime. Copy everything it produced.
           # ── native .node files ──────────────────────────────────────────────
-          for artifact_dir in artifacts/native-*/; do
-            target=$(basename "$artifact_dir" | sed 's/native-//')
-            for node_file in "$artifact_dir"*.node; do
+          for node_file in artifacts/native-*/*.node; do
             [ -f "$node_file" ] || continue
-            basename_file=$(basename "$node_file")
-            # if napi already added platform suffix (--platform flag), copy as-is
-            # otherwise rename: pic_scale.node → pic_scale.<target>.node
-            if [[ "$basename_file" == *"."*"."* ]]; then
-              cp "$node_file" "dist/$basename_file"
-            else
-              stem="${basename_file%.node}"
-              cp "$node_file" "dist/${stem}.${target}.node"
-            fi
-            done
+            cp "$node_file" "dist/$(basename "$node_file")"
           done
 
           # ── WASM bundle ─────────────────────────────────────────────────────
