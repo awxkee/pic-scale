@@ -1,6 +1,6 @@
 {
   "name": "@radzivon.bartoshyk/pic-scale",
-  "version": "0.7.7",
+  "version": "0.7.8",
   "description": "High-performance image resampling",
   "license": "(BSD-3-Clause OR Apache-2.0)",
   "repository": {
@@ -24,8 +24,22 @@
       "types": "./index.d.ts"
     },
     "./wasm": {
-      "import": "./wasm/pic_scale_node.js",
-      "types": "./wasm/pic_scale_node.d.ts"
+      "require": "./wasm/nodejs/pic_scale_js.cjs",
+      "import": "./wasm/bundler/pic_scale_js.js",
+      "browser": "./wasm/web/pic_scale_js.js",
+      "types": "./wasm/bundler/pic_scale_js.d.ts"
+    },
+    "./wasm/bundler": {
+      "import": "./wasm/bundler/pic_scale_js.js",
+      "types": "./wasm/bundler/pic_scale_js.d.ts"
+    },
+    "./wasm/web": {
+      "import": "./wasm/web/pic_scale_js.js",
+      "types": "./wasm/web/pic_scale_js.d.ts"
+    },
+    "./wasm/nodejs": {
+      "require": "./wasm/nodejs/pic_scale_js.cjs",
+      "types": "./wasm/nodejs/pic_scale_js.d.ts"
     }
   },
   "files": [

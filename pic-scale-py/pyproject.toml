@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "pic_scale"
-version = "0.7.7"
+version = "0.7.8"
 description = "High-performance image resampling with a Pillow-compatible API"
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
