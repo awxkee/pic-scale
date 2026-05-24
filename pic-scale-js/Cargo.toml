@@ -1,0 +1,62 @@
+[package]
+name = "pic-scale-js"
+version = "0.7.7"
+edition = "2024"
+description = "Node.js and WASM bindings for pic-scale image resampling"
+license = "BSD-3-Clause OR Apache-2.0"
+keywords = ["scale", "resize", "image-resize"]
+authors = ["Radzivon Bartoshyk"]
+documentation = "https://github.com/awxkee/pic-scale"
+categories = ["multimedia::images", "multimedia::video"]
+homepage = "https://github.com/awxkee/pic-scale"
+repository = "https://github.com/awxkee/pic-scale"
+exclude = ["*.jpg", "/assets", "*.png", "*.sh", "/assets/*", "/.github"]
+rust-version = "1.89.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies.libheif-rs]
+version = "2.7.0"
+features = ["v1_21"]
+default-features = false
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies.yuv]
+version = "0.8"
+
+[dependencies]
+pic-scale = { path = "../", features = ["avx", "neon"] }
+thiserror = "2.0.18"
+img-parts = "0.4.0"
+image = { version = "0.25.10", features = ["jpeg", "png", "webp", "tiff", "bmp", "ico", "qoi"] }
+kamadak-exif = "0.6.1"
+bytemuck = "1.25.0"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+napi = { version = "3.9.0", features = ["napi4", "tokio_rt"], optional = true }
+napi-derive = { version = "3.5.6", optional = true }
+tokio = { version = "1", features = ["fs"], optional = true }
+wasm-bindgen = { version = "0.2.122", optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = { version = "0.2.122", optional = true }
+js-sys = { version = "0.3", optional = true }
+
+[build-dependencies]
+napi-build = { version = "2", optional = true }
+
+[features]
+default = []
+napi = ["dep:napi", "dep:napi-derive", "dep:tokio", "dep:napi-build"]
+wasm = ["dep:wasm-bindgen", "dep:js-sys"]
+x86_set = ["pic-scale/avx512", "pic-scale/avx", "pic-scale/sse"]
+aarch64_set = ["pic-scale/rdm", "pic-scale/sve", "pic-scale/nightly_i8mm"]
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-O", "--enable-simd", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]
