@@ -273,6 +273,19 @@ pub(crate) fn encode_heif(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+fn expand_to_16bit(buffer: &mut [u16], is12_bit: bool) {
+    if is12_bit {
+        for px in buffer.iter_mut() {
+            *px = (*px << 4) | (*px >> 8);
+        }
+    } else {
+        for px in buffer.iter_mut() {
+            *px = (*px << 6) | (*px >> 4);
+        }
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn decode_heic(bytes: &[u8]) -> Result<DynamicImage> {
     use libheif_rs::{Chroma, ColorSpace, HeifContext, LibHeif, MatrixCoefficients, RgbChroma};
     use yuv::{
@@ -378,6 +391,7 @@ pub(crate) fn decode_heic(bytes: &[u8]) -> Result<DynamicImage> {
                         (_, true) => icgc412_alpha_to_rgba12(&yuva, &mut out, w * 4, range),
                     }
                     .map_err(|e| PicError::Format(format!("icgc→rgba16: {e}")))?;
+                    expand_to_16bit(&mut out, is_12);
                     return Ok(DynamicImage::ImageRgba16(
                         image::ImageBuffer::from_raw(w, h, out)
                             .ok_or_else(|| PicError::Format("HEIC RGBA16 mismatch".into()))?,
@@ -403,6 +417,7 @@ pub(crate) fn decode_heic(bytes: &[u8]) -> Result<DynamicImage> {
                     (_, true) => icgc412_to_rgb12(&yuv, &mut out, w * 3, range),
                 }
                 .map_err(|e| PicError::Format(format!("icgc→rgb16: {e}")))?;
+                expand_to_16bit(&mut out, is_12);
                 return Ok(DynamicImage::ImageRgb16(
                     image::ImageBuffer::from_raw(w, h, out)
                         .ok_or_else(|| PicError::Format("HEIC RGB16 mismatch".into()))?,
@@ -441,6 +456,7 @@ pub(crate) fn decode_heic(bytes: &[u8]) -> Result<DynamicImage> {
                     (_, true) => i412_alpha_to_rgba12(&yuva, &mut out, w * 4, range, matrix),
                 }
                 .map_err(|e| PicError::Format(format!("yuv→rgba16: {e}")))?;
+                expand_to_16bit(&mut out, is_12);
                 return Ok(DynamicImage::ImageRgba16(
                     image::ImageBuffer::from_raw(w, h, out)
                         .ok_or_else(|| PicError::Format("HEIC RGBA16 mismatch".into()))?,
@@ -467,6 +483,7 @@ pub(crate) fn decode_heic(bytes: &[u8]) -> Result<DynamicImage> {
                 (_, true) => i412_to_rgb12(&yuv, &mut out, w * 3, range, matrix),
             }
             .map_err(|e| PicError::Format(format!("yuv→rgb16: {e}")))?;
+            expand_to_16bit(&mut out, is_12);
             return Ok(DynamicImage::ImageRgb16(
                 image::ImageBuffer::from_raw(w, h, out)
                     .ok_or_else(|| PicError::Format("HEIC RGB16 mismatch".into()))?,
