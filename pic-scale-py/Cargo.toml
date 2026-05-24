@@ -36,3 +36,9 @@ sse = ["pic-scale/sse"]
 nightly_i8mm = ["pic-scale/nightly_i8mm"]
 # Allows use nightly SVE2
 sve = ["pic-scale/sve"]
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
