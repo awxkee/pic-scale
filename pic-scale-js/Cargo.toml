@@ -1,6 +1,6 @@
 [package]
 name = "pic-scale-js"
-version = "0.7.6"
+version = "0.7.7"
 edition = "2024"
 description = "Node.js and WASM bindings for pic-scale image resampling"
 license = "BSD-3-Clause OR Apache-2.0"
