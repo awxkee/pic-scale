@@ -181,6 +181,7 @@ jobs:
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
 
       # Required for OIDC trusted publishing
       - name: Install dependencies
