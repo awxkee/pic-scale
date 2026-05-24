@@ -177,20 +177,23 @@ jobs:
 
       # Required for OIDC trusted publishing
       - name: Install dependencies
+        working-directory: pic-scale-js
         run: npm install && npm ci
 
       - name: Download all artifacts
         uses: actions/download-artifact@v6
         with:
-          path: artifacts/
+          path: pic-scale-js/artifacts/
 
       - name: Extract version from Cargo.toml
         id: version
+        working-directory: pic-scale-js
         run: |
           VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Assemble dist/
+        working-directory: pic-scale-js
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           mkdir -p dist/wasm
@@ -223,13 +226,13 @@ jobs:
             npx @napi-rs/cli artifacts --dist dist/
           fi
 
-          cp pic-scale-js/README.md dist/README.md
+          cp README.md dist/README.md
 
-          # Stamp version into package.json
           sed "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" \
             package.json > dist/package.json
           jq 'del(.devDependencies)' dist/package.json \
             > dist/package.tmp && mv dist/package.tmp dist/package.json
 
       - name: Publish dist/
+        working-directory: pic-scale-js
         run: npm publish dist/ --provenance --access public
