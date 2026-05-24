@@ -183,6 +183,8 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           package-manager-cache: false
 
+      - run: npm install -g npm@latest
+
       # Required for OIDC trusted publishing
       - name: Install dependencies
         working-directory: pic-scale-js
