@@ -1,4 +1,4 @@
 node_modules
 *.node
 *.jpg
-index.d.ts
+dist/
