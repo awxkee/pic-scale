@@ -256,4 +256,4 @@ jobs:
 
       - name: Publish dist/
         working-directory: pic-scale-js/dist
-        run: npm ci && npm publish --provenance --access public
+        run: npm install && npm ci && npm publish --provenance --access public
