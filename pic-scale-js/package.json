@@ -2,10 +2,10 @@
   "name": "@radzivon.bartoshyk/pic-scale",
   "version": "0.7.7",
   "description": "High-performance image resampling",
-  "license": "BSD-3-Clause",
+  "license": "(BSD-3-Clause OR Apache-2.0)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/awxkee/pic-scale.git"
+    "url": "https://github.com/awxkee/pic-scale"
   },
   "keywords": [
     "image",
