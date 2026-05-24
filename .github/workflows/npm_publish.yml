@@ -186,7 +186,7 @@ jobs:
       # Required for OIDC trusted publishing
       - name: Install dependencies
         working-directory: pic-scale-js
-        run: npm install && npm ci
+        run: npm install
 
       - name: Download all artifacts
         uses: actions/download-artifact@v6
@@ -247,4 +247,4 @@ jobs:
 
       - name: Publish dist/
         working-directory: pic-scale-js
-        run: npm publish dist/ --provenance --access public
+        run: npm ci && npm publish dist/ --provenance --access public
