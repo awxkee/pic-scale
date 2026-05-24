@@ -14,3 +14,4 @@ Cargo.lock
 app/Cargo.lock
 pic-scale-py/.venv
 *.so
+pic-scale-js/node_modules

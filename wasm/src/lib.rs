@@ -33,7 +33,7 @@ pub fn process(image: Uint8Array) -> Uint8Array {
     let transient = img.to_rgb8();
     let mut bytes = Vec::from(transient.as_bytes());
 
-    let mut scaler =
+    let scaler =
         Scaler::new(ResamplingFunction::Lanczos3).set_threading_policy(ThreadingPolicy::Single);
 
     let store =

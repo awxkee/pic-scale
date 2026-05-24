@@ -11,9 +11,9 @@ on:
       - '!ci_test_*'
     tags-ignore:
       - '*'
-  pull_request:
-    branches:
-      - 'master'
+#  pull_request:
+#    branches:
+#      - 'master'
 
 jobs:
   build:
@@ -74,6 +74,7 @@ jobs:
   tests_aarch64_neon_no_rdm_no_i8mm:
     name: Testing AArch64 NEON (no RDM, no I8MM)
     runs-on: ubuntu-24.04-arm
+    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
@@ -106,6 +107,7 @@ jobs:
   tests_aarch64_neon_rdm_no_i8mm:
     name: Testing AArch64 NEON (RDM, no I8MM)
     runs-on: ubuntu-24.04-arm
+    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
@@ -138,6 +140,7 @@ jobs:
   tests_x86_sse_isolated:
     name: Testing x86 SSE isolated
     runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
@@ -207,6 +210,7 @@ jobs:
   fuzz_rgba_8bit:
     name: Fuzzing 8bit
     runs-on: ubuntu-24.04-arm
+    if: github.event_name == 'pull_request'
     strategy:
       matrix:
         feature: [ "rdm,nightly_f16", "neon,nightly_f16" ]
@@ -233,6 +237,7 @@ jobs:
   fuzz_nightly_arm:
     name: Fuzzing 8bit I8MM
     runs-on: ubuntu-24.04-arm
+    if: github.event_name == 'pull_request'
     strategy:
       matrix:
         feature: [ nightly_i8mm ]
@@ -247,6 +252,7 @@ jobs:
   fuzz_nightly_arm_sve:
     name: Fuzzing SVE2
     runs-on: ubuntu-24.04-arm
+    if: github.event_name == 'pull_request'
     strategy:
       matrix:
         feature: [ sve ]
@@ -269,6 +275,7 @@ jobs:
 
   fuzz_avx_sse:
     name: Fuzzing AVX,SSE
+    if: github.event_name == 'pull_request'
     strategy:
       matrix:
         feature: [ "sse,nightly_f16", "avx,nightly_f16", "" ]

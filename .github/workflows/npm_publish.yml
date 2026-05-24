@@ -1,0 +1,236 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  DEBUG: napi:*
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-native:
+    name: Build native (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+            toolchain: stable
+            features: x86_set
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-arm
+            toolchain: nightly
+            features: aarch64_set
+          - target: aarch64-apple-darwin
+            runner: macos-14
+            toolchain: nightly
+            features: aarch64_set
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+            toolchain: stable
+            features: x86_set
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          toolchain: ${{ matrix.toolchain }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Install @napi-rs/cli
+        run: npm install -g @napi-rs/cli
+
+      - name: Install cross-compilation tools (Linux aarch64)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu \
+            binutils-aarch64-linux-gnu
+
+      - name: Cache vcpkg MD
+        if: matrix.runner == 'windows-latest'
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg\installed
+          key: vcpkg-x64-windows-static-md-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: vcpkg-x64-windows-static-md-
+
+      - name: Install dependencies (Windows)
+        if: matrix.runner == 'windows-latest'
+        shell: powershell
+        run: |
+          vcpkg integrate install
+          vcpkg install `
+            libheif:x64-windows-static-md `
+            libjpeg-turbo:x64-windows-static-md `
+            libpng:x64-windows-static-md `
+            zlib:x64-windows-static-md `
+            aom:x64-windows-static-md `
+            dav1d:x64-windows-static-md `
+            libde265:x64-windows-static-md `
+            x265:x64-windows-static-md
+
+      - name: Cache Cargo registry + build
+        uses: actions/cache@v4
+        if: matrix.runner == 'windows-latest'
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target/
+          key: cargo-${{ matrix.target }}-${{ matrix.toolchain }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ matrix.target }}-${{ matrix.toolchain }}-
+            cargo-${{ matrix.target }}-
+
+      - name: Build native addon
+        working-directory: pic-scale-js
+        env:
+          VCPKG_ROOT: ${{ matrix.runner == 'windows-latest' && 'C:\vcpkg' || '' }}
+          VCPKG_TARGET_TRIPLET: ${{ matrix.runner == 'windows-latest' && 'x64-windows-static' || '' }}
+        run: |
+          napi build --release --target ${{ matrix.target }} --features "napi,${{ matrix.features }}" --output-dir dist/
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: native-${{ matrix.target }}
+          path: pic-scale-js/dist/*.node
+          retention-days: 1
+
+  build-wasm:
+    name: Build WASM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build (bundler)
+        working-directory: pic-scale-js
+        run: |
+          RUSTFLAGS="-C target-feature=+simd128" \
+          wasm-pack build --release --target bundler \
+            --out-dir wasm-pkg/bundler \
+            --features wasm
+
+      - name: Build (web)
+        working-directory: pic-scale-js
+        run: |
+          RUSTFLAGS="-C target-feature=+simd128" \
+          wasm-pack build --release --target web \
+            --out-dir wasm-pkg/web \
+            --features wasm
+
+      - name: Build (nodejs)
+        working-directory: pic-scale-js
+        run: |
+          RUSTFLAGS="-C target-feature=+simd128" \
+          wasm-pack build --release --target nodejs \
+            --out-dir wasm-pkg/nodejs \
+            --features wasm
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: wasm-pkg
+          path: pic-scale-js/wasm-pkg/
+          retention-days: 1
+
+  publish:
+    name: Publish to npm
+    needs: [ build-native, build-wasm ]
+    runs-on: ubuntu-latest
+    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
+    environment: Cargo
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      # Required for OIDC trusted publishing
+      - name: Install dependencies
+        run: npm install && npm ci
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v6
+        with:
+          path: artifacts/
+
+      - name: Extract version from Cargo.toml
+        id: version
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Assemble dist/
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p dist/wasm
+
+          # ── native .node files ──────────────────────────────────────────────
+          # napi-rs CLI generates index.js / index.d.ts / index.mjs that load
+          # the right platform binary at runtime. Copy everything it produced.
+          cp artifacts/native-*/*.node dist/
+
+          # ── WASM bundle ─────────────────────────────────────────────────────
+          # Use the bundler build as the default WASM target (vite/webpack).
+          rsync -a --exclude='package.json' --exclude='.gitignore' \
+            artifacts/wasm-pkg/bundler/ dist/wasm/bundler/
+          rsync -a --exclude='package.json' --exclude='.gitignore' \
+            artifacts/wasm-pkg/web/ dist/wasm/web/
+          rsync -a --exclude='package.json' --exclude='.gitignore' \
+            artifacts/wasm-pkg/nodejs/ dist/wasm/nodejs/
+
+          if [ -f dist/wasm/nodejs/pic_scale_node.js ]; then
+            mv dist/wasm/nodejs/pic_scale_node.js    dist/wasm/nodejs/pic_scale_node.cjs
+            mv dist/wasm/nodejs/pic_scale_node_bg.js dist/wasm/nodejs/pic_scale_node_bg.cjs
+            sed -i "s|require('./pic_scale_node_bg.js')|require('./pic_scale_node_bg.cjs')|g" \
+              dist/wasm/nodejs/pic_scale_node.cjs
+          fi
+
+          # ── loader files (generated by napi build) ──────────────────────────
+          # napi build --output-dir dist/ already wrote index.js/mjs/d.ts there.
+          # If not present, generate them now.
+          if [ ! -f dist/index.js ]; then
+            npx @napi-rs/cli artifacts --dist dist/
+          fi
+
+          cp pic-scale-js/README.md dist/README.md
+
+          # Stamp version into package.json
+          sed "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" \
+            package.json > dist/package.json
+          jq 'del(.devDependencies)' dist/package.json \
+            > dist/package.tmp && mv dist/package.tmp dist/package.json
+
+      - name: Publish dist/
+        run: npm publish dist/ --provenance --access public

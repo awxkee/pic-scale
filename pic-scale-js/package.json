@@ -1,0 +1,60 @@
+{
+  "name": "@radzivon-bartoshyk/pic-scale",
+  "version": "0.7.0",
+  "description": "High-performance image resampling",
+  "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/awxkee/pic-scale.git"
+  },
+  "keywords": [
+    "image",
+    "resize",
+    "resampling",
+    "lanczos",
+    "simd",
+    "native"
+  ],
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./index.js",
+      "import": "./index.mjs",
+      "types": "./index.d.ts"
+    },
+    "./wasm": {
+      "import": "./wasm/pic_scale_node.js",
+      "types": "./wasm/pic_scale_node.d.ts"
+    }
+  },
+  "files": [
+    "index.js",
+    "index.mjs",
+    "index.d.ts",
+    "*.node",
+    "wasm/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "napi": {
+    "binaryName": "pic_scale",
+    "targets": [
+      "x86_64-unknown-linux-gnu",
+      "x86_64-unknown-linux-musl",
+      "aarch64-unknown-linux-gnu",
+      "x86_64-apple-darwin",
+      "aarch64-apple-darwin",
+      "x86_64-pc-windows-msvc"
+    ]
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2",
+    "typescript": "^5"
+  }
+}
