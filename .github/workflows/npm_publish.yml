@@ -14,7 +14,6 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
-  DEBUG: napi:*
 
 permissions:
   id-token: write
@@ -254,6 +253,6 @@ jobs:
           jq 'del(.devDependencies)' dist/package.json \
             > dist/package.tmp && mv dist/package.tmp dist/package.json
 
-      - name: Publish dist/
+      - name: Publish
         working-directory: pic-scale-js/dist
         run: npm install && npm ci && npm publish --provenance --access public
