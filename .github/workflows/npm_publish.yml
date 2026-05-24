@@ -188,10 +188,19 @@ jobs:
         working-directory: pic-scale-js
         run: npm install
 
-      - name: Download all artifacts
+      - name: Download artifacts (this run)
+        if: ${{ !inputs.skip_build }}
         uses: actions/download-artifact@v6
         with:
           path: pic-scale-js/artifacts/
+
+      - name: Download artifacts (previous run)
+        if: ${{ inputs.skip_build != '' }}
+        uses: actions/download-artifact@v6
+        with:
+          path: pic-scale-js/artifacts/
+          run-id: ${{ inputs.skip_build }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract version from Cargo.toml
         id: version
@@ -246,5 +255,5 @@ jobs:
             > dist/package.tmp && mv dist/package.tmp dist/package.json
 
       - name: Publish dist/
-        working-directory: pic-scale-js
-        run: npm ci && npm publish dist/ --provenance --access public
+        working-directory: pic-scale-js/dist
+        run: npm ci && npm publish --provenance --access public
