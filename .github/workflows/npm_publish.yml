@@ -253,6 +253,7 @@ jobs:
           cp README.md dist/README.md
           cp index.js dist/index.js
           cp index.mjs dist/index.mjs
+          cp index.d.ts dist/index.d.ts
 
           sed "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" \
             package.json > dist/package.json
