@@ -14,6 +14,12 @@ on:
     tags:
       - '[0-9]*'
       - 'py[0-9]*'
+  workflow_dispatch:
+    inputs:
+      skip_build:
+        description: 'Skip native+wasm build and use artifacts from run ID'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -21,6 +27,7 @@ permissions:
 jobs:
   linux:
     runs-on: ${{ matrix.platform.runner }}
+    if: inputs.skip_build == ''
     strategy:
       fail-fast: false
       matrix:
@@ -71,6 +78,7 @@ jobs:
 
   musllinux:
     runs-on: ${{ matrix.platform.runner }}
+    if: inputs.skip_build == ''
     strategy:
       fail-fast: false
       matrix:
@@ -113,6 +121,7 @@ jobs:
 
   windows:
     runs-on: ${{ matrix.platform.runner }}
+    if: inputs.skip_build == ''
     strategy:
       fail-fast: false
       matrix:
@@ -154,6 +163,7 @@ jobs:
 
   macos:
     runs-on: ${{ matrix.platform.runner }}
+    if: inputs.skip_build == ''
     strategy:
       fail-fast: false
       matrix:
@@ -187,6 +197,7 @@ jobs:
 
   sdist:
     runs-on: ubuntu-latest
+    if: inputs.skip_build == ''
     steps:
       - uses: actions/checkout@v6
       - name: Build sdist

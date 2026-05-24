@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      skip_build:
+        description: 'Skip native+wasm build and use artifacts from run ID'
+        required: false
+        default: ''
 
 env:
   CARGO_TERM_COLOR: always
@@ -18,6 +24,7 @@ jobs:
   build-native:
     name: Build native (${{ matrix.target }})
     runs-on: ${{ matrix.runner }}
+    if: inputs.skip_build == ''
     strategy:
       fail-fast: false
       matrix:
@@ -104,7 +111,7 @@ jobs:
         working-directory: pic-scale-js
         env:
           VCPKG_ROOT: ${{ matrix.runner == 'windows-latest' && 'C:\vcpkg' || '' }}
-          VCPKG_TARGET_TRIPLET: ${{ matrix.runner == 'windows-latest' && 'x64-windows-static' || '' }}
+          VCPKG_TARGET_TRIPLET: ${{ matrix.runner == 'windows-latest' && 'x64-windows-static-md' || '' }}
         run: |
           napi build --release --target ${{ matrix.target }} --features "napi,${{ matrix.features }}" --output-dir dist/
 
@@ -117,6 +124,7 @@ jobs:
   build-wasm:
     name: Build WASM
     runs-on: ubuntu-latest
+    if: inputs.skip_build == ''
     steps:
       - uses: actions/checkout@v6
 
@@ -201,7 +209,22 @@ jobs:
           # ── native .node files ──────────────────────────────────────────────
           # napi-rs CLI generates index.js / index.d.ts / index.mjs that load
           # the right platform binary at runtime. Copy everything it produced.
-          cp artifacts/native-*/*.node dist/
+          # ── native .node files ──────────────────────────────────────────────
+          for artifact_dir in artifacts/native-*/; do
+            target=$(basename "$artifact_dir" | sed 's/native-//')
+            for node_file in "$artifact_dir"*.node; do
+            [ -f "$node_file" ] || continue
+            basename_file=$(basename "$node_file")
+            # if napi already added platform suffix (--platform flag), copy as-is
+            # otherwise rename: pic_scale.node → pic_scale.<target>.node
+            if [[ "$basename_file" == *"."*"."* ]]; then
+              cp "$node_file" "dist/$basename_file"
+            else
+              stem="${basename_file%.node}"
+              cp "$node_file" "dist/${stem}.${target}.node"
+            fi
+            done
+          done
 
           # ── WASM bundle ─────────────────────────────────────────────────────
           # Use the bundler build as the default WASM target (vite/webpack).
