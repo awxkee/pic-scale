@@ -1,6 +1,6 @@
 {
-  "name": "@radzivon-bartoshyk/pic-scale",
-  "version": "0.7.0",
+  "name": "@radzivon.bartoshyk/pic-scale",
+  "version": "0.7.6",
   "description": "High-performance image resampling",
   "license": "BSD-3-Clause",
   "repository": {
@@ -37,7 +37,7 @@
     "README.md"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "publishConfig": {
     "access": "public"
