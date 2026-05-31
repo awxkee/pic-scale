@@ -34,6 +34,9 @@ mod core;
 #[cfg(feature = "napi")]
 mod napi_bindings;
 
+mod heif;
+mod jxl;
 mod metadata;
+mod transpose;
 #[cfg(feature = "wasm")]
 mod wasm_bindings;

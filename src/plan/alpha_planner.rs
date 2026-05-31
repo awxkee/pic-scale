@@ -37,6 +37,7 @@ use crate::plan::supersampling::{supersampling_intermediate_size, supersampling_
 use crate::plan::{
     MultiStepResamplePlan, NoopPlan, ResampleNearestPlan, TrampolineFiltering, make_alpha_plan,
 };
+use crate::support::check_image_size_overflow;
 use crate::{
     ImageSize, ImageStore, ImageStoreMut, PicScaleError, Resampling, ResamplingFunction, Scaler,
 };
@@ -241,6 +242,19 @@ impl AlphaPlanner {
             VerticalConvolutionPass<T, W, N> + HorizontalFilterPass<T, W, N> + AssociateAlpha<T, N>,
         for<'a> ImageStoreMut<'a, T, N>: CheckStoreDensity + UnassociateAlpha<T, N>,
     {
+        if destination_size.width == 0 || destination_size.height == 0 {
+            return Err(PicScaleError::ZeroImageDimensions);
+        }
+        if check_image_size_overflow(
+            destination_size.width,
+            destination_size.height,
+            N,
+            size_of::<T>() as isize,
+        ) {
+            return Err(PicScaleError::Generic(
+                "Destination width or height overflows isize".to_string(),
+            ));
+        }
         if scaler.function == ResamplingFunction::Nearest {
             return Ok(Arc::new(ResampleNearestPlan {
                 source_size,

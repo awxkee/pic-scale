@@ -27,7 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 //
-// All methods are synchronous. WASM is single-threaded — there is no event
+// All methods are synchronous. WASM is Single-threaded — there is no event
 // loop to block and no spawn_blocking equivalent. CPU-heavy work (resize,
 // encode) runs inline. For non-blocking behaviour in the browser, call from
 // a Web Worker:
@@ -59,7 +59,7 @@ fn map_err(e: crate::core::PicError) -> JsValue {
 
 #[wasm_bindgen(typescript_custom_section)]
 const WORKERS_TYPE: &str = r#"
-export type Workers = 'adaptive' | 'single';
+export type Workers = 'Adaptive' | 'Single';
 "#;
 
 #[wasm_bindgen]
@@ -121,7 +121,7 @@ impl Image {
     ///                     `"fill"` stretch · `"fit"` letterbox · `"cover"` crop centre
     ///                     `"fit_width"` · `"fit_height"`
     /// premultiply_alpha — pre-multiply alpha for RGBA/LA (default true)
-    /// workers           — thread count; 0 = adaptive (default 1)
+    /// workers           — thread count; 0 = Adaptive (default 1)
     /// bg_color          — `[r, g, b, a]` padding for `"fit"` mode (default transparent)
     /// auto_orient       — rotate pixels per EXIF orientation before resize (default true)
     ///
@@ -170,8 +170,8 @@ impl Image {
                     return n as usize;
                 }
                 match v.as_string().as_deref() {
-                    Some("adaptive") => 0,
-                    Some("single") => 1,
+                    Some("Adaptive") => 0,
+                    Some("Single") => 1,
                     _ => 1,
                 }
             })

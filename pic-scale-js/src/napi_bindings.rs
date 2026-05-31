@@ -44,28 +44,26 @@ fn map_err(e: crate::core::PicError) -> napi::Error {
     napi::Error::from_reason(e.to_string())
 }
 
-// ─── option structs ───────────────────────────────────────────────────────────
-
 #[napi(object)]
 pub struct ResizeOptions {
     /// Resampling filter. Default `"lanczos"`.
     /// One of: nearest, bilinear, bicubic, lanczos, lanczos2, lanczos4,
-    ///         box, hamming, mitchell, catmull_rom, gaussian, hann.
+    /// box, hamming, mitchell, catmull_rom, gaussian, hann.
     pub filter: Option<String>,
     /// Resize mode. Default `"fill"`.
     /// - `"fill"`       — stretch to exact size
     /// - `"fit"`        — fit inside box, pad edges with bgColor
-    /// - `"cover"`      — fill box, crop from centre
+    /// - `"cover"`      — fill box, crop from center
     /// - `"fit_width"`  — scale to width, height proportional
-    /// - `"fit_height"` — scale to height, width proportional
+    /// - `"fit_height"` - scale to height, width proportional
     pub mode: Option<String>,
     /// Pre-multiply alpha before resampling (LA/RGBA). Default `true`.
     pub premultiply_alpha: Option<bool>,
     /// Thread count. `0` = adaptive. Default `1`.
     pub workers: Option<u32>,
-    /// Background colour for `"fit"` padding as `[r, g, b, a]`. Default `[0,0,0,0]`.
+    /// Background color for `"fit"` padding as `[r, g, b, a]`. Default `[0,0,0,0]`.
     pub bg_color: Option<Vec<u8>>,
-    /// Copy ICC colour profile to output. Default `true`.
+    /// Copy ICC color profile to output. Default `true`.
     pub with_icc: Option<bool>,
     /// Copy EXIF block (orientation reset to 1). Default `true`.
     pub with_exif: Option<bool>,
@@ -80,8 +78,6 @@ pub struct EncodeOpts {
     /// JPEG quality 1–100. Ignored for lossless formats. Default `85`.
     pub quality: Option<u32>,
 }
-
-// ─── Image class ──────────────────────────────────────────────────────────────
 
 #[napi]
 pub struct Image {

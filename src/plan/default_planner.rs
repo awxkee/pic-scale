@@ -32,6 +32,7 @@ use crate::math::WeightsGenerator;
 use crate::plan::superresolution::plan_intermediate_sizes;
 use crate::plan::supersampling::{supersampling_intermediate_size, supersampling_prefilter};
 use crate::plan::{MultiStepResamplePlan, ResampleNearestPlan};
+use crate::support::check_image_size_overflow;
 use crate::{
     ImageSize, ImageStore, ImageStoreMut, PicScaleError, Resampling, ResamplingFunction, Scaler,
 };
@@ -126,6 +127,19 @@ impl DefaultPlanner {
             VerticalConvolutionPass<T, W, N> + HorizontalFilterPass<T, W, N>,
         for<'a> ImageStoreMut<'a, T, N>: CheckStoreDensity,
     {
+        if destination_size.width == 0 || destination_size.height == 0 {
+            return Err(PicScaleError::ZeroImageDimensions);
+        }
+        if check_image_size_overflow(
+            destination_size.width,
+            destination_size.height,
+            N,
+            size_of::<T>() as isize,
+        ) {
+            return Err(PicScaleError::Generic(
+                "Destination width or height overflows isize".to_string(),
+            ));
+        }
         if scaler.function == ResamplingFunction::Nearest {
             return Ok(Arc::new(ResampleNearestPlan {
                 source_size,

@@ -89,7 +89,7 @@ where
 
         let safe_4_chunks = (dst_height / 4) * 4;
 
-        let already_processed_y = safe_4_chunks * 4;
+        let already_processed_y = safe_4_chunks;
 
         if already_processed_y < dst_height {
             let left_src = if processed_4 {

@@ -1,6 +1,6 @@
 [package]
 name = "pic-scale-py"
-version = "0.7.8"
+version = "0.7.9"
 edition = "2024"
 description = "High performance image scaling"
 readme = "README.md"

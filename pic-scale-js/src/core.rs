@@ -27,43 +27,31 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::metadata::{Metadata, MetadataOptions, Orientation, apply_orientation, extract, inject};
+use crate::metadata::{Metadata, MetadataOptions, Orientation, extract, inject};
 use image::{DynamicImage, ImageFormat, ImageReader};
 
+use crate::jxl::{decode_jxl, encode_jxl, is_jxl};
+use crate::transpose::apply_orientation;
 use pic_scale::{
-    ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy,
-    WorkloadStrategy,
+    ImageSize, ImageStore, ImageStoreMut, PicScaleError, ResamplingFunction, Scaler,
+    ThreadingPolicy, WorkloadStrategy,
 };
 use std::io::Cursor;
-
-#[cfg(not(target_arch = "wasm32"))]
-fn to_u16<'a>(bytes: &'a [u8]) -> std::borrow::Cow<'a, [u16]> {
-    if bytes.len().is_multiple_of(2) && (bytes.as_ptr() as usize).is_multiple_of(align_of::<u16>())
-    {
-        return std::borrow::Cow::Borrowed(bytemuck::cast_slice(bytes));
-    }
-    bytes
-        .as_chunks::<2>()
-        .0
-        .iter()
-        .map(|b| u16::from_le_bytes([b[0], b[1]]))
-        .collect()
-}
 
 #[derive(Debug, thiserror::Error)]
 pub enum PicError {
     #[error("image error: {0}")]
     Image(#[from] image::ImageError),
     #[error("pic-scale error: {0:?}")]
-    Scale(pic_scale::PicScaleError),
+    Scale(PicScaleError),
     #[error("unsupported format: {0}")]
     Format(String),
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 }
 
-impl From<pic_scale::PicScaleError> for PicError {
-    fn from(e: pic_scale::PicScaleError) -> Self {
+impl From<PicScaleError> for PicError {
+    fn from(e: PicScaleError) -> Self {
         PicError::Scale(e)
     }
 }
@@ -110,6 +98,10 @@ pub fn is_heif_format(fmt: &str) -> bool {
         fmt.to_lowercase().as_str(),
         "heic" | "heif" | "avif" | "avifs"
     )
+}
+
+pub fn is_jxl_format(fmt: &str) -> bool {
+    matches!(fmt.to_lowercase().as_str(), "jxl" | "jpegxl")
 }
 
 pub fn parse_format(fmt: &str) -> Result<ImageFormat> {
@@ -272,366 +264,6 @@ pub(crate) fn encode_heif(
     Ok(buf)
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-fn expand_to_16bit(buffer: &mut [u16], is12_bit: bool) {
-    if is12_bit {
-        for px in buffer.iter_mut() {
-            *px = (*px << 4) | (*px >> 8);
-        }
-    } else {
-        for px in buffer.iter_mut() {
-            *px = (*px << 6) | (*px >> 4);
-        }
-    }
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-pub(crate) fn decode_heic(bytes: &[u8]) -> Result<DynamicImage> {
-    use libheif_rs::{Chroma, ColorSpace, HeifContext, LibHeif, MatrixCoefficients, RgbChroma};
-    use yuv::{
-        YuvPlanarImage, YuvPlanarImageWithAlpha, YuvRange, YuvStandardMatrix, i010_alpha_to_rgba10,
-        i010_to_rgb10, i012_alpha_to_rgba12, i012_to_rgb12, i210_alpha_to_rgba10, i210_to_rgb10,
-        i212_alpha_to_rgba12, i212_to_rgb12, i410_alpha_to_rgba10, i410_to_rgb10,
-        i412_alpha_to_rgba12, i412_to_rgb12, icgc010_alpha_to_rgba10, icgc010_to_rgb10,
-        icgc012_alpha_to_rgba12, icgc012_to_rgb12, icgc210_alpha_to_rgba10, icgc210_to_rgb10,
-        icgc212_alpha_to_rgba12, icgc212_to_rgb12, icgc410_alpha_to_rgba10, icgc410_to_rgb10,
-        icgc412_alpha_to_rgba12, icgc412_to_rgb12, ycgco420_alpha_to_rgba, ycgco420_to_rgb,
-        ycgco422_alpha_to_rgba, ycgco422_to_rgb, ycgco444_alpha_to_rgba, ycgco444_to_rgb,
-        yuv420_alpha_to_rgba, yuv420_to_rgb, yuv422_alpha_to_rgba, yuv422_to_rgb,
-        yuv444_alpha_to_rgba, yuv444_to_rgb,
-    };
-
-    let lib = LibHeif::new();
-    let ctx = HeifContext::read_from_bytes(bytes)
-        .map_err(|e| PicError::Format(format!("libheif: {e}")))?;
-    let handle = ctx
-        .primary_image_handle()
-        .map_err(|e| PicError::Format(format!("libheif handle: {e}")))?;
-
-    let has_alpha = handle.has_alpha_channel();
-    let w = handle.width();
-    let h = handle.height();
-
-    let mut matrix = YuvStandardMatrix::Bt601;
-    let mut range = YuvRange::Limited;
-    let mut is_ycgco = false;
-
-    if let Some(nclx) = handle.color_profile_nclx() {
-        matrix = match nclx.matrix_coefficients() {
-            MatrixCoefficients::ITU_R_BT_709_5 => YuvStandardMatrix::Bt709,
-            MatrixCoefficients::ITU_R_BT_2020_2_NonConstantLuminance => YuvStandardMatrix::Bt2020,
-            MatrixCoefficients::ITU_R_BT_2020_2_ConstantLuminance => YuvStandardMatrix::Bt2020,
-            MatrixCoefficients::YCgCo => {
-                is_ycgco = true;
-                YuvStandardMatrix::Bt601
-            }
-            _ => YuvStandardMatrix::Bt601,
-        };
-        range = if nclx.full_range_flag() == 1 {
-            YuvRange::Full
-        } else {
-            YuvRange::Limited
-        };
-    }
-
-    let rgb_stride = w * 3;
-    let rgba_stride = w * 4;
-    let bit_depth = handle.luma_bits_per_pixel() as u32;
-    let high_bit = bit_depth > 8;
-
-    for chroma in [Chroma::C420, Chroma::C422, Chroma::C444] {
-        let Ok(plane) = lib.decode(&handle, ColorSpace::YCbCr(chroma), None) else {
-            continue;
-        };
-        let planes = plane.planes();
-        let (Some(y_p), Some(cb_p), Some(cr_p)) = (planes.y, planes.cb, planes.cr) else {
-            continue;
-        };
-
-        // ── High bit-depth (10 / 12 bit) ─────────────────────────────────────
-        if high_bit {
-            let y16 = to_u16(y_p.data);
-            let cb16 = to_u16(cb_p.data);
-            let cr16 = to_u16(cr_p.data);
-            let ys = (y_p.stride / 2) as u32;
-            let us = (cb_p.stride / 2) as u32;
-            let vs = (cr_p.stride / 2) as u32;
-            let is_12 = bit_depth >= 12;
-
-            if is_ycgco {
-                if let Some(a_p) = planes.a {
-                    let a16 = to_u16(a_p.data);
-                    let yuva = YuvPlanarImageWithAlpha {
-                        y_plane: &y16,
-                        y_stride: ys,
-                        u_plane: &cb16,
-                        u_stride: us,
-                        v_plane: &cr16,
-                        v_stride: vs,
-                        a_plane: &a16,
-                        a_stride: (a_p.stride / 2) as u32,
-                        width: w,
-                        height: h,
-                    };
-                    let mut out = vec![0u16; (w * 4 * h) as usize];
-                    match (chroma, is_12) {
-                        (Chroma::C420, false) => {
-                            icgc010_alpha_to_rgba10(&yuva, &mut out, w * 4, range)
-                        }
-                        (Chroma::C422, false) => {
-                            icgc210_alpha_to_rgba10(&yuva, &mut out, w * 4, range)
-                        }
-                        (_, false) => icgc410_alpha_to_rgba10(&yuva, &mut out, w * 4, range),
-                        (Chroma::C420, true) => {
-                            icgc012_alpha_to_rgba12(&yuva, &mut out, w * 4, range)
-                        }
-                        (Chroma::C422, true) => {
-                            icgc212_alpha_to_rgba12(&yuva, &mut out, w * 4, range)
-                        }
-                        (_, true) => icgc412_alpha_to_rgba12(&yuva, &mut out, w * 4, range),
-                    }
-                    .map_err(|e| PicError::Format(format!("icgc→rgba16: {e}")))?;
-                    expand_to_16bit(&mut out, is_12);
-                    return Ok(DynamicImage::ImageRgba16(
-                        image::ImageBuffer::from_raw(w, h, out)
-                            .ok_or_else(|| PicError::Format("HEIC RGBA16 mismatch".into()))?,
-                    ));
-                }
-                let yuv = YuvPlanarImage {
-                    y_plane: &y16,
-                    y_stride: ys,
-                    u_plane: &cb16,
-                    u_stride: us,
-                    v_plane: &cr16,
-                    v_stride: vs,
-                    width: w,
-                    height: h,
-                };
-                let mut out = vec![0u16; (w * 3 * h) as usize];
-                match (chroma, is_12) {
-                    (Chroma::C420, false) => icgc010_to_rgb10(&yuv, &mut out, w * 3, range),
-                    (Chroma::C422, false) => icgc210_to_rgb10(&yuv, &mut out, w * 3, range),
-                    (_, false) => icgc410_to_rgb10(&yuv, &mut out, w * 3, range),
-                    (Chroma::C420, true) => icgc012_to_rgb12(&yuv, &mut out, w * 3, range),
-                    (Chroma::C422, true) => icgc212_to_rgb12(&yuv, &mut out, w * 3, range),
-                    (_, true) => icgc412_to_rgb12(&yuv, &mut out, w * 3, range),
-                }
-                .map_err(|e| PicError::Format(format!("icgc→rgb16: {e}")))?;
-                expand_to_16bit(&mut out, is_12);
-                return Ok(DynamicImage::ImageRgb16(
-                    image::ImageBuffer::from_raw(w, h, out)
-                        .ok_or_else(|| PicError::Format("HEIC RGB16 mismatch".into()))?,
-                ));
-            }
-
-            if let Some(a_p) = planes.a {
-                let a16 = to_u16(a_p.data);
-                let yuva = YuvPlanarImageWithAlpha {
-                    y_plane: &y16,
-                    y_stride: ys,
-                    u_plane: &cb16,
-                    u_stride: us,
-                    v_plane: &cr16,
-                    v_stride: vs,
-                    a_plane: &a16,
-                    a_stride: (a_p.stride / 2) as u32,
-                    width: w,
-                    height: h,
-                };
-                let mut out = vec![0u16; (w * 4 * h) as usize];
-                match (chroma, is_12) {
-                    (Chroma::C420, false) => {
-                        i010_alpha_to_rgba10(&yuva, &mut out, w * 4, range, matrix)
-                    }
-                    (Chroma::C422, false) => {
-                        i210_alpha_to_rgba10(&yuva, &mut out, w * 4, range, matrix)
-                    }
-                    (_, false) => i410_alpha_to_rgba10(&yuva, &mut out, w * 4, range, matrix),
-                    (Chroma::C420, true) => {
-                        i012_alpha_to_rgba12(&yuva, &mut out, w * 4, range, matrix)
-                    }
-                    (Chroma::C422, true) => {
-                        i212_alpha_to_rgba12(&yuva, &mut out, w * 4, range, matrix)
-                    }
-                    (_, true) => i412_alpha_to_rgba12(&yuva, &mut out, w * 4, range, matrix),
-                }
-                .map_err(|e| PicError::Format(format!("yuv→rgba16: {e}")))?;
-                expand_to_16bit(&mut out, is_12);
-                return Ok(DynamicImage::ImageRgba16(
-                    image::ImageBuffer::from_raw(w, h, out)
-                        .ok_or_else(|| PicError::Format("HEIC RGBA16 mismatch".into()))?,
-                ));
-            }
-
-            let yuv = YuvPlanarImage {
-                y_plane: &y16,
-                y_stride: ys,
-                u_plane: &cb16,
-                u_stride: us,
-                v_plane: &cr16,
-                v_stride: vs,
-                width: w,
-                height: h,
-            };
-            let mut out = vec![0u16; (w * 3 * h) as usize];
-            match (chroma, is_12) {
-                (Chroma::C420, false) => i010_to_rgb10(&yuv, &mut out, w * 3, range, matrix),
-                (Chroma::C422, false) => i210_to_rgb10(&yuv, &mut out, w * 3, range, matrix),
-                (_, false) => i410_to_rgb10(&yuv, &mut out, w * 3, range, matrix),
-                (Chroma::C420, true) => i012_to_rgb12(&yuv, &mut out, w * 3, range, matrix),
-                (Chroma::C422, true) => i212_to_rgb12(&yuv, &mut out, w * 3, range, matrix),
-                (_, true) => i412_to_rgb12(&yuv, &mut out, w * 3, range, matrix),
-            }
-            .map_err(|e| PicError::Format(format!("yuv→rgb16: {e}")))?;
-            expand_to_16bit(&mut out, is_12);
-            return Ok(DynamicImage::ImageRgb16(
-                image::ImageBuffer::from_raw(w, h, out)
-                    .ok_or_else(|| PicError::Format("HEIC RGB16 mismatch".into()))?,
-            ));
-        }
-
-        // ── 8-bit path ───────────────────────────────────────────────────────
-        return if is_ycgco {
-            if has_alpha && let Some(a_p) = planes.a {
-                let yuv = YuvPlanarImageWithAlpha {
-                    y_plane: y_p.data,
-                    y_stride: y_p.stride as u32,
-                    u_plane: cb_p.data,
-                    u_stride: cb_p.stride as u32,
-                    v_plane: cr_p.data,
-                    v_stride: cr_p.stride as u32,
-                    a_plane: a_p.data,
-                    a_stride: a_p.stride as u32,
-                    width: w,
-                    height: h,
-                };
-                let mut rgba = vec![0u8; (rgba_stride * h) as usize];
-                match chroma {
-                    Chroma::C420 => ycgco420_alpha_to_rgba(&yuv, &mut rgba, rgba_stride, range),
-                    Chroma::C422 => ycgco422_alpha_to_rgba(&yuv, &mut rgba, rgba_stride, range),
-                    _ => ycgco444_alpha_to_rgba(&yuv, &mut rgba, rgba_stride, range),
-                }
-                .map_err(|e| PicError::Format(format!("ycgco→rgba: {e}")))?;
-                Ok(DynamicImage::ImageRgba8(
-                    image::RgbaImage::from_raw(w, h, rgba)
-                        .ok_or_else(|| PicError::Format("HEIC RGBA mismatch".into()))?,
-                ))
-            } else {
-                let yuv = YuvPlanarImage {
-                    y_plane: y_p.data,
-                    y_stride: y_p.stride as u32,
-                    u_plane: cb_p.data,
-                    u_stride: cb_p.stride as u32,
-                    v_plane: cr_p.data,
-                    v_stride: cr_p.stride as u32,
-                    width: w,
-                    height: h,
-                };
-                let mut rgb = vec![0u8; (rgb_stride * h) as usize];
-                match chroma {
-                    Chroma::C420 => ycgco420_to_rgb(&yuv, &mut rgb, rgb_stride, range),
-                    Chroma::C422 => ycgco422_to_rgb(&yuv, &mut rgb, rgb_stride, range),
-                    _ => ycgco444_to_rgb(&yuv, &mut rgb, rgb_stride, range),
-                }
-                .map_err(|e| PicError::Format(format!("ycgco→rgb: {e}")))?;
-                Ok(DynamicImage::ImageRgb8(
-                    image::RgbImage::from_raw(w, h, rgb)
-                        .ok_or_else(|| PicError::Format("HEIC RGB mismatch".into()))?,
-                ))
-            }
-        } else if has_alpha && let Some(a_p) = planes.a {
-            let yuv = YuvPlanarImageWithAlpha {
-                y_plane: y_p.data,
-                y_stride: y_p.stride as u32,
-                u_plane: cb_p.data,
-                u_stride: cb_p.stride as u32,
-                v_plane: cr_p.data,
-                v_stride: cr_p.stride as u32,
-                a_plane: a_p.data,
-                a_stride: a_p.stride as u32,
-                width: w,
-                height: h,
-            };
-            let mut rgba = vec![0u8; (rgba_stride * h) as usize];
-            match chroma {
-                Chroma::C420 => {
-                    yuv420_alpha_to_rgba(&yuv, &mut rgba, rgba_stride, range, matrix, false)
-                }
-                Chroma::C422 => {
-                    yuv422_alpha_to_rgba(&yuv, &mut rgba, rgba_stride, range, matrix, false)
-                }
-                _ => yuv444_alpha_to_rgba(&yuv, &mut rgba, rgba_stride, range, matrix, false),
-            }
-            .map_err(|e| PicError::Format(format!("yuv→rgba: {e}")))?;
-            Ok(DynamicImage::ImageRgba8(
-                image::RgbaImage::from_raw(w, h, rgba)
-                    .ok_or_else(|| PicError::Format("HEIC RGBA mismatch".into()))?,
-            ))
-        } else {
-            let yuv = YuvPlanarImage {
-                y_plane: y_p.data,
-                y_stride: y_p.stride as u32,
-                u_plane: cb_p.data,
-                u_stride: cb_p.stride as u32,
-                v_plane: cr_p.data,
-                v_stride: cr_p.stride as u32,
-                width: w,
-                height: h,
-            };
-            let mut rgb = vec![0u8; (rgb_stride * h) as usize];
-            match chroma {
-                Chroma::C420 => yuv420_to_rgb(&yuv, &mut rgb, rgb_stride, range, matrix),
-                Chroma::C422 => yuv422_to_rgb(&yuv, &mut rgb, rgb_stride, range, matrix),
-                _ => yuv444_to_rgb(&yuv, &mut rgb, rgb_stride, range, matrix),
-            }
-            .map_err(|e| PicError::Format(format!("yuv→rgb: {e}")))?;
-            Ok(DynamicImage::ImageRgb8(
-                image::RgbImage::from_raw(w, h, rgb)
-                    .ok_or_else(|| PicError::Format("HEIC RGB mismatch".into()))?,
-            ))
-        };
-    }
-
-    // ── Fallback: let libheif do YUV→RGB ─────────────────────────────────────
-    let chroma = if has_alpha {
-        RgbChroma::Rgba
-    } else {
-        RgbChroma::Rgb
-    };
-    let plane = lib
-        .decode(&handle, ColorSpace::Rgb(chroma), None)
-        .map_err(|e| PicError::Format(format!("libheif RGB fallback: {e}")))?;
-    let il = plane
-        .planes()
-        .interleaved
-        .ok_or_else(|| PicError::Format("libheif: no interleaved plane".into()))?;
-
-    let channels = if has_alpha { 4usize } else { 3 };
-    let packed = if il.stride == w as usize * channels {
-        il.data.to_vec()
-    } else {
-        let mut out = Vec::with_capacity(w as usize * h as usize * channels);
-        for row in 0..h as usize {
-            out.extend_from_slice(
-                &il.data[row * il.stride..row * il.stride + w as usize * channels],
-            );
-        }
-        out
-    };
-
-    Ok(if has_alpha {
-        DynamicImage::ImageRgba8(
-            image::RgbaImage::from_raw(w, h, packed)
-                .ok_or_else(|| PicError::Format("HEIC RGBA mismatch".into()))?,
-        )
-    } else {
-        DynamicImage::ImageRgb8(
-            image::RgbImage::from_raw(w, h, packed)
-                .ok_or_else(|| PicError::Format("HEIC RGB mismatch".into()))?,
-        )
-    })
-}
-
 /// Decoded image held in memory. Wraps a `DynamicImage` and exposes
 /// decode / resize / encode operations that work on both NAPI and WASM targets.
 pub struct CoreImage {
@@ -643,8 +275,6 @@ unsafe impl Send for CoreImage {}
 unsafe impl Sync for CoreImage {}
 
 impl CoreImage {
-    // ── decode ────────────────────────────────────────────────────────────────
-
     /// Decode an image from raw bytes (any supported format).
     ///
     /// On native targets, HEIC/HEIF is handled by `libheif-rs` which registers
@@ -658,7 +288,15 @@ impl CoreImage {
         // The image crate has no native HEIC support so we bypass ImageReader.
         #[cfg(not(target_arch = "wasm32"))]
         if is_heic(bytes) {
+            use crate::heif::decode_heic;
             let img = decode_heic(bytes)?;
+            return Ok(CoreImage {
+                inner: img,
+                metadata: Some(meta),
+            });
+        }
+        if is_jxl(bytes) {
+            let img = decode_jxl(bytes)?;
             return Ok(CoreImage {
                 inner: img,
                 metadata: Some(meta),
@@ -690,8 +328,6 @@ impl CoreImage {
         self.inner.color().channel_count()
     }
 
-    // ── resize ────────────────────────────────────────────────────────────────
-
     /// Resize to `(dst_w, dst_h)` using the named filter.
     /// `premultiply_alpha` only affects images with an alpha channel.
     pub fn resize(
@@ -702,21 +338,35 @@ impl CoreImage {
         premultiply_alpha: bool,
         workers: usize,
     ) -> Result<CoreImage> {
+        if dst_w == 0 || dst_w == 0 {
+            return Err(PicError::Scale(PicScaleError::Generic(
+                "Dst width and height cannot be 0".to_string(),
+            )));
+        }
+        let area_ok = isize::try_from(dst_w)
+            .ok()
+            .zip(isize::try_from(dst_h).ok())
+            .and_then(|(w, h)| w.checked_mul(h))
+            .is_some();
+        if !area_ok {
+            return Err(PicError::Scale(PicScaleError::Generic(
+                "Dst width or height overflows isize".to_string(),
+            )));
+        }
         let func = parse_filter(filter)?;
         let threading = match workers {
             0 => ThreadingPolicy::Adaptive,
             1 => ThreadingPolicy::Single,
             n => ThreadingPolicy::Fixed(n),
         };
-        let mut scaler = Scaler::new(func);
-        scaler.set_threading_policy(threading);
-        scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
+        let scaler = Scaler::new(func)
+            .set_threading_policy(threading)
+            .set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
         let src_size = ImageSize::new(self.width() as usize, self.height() as usize);
         let dst_size = ImageSize::new(dst_w as usize, dst_h as usize);
 
         let resized = match &self.inner {
-            // ── u8 variants ─────────────────────────────────────────────────
             DynamicImage::ImageLuma8(img) => {
                 let store = ImageStore::<u8, 1>::from_slice(
                     img.as_raw(),
@@ -930,7 +580,15 @@ impl CoreImage {
             ));
         }
 
-        // ── All other formats via the image crate ────────────────────────────
+        if is_jxl_format(&fmt_lower) {
+            let icc = if meta_opts.icc {
+                src_meta.and_then(|m| m.icc.as_deref())
+            } else {
+                None
+            };
+            return encode_jxl(&self.inner, opts.quality, icc);
+        }
+
         let fmt = parse_format(&opts.format)?;
         let mut buf = Vec::new();
         let mut cursor = Cursor::new(&mut buf);
@@ -959,6 +617,21 @@ impl CoreImage {
         workers: usize,
         meta_opts: &MetadataOptions,
     ) -> Result<(CoreImage, Option<Metadata>)> {
+        if dst_w == 0 || dst_w == 0 {
+            return Err(PicError::Scale(PicScaleError::Generic(
+                "Dst width and height cannot be 0".to_string(),
+            )));
+        }
+        let area_ok = isize::try_from(dst_w)
+            .ok()
+            .zip(isize::try_from(dst_h).ok())
+            .and_then(|(w, h)| w.checked_mul(h))
+            .is_some();
+        if !area_ok {
+            return Err(PicError::Scale(PicScaleError::Generic(
+                "Dst width or height overflows isize".to_string(),
+            )));
+        }
         let orientation = self
             .metadata
             .as_ref()
@@ -1005,8 +678,6 @@ impl CoreImage {
         Ok(())
     }
 }
-
-// ─── resize modes ─────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ResizeMode {

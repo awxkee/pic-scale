@@ -33,34 +33,32 @@ const require = createRequire(import.meta.url)
 
 const {Image} = require('./pic_scale.node')
 
-const img = await Image.open('../assets/1.avif')
+const img = await Image.open('../assets/digital_art_portrait2_gray.png')
 console.log(`Loaded: ${img.width}x${img.height}, ${img.channels}ch`)
 
 // ── resize — cover mode, lanczos, auto-orient + keep ICC/EXIF ────────────────
-const small = await img.resize(640, 540, {
+const small = await img.resize(img.width / 2, img.height / 2, {
     filter: 'lanczos',
     mode: 'cover',       // crop from centre to fill 320×240
-    autoOrient: true,          // default — bake EXIF rotation into pixels
-    withIcc: true,          // default — copy ICC profile to output
-    withExif: true,          // default — copy EXIF (orientation reset to 1)
-    withXmp: false,         // default — skip XMP
+    autoOrient: true,    // default — bake EXIF rotation into pixels
+    withIcc: true,       // default — copy ICC profile to output
+    withExif: true,      // default — copy EXIF (orientation reset to 1)
+    withXmp: false,      // default — skip XMP
 })
 console.log(`Resized: ${small.width}x${small.height}`)
 
-// ── save to JPEG ─────────────────────────────────────────────────────────────
-await small.save('out.jpg', {quality: 85})
+await small.save('out.avif', {quality: 85})
 console.log('Saved out.jpg')
 
-// ── encode to Buffer in memory ───────────────────────────────────────────────
 const webpBuf = await small.toBuffer('webp', {quality: 80})
 console.log(`WebP buffer: ${webpBuf.length} bytes`)
 
 // ── fit mode — letterbox with black padding ───────────────────────────────────
-const fitted = await img.resize(640, 480, {
+const fitted = await img.resize(img.width * 1.5, img.height * 1.5, {
     mode: 'fit',
     bgColor: [0, 0, 0, 255],   // black bars
 })
-await fitted.save('out_fit.jpg', {quality: 85})
+await fitted.save('out_fit.jxl', {quality: 35})
 console.log(`Saved out_fit.jpg (${fitted.width}x${fitted.height})`)
 
 // ── sync variants ─────────────────────────────────────────────────────────────
