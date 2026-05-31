@@ -61,7 +61,7 @@ impl HorizontalFilterPass<f32, f32, 2> for ImageStore<'_, f32, 2> {
             filter_weights,
             filter_4_rows: _dispatcher_4_rows,
             filter_row: _dispatcher_row,
-            threading_policy,
+            _threading_policy: threading_policy,
         })
     }
 }
@@ -81,7 +81,7 @@ impl HorizontalFilterPass<f32, f64, 2> for ImageStore<'_, f32, 2> {
             filter_weights,
             filter_4_rows: _dispatcher_4_rows,
             filter_row: _dispatcher_row,
-            threading_policy,
+            _threading_policy: threading_policy,
         })
     }
 }

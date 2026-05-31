@@ -90,7 +90,7 @@ impl HorizontalFilterPass<u8, f32, 1> for ImageStore<'_, u8, 1> {
             filter_weights: i_weights,
             filter_4_rows: _dispatcher_4_rows,
             filter_row: _dispatcher_1_row,
-            threading_policy,
+            _threading_policy: threading_policy,
         })
     }
 }

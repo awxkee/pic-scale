@@ -28,7 +28,8 @@
  */
 use crate::convolution::RowFilter;
 use crate::filter_weights::FilterWeights;
-use crate::{ImageSize, ImageStore, ImageStoreMut, ThreadingPolicy};
+use crate::{ImageStore, ImageStoreMut, ThreadingPolicy};
+#[cfg(feature = "threading")]
 use novtb::{ParallelZonedIterator, TbSliceMut};
 
 pub(crate) struct HorizontalFiltering<T, F, const N: usize> {
@@ -45,7 +46,7 @@ pub(crate) struct HorizontalFiltering<T, F, const N: usize> {
     pub(crate) filter_row:
         fn(src: &[T], dst: &mut [T], filter_weights: &FilterWeights<F>, bit_depth: u32),
     pub(crate) filter_weights: FilterWeights<F>,
-    pub(crate) threading_policy: ThreadingPolicy,
+    pub(crate) _threading_policy: ThreadingPolicy,
 }
 
 impl<T: Send + Sync, F: Send + Sync, const N: usize> RowFilter<T, N>
@@ -54,8 +55,11 @@ where
     [T]: ToOwned<Owned = Vec<T>>,
 {
     fn filter(&self, source: &ImageStore<'_, T, N>, destination: &mut ImageStoreMut<T, N>) {
+        #[cfg(feature = "threading")]
+        use crate::ImageSize;
+        #[cfg(feature = "threading")]
         let pool = self
-            .threading_policy
+            ._threading_policy
             .get_nova_pool(ImageSize::new(destination.width, destination.height));
 
         let src_stride = source.stride();
@@ -70,11 +74,27 @@ where
         let src = source.projected();
 
         if let Some(dispatcher) = self.filter_4_rows {
+            #[cfg(feature = "threading")]
             dst_buffer
                 .tb_par_chunks_mut(dst_stride * 4)
                 .take(dst_height / 4)
                 .zip(src.chunks(src_stride * 4).take(dst_height / 4))
                 .for_each(&pool, |(dst, src)| {
+                    dispatcher(
+                        src,
+                        src_stride,
+                        dst,
+                        dst_stride,
+                        &self.filter_weights,
+                        dst_bit_depth,
+                    );
+                });
+            #[cfg(not(feature = "threading"))]
+            dst_buffer
+                .chunks_mut(dst_stride * 4)
+                .take(dst_height / 4)
+                .zip(src.chunks(src_stride * 4).take(dst_height / 4))
+                .for_each(|(dst, src)| {
                     dispatcher(
                         src,
                         src_stride,
@@ -108,10 +128,23 @@ where
 
             let one_row_filter = self.filter_row;
 
+            #[cfg(feature = "threading")]
             left_dst
                 .tb_par_chunks_mut(dst_stride)
                 .zip(left_src.chunks(src_stride))
                 .for_each(&pool, |(dst, src)| {
+                    one_row_filter(
+                        src,
+                        &mut dst[..dst_width * N],
+                        &self.filter_weights,
+                        dst_bit_depth,
+                    );
+                });
+            #[cfg(not(feature = "threading"))]
+            left_dst
+                .chunks_mut(dst_stride)
+                .zip(left_src.chunks(src_stride))
+                .for_each(|(dst, src)| {
                     one_row_filter(
                         src,
                         &mut dst[..dst_width * N],

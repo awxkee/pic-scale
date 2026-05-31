@@ -48,7 +48,7 @@ impl HorizontalFilterPass<i16, f32, 1> for ImageStore<'_, i16, 1> {
                 filter_weights,
                 filter_4_rows: Some(convolve_row_handler_floating_point_4::<i16, f32, f32, 1>),
                 filter_row: convolve_row_handler_floating_point::<i16, f32, f32, 1>,
-                threading_policy,
+                _threading_policy: threading_policy,
             });
         }
         let weights_q0_15 = DefaultWeightsConverter::default().prepare_weights(&filter_weights);
@@ -66,7 +66,7 @@ impl HorizontalFilterPass<i16, f32, 1> for ImageStore<'_, i16, 1> {
                         filter_weights: approx_num_q031,
                         filter_4_rows: Some(convolve_horizontal_plane_neon_rows_4_hb_s16),
                         filter_row: convolve_horizontal_plane_neon_s16_hb_row,
-                        threading_policy,
+                        _threading_policy: threading_policy,
                     });
                 }
             }
@@ -78,7 +78,7 @@ impl HorizontalFilterPass<i16, f32, 1> for ImageStore<'_, i16, 1> {
                 filter_weights: weights_q0_15,
                 filter_4_rows: Some(convolve_horizontal_plane_neon_rows_4_lb_i16),
                 filter_row: convolve_horizontal_plane_neon_i16_lb_row,
-                threading_policy,
+                _threading_policy: threading_policy,
             })
         }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
@@ -93,7 +93,7 @@ impl HorizontalFilterPass<i16, f32, 1> for ImageStore<'_, i16, 1> {
                     filter_weights: weights_q0_15,
                     filter_4_rows: Some(convolve_horizontal_plane_avx_rows_4_i16),
                     filter_row: convolve_horizontal_plane_avx_i16lp_row,
-                    threading_policy,
+                    _threading_policy: threading_policy,
                 });
             }
         }
@@ -107,7 +107,7 @@ impl HorizontalFilterPass<i16, f32, 1> for ImageStore<'_, i16, 1> {
                 filter_weights: weights_q0_15,
                 filter_4_rows: Some(convolve_row_handler_fixed_point_4::<i16, i32, 1>),
                 filter_row: convolve_row_handler_fixed_point::<i16, i32, 1>,
-                threading_policy,
+                _threading_policy: threading_policy,
             })
         }
     }

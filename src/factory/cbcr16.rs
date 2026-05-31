@@ -54,7 +54,7 @@ impl HorizontalFilterPass<u16, f32, 2> for ImageStore<'_, u16, 2> {
                     filter_weights: approx,
                     filter_4_rows: Some(convolve_horizontal_gray_alpha_neon_rows_4_lb_u16),
                     filter_row: convolve_horizontal_gray_alpha_neon_u16_lb_row,
-                    threading_policy,
+                    _threading_policy: threading_policy,
                 });
             }
             #[cfg(not(all(target_arch = "aarch64", feature = "neon")))]
@@ -66,7 +66,7 @@ impl HorizontalFilterPass<u16, f32, 2> for ImageStore<'_, u16, 2> {
                     filter_weights: approx,
                     filter_4_rows: Some(convolve_row_handler_fixed_point_4::<u16, i32, 2>),
                     filter_row: convolve_row_handler_fixed_point::<u16, i32, 2>,
-                    threading_policy,
+                    _threading_policy: threading_policy,
                 });
             }
         }
@@ -80,7 +80,7 @@ impl HorizontalFilterPass<u16, f32, 2> for ImageStore<'_, u16, 2> {
                 filter_weights,
                 filter_4_rows: Some(convolve_horizontal_cbcr_neon_rows_4_f32_u16),
                 filter_row: convolve_horizontal_cbcr_neon_f32_u16_row,
-                threading_policy,
+                _threading_policy: threading_policy,
             })
         }
         #[cfg(not(all(target_arch = "aarch64", feature = "neon")))]
@@ -92,7 +92,7 @@ impl HorizontalFilterPass<u16, f32, 2> for ImageStore<'_, u16, 2> {
                 filter_weights,
                 filter_4_rows: Some(convolve_row_handler_floating_point_4::<u16, f32, f32, 2>),
                 filter_row: convolve_row_handler_floating_point::<u16, f32, f32, 2>,
-                threading_policy,
+                _threading_policy: threading_policy,
             })
         }
     }

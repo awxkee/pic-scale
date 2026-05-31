@@ -29,6 +29,7 @@
 use crate::convolution::ColumnFilter;
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::{ImageSize, ImageStore, ImageStoreMut, ThreadingPolicy};
+#[cfg(feature = "threading")]
 use novtb::{ParallelZonedIterator, TbSliceMut};
 
 pub(crate) struct VerticalFiltering<T, F, const N: usize> {
@@ -43,7 +44,7 @@ where
     [T]: ToOwned<Owned = Vec<T>>,
 {
     fn filter(&self, source: &ImageStore<'_, T, N>, destination: &mut ImageStoreMut<T, N>) {
-        let pool = self
+        let _pool = self
             .threading_policy
             .get_nova_pool(ImageSize::new(destination.width, destination.height));
         let src_stride = source.stride();
@@ -58,9 +59,10 @@ where
 
         let source_buffer = source.projected();
 
+        #[cfg(feature = "threading")]
         dst_buffer
             .tb_par_chunks_mut(dst_stride)
-            .for_each_enumerated(&pool, |y, row| {
+            .for_each_enumerated(&_pool, |y, row| {
                 if row.is_empty() {
                     return;
                 }
@@ -77,6 +79,29 @@ where
                     dst_bit_depth,
                 );
             });
+        #[cfg(not(feature = "threading"))]
+        {
+            dst_buffer
+                .chunks_mut(dst_stride)
+                .enumerate()
+                .for_each(|(y, row)| {
+                    if row.is_empty() {
+                        return;
+                    }
+                    let bounds = self.filter_weights.bounds[y];
+                    let filter_offset = y * self.filter_weights.aligned_size;
+                    let weights = &self.filter_weights.weights[filter_offset..];
+                    row_filter(
+                        dst_width,
+                        &bounds,
+                        source_buffer,
+                        &mut row[..dst_width * N],
+                        src_stride,
+                        weights,
+                        dst_bit_depth,
+                    );
+                });
+        }
     }
 
     fn run_on_row(

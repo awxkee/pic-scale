@@ -33,6 +33,7 @@ jobs:
       - run: RUSTFLAGS="-C target-feature=+avx2,+f16c" cargo +nightly build --features nightly_f16 --target x86_64-unknown-linux-gnu
       - run: RUSTFLAGS="-C target-feature=+avx2" cargo build --target x86_64-unknown-linux-gnu
       - run: RUSTFLAGS="-C target-feature=+simd128" cargo build --target wasm32-unknown-unknown
+      - run: RUSTFLAGS="-C target-feature=+avx2" cargo build --target x86_64-unknown-linux-gnu --no-default-features
 
   clippy:
     name: Clippy
@@ -45,6 +46,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: rustup component add clippy
       - run: cargo clippy -- -D warnings
+      - run: cargo clippy --no-default-features -- -D warnings
 
   clippy_nightly:
     name: Clippy Nightly
@@ -300,7 +302,7 @@ jobs:
       - run: cargo fuzz run resize_rgb_f32 --features "${{ matrix.feature }}" -- -max_total_time=10
       - run: cargo fuzz run resize_cbcr_f32 --features "${{ matrix.feature }}" -- -max_total_time=10
       - run: cargo fuzz run resize_plane_f32 --features "${{ matrix.feature }}" -- -max_total_time=10
-        
+
   python_bindings:
     name: Python bindings
     runs-on: ubuntu-latest

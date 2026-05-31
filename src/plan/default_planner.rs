@@ -144,7 +144,7 @@ impl DefaultPlanner {
             return Ok(Arc::new(ResampleNearestPlan {
                 source_size,
                 target_size: destination_size,
-                threading_policy: scaler.threading_policy,
+                _threading_policy: scaler.threading_policy,
                 _phantom_data: PhantomData,
             }));
         }

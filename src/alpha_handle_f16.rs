@@ -35,7 +35,9 @@ use crate::neon::{neon_premultiply_alpha_rgba_f16, neon_unpremultiply_alpha_rgba
 use crate::neon::{neon_premultiply_alpha_rgba_f16_full, neon_unpremultiply_alpha_rgba_f16_full};
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::{sse_premultiply_alpha_rgba_f16, sse_unpremultiply_alpha_rgba_f16};
+use crate::threading_policy::ScalingPool;
 use core::f16;
+#[cfg(feature = "threading")]
 use novtb::{ParallelZonedIterator, TbSliceMut};
 
 #[inline]
@@ -90,7 +92,7 @@ pub(crate) fn premultiply_alpha_rgba_f16(
     src_stride: usize,
     width: usize,
     _: usize,
-    pool: &novtb::ThreadPool,
+    _pool: &ScalingPool,
 ) {
     #[allow(clippy::type_complexity)]
     let mut _dispatcher: fn(&mut [f16], &[f16]) = premultiply_pixel_f16_row;
@@ -115,9 +117,16 @@ pub(crate) fn premultiply_alpha_rgba_f16(
             _dispatcher = avx_premultiply_alpha_rgba_f16;
         }
     }
+    #[cfg(feature = "threading")]
     dst.tb_par_chunks_mut(dst_stride)
         .zip(src.chunks(src_stride))
-        .for_each(pool, |(dst, src)| {
+        .for_each(_pool, |(dst, src)| {
+            _dispatcher(&mut dst[..width * 4], &src[..width * 4]);
+        });
+    #[cfg(not(feature = "threading"))]
+    dst.chunks_mut(dst_stride)
+        .zip(src.chunks(src_stride))
+        .for_each(|(dst, src)| {
             _dispatcher(&mut dst[..width * 4], &src[..width * 4]);
         });
 }
@@ -127,7 +136,7 @@ pub(crate) fn unpremultiply_alpha_rgba_f16(
     stride: usize,
     width: usize,
     _: usize,
-    pool: &novtb::ThreadPool,
+    _pool: &ScalingPool,
 ) {
     let mut _dispatcher: fn(&mut [f16]) = unpremultiply_pixel_f16_row;
     #[cfg(all(target_arch = "aarch64", feature = "neon"))]
@@ -151,7 +160,12 @@ pub(crate) fn unpremultiply_alpha_rgba_f16(
             _dispatcher = avx_unpremultiply_alpha_rgba_f16;
         }
     }
-    in_place.tb_par_chunks_mut(stride).for_each(pool, |row| {
+    #[cfg(feature = "threading")]
+    in_place.tb_par_chunks_mut(stride).for_each(_pool, |row| {
+        _dispatcher(&mut row[..width * 4]);
+    });
+    #[cfg(not(feature = "threading"))]
+    in_place.chunks_mut(stride).for_each(|row| {
         _dispatcher(&mut row[..width * 4]);
     });
 }
