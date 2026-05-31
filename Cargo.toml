@@ -1,8 +1,10 @@
-workspace = { members = ["app", "wasm", "app/accelerate", "speedtest"], exclude = ["picscale", "fuzz", "pic-scale-py", "pic-scale-js"] }
+[workspace]
+members = ["app", "wasm", "app/accelerate", "speedtest", "pic-scale-js"]
+exclude = ["picscale", "fuzz", "pic-scale-py"]
 
 [package]
 name = "pic-scale"
-version = "0.7.8"
+version = "0.7.9"
 edition = "2024"
 description = "High performance image scaling"
 readme = "README.md"

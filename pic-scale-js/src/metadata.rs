@@ -31,8 +31,6 @@ use crate::core::PicError;
 use img_parts::{ImageICC, jpeg::Jpeg, png::Png, webp::WebP};
 use std::io::Cursor;
 
-// ─── orientation ─────────────────────────────────────────────────────────────
-
 /// EXIF orientation value (1–8).  Maps to the operations needed to make the
 /// image "upright" — i.e. what must be done to the pixels before resizing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -92,38 +90,10 @@ pub fn read_orientation(bytes: &[u8]) -> Orientation {
         .unwrap_or_default()
 }
 
-/// Apply EXIF orientation to a `DynamicImage`, consuming it and returning
-/// the corrected image.  After this the orientation is baked into pixels,
-/// so the EXIF tag should be reset to 1 on output.
-pub fn apply_orientation(
-    img: image::DynamicImage,
-    orientation: Orientation,
-) -> image::DynamicImage {
-    use image::imageops;
-    match orientation {
-        Orientation::Normal => img,
-        Orientation::FlipH => img.fliph(),
-        Orientation::Rotate180 => img.rotate180(),
-        Orientation::FlipV => img.flipv(),
-        Orientation::Transpose => {
-            // transpose = rotate90 + fliph
-            image::DynamicImage::ImageRgba8(imageops::flip_horizontal(&img.rotate90()))
-        }
-        Orientation::Rotate90 => img.rotate90(),
-        Orientation::Transverse => {
-            // transverse = rotate270 + fliph
-            image::DynamicImage::ImageRgba8(imageops::flip_horizontal(&img.rotate270()))
-        }
-        Orientation::Rotate270 => img.rotate270(),
-    }
-}
-
-// ─── metadata options ─────────────────────────────────────────────────────────
-
 /// Which metadata to carry from source to destination.
 #[derive(Debug, Clone, Default)]
 pub struct MetadataOptions {
-    /// Copy ICC colour profile.  Default `true`.
+    /// Copy ICC color profile. Default `true`.
     pub icc: bool,
     /// Copy EXIF block (excluding orientation tag which is reset to 1).
     pub exif: bool,
@@ -151,8 +121,6 @@ impl MetadataOptions {
         MetadataOptions::default()
     }
 }
-
-// ─── metadata extraction ──────────────────────────────────────────────────────
 
 /// Raw metadata blobs extracted from a source image.
 #[derive(Debug, Default, Clone)]
@@ -220,8 +188,6 @@ fn extract_webp(bytes: &[u8], meta: &mut Metadata) {
         meta.icc = webp.icc_profile().map(|b| b.to_vec());
     }
 }
-
-// ─── metadata injection ───────────────────────────────────────────────────────
 
 /// Inject metadata blobs into encoded destination bytes.
 ///

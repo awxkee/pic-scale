@@ -1,6 +1,6 @@
-# @radzivon-bartoshyk/pic-scale
+# @radzivon.bartoshyk/pic-scale
 
-[![npm](https://img.shields.io/npm/v/@radzivon-bartoshyk/pic-scale)](https://www.npmjs.com/package/@radzivon-bartoshyk/pic-scale)
+[![npm](https://img.shields.io/npm/v/@radzivon.bartoshyk/pic-scale)](https://www.npmjs.com/package/@radzivon.bartoshyk/pic-scale)
 
 High-performance image resizing for Node.js and the browser, powered by the
 [pic-scale](https://github.com/awxkee/pic-scale) Rust engine with SIMD
@@ -8,15 +8,15 @@ acceleration (AVX2+FMA on x86-64, NEON on AArch64).
 
 Two delivery modes, one package:
 
-| Mode | Import | When to use |
-|---|---|---|
-| **Native addon** | `require('@radzivon-bartoshyk/pic-scale')` | Node.js — fastest, file I/O |
-| **WASM** | `import ... from '.../pic-scale/wasm'` | Browser, Deno, edge runtimes |
+| Mode             | Import                                     | When to use                  |
+|------------------|--------------------------------------------|------------------------------|
+| **Native addon** | `require('@radzivon.bartoshyk/pic-scale')` | Node.js — fastest, file I/O  |
+| **WASM**         | `import ... from '.../pic-scale/wasm'`     | Browser, Deno, edge runtimes |
 
 ## Installation
 
 ```bash
-npm install @radzivon-bartoshyk/pic-scale
+npm install @radzivon.bartoshyk/pic-scale
 ```
 
 ---
@@ -27,7 +27,7 @@ All heavy operations (`resize`, `toBuffer`, `save`) run on Tokio's thread pool
 and return Promises, so the event loop is never blocked.
 
 ```js
-import { Image } from '@radzivon-bartoshyk/pic-scale'
+import { Image } from '@radzivon.bartoshyk/pic-scale'
 
 // Open from file — metadata (ICC, EXIF orientation) extracted automatically
 const img = await Image.open('photo.jpg')
@@ -57,30 +57,30 @@ const png    = small2.toBufferSync('png')
 
 ### Resize modes
 
-| Mode | Description |
-|---|---|
-| `"fill"` | Stretch to exact `(width, height)` — ignores aspect ratio (default) |
-| `"cover"` | Scale to fill the box, crop excess from the centre |
-| `"fit"` | Scale to fit inside the box, pad edges with `bgColor` |
-| `"fit_width"` | Scale to match width, height adjusts proportionally |
-| `"fit_height"` | Scale to match height, width adjusts proportionally |
+| Mode           | Description                                                         |
+|----------------|---------------------------------------------------------------------|
+| `"fill"`       | Stretch to exact `(width, height)` — ignores aspect ratio (default) |
+| `"cover"`      | Scale to fill the box, crop excess from the centre                  |
+| `"fit"`        | Scale to fit inside the box, pad edges with `bgColor`               |
+| `"fit_width"`  | Scale to match width, height adjusts proportionally                 |
+| `"fit_height"` | Scale to match height, width adjusts proportionally                 |
 
 ### Resampling filters
 
-| Filter | Notes |
-|---|---|
-| `nearest` | Fastest, blocky |
-| `bilinear` | Fast, smooth |
-| `bicubic` | Keys cubic |
-| `lanczos` | Window-3 sinc — best general quality (default) |
-| `lanczos2` | Faster, slightly softer |
-| `lanczos4` | Slower, very sharp |
-| `box` | Area average — best for heavy downscaling |
-| `hamming` | |
-| `mitchell` | Mitchell-Netravali — balanced sharpness/ringing |
-| `catmull_rom` | Sharper than Mitchell |
-| `gaussian` | |
-| `hann` | |
+| Filter        | Notes                                           |
+|---------------|-------------------------------------------------|
+| `nearest`     | Fastest, blocky                                 |
+| `bilinear`    | Fast, smooth                                    |
+| `bicubic`     | Keys cubic                                      |
+| `lanczos`     | Window-3 sinc — best general quality (default)  |
+| `lanczos2`    | Faster, slightly softer                         |
+| `lanczos4`    | Slower, very sharp                              |
+| `box`         | Area average — best for heavy downscaling       |
+| `hamming`     |                                                 |
+| `mitchell`    | Mitchell-Netravali — balanced sharpness/ringing |
+| `catmull_rom` | Sharper than Mitchell                           |
+| `gaussian`    |                                                 |
+| `hann`        |                                                 |
 
 ### Metadata
 
@@ -114,7 +114,7 @@ behaviour in the browser, run inside a **Web Worker**:
 
 ```js
 // worker.js
-import init, { Image } from '@radzivon-bartoshyk/pic-scale/wasm'
+import init, { Image } from '@radzivon.bartoshyk/pic-scale/wasm'
 await init()
 
 self.onmessage = ({ data }) => {
@@ -139,7 +139,7 @@ worker.onmessage = ({ data }) => {
 ### WASM API
 
 ```js
-import init, { Image } from '@radzivon-bartoshyk/pic-scale/wasm'
+import init, { Image } from '@radzivon.bartoshyk/pic-scale/wasm'
 await init()
 
 const bytes = new Uint8Array(await file.arrayBuffer())
@@ -181,30 +181,7 @@ const out = small.toBytes(
 | QOI                    | ✓            | ✓            | ✓          | ✓          |
 | **AVIF**               | ✓            | ✓            | —           | —           |
 | **HEIC/HEIF**          | ✓            | ✓            | —           | —           |
-| **AVIF** (via libheif) | ✓            | ✓            | —           | —           |
-
-HEIC/HEIF and AVIF encoding and decoding use [libheif](https://github.com/strukturag/libheif)
-via `libheif-rs`. libheif is compiled from source bundled inside `libheif-sys`
-via the `embedded-libheif` feature — **no system library installation needed**.
-The first build takes an extra 2–3 minutes to compile libheif from C source,
-but subsequent builds are cached normally.
-
-> If you prefer to link against a system libheif instead
-> (`brew install libheif` / `apt install libheif-dev`), remove the
-> `embedded-libheif` feature from `Cargo.toml`.
-
-ICC profiles and EXIF are embedded natively into the HEIF container via
-libheif's metadata API — no post-processing needed.
-
-AVIF decoding and encoding on native targets uses
-[dav1d](https://code.videolan.org/videolan/dav1d) (the same AV1 decoder as
-Firefox and VLC) via the `image` crate's `avif` feature. `dav1d` requires a C
-compiler and `meson`/`nasm` at build time — see the
-[dav1d build docs](https://github.com/nickel-lang/dav1d) if the build fails.
-
-AVIF is not available in WASM builds because `dav1d-sys` does not compile to
-`wasm32`. If you need AVIF in the browser, decode it with the browser's native
-`<img>` element or `createImageBitmap` API first, then pass the pixel data in.
+| **JPEG XL (JXL)**      | ✓            | ✓            | ✓          | ✓          |
 
 ---
 

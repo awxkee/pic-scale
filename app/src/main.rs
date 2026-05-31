@@ -23,6 +23,7 @@ use pic_scale::{
     ThreadingPolicy, TransferFunction, WorkloadStrategy, XYZScaler,
 };
 use rand::RngExt;
+use std::fs;
 
 fn resize_rgba_fuzz(
     data: u8,
@@ -96,168 +97,185 @@ fn resize_rgba_fuzz(
 }
 
 fn main() {
-    // resize_rgba_fuzz(
-    //     17,
-    //     1023,
-    //     5,
-    //     6,
-    //     5,
-    //     ResamplingFunction::Bilinear,
-    //     WorkloadStrategy::PreferSpeed,
-    //     ThreadingPolicy::Single,
-    //     false,
-    //     true,
-    // );
-    // resize_rgba(0, 143, 35, 143, 35, ResamplingFunction::Bilinear, false);
-    // resize_rgba(0, 1, 256, 79, 256, ResamplingFunction::Bilinear, false);
-    let src_image = vec![128; 256 * 256];
-    let src_img = Planar8ImageStore::borrow(&src_image, 256, 256).unwrap();
-    let mut dst_image = Planar8ImageStoreMut::alloc(128, 128);
-    let resizing_plan = Scaler::new(ResamplingFunction::Lanczos3)
-        .set_workload_strategy(WorkloadStrategy::PreferSpeed)
-        .plan_planar_resampling(src_img.size(), dst_image.size())
-        .unwrap();
-    resizing_plan.resample(&src_img, &mut dst_image).unwrap();
-    dst_image
-        .buffer
-        .borrow()
-        .iter()
-        .zip(src_image.iter())
-        .for_each(|(&dst, &src)| {
-            assert!(((src as i64 - dst as i64).unsigned_abs() as u16) < 3);
-        });
-    println!("{:?}", &dst_image.buffer.borrow()[..10]);
+    let source_width = 1;
+    let source_height = 5;
+    let target_width = 2;
+    let target_height = source_height;
 
-    #[allow(overflowing_literals)]
-    // test_fast_image();
-    let img = ImageReader::open("./assets/asset_5.png")
-        .unwrap()
-        .decode()
-        .unwrap();
-    // img.save("top_right.tga").unwrap();
-    let dimensions = img.dimensions();
-    let transient = img.to_rgb8();
-    let mut bytes = transient.to_vec().iter().map(|&x| x).collect::<Vec<_>>();
+    let source = [255, 0, 0].repeat(source_width * source_height);
 
-    // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
+    println!("input:");
+    for (y, row) in source.chunks_exact(source_width * 3).enumerate() {
+        println!("row {y}: {row:?}");
+    }
 
-    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3)
-        .set_threading_policy(ThreadingPolicy::Single)
-        .set_supersampling(false);
-    // scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
+    let src = ImageStore::<u8, 3>::from_slice(&source, source_width, source_height).unwrap();
+    let mut output = vec![0; target_width * target_height * 3];
+    let mut dst =
+        ImageStoreMut::<u8, 3>::from_slice(&mut output, target_width, target_height).unwrap();
 
-    let mut store =
-        Rgb8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
-    store.bit_depth = 10;
-
-    let mut t_size = ImageSize::new(dimensions.0 as usize / 6, dimensions.1 as usize / 6);
-    // t_size.height += 1;
-    let resizing_plan = scaler
+    let scaler = Scaler::new(ResamplingFunction::CatmullRom);
+    let plan = scaler
         .plan_rgb_resampling(
-            ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-            t_size,
+            ImageSize::new(source_width, source_height),
+            ImageSize::new(target_width, target_height),
         )
         .unwrap();
-    let mut dst_store = Rgb8ImageStoreMut::alloc_with_depth(
-        dimensions.0 as usize / 6,
-        dimensions.1 as usize / 6,
-        10,
-    );
-    resizing_plan.resample(&store, &mut dst_store).unwrap();
-    // scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
-    //
-    // let elapsed_time = start_time.elapsed();
-    // // Print the elapsed time in milliseconds
-    // println!("Scaler: {:.2?}", elapsed_time);
-    //
-    // // #[cfg(target_os = "macos")]
-    // // {
-    // //     use accelerate::{kvImageDoNotTile, vImageScale_ARGB8888, vImage_Buffer};
-    // //     let src_buffer = vImage_Buffer {
-    // //         data: store.buffer.as_ptr() as *mut libc::c_void,
-    // //         height: store.height,
-    // //         width: store.width,
-    // //         row_bytes: store.stride(),
-    // //     };
-    // //
-    // //     let mut dst_buffer = vImage_Buffer {
-    // //         data: dst_store.buffer.borrow_mut().as_mut_ptr() as *mut libc::c_void,
-    // //         height: dst_store.height,
-    // //         width: dst_store.width,
-    // //         row_bytes: dst_store.stride(),
-    // //     };
-    // //
-    // //     let start_time = Instant::now();
-    // //     let result = unsafe {
-    // //         vImageScale_ARGB8888(&src_buffer, &mut dst_buffer, std::ptr::null_mut(), kvImageDoNotTile)
-    // //     };
-    // //     if result != 0 {
-    // //         panic!("Can' resize by accelerate");
-    // //     }
-    // //
-    // //     let elapsed_time = start_time.elapsed();
-    // //     // Print the elapsed time in milliseconds
-    // //     println!("Accelerate: {:.2?}", elapsed_time);
-    // // }
-    //
-    // // let dst: Vec<u8> = resized
-    // //     .as_bytes()
-    // //     .iter()
-    // //     .map(|&x| (x * 255f32) as u8)
-    // //     .collect();
-    //
-    // let dst: Vec<u8> = dst_store
-    //     .as_bytes()
-    //     .iter()
-    //     .map(|&x| (x >> 4) as u8)
-    //     .collect();
+    plan.resample(&src, &mut dst).unwrap();
 
-    let dst = dst_store
-        .as_bytes()
-        .iter()
-        .map(|&x| x)
-        // .map(|&x| (((x) >> 2) as u8).min(255))
-        // .map(|&x| (x as f32 * 255.).round() as u8)
-        .collect::<Vec<_>>();
-
-    if dst_store.channels == 4 {
-        image::save_buffer(
-            "converted1.png",
-            &dst,
-            dst_store.width as u32,
-            dst_store.height as u32,
-            image::ColorType::Rgba8,
-        )
-        .unwrap();
-    } else if dst_store.channels == 2 {
-        image::save_buffer(
-            "../../converted_del.png",
-            &dst,
-            dst_store.width as u32,
-            dst_store.height as u32,
-            image::ColorType::La8,
-        )
-        .unwrap();
-    } else if dst_store.channels == 1 {
-        image::save_buffer(
-            "converted_s.png",
-            &dst,
-            dst_store.width as u32,
-            dst_store.height as u32,
-            image::ColorType::L8,
-        )
-        .unwrap();
-    } else {
-        image::save_buffer(
-            "converted1.png",
-            &dst,
-            dst_store.width as u32,
-            dst_store.height as u32,
-            image::ColorType::Rgb8,
-        )
-        .unwrap();
+    println!("output:");
+    for (y, row) in output.chunks_exact(target_width * 3).enumerate() {
+        println!("row {y}: {row:?}");
     }
 }
+
+//
+// fn main() {
+//     // resize_rgba_fuzz(
+//     //     17,
+//     //     1023,
+//     //     5,
+//     //     6,
+//     //     5,
+//     //     ResamplingFunction::Bilinear,
+//     //     WorkloadStrategy::PreferSpeed,
+//     //     ThreadingPolicy::Single,
+//     //     false,
+//     //     true,
+//     // );
+//     // resize_rgba(0, 143, 35, 143, 35, ResamplingFunction::Bilinear, false);
+//     // resize_rgba(0, 1, 256, 79, 256, ResamplingFunction::Bilinear, false);
+//
+//     #[allow(overflowing_literals)]
+//     // test_fast_image();
+//     let img = ImageReader::open("./assets/asset_5.png")
+//         .unwrap()
+//         .decode()
+//         .unwrap();
+//     // img.save("top_right.tga").unwrap();
+//     let dimensions = img.dimensions();
+//     let transient = img.to_rgb8();
+//     let mut bytes = transient.to_vec().iter().map(|&x| x).collect::<Vec<_>>();
+//
+//     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
+//
+//     let mut scaler = Scaler::new(ResamplingFunction::Lanczos3)
+//         .set_threading_policy(ThreadingPolicy::Single)
+//         .set_supersampling(false);
+//     // scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
+//
+//     let mut store =
+//         Rgb8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
+//     store.bit_depth = 10;
+//
+//     let mut t_size = ImageSize::new(dimensions.0 as usize / 6, dimensions.1 as usize / 6);
+//     // t_size.height += 1;
+//     let resizing_plan = scaler
+//         .plan_rgb_resampling(
+//             ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+//             t_size,
+//         )
+//         .unwrap();
+//     let mut dst_store = Rgb8ImageStoreMut::alloc_with_depth(
+//         dimensions.0 as usize / 6,
+//         dimensions.1 as usize / 6,
+//         10,
+//     );
+//     resizing_plan.resample(&store, &mut dst_store).unwrap();
+//     // scaler.resize_rgba(&store, &mut dst_store, true).unwrap();
+//     //
+//     // let elapsed_time = start_time.elapsed();
+//     // // Print the elapsed time in milliseconds
+//     // println!("Scaler: {:.2?}", elapsed_time);
+//     //
+//     // // #[cfg(target_os = "macos")]
+//     // // {
+//     // //     use accelerate::{kvImageDoNotTile, vImageScale_ARGB8888, vImage_Buffer};
+//     // //     let src_buffer = vImage_Buffer {
+//     // //         data: store.buffer.as_ptr() as *mut libc::c_void,
+//     // //         height: store.height,
+//     // //         width: store.width,
+//     // //         row_bytes: store.stride(),
+//     // //     };
+//     // //
+//     // //     let mut dst_buffer = vImage_Buffer {
+//     // //         data: dst_store.buffer.borrow_mut().as_mut_ptr() as *mut libc::c_void,
+//     // //         height: dst_store.height,
+//     // //         width: dst_store.width,
+//     // //         row_bytes: dst_store.stride(),
+//     // //     };
+//     // //
+//     // //     let start_time = Instant::now();
+//     // //     let result = unsafe {
+//     // //         vImageScale_ARGB8888(&src_buffer, &mut dst_buffer, std::ptr::null_mut(), kvImageDoNotTile)
+//     // //     };
+//     // //     if result != 0 {
+//     // //         panic!("Can' resize by accelerate");
+//     // //     }
+//     // //
+//     // //     let elapsed_time = start_time.elapsed();
+//     // //     // Print the elapsed time in milliseconds
+//     // //     println!("Accelerate: {:.2?}", elapsed_time);
+//     // // }
+//     //
+//     // // let dst: Vec<u8> = resized
+//     // //     .as_bytes()
+//     // //     .iter()
+//     // //     .map(|&x| (x * 255f32) as u8)
+//     // //     .collect();
+//     //
+//     // let dst: Vec<u8> = dst_store
+//     //     .as_bytes()
+//     //     .iter()
+//     //     .map(|&x| (x >> 4) as u8)
+//     //     .collect();
+//
+//     let dst = dst_store
+//         .as_bytes()
+//         .iter()
+//         .map(|&x| x)
+//         // .map(|&x| (((x) >> 2) as u8).min(255))
+//         // .map(|&x| (x as f32 * 255.).round() as u8)
+//         .collect::<Vec<_>>();
+//
+//     if dst_store.channels == 4 {
+//         image::save_buffer(
+//             "converted1.png",
+//             &dst,
+//             dst_store.width as u32,
+//             dst_store.height as u32,
+//             image::ColorType::Rgba8,
+//         )
+//         .unwrap();
+//     } else if dst_store.channels == 2 {
+//         image::save_buffer(
+//             "../../converted_del.png",
+//             &dst,
+//             dst_store.width as u32,
+//             dst_store.height as u32,
+//             image::ColorType::La8,
+//         )
+//         .unwrap();
+//     } else if dst_store.channels == 1 {
+//         image::save_buffer(
+//             "converted_s.png",
+//             &dst,
+//             dst_store.width as u32,
+//             dst_store.height as u32,
+//             image::ColorType::L8,
+//         )
+//         .unwrap();
+//     } else {
+//         image::save_buffer(
+//             "converted1.png",
+//             &dst,
+//             dst_store.width as u32,
+//             dst_store.height as u32,
+//             image::ColorType::Rgb8,
+//         )
+//         .unwrap();
+//     }
+// }
 
 fn u16_to_u8(u16_buffer: &[u16]) -> &[u8] {
     let len = u16_buffer.len() * 2;

@@ -40,25 +40,25 @@ export interface ResizeOptions {
   /**
    * Resampling filter. Default `"lanczos"`.
    * One of: nearest, bilinear, bicubic, lanczos, lanczos2, lanczos4,
-   *         box, hamming, mitchell, catmull_rom, gaussian, hann.
+   * box, hamming, mitchell, catmull_rom, gaussian, hann.
    */
   filter?: string
   /**
    * Resize mode. Default `"fill"`.
    * - `"fill"`       — stretch to exact size
    * - `"fit"`        — fit inside box, pad edges with bgColor
-   * - `"cover"`      — fill box, crop from centre
+   * - `"cover"`      — fill box, crop from center
    * - `"fit_width"`  — scale to width, height proportional
-   * - `"fit_height"` — scale to height, width proportional
+   * - `"fit_height"` - scale to height, width proportional
    */
   mode?: string
   /** Pre-multiply alpha before resampling (LA/RGBA). Default `true`. */
   premultiplyAlpha?: boolean
   /** Thread count. `0` = adaptive. Default `1`. */
   workers?: number
-  /** Background colour for `"fit"` padding as `[r, g, b, a]`. Default `[0,0,0,0]`. */
+  /** Background color for `"fit"` padding as `[r, g, b, a]`. Default `[0,0,0,0]`. */
   bgColor?: Array<number>
-  /** Copy ICC colour profile to output. Default `true`. */
+  /** Copy ICC color profile to output. Default `true`. */
   withIcc?: boolean
   /** Copy EXIF block (orientation reset to 1). Default `true`. */
   withExif?: boolean

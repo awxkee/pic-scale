@@ -1,6 +1,6 @@
 [package]
 name = "pic-scale-js"
-version = "0.7.8"
+version = "0.7.9"
 edition = "2024"
 description = "Node.js and WASM bindings for pic-scale image resampling"
 license = "BSD-3-Clause OR Apache-2.0"
@@ -18,7 +18,7 @@ crate-type = ["cdylib"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.libheif-rs]
 version = "2.7.0"
-features = ["v1_21", "embedded-libheif"]
+features = ["v1_21"]
 default-features = false
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.yuv]
@@ -28,9 +28,12 @@ version = "0.8"
 pic-scale = { path = "../", features = ["avx", "neon"] }
 thiserror = "2.0.18"
 img-parts = "0.4.0"
-image = { version = "0.25.10", features = ["jpeg", "png", "webp", "tiff", "bmp", "ico", "qoi"] }
+image = { version = "0.25.10", features = ["jpeg", "png", "webp", "tiff", "bmp", "ico", "qoi", "gif"] }
 kamadak-exif = "0.6.1"
 bytemuck = "1.25.0"
+jxl = { version = "0.4.3" }
+fast_transpose = "0.2.5"
+jixel = "0.1.3"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 napi = { version = "3.9.0", features = ["napi4", "tokio_rt"], optional = true }
@@ -51,6 +54,7 @@ napi = ["dep:napi", "dep:napi-derive", "dep:tokio", "dep:napi-build"]
 wasm = ["dep:wasm-bindgen", "dep:js-sys"]
 x86_set = ["pic-scale/avx512", "pic-scale/avx", "pic-scale/sse"]
 aarch64_set = ["pic-scale/rdm", "pic-scale/sve", "pic-scale/nightly_i8mm"]
+embedded = ["libheif-rs/v1_21", "libheif-rs/embedded-libheif"]
 
 [profile.release]
 opt-level = 3
