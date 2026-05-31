@@ -3,6 +3,7 @@ name: Publish to npm
 on:
   push:
     tags:
+      - '[0-9]*'
       - 'npm[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
     inputs:

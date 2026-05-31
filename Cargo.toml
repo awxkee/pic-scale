@@ -1,7 +1,6 @@
-workspace = {
-    members = ["app", "wasm", "app/accelerate", "speedtest", "pic-scale-js"],
-    exclude = ["picscale", "fuzz", "pic-scale-py"]
-}
+[workspace]
+members = ["app", "wasm", "app/accelerate", "speedtest", "pic-scale-js"]
+exclude = ["picscale", "fuzz", "pic-scale-py"]
 
 [package]
 name = "pic-scale"
