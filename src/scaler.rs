@@ -156,7 +156,7 @@ impl Scaler {
             return Ok(Arc::new(ResampleNearestPlan {
                 source_size,
                 target_size: destination_size,
-                threading_policy: self.threading_policy,
+                _threading_policy: self.threading_policy,
                 _phantom_data: PhantomData,
             }));
         }
@@ -854,7 +854,7 @@ impl Scaler {
             return Ok(Arc::new(ResampleNearestPlan {
                 source_size,
                 target_size: destination_size,
-                threading_policy: self.threading_policy,
+                _threading_policy: self.threading_policy,
                 _phantom_data: PhantomData,
             }));
         }
@@ -933,7 +933,7 @@ impl Scaler {
                                 >
                             }
                         }),
-                        threading_policy: self.threading_policy,
+                        _threading_policy: self.threading_policy,
                         filter_weights: horizontal_filters
                             .numerical_approximation_i16::<{ crate::support::PRECISION }>(0),
                     }))

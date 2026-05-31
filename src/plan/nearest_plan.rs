@@ -28,13 +28,14 @@
  */
 use crate::validation::validate_sizes;
 use crate::{ImageSize, ImageStore, ImageStoreMut, PicScaleError, ResamplingPlan, ThreadingPolicy};
+#[cfg(feature = "threading")]
 use novtb::{ParallelZonedIterator, TbSliceMut};
 use std::fmt::Debug;
 
 pub(crate) struct ResampleNearestPlan<T, const N: usize> {
     pub(crate) source_size: ImageSize,
     pub(crate) target_size: ImageSize,
-    pub(crate) threading_policy: ThreadingPolicy,
+    pub(crate) _threading_policy: ThreadingPolicy,
     pub(crate) _phantom_data: std::marker::PhantomData<T>,
 }
 
@@ -69,34 +70,61 @@ impl<T: Copy + Send + Sync + Clone + Debug, const N: usize> ResamplingPlan<T, N>
         let dst_width = into.width;
         let dst = into.projected();
 
-        let pool = self.threading_policy.get_nova_pool(ImageSize::new(
-            self.target_size.width,
-            self.target_size.height,
-        ));
-
         let src = store.projected();
 
-        dst.tb_par_chunks_mut(dst_stride)
-            .for_each_enumerated(&pool, |y, dst_chunk| {
-                let dst_chunk = &mut dst_chunk[..dst_width * N];
-                let src_y = ((y as u64 * k_y + k_y_half) >> SCALE) as usize;
-                let src_offset_y = src_y * src_stride;
+        #[cfg(feature = "threading")]
+        {
+            let pool = self._threading_policy.get_nova_pool(ImageSize::new(
+                self.target_size.width,
+                self.target_size.height,
+            ));
+            dst.tb_par_chunks_mut(dst_stride)
+                .for_each_enumerated(&pool, |y, dst_chunk| {
+                    let dst_chunk = &mut dst_chunk[..dst_width * N];
+                    let src_y = ((y as u64 * k_y + k_y_half) >> SCALE) as usize;
+                    let src_offset_y = src_y * src_stride;
 
-                let mut src_x_fixed = k_x_half;
-                for dst in dst_chunk.as_chunks_mut::<N>().0.iter_mut() {
-                    let src_x = (src_x_fixed >> SCALE) as usize;
+                    let mut src_x_fixed = k_x_half;
+                    for dst in dst_chunk.as_chunks_mut::<N>().0.iter_mut() {
+                        let src_x = (src_x_fixed >> SCALE) as usize;
 
-                    let src_px = src_x * N;
-                    let offset = src_offset_y + src_px;
+                        let src_px = src_x * N;
+                        let offset = src_offset_y + src_px;
 
-                    let src_slice = &src[offset..(offset + N)];
+                        let src_slice = &src[offset..(offset + N)];
 
-                    for (src, dst) in src_slice.iter().zip(dst.iter_mut()) {
-                        *dst = *src;
+                        for (src, dst) in src_slice.iter().zip(dst.iter_mut()) {
+                            *dst = *src;
+                        }
+                        src_x_fixed += k_x;
                     }
-                    src_x_fixed += k_x;
-                }
-            });
+                });
+        }
+        #[cfg(not(feature = "threading"))]
+        {
+            dst.chunks_mut(dst_stride)
+                .enumerate()
+                .for_each(|(y, dst_chunk)| {
+                    let dst_chunk = &mut dst_chunk[..dst_width * N];
+                    let src_y = ((y as u64 * k_y + k_y_half) >> SCALE) as usize;
+                    let src_offset_y = src_y * src_stride;
+
+                    let mut src_x_fixed = k_x_half;
+                    for dst in dst_chunk.as_chunks_mut::<N>().0.iter_mut() {
+                        let src_x = (src_x_fixed >> SCALE) as usize;
+
+                        let src_px = src_x * N;
+                        let offset = src_offset_y + src_px;
+
+                        let src_slice = &src[offset..(offset + N)];
+
+                        for (src, dst) in src_slice.iter().zip(dst.iter_mut()) {
+                            *dst = *src;
+                        }
+                        src_x_fixed += k_x;
+                    }
+                });
+        }
         Ok(())
     }
 

@@ -33,6 +33,7 @@ use crate::alpha_handle_f32::{premultiply_alpha_rgba_f32, unpremultiply_alpha_rg
 use crate::alpha_handle_u8::{premultiply_alpha_rgba, unpremultiply_alpha_rgba};
 use crate::alpha_handle_u16::{premultiply_alpha_rgba_u16, unpremultiply_alpha_rgba_u16};
 use crate::support::{check_image_size_overflow, check_image_size_overflow_with_stride};
+use crate::threading_policy::ScalingPool;
 use crate::validation::{PicScaleBufferMismatch, PicScaleError, try_vec};
 use crate::{ImageSize, WorkloadStrategy};
 #[cfg(feature = "nightly_f16")]
@@ -768,20 +769,16 @@ impl<'a, T: Clone + Default + Copy, const N: usize> ImageStoreMut<'a, T, N> {
 }
 
 pub(crate) trait AssociateAlpha<T: Clone + Copy + Debug, const N: usize> {
-    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, T, N>, pool: &novtb::ThreadPool);
+    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, T, N>, pool: &ScalingPool);
     fn is_alpha_premultiplication_needed(&self) -> bool;
 }
 
 pub(crate) trait UnassociateAlpha<T: Clone + Copy + Debug, const N: usize> {
-    fn unpremultiply_alpha(
-        &mut self,
-        pool: &novtb::ThreadPool,
-        workload_strategy: WorkloadStrategy,
-    );
+    fn unpremultiply_alpha(&mut self, pool: &ScalingPool, workload_strategy: WorkloadStrategy);
 }
 
 impl AssociateAlpha<u8, 2> for ImageStore<'_, u8, 2> {
-    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, u8, 2>, pool: &novtb::ThreadPool) {
+    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, u8, 2>, pool: &ScalingPool) {
         let dst_stride = into.stride();
         let dst = into.projected();
         let src = self.projected();
@@ -804,7 +801,7 @@ impl AssociateAlpha<u8, 2> for ImageStore<'_, u8, 2> {
 }
 
 impl AssociateAlpha<u16, 2> for ImageStore<'_, u16, 2> {
-    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, u16, 2>, pool: &novtb::ThreadPool) {
+    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, u16, 2>, pool: &ScalingPool) {
         let dst_stride = into.stride();
         let dst = into.projected();
         let src = self.projected();
@@ -829,7 +826,7 @@ impl AssociateAlpha<u16, 2> for ImageStore<'_, u16, 2> {
 }
 
 impl AssociateAlpha<f32, 2> for ImageStore<'_, f32, 2> {
-    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, f32, 2>, pool: &novtb::ThreadPool) {
+    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, f32, 2>, pool: &ScalingPool) {
         let dst_stride = into.stride();
         let dst = into.projected();
         let src = self.projected();
@@ -852,7 +849,7 @@ impl AssociateAlpha<f32, 2> for ImageStore<'_, f32, 2> {
 }
 
 impl AssociateAlpha<u8, 4> for ImageStore<'_, u8, 4> {
-    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, u8, 4>, pool: &novtb::ThreadPool) {
+    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, u8, 4>, pool: &ScalingPool) {
         let dst_stride = into.stride();
         let dst = into.projected();
         let src = self.projected();
@@ -918,11 +915,7 @@ impl AssociateAlpha<u8, 4> for ImageStore<'_, u8, 4> {
 }
 
 impl UnassociateAlpha<u8, 4> for ImageStoreMut<'_, u8, 4> {
-    fn unpremultiply_alpha(
-        &mut self,
-        pool: &novtb::ThreadPool,
-        workload_strategy: WorkloadStrategy,
-    ) {
+    fn unpremultiply_alpha(&mut self, pool: &ScalingPool, workload_strategy: WorkloadStrategy) {
         let src_stride = self.stride();
         let width = self.width;
         let height = self.height;
@@ -932,11 +925,7 @@ impl UnassociateAlpha<u8, 4> for ImageStoreMut<'_, u8, 4> {
 }
 
 impl UnassociateAlpha<u8, 2> for ImageStoreMut<'_, u8, 2> {
-    fn unpremultiply_alpha(
-        &mut self,
-        pool: &novtb::ThreadPool,
-        workload_strategy: WorkloadStrategy,
-    ) {
+    fn unpremultiply_alpha(&mut self, pool: &ScalingPool, workload_strategy: WorkloadStrategy) {
         let src_stride = self.stride();
         let width = self.width;
         let height = self.height;
@@ -947,7 +936,7 @@ impl UnassociateAlpha<u8, 2> for ImageStoreMut<'_, u8, 2> {
 }
 
 impl UnassociateAlpha<f32, 2> for ImageStoreMut<'_, f32, 2> {
-    fn unpremultiply_alpha(&mut self, pool: &novtb::ThreadPool, _: WorkloadStrategy) {
+    fn unpremultiply_alpha(&mut self, pool: &ScalingPool, _: WorkloadStrategy) {
         let src_stride = self.stride();
         let width = self.width;
         let height = self.height;
@@ -958,7 +947,7 @@ impl UnassociateAlpha<f32, 2> for ImageStoreMut<'_, f32, 2> {
 }
 
 impl UnassociateAlpha<u16, 2> for ImageStoreMut<'_, u16, 2> {
-    fn unpremultiply_alpha(&mut self, pool: &novtb::ThreadPool, _: WorkloadStrategy) {
+    fn unpremultiply_alpha(&mut self, pool: &ScalingPool, _: WorkloadStrategy) {
         let src_stride = self.stride();
         let width = self.width;
         let height = self.height;
@@ -970,7 +959,7 @@ impl UnassociateAlpha<u16, 2> for ImageStoreMut<'_, u16, 2> {
 }
 
 impl AssociateAlpha<u16, 4> for ImageStore<'_, u16, 4> {
-    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, u16, 4>, pool: &novtb::ThreadPool) {
+    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, u16, 4>, pool: &ScalingPool) {
         let dst_stride = into.stride();
         let bit_depth = into.bit_depth;
         let dst = into.projected();
@@ -1029,7 +1018,7 @@ impl AssociateAlpha<u16, 4> for ImageStore<'_, u16, 4> {
 }
 
 impl AssociateAlpha<f32, 4> for ImageStore<'_, f32, 4> {
-    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, f32, 4>, pool: &novtb::ThreadPool) {
+    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, f32, 4>, pool: &ScalingPool) {
         let src_stride = self.stride();
         let dst_stride = into.stride();
         let width = self.width;
@@ -1046,7 +1035,7 @@ impl AssociateAlpha<f32, 4> for ImageStore<'_, f32, 4> {
 
 #[cfg(feature = "nightly_f16")]
 impl AssociateAlpha<f16, 4> for ImageStore<'_, f16, 4> {
-    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, f16, 4>, pool: &novtb::ThreadPool) {
+    fn premultiply_alpha(&self, into: &mut ImageStoreMut<'_, f16, 4>, pool: &ScalingPool) {
         let src_stride = self.stride();
         let dst_stride = into.stride();
         let width = self.width;
@@ -1062,7 +1051,7 @@ impl AssociateAlpha<f16, 4> for ImageStore<'_, f16, 4> {
 }
 
 impl UnassociateAlpha<u16, 4> for ImageStoreMut<'_, u16, 4> {
-    fn unpremultiply_alpha(&mut self, pool: &novtb::ThreadPool, _: WorkloadStrategy) {
+    fn unpremultiply_alpha(&mut self, pool: &ScalingPool, _: WorkloadStrategy) {
         let src_stride = self.stride();
         let width = self.width;
         let height = self.height;
@@ -1073,7 +1062,7 @@ impl UnassociateAlpha<u16, 4> for ImageStoreMut<'_, u16, 4> {
 }
 
 impl UnassociateAlpha<f32, 4> for ImageStoreMut<'_, f32, 4> {
-    fn unpremultiply_alpha(&mut self, pool: &novtb::ThreadPool, _: WorkloadStrategy) {
+    fn unpremultiply_alpha(&mut self, pool: &ScalingPool, _: WorkloadStrategy) {
         let stride = self.stride();
         let width = self.width;
         let height = self.height;
@@ -1084,7 +1073,7 @@ impl UnassociateAlpha<f32, 4> for ImageStoreMut<'_, f32, 4> {
 
 #[cfg(feature = "nightly_f16")]
 impl UnassociateAlpha<f16, 4> for ImageStoreMut<'_, f16, 4> {
-    fn unpremultiply_alpha(&mut self, pool: &novtb::ThreadPool, _: WorkloadStrategy) {
+    fn unpremultiply_alpha(&mut self, pool: &ScalingPool, _: WorkloadStrategy) {
         let stride = self.stride();
         let width = self.width;
         let height = self.height;

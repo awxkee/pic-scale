@@ -56,7 +56,7 @@ impl HorizontalFilterPass<u16, f32, 4> for ImageStore<'_, u16, 4> {
                     filter_weights: approx,
                     filter_4_rows: Some(convolve_horizontal_rgba_neon_rows_4_lb_u16),
                     filter_row: convolve_horizontal_rgba_neon_u16_lb_row,
-                    threading_policy,
+                    _threading_policy: threading_policy,
                 });
             }
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -78,7 +78,7 @@ impl HorizontalFilterPass<u16, f32, 4> for ImageStore<'_, u16, 4> {
                                         convolve_horizontal_rgba_avx_rows_4_u16_vnni,
                                     ),
                                     filter_row: convolve_horizontal_rgba_avx_u16lp_row_vnni,
-                                    threading_policy,
+                                    _threading_policy: threading_policy,
                                 });
                             }
                         }
@@ -90,7 +90,7 @@ impl HorizontalFilterPass<u16, f32, 4> for ImageStore<'_, u16, 4> {
                             filter_weights: approx,
                             filter_4_rows: Some(convolve_horizontal_rgba_avx_rows_4_u16),
                             filter_row: convolve_horizontal_rgba_avx_u16lp_row,
-                            threading_policy,
+                            _threading_policy: threading_policy,
                         });
                     }
                 }
@@ -105,7 +105,7 @@ impl HorizontalFilterPass<u16, f32, 4> for ImageStore<'_, u16, 4> {
                             filter_weights: approx,
                             filter_4_rows: Some(convolve_horizontal_rgba_sse_rows_4_lb_u16),
                             filter_row: convolve_horizontal_rgba_sse_u16_lb_row,
-                            threading_policy,
+                            _threading_policy: threading_policy,
                         });
                     }
                 }
@@ -119,7 +119,7 @@ impl HorizontalFilterPass<u16, f32, 4> for ImageStore<'_, u16, 4> {
                     filter_weights: approx,
                     filter_4_rows: Some(convolve_row_handler_fixed_point_4::<u16, i32, 4>),
                     filter_row: convolve_row_handler_fixed_point::<u16, i32, 4>,
-                    threading_policy,
+                    _threading_policy: threading_policy,
                 });
             }
         }
@@ -137,7 +137,7 @@ impl HorizontalFilterPass<u16, f32, 4> for ImageStore<'_, u16, 4> {
                         filter_weights,
                         filter_4_rows: Some(convolve_horizontal_rgba_avx_rows_4_u16_fma),
                         filter_row: convolve_horizontal_rgba_avx_u16_row_fma,
-                        threading_policy,
+                        _threading_policy: threading_policy,
                     });
                 }
                 use crate::avx2::{
@@ -148,7 +148,7 @@ impl HorizontalFilterPass<u16, f32, 4> for ImageStore<'_, u16, 4> {
                     filter_weights,
                     filter_4_rows: Some(convolve_horizontal_rgba_avx_rows_4_u16_default),
                     filter_row: convolve_horizontal_rgba_avx_u16_row_default,
-                    threading_policy,
+                    _threading_policy: threading_policy,
                 });
             }
         }
@@ -162,7 +162,7 @@ impl HorizontalFilterPass<u16, f32, 4> for ImageStore<'_, u16, 4> {
                     filter_weights,
                     filter_4_rows: Some(convolve_horizontal_rgba_sse_rows_4_u16),
                     filter_row: convolve_horizontal_rgba_sse_u16_row,
-                    threading_policy,
+                    _threading_policy: threading_policy,
                 });
             }
         }
@@ -182,7 +182,7 @@ impl HorizontalFilterPass<u16, f32, 4> for ImageStore<'_, u16, 4> {
                         filter_weights: approx_num,
                         filter_4_rows: Some(convolve_horizontal_rgba_neon_rows_4_hb_u16),
                         filter_row: convolve_horizontal_rgba_neon_u16_hb_row,
-                        threading_policy,
+                        _threading_policy: threading_policy,
                     });
                 }
             }
@@ -195,7 +195,7 @@ impl HorizontalFilterPass<u16, f32, 4> for ImageStore<'_, u16, 4> {
                 filter_weights,
                 filter_4_rows: Some(convolve_horizontal_rgba_neon_rows_4_f32_u16),
                 filter_row: convolve_horizontal_rgba_neon_f32_u16_row,
-                threading_policy,
+                _threading_policy: threading_policy,
             })
         }
 
@@ -208,7 +208,7 @@ impl HorizontalFilterPass<u16, f32, 4> for ImageStore<'_, u16, 4> {
                 filter_weights,
                 filter_4_rows: Some(convolve_row_handler_floating_point_4::<u16, f32, f32, 4>),
                 filter_row: convolve_row_handler_floating_point::<u16, f32, f32, 4>,
-                threading_policy,
+                _threading_policy: threading_policy,
             })
         }
     }

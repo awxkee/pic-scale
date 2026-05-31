@@ -29,6 +29,7 @@
 
 use crate::convolution::{ColumnFilter, RowFilter, TrampolineFilter};
 use crate::image_store::{AssociateAlpha, CheckStoreDensity, UnassociateAlpha};
+use crate::threading_policy::ScalingPool;
 use crate::validation::{try_vec, validate_scratch, validate_sizes};
 use crate::{
     ImageSize, ImageStore, ImageStoreMut, PicScaleError, Resampling, ResamplingPlan,
@@ -43,7 +44,7 @@ fn maybe_premultiply_alpha<'a, T, const N: usize>(
     needs_alpha_forward: bool,
     needs_alpha_backward: bool,
     bit_depth: usize,
-    pool: &novtb::ThreadPool,
+    pool: &ScalingPool,
 ) -> Result<(std::borrow::Cow<'a, ImageStore<'a, T, N>>, bool), PicScaleError>
 where
     T: Copy + Send + Sync + Clone + Debug + Default + 'static,

@@ -27,13 +27,29 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
-use rayon::ThreadPool;
 #[cfg(not(target_arch = "wasm32"))]
 use std::num::NonZeroUsize;
 #[cfg(not(target_arch = "wasm32"))]
 use std::thread::available_parallelism;
 
 use crate::ImageSize;
+
+#[allow(unused)]
+pub(crate) struct LocalThreadPool {
+    _amount: usize,
+}
+
+#[allow(unused)]
+impl LocalThreadPool {
+    pub(crate) fn new(size: usize) -> LocalThreadPool {
+        Self { _amount: size }
+    }
+}
+
+#[cfg(feature = "threading")]
+pub(crate) type ScalingPool = novtb::ThreadPool;
+#[cfg(not(feature = "threading"))]
+pub(crate) type ScalingPool = LocalThreadPool;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Default)]
@@ -76,28 +92,18 @@ impl ThreadingPolicy {
 }
 
 impl ThreadingPolicy {
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn get_pool(&self, for_size: ImageSize) -> Option<ThreadPool> {
-        if *self == ThreadingPolicy::Single {
-            return None;
+    pub(crate) fn get_nova_pool(&self, _for_size: ImageSize) -> ScalingPool {
+        #[cfg(feature = "threading")]
+        {
+            if *self == ThreadingPolicy::Single {
+                return ScalingPool::new(1);
+            }
+            let thread_count = self.thread_count(_for_size);
+            ScalingPool::new(thread_count)
         }
-        let thread_count = self.thread_count(for_size);
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(thread_count)
-            .build()
-            .ok()
-    }
-
-    pub(crate) fn get_nova_pool(&self, for_size: ImageSize) -> novtb::ThreadPool {
-        if *self == ThreadingPolicy::Single {
-            return novtb::ThreadPool::new(1);
+        #[cfg(not(feature = "threading"))]
+        {
+            ScalingPool::new(1)
         }
-        let thread_count = self.thread_count(for_size);
-        novtb::ThreadPool::new(thread_count)
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    pub fn get_pool(&self, _: ImageSize) -> Option<ThreadPool> {
-        None
     }
 }

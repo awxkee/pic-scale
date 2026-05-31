@@ -86,7 +86,7 @@ impl HorizontalFilterPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
                             filter_weights: i_weights,
                             filter_4_rows: Some(sve_convolve_horizontal_rgb_neon_rows_4_dot),
                             filter_row: sve_convolve_horizontal_rgb_neon_row_one_dot,
-                            threading_policy,
+                            _threading_policy: threading_policy,
                         });
                     }
                     #[cfg(feature = "rdm")]
@@ -109,7 +109,7 @@ impl HorizontalFilterPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
                             filter_weights: i_weights,
                             filter_4_rows: Some(convolve_horizontal_rgb_neon_rows_4_dot),
                             filter_row: convolve_horizontal_rgb_neon_row_one_dot,
-                            threading_policy,
+                            _threading_policy: threading_policy,
                         });
                     }
                 }
@@ -146,7 +146,7 @@ impl HorizontalFilterPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
             filter_weights: i_weights,
             filter_4_rows: _dispatcher_4_rows,
             filter_row: _dispatcher_1_row,
-            threading_policy,
+            _threading_policy: threading_policy,
         })
     }
 }

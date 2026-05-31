@@ -36,6 +36,8 @@ use crate::mixed_storage::CpuRound;
 use crate::neon::{neon_premultiply_alpha_rgba_u16, neon_unpremultiply_alpha_rgba_u16};
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::{premultiply_alpha_sse_rgba_u16, unpremultiply_alpha_sse_rgba_u16};
+use crate::threading_policy::ScalingPool;
+#[cfg(feature = "threading")]
 use novtb::{ParallelZonedIterator, TbSliceMut};
 
 #[inline]
@@ -212,12 +214,19 @@ fn premultiply_alpha_gray_alpha_impl(
     _: usize,
     src_stride: usize,
     bit_depth: usize,
-    pool: &novtb::ThreadPool,
+    _pool: &ScalingPool,
 ) {
     let max_colors = (1 << bit_depth) - 1;
+    #[cfg(feature = "threading")]
     dst.tb_par_chunks_mut(dst_stride)
         .zip(src.chunks(src_stride))
-        .for_each(pool, |(dst, src)| {
+        .for_each(_pool, |(dst, src)| {
+            premultiply_alpha_gray_alpha_row(&mut dst[..width * 2], &src[..width * 2], max_colors);
+        });
+    #[cfg(not(feature = "threading"))]
+    dst.chunks_mut(dst_stride)
+        .zip(src.chunks(src_stride))
+        .for_each(|(dst, src)| {
             premultiply_alpha_gray_alpha_row(&mut dst[..width * 2], &src[..width * 2], max_colors);
         });
 }
@@ -228,14 +237,19 @@ fn unpremultiply_alpha_gray_alpha_impl(
     width: usize,
     _: usize,
     bit_depth: usize,
-    pool: &novtb::ThreadPool,
+    _pool: &ScalingPool,
 ) {
     let max_colors = (1 << bit_depth) - 1;
+    #[cfg(feature = "threading")]
     in_place
         .tb_par_chunks_mut(src_stride)
-        .for_each(pool, |row| {
+        .for_each(_pool, |row| {
             unpremultiply_alpha_gray_alpha_row(&mut row[..width * 2], max_colors);
         });
+    #[cfg(not(feature = "threading"))]
+    in_place.chunks_mut(src_stride).for_each(|row| {
+        unpremultiply_alpha_gray_alpha_row(&mut row[..width * 2], max_colors);
+    });
 }
 
 pub(crate) fn premultiply_alpha_rgba_u16(
@@ -246,7 +260,7 @@ pub(crate) fn premultiply_alpha_rgba_u16(
     _: usize,
     src_stride: usize,
     bit_depth: usize,
-    pool: &novtb::ThreadPool,
+    _pool: &ScalingPool,
 ) {
     #[allow(clippy::type_complexity)]
     let mut _dispatcher: fn(&mut [u16], &[u16], usize) = premultiply_alpha_rgba_row;
@@ -266,9 +280,16 @@ pub(crate) fn premultiply_alpha_rgba_u16(
     {
         _dispatcher = neon_premultiply_alpha_rgba_u16;
     }
+    #[cfg(feature = "threading")]
     dst.tb_par_chunks_mut(dst_stride)
         .zip(src.chunks(src_stride))
-        .for_each(pool, |(dst, src)| {
+        .for_each(_pool, |(dst, src)| {
+            _dispatcher(&mut dst[..width * 4], &src[..width * 4], bit_depth);
+        });
+    #[cfg(not(feature = "threading"))]
+    dst.chunks_mut(dst_stride)
+        .zip(src.chunks(src_stride))
+        .for_each(|(dst, src)| {
             _dispatcher(&mut dst[..width * 4], &src[..width * 4], bit_depth);
         });
 }
@@ -281,7 +302,7 @@ pub(crate) fn premultiply_alpha_gray_alpha_u16(
     height: usize,
     src_stride: usize,
     bit_depth: usize,
-    pool: &novtb::ThreadPool,
+    pool: &ScalingPool,
 ) {
     #[allow(clippy::type_complexity)]
     let mut _dispatcher: fn(
@@ -292,7 +313,7 @@ pub(crate) fn premultiply_alpha_gray_alpha_u16(
         usize,
         usize,
         usize,
-        &novtb::ThreadPool,
+        &ScalingPool,
     ) = premultiply_alpha_gray_alpha_impl;
     _dispatcher(
         dst, dst_stride, src, width, height, src_stride, bit_depth, pool,
@@ -305,7 +326,7 @@ pub(crate) fn unpremultiply_alpha_rgba_u16(
     width: usize,
     _: usize,
     bit_depth: usize,
-    pool: &novtb::ThreadPool,
+    _pool: &ScalingPool,
 ) {
     #[allow(clippy::type_complexity)]
     let mut _dispatcher: fn(&mut [u16], usize) = unpremultiply_alpha_rgba_row;
@@ -325,11 +346,16 @@ pub(crate) fn unpremultiply_alpha_rgba_u16(
     {
         _dispatcher = neon_unpremultiply_alpha_rgba_u16;
     }
+    #[cfg(feature = "threading")]
     in_place
         .tb_par_chunks_mut(src_stride)
-        .for_each(pool, |row| {
+        .for_each(_pool, |row| {
             _dispatcher(&mut row[..width * 4], bit_depth);
         });
+    #[cfg(not(feature = "threading"))]
+    in_place.chunks_mut(src_stride).for_each(|row| {
+        _dispatcher(&mut row[..width * 4], bit_depth);
+    });
 }
 
 pub(crate) fn unpremultiply_alpha_gray_alpha_u16(
@@ -338,10 +364,10 @@ pub(crate) fn unpremultiply_alpha_gray_alpha_u16(
     width: usize,
     height: usize,
     bit_depth: usize,
-    pool: &novtb::ThreadPool,
+    pool: &ScalingPool,
 ) {
     #[allow(clippy::type_complexity)]
-    let mut _dispatcher: fn(&mut [u16], usize, usize, usize, usize, &novtb::ThreadPool) =
+    let mut _dispatcher: fn(&mut [u16], usize, usize, usize, usize, &ScalingPool) =
         unpremultiply_alpha_gray_alpha_impl;
     _dispatcher(in_place, src_stride, width, height, bit_depth, pool);
 }

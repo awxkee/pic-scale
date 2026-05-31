@@ -148,7 +148,7 @@ impl HorizontalFilterPass<f16, f32, 4> for ImageStore<'_, f16, 4> {
                             filter_weights: weights,
                             filter_4_rows: Some(convolve_horizontal_rgba_neon_rows_4_f16_fhm),
                             filter_row: convolve_horizontal_rgba_neon_row_one_f16_fhm,
-                            threading_policy,
+                            _threading_policy: threading_policy,
                         });
                     }
                 }
@@ -178,7 +178,7 @@ impl HorizontalFilterPass<f16, f32, 4> for ImageStore<'_, f16, 4> {
             filter_weights,
             filter_4_rows: _dispatcher_4_rows,
             filter_row: _dispatcher_row,
-            threading_policy,
+            _threading_policy: threading_policy,
         })
     }
 }
@@ -305,7 +305,7 @@ impl HorizontalFilterPass<f16, f32, 3> for ImageStore<'_, f16, 3> {
                             filter_weights: weights,
                             filter_4_rows: Some(convolve_horizontal_rgb_neon_rows_4_f16_fhm),
                             filter_row: convolve_horizontal_rgb_neon_row_one_f16_fhm,
-                            threading_policy,
+                            _threading_policy: threading_policy,
                         });
                     }
                 }
@@ -330,7 +330,7 @@ impl HorizontalFilterPass<f16, f32, 3> for ImageStore<'_, f16, 3> {
             filter_weights,
             filter_4_rows: _dispatcher_4_rows,
             filter_row: _dispatcher_row,
-            threading_policy,
+            _threading_policy: threading_policy,
         })
     }
 }
@@ -417,7 +417,7 @@ impl HorizontalFilterPass<f16, f32, 1> for ImageStore<'_, f16, 1> {
             filter_weights,
             filter_4_rows: _dispatcher_4_rows,
             filter_row: _dispatcher_row,
-            threading_policy,
+            _threading_policy: threading_policy,
         })
     }
 }
@@ -503,7 +503,7 @@ impl HorizontalFilterPass<f16, f32, 2> for ImageStore<'_, f16, 2> {
             filter_weights,
             filter_4_rows: _dispatcher_4_rows,
             filter_row: _dispatcher_row,
-            threading_policy,
+            _threading_policy: threading_policy,
         })
     }
 }
