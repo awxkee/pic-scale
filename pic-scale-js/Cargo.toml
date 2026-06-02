@@ -33,7 +33,7 @@ kamadak-exif = "0.6.1"
 bytemuck = "1.25.0"
 jxl = { version = "0.4.3" }
 fast_transpose = "0.2.5"
-jixel = "0.1.3"
+jixel = "0.2.2"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 napi = { version = "3.9.0", features = ["napi4", "tokio_rt"], optional = true }

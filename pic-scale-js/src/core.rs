@@ -338,7 +338,7 @@ impl CoreImage {
         premultiply_alpha: bool,
         workers: usize,
     ) -> Result<CoreImage> {
-        if dst_w == 0 || dst_w == 0 {
+        if dst_w == 0 || dst_h == 0 {
             return Err(PicError::Scale(PicScaleError::Generic(
                 "Dst width and height cannot be 0".to_string(),
             )));
@@ -586,7 +586,12 @@ impl CoreImage {
             } else {
                 None
             };
-            return encode_jxl(&self.inner, opts.quality, icc);
+            let exif = if meta_opts.exif {
+                src_meta.and_then(|m| m.exif.as_deref())
+            } else {
+                None
+            };
+            return encode_jxl(&self.inner, opts.quality, icc, exif);
         }
 
         let fmt = parse_format(&opts.format)?;
@@ -617,7 +622,7 @@ impl CoreImage {
         workers: usize,
         meta_opts: &MetadataOptions,
     ) -> Result<(CoreImage, Option<Metadata>)> {
-        if dst_w == 0 || dst_w == 0 {
+        if dst_w == 0 || dst_h == 0 {
             return Err(PicError::Scale(PicScaleError::Generic(
                 "Dst width and height cannot be 0".to_string(),
             )));
