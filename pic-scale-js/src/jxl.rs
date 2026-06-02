@@ -29,9 +29,10 @@
 use crate::core::PicError;
 use image::DynamicImage;
 use jixel::{
-    EncodeConfig, encode_image, encode_image_12bit, encode_image_gray, encode_image_gray_12bit,
+    ColorSpace, EncodeConfig, FlMeta, encode_fast_lossless, encode_fast_lossless_u16, encode_image,
+    encode_image_12bit, encode_image_f32, encode_image_gray, encode_image_gray_12bit,
     encode_image_gray_alpha, encode_image_gray_alpha_12bit, encode_image_with_alpha,
-    encode_image_with_alpha_12bit,
+    encode_image_with_alpha_12bit, encode_image_with_alpha_f32,
 };
 use jxl::api::{JxlColorType, JxlDataFormat};
 use jxl::headers::extra_channels::ExtraChannel;
@@ -205,10 +206,75 @@ pub(crate) fn encode_jxl(
     img: &DynamicImage,
     quality: u8,
     icc: Option<&[u8]>,
+    exif: Option<&[u8]>,
 ) -> crate::core::Result<Vec<u8>> {
     let width = img.width() as usize;
     let height = img.height() as usize;
     let lossless = quality == 100;
+    let has_alpha = img.color().has_alpha();
+
+    if lossless
+        && !matches!(img, DynamicImage::ImageRgb32F(_))
+        && !matches!(img, DynamicImage::ImageRgba32F(_))
+    {
+        let mut meta = FlMeta::default();
+        if let Some(exif) = exif {
+            meta.exif = Some(exif.to_vec());
+        }
+        let result = match img {
+            DynamicImage::ImageRgba16(img16) => encode_fast_lossless_u16(
+                &img16.iter().map(|x| x >> 4).collect::<Vec<_>>(),
+                width,
+                height,
+                ColorSpace::Rgb,
+                true,
+                12,
+                &meta,
+            ),
+            DynamicImage::ImageRgb16(img16) => encode_fast_lossless_u16(
+                &img16.iter().map(|x| x >> 4).collect::<Vec<_>>(),
+                width,
+                height,
+                ColorSpace::Rgb,
+                false,
+                12,
+                &meta,
+            ),
+            DynamicImage::ImageLuma8(luma8) => {
+                encode_fast_lossless(luma8, width, height, ColorSpace::Gray, false, &meta)
+            }
+            DynamicImage::ImageLumaA8(luma8) => {
+                encode_fast_lossless(luma8, width, height, ColorSpace::Gray, true, &meta)
+            }
+            DynamicImage::ImageLuma16(luma16) => encode_fast_lossless_u16(
+                &luma16.iter().map(|x| x >> 4).collect::<Vec<_>>(),
+                width,
+                height,
+                ColorSpace::Gray,
+                false,
+                12,
+                &meta,
+            ),
+            DynamicImage::ImageLumaA16(luma16) => encode_fast_lossless_u16(
+                &luma16.iter().map(|x| x >> 4).collect::<Vec<_>>(),
+                width,
+                height,
+                ColorSpace::Gray,
+                true,
+                12,
+                &meta,
+            ),
+            _ if has_alpha => {
+                let rgba = img.to_rgba8();
+                encode_fast_lossless(rgba.as_raw(), width, height, ColorSpace::Rgb, true, &meta)
+            }
+            _ => {
+                let rgb = img.to_rgb8();
+                encode_fast_lossless(rgb.as_raw(), width, height, ColorSpace::Rgb, false, &meta)
+            }
+        };
+        return result.map_err(|x| PicError::Format(x.to_string()));
+    }
 
     let mut config = EncodeConfig::default()
         .with_quality(quality as f32)
@@ -217,8 +283,9 @@ pub(crate) fn encode_jxl(
     if let Some(icc_data) = icc {
         config = config.with_icc_profile(icc_data.to_vec());
     }
-
-    let has_alpha = img.color().has_alpha();
+    if let Some(exif_data) = exif {
+        config = config.with_exif(exif_data.to_vec());
+    }
 
     let result = match img {
         DynamicImage::ImageRgba16(img16) => encode_image_with_alpha_12bit(
@@ -233,8 +300,8 @@ pub(crate) fn encode_jxl(
             height,
             &config,
         ),
-        DynamicImage::ImageLuma8(luma8) => encode_image_gray(&luma8, width, height, &config),
-        DynamicImage::ImageLumaA8(luma8) => encode_image_gray_alpha(&luma8, width, height, &config),
+        DynamicImage::ImageLuma8(luma8) => encode_image_gray(luma8, width, height, &config),
+        DynamicImage::ImageLumaA8(luma8) => encode_image_gray_alpha(luma8, width, height, &config),
         DynamicImage::ImageLuma16(luma16) => encode_image_gray_12bit(
             &luma16.iter().map(|x| x >> 4).collect::<Vec<_>>(),
             width,
@@ -247,6 +314,12 @@ pub(crate) fn encode_jxl(
             height,
             &config,
         ),
+        DynamicImage::ImageRgb32F(img32) => encode_image_f32(img32, width, height, &config),
+        DynamicImage::ImageRgba32F(img32) => {
+            encode_image_with_alpha_f32(img32, width, height, &config)
+        }
+        DynamicImage::ImageRgb8(rgb) => encode_image(rgb, width, height, &config),
+        DynamicImage::ImageRgba8(rgba) => encode_image_with_alpha(rgba, width, height, &config),
         _ if has_alpha => {
             let rgba = img.to_rgba8();
             encode_image_with_alpha(rgba.as_raw(), width, height, &config)
