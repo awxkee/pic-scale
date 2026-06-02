@@ -65,7 +65,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
+            sudo apt-get install -y \
             cmake nasm \
             libde265-dev \
             libaom-dev \
@@ -74,7 +74,8 @@ jobs:
             libjpeg-dev \
             libpng-dev \
             zlib1g-dev \
-            libdav1d-dev
+            libdav1d-dev \
+            libnuma-dev
 
       - name: Install cross-compilation tools (Linux aarch64)
         if: matrix.target == 'aarch64-unknown-linux-gnu'
