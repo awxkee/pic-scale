@@ -428,11 +428,11 @@ fn convolve_column_lb_avx_i16_impl<const HAS_DOT: bool>(
         );
 
         let tail8 = rem.as_chunks_mut::<8>().1;
-        let iter4 = tail8.chunks_exact_mut(4);
+        let iter4 = tail8.as_chunks_mut::<4>();
 
         let v_cx = cx;
 
-        for (x, dst) in iter4.enumerate() {
+        for (x, dst) in iter4.0.iter_mut().enumerate() {
             let mut store0 = _mm_set1_epi32(ROUNDING_CONST);
 
             let v_dx = v_cx + x * 4;
@@ -463,7 +463,7 @@ fn convolve_column_lb_avx_i16_impl<const HAS_DOT: bool>(
             cx += 4;
         }
 
-        let tail4 = tail8.chunks_exact_mut(4).into_remainder();
+        let tail4 = tail8.as_chunks_mut::<4>().1;
         let a_px = cx;
 
         for (x, dst) in tail4.iter_mut().enumerate() {

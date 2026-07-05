@@ -34,6 +34,7 @@ mod core;
 #[cfg(feature = "napi")]
 mod napi_bindings;
 
+mod avif_enc;
 mod heif;
 mod jxl;
 mod metadata;

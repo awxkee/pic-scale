@@ -533,11 +533,11 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
         );
         let tail8 = rem.as_chunks_mut::<8>().1;
 
-        let iter4 = tail8.chunks_exact_mut(4);
+        let iter4 = tail8.as_chunks_mut::<4>();
 
         let v_cx = cx;
 
-        for (x, dst) in iter4.enumerate() {
+        for (x, dst) in iter4.0.iter_mut().enumerate() {
             let mut store0 = zeros_ps;
 
             let v_dx = v_cx + x * 4;
@@ -568,7 +568,7 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
             cx += 4;
         }
 
-        let tail4 = tail8.chunks_exact_mut(4).into_remainder();
+        let tail4 = tail8.as_chunks_mut::<4>().1;
 
         for (x, dst) in tail4.iter_mut().enumerate() {
             let mut store0 = 0.;

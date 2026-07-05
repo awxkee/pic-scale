@@ -70,11 +70,11 @@ fn convolve_column_lb_u16_impl(
 
         let v_px = cx;
 
-        let iter16 = dst.chunks_exact_mut(16);
+        let iter16 = dst.as_chunks_mut::<16>();
 
         let weights = &weight[..bounds.size];
 
-        for (x, dst) in iter16.enumerate() {
+        for (x, dst) in iter16.0.iter_mut().enumerate() {
             let mut store0 = initial_store;
             let mut store1 = initial_store;
             let mut store2 = initial_store;
@@ -88,8 +88,8 @@ fn convolve_column_lb_u16_impl(
 
                 let v_weight = _mm_set1_epi16(k_weight);
 
-                let item_row0 = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
-                let item_row1 = _mm_loadu_si128(src_ptr.as_ptr().add(8) as *const __m128i);
+                let item_row0 = _mm_loadu_si128(src_ptr.as_ptr().cast());
+                let item_row1 = _mm_loadu_si128(src_ptr.as_ptr().add(8).cast());
 
                 store0 = _mm_add_epi32(
                     store0,
@@ -123,12 +123,12 @@ fn convolve_column_lb_u16_impl(
             cx += 16;
         }
 
-        let tail16 = dst.chunks_exact_mut(16).into_remainder();
-        let iter8 = tail16.chunks_exact_mut(8);
+        let tail16 = dst.as_chunks_mut::<16>().1;
+        let iter8 = tail16.as_chunks_mut::<8>();
 
         let v_px = cx;
 
-        for (x, dst) in iter8.enumerate() {
+        for (x, dst) in iter8.0.iter_mut().enumerate() {
             let mut store0 = initial_store;
             let mut store1 = initial_store;
 
@@ -140,7 +140,7 @@ fn convolve_column_lb_u16_impl(
 
                 let v_weight = _mm_set1_epi16(k_weight);
 
-                let item_row = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
+                let item_row = _mm_loadu_si128(src_ptr.as_ptr().cast());
 
                 store0 = _mm_add_epi32(
                     store0,
@@ -161,12 +161,12 @@ fn convolve_column_lb_u16_impl(
             cx += 8;
         }
 
-        let tail8 = tail16.chunks_exact_mut(8).into_remainder();
-        let iter4 = tail8.chunks_exact_mut(4);
+        let tail8 = tail16.as_chunks_mut::<8>().1;
+        let iter4 = tail8.as_chunks_mut::<4>();
 
         let v_cx = cx;
 
-        for (x, dst) in iter4.enumerate() {
+        for (x, dst) in iter4.0.iter_mut().enumerate() {
             let mut store0 = initial_store;
 
             let v_dx = v_cx + x * 4;
@@ -193,7 +193,7 @@ fn convolve_column_lb_u16_impl(
             cx += 4;
         }
 
-        let tail4 = tail8.chunks_exact_mut(4).into_remainder();
+        let tail4 = tail8.as_chunks_mut::<4>().1;
 
         let a_px = cx;
 

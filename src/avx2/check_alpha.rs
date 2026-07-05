@@ -59,14 +59,11 @@ fn avx_has_non_constant_cap_alpha_rgba8_impl(store: &[u8], width: usize, stride:
             let row = &row[..width * 4];
             let mut sums = _mm256_set1_epi32(0);
 
-            for chunk in row.chunks_exact(32 * 4) {
-                let mut r0 = _mm256_loadu_si256(chunk.as_ptr() as *const __m256i);
-                let mut r1 =
-                    _mm256_loadu_si256(chunk.get_unchecked(32..).as_ptr() as *const __m256i);
-                let mut r2 =
-                    _mm256_loadu_si256(chunk.get_unchecked(64..).as_ptr() as *const __m256i);
-                let mut r3 =
-                    _mm256_loadu_si256(chunk.get_unchecked(96..).as_ptr() as *const __m256i);
+            for chunk in row.as_chunks::<128>().0.iter() {
+                let mut r0 = _mm256_loadu_si256(chunk.as_ptr().cast());
+                let mut r1 = _mm256_loadu_si256(chunk.get_unchecked(32..).as_ptr().cast());
+                let mut r2 = _mm256_loadu_si256(chunk.get_unchecked(64..).as_ptr().cast());
+                let mut r3 = _mm256_loadu_si256(chunk.get_unchecked(96..).as_ptr().cast());
 
                 r0 = _mm256_xor_si256(_mm256_shuffle_epi8(r0, ash0), def_alpha);
                 r1 = _mm256_xor_si256(_mm256_shuffle_epi8(r1, ash0), def_alpha);
@@ -79,17 +76,17 @@ fn avx_has_non_constant_cap_alpha_rgba8_impl(store: &[u8], width: usize, stride:
                 sums = _mm256_add_epi32(sums, r3);
             }
 
-            let row = row.chunks_exact(32 * 4).remainder();
+            let row = row.as_chunks::<128>().1;
 
-            for chunk in row.chunks_exact(32) {
-                let mut r0 = _mm256_loadu_si256(chunk.as_ptr() as *const __m256i);
+            for chunk in row.as_chunks::<32>().0.iter() {
+                let mut r0 = _mm256_loadu_si256(chunk.as_ptr().cast());
 
                 r0 = _mm256_xor_si256(_mm256_shuffle_epi8(r0, ash0), def_alpha);
 
                 sums = _mm256_add_epi32(sums, r0);
             }
 
-            let row = row.chunks_exact(32).remainder();
+            let row = row.as_chunks::<32>().1;
 
             let mut sums = _mm_add_epi32(
                 _mm256_castsi256_si128(sums),
@@ -97,7 +94,7 @@ fn avx_has_non_constant_cap_alpha_rgba8_impl(store: &[u8], width: usize, stride:
             );
             let def_alpha = _mm_set1_epi32(first_alpha as i32);
 
-            for chunk in row.chunks_exact(16) {
+            for chunk in row.as_chunks::<16>().0.iter() {
                 let mut r0 = _mm_loadu_si128(chunk.as_ptr() as *const __m128i);
 
                 r0 = _mm_shuffle_epi8(r0, sh0);
@@ -107,12 +104,12 @@ fn avx_has_non_constant_cap_alpha_rgba8_impl(store: &[u8], width: usize, stride:
                 sums = _mm_add_epi32(sums, alphas);
             }
 
-            let row = row.chunks_exact(16).remainder();
+            let row = row.as_chunks::<16>().1;
 
             use crate::avx2::routines::_mm_hsum_epi32;
             let mut h_sum = _mm_hsum_epi32(sums);
 
-            for chunk in row.chunks_exact(4) {
+            for chunk in row.as_chunks::<4>().0.iter() {
                 h_sum += chunk[3] as i32 ^ first_alpha as i32;
             }
 
@@ -151,14 +148,11 @@ fn avx_has_non_constant_cap_alpha_rgba16_impl(store: &[u16], width: usize, strid
         for row in store.chunks(stride) {
             let row = &row[..width * 4];
             let mut sums = _mm256_set1_epi32(0);
-            for chunk in row.chunks_exact(16 * 4) {
-                let mut r0 = _mm256_loadu_si256(chunk.as_ptr() as *const __m256i);
-                let mut r1 =
-                    _mm256_loadu_si256(chunk.get_unchecked(16..).as_ptr() as *const __m256i);
-                let mut r2 =
-                    _mm256_loadu_si256(chunk.get_unchecked(32..).as_ptr() as *const __m256i);
-                let mut r3 =
-                    _mm256_loadu_si256(chunk.get_unchecked(48..).as_ptr() as *const __m256i);
+            for chunk in row.as_chunks::<64>().0.iter() {
+                let mut r0 = _mm256_loadu_si256(chunk.as_ptr().cast());
+                let mut r1 = _mm256_loadu_si256(chunk[16..].as_ptr().cast());
+                let mut r2 = _mm256_loadu_si256(chunk[32..].as_ptr().cast());
+                let mut r3 = _mm256_loadu_si256(chunk[48..].as_ptr().cast());
 
                 r0 = _mm256_shuffle_epi8(r0, ash0);
                 r1 = _mm256_shuffle_epi8(r1, ash0);
@@ -172,10 +166,10 @@ fn avx_has_non_constant_cap_alpha_rgba16_impl(store: &[u16], width: usize, strid
                 sums = _mm256_add_epi32(sums, r23);
             }
 
-            let row = row.chunks_exact(16 * 4).remainder();
+            let row = row.as_chunks::<32>().1;
 
-            for chunk in row.chunks_exact(16) {
-                let mut r0 = _mm256_loadu_si256(chunk.as_ptr() as *const __m256i);
+            for chunk in row.as_chunks::<16>().0.iter() {
+                let mut r0 = _mm256_loadu_si256(chunk.as_ptr().cast());
 
                 r0 = _mm256_shuffle_epi8(r0, ash0);
 
@@ -184,7 +178,7 @@ fn avx_has_non_constant_cap_alpha_rgba16_impl(store: &[u16], width: usize, strid
                 sums = _mm256_add_epi32(sums, alphas);
             }
 
-            let row = row.chunks_exact(16).remainder();
+            let row = row.as_chunks::<16>().1;
 
             use crate::avx2::routines::_mm_hsum_epi32;
             let mut h_sum = _mm_hsum_epi32(_mm_add_epi32(
@@ -192,7 +186,7 @@ fn avx_has_non_constant_cap_alpha_rgba16_impl(store: &[u16], width: usize, strid
                 _mm256_extracti128_si256::<1>(sums),
             ));
 
-            for chunk in row.chunks_exact(4) {
+            for chunk in row.as_chunks::<4>().0.iter() {
                 h_sum += chunk[3] as i32 ^ first_alpha as i32;
             }
 

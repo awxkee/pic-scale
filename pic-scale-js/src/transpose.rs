@@ -282,16 +282,17 @@ pub(crate) fn apply_orientation(
         Orientation::FlipH => Op::Flip,
         Orientation::FlipV => Op::Flop,
         Orientation::Rotate180 => Op::Rotate180,
-        Orientation::Rotate90 => Op::Transpose(FlipMode::NoFlip, FlopMode::NoFlop),
-        Orientation::Rotate270 => Op::Transpose(FlipMode::NoFlip, FlopMode::Flop),
-        Orientation::Transpose => Op::Transpose(FlipMode::Flip, FlopMode::NoFlop),
-        Orientation::Transverse => Op::Transpose(FlipMode::Flip, FlopMode::Flop),
+        Orientation::Rotate90 => Op::Transpose(FlipMode::Flip, FlopMode::Flop),
+        Orientation::Rotate270 => Op::Transpose(FlipMode::NoFlip, FlopMode::NoFlop),
+        Orientation::Transpose => Op::Transpose(FlipMode::NoFlip, FlopMode::Flop),
+        Orientation::Transverse => Op::Transpose(FlipMode::Flip, FlopMode::NoFlop),
     };
-
     let (width, height) = img.dimensions();
     let (w, h) = (width as usize, height as usize);
-    let (out_w, out_h) = match op {
-        Op::Transpose(..) => (h, w),
+    let (out_w, out_h) = match orientation {
+        Orientation::Transpose => (h, w),
+        Orientation::Rotate90 => (h, w),
+        Orientation::Rotate270 => (h, w),
         _ => (w, h),
     };
 
