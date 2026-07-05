@@ -53,7 +53,12 @@ fn sse_premultiply_alpha_rgba_row_f16_impl<const F16C: bool>(dst: &mut [f16], sr
         let mut rem = dst;
         let mut src_rem = src;
 
-        for (dst, src) in rem.as_chunks_mut::<32>().0.iter_mut().zip(src_rem.as_chunks::<32>().0.iter()) {
+        for (dst, src) in rem
+            .as_chunks_mut::<32>()
+            .0
+            .iter_mut()
+            .zip(src_rem.as_chunks::<32>().0.iter())
+        {
             let lane0 = _mm_loadu_si128(src.as_ptr().cast());
             let lane1 = _mm_loadu_si128(src[8..].as_ptr().cast());
             let lane2 = _mm_loadu_si128(src[16..].as_ptr().cast());
