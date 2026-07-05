@@ -36,7 +36,12 @@ fn convert_weights_to_f16_impl<J: Default + Clone>(weights: &[f32]) -> Vec<J> {
     unsafe {
         let mut new_weights = vec![J::default(); weights.len()];
 
-        for (dst, src) in new_weights.chunks_exact_mut(8).zip(weights.chunks_exact(8)) {
+        for (dst, src) in new_weights
+            .as_chunks_mut::<8>()
+            .0
+            .iter_mut()
+            .zip(weights.as_chunks::<8>().0.iter())
+        {
             let j = vld1q_f32_x2(src.as_ptr());
             let cvt0 = vcvt_f16_f32(j.0);
             let cvt1 = vcvt_f16_f32(j.1);
@@ -46,19 +51,24 @@ fn convert_weights_to_f16_impl<J: Default + Clone>(weights: &[f32]) -> Vec<J> {
             );
         }
 
-        let dst = new_weights.chunks_exact_mut(8).into_remainder();
-        let src = weights.chunks_exact(8).remainder();
+        let dst = new_weights.as_chunks_mut::<8>().1;
+        let src = weights.as_chunks::<8>().1;
 
-        for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+        for (dst, src) in dst
+            .as_chunks_mut::<4>()
+            .0
+            .iter_mut()
+            .zip(src.as_chunks::<4>().0.iter())
+        {
             let j = vld1q_f32(src.as_ptr());
             let cvt = vcvt_f16_f32(j);
             vst1_u16(dst.as_mut_ptr() as *mut u16, vreinterpret_u16_f16(cvt));
         }
 
-        let dst = dst.chunks_exact_mut(4).into_remainder();
-        let src = src.chunks_exact(4).remainder();
+        let dst = dst.as_chunks_mut::<4>().1;
+        let src = src.as_chunks::<4>().1;
 
-        for (dst, src) in dst.chunks_exact_mut(1).zip(src.iter()) {
+        for (dst, src) in dst.as_chunks_mut::<1>().0.iter_mut().zip(src.iter()) {
             let j = vcvt_f16_f32(vld1q_lane_f32::<0>(src, vdupq_n_f32(0.)));
             vst1_lane_u16::<0>(dst.as_mut_ptr() as *mut u16, vreinterpret_u16_f16(j));
         }

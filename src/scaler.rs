@@ -1155,7 +1155,7 @@ mod tests {
         ($dst: expr, $image_width: expr, $max: expr) => {
             {
                 for (y, row) in $dst.chunks_exact($image_width * 4).enumerate() {
-                    for (i, dst) in row.chunks_exact(4).enumerate() {
+                    for (i, dst) in row.as_chunks::<4>().0.iter().enumerate() {
                         let diff0 = (dst[0] as i32 - 124).abs();
                         let diff1 = (dst[1] as i32 - 41).abs();
                         let diff2 = (dst[2] as i32 - 99).abs();
@@ -1221,7 +1221,7 @@ mod tests {
         let image_height = 512;
         const CN: usize = 4;
         let mut image = vec![0u8; image_height * image_width * CN];
-        for dst in image.chunks_exact_mut(4) {
+        for dst in image.as_chunks_mut::<4>().0.iter_mut() {
             dst[0] = 124;
             dst[1] = 41;
             dst[2] = 99;
@@ -1245,7 +1245,7 @@ mod tests {
         let image_height = 512;
         const CN: usize = 4;
         let mut image = vec![0u8; image_height * image_width * CN];
-        for dst in image.chunks_exact_mut(4) {
+        for dst in image.as_chunks_mut::<4>().0.iter_mut() {
             dst[0] = 124;
             dst[1] = 41;
             dst[2] = 99;
@@ -1270,7 +1270,7 @@ mod tests {
         let image_height = 512;
         const CN: usize = 4;
         let mut image = vec![0u8; image_height * image_width * CN];
-        for dst in image.chunks_exact_mut(4) {
+        for dst in image.as_chunks_mut::<4>().0.iter_mut() {
             dst[0] = 124;
             dst[1] = 41;
             dst[2] = 99;
@@ -1343,7 +1343,7 @@ mod tests {
         let image_height = 8;
         const CN: usize = 4;
         let mut image = vec![0u16; image_height * image_width * CN];
-        for dst in image.chunks_exact_mut(4) {
+        for dst in image.as_chunks_mut::<4>().0.iter_mut() {
             dst[0] = 124;
             dst[1] = 41;
             dst[2] = 99;
@@ -1445,7 +1445,7 @@ mod tests {
         let image_height = 8;
         const CN: usize = 4;
         let mut image = vec![0u16; image_height * image_width * CN];
-        for dst in image.chunks_exact_mut(4) {
+        for dst in image.as_chunks_mut::<4>().0.iter_mut() {
             dst[0] = 124;
             dst[1] = 41;
             dst[2] = 99;
@@ -1471,7 +1471,7 @@ mod tests {
         let image_height = 8;
         const CN: usize = 4;
         let mut image = vec![0u16; image_height * image_width * CN];
-        for dst in image.chunks_exact_mut(4) {
+        for dst in image.as_chunks_mut::<4>().0.iter_mut() {
             dst[0] = 124;
             dst[1] = 41;
             dst[2] = 99;
@@ -1497,7 +1497,7 @@ mod tests {
         let image_height = 512;
         const CN: usize = 4;
         let mut image = vec![0u8; image_height * image_width * CN];
-        for dst in image.chunks_exact_mut(4) {
+        for dst in image.as_chunks_mut::<4>().0.iter_mut() {
             dst[0] = 124;
             dst[1] = 41;
             dst[2] = 99;
@@ -1522,7 +1522,7 @@ mod tests {
         let image_height = 512;
         const CN: usize = 4;
         let mut image = vec![0u8; image_height * image_width * CN];
-        for dst in image.chunks_exact_mut(4) {
+        for dst in image.as_chunks_mut::<4>().0.iter_mut() {
             dst[0] = 124;
             dst[1] = 41;
             dst[2] = 99;

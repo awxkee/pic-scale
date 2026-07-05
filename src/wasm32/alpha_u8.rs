@@ -105,7 +105,7 @@ fn wasm_unpremultiply_alpha_rgba_impl(in_place: &mut [u8]) {
 
     let table = unpremultiplication_table();
 
-    for dst in rem.chunks_exact_mut(4) {
+    for dst in rem.as_chunks_mut::<4>().0.iter_mut() {
         let a = dst[3];
         let z = a as u16 * 255;
         dst[0] = table[(z + dst[0] as u16) as usize];

@@ -37,7 +37,12 @@ fn neon_premultiply_alpha_rgba_row_f16(dst: &mut [f16], src: &[f16]) {
         let mut rem = dst;
         let mut src_rem = src;
 
-        for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
+        for (dst, src) in rem
+            .as_chunks_mut::<32>()
+            .0
+            .iter_mut()
+            .zip(src_rem.as_chunks::<32>().0.iter())
+        {
             let src_ptr = src.as_ptr();
             let pixel = vld4q_u16(src_ptr.cast());
 
@@ -86,8 +91,8 @@ fn neon_premultiply_alpha_rgba_row_f16(dst: &mut [f16], src: &[f16]) {
             vst4q_u16(dst_ptr as *mut u16, store_pixel);
         }
 
-        rem = rem.chunks_exact_mut(8 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(8 * 4).remainder();
+        rem = rem.as_chunks_mut::<32>().1;
+        src_rem = src_rem.as_chunks::<32>().1;
 
         premultiply_pixel_f16_row(rem, src_rem);
     }
@@ -104,7 +109,7 @@ fn neon_unpremultiply_alpha_rgba_row_f16(in_place: &mut [f16]) {
     unsafe {
         let mut rem = in_place;
 
-        for dst in rem.chunks_exact_mut(8 * 4) {
+        for dst in rem.as_chunks_mut::<32>().0.iter_mut() {
             let src_ptr = dst.as_ptr();
             let pixel = vld4q_u16(src_ptr.cast());
 
@@ -172,7 +177,7 @@ fn neon_unpremultiply_alpha_rgba_row_f16(in_place: &mut [f16]) {
             vst4q_u16(dst_ptr as *mut u16, store_pixel);
         }
 
-        rem = rem.chunks_exact_mut(8 * 4).into_remainder();
+        rem = rem.as_chunks_mut::<32>().1;
 
         unpremultiply_pixel_f16_row(rem);
     }
