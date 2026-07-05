@@ -46,27 +46,27 @@ pub(crate) fn neon_has_non_constant_cap_alpha_rgba8(
         for row in store.chunks(stride) {
             let row = &row[..width * 4];
             let mut sums = vdupq_n_u32(0);
-            for chunk in row.chunks_exact(16 * 4) {
+            for chunk in row.as_chunks::<64>().0.iter() {
                 let loaded = vld4q_u8(chunk.as_ptr());
                 let blend_result = veorq_u8(loaded.3, v_first_alpha);
                 let blend32 = vpaddlq_u16(vpaddlq_u8(blend_result));
                 sums = vaddq_u32(sums, blend32);
             }
 
-            let row = row.chunks_exact(16 * 4).remainder();
+            let row = row.as_chunks::<64>().1;
 
-            for chunk in row.chunks_exact(8 * 4) {
+            for chunk in row.as_chunks::<32>().0.iter() {
                 let loaded = vld4_u8(chunk.as_ptr());
                 let blend_result = veor_u8(loaded.3, vget_low_u8(v_first_alpha));
                 let blend32 = vpaddl_u16(vpaddl_u8(blend_result));
                 sums = vaddq_u32(sums, vcombine_u32(blend32, blend32));
             }
 
-            let row = row.chunks_exact(8 * 4).remainder();
+            let row = row.as_chunks::<32>().1;
 
             let mut h_sum = vaddvq_u32(sums);
 
-            for chunk in row.chunks_exact(4) {
+            for chunk in row.as_chunks::<4>().0.iter() {
                 h_sum += chunk[3] as u32 ^ first_alpha as u32;
             }
 
@@ -96,16 +96,16 @@ pub(crate) fn neon_has_non_constant_cap_alpha_rgba16(
         for row in store.chunks(stride) {
             let row = &row[..width * 4];
             let mut sums = vdupq_n_u32(0);
-            for chunk in row.chunks_exact(8 * 4) {
+            for chunk in row.as_chunks::<32>().0.iter() {
                 let r0 = vld4q_u16(chunk.as_ptr());
 
                 let pxor = veorq_u16(r0.3, def_alpha);
                 sums = vaddq_u32(sums, vpaddlq_u16(pxor));
             }
 
-            let row = row.chunks_exact(8 * 4).remainder();
+            let row = row.as_chunks::<32>().1;
 
-            for chunk in row.chunks_exact(4 * 4) {
+            for chunk in row.as_chunks::<16>().0.iter() {
                 let r0 = vld4_u16(chunk.as_ptr());
 
                 let pxor = veor_u16(r0.3, vget_low_u16(def_alpha));
@@ -113,11 +113,11 @@ pub(crate) fn neon_has_non_constant_cap_alpha_rgba16(
                 sums = vaddq_u32(sums, vcombine_u32(pw, pw));
             }
 
-            let row = row.chunks_exact(4 * 4).remainder();
+            let row = row.as_chunks::<16>().1;
 
             let mut h_sum = vaddvq_u32(sums);
 
-            for chunk in row.chunks_exact(4) {
+            for chunk in row.as_chunks::<4>().0.iter() {
                 h_sum += chunk[3] as u32 ^ first_alpha as u32;
             }
 

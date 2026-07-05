@@ -175,7 +175,8 @@ pub(crate) fn vertical_strategy_u8<const N: usize>(
     match _options.workload_strategy {
         crate::WorkloadStrategy::PreferQuality => {}
         crate::WorkloadStrategy::PreferSpeed => {
-            if std::arch::is_aarch64_feature_detected!("sve2")
+            if _scale_factor < 10.
+                && std::arch::is_aarch64_feature_detected!("sve2")
                 && std::arch::is_aarch64_feature_detected!("i8mm")
             {
                 use crate::sve2::convolve_vertical_sve2_i8_dot;

@@ -184,14 +184,16 @@ impl Sse41PremultiplyExecutorRgba8 for Sse41PremultiplyExecutor8Default {
             let mut src_rem = src;
 
             for (dst, src) in rem
-                .chunks_exact_mut(16 * 4)
-                .zip(src_rem.chunks_exact(16 * 4))
+                .as_chunks_mut::<64>()
+                .0
+                .iter_mut()
+                .zip(src_rem.as_chunks::<64>().0.iter())
             {
                 self.premultiply_chunk(dst, src);
             }
 
-            rem = rem.chunks_exact_mut(16 * 4).into_remainder();
-            src_rem = src_rem.chunks_exact(16 * 4).remainder();
+            rem = rem.as_chunks_mut::<64>().1;
+            src_rem = src_rem.as_chunks::<64>().1;
 
             if !rem.is_empty() {
                 const PART_SIZE: usize = 16 * 4;
@@ -274,11 +276,11 @@ impl DisassociateAlpha for DisassociateAlphaDefault {
         unsafe {
             let mut rem = in_place;
 
-            for dst in rem.chunks_exact_mut(16 * 4) {
+            for dst in rem.as_chunks_mut::<64>().0.iter_mut() {
                 self.disassociate_chunk(dst);
             }
 
-            rem = rem.chunks_exact_mut(16 * 4).into_remainder();
+            rem = rem.as_chunks_mut::<64>().1;
 
             if !rem.is_empty() {
                 const PART_SIZE: usize = 16 * 4;

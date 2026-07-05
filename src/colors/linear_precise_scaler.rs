@@ -83,8 +83,10 @@ impl<const N: usize> Splitter<u8, f32, N> for Common8BitSplitter<N> {
         if N == 4 {
             for (src, dst) in from
                 .as_bytes()
-                .chunks_exact(4)
-                .zip(into.buffer.borrow_mut().chunks_exact_mut(4))
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(into.buffer.borrow_mut().as_chunks_mut::<4>().0.iter_mut())
             {
                 dst[0] = self.linearization[src[0] as usize];
                 dst[1] = self.linearization[src[1] as usize];
@@ -94,8 +96,10 @@ impl<const N: usize> Splitter<u8, f32, N> for Common8BitSplitter<N> {
         } else if N == 2 && self.has_alpha {
             for (src, dst) in from
                 .as_bytes()
-                .chunks_exact(2)
-                .zip(into.buffer.borrow_mut().chunks_exact_mut(2))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .zip(into.buffer.borrow_mut().as_chunks_mut::<2>().0.iter_mut())
             {
                 dst[0] = self.linearization[src[0] as usize];
                 dst[1] = src[1] as f32 * S;
@@ -116,8 +120,10 @@ impl<const N: usize> Splitter<u8, f32, N> for Common8BitSplitter<N> {
         if N == 4 {
             for (src, dst) in from
                 .as_bytes()
-                .chunks_exact(4)
-                .zip(into.buffer.borrow_mut().chunks_exact_mut(4))
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(into.buffer.borrow_mut().as_chunks_mut::<4>().0.iter_mut())
             {
                 let v0 = (src[0] * 65535.).cpu_round() as u16;
                 let v1 = (src[1] * 65535.).cpu_round() as u16;
@@ -131,8 +137,10 @@ impl<const N: usize> Splitter<u8, f32, N> for Common8BitSplitter<N> {
         } else if N == 2 && self.has_alpha {
             for (src, dst) in from
                 .as_bytes()
-                .chunks_exact(2)
-                .zip(into.buffer.borrow_mut().chunks_exact_mut(2))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .zip(into.buffer.borrow_mut().as_chunks_mut::<2>().0.iter_mut())
             {
                 let v0 = (src[0] * 65535.).cpu_round() as u16;
 
@@ -173,8 +181,10 @@ impl<const N: usize> Splitter<u16, f32, N> for Common16BitSplitter<N> {
 
             for (src, dst) in from
                 .as_bytes()
-                .chunks_exact(4)
-                .zip(into.buffer.borrow_mut().chunks_exact_mut(4))
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(into.buffer.borrow_mut().as_chunks_mut::<4>().0.iter_mut())
             {
                 dst[0] = self.linearization[src[0] as usize];
                 dst[1] = self.linearization[src[1] as usize];
@@ -187,8 +197,10 @@ impl<const N: usize> Splitter<u16, f32, N> for Common16BitSplitter<N> {
 
             for (src, dst) in from
                 .as_bytes()
-                .chunks_exact(2)
-                .zip(into.buffer.borrow_mut().chunks_exact_mut(2))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .zip(into.buffer.borrow_mut().as_chunks_mut::<2>().0.iter_mut())
             {
                 dst[0] = self.linearization[src[0] as usize];
                 dst[1] = src[1] as f32 * v_recip;
@@ -210,8 +222,10 @@ impl<const N: usize> Splitter<u16, f32, N> for Common16BitSplitter<N> {
             let max_bit_depth_value = ((1u32 << self.bit_depth) - 1) as f32;
             for (src, dst) in from
                 .as_bytes()
-                .chunks_exact(4)
-                .zip(into.buffer.borrow_mut().chunks_exact_mut(4))
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(into.buffer.borrow_mut().as_chunks_mut::<4>().0.iter_mut())
             {
                 let v0 = ((src[0] * 262143.).cpu_round().max(0.) as u32).min(262143);
                 let v1 = ((src[1] * 262143.).cpu_round().max(0.) as u32).min(262143);
@@ -229,8 +243,10 @@ impl<const N: usize> Splitter<u16, f32, N> for Common16BitSplitter<N> {
             let max_bit_depth_value = ((1u32 << self.bit_depth) - 1) as f32;
             for (src, dst) in from
                 .as_bytes()
-                .chunks_exact(2)
-                .zip(into.buffer.borrow_mut().chunks_exact_mut(2))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .zip(into.buffer.borrow_mut().as_chunks_mut::<2>().0.iter_mut())
             {
                 let v0 = ((src[0] * 262143.).cpu_round().max(0.) as u32).min(262143);
 

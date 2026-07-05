@@ -133,7 +133,7 @@ fn convolve_horizontal_rgba_vnni_row_4_impl(
                 let mut store_avx2 = vld;
                 let mut store_avx3 = vld;
 
-                while jx + 8 < bounds.size {
+                while jx + 8 <= bounds.size {
                     let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
 
@@ -180,7 +180,7 @@ fn convolve_horizontal_rgba_vnni_row_4_impl(
                     jx += 8;
                 }
 
-                while jx + 4 < bounds.size {
+                while jx + 4 <= bounds.size {
                     let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
 
@@ -225,18 +225,18 @@ fn convolve_horizontal_rgba_vnni_row_4_impl(
                     jx += 4;
                 }
 
-                store_0 = _mm256_add_epi16(
+                store_0 = _mm256_add_epi32(
                     _mm256_permute2x128_si256::<0x20>(store_avx0, store_avx1),
                     _mm256_permute2x128_si256::<0x31>(store_avx0, store_avx1),
                 );
 
-                store_1 = _mm256_add_epi16(
+                store_1 = _mm256_add_epi32(
                     _mm256_permute2x128_si256::<0x20>(store_avx2, store_avx3),
                     _mm256_permute2x128_si256::<0x31>(store_avx2, store_avx3),
                 );
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
 
@@ -382,7 +382,7 @@ fn convolve_horizontal_rgba_vnni_rows_one_impl(
 
         let permute_avx_weights = _mm256_setr_epi32(0, 0, 0, 0, 1, 1, 1, 1);
 
-        let vld = _mm_set1_epi32(PRECISION);
+        let vld = _mm_set1_epi32(ROUNDING_CONST);
 
         for ((dst, bounds), weights) in dst
             .as_chunks_mut::<CN>()
@@ -410,7 +410,7 @@ fn convolve_horizontal_rgba_vnni_rows_one_impl(
                     0,
                 );
 
-                while jx + 8 < bounds.size {
+                while jx + 8 <= bounds.size {
                     let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
 
@@ -433,7 +433,7 @@ fn convolve_horizontal_rgba_vnni_rows_one_impl(
                     jx += 8;
                 }
 
-                while jx + 4 < bounds.size {
+                while jx + 4 <= bounds.size {
                     let w_ptr = weights.get_unchecked(jx..);
                     let bounds_start = bounds.start + jx;
 
@@ -461,7 +461,7 @@ fn convolve_horizontal_rgba_vnni_rows_one_impl(
                 );
             }
 
-            while jx + 2 < bounds.size {
+            while jx + 2 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..);
                 let bounds_start = bounds.start + jx;
 

@@ -53,12 +53,16 @@ fn sse_premultiply_alpha_rgba_row_f16_impl<const F16C: bool>(dst: &mut [f16], sr
         let mut rem = dst;
         let mut src_rem = src;
 
-        for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
-            let src_ptr = src.as_ptr();
-            let lane0 = _mm_loadu_si128(src_ptr as *const __m128i);
-            let lane1 = _mm_loadu_si128(src_ptr.add(8) as *const __m128i);
-            let lane2 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
-            let lane3 = _mm_loadu_si128(src_ptr.add(24) as *const __m128i);
+        for (dst, src) in rem
+            .as_chunks_mut::<32>()
+            .0
+            .iter_mut()
+            .zip(src_rem.as_chunks::<32>().0.iter())
+        {
+            let lane0 = _mm_loadu_si128(src.as_ptr().cast());
+            let lane1 = _mm_loadu_si128(src[8..].as_ptr().cast());
+            let lane2 = _mm_loadu_si128(src[16..].as_ptr().cast());
+            let lane3 = _mm_loadu_si128(src[24..].as_ptr().cast());
             let pixel = sse_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
 
             let low_alpha = _mm_cvtph_psx::<F16C>(pixel.3);
@@ -85,17 +89,16 @@ fn sse_premultiply_alpha_rgba_row_f16_impl<const F16C: bool>(dst: &mut [f16], sr
                 _mm_unpacklo_epi64(_mm_cvtps_phx::<F16C>(low_g), _mm_cvtps_phx::<F16C>(high_g));
             let b_values =
                 _mm_unpacklo_epi64(_mm_cvtps_phx::<F16C>(low_b), _mm_cvtps_phx::<F16C>(high_b));
-            let dst_ptr = dst.as_mut_ptr();
             let (d_lane0, d_lane1, d_lane2, d_lane3) =
                 sse_interleave_rgba_epi16(r_values, g_values, b_values, pixel.3);
-            _mm_storeu_si128(dst_ptr as *mut __m128i, d_lane0);
-            _mm_storeu_si128(dst_ptr.add(8) as *mut __m128i, d_lane1);
-            _mm_storeu_si128(dst_ptr.add(16) as *mut __m128i, d_lane2);
-            _mm_storeu_si128(dst_ptr.add(24) as *mut __m128i, d_lane3);
+            _mm_storeu_si128(dst.as_mut_ptr().cast(), d_lane0);
+            _mm_storeu_si128(dst[8..].as_mut_ptr().cast(), d_lane1);
+            _mm_storeu_si128(dst[16..].as_mut_ptr().cast(), d_lane2);
+            _mm_storeu_si128(dst[24..].as_mut_ptr().cast(), d_lane3);
         }
 
-        rem = rem.chunks_exact_mut(8 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(8 * 4).remainder();
+        rem = rem.as_chunks_mut::<32>().1;
+        src_rem = src_rem.as_chunks::<32>().1;
 
         premultiply_pixel_f16_row(rem, src_rem);
     }
@@ -126,12 +129,11 @@ fn sse_unpremultiply_alpha_rgba_f16_row_impl<const F16C: bool>(in_place: &mut [f
     unsafe {
         let mut rem = in_place;
 
-        for dst in rem.chunks_exact_mut(8 * 4) {
-            let src_ptr = dst.as_ptr();
-            let lane0 = _mm_loadu_si128(src_ptr as *const __m128i);
-            let lane1 = _mm_loadu_si128(src_ptr.add(8) as *const __m128i);
-            let lane2 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
-            let lane3 = _mm_loadu_si128(src_ptr.add(24) as *const __m128i);
+        for dst in rem.as_chunks_mut::<32>().0.iter_mut() {
+            let lane0 = _mm_loadu_si128(dst.as_ptr().cast());
+            let lane1 = _mm_loadu_si128(dst[8..].as_ptr().cast());
+            let lane2 = _mm_loadu_si128(dst[16..].as_ptr().cast());
+            let lane3 = _mm_loadu_si128(dst[24..].as_ptr().cast());
             let pixel = sse_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
 
             let low_alpha = _mm_cvtph_psx::<F16C>(pixel.3);
@@ -185,16 +187,15 @@ fn sse_unpremultiply_alpha_rgba_f16_row_impl<const F16C: bool>(in_place: &mut [f
                 _mm_unpacklo_epi64(_mm_cvtps_phx::<F16C>(low_g), _mm_cvtps_phx::<F16C>(high_g));
             let b_values =
                 _mm_unpacklo_epi64(_mm_cvtps_phx::<F16C>(low_b), _mm_cvtps_phx::<F16C>(high_b));
-            let dst_ptr = dst.as_mut_ptr();
             let (d_lane0, d_lane1, d_lane2, d_lane3) =
                 sse_interleave_rgba_epi16(r_values, g_values, b_values, pixel.3);
-            _mm_storeu_si128(dst_ptr as *mut __m128i, d_lane0);
-            _mm_storeu_si128(dst_ptr.add(8) as *mut __m128i, d_lane1);
-            _mm_storeu_si128(dst_ptr.add(16) as *mut __m128i, d_lane2);
-            _mm_storeu_si128(dst_ptr.add(24) as *mut __m128i, d_lane3);
+            _mm_storeu_si128(dst.as_mut_ptr().cast(), d_lane0);
+            _mm_storeu_si128(dst[8..].as_mut_ptr().cast(), d_lane1);
+            _mm_storeu_si128(dst[16..].as_mut_ptr().cast(), d_lane2);
+            _mm_storeu_si128(dst[24..].as_mut_ptr().cast(), d_lane3);
         }
 
-        rem = rem.chunks_exact_mut(8 * 4).into_remainder();
+        rem = rem.as_chunks_mut::<32>().1;
 
         unpremultiply_pixel_f16_row(rem);
     }

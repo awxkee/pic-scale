@@ -46,14 +46,15 @@ fn avx_premultiply_alpha_rgba_f16_row_impl(dst: &mut [f16], src: &[f16]) {
         let mut src_rem = src;
 
         for (dst, src) in rem
-            .chunks_exact_mut(16 * 4)
-            .zip(src_rem.chunks_exact(16 * 4))
+            .as_chunks_mut::<64>()
+            .0
+            .iter_mut()
+            .zip(src_rem.as_chunks::<64>().0.iter())
         {
-            let src_ptr = src.as_ptr();
-            let lane0 = _mm256_loadu_si256(src_ptr as *const __m256i);
-            let lane1 = _mm256_loadu_si256(src_ptr.add(16) as *const __m256i);
-            let lane2 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
-            let lane3 = _mm256_loadu_si256(src_ptr.add(48) as *const __m256i);
+            let lane0 = _mm256_loadu_si256(src.as_ptr().cast());
+            let lane1 = _mm256_loadu_si256(src[16..].as_ptr().cast());
+            let lane2 = _mm256_loadu_si256(src[32..].as_ptr().cast());
+            let lane3 = _mm256_loadu_si256(src[48..].as_ptr().cast());
             let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
 
             let low_alpha = _mm256_cvtph_ps(_mm256_castsi256_si128(pixel.3));
@@ -86,17 +87,16 @@ fn avx_premultiply_alpha_rgba_f16_row_impl(dst: &mut [f16], src: &[f16]) {
                 _mm256_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(low_b),
                 _mm256_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(high_b),
             );
-            let dst_ptr = dst.as_mut_ptr();
             let (d_lane0, d_lane1, d_lane2, d_lane3) =
                 avx_interleave_rgba_epi16(r_values, g_values, b_values, pixel.3);
-            _mm256_storeu_si256(dst_ptr as *mut __m256i, d_lane0);
-            _mm256_storeu_si256(dst_ptr.add(16) as *mut __m256i, d_lane1);
-            _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, d_lane2);
-            _mm256_storeu_si256(dst_ptr.add(48) as *mut __m256i, d_lane3);
+            _mm256_storeu_si256(dst.as_mut_ptr().cast(), d_lane0);
+            _mm256_storeu_si256(dst[16..].as_mut_ptr().cast(), d_lane1);
+            _mm256_storeu_si256(dst[32..].as_mut_ptr().cast(), d_lane2);
+            _mm256_storeu_si256(dst[48..].as_mut_ptr().cast(), d_lane3);
         }
 
-        rem = rem.chunks_exact_mut(16 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(16 * 4).remainder();
+        rem = rem.as_chunks_mut::<64>().1;
+        src_rem = src_rem.as_chunks::<64>().1;
 
         premultiply_pixel_f16_row(rem, src_rem);
     }
@@ -114,12 +114,11 @@ fn avx_unpremultiply_alpha_rgba_f16_row_impl(in_place: &mut [f16]) {
     unsafe {
         let mut rem = in_place;
 
-        for dst in rem.chunks_exact_mut(16 * 4) {
-            let src_ptr = dst.as_ptr();
-            let lane0 = _mm256_loadu_si256(src_ptr as *const __m256i);
-            let lane1 = _mm256_loadu_si256(src_ptr.add(16) as *const __m256i);
-            let lane2 = _mm256_loadu_si256(src_ptr.add(32) as *const __m256i);
-            let lane3 = _mm256_loadu_si256(src_ptr.add(48) as *const __m256i);
+        for dst in rem.as_chunks_mut::<64>().0.iter_mut() {
+            let lane0 = _mm256_loadu_si256(dst.as_mut_ptr().cast());
+            let lane1 = _mm256_loadu_si256(dst[16..].as_mut_ptr().cast());
+            let lane2 = _mm256_loadu_si256(dst[32..].as_mut_ptr().cast());
+            let lane3 = _mm256_loadu_si256(dst[48..].as_mut_ptr().cast());
             let pixel = avx_deinterleave_rgba_epi16(lane0, lane1, lane2, lane3);
 
             let low_alpha = _mm256_cvtph_ps(_mm256_castsi256_si128(pixel.3));
@@ -179,16 +178,15 @@ fn avx_unpremultiply_alpha_rgba_f16_row_impl(in_place: &mut [f16]) {
                 _mm256_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(low_b),
                 _mm256_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(high_b),
             );
-            let dst_ptr = dst.as_mut_ptr();
             let (d_lane0, d_lane1, d_lane2, d_lane3) =
                 avx_interleave_rgba_epi16(r_values, g_values, b_values, pixel.3);
-            _mm256_storeu_si256(dst_ptr as *mut __m256i, d_lane0);
-            _mm256_storeu_si256(dst_ptr.add(16) as *mut __m256i, d_lane1);
-            _mm256_storeu_si256(dst_ptr.add(32) as *mut __m256i, d_lane2);
-            _mm256_storeu_si256(dst_ptr.add(48) as *mut __m256i, d_lane3);
+            _mm256_storeu_si256(dst.as_mut_ptr().cast(), d_lane0);
+            _mm256_storeu_si256(dst[16..].as_mut_ptr().cast(), d_lane1);
+            _mm256_storeu_si256(dst[32..].as_mut_ptr().cast(), d_lane2);
+            _mm256_storeu_si256(dst[48..].as_mut_ptr().cast(), d_lane3);
         }
 
-        rem = rem.chunks_exact_mut(16 * 4).into_remainder();
+        rem = rem.as_chunks_mut::<64>().1;
 
         unpremultiply_pixel_f16_row(rem);
     }

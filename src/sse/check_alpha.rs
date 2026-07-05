@@ -57,11 +57,11 @@ fn sse_has_non_constant_cap_alpha_rgba8_impl(store: &[u8], width: usize, stride:
         for row in store.chunks(stride) {
             let row = &row[..width * 4];
             let mut sums = _mm_set1_epi32(0);
-            for chunk in row.chunks_exact(16 * 4) {
-                let mut r0 = _mm_loadu_si128(chunk.as_ptr() as *const __m128i);
-                let mut r1 = _mm_loadu_si128(chunk.get_unchecked(16..).as_ptr() as *const __m128i);
-                let mut r2 = _mm_loadu_si128(chunk.get_unchecked(32..).as_ptr() as *const __m128i);
-                let mut r3 = _mm_loadu_si128(chunk.get_unchecked(48..).as_ptr() as *const __m128i);
+            for chunk in row.as_chunks::<64>().0.iter() {
+                let mut r0 = _mm_loadu_si128(chunk.as_ptr().cast());
+                let mut r1 = _mm_loadu_si128(chunk[16..].as_ptr().cast());
+                let mut r2 = _mm_loadu_si128(chunk[32..].as_ptr().cast());
+                let mut r3 = _mm_loadu_si128(chunk[48..].as_ptr().cast());
 
                 r0 = _mm_xor_si128(_mm_shuffle_epi8(r0, sh0), def_alpha);
                 r1 = _mm_xor_si128(_mm_shuffle_epi8(r1, sh0), def_alpha);
@@ -74,10 +74,10 @@ fn sse_has_non_constant_cap_alpha_rgba8_impl(store: &[u8], width: usize, stride:
                 sums = _mm_add_epi32(sums, r3);
             }
 
-            let row = row.chunks_exact(16 * 4).remainder();
+            let row = row.as_chunks::<64>().1;
 
-            for chunk in row.chunks_exact(16) {
-                let mut r0 = _mm_loadu_si128(chunk.as_ptr() as *const __m128i);
+            for chunk in row.as_chunks::<16>().0.iter() {
+                let mut r0 = _mm_loadu_si128(chunk.as_ptr().cast());
 
                 r0 = _mm_shuffle_epi8(r0, sh0);
 
@@ -86,11 +86,11 @@ fn sse_has_non_constant_cap_alpha_rgba8_impl(store: &[u8], width: usize, stride:
                 sums = _mm_add_epi32(sums, alphas);
             }
 
-            let row = row.chunks_exact(16).remainder();
+            let row = row.as_chunks::<16>().1;
 
             let mut h_sum = _mm_hsum_epi32(sums);
 
-            for chunk in row.chunks_exact(4) {
+            for chunk in row.as_chunks::<4>().0.iter() {
                 h_sum += chunk[3] as i32 ^ first_alpha as i32;
             }
 
@@ -126,11 +126,11 @@ fn sse_has_non_constant_cap_alpha_rgba16_impl(store: &[u16], width: usize, strid
         for row in store.chunks(stride) {
             let row = &row[..width * 4];
             let mut sums = _mm_set1_epi32(0);
-            for chunk in row.chunks_exact(8 * 4) {
-                let mut r0 = _mm_loadu_si128(chunk.as_ptr() as *const __m128i);
-                let mut r1 = _mm_loadu_si128(chunk.get_unchecked(8..).as_ptr() as *const __m128i);
-                let mut r2 = _mm_loadu_si128(chunk.get_unchecked(16..).as_ptr() as *const __m128i);
-                let mut r3 = _mm_loadu_si128(chunk.get_unchecked(24..).as_ptr() as *const __m128i);
+            for chunk in row.as_chunks::<32>().0.iter() {
+                let mut r0 = _mm_loadu_si128(chunk.as_ptr().cast());
+                let mut r1 = _mm_loadu_si128(chunk[8..].as_ptr().cast());
+                let mut r2 = _mm_loadu_si128(chunk[16..].as_ptr().cast());
+                let mut r3 = _mm_loadu_si128(chunk[24..].as_ptr().cast());
 
                 r0 = _mm_shuffle_epi8(r0, sh0);
                 r1 = _mm_shuffle_epi8(r1, sh0);
@@ -144,10 +144,10 @@ fn sse_has_non_constant_cap_alpha_rgba16_impl(store: &[u16], width: usize, strid
                 sums = _mm_add_epi32(sums, r23);
             }
 
-            let row = row.chunks_exact(8 * 4).remainder();
+            let row = row.as_chunks::<32>().1;
 
-            for chunk in row.chunks_exact(8) {
-                let mut r0 = _mm_loadu_si128(chunk.as_ptr() as *const __m128i);
+            for chunk in row.as_chunks::<8>().0.iter() {
+                let mut r0 = _mm_loadu_si128(chunk.as_ptr().cast());
 
                 r0 = _mm_shuffle_epi8(r0, sh0);
 
@@ -156,11 +156,11 @@ fn sse_has_non_constant_cap_alpha_rgba16_impl(store: &[u16], width: usize, strid
                 sums = _mm_add_epi32(sums, alphas);
             }
 
-            let row = row.chunks_exact(8).remainder();
+            let row = row.as_chunks::<8>().1;
 
             let mut h_sum = _mm_hsum_epi32(sums);
 
-            for chunk in row.chunks_exact(4) {
+            for chunk in row.as_chunks::<4>().0.iter() {
                 h_sum += chunk[3] as i32 ^ first_alpha as i32;
             }
 

@@ -264,7 +264,9 @@ fn convolve_horizontal_cbcr_neon_rdm_row_impl(
         let v_weights = vld1q_u8(weights_tbl.as_ptr());
 
         for ((dst, bounds), weights) in dst
-            .chunks_exact_mut(2)
+            .as_chunks_mut::<2>()
+            .0
+            .iter_mut()
             .zip(filter_weights.bounds.iter())
             .zip(
                 filter_weights

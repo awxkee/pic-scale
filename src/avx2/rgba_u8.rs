@@ -368,7 +368,7 @@ fn convolve_horizontal_rgba_avx_rows_one_impl(
 
         let permute_avx_weights = _mm256_setr_epi32(0, 0, 0, 0, 1, 1, 1, 1);
 
-        let vld = _mm_set1_epi32(PRECISION);
+        let vld = _mm_set1_epi32(ROUNDING_CONST);
 
         for ((dst, bounds), weights) in dst
             .as_chunks_mut::<CN>()

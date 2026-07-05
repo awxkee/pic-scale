@@ -26,17 +26,20 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 use crate::metadata::{Metadata, MetadataOptions, Orientation, extract, inject};
 use image::{DynamicImage, ImageFormat, ImageReader};
 
+use crate::avif_enc::{AvifOptions, DynamicImageAvifExt};
+use crate::heif::encode_heic;
 use crate::jxl::{decode_jxl, encode_jxl, is_jxl};
 use crate::transpose::apply_orientation;
+use image::math::Rect;
 use pic_scale::{
     ImageSize, ImageStore, ImageStoreMut, PicScaleError, ResamplingFunction, Scaler,
     ThreadingPolicy, WorkloadStrategy,
 };
 use std::io::Cursor;
+use std::num::NonZeroUsize;
 
 #[derive(Debug, thiserror::Error)]
 pub enum PicError {
@@ -46,6 +49,8 @@ pub enum PicError {
     Scale(PicScaleError),
     #[error("unsupported format: {0}")]
     Format(String),
+    #[error("HEIC encoder signalled an error: {0}")]
+    HeicEncoder(String),
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 }
@@ -93,11 +98,12 @@ impl Default for EncodeOptions {
 
 /// Returns true if the format string targets HEIF or AVIF output,
 /// which is handled by libheif rather than the image crate.
-pub fn is_heif_format(fmt: &str) -> bool {
-    matches!(
-        fmt.to_lowercase().as_str(),
-        "heic" | "heif" | "avif" | "avifs"
-    )
+pub(crate) fn is_heif_format(fmt: &str) -> bool {
+    matches!(fmt.to_lowercase().as_str(), "heic" | "heif")
+}
+
+pub(crate) fn is_avif_format(fmt: &str) -> bool {
+    matches!(fmt.to_lowercase().as_str(), "avif" | "avifs")
 }
 
 pub fn is_jxl_format(fmt: &str) -> bool {
@@ -113,12 +119,25 @@ pub fn parse_format(fmt: &str) -> Result<ImageFormat> {
         "bmp" => Ok(ImageFormat::Bmp),
         "ico" => Ok(ImageFormat::Ico),
         "qoi" => Ok(ImageFormat::Qoi),
-        // HEIF/AVIF are routed through libheif — not via ImageFormat
         "heic" | "heif" | "avif" | "avifs" => Err(PicError::Format(
             "Use encode_heif() for HEIC/HEIF/AVIF output".into(),
         )),
         other => Err(PicError::Format(format!("Unknown format '{other}'"))),
     }
+}
+
+/// Detect AVIF by the ISOBMFF `ftyp` box at offset 4–12.
+/// AVIF shares the ISOBMFF container with HEIC/HEIF but is a distinct format
+/// based on AV1 compression rather than HEVC.
+#[cfg(not(target_arch = "wasm32"))]
+fn is_avif(bytes: &[u8]) -> bool {
+    if bytes.len() < 12 {
+        return false;
+    }
+    if &bytes[4..8] != b"ftyp" {
+        return false;
+    }
+    matches!(&bytes[8..12], b"avif" | b"avis")
 }
 
 /// Detect HEIC/HEIF by the ISOBMFF `ftyp` box at offset 4–12.
@@ -145,125 +164,6 @@ fn is_heic(bytes: &[u8]) -> bool {
     )
 }
 
-/// Encode a `DynamicImage` to HEIC, HEIF, or AVIF bytes using libheif.
-///
-/// `format`  — `"heic"` / `"heif"` uses HEVC compression (H.265).
-///             `"avif"` / `"avifs"` uses AV1 compression.
-/// `quality` — 1–100, maps to libheif's quality scale.
-/// `icc`     — optional ICC profile bytes to embed in the output container.
-/// `exif`    — optional raw EXIF block (starting with `"Exif\0\0"`) to embed.
-#[cfg(not(target_arch = "wasm32"))]
-pub(crate) fn encode_heif(
-    img: &DynamicImage,
-    format: &str,
-    quality: u8,
-    icc: Option<&[u8]>,
-    exif: Option<&[u8]>,
-) -> Result<Vec<u8>> {
-    use libheif_rs::{
-        Channel, ColorSpace as HColorSpace, CompressionFormat, EncoderQuality, HeifContext,
-        Image as HImage, LibHeif, RgbChroma as HRgbChroma,
-    };
-
-    let compression = match format.to_lowercase().as_str() {
-        "avif" | "avifs" => CompressionFormat::Av1,
-        _ => CompressionFormat::Hevc,
-    };
-
-    let lib = LibHeif::new();
-    let mut encoder = lib
-        .encoder_for_format(compression)
-        .map_err(|e| PicError::Format(format!("libheif encoder: {e}")))?;
-    encoder
-        .set_quality(EncoderQuality::Lossy(quality))
-        .map_err(|e| PicError::Format(format!("libheif set_quality: {e}")))?;
-
-    // Convert DynamicImage to RGB8 or RGBA8 for libheif input.
-    // libheif can handle other bit depths but HEIC/AVIF encode path
-    // via libheif works best with 8-bit interleaved input.
-    let (rgba_pixels, has_alpha, w, h) = match img {
-        DynamicImage::ImageRgba8(i) => (i.as_raw().clone(), true, i.width(), i.height()),
-        DynamicImage::ImageRgb8(i) => (i.as_raw().clone(), false, i.width(), i.height()),
-        other => {
-            if other.color().has_alpha() {
-                let i = other.to_rgba8();
-                (i.as_raw().clone(), true, i.width(), i.height())
-            } else {
-                let i = other.to_rgb8();
-                (i.as_raw().clone(), false, i.width(), i.height())
-            }
-        }
-    };
-
-    let chroma = if has_alpha {
-        HRgbChroma::Rgba
-    } else {
-        HRgbChroma::Rgb
-    };
-    let channels = if has_alpha { 4u32 } else { 3u32 };
-
-    let mut heif_img = HImage::new(w, h, HColorSpace::Rgb(chroma))
-        .map_err(|e| PicError::Format(format!("libheif new image: {e}")))?;
-
-    // Create the interleaved plane and write pixel data
-    let channel = Channel::Interleaved;
-    heif_img
-        .create_plane(channel, w, h, 8)
-        .map_err(|e| PicError::Format(format!("libheif create_plane: {e}")))?;
-
-    {
-        let plane = heif_img
-            .planes_mut()
-            .interleaved
-            .ok_or_else(|| PicError::Format("libheif: no interleaved plane".into()))?;
-        let stride = plane.stride;
-        let dst = plane.data;
-        let src_stride = w as usize * channels as usize;
-
-        if stride == src_stride {
-            dst[..rgba_pixels.len()].copy_from_slice(&rgba_pixels);
-        } else {
-            // Pad rows to match libheif's stride
-            for row in 0..h as usize {
-                let src = &rgba_pixels[row * src_stride..(row + 1) * src_stride];
-                dst[row * stride..row * stride + src_stride].copy_from_slice(src);
-            }
-        }
-    }
-
-    // Embed ICC profile if provided
-    if let Some(icc_bytes) = icc {
-        use libheif_rs::ColorProfileRaw;
-        use libheif_rs::color_profile_types::R_ICC;
-        heif_img
-            .set_color_profile_raw(&ColorProfileRaw::new(R_ICC, icc_bytes.to_vec()))
-            .map_err(|e| PicError::Format(format!("libheif set ICC: {e}")))?;
-    }
-
-    let mut ctx =
-        HeifContext::new().map_err(|e| PicError::Format(format!("libheif context: {e}")))?;
-    let handle = ctx
-        .encode_image(&heif_img, &mut encoder, None)
-        .map_err(|e| PicError::Format(format!("libheif encode: {e}")))?;
-
-    // Embed EXIF block if provided
-    if let Some(exif_bytes) = exif {
-        // libheif expects raw EXIF starting after the "Exif\0\0" prefix
-        let payload = if exif_bytes.starts_with(b"Exif\0\0") {
-            &exif_bytes[6..]
-        } else {
-            exif_bytes
-        };
-        ctx.add_exif_metadata(&handle, payload)
-            .map_err(|e| PicError::Format(format!("libheif add EXIF: {e}")))?;
-    }
-
-    let buf = ctx
-        .write_to_bytes()
-        .map_err(|e| PicError::Format(format!("libheif write: {e}")))?;
-    Ok(buf)
-}
-
 /// Decoded image held in memory. Wraps a `DynamicImage` and exposes
 /// decode / resize / encode operations that work on both NAPI and WASM targets.
 pub struct CoreImage {
@@ -282,12 +182,12 @@ impl CoreImage {
     /// feature. YUV planar data is converted via the `yuv` crate's SIMD paths.
     /// On WASM, HEIC is not supported.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        let meta = extract(bytes);
+        let mut meta = extract(bytes);
 
         // HEIC/HEIF: detect by ISOBMFF ftyp box and call libheif directly.
         // The image crate has no native HEIC support so we bypass ImageReader.
-        #[cfg(not(target_arch = "wasm32"))]
-        if is_heic(bytes) {
+        if is_heic(bytes) && !is_avif(bytes) {
+            meta.orientation = Orientation::Normal;
             use crate::heif::decode_heic;
             let img = decode_heic(bytes)?;
             return Ok(CoreImage {
@@ -303,8 +203,8 @@ impl CoreImage {
             });
         }
 
-        let reader = ImageReader::new(Cursor::new(bytes)).with_guessed_format()?;
-        let img = reader.decode()?;
+        let mut reader = ImageReader::new(Cursor::new(bytes))?;
+        let (img, _) = reader.decode()?;
         Ok(CoreImage {
             inner: img,
             metadata: Some(meta),
@@ -559,7 +459,6 @@ impl CoreImage {
     ) -> Result<Vec<u8>> {
         let fmt_lower = opts.format.to_lowercase();
 
-        #[cfg(not(target_arch = "wasm32"))]
         if is_heif_format(&fmt_lower) {
             let icc = if meta_opts.icc {
                 src_meta.and_then(|m| m.icc.as_deref())
@@ -571,9 +470,31 @@ impl CoreImage {
             } else {
                 None
             };
-            return encode_heif(&self.inner, &fmt_lower, opts.quality, icc, exif);
+            return encode_heic(&self.inner, opts.quality, icc, exif);
         }
-        #[cfg(target_arch = "wasm32")]
+        if is_avif_format(&fmt_lower) {
+            let mut cfg = maroontree::EncodeConfig::new()
+                .with_quality(opts.quality)
+                .with_threads(
+                    std::thread::available_parallelism()
+                        .unwrap_or(NonZeroUsize::new(1).unwrap())
+                        .get(),
+                );
+            if let Some(icc) = src_meta.and_then(|m| m.icc.as_deref()) {
+                cfg = cfg.with_icc_profile(icc.to_vec());
+            }
+            if let Some(exif) = src_meta.and_then(|m| m.exif.as_deref()) {
+                cfg = cfg.with_exif(exif.to_vec());
+            }
+            let opts = AvifOptions::new(cfg);
+            let encoded = self.inner.encode_av1_avif_with_options(opts).map_err(|x| {
+                PicError::Format(format!(
+                    "AVIF encoding failed with an error: {:?}",
+                    x.to_string()
+                ))
+            })?;
+            return Ok(encoded);
+        }
         if is_heif_format(&fmt_lower) {
             return Err(PicError::Format(
                 "HEIF/AVIF encoding is not supported in WASM builds".into(),
@@ -781,7 +702,12 @@ impl CoreImage {
 
         let cropped = if crop_x != 0 || crop_y != 0 || crop_w != src_w || crop_h != src_h {
             CoreImage {
-                inner: self.inner.crop_imm(crop_x, crop_y, crop_w, crop_h),
+                inner: self.inner.crop(Rect {
+                    x: crop_x,
+                    y: crop_y,
+                    width: crop_w,
+                    height: crop_h,
+                }),
                 metadata: self.metadata.clone(),
             }
         } else {

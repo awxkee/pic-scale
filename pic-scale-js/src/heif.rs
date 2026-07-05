@@ -26,22 +26,12 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#![cfg(not(target_arch = "wasm32"))]
 use crate::core::PicError;
-use image::DynamicImage;
-
-fn to_u16(bytes: &[u8]) -> std::borrow::Cow<'_, [u16]> {
-    if bytes.len().is_multiple_of(2) && (bytes.as_ptr() as usize).is_multiple_of(align_of::<u16>())
-    {
-        return std::borrow::Cow::Borrowed(bytemuck::cast_slice(bytes));
-    }
-    bytes
-        .as_chunks::<2>()
-        .0
-        .iter()
-        .map(|b| u16::from_le_bytes([b[0], b[1]]))
-        .collect()
-}
+use crate::transpose::apply_orientation;
+use hpvca::{ChromaFormat, EncodeConfig};
+use hpvcd::Orientation;
+use image::{DynamicImage, Luma};
+use std::num::NonZeroUsize;
 
 fn expand_to_16bit(buffer: &mut [u16], is12_bit: bool) {
     if is12_bit {
@@ -55,8 +45,21 @@ fn expand_to_16bit(buffer: &mut [u16], is12_bit: bool) {
     }
 }
 
+fn to_core_orientation(orientation: hpvcd::Orientation) -> crate::metadata::Orientation {
+    match orientation {
+        Orientation::Normal => crate::metadata::Orientation::Normal,
+        Orientation::FlipH => crate::metadata::Orientation::FlipH,
+        Orientation::Rotate180 => crate::metadata::Orientation::Rotate180,
+        Orientation::FlipV => crate::metadata::Orientation::FlipV,
+        Orientation::Transpose => crate::metadata::Orientation::Transpose,
+        Orientation::Rotate90 => crate::metadata::Orientation::Rotate90,
+        Orientation::Transverse => crate::metadata::Orientation::Transverse,
+        Orientation::Rotate270 => crate::metadata::Orientation::Rotate270,
+    }
+}
+
 pub(crate) fn decode_heic(bytes: &[u8]) -> crate::core::Result<DynamicImage> {
-    use libheif_rs::{Chroma, ColorSpace, HeifContext, LibHeif, MatrixCoefficients, RgbChroma};
+    use hpvcd::{ChromaFormat, MatrixCoefficients};
     use yuv::{
         YuvPlanarImage, YuvPlanarImageWithAlpha, YuvRange, YuvStandardMatrix, i010_alpha_to_rgba10,
         i010_to_rgb10, i012_alpha_to_rgba12, i012_to_rgb12, i210_alpha_to_rgba10, i210_to_rgb10,
@@ -70,331 +73,503 @@ pub(crate) fn decode_heic(bytes: &[u8]) -> crate::core::Result<DynamicImage> {
         yuv444_alpha_to_rgba, yuv444_to_rgb,
     };
 
-    let lib = LibHeif::new();
-    let ctx = HeifContext::read_from_bytes(bytes)
-        .map_err(|e| PicError::Format(format!("libheif: {e}")))?;
-    let handle = ctx
-        .primary_image_handle()
-        .map_err(|e| PicError::Format(format!("libheif handle: {e}")))?;
+    let dec = hpvcd::decode_heic_yuv(bytes).map_err(|e| PicError::Format(format!("hpvcd: {e}")))?;
 
-    let has_alpha = handle.has_alpha_channel();
-    let w = handle.width();
-    let h = handle.height();
+    let w = dec.width;
+    let h = dec.height;
+    let bit_depth = dec.bit_depth.bits() as u32;
+    let high_bit = bit_depth > 8;
+    let is_12 = bit_depth >= 12;
+
+    // Chroma subsampling factors → tight plane strides.
+    let (sub_w, sub_h) = match dec.chroma {
+        ChromaFormat::Yuv420 => (2u32, 2u32),
+        ChromaFormat::Yuv422 => (2, 1),
+        ChromaFormat::Yuv444 | ChromaFormat::Monochrome => (1, 1),
+    };
+    let y_stride = w;
+    let c_stride = w.div_ceil(sub_w);
+    let _ch = h.div_ceil(sub_h);
 
     let mut matrix = YuvStandardMatrix::Bt601;
     let mut range = YuvRange::Limited;
     let mut is_ycgco = false;
-
-    if let Some(nclx) = handle.color_profile_nclx() {
-        matrix = match nclx.matrix_coefficients() {
-            MatrixCoefficients::ITU_R_BT_709_5 => YuvStandardMatrix::Bt709,
-            MatrixCoefficients::ITU_R_BT_2020_2_NonConstantLuminance => YuvStandardMatrix::Bt2020,
-            MatrixCoefficients::ITU_R_BT_2020_2_ConstantLuminance => YuvStandardMatrix::Bt2020,
-            MatrixCoefficients::YCgCo => {
+    if let Some(enc) = &dec.color.cicp {
+        matrix = match enc.matrix {
+            MatrixCoefficients::Smpte170m => YuvStandardMatrix::Bt601,
+            MatrixCoefficients::Bt709 => YuvStandardMatrix::Bt709,
+            MatrixCoefficients::Bt2020Ncl | MatrixCoefficients::Bt2020Cl => {
+                YuvStandardMatrix::Bt2020
+            }
+            MatrixCoefficients::YCgCo
+            | MatrixCoefficients::YCgCoRe
+            | MatrixCoefficients::YCgCoRo => {
                 is_ycgco = true;
                 YuvStandardMatrix::Bt601
             }
             _ => YuvStandardMatrix::Bt601,
         };
-        range = if nclx.full_range_flag() == 1 {
+        range = if enc.full_range {
             YuvRange::Full
         } else {
             YuvRange::Limited
         };
     }
 
+    if dec.chroma == ChromaFormat::Monochrome {
+        return finish_monochrome(&dec, w, h, high_bit, is_12);
+    }
+
     let rgb_stride = w * 3;
     let rgba_stride = w * 4;
-    let bit_depth = handle.luma_bits_per_pixel() as u32;
-    let high_bit = bit_depth > 8;
+    let has_alpha = dec.alpha.is_some();
 
-    for chroma in [Chroma::C420, Chroma::C422, Chroma::C444] {
-        let Ok(plane) = lib.decode(&handle, ColorSpace::YCbCr(chroma), None) else {
-            continue;
-        };
-        let planes = plane.planes();
-        let (Some(y_p), Some(cb_p), Some(cr_p)) = (planes.y, planes.cb, planes.cr) else {
-            continue;
-        };
-
-        // ── High bit-depth (10 / 12 bit) ─────────────────────────────────────
-        if high_bit {
-            let y16 = to_u16(y_p.data);
-            let cb16 = to_u16(cb_p.data);
-            let cr16 = to_u16(cr_p.data);
-            let ys = (y_p.stride / 2) as u32;
-            let us = (cb_p.stride / 2) as u32;
-            let vs = (cr_p.stride / 2) as u32;
-            let is_12 = bit_depth >= 12;
-
-            if is_ycgco {
-                if let Some(a_p) = planes.a {
-                    let a16 = to_u16(a_p.data);
-                    let yuva = YuvPlanarImageWithAlpha {
-                        y_plane: &y16,
-                        y_stride: ys,
-                        u_plane: &cb16,
-                        u_stride: us,
-                        v_plane: &cr16,
-                        v_stride: vs,
-                        a_plane: &a16,
-                        a_stride: (a_p.stride / 2) as u32,
-                        width: w,
-                        height: h,
-                    };
-                    let mut out = vec![0u16; (w * 4 * h) as usize];
-                    match (chroma, is_12) {
-                        (Chroma::C420, false) => {
-                            icgc010_alpha_to_rgba10(&yuva, &mut out, w * 4, range)
-                        }
-                        (Chroma::C422, false) => {
-                            icgc210_alpha_to_rgba10(&yuva, &mut out, w * 4, range)
-                        }
-                        (_, false) => icgc410_alpha_to_rgba10(&yuva, &mut out, w * 4, range),
-                        (Chroma::C420, true) => {
-                            icgc012_alpha_to_rgba12(&yuva, &mut out, w * 4, range)
-                        }
-                        (Chroma::C422, true) => {
-                            icgc212_alpha_to_rgba12(&yuva, &mut out, w * 4, range)
-                        }
-                        (_, true) => icgc412_alpha_to_rgba12(&yuva, &mut out, w * 4, range),
-                    }
-                    .map_err(|e| PicError::Format(format!("icgc→rgba16: {e}")))?;
-                    expand_to_16bit(&mut out, is_12);
-                    return Ok(DynamicImage::ImageRgba16(
-                        image::ImageBuffer::from_raw(w, h, out)
-                            .ok_or_else(|| PicError::Format("HEIC RGBA16 mismatch".into()))?,
-                    ));
-                }
-                let yuv = YuvPlanarImage {
-                    y_plane: &y16,
-                    y_stride: ys,
-                    u_plane: &cb16,
-                    u_stride: us,
-                    v_plane: &cr16,
-                    v_stride: vs,
-                    width: w,
-                    height: h,
-                };
-                let mut out = vec![0u16; (w * 3 * h) as usize];
-                match (chroma, is_12) {
-                    (Chroma::C420, false) => icgc010_to_rgb10(&yuv, &mut out, w * 3, range),
-                    (Chroma::C422, false) => icgc210_to_rgb10(&yuv, &mut out, w * 3, range),
-                    (_, false) => icgc410_to_rgb10(&yuv, &mut out, w * 3, range),
-                    (Chroma::C420, true) => icgc012_to_rgb12(&yuv, &mut out, w * 3, range),
-                    (Chroma::C422, true) => icgc212_to_rgb12(&yuv, &mut out, w * 3, range),
-                    (_, true) => icgc412_to_rgb12(&yuv, &mut out, w * 3, range),
-                }
-                .map_err(|e| PicError::Format(format!("icgc→rgb16: {e}")))?;
-                expand_to_16bit(&mut out, is_12);
-                return Ok(DynamicImage::ImageRgb16(
-                    image::ImageBuffer::from_raw(w, h, out)
-                        .ok_or_else(|| PicError::Format("HEIC RGB16 mismatch".into()))?,
+    let img = if high_bit {
+        let y16 = match dec.y.as_u16() {
+            None => {
+                return Err(PicError::Format(
+                    "HEIC RGBA10/RGBA12 Luma is not actually 10/12".to_string(),
                 ));
             }
+            Some(v) => v,
+        };
+        let cb16 = match dec.cb.as_u16() {
+            None => {
+                return Err(PicError::Format(
+                    "HEIC RGBA10/RGBA12 Cb is not actually 10/12".to_string(),
+                ));
+            }
+            Some(v) => v,
+        };
+        let cr16 = match dec.cr.as_u16() {
+            None => {
+                return Err(PicError::Format(
+                    "HEIC RGBA10/RGBA12 Cr is not actually 10/12".to_string(),
+                ));
+            }
+            Some(v) => v,
+        };
 
-            if let Some(a_p) = planes.a {
-                let a16 = to_u16(a_p.data);
+        if is_ycgco {
+            if let Some(a) = dec.alpha.as_ref().and_then(|a| a.as_u16()) {
                 let yuva = YuvPlanarImageWithAlpha {
-                    y_plane: &y16,
-                    y_stride: ys,
-                    u_plane: &cb16,
-                    u_stride: us,
-                    v_plane: &cr16,
-                    v_stride: vs,
-                    a_plane: &a16,
-                    a_stride: (a_p.stride / 2) as u32,
+                    y_plane: y16,
+                    y_stride,
+                    u_plane: cb16,
+                    u_stride: c_stride,
+                    v_plane: cr16,
+                    v_stride: c_stride,
+                    a_plane: a,
+                    a_stride: y_stride,
                     width: w,
                     height: h,
                 };
                 let mut out = vec![0u16; (w * 4 * h) as usize];
-                match (chroma, is_12) {
-                    (Chroma::C420, false) => {
-                        i010_alpha_to_rgba10(&yuva, &mut out, w * 4, range, matrix)
-                    }
-                    (Chroma::C422, false) => {
-                        i210_alpha_to_rgba10(&yuva, &mut out, w * 4, range, matrix)
-                    }
-                    (_, false) => i410_alpha_to_rgba10(&yuva, &mut out, w * 4, range, matrix),
-                    (Chroma::C420, true) => {
-                        i012_alpha_to_rgba12(&yuva, &mut out, w * 4, range, matrix)
-                    }
-                    (Chroma::C422, true) => {
-                        i212_alpha_to_rgba12(&yuva, &mut out, w * 4, range, matrix)
-                    }
-                    (_, true) => i412_alpha_to_rgba12(&yuva, &mut out, w * 4, range, matrix),
+                match (sub_w, sub_h, is_12) {
+                    (2, 2, false) => icgc010_alpha_to_rgba10(&yuva, &mut out, w * 4, range),
+                    (2, 1, false) => icgc210_alpha_to_rgba10(&yuva, &mut out, w * 4, range),
+                    (_, _, false) => icgc410_alpha_to_rgba10(&yuva, &mut out, w * 4, range),
+                    (2, 2, true) => icgc012_alpha_to_rgba12(&yuva, &mut out, w * 4, range),
+                    (2, 1, true) => icgc212_alpha_to_rgba12(&yuva, &mut out, w * 4, range),
+                    (_, _, true) => icgc412_alpha_to_rgba12(&yuva, &mut out, w * 4, range),
                 }
-                .map_err(|e| PicError::Format(format!("yuv→rgba16: {e}")))?;
+                .map_err(|e| PicError::Format(format!("icgc→rgba16: {e}")))?;
                 expand_to_16bit(&mut out, is_12);
-                return Ok(DynamicImage::ImageRgba16(
-                    image::ImageBuffer::from_raw(w, h, out)
-                        .ok_or_else(|| PicError::Format("HEIC RGBA16 mismatch".into()))?,
-                ));
+                rgba16_image(w, h, out)?
+            } else {
+                let yuv = YuvPlanarImage {
+                    y_plane: y16,
+                    y_stride,
+                    u_plane: cb16,
+                    u_stride: c_stride,
+                    v_plane: cr16,
+                    v_stride: c_stride,
+                    width: w,
+                    height: h,
+                };
+                let mut out = vec![0u16; (w * 3 * h) as usize];
+                match (sub_w, sub_h, is_12) {
+                    (2, 2, false) => icgc010_to_rgb10(&yuv, &mut out, w * 3, range),
+                    (2, 1, false) => icgc210_to_rgb10(&yuv, &mut out, w * 3, range),
+                    (_, _, false) => icgc410_to_rgb10(&yuv, &mut out, w * 3, range),
+                    (2, 2, true) => icgc012_to_rgb12(&yuv, &mut out, w * 3, range),
+                    (2, 1, true) => icgc212_to_rgb12(&yuv, &mut out, w * 3, range),
+                    (_, _, true) => icgc412_to_rgb12(&yuv, &mut out, w * 3, range),
+                }
+                .map_err(|e| PicError::Format(format!("icgc→rgb16: {e}")))?;
+                expand_to_16bit(&mut out, is_12);
+                rgb16_image(w, h, out)?
             }
-
+        } else if let Some(a) = dec.alpha.as_ref().and_then(|a| a.as_u16()) {
+            let yuva = YuvPlanarImageWithAlpha {
+                y_plane: y16,
+                y_stride,
+                u_plane: cb16,
+                u_stride: c_stride,
+                v_plane: cr16,
+                v_stride: c_stride,
+                a_plane: a,
+                a_stride: y_stride,
+                width: w,
+                height: h,
+            };
+            let mut out = vec![0u16; (w * 4 * h) as usize];
+            match (sub_w, sub_h, is_12) {
+                (2, 2, false) => i010_alpha_to_rgba10(&yuva, &mut out, w * 4, range, matrix),
+                (2, 1, false) => i210_alpha_to_rgba10(&yuva, &mut out, w * 4, range, matrix),
+                (_, _, false) => i410_alpha_to_rgba10(&yuva, &mut out, w * 4, range, matrix),
+                (2, 2, true) => i012_alpha_to_rgba12(&yuva, &mut out, w * 4, range, matrix),
+                (2, 1, true) => i212_alpha_to_rgba12(&yuva, &mut out, w * 4, range, matrix),
+                (_, _, true) => i412_alpha_to_rgba12(&yuva, &mut out, w * 4, range, matrix),
+            }
+            .map_err(|e| PicError::Format(format!("yuv→rgba16: {e}")))?;
+            expand_to_16bit(&mut out, is_12);
+            rgba16_image(w, h, out)?
+        } else {
             let yuv = YuvPlanarImage {
-                y_plane: &y16,
-                y_stride: ys,
-                u_plane: &cb16,
-                u_stride: us,
-                v_plane: &cr16,
-                v_stride: vs,
+                y_plane: y16,
+                y_stride,
+                u_plane: cb16,
+                u_stride: c_stride,
+                v_plane: cr16,
+                v_stride: c_stride,
                 width: w,
                 height: h,
             };
             let mut out = vec![0u16; (w * 3 * h) as usize];
-            match (chroma, is_12) {
-                (Chroma::C420, false) => i010_to_rgb10(&yuv, &mut out, w * 3, range, matrix),
-                (Chroma::C422, false) => i210_to_rgb10(&yuv, &mut out, w * 3, range, matrix),
-                (_, false) => i410_to_rgb10(&yuv, &mut out, w * 3, range, matrix),
-                (Chroma::C420, true) => i012_to_rgb12(&yuv, &mut out, w * 3, range, matrix),
-                (Chroma::C422, true) => i212_to_rgb12(&yuv, &mut out, w * 3, range, matrix),
-                (_, true) => i412_to_rgb12(&yuv, &mut out, w * 3, range, matrix),
+            match (sub_w, sub_h, is_12) {
+                (2, 2, false) => i010_to_rgb10(&yuv, &mut out, w * 3, range, matrix),
+                (2, 1, false) => i210_to_rgb10(&yuv, &mut out, w * 3, range, matrix),
+                (_, _, false) => i410_to_rgb10(&yuv, &mut out, w * 3, range, matrix),
+                (2, 2, true) => i012_to_rgb12(&yuv, &mut out, w * 3, range, matrix),
+                (2, 1, true) => i212_to_rgb12(&yuv, &mut out, w * 3, range, matrix),
+                (_, _, true) => i412_to_rgb12(&yuv, &mut out, w * 3, range, matrix),
             }
             .map_err(|e| PicError::Format(format!("yuv→rgb16: {e}")))?;
             expand_to_16bit(&mut out, is_12);
-            return Ok(DynamicImage::ImageRgb16(
-                image::ImageBuffer::from_raw(w, h, out)
-                    .ok_or_else(|| PicError::Format("HEIC RGB16 mismatch".into()))?,
-            ));
+            rgb16_image(w, h, out)?
         }
+    } else {
+        let y8 = match dec.y.as_u8() {
+            None => {
+                return Err(PicError::Format(
+                    "HEIC RGBA8 Luma is not actually 8".to_string(),
+                ));
+            }
+            Some(v) => v,
+        };
+        let cb8 = match dec.cb.as_u8() {
+            None => {
+                return Err(PicError::Format(
+                    "HEIC RGBA8 Cb is not actually 8".to_string(),
+                ));
+            }
+            Some(v) => v,
+        };
+        let cr8 = match dec.cr.as_u8() {
+            None => {
+                return Err(PicError::Format(
+                    "HEIC RGBA8 Cr is not actually 8".to_string(),
+                ));
+            }
+            Some(v) => v,
+        };
 
-        return if is_ycgco {
-            if has_alpha && let Some(a_p) = planes.a {
+        if is_ycgco {
+            if let Some(a) = dec.alpha.as_ref().and_then(|a| a.as_u8()) {
                 let yuv = YuvPlanarImageWithAlpha {
-                    y_plane: y_p.data,
-                    y_stride: y_p.stride as u32,
-                    u_plane: cb_p.data,
-                    u_stride: cb_p.stride as u32,
-                    v_plane: cr_p.data,
-                    v_stride: cr_p.stride as u32,
-                    a_plane: a_p.data,
-                    a_stride: a_p.stride as u32,
+                    y_plane: y8,
+                    y_stride,
+                    u_plane: cb8,
+                    u_stride: c_stride,
+                    v_plane: cr8,
+                    v_stride: c_stride,
+                    a_plane: a,
+                    a_stride: y_stride,
                     width: w,
                     height: h,
                 };
                 let mut rgba = vec![0u8; (rgba_stride * h) as usize];
-                match chroma {
-                    Chroma::C420 => ycgco420_alpha_to_rgba(&yuv, &mut rgba, rgba_stride, range),
-                    Chroma::C422 => ycgco422_alpha_to_rgba(&yuv, &mut rgba, rgba_stride, range),
+                match (sub_w, sub_h) {
+                    (2, 2) => ycgco420_alpha_to_rgba(&yuv, &mut rgba, rgba_stride, range),
+                    (2, 1) => ycgco422_alpha_to_rgba(&yuv, &mut rgba, rgba_stride, range),
                     _ => ycgco444_alpha_to_rgba(&yuv, &mut rgba, rgba_stride, range),
                 }
                 .map_err(|e| PicError::Format(format!("ycgco→rgba: {e}")))?;
-                Ok(DynamicImage::ImageRgba8(
-                    image::RgbaImage::from_raw(w, h, rgba)
-                        .ok_or_else(|| PicError::Format("HEIC RGBA mismatch".into()))?,
-                ))
+                rgba8_image(w, h, rgba)?
             } else {
                 let yuv = YuvPlanarImage {
-                    y_plane: y_p.data,
-                    y_stride: y_p.stride as u32,
-                    u_plane: cb_p.data,
-                    u_stride: cb_p.stride as u32,
-                    v_plane: cr_p.data,
-                    v_stride: cr_p.stride as u32,
+                    y_plane: y8,
+                    y_stride,
+                    u_plane: cb8,
+                    u_stride: c_stride,
+                    v_plane: cr8,
+                    v_stride: c_stride,
                     width: w,
                     height: h,
                 };
                 let mut rgb = vec![0u8; (rgb_stride * h) as usize];
-                match chroma {
-                    Chroma::C420 => ycgco420_to_rgb(&yuv, &mut rgb, rgb_stride, range),
-                    Chroma::C422 => ycgco422_to_rgb(&yuv, &mut rgb, rgb_stride, range),
+                match (sub_w, sub_h) {
+                    (2, 2) => ycgco420_to_rgb(&yuv, &mut rgb, rgb_stride, range),
+                    (2, 1) => ycgco422_to_rgb(&yuv, &mut rgb, rgb_stride, range),
                     _ => ycgco444_to_rgb(&yuv, &mut rgb, rgb_stride, range),
                 }
                 .map_err(|e| PicError::Format(format!("ycgco→rgb: {e}")))?;
-                Ok(DynamicImage::ImageRgb8(
-                    image::RgbImage::from_raw(w, h, rgb)
-                        .ok_or_else(|| PicError::Format("HEIC RGB mismatch".into()))?,
-                ))
+                rgb8_image(w, h, rgb)?
             }
-        } else if has_alpha && let Some(a_p) = planes.a {
+        } else if let Some(a) = dec.alpha.as_ref().and_then(|a| a.as_u8()) {
             let yuv = YuvPlanarImageWithAlpha {
-                y_plane: y_p.data,
-                y_stride: y_p.stride as u32,
-                u_plane: cb_p.data,
-                u_stride: cb_p.stride as u32,
-                v_plane: cr_p.data,
-                v_stride: cr_p.stride as u32,
-                a_plane: a_p.data,
-                a_stride: a_p.stride as u32,
+                y_plane: y8,
+                y_stride,
+                u_plane: cb8,
+                u_stride: c_stride,
+                v_plane: cr8,
+                v_stride: c_stride,
+                a_plane: a,
+                a_stride: y_stride,
                 width: w,
                 height: h,
             };
             let mut rgba = vec![0u8; (rgba_stride * h) as usize];
-            match chroma {
-                Chroma::C420 => {
-                    yuv420_alpha_to_rgba(&yuv, &mut rgba, rgba_stride, range, matrix, false)
-                }
-                Chroma::C422 => {
-                    yuv422_alpha_to_rgba(&yuv, &mut rgba, rgba_stride, range, matrix, false)
-                }
+            match (sub_w, sub_h) {
+                (2, 2) => yuv420_alpha_to_rgba(&yuv, &mut rgba, rgba_stride, range, matrix, false),
+                (2, 1) => yuv422_alpha_to_rgba(&yuv, &mut rgba, rgba_stride, range, matrix, false),
                 _ => yuv444_alpha_to_rgba(&yuv, &mut rgba, rgba_stride, range, matrix, false),
             }
             .map_err(|e| PicError::Format(format!("yuv→rgba: {e}")))?;
-            Ok(DynamicImage::ImageRgba8(
-                image::RgbaImage::from_raw(w, h, rgba)
-                    .ok_or_else(|| PicError::Format("HEIC RGBA mismatch".into()))?,
-            ))
+            rgba8_image(w, h, rgba)?
         } else {
             let yuv = YuvPlanarImage {
-                y_plane: y_p.data,
-                y_stride: y_p.stride as u32,
-                u_plane: cb_p.data,
-                u_stride: cb_p.stride as u32,
-                v_plane: cr_p.data,
-                v_stride: cr_p.stride as u32,
+                y_plane: y8,
+                y_stride,
+                u_plane: cb8,
+                u_stride: c_stride,
+                v_plane: cr8,
+                v_stride: c_stride,
                 width: w,
                 height: h,
             };
             let mut rgb = vec![0u8; (rgb_stride * h) as usize];
-            match chroma {
-                Chroma::C420 => yuv420_to_rgb(&yuv, &mut rgb, rgb_stride, range, matrix),
-                Chroma::C422 => yuv422_to_rgb(&yuv, &mut rgb, rgb_stride, range, matrix),
+            match (sub_w, sub_h) {
+                (2, 2) => yuv420_to_rgb(&yuv, &mut rgb, rgb_stride, range, matrix),
+                (2, 1) => yuv422_to_rgb(&yuv, &mut rgb, rgb_stride, range, matrix),
                 _ => yuv444_to_rgb(&yuv, &mut rgb, rgb_stride, range, matrix),
             }
             .map_err(|e| PicError::Format(format!("yuv→rgb: {e}")))?;
-            Ok(DynamicImage::ImageRgb8(
-                image::RgbImage::from_raw(w, h, rgb)
-                    .ok_or_else(|| PicError::Format("HEIC RGB mismatch".into()))?,
-            ))
-        };
-    }
-
-    let chroma = if has_alpha {
-        RgbChroma::Rgba
-    } else {
-        RgbChroma::Rgb
-    };
-    let plane = lib
-        .decode(&handle, ColorSpace::Rgb(chroma), None)
-        .map_err(|e| PicError::Format(format!("libheif RGB fallback: {e}")))?;
-    let il = plane
-        .planes()
-        .interleaved
-        .ok_or_else(|| PicError::Format("libheif: no interleaved plane".into()))?;
-
-    let channels = if has_alpha { 4usize } else { 3 };
-    let packed = if il.stride == w as usize * channels {
-        il.data.to_vec()
-    } else {
-        let mut out = Vec::with_capacity(w as usize * h as usize * channels);
-        for row in 0..h as usize {
-            out.extend_from_slice(
-                &il.data[row * il.stride..row * il.stride + w as usize * channels],
-            );
+            rgb8_image(w, h, rgb)?
         }
-        out
     };
 
-    Ok(if has_alpha {
-        DynamicImage::ImageRgba8(
-            image::RgbaImage::from_raw(w, h, packed)
-                .ok_or_else(|| PicError::Format("HEIC RGBA mismatch".into()))?,
-        )
-    } else {
-        DynamicImage::ImageRgb8(
-            image::RgbImage::from_raw(w, h, packed)
+    let _ = has_alpha; // (kept for parity/readability)
+    Ok(apply_orientation(img, to_core_orientation(dec.orientation)))
+}
+
+fn rgb8_image(w: u32, h: u32, buf: Vec<u8>) -> crate::core::Result<DynamicImage> {
+    Ok(DynamicImage::ImageRgb8(
+        image::RgbImage::from_raw(w, h, buf)
+            .ok_or_else(|| PicError::Format("HEIC RGB mismatch".into()))?,
+    ))
+}
+fn rgba8_image(w: u32, h: u32, buf: Vec<u8>) -> crate::core::Result<DynamicImage> {
+    Ok(DynamicImage::ImageRgba8(
+        image::RgbaImage::from_raw(w, h, buf)
+            .ok_or_else(|| PicError::Format("HEIC RGBA mismatch".into()))?,
+    ))
+}
+fn rgb16_image(w: u32, h: u32, buf: Vec<u16>) -> crate::core::Result<DynamicImage> {
+    Ok(DynamicImage::ImageRgb16(
+        image::ImageBuffer::from_raw(w, h, buf)
+            .ok_or_else(|| PicError::Format("HEIC RGB16 mismatch".into()))?,
+    ))
+}
+fn rgba16_image(w: u32, h: u32, buf: Vec<u16>) -> crate::core::Result<DynamicImage> {
+    Ok(DynamicImage::ImageRgba16(
+        image::ImageBuffer::from_raw(w, h, buf)
+            .ok_or_else(|| PicError::Format("HEIC RGBA16 mismatch".into()))?,
+    ))
+}
+
+/// 4:0:0 monochrome: replicate the luma plane across R, G, B.
+fn finish_monochrome(
+    dec: &hpvcd::DecodedYuv,
+    w: u32,
+    h: u32,
+    high_bit: bool,
+    is_12: bool,
+) -> crate::core::Result<DynamicImage> {
+    let img = if high_bit {
+        let mut y = dec.y.as_u16().expect("high-bit luma is u16").to_vec();
+        expand_to_16bit(&mut y, is_12);
+        DynamicImage::ImageLuma16(
+            image::ImageBuffer::<Luma<u16>, Vec<u16>>::from_raw(w, h, y.to_vec())
                 .ok_or_else(|| PicError::Format("HEIC RGB mismatch".into()))?,
         )
-    })
+    } else {
+        let y = dec.y.as_u8().expect("8-bit luma is u8");
+        if let Some(alpha) = dec.alpha.as_ref() {
+            let y = match dec.y.as_u8() {
+                None => {
+                    return Err(PicError::Format(
+                        "HEIC RGBA8 luma 8 is not actually 8".into(),
+                    ));
+                }
+                Some(v) => v,
+            };
+            let alpha = match alpha.as_u8() {
+                None => {
+                    return Err(PicError::Format(
+                        "HEIC RGBA8 alpha 8 is not actually 8".into(),
+                    ));
+                }
+                Some(v) => v,
+            };
+            let mut new_img = vec![0u8; dec.width as usize * dec.height as usize * 2];
+            for ((dst, src), alpha) in new_img
+                .as_chunks_mut::<2>()
+                .0
+                .iter_mut()
+                .zip(y.iter())
+                .zip(alpha.iter())
+            {
+                dst[0] = *src;
+                dst[1] = *alpha;
+            }
+            DynamicImage::ImageLuma8(
+                image::GrayImage::from_raw(w, h, y.to_vec())
+                    .ok_or_else(|| PicError::Format("HEIC RGB mismatch".into()))?,
+            )
+        } else {
+            DynamicImage::ImageLuma8(
+                image::GrayImage::from_raw(w, h, y.to_vec())
+                    .ok_or_else(|| PicError::Format("HEIC RGB mismatch".into()))?,
+            )
+        }
+    };
+    Ok(apply_orientation(img, to_core_orientation(dec.orientation)))
+}
+
+pub(crate) fn encode_heic(
+    img: &DynamicImage,
+    quality: u8,
+    icc: Option<&[u8]>,
+    exif: Option<&[u8]>,
+) -> crate::core::Result<Vec<u8>> {
+    let mut base_cfg = EncodeConfig::default()
+        .with_quality(quality)
+        .with_chroma(ChromaFormat::Yuv420)
+        .with_threads(
+            std::thread::available_parallelism()
+                .unwrap_or(NonZeroUsize::new(1).unwrap())
+                .get(),
+        );
+    if let Some(icc_data) = icc {
+        base_cfg = base_cfg.with_icc_profile(icc_data.to_vec());
+    }
+    if let Some(exif_data) = exif {
+        base_cfg = base_cfg.with_exif(exif_data.to_vec());
+    }
+
+    let cfg_rgb_8 = base_cfg.clone();
+    let cfg_gray_8 = base_cfg.clone().with_chroma(ChromaFormat::Monochrome);
+    let cfg_gray_10 = base_cfg.clone().with_chroma(ChromaFormat::Monochrome);
+
+    let w = img.width();
+    let h = img.height();
+
+    let map_err = |e: hpvca::EncodeError| PicError::HeicEncoder(e.to_string());
+
+    match img {
+        DynamicImage::ImageLuma8(luma) => {
+            hpvca::encode_gray(luma, w, h, &cfg_gray_8).map_err(map_err)
+        }
+
+        DynamicImage::ImageLumaA8(luma_alpha) => {
+            hpvca::encode_gray_alpha_with_alpha(luma_alpha, w, h, &cfg_gray_8).map_err(map_err)
+        }
+
+        DynamicImage::ImageRgb8(rgb) => hpvca::encode_rgb(rgb, w, h, &cfg_rgb_8).map_err(map_err),
+
+        DynamicImage::ImageRgba8(rgba) => {
+            hpvca::encode_rgba_with_alpha(rgba, w, h, &cfg_rgb_8).map_err(map_err)
+        }
+
+        DynamicImage::ImageLuma16(luma) => hpvca::encode_gray10(
+            &luma.iter().map(|&x| x >> 6).collect::<Vec<_>>(),
+            w,
+            h,
+            &cfg_gray_10,
+        )
+        .map_err(map_err),
+
+        DynamicImage::ImageLumaA16(luma_alpha) => hpvca::encode_gray_alpha10_with_alpha(
+            &luma_alpha.iter().map(|&x| x >> 6).collect::<Vec<_>>(),
+            w,
+            h,
+            &cfg_gray_10,
+        )
+        .map_err(map_err),
+
+        DynamicImage::ImageRgb16(rgb) => hpvca::encode_rgb10(
+            &rgb.iter().map(|&x| x >> 6).collect::<Vec<_>>(),
+            w,
+            h,
+            &cfg_rgb_8,
+        )
+        .map_err(map_err),
+
+        DynamicImage::ImageRgba16(rgba) => hpvca::encode_rgba10_with_alpha(
+            &rgba.iter().map(|&x| x >> 6).collect::<Vec<_>>(),
+            w,
+            h,
+            &cfg_rgb_8,
+        )
+        .map_err(map_err),
+
+        DynamicImage::ImageLuma32F(luma) => hpvca::encode_gray10(
+            &luma
+                .iter()
+                .map(|&x| (x * 1023.).round().clamp(0., 1023.) as u16)
+                .collect::<Vec<_>>(),
+            w,
+            h,
+            &cfg_gray_10,
+        )
+        .map_err(map_err),
+
+        DynamicImage::ImageLumaA32F(luma_alpha) => hpvca::encode_gray_alpha10_with_alpha(
+            &luma_alpha
+                .iter()
+                .map(|&x| (x * 1023.).round().clamp(0., 1023.) as u16)
+                .collect::<Vec<_>>(),
+            w,
+            h,
+            &cfg_gray_10,
+        )
+        .map_err(map_err),
+
+        DynamicImage::ImageRgb32F(rgb) => hpvca::encode_rgb10(
+            &rgb.iter()
+                .map(|&x| (x * 1023.).round().clamp(0., 1023.) as u16)
+                .collect::<Vec<_>>(),
+            w,
+            h,
+            &cfg_rgb_8,
+        )
+        .map_err(map_err),
+
+        DynamicImage::ImageRgba32F(rgba) => hpvca::encode_rgba10_with_alpha(
+            &rgba
+                .iter()
+                .map(|&x| (x * 1023.).round().clamp(0., 1023.) as u16)
+                .collect::<Vec<_>>(),
+            w,
+            h,
+            &cfg_rgb_8,
+        )
+        .map_err(map_err),
+        _ => {
+            let rgba8 = img.to_rgba8();
+            hpvca::encode_rgba(&rgba8, w, h, &cfg_rgb_8).map_err(map_err)
+        }
+    }
 }

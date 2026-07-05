@@ -1,6 +1,6 @@
 [package]
 name = "pic-scale-py"
-version = "0.7.9"
+version = "0.7.10"
 edition = "2024"
 description = "High performance image scaling"
 readme = "README.md"
@@ -16,7 +16,7 @@ rust-version = "1.89.0"
 
 [dependencies]
 pic-scale = { path = "../" }
-pyo3 = { version = "0.28.3", features = ["extension-module"] }
+pyo3 = { version = "0.29.0", features = ["extension-module"] }
 
 [features]
 default = ["neon", "rdm", "sse", "avx"]

@@ -51,12 +51,11 @@ pub(crate) fn sse_unpremultiply_alpha_rgba_f32(in_place: &mut [f32]) {
 #[target_feature(enable = "sse4.1")]
 fn sse_unpremultiply_alpha_rgba_f32_row_impl(in_place: &mut [f32]) {
     unsafe {
-        for dst in in_place.chunks_exact_mut(4 * 4) {
-            let src_ptr = dst.as_ptr();
-            let rgba0 = _mm_loadu_ps(src_ptr);
-            let rgba1 = _mm_loadu_ps(src_ptr.add(4));
-            let rgba2 = _mm_loadu_ps(src_ptr.add(8));
-            let rgba3 = _mm_loadu_ps(src_ptr.add(12));
+        for dst in in_place.as_chunks_mut::<16>().0.iter_mut() {
+            let rgba0 = _mm_loadu_ps(dst.as_ptr());
+            let rgba1 = _mm_loadu_ps(dst[4..].as_ptr());
+            let rgba2 = _mm_loadu_ps(dst[8..].as_ptr());
+            let rgba3 = _mm_loadu_ps(dst[12..].as_ptr());
 
             let (rrr, ggg, bbb, aaa) = sse_deinterleave_rgba_ps(rgba0, rgba1, rgba2, rgba3);
 
@@ -66,14 +65,13 @@ fn sse_unpremultiply_alpha_rgba_f32_row_impl(in_place: &mut [f32]) {
 
             let (rgba0, rgba1, rgba2, rgba3) = sse_interleave_rgba_ps(rrr, ggg, bbb, aaa);
 
-            let dst_ptr = dst.as_mut_ptr();
-            _mm_storeu_ps(dst_ptr, rgba0);
-            _mm_storeu_ps(dst_ptr.add(4), rgba1);
-            _mm_storeu_ps(dst_ptr.add(8), rgba2);
-            _mm_storeu_ps(dst_ptr.add(12), rgba3);
+            _mm_storeu_ps(dst.as_mut_ptr(), rgba0);
+            _mm_storeu_ps(dst[4..].as_mut_ptr(), rgba1);
+            _mm_storeu_ps(dst[8..].as_mut_ptr(), rgba2);
+            _mm_storeu_ps(dst[12..].as_mut_ptr(), rgba3);
         }
 
-        let rem = in_place.chunks_exact_mut(4 * 4).into_remainder();
+        let rem = in_place.as_chunks_mut::<16>().1;
 
         unpremultiply_rgba_f32_row(rem);
     }
@@ -91,7 +89,12 @@ fn sse_premultiply_alpha_rgba_f32_row_impl(dst: &mut [f32], src: &[f32]) {
         let mut rem = dst;
         let mut src_rem = src;
 
-        for (dst, src) in rem.chunks_exact_mut(4 * 4).zip(src_rem.chunks_exact(4 * 4)) {
+        for (dst, src) in rem
+            .as_chunks_mut::<16>()
+            .0
+            .iter_mut()
+            .zip(src_rem.as_chunks::<16>().0.iter())
+        {
             let src_ptr = src.as_ptr();
             let rgba0 = _mm_loadu_ps(src_ptr);
             let rgba1 = _mm_loadu_ps(src_ptr.add(4));
@@ -112,8 +115,8 @@ fn sse_premultiply_alpha_rgba_f32_row_impl(dst: &mut [f32], src: &[f32]) {
             _mm_storeu_ps(dst_ptr.add(12), rgba3);
         }
 
-        rem = rem.chunks_exact_mut(4 * 4).into_remainder();
-        src_rem = src_rem.chunks_exact(4 * 4).remainder();
+        rem = rem.as_chunks_mut::<16>().1;
+        src_rem = src_rem.as_chunks::<16>().1;
 
         premultiply_rgba_f32_row(rem, src_rem);
     }
