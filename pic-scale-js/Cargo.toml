@@ -20,7 +20,7 @@ crate-type = ["cdylib"]
 pic-scale = { path = "../", features = ["avx", "neon"] }
 thiserror = "2.0.18"
 img-parts = "0.4.0"
-image = { path = "../../image", features = ["jpeg", "png", "webp", "tiff", "bmp", "ico", "qoi", "gif", "avif-native"], default-features = false }
+image = { git = "https://github.com/image-rs/image", rev = "2083aaeb7b0d2a989af914bd963fc1932d96284c", features = ["jpeg", "png", "webp", "tiff", "bmp", "ico", "qoi", "gif", "avif-native"], default-features = false }
 kamadak-exif = "0.6.1"
 bytemuck = "1.25.0"
 jxl = { version = "0.4.3" }
