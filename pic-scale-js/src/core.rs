@@ -129,7 +129,6 @@ pub fn parse_format(fmt: &str) -> Result<ImageFormat> {
 /// Detect AVIF by the ISOBMFF `ftyp` box at offset 4–12.
 /// AVIF shares the ISOBMFF container with HEIC/HEIF but is a distinct format
 /// based on AV1 compression rather than HEVC.
-#[cfg(not(target_arch = "wasm32"))]
 fn is_avif(bytes: &[u8]) -> bool {
     if bytes.len() < 12 {
         return false;
@@ -141,7 +140,6 @@ fn is_avif(bytes: &[u8]) -> bool {
 }
 
 /// Detect HEIC/HEIF by the ISOBMFF `ftyp` box at offset 4–12.
-#[cfg(not(target_arch = "wasm32"))]
 fn is_heic(bytes: &[u8]) -> bool {
     if bytes.len() < 12 {
         return false;

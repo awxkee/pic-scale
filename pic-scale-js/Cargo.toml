@@ -23,12 +23,16 @@ version = "0.8"
 pic-scale = { path = "../", features = ["avx", "neon"] }
 thiserror = "2.0.18"
 img-parts = "0.4.0"
-image = { git = "https://github.com/image-rs/image", rev = "2083aaeb7b0d2a989af914bd963fc1932d96284c", features = ["jpeg", "png", "webp", "tiff", "bmp", "ico", "qoi", "gif", "avif-native"], default-features = false }
+image = { git = "https://github.com/image-rs/image", rev = "2083aaeb7b0d2a989af914bd963fc1932d96284c", features = ["jpeg", "png", "webp", "tiff", "bmp", "ico", "qoi", "gif"], default-features = false }
 kamadak-exif = "0.6.1"
 bytemuck = "1.25.0"
 jxl = { version = "0.4.3" }
-fast_transpose = "0.2.5"
-jixel = "0.2.2"
+maroontree = { version = "0.1.4", default-features = false }
+fast_transpose = "0.2.7"
+jixel = "0.2.5"
+hpvca = "0.1.9"
+hpvcd = "0.2.3"
+yuv = "0.8.16"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 napi = { version = "3.9.0", features = ["napi4", "tokio_rt"], optional = true }
@@ -47,10 +51,8 @@ napi-build = { version = "2", optional = true }
 default = []
 napi = ["dep:napi", "dep:napi-derive", "dep:tokio", "dep:napi-build"]
 wasm = ["dep:wasm-bindgen", "dep:js-sys"]
-x86_set = ["pic-scale/avx512", "pic-scale/avx", "pic-scale/sse", "maroontree/avx"]
-aarch64_set = ["pic-scale/rdm", "pic-scale/sve", "pic-scale/nightly_i8mm", "maroontree/neon"]
-x86_set = ["pic-scale/avx512", "pic-scale/avx", "pic-scale/sse", "image/avif-native"]
-aarch64_set = ["pic-scale/rdm", "pic-scale/sve", "pic-scale/nightly_i8mm", "image/avif-native"]
+x86_set = ["pic-scale/avx512", "pic-scale/avx", "pic-scale/sse", "maroontree/avx", "image/avif-native"]
+aarch64_set = ["pic-scale/rdm", "pic-scale/sve", "pic-scale/nightly_i8mm", "maroontree/neon", "image/avif-native"]
 
 [profile.release]
 opt-level = 3
