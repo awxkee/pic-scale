@@ -48,7 +48,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -62,19 +61,11 @@ jobs:
         run: npm install -g @napi-rs/cli
 
       - name: Install build dependencies (Linux)
-        if: runner.os == 'Linux'
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
         run: |
           sudo apt-get update
             sudo apt-get install -y \
             cmake nasm \
-            libde265-dev \
-            libaom-dev \
-            libx265-dev \
-            libx264-dev \
-            libjpeg-dev \
-            libpng-dev \
-            zlib1g-dev \
-            libdav1d-dev \
             libnuma-dev
 
       - name: Install cross-compilation tools (Linux aarch64)
@@ -82,6 +73,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
+            cmake nasm \
             gcc-aarch64-linux-gnu \
             g++-aarch64-linux-gnu \
             binutils-aarch64-linux-gnu
@@ -97,7 +89,7 @@ jobs:
       - name: Install build dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install cmake nasm libde265 aom x265 dav1d rav1e jpeg-turbo libpng
+          brew install cmake nasm jpeg-turbo libpng
 
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
@@ -135,7 +127,7 @@ jobs:
           PKG_CONFIG_ALL_STATIC: ${{ runner.os != 'Windows' && '1' || '' }}
           MACOSX_DEPLOYMENT_TARGET: ${{ runner.os == 'macOS' && '11.0' || '' }}
         run: |
-          napi build --release --platform --target ${{ matrix.target }} --features "napi,${{ matrix.features }},embedded" --output-dir dist/
+          napi build --release --platform --target ${{ matrix.target }} --features "napi,${{ matrix.features }}" --output-dir dist/
 
       - uses: actions/upload-artifact@v6
         with:
@@ -191,7 +183,7 @@ jobs:
     name: Publish to npm
     needs: [ build-native, build-wasm ]
     runs-on: ubuntu-latest
-    if: always() && (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch')
+    if: success() && (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch')
     environment: Cargo
     permissions:
       contents: read
