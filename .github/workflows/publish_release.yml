@@ -29,6 +29,8 @@ jobs:
       - run: cargo clippy
       - run: cargo clippy --target aarch64-unknown-linux-gnu
       - run: RUSTFLAGS="-C target-feature=+sse4.1" cargo build  --target x86_64-unknown-linux-gnu
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
       - name: Make a release
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
