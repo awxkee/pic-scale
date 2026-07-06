@@ -91,14 +91,12 @@ fn wasm_unpremultiply_alpha_rgba_impl(in_place: &mut [u8]) {
     let mut rem = in_place;
 
     for dst in rem.as_chunks_mut::<64>().0.iter_mut() {
-        let src_ptr = dst.as_ptr();
-        let mut pixel = wasm_load_deinterleave_u8x4(src_ptr);
+        let mut pixel = wasm_load_deinterleave_u8x4(dst);
 
         pixel.0 = unpremultiply_vec(pixel.0, pixel.3);
         pixel.1 = unpremultiply_vec(pixel.1, pixel.3);
         pixel.2 = unpremultiply_vec(pixel.2, pixel.3);
-        let dst_ptr = dst.as_mut_ptr();
-        wasm_store_interleave_u8x4(dst_ptr, pixel);
+        wasm_store_interleave_u8x4(dst, pixel);
     }
 
     rem = rem.as_chunks_mut::<64>().1;
@@ -130,11 +128,11 @@ fn wasm_premultiply_alpha_rgba_impl(dst: &mut [u8], src: &[u8]) {
         .iter_mut()
         .zip(src_rem.as_chunks::<64>().0.iter())
     {
-        let mut pixel = wasm_load_deinterleave_u8x4(src.as_ptr());
+        let mut pixel = wasm_load_deinterleave_u8x4(src);
         pixel.0 = premultiply_vec(pixel.0, pixel.3);
         pixel.1 = premultiply_vec(pixel.1, pixel.3);
         pixel.2 = premultiply_vec(pixel.2, pixel.3);
-        wasm_store_interleave_u8x4(dst.as_mut_ptr(), pixel);
+        wasm_store_interleave_u8x4(dst, pixel);
     }
 
     rem = rem.as_chunks_mut::<64>().1;
