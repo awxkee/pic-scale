@@ -79,8 +79,10 @@ impl<const N: usize> Splitter<u8, u16, N> for Common8BitSplitter<N> {
         if N == 4 {
             for (src, dst) in from
                 .as_bytes()
-                .chunks_exact(4)
-                .zip(into.buffer.borrow_mut().chunks_exact_mut(4))
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(into.buffer.borrow_mut().as_chunks_mut::<4>().0.iter_mut())
             {
                 dst[0] = self.linearization[src[0] as usize];
                 dst[1] = self.linearization[src[1] as usize];
@@ -90,8 +92,10 @@ impl<const N: usize> Splitter<u8, u16, N> for Common8BitSplitter<N> {
         } else if N == 2 && self.has_alpha {
             for (src, dst) in from
                 .as_bytes()
-                .chunks_exact(2)
-                .zip(into.buffer.borrow_mut().chunks_exact_mut(2))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .zip(into.buffer.borrow_mut().as_chunks_mut::<2>().0.iter_mut())
             {
                 dst[0] = self.linearization[src[0] as usize];
                 dst[1] = ((src[1] as u16) << 4) | ((src[1] as u16) >> 4);
@@ -114,8 +118,10 @@ impl<const N: usize> Splitter<u8, u16, N> for Common8BitSplitter<N> {
         if N == 4 {
             for (src, dst) in from
                 .as_bytes()
-                .chunks_exact(4)
-                .zip(into.buffer.borrow_mut().chunks_exact_mut(4))
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(into.buffer.borrow_mut().as_chunks_mut::<4>().0.iter_mut())
             {
                 dst[0] = self.gamma[src[0] as usize];
                 dst[1] = self.gamma[src[1] as usize];
@@ -125,8 +131,10 @@ impl<const N: usize> Splitter<u8, u16, N> for Common8BitSplitter<N> {
         } else if N == 2 && self.has_alpha {
             for (src, dst) in from
                 .as_bytes()
-                .chunks_exact(2)
-                .zip(into.buffer.borrow_mut().chunks_exact_mut(2))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .zip(into.buffer.borrow_mut().as_chunks_mut::<2>().0.iter_mut())
             {
                 dst[0] = self.gamma[src[0] as usize];
                 dst[1] = (src[1] >> 4).min(255) as u8;
@@ -355,8 +363,10 @@ impl<const N: usize> Splitter<u16, u16, N> for Common16BitSplitter<N> {
 
             for (src, dst) in from
                 .as_bytes()
-                .chunks_exact(4)
-                .zip(into.buffer.borrow_mut().chunks_exact_mut(4))
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(into.buffer.borrow_mut().as_chunks_mut::<4>().0.iter_mut())
             {
                 dst[0] = self.linearization[src[0] as usize];
                 dst[1] = self.linearization[src[1] as usize];
@@ -370,8 +380,10 @@ impl<const N: usize> Splitter<u16, u16, N> for Common16BitSplitter<N> {
 
             for (src, dst) in from
                 .as_bytes()
-                .chunks_exact(2)
-                .zip(into.buffer.borrow_mut().chunks_exact_mut(2))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .zip(into.buffer.borrow_mut().as_chunks_mut::<2>().0.iter_mut())
             {
                 dst[0] = self.linearization[src[0] as usize];
                 dst[1] = (src[1] as f32 * a_f_scale).cpu_round() as u16;
@@ -395,8 +407,10 @@ impl<const N: usize> Splitter<u16, u16, N> for Common16BitSplitter<N> {
 
             for (src, dst) in from
                 .as_bytes()
-                .chunks_exact(4)
-                .zip(into.buffer.borrow_mut().chunks_exact_mut(4))
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(into.buffer.borrow_mut().as_chunks_mut::<4>().0.iter_mut())
             {
                 dst[0] = self.gamma[src[0] as usize];
                 dst[1] = self.gamma[src[1] as usize];
@@ -411,8 +425,10 @@ impl<const N: usize> Splitter<u16, u16, N> for Common16BitSplitter<N> {
 
             for (src, dst) in from
                 .as_bytes()
-                .chunks_exact(2)
-                .zip(into.buffer.borrow_mut().chunks_exact_mut(2))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .zip(into.buffer.borrow_mut().as_chunks_mut::<2>().0.iter_mut())
             {
                 dst[0] = self.gamma[src[0] as usize];
                 dst[1] = (src[1] as f32 * a_r_scale)

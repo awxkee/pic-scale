@@ -3,7 +3,7 @@ name: Publish to npm
 on:
   push:
     tags:
-      - '[0-9]*'
+#      - '[0-9]*'
       - 'npm[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
     inputs:
@@ -78,34 +78,6 @@ jobs:
             g++-aarch64-linux-gnu \
             binutils-aarch64-linux-gnu
 
-      - name: Cache vcpkg MD
-        if: matrix.runner == 'windows-latest'
-        uses: actions/cache@v4
-        with:
-          path: C:\vcpkg\installed
-          key: vcpkg-x64-windows-static-md-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: vcpkg-x64-windows-static-md-
-
-      - name: Install build dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install cmake nasm jpeg-turbo libpng
-
-      - name: Install dependencies (Windows)
-        if: runner.os == 'Windows'
-        shell: powershell
-        run: |
-          vcpkg integrate install
-          vcpkg install `
-            libheif:x64-windows-static-md `
-            libjpeg-turbo:x64-windows-static-md `
-            libpng:x64-windows-static-md `
-            zlib:x64-windows-static-md `
-            aom:x64-windows-static-md `
-            dav1d:x64-windows-static-md `
-            libde265:x64-windows-static-md `
-            x265:x64-windows-static-md
-
       - name: Cache Cargo registry + build
         uses: actions/cache@v4
         with:
@@ -122,8 +94,6 @@ jobs:
       - name: Build native addon
         working-directory: pic-scale-js
         env:
-          VCPKG_ROOT: ${{ matrix.runner == 'windows-latest' && 'C:\vcpkg' || '' }}
-          VCPKG_TARGET_TRIPLET: ${{ matrix.runner == 'windows-latest' && 'x64-windows-static-md' || '' }}
           PKG_CONFIG_ALL_STATIC: ${{ runner.os != 'Windows' && '1' || '' }}
           MACOSX_DEPLOYMENT_TARGET: ${{ runner.os == 'macOS' && '11.0' || '' }}
         run: |

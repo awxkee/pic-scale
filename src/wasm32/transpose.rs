@@ -31,12 +31,12 @@ use std::arch::wasm32::*;
 
 #[inline]
 #[target_feature(enable = "simd128")]
-pub fn wasm_load_deinterleave_u8x4(ptr: *const u8) -> (v128, v128, v128, v128) {
+pub(crate) fn wasm_load_deinterleave_u8x4(src: &[u8]) -> (v128, v128, v128, v128) {
     unsafe {
-        let u0 = v128_load(ptr as *const v128); // a0 b0 c0 d0 a1 b1 c1 d1 ...
-        let u1 = v128_load(ptr.add(16) as *const v128); // a4 b4 c4 d4 ...
-        let u2 = v128_load(ptr.add(32) as *const v128); // a8 b8 c8 d8 ...
-        let u3 = v128_load(ptr.add(48) as *const v128); // a12 b12 c12 d12 ...
+        let u0 = v128_load(src.as_ptr().cast()); // a0 b0 c0 d0 a1 b1 c1 d1 ...
+        let u1 = v128_load(src[16..].as_ptr().cast()); // a4 b4 c4 d4 ...
+        let u2 = v128_load(src[32..].as_ptr().cast()); // a8 b8 c8 d8 ...
+        let u3 = v128_load(src[48..].as_ptr().cast()); // a12 b12 c12 d12 ...
 
         let v0 = i8x16_shuffle::<0, 4, 8, 12, 16, 20, 24, 28, 1, 5, 9, 13, 17, 21, 25, 29>(u0, u1);
         let v1 = i8x16_shuffle::<0, 4, 8, 12, 16, 20, 24, 28, 1, 5, 9, 13, 17, 21, 25, 29>(u2, u3);
@@ -57,7 +57,7 @@ pub fn wasm_load_deinterleave_u8x4(ptr: *const u8) -> (v128, v128, v128, v128) {
 
 #[inline]
 #[target_feature(enable = "simd128")]
-pub fn wasm_store_interleave_u8x4(ptr: *mut u8, packed: (v128, v128, v128, v128)) {
+pub(crate) fn wasm_store_interleave_u8x4(dst: &mut [u8; 64], packed: (v128, v128, v128, v128)) {
     unsafe {
         let a = packed.0;
         let b = packed.1;
@@ -77,9 +77,9 @@ pub fn wasm_store_interleave_u8x4(ptr: *mut u8, packed: (v128, v128, v128, v128)
         let v2 = wasm_unpacklo_i8x16(u1, u3); // a8 b8 c8 d8 ...
         let v3 = wasm_unpackhi_i8x16(u1, u3); // a12 b12 c12 d12 ...
 
-        v128_store(ptr as *mut v128, v0);
-        v128_store(ptr.add(16) as *mut v128, v1);
-        v128_store(ptr.add(32) as *mut v128, v2);
-        v128_store(ptr.add(48) as *mut v128, v3);
+        v128_store(dst.as_mut_ptr().cast(), v0);
+        v128_store(dst[16..].as_mut_ptr().cast(), v1);
+        v128_store(dst[32..].as_mut_ptr().cast(), v2);
+        v128_store(dst[48..].as_mut_ptr().cast(), v3);
     }
 }

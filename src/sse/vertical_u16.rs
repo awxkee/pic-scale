@@ -84,9 +84,9 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
 
         let v_px = cx;
 
-        let iter16 = dst.chunks_exact_mut(16);
+        let iter16 = dst.as_chunks_mut::<16>();
 
-        for (x, dst) in iter16.enumerate() {
+        for (x, dst) in iter16.0.iter_mut().enumerate() {
             let mut store0 = zeros_ps;
             let mut store1 = zeros_ps;
             let mut store2 = zeros_ps;
@@ -100,8 +100,8 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
 
                 let v_weight = _mm_set1_ps(k_weight);
 
-                let item_row0 = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
-                let item_row1 = _mm_loadu_si128(src_ptr.as_ptr().add(8) as *const __m128i);
+                let item_row0 = _mm_loadu_si128(src_ptr.as_ptr().cast());
+                let item_row1 = _mm_loadu_si128(src_ptr.as_ptr().add(8).cast());
 
                 store0 = _mm_prefer_fma_ps::<FMA>(
                     store0,
@@ -133,18 +133,18 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
             let item0 = _mm_packus_epi32(v_st0, v_st1);
             let item1 = _mm_packus_epi32(v_st2, v_st3);
 
-            _mm_storeu_si128(dst.as_mut_ptr() as *mut __m128i, item0);
-            _mm_storeu_si128(dst.as_mut_ptr().add(8) as *mut __m128i, item1);
+            _mm_storeu_si128(dst.as_mut_ptr().cast(), item0);
+            _mm_storeu_si128(dst.as_mut_ptr().add(8).cast(), item1);
 
             cx += 16;
         }
 
-        let tail16 = dst.chunks_exact_mut(16).into_remainder();
-        let iter8 = tail16.chunks_exact_mut(8);
+        let tail16 = dst.as_chunks_mut::<16>().1;
+        let iter8 = tail16.as_chunks_mut::<8>();
 
         let v_px = cx;
 
-        for (x, dst) in iter8.enumerate() {
+        for (x, dst) in iter8.0.iter_mut().enumerate() {
             let mut store0 = zeros_ps;
             let mut store1 = zeros_ps;
 
@@ -156,7 +156,7 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
 
                 let v_weight = _mm_set1_ps(k_weight);
 
-                let item_row = _mm_loadu_si128(src_ptr.as_ptr() as *const __m128i);
+                let item_row = _mm_loadu_si128(src_ptr.as_ptr().cast());
 
                 store0 = _mm_prefer_fma_ps::<FMA>(
                     store0,
@@ -174,17 +174,17 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
             let v_st1 = _mm_min_epi32(_mm_cvtps_epi32(store1), v_max_colors);
 
             let item = _mm_packus_epi32(v_st0, v_st1);
-            _mm_storeu_si128(dst.as_mut_ptr() as *mut __m128i, item);
+            _mm_storeu_si128(dst.as_mut_ptr().cast(), item);
 
             cx += 8;
         }
 
-        let tail8 = tail16.chunks_exact_mut(8).into_remainder();
-        let iter4 = tail8.chunks_exact_mut(4);
+        let tail8 = tail16.as_chunks_mut::<8>().1;
+        let iter4 = tail8.as_chunks_mut::<4>();
 
         let v_cx = cx;
 
-        for (x, dst) in iter4.enumerate() {
+        for (x, dst) in iter4.0.iter_mut().enumerate() {
             let mut store0 = zeros_ps;
 
             let v_dx = v_cx + x * 4;
@@ -212,7 +212,7 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
             cx += 4;
         }
 
-        let tail4 = tail8.chunks_exact_mut(4).into_remainder();
+        let tail4 = tail8.as_chunks_mut::<4>().1;
 
         let a_px = cx;
 

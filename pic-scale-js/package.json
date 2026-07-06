@@ -1,6 +1,6 @@
 {
   "name": "@radzivon.bartoshyk/pic-scale",
-  "version": "0.7.9",
+  "version": "0.7.10",
   "description": "High-performance image resampling",
   "license": "(BSD-3-Clause OR Apache-2.0)",
   "repository": {

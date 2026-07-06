@@ -62,7 +62,7 @@ fn avx512_has_non_constant_cap_alpha_rgba8_impl(store: &[u8], width: usize, stri
             let row = &row[..width * 4];
             let mut sums = _mm512_set1_epi32(0);
 
-            for chunk in row.chunks_exact(64) {
+            for chunk in row.as_chunks::<64>().0.iter() {
                 let working_mask: __mmask64 = if chunk.len() == 64 {
                     0xffff_ffff_ffff_ffff
                 } else {

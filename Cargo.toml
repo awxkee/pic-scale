@@ -4,7 +4,7 @@ exclude = ["picscale", "fuzz", "pic-scale-py"]
 
 [package]
 name = "pic-scale"
-version = "0.7.9"
+version = "0.7.10"
 edition = "2024"
 description = "High performance image scaling"
 readme = "README.md"

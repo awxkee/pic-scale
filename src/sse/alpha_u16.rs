@@ -130,10 +130,10 @@ impl DisassociateAlphaDefault {
             let max_colors = (1u32 << bit_depth) - 1;
             let v_max_test = _mm_set1_epi16(max_colors as i16);
 
-            let row0 = _mm_loadu_si128(src_ptr as *const __m128i);
-            let row1 = _mm_loadu_si128(src_ptr.add(8) as *const __m128i);
-            let row2 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
-            let row3 = _mm_loadu_si128(src_ptr.add(24) as *const __m128i);
+            let row0 = _mm_loadu_si128(src_ptr.cast());
+            let row1 = _mm_loadu_si128(src_ptr.add(8).cast());
+            let row2 = _mm_loadu_si128(src_ptr.add(16).cast());
+            let row3 = _mm_loadu_si128(src_ptr.add(24).cast());
             let (rrrr, gggg, bbbb, aaaa) = sse_deinterleave_rgba_epi16(row0, row1, row2, row3);
 
             let is_zero_mask = _mm_cmpeq_epi16(aaaa, _mm_setzero_si128());
@@ -164,10 +164,10 @@ impl DisassociateAlphaDefault {
                 sse_interleave_rgba_epi16(new_rrrr, new_gggg, new_bbbb, aaaa);
 
             let dst_ptr = in_place.as_mut_ptr();
-            _mm_storeu_si128(dst_ptr as *mut __m128i, rgba0);
-            _mm_storeu_si128(dst_ptr.add(8) as *mut __m128i, rgba1);
-            _mm_storeu_si128(dst_ptr.add(16) as *mut __m128i, rgba2);
-            _mm_storeu_si128(dst_ptr.add(24) as *mut __m128i, rgba3);
+            _mm_storeu_si128(dst_ptr.cast(), rgba0);
+            _mm_storeu_si128(dst_ptr.add(8).cast(), rgba1);
+            _mm_storeu_si128(dst_ptr.add(16).cast(), rgba2);
+            _mm_storeu_si128(dst_ptr.add(24).cast(), rgba3);
         }
     }
 }
@@ -182,11 +182,11 @@ impl DisassociateAlpha for DisassociateAlphaDefault {
 
             let mut rem = in_place;
 
-            for dst in rem.chunks_exact_mut(8 * 4) {
+            for dst in rem.as_chunks_mut::<32>().0.iter_mut() {
                 self.disassociate_chunk(dst, v_max_colors, bit_depth);
             }
 
-            rem = rem.chunks_exact_mut(8 * 4).into_remainder();
+            rem = rem.as_chunks_mut::<32>().1;
 
             if !rem.is_empty() {
                 assert!(rem.len() < 8 * 4);
@@ -258,10 +258,10 @@ impl<const BIT_DEPTH: usize> Sse41PremultiplyExecutorDefault<BIT_DEPTH> {
         unsafe {
             let zeros = _mm_setzero_si128();
             let src_ptr = src.as_ptr();
-            let row0 = _mm_loadu_si128(src_ptr as *const __m128i);
-            let row1 = _mm_loadu_si128(src_ptr.add(8) as *const __m128i);
-            let row2 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
-            let row3 = _mm_loadu_si128(src_ptr.add(24) as *const __m128i);
+            let row0 = _mm_loadu_si128(src_ptr.cast());
+            let row1 = _mm_loadu_si128(src_ptr.add(8).cast());
+            let row2 = _mm_loadu_si128(src_ptr.add(16).cast());
+            let row3 = _mm_loadu_si128(src_ptr.add(24).cast());
             let (rrrr, gggg, bbbb, aaaa) = sse_deinterleave_rgba_epi16(row0, row1, row2, row3);
 
             let a_lo_f = _mm_unpacklo_epi16(aaaa, zeros);
@@ -284,10 +284,10 @@ impl<const BIT_DEPTH: usize> Sse41PremultiplyExecutorDefault<BIT_DEPTH> {
                 sse_interleave_rgba_epi16(new_rrrr, new_gggg, new_bbbb, aaaa);
 
             let dst_ptr = dst.as_mut_ptr();
-            _mm_storeu_si128(dst_ptr as *mut __m128i, rgba0);
-            _mm_storeu_si128(dst_ptr.add(8) as *mut __m128i, rgba1);
-            _mm_storeu_si128(dst_ptr.add(16) as *mut __m128i, rgba2);
-            _mm_storeu_si128(dst_ptr.add(24) as *mut __m128i, rgba3);
+            _mm_storeu_si128(dst_ptr.cast(), rgba0);
+            _mm_storeu_si128(dst_ptr.add(8).cast(), rgba1);
+            _mm_storeu_si128(dst_ptr.add(16).cast(), rgba2);
+            _mm_storeu_si128(dst_ptr.add(24).cast(), rgba3);
         }
     }
 }
@@ -301,12 +301,17 @@ impl<const BIT_DEPTH: usize> Sse41PremultiplyExecutor
             let mut rem = dst;
             let mut src_rem = src;
 
-            for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
+            for (dst, src) in rem
+                .as_chunks_mut::<32>()
+                .0
+                .iter_mut()
+                .zip(src_rem.as_chunks::<32>().0.iter())
+            {
                 self.premultiply_chunk(dst, src);
             }
 
-            rem = rem.chunks_exact_mut(8 * 4).into_remainder();
-            src_rem = src_rem.chunks_exact(8 * 4).remainder();
+            rem = rem.as_chunks_mut::<32>().1;
+            src_rem = src_rem.as_chunks::<32>().1;
 
             if !rem.is_empty() {
                 assert!(src_rem.len() < 8 * 4);
@@ -334,10 +339,10 @@ impl Sse41PremultiplyExecutorAny {
     fn premultiply_chunk(&self, dst: &mut [u16], src: &[u16], scale: __m128) {
         unsafe {
             let src_ptr = src.as_ptr();
-            let row0 = _mm_loadu_si128(src_ptr as *const __m128i);
-            let row1 = _mm_loadu_si128(src_ptr.add(8) as *const __m128i);
-            let row2 = _mm_loadu_si128(src_ptr.add(16) as *const __m128i);
-            let row3 = _mm_loadu_si128(src_ptr.add(24) as *const __m128i);
+            let row0 = _mm_loadu_si128(src_ptr.cast());
+            let row1 = _mm_loadu_si128(src_ptr.add(8).cast());
+            let row2 = _mm_loadu_si128(src_ptr.add(16).cast());
+            let row3 = _mm_loadu_si128(src_ptr.add(24).cast());
             let (rrrr, gggg, bbbb, aaaa) = sse_deinterleave_rgba_epi16(row0, row1, row2, row3);
 
             let a_lo_f = _mm_cvtepi32_ps(_mm_unpacklo_epi16(aaaa, _mm_setzero_si128()));
@@ -351,10 +356,10 @@ impl Sse41PremultiplyExecutorAny {
                 sse_interleave_rgba_epi16(new_rrrr, new_gggg, new_bbbb, aaaa);
 
             let dst_ptr = dst.as_mut_ptr();
-            _mm_storeu_si128(dst_ptr as *mut __m128i, rgba0);
-            _mm_storeu_si128(dst_ptr.add(8) as *mut __m128i, rgba1);
-            _mm_storeu_si128(dst_ptr.add(16) as *mut __m128i, rgba2);
-            _mm_storeu_si128(dst_ptr.add(24) as *mut __m128i, rgba3);
+            _mm_storeu_si128(dst_ptr.cast(), rgba0);
+            _mm_storeu_si128(dst_ptr.add(8).cast(), rgba1);
+            _mm_storeu_si128(dst_ptr.add(16).cast(), rgba2);
+            _mm_storeu_si128(dst_ptr.add(24).cast(), rgba3);
         }
     }
 }
@@ -370,12 +375,17 @@ impl Sse41PremultiplyExecutor for Sse41PremultiplyExecutorAny {
 
             let v_max_colors_scale =
                 _mm_div_ps(_mm_set1_ps(1.), _mm_cvtepi32_ps(_mm_set1_epi32(max_colors)));
-            for (dst, src) in rem.chunks_exact_mut(8 * 4).zip(src_rem.chunks_exact(8 * 4)) {
+            for (dst, src) in rem
+                .as_chunks_mut::<32>()
+                .0
+                .iter_mut()
+                .zip(src_rem.as_chunks::<32>().0.iter())
+            {
                 self.premultiply_chunk(dst, src, v_max_colors_scale);
             }
 
-            rem = rem.chunks_exact_mut(8 * 4).into_remainder();
-            src_rem = src_rem.chunks_exact(8 * 4).remainder();
+            rem = rem.as_chunks_mut::<32>().1;
+            src_rem = src_rem.as_chunks::<32>().1;
 
             if !rem.is_empty() {
                 assert!(src_rem.len() < 8 * 4);
