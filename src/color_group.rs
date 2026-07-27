@@ -224,7 +224,7 @@ where
                 self.r * rhs.r,
                 self.g * rhs.g,
                 self.b * rhs.b,
-                self.a * rhs.b,
+                self.a * rhs.a,
             )
         } else {
             unimplemented!();

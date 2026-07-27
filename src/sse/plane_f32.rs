@@ -144,7 +144,7 @@ fn convolve_horizontal_plane_sse_row_one_impl<const FMA: bool>(
                 let read_weights3 = _mm_loadu_ps(ptr.get_unchecked(12..).as_ptr());
                 let weights = (read_weights0, read_weights1, read_weights2, read_weights3);
                 store = conv_horiz_plane_16_f32!(bounds_start, src, weights, store, FMA);
-                jx += 8;
+                jx += 16;
             }
 
             while jx + 8 <= bounds.size {

@@ -529,15 +529,17 @@ impl VerticalConvolutionPass<f16, f32, 2> for ImageStore<'_, f16, 2> {
             _dispatcher = convolve_vertical_rgb_neon_row_f16;
             match _options.workload_strategy {
                 crate::WorkloadStrategy::PreferQuality => {
-                    use crate::filter_weights::WeightFloat16Converter;
-                    use crate::neon::convolve_vertical_rgb_neon_row_f16_fhm;
-                    let weights =
-                        WeightFloat16Converter::default().prepare_weights(&filter_weights);
-                    return Arc::new(VerticalFiltering {
-                        filter_weights: weights,
-                        filter_row: convolve_vertical_rgb_neon_row_f16_fhm,
-                        threading_policy,
-                    });
+                    if std::arch::is_aarch64_feature_detected!("fhm") {
+                        use crate::filter_weights::WeightFloat16Converter;
+                        use crate::neon::convolve_vertical_rgb_neon_row_f16_fhm;
+                        let weights =
+                            WeightFloat16Converter::default().prepare_weights(&filter_weights);
+                        return Arc::new(VerticalFiltering {
+                            filter_weights: weights,
+                            filter_row: convolve_vertical_rgb_neon_row_f16_fhm,
+                            threading_policy,
+                        });
+                    }
                 }
                 crate::WorkloadStrategy::PreferSpeed => {
                     if std::arch::is_aarch64_feature_detected!("fp16") {

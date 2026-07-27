@@ -242,12 +242,12 @@ pub fn convolve_horizontal_cbcr_neon_dot_row(
     _: u32,
 ) {
     unsafe {
-        convolve_horizontal_cbcr_neon_rdm_row_impl(src, dst, filter_weights);
+        convolve_horizontal_cbcr_neon_dot_row_impl(src, dst, filter_weights);
     }
 }
 
 #[target_feature(enable = "i8mm")]
-fn convolve_horizontal_cbcr_neon_rdm_row_impl(
+fn convolve_horizontal_cbcr_neon_dot_row_impl(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i8>,

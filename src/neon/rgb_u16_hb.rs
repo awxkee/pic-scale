@@ -73,8 +73,8 @@ fn conv_horiz_rgba_2_u16(
 
         let hi = vext_u16::<3>(l1, vreinterpret_u16_u32(l2));
 
-        let acc = vqrdmlahq_s32(store, vreinterpretq_s32_u32(vshll_n_u16::<6>(l1)), w1);
-        vqrdmlahq_s32(acc, vreinterpretq_s32_u32(vshll_n_u16::<6>(hi)), w0)
+        let acc = vqrdmlahq_s32(store, vreinterpretq_s32_u32(vshll_n_u16::<6>(l1)), w0);
+        vqrdmlahq_s32(acc, vreinterpretq_s32_u32(vshll_n_u16::<6>(hi)), w1)
     }
 }
 

@@ -57,7 +57,7 @@ fn conv_horiz_4_rgb_f16(
         let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
 
         let v0 = vld1q_u16(src_ptr.cast());
-        let v1 = vcombine_u16(vld1_u16(src_ptr.cast()), vdup_n_u16(0));
+        let v1 = vcombine_u16(vld1_u16(src_ptr.add(8).cast()), vdup_n_u16(0));
 
         let rgb_pixel_s = uint16x8x2_t(v0, v1);
         let rgb_first_u = vget_low_u16(rgb_pixel_s.0);
@@ -122,7 +122,7 @@ fn conv_horiz_1_rgb_f16(
 
         let mut rgb_pixel_u =
             vreinterpret_u16_u32(vld1_lane_u32::<0>(src_ptr.cast(), vdup_n_u32(0)));
-        rgb_pixel_u = vld1_lane_u16::<2>(src_ptr.cast(), rgb_pixel_u);
+        rgb_pixel_u = vld1_lane_u16::<2>(src_ptr.add(2).cast(), rgb_pixel_u);
 
         let rgb_pixel = vreinterpret_f16_u16(rgb_pixel_u);
         vfma_f16(store, rgb_pixel, set)

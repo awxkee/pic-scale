@@ -55,7 +55,7 @@ fn convolve_16_items(
     let max_colors = (1u32 << bit_depth) - 1;
     let mut cx = cx;
 
-    let initial_store = vdupq_n_s32((1 << 5) - 1);
+    let initial_store = vdupq_n_s32(1 << 5);
 
     let v_max_colors = vdupq_n_u16(max_colors as u16);
 
@@ -244,7 +244,7 @@ fn convolve_column_hb_impl(
         let bounds_size = bounds.size;
         let weights = &weights[..bounds.size];
 
-        let initial_store = vdupq_n_s32((1 << 5) - 1);
+        let initial_store = vdupq_n_s32(1 << 5);
 
         let v_max_colors = vdupq_n_u16(max_colors as u16);
 
@@ -343,7 +343,7 @@ fn convolve_column_hb_impl(
                 store0 += *src_ptr as i64 * k_weight as i64;
             }
 
-            const R: i64 = (1 << 30) - 1;
+            const R: i64 = 1 << 30;
             *dst = ((store0 + R) >> 31).max(0).min(max_colors as i64) as u16;
         }
     }

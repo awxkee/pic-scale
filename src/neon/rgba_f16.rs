@@ -124,7 +124,7 @@ fn conv_horiz_rgba_4_f16(
         );
         prefer_vfmaq_laneq_f32::<3>(
             acc,
-            vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(rgb_pixel.0))),
+            vcvt_f32_f16(vreinterpret_f16_u16(vget_high_u16(rgb_pixel.1))),
             set1,
         )
     }

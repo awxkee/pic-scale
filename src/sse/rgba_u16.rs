@@ -73,7 +73,7 @@ fn conv_horiz_rgba_2_u16<const FMA: bool>(
         );
         _mm_prefer_fma_ps::<FMA>(
             acc,
-            _mm_cvtepi32_ps(_mm_unpacklo_epi16(rgba_pixel, _mm_setzero_si128())),
+            _mm_cvtepi32_ps(_mm_unpackhi_epi16(rgba_pixel, _mm_setzero_si128())),
             w1,
         )
     }
@@ -113,7 +113,7 @@ fn conv_horiz_rgba_4_u16<const FMA: bool>(
         );
         _mm_prefer_fma_ps::<FMA>(
             acc,
-            _mm_cvtepi32_ps(_mm_unpackhi_epi16(rgba_pixel0, _mm_setzero_si128())),
+            _mm_cvtepi32_ps(_mm_unpacklo_epi16(rgba_pixel0, _mm_setzero_si128())),
             w0,
         )
     }

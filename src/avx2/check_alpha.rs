@@ -166,7 +166,7 @@ fn avx_has_non_constant_cap_alpha_rgba16_impl(store: &[u16], width: usize, strid
                 sums = _mm256_add_epi32(sums, r23);
             }
 
-            let row = row.as_chunks::<32>().1;
+            let row = row.as_chunks::<64>().1;
 
             for chunk in row.as_chunks::<16>().0.iter() {
                 let mut r0 = _mm256_loadu_si256(chunk.as_ptr().cast());

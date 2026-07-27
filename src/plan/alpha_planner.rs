@@ -139,7 +139,7 @@ impl AlphaPlanner {
         )?;
 
         let quality_plan = Self::build_quality_pass_plan::<T, W, N>(
-            &pre_scaler,
+            &scaler,
             intermediate,
             destination_size,
             bit_depth,

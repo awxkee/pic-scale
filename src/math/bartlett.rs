@@ -74,11 +74,67 @@ where
     if x > 2f32.as_() {
         return 0f32.as_();
     }
-    let l = 2.0f32.as_();
-    let fac = (x / (l - 1.0f32.as_()) - 0.5f32.as_()).abs();
+    // The window is defined on an index `t = n/(N-1)` in [0, 1] as
+    // `0.62 - 0.48*|t - 0.5| - 0.38*cos(2*pi*t)`, but resampling passes a distance
+    // from the centre. Re-expressed over the normalized distance `d = |x|/R`,
+    // `|t - 0.5|` becomes `d/2` (halving the linear coefficient) and the cosine
+    // folds to `+0.38*cos(pi*d)`, giving w(0) = 1 and w(R) = 0.
+    let d = x * 0.5f32.as_();
     mla(
         0.38f32.as_(),
-        (2f32.as_() * fac).f_cospi(),
-        mla(-0.4832.as_(), fac, 0.62f32.as_()),
+        d.f_cospi(),
+        mla(-0.24f32.as_(), d, 0.62f32.as_()),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Reference Bartlett-Hann window in its textbook index form,
+    /// `t = n/(N-1)` over [0, 1].
+    fn reference_index(t: f64) -> f64 {
+        0.62 - 0.48 * (t - 0.5).abs() - 0.38 * (2.0 * std::f64::consts::PI * t).cos()
+    }
+
+    #[test]
+    fn bartlett_hann_matches_reference_window() {
+        // Distance `d` from the centre corresponds to index `0.5 + d/2`.
+        for i in 0..=1000 {
+            let d = i as f64 / 1000.0;
+            let got = bartlett_hann(d * 2.0);
+            let want = reference_index(0.5 + d / 2.0);
+            assert!(
+                (got - want).abs() < 1e-6,
+                "d = {d}: got {got}, want {want}"
+            );
+        }
+    }
+
+    #[test]
+    fn bartlett_hann_endpoints_and_symmetry() {
+        assert!((bartlett_hann(0.0f64) - 1.0).abs() < 1e-6);
+        assert!(bartlett_hann(2.0f64).abs() < 1e-6);
+        assert_eq!(bartlett_hann(2.5f64), 0.0);
+
+        for i in 0..=200 {
+            let x = i as f64 / 100.0;
+            assert!(
+                (bartlett_hann(x) - bartlett_hann(-x)).abs() < 1e-12,
+                "not symmetric at {x}"
+            );
+        }
+    }
+
+    #[test]
+    fn bartlett_hann_is_non_negative_and_decreasing() {
+        let mut prev = f64::INFINITY;
+        for i in 0..=200 {
+            let x = i as f64 / 100.0;
+            let w = bartlett_hann(x);
+            assert!(w >= -1e-6, "negative tap {w} at {x}");
+            assert!(w <= prev + 1e-9, "not decreasing at {x}");
+            prev = w;
+        }
+    }
 }

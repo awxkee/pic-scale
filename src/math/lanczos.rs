@@ -46,7 +46,9 @@ where
     f64: AsPrimitive<V>,
 {
     let scale_a: V = 1f32.as_() / a;
-    if x == 0f32.as_() || x > 16.247661874700962f32.as_() {
+    // No special case for `x == 0`: `jinc` is well defined there and pxfm
+    // returns 1, so the centre tap correctly evaluates to `jinc(0) * jinc(0) == 1`.
+    if x > 16.247661874700962f32.as_() {
         return 0f32.as_();
     }
     if x.abs() < a {
@@ -186,4 +188,89 @@ where
     f32: AsPrimitive<V>,
 {
     lanczos_sinc(x, 2f32.as_())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const JINC: [(&str, fn(f64) -> f64); 5] = [
+        ("lanczos2_jinc", lanczos2_jinc),
+        ("lanczos3_jinc", lanczos3_jinc),
+        ("lanczos4_jinc", lanczos4_jinc),
+        ("lanczos5_jinc", lanczos5_jinc),
+        ("lanczos6_jinc", lanczos6_jinc),
+    ];
+
+    /// `jinc(0) == 1`, so the centre tap must be 1 — not 0.
+    #[test]
+    fn centre_tap_is_unity() {
+        for (name, kernel) in JINC {
+            let w = kernel(0.0);
+            assert!((w - 1.0).abs() < 1e-9, "{name}(0) = {w}, expected 1");
+        }
+        // The sinc siblings already behave; keep them pinned alongside.
+        for (name, kernel) in [("lanczos2", lanczos2 as fn(f64) -> f64), ("lanczos3", lanczos3)] {
+            let w = kernel(0.0);
+            assert!((w - 1.0).abs() < 1e-9, "{name}(0) = {w}, expected 1");
+        }
+    }
+
+    /// The pre-fix `x == 0` early-out made the kernel jump 1.0 -> 0.0 at a
+    /// single point. Nothing may discontinuously drop at the centre.
+    #[test]
+    fn is_continuous_at_the_centre() {
+        for (name, kernel) in JINC {
+            for eps in [1e-12, 1e-9, 1e-6] {
+                let (at_zero, near_zero) = (kernel(0.0), kernel(eps));
+                assert!(
+                    (at_zero - near_zero).abs() < 1e-5,
+                    "{name}: w(0) = {at_zero} but w({eps}) = {near_zero}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn centre_is_the_maximum() {
+        for (name, kernel) in JINC {
+            let peak = kernel(0.0);
+            for i in 0..=6000 {
+                let x = i as f64 / 1000.0;
+                assert!(
+                    kernel(x) <= peak + 1e-12,
+                    "{name}: w({x}) exceeds centre tap"
+                );
+            }
+        }
+    }
+
+    /// At a 1:1 ratio `weights.rs` produces `dx == 0` for the centre tap, so
+    /// after normalization that tap must dominate — this is the case the
+    /// pre-fix kernel turned into "reconstruct a pixel from its neighbours only".
+    #[test]
+    fn identity_ratio_keeps_the_centre_pixel() {
+        for (name, kernel) in JINC {
+            let raw: Vec<f64> = (-3..=3).map(|k| kernel((k as f64).abs())).collect();
+            let sum: f64 = raw.iter().sum();
+            let centre = raw[3] / sum;
+            assert!(
+                centre > 0.5,
+                "{name}: centre tap holds only {centre} of the weight at 1:1"
+            );
+        }
+    }
+
+    #[test]
+    fn is_symmetric_within_the_support() {
+        for (name, kernel) in JINC {
+            for i in 0..=6000 {
+                let x = i as f64 / 1000.0;
+                assert!(
+                    (kernel(x) - kernel(-x)).abs() < 1e-12,
+                    "{name}: not symmetric at {x}"
+                );
+            }
+        }
+    }
 }

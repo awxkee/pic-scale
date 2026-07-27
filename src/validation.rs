@@ -195,19 +195,19 @@ macro_rules! validate_sizes {
     ($store: expr, $into: expr, $src_size: expr, $dst_size: expr) => {{
         $into.validate()?;
         $store.validate()?;
-        if $store.width != $src_size.width && $store.height != $src_size.height {
+        if $store.width != $src_size.width || $store.height != $src_size.height {
             return Err(PicScaleError::InvalidSourceSize {
                 expected: $src_size,
                 size: $store.size(),
             });
         }
-        if $into.width != $dst_size.width && $into.height != $dst_size.height {
+        if $into.width != $dst_size.width || $into.height != $dst_size.height {
             return Err(PicScaleError::InvalidDestinationSize {
                 expected: $dst_size,
                 size: $into.size(),
             });
         }
-        if $store.width == $into.width && $store.height == $into.height {
+        if $store.width == $into.width || $store.height == $into.height {
             $store.copied_to_mut($into);
             return Ok(());
         }

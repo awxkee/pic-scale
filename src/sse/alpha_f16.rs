@@ -107,9 +107,9 @@ fn sse_premultiply_alpha_rgba_row_f16_impl<const F16C: bool>(dst: &mut [f16], sr
 pub(crate) fn sse_unpremultiply_alpha_rgba_f16(in_place: &mut [f16]) {
     unsafe {
         if is_x86_feature_detected!("f16c") {
-            sse_unpremultiply_alpha_rgba_f16_regular(in_place);
-        } else {
             sse_unpremultiply_alpha_rgba_f16c(in_place);
+        } else {
+            sse_unpremultiply_alpha_rgba_f16_regular(in_place);
         }
     }
 }
@@ -140,17 +140,17 @@ fn sse_unpremultiply_alpha_rgba_f16_row_impl<const F16C: bool>(in_place: &mut [f
             let zeros = _mm_setzero_ps();
             let low_alpha_zero_mask = _mm_cmpeq_ps(low_alpha, zeros);
             let low_r = _mm_blendv_ps(
-                _mm_mul_ps(_mm_cvtph_psx::<F16C>(pixel.0), low_alpha),
+                _mm_div_ps(_mm_cvtph_psx::<F16C>(pixel.0), low_alpha),
                 zeros,
                 low_alpha_zero_mask,
             );
             let low_g = _mm_blendv_ps(
-                _mm_mul_ps(_mm_cvtph_psx::<F16C>(pixel.1), low_alpha),
+                _mm_div_ps(_mm_cvtph_psx::<F16C>(pixel.1), low_alpha),
                 zeros,
                 low_alpha_zero_mask,
             );
             let low_b = _mm_blendv_ps(
-                _mm_mul_ps(_mm_cvtph_psx::<F16C>(pixel.2), low_alpha),
+                _mm_div_ps(_mm_cvtph_psx::<F16C>(pixel.2), low_alpha),
                 zeros,
                 low_alpha_zero_mask,
             );
@@ -158,7 +158,7 @@ fn sse_unpremultiply_alpha_rgba_f16_row_impl<const F16C: bool>(in_place: &mut [f
             let high_alpha = _mm_cvtph_psx::<F16C>(_mm_srli_si128::<8>(pixel.3));
             let high_alpha_zero_mask = _mm_cmpeq_ps(high_alpha, zeros);
             let high_r = _mm_blendv_ps(
-                _mm_mul_ps(
+                _mm_div_ps(
                     _mm_cvtph_psx::<F16C>(_mm_srli_si128::<8>(pixel.0)),
                     high_alpha,
                 ),
@@ -166,7 +166,7 @@ fn sse_unpremultiply_alpha_rgba_f16_row_impl<const F16C: bool>(in_place: &mut [f
                 high_alpha_zero_mask,
             );
             let high_g = _mm_blendv_ps(
-                _mm_mul_ps(
+                _mm_div_ps(
                     _mm_cvtph_psx::<F16C>(_mm_srli_si128::<8>(pixel.1)),
                     high_alpha,
                 ),
@@ -174,7 +174,7 @@ fn sse_unpremultiply_alpha_rgba_f16_row_impl<const F16C: bool>(in_place: &mut [f
                 high_alpha_zero_mask,
             );
             let high_b = _mm_blendv_ps(
-                _mm_mul_ps(
+                _mm_div_ps(
                     _mm_cvtph_psx::<F16C>(_mm_srli_si128::<8>(pixel.2)),
                     high_alpha,
                 ),

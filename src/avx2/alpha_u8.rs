@@ -108,7 +108,7 @@ impl AssociateAlpha for AssociateAlphaDefault {
 
             let mut buffer: [u8; PART_SIZE] = [0u8; PART_SIZE];
             let mut dst_buffer: [u8; PART_SIZE] = [0u8; PART_SIZE];
-            buffer[..rem.len()].copy_from_slice(rem);
+            buffer[..rem.len()].copy_from_slice(src_rem);
 
             self.associate_chunk(&mut dst_buffer, &buffer);
 
