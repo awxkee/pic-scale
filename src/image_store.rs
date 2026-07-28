@@ -605,7 +605,7 @@ where
             channels: N,
             width: self.width,
             height: self.height,
-            stride: self.width * N,
+            stride: self.stride(),
             bit_depth: self.bit_depth,
         }
     }
@@ -678,7 +678,7 @@ where
             channels: N,
             width: self.width,
             height: self.height,
-            stride: self.width * N,
+            stride: self.stride(),
             bit_depth: self.bit_depth,
         }
     }
@@ -690,7 +690,7 @@ where
             channels: N,
             width: self.width,
             height: self.height,
-            stride: self.width * N,
+            stride: self.stride(),
             bit_depth: self.bit_depth,
         }
     }

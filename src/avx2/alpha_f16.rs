@@ -109,7 +109,6 @@ pub(crate) fn avx_unpremultiply_alpha_rgba_f16(in_place: &mut [f16]) {
 }
 
 #[target_feature(enable = "avx2", enable = "f16c")]
-/// This inlining is required to activate all features for runtime dispatch
 fn avx_unpremultiply_alpha_rgba_f16_row_impl(in_place: &mut [f16]) {
     unsafe {
         let mut rem = in_place;
@@ -125,17 +124,17 @@ fn avx_unpremultiply_alpha_rgba_f16_row_impl(in_place: &mut [f16]) {
             let zeros = _mm256_setzero_ps();
             let low_alpha_zero_mask = _mm256_cmp_ps::<_CMP_EQ_OS>(low_alpha, zeros);
             let low_r = _mm256_blendv_ps(
-                _mm256_mul_ps(_mm256_cvtph_ps(_mm256_castsi256_si128(pixel.0)), low_alpha),
+                _mm256_div_ps(_mm256_cvtph_ps(_mm256_castsi256_si128(pixel.0)), low_alpha),
                 zeros,
                 low_alpha_zero_mask,
             );
             let low_g = _mm256_blendv_ps(
-                _mm256_mul_ps(_mm256_cvtph_ps(_mm256_castsi256_si128(pixel.1)), low_alpha),
+                _mm256_div_ps(_mm256_cvtph_ps(_mm256_castsi256_si128(pixel.1)), low_alpha),
                 zeros,
                 low_alpha_zero_mask,
             );
             let low_b = _mm256_blendv_ps(
-                _mm256_mul_ps(_mm256_cvtph_ps(_mm256_castsi256_si128(pixel.2)), low_alpha),
+                _mm256_div_ps(_mm256_cvtph_ps(_mm256_castsi256_si128(pixel.2)), low_alpha),
                 zeros,
                 low_alpha_zero_mask,
             );
@@ -143,7 +142,7 @@ fn avx_unpremultiply_alpha_rgba_f16_row_impl(in_place: &mut [f16]) {
             let high_alpha = _mm256_cvtph_ps(_mm256_extracti128_si256::<1>(pixel.3));
             let high_alpha_zero_mask = _mm256_cmp_ps::<_CMP_EQ_OS>(high_alpha, zeros);
             let high_r = _mm256_blendv_ps(
-                _mm256_mul_ps(
+                _mm256_div_ps(
                     _mm256_cvtph_ps(_mm256_extracti128_si256::<1>(pixel.0)),
                     high_alpha,
                 ),
@@ -151,7 +150,7 @@ fn avx_unpremultiply_alpha_rgba_f16_row_impl(in_place: &mut [f16]) {
                 high_alpha_zero_mask,
             );
             let high_g = _mm256_blendv_ps(
-                _mm256_mul_ps(
+                _mm256_div_ps(
                     _mm256_cvtph_ps(_mm256_extracti128_si256::<1>(pixel.1)),
                     high_alpha,
                 ),
@@ -159,7 +158,7 @@ fn avx_unpremultiply_alpha_rgba_f16_row_impl(in_place: &mut [f16]) {
                 high_alpha_zero_mask,
             );
             let high_b = _mm256_blendv_ps(
-                _mm256_mul_ps(
+                _mm256_div_ps(
                     _mm256_cvtph_ps(_mm256_extracti128_si256::<1>(pixel.2)),
                     high_alpha,
                 ),

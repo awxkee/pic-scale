@@ -76,7 +76,7 @@ fn conv_horiz_rgba_4_f16(
         let acc = vfmlalq_lane_low_f16::<0>(store, vreinterpretq_f16_u16(rgb_pixel.0), set1);
         let acc = vfmlalq_lane_high_f16::<1>(acc, vreinterpretq_f16_u16(rgb_pixel.0), set1);
         let acc = vfmlalq_lane_low_f16::<2>(acc, vreinterpretq_f16_u16(rgb_pixel.1), set1);
-        vfmlalq_lane_high_f16::<3>(acc, vreinterpretq_f16_u16(rgb_pixel.0), set1)
+        vfmlalq_lane_high_f16::<3>(acc, vreinterpretq_f16_u16(rgb_pixel.1), set1)
     }
 }
 

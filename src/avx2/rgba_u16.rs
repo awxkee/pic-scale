@@ -80,8 +80,8 @@ fn conv_horiz_rgba_2_u16<const FMA: bool>(
 fn conv_horiz_rgba_4_u16<const FMA: bool>(
     start_x: usize,
     src: &[u16],
-    w0: __m256,
-    w1: __m256,
+    w02: __m256,
+    w13: __m256,
     store: __m256,
 ) -> __m256 {
     unsafe {
@@ -92,25 +92,28 @@ fn conv_horiz_rgba_4_u16<const FMA: bool>(
 
         let acc = _mm256_prefer_fma_ps::<FMA>(
             store,
-            _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(rgba_pixel, _mm256_setzero_si256())),
-            w0,
+            _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(rgba_pixel, _mm256_setzero_si256())),
+            w02,
         );
         _mm256_prefer_fma_ps::<FMA>(
             acc,
-            _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(rgba_pixel, _mm256_setzero_si256())),
-            w1,
+            _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(rgba_pixel, _mm256_setzero_si256())),
+            w13,
         )
     }
 }
 
 #[inline(always)]
+/// See [`conv_horiz_rgba_4_u16`] for the lane layout; weights must be
+/// `w02 = [w0 x4 | w2 x4]`, `w13 = [w1 x4 | w3 x4]`,
+/// `w46 = [w4 x4 | w6 x4]`, `w57 = [w5 x4 | w7 x4]`.
 fn conv_horiz_rgba_8_u16<const FMA: bool>(
     start_x: usize,
     src: &[u16],
-    w01: __m256,
-    w23: __m256,
-    w45: __m256,
-    w67: __m256,
+    w02: __m256,
+    w13: __m256,
+    w46: __m256,
+    w57: __m256,
     store: __m256,
 ) -> __m256 {
     unsafe {
@@ -125,22 +128,22 @@ fn conv_horiz_rgba_8_u16<const FMA: bool>(
         let mut acc = _mm256_prefer_fma_ps::<FMA>(
             store,
             _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(rgba_pixel1, z)),
-            w67,
+            w57,
         );
         acc = _mm256_prefer_fma_ps::<FMA>(
             acc,
             _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(rgba_pixel1, z)),
-            w45,
+            w46,
         );
         acc = _mm256_prefer_fma_ps::<FMA>(
             acc,
             _mm256_cvtepi32_ps(_mm256_unpackhi_epi16(rgba_pixel0, z)),
-            w23,
+            w13,
         );
         _mm256_prefer_fma_ps::<FMA>(
             acc,
             _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(rgba_pixel0, z)),
-            w01,
+            w02,
         )
     }
 }
@@ -348,45 +351,45 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                         let w6 = _mm_shuffle_ps::<{ shuffle(2, 2, 2, 2) }>(w_hi, w_hi);
                         let w7 = _mm_shuffle_ps::<{ shuffle(3, 3, 3, 3) }>(w_hi, w_hi);
 
-                        let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
-                        let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
-                        let w45 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w4), w5);
-                        let w67 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w6), w7);
+                        let w02 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w2);
+                        let w13 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w1), w3);
+                        let w46 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w4), w6);
+                        let w57 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w5), w7);
 
                         astore_0 = conv_horiz_rgba_8_u16::<FMA>(
                             bounds_start,
                             src0,
-                            w01,
-                            w23,
-                            w45,
-                            w67,
+                            w02,
+                            w13,
+                            w46,
+                            w57,
                             astore_0,
                         );
                         astore_1 = conv_horiz_rgba_8_u16::<FMA>(
                             bounds_start,
                             src1,
-                            w01,
-                            w23,
-                            w45,
-                            w67,
+                            w02,
+                            w13,
+                            w46,
+                            w57,
                             astore_1,
                         );
                         astore_2 = conv_horiz_rgba_8_u16::<FMA>(
                             bounds_start,
                             src2,
-                            w01,
-                            w23,
-                            w45,
-                            w67,
+                            w02,
+                            w13,
+                            w46,
+                            w57,
                             astore_2,
                         );
                         astore_3 = conv_horiz_rgba_8_u16::<FMA>(
                             bounds_start,
                             src3,
-                            w01,
-                            w23,
-                            w45,
-                            w67,
+                            w02,
+                            w13,
+                            w46,
+                            w57,
                             astore_3,
                         );
                         jx += 8;
@@ -403,17 +406,17 @@ impl<const FMA: bool> Row4ExecutionHandler<FMA> {
                         let w2 = _mm_shuffle_ps::<{ shuffle(2, 2, 2, 2) }>(weights, weights);
                         let w3 = _mm_shuffle_ps::<{ shuffle(3, 3, 3, 3) }>(weights, weights);
 
-                        let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
-                        let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
+                        let w02 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w2);
+                        let w13 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w1), w3);
 
                         astore_0 =
-                            conv_horiz_rgba_4_u16::<FMA>(bounds_start, src0, w01, w23, astore_0);
+                            conv_horiz_rgba_4_u16::<FMA>(bounds_start, src0, w02, w13, astore_0);
                         astore_1 =
-                            conv_horiz_rgba_4_u16::<FMA>(bounds_start, src1, w01, w23, astore_1);
+                            conv_horiz_rgba_4_u16::<FMA>(bounds_start, src1, w02, w13, astore_1);
                         astore_2 =
-                            conv_horiz_rgba_4_u16::<FMA>(bounds_start, src2, w01, w23, astore_2);
+                            conv_horiz_rgba_4_u16::<FMA>(bounds_start, src2, w02, w13, astore_2);
                         astore_3 =
-                            conv_horiz_rgba_4_u16::<FMA>(bounds_start, src3, w01, w23, astore_3);
+                            conv_horiz_rgba_4_u16::<FMA>(bounds_start, src3, w02, w13, astore_3);
                         jx += 4;
                     }
 
@@ -572,17 +575,17 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
                         let w6 = _mm_shuffle_ps::<{ shuffle(2, 2, 2, 2) }>(w_hi, w_hi);
                         let w7 = _mm_shuffle_ps::<{ shuffle(3, 3, 3, 3) }>(w_hi, w_hi);
 
-                        let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
-                        let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
-                        let w45 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w4), w5);
-                        let w67 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w6), w7);
+                        let w02 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w2);
+                        let w13 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w1), w3);
+                        let w46 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w4), w6);
+                        let w57 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w5), w7);
                         astore = conv_horiz_rgba_8_u16::<FMA>(
                             bounds_start,
                             src,
-                            w01,
-                            w23,
-                            w45,
-                            w67,
+                            w02,
+                            w13,
+                            w46,
+                            w57,
                             astore,
                         );
                         jx += 8;
@@ -599,10 +602,10 @@ impl<const FMA: bool> OneRowExecutionHandler<FMA> {
 
                         let bounds_start = bounds.start + jx;
 
-                        let w01 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w1);
-                        let w23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w2), w3);
+                        let w02 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w0), w2);
+                        let w13 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(w1), w3);
 
-                        astore = conv_horiz_rgba_4_u16::<FMA>(bounds_start, src, w01, w23, astore);
+                        astore = conv_horiz_rgba_4_u16::<FMA>(bounds_start, src, w02, w13, astore);
                         jx += 4;
                     }
 

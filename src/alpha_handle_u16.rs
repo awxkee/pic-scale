@@ -80,7 +80,7 @@ pub(crate) fn premultiply_alpha_rgba_row(dst: &mut [u16], src: &[u16], bit_depth
             dst[2] = div_by_1023((src[2] as u32).wrapping_mul(a));
             dst[3] = div_by_1023((src[3] as u32).wrapping_mul(1023));
         }
-    } else if max_colors == 4096 {
+    } else if max_colors == 4095 {
         for (dst, src) in dst
             .as_chunks_mut::<4>()
             .0
@@ -142,7 +142,7 @@ pub(crate) fn premultiply_alpha_gray_alpha_row(dst: &mut [u16], src: &[u16], max
             dst[0] = div_by_1023((src[0] as u32).wrapping_mul(a));
             dst[1] = div_by_1023(a.wrapping_mul(1023));
         }
-    } else if max_colors == 4096 {
+    } else if max_colors == 4095 {
         for (dst, src) in dst
             .as_chunks_mut::<2>()
             .0

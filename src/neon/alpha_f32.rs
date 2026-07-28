@@ -66,7 +66,7 @@ fn neon_premultiply_alpha_rgba_row_f32(dst: &mut [f32], src: &[f32]) {
     }
 
     rem = rem.as_chunks_mut::<16>().1;
-    src_rem = src.as_chunks::<16>().1;
+    src_rem = src_rem.as_chunks::<16>().1;
 
     for (dst, src) in rem
         .as_chunks_mut::<4>()

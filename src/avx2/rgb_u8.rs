@@ -182,8 +182,8 @@ impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
             const CN: usize = 3;
             let src_ptr0 = src0.get_unchecked((start_x * CN)..).as_ptr();
             let src_ptr1 = src1.get_unchecked((start_x * CN)..).as_ptr();
-            let base_pixel0 = _mm_loadu_si16(src0.as_ptr());
-            let base_pixel1 = _mm_loadu_si16(src1.as_ptr());
+            let base_pixel0 = _mm_loadu_si16(src_ptr0);
+            let base_pixel1 = _mm_loadu_si16(src_ptr1);
             let m_vl0 = _mm_insert_epi8::<2>(base_pixel0, src_ptr0.add(2).read_unaligned() as i32);
             let m_vl1 = _mm_insert_epi8::<2>(base_pixel1, src_ptr1.add(2).read_unaligned() as i32);
             let lo0 = _mm_unpacklo_epi8(m_vl0, _mm_setzero_si128());
@@ -500,7 +500,7 @@ fn add_one_weight<const HAS_DOT: bool>(
     unsafe {
         const CN: usize = 3;
         let src_ptr = src.get_unchecked((start_x * CN)..).as_ptr();
-        let base_pixel = _mm_loadu_si16(src.as_ptr());
+        let base_pixel = _mm_loadu_si16(src_ptr);
         let m_vl = _mm_insert_epi8::<2>(base_pixel, src_ptr.add(2).read_unaligned() as i32);
         let lo = _mm_unpacklo_epi8(m_vl, _mm_setzero_si128());
         _mm_dot16_avx_epi32::<HAS_DOT>(

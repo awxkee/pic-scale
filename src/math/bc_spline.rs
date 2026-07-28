@@ -174,7 +174,7 @@ where
     bc_spline(
         x,
         12f32.as_() / mla(9f32.as_(), V::const_sqrt2(), 19f32.as_()),
-        13f32.as_() / mla(216f32.as_(), V::const_sqrt2(), 58f32.as_()),
+        113f32.as_() / mla(216f32.as_(), V::const_sqrt2(), 58f32.as_()),
     )
 }
 
@@ -201,4 +201,83 @@ where
         6f32.as_() / mla(7f32.as_(), V::const_sqrt2(), 13f32.as_()),
         7f32.as_() / mla(12f32.as_(), V::const_sqrt2(), 2f32.as_()),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Recovers `(B, C)` from a BC-spline kernel by sampling it.
+    ///
+    /// `w(0) = (6 - 2B)/6` carries only `B`, and `w(1.5) = (0.125B - 0.75C)/6`
+    /// then pins `C`. This lets the tests assert the defining constants without
+    /// having to expose them.
+    fn recover_bc(kernel: impl Fn(f64) -> f64) -> (f64, f64) {
+        let b = 3.0 * (1.0 - kernel(0.0));
+        let c = (0.125 * b - 6.0 * kernel(1.5)) / 0.75;
+        (b, c)
+    }
+
+    /// Every filter in the Mitchell family that is meant to be a Keys cubic
+    /// satisfies `B + 2C == 1`. Robidoux and Robidoux-Sharp both are.
+    #[test]
+    fn robidoux_filters_satisfy_keys_invariant() {
+        for (name, (b, c)) in [
+            ("robidoux", recover_bc(robidoux::<f64>)),
+            ("robidoux_sharp", recover_bc(robidoux_sharp::<f64>)),
+        ] {
+            assert!(
+                (b + 2.0 * c - 1.0).abs() < 1e-9,
+                "{name}: B + 2C = {} (B = {b}, C = {c}), expected 1",
+                b + 2.0 * c
+            );
+        }
+    }
+
+    #[test]
+    fn robidoux_matches_published_constants() {
+        let (b, c) = recover_bc(robidoux::<f64>);
+        assert!((b - 0.378215755093998_67).abs() < 1e-9, "B = {b}");
+        assert!((c - 0.310892122453000_67).abs() < 1e-9, "C = {c}");
+    }
+
+    #[test]
+    fn robidoux_sharp_matches_published_constants() {
+        let (b, c) = recover_bc(robidoux_sharp::<f64>);
+        assert!((b - 0.2620145123991189).abs() < 1e-9, "B = {b}");
+        assert!((c - 0.3689927438004406).abs() < 1e-9, "C = {c}");
+    }
+
+    /// A BC-spline must reconstruct a constant signal exactly at any phase.
+    #[test]
+    fn bc_splines_are_a_partition_of_unity() {
+        let kernels: [(&str, fn(f64) -> f64); 6] = [
+            ("hermite_spline", hermite_spline),
+            ("b_spline", b_spline),
+            ("mitchell_netravalli", mitchell_netravalli),
+            ("catmull_rom", catmull_rom),
+            ("robidoux", robidoux),
+            ("robidoux_sharp", robidoux_sharp),
+        ];
+        for (name, kernel) in kernels {
+            for i in 0..64 {
+                let phase = i as f64 / 64.0;
+                let sum: f64 = (-2..=2).map(|k| kernel(k as f64 + phase)).sum();
+                assert!(
+                    (sum - 1.0).abs() < 1e-9,
+                    "{name} at phase {phase}: sum = {sum}"
+                );
+            }
+        }
+    }
+
+    /// Robidoux is a sharpening filter: it must have a real negative lobe.
+    /// The pre-fix constant left one ~46x too shallow to do anything.
+    #[test]
+    fn robidoux_has_a_negative_lobe() {
+        let min = (0..=2000)
+            .map(|i| robidoux(i as f64 / 1000.0))
+            .fold(f64::INFINITY, f64::min);
+        assert!(min < -0.02, "negative lobe too shallow: min = {min}");
+    }
 }

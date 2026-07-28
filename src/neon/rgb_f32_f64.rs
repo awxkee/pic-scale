@@ -41,7 +41,7 @@ macro_rules! store_rgb {
 unsafe fn ld1x3_rgb(ptr: &[f32]) -> float32x4_t {
     unsafe {
         let rgb_pixel = vcombine_u64(vld1_u64(ptr.as_ptr() as *const _), vdup_n_u64(0));
-        vld1q_lane_f32::<0>(
+        vld1q_lane_f32::<2>(
             ptr.get_unchecked(2..).as_ptr(),
             vreinterpretq_f32_u64(rgb_pixel),
         )
@@ -78,7 +78,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4_f32_f64(
         let weights_ptr = filter_weights.weights.as_ptr();
 
         let src1 = src.get_unchecked(src_stride..);
-        let src2 = src.get_unchecked(src_stride * 3..);
+        let src2 = src.get_unchecked(src_stride * 2..);
         let src3 = src.get_unchecked(src_stride * 3..);
 
         let dst_width = filter_weights.bounds.len();
@@ -170,13 +170,13 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4_f32_f64(
 
             let dest_ptr_2 = dst.get_unchecked_mut(px + dst_stride * 2..).as_mut_ptr();
             store_rgb!(
-                vcombine_f32(vcvt_f32_f64(store_3), vcvt_f32_f64(store_4)),
+                vcombine_f32(vcvt_f32_f64(store_4), vcvt_f32_f64(store_5)),
                 dest_ptr_2
             );
 
             let dest_ptr_3 = dst.get_unchecked_mut(px + dst_stride * 3..).as_mut_ptr();
             store_rgb!(
-                vcombine_f32(vcvt_f32_f64(store_5), vcvt_f32_f64(store_6)),
+                vcombine_f32(vcvt_f32_f64(store_6), vcvt_f32_f64(store_7)),
                 dest_ptr_3
             );
 

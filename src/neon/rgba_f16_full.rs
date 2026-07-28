@@ -123,7 +123,7 @@ fn conv_horiz_4_rgba_f16(
         );
         vfma_lane_f16::<3>(
             acc,
-            vreinterpret_f16_u16(vget_high_u16(rgb_pixel.0)),
+            vreinterpret_f16_u16(vget_high_u16(rgb_pixel.1)),
             weights,
         )
     }
