@@ -221,8 +221,7 @@ fn convolve_16_items(
             vst1q_u16(dst.as_mut_ptr(), item0);
             vst1q_u16(dst.get_unchecked_mut(8..).as_mut_ptr(), item1);
         }
-
-        cx = v_dx;
+        cx = v_dx + 16;
     }
     cx
 }

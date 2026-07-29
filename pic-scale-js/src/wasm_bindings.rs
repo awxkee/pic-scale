@@ -208,7 +208,7 @@ impl Image {
     ///
     /// `format`    — `"jpeg"`, `"png"`, `"webp"`, `"tiff"`, `"bmp"`, `"qoi"`, `"heic"`, `"heif"`, `"avif"`. Default `"png"`.
     /// `quality`   — JPEG quality 1–100 (default 85). Ignored for lossless formats.
-    /// `with_icc`  — embed ICC colour profile (default true).
+    /// `with_icc`  — embed ICC color profile (default true).
     /// `with_exif` — embed EXIF block, orientation reset to 1 (default true).
     /// `with_xmp`  — embed XMP block (default false).
     #[wasm_bindgen(js_name = toBytes)]

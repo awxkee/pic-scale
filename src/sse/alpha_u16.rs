@@ -46,16 +46,10 @@ fn sse_unpremultiply_row_u16(
         let lo = _mm_unpacklo_epi16(x, zeros);
         let hi = _mm_unpackhi_epi16(x, zeros);
 
-        let new_lo = _mm_cvtps_epi32(_mm_add_ps(
-            _mm_set1_ps(0.5f32),
-            _mm_mul_ps(_mm_cvtepi32_ps(lo), a_lo_f),
-        ));
-        let new_hi = _mm_cvtps_epi32(_mm_add_ps(
-            _mm_set1_ps(0.5f32),
-            _mm_mul_ps(_mm_cvtepi32_ps(hi), a_hi_f),
-        ));
+        let new_lo = _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(lo), a_lo_f));
+        let new_hi = _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(hi), a_hi_f));
 
-        let pixel = _mm_packs_epi32(new_lo, new_hi);
+        let pixel = _mm_packus_epi32(new_lo, new_hi);
         _mm_select_si128(is_zero_mask, x, pixel)
     }
 }
@@ -137,19 +131,13 @@ impl DisassociateAlphaDefault {
             let (rrrr, gggg, bbbb, aaaa) = sse_deinterleave_rgba_epi16(row0, row1, row2, row3);
 
             let is_zero_mask = _mm_cmpeq_epi16(aaaa, _mm_setzero_si128());
-            let a_lo_f = _mm_mul_ps(
-                _mm_rcp_ps(_mm_cvtepi32_ps(_mm_unpacklo_epi16(
-                    aaaa,
-                    _mm_setzero_si128(),
-                ))),
+            let a_lo_f = _mm_div_ps(
                 v_max_colors,
+                _mm_cvtepi32_ps(_mm_unpacklo_epi16(aaaa, _mm_setzero_si128())),
             );
-            let a_hi_f = _mm_mul_ps(
-                _mm_rcp_ps(_mm_cvtepi32_ps(_mm_unpackhi_epi16(
-                    aaaa,
-                    _mm_setzero_si128(),
-                ))),
+            let a_hi_f = _mm_div_ps(
                 v_max_colors,
+                _mm_cvtepi32_ps(_mm_unpackhi_epi16(aaaa, _mm_setzero_si128())),
             );
 
             let mut new_rrrr = sse_unpremultiply_row_u16(rrrr, is_zero_mask, a_lo_f, a_hi_f);
@@ -234,7 +222,7 @@ fn sse_premultiply_row_u16(
             a_hi_f,
         ));
 
-        _mm_packs_epi32(new_lo, new_hi)
+        _mm_packus_epi32(new_lo, new_hi)
     }
 }
 

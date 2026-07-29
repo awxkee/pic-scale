@@ -72,7 +72,7 @@ fn hsl_to_rgb(h: f64, s: f64, l: f64) -> RGBColor {
     )
 }
 
-/// Assign a distinct colour to every `(backend, filter)` series.
+/// Assign a distinct color to every `(backend, filter)` series.
 /// Filters within the same backend are spread across lightness levels.
 fn assign_colors(keys: &[SeriesKey]) -> Vec<(SeriesKey, RGBColor)> {
     // Group keys by backend to count siblings
@@ -157,7 +157,7 @@ pub fn plot(
 
     let series: Vec<(SeriesKey, RGBColor, Vec<(f64, f64)>)> = colored
         .into_iter()
-        .map(|(key, colour)| {
+        .map(|(key, color)| {
             let mut points: Vec<(f64, f64)> = results
                 .iter()
                 .filter(|r| r.backend == key.backend && r.filter == key.filter)
@@ -168,7 +168,7 @@ pub fn plot(
                 })
                 .collect();
             points.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-            (key, colour, points)
+            (key, color, points)
         })
         .collect();
 
@@ -213,26 +213,26 @@ pub fn plot(
         Into::<ShapeStyle>::into(BLACK.mix(0.20)).stroke_width(1),
     ))?;
 
-    for (key, colour, points) in &series {
+    for (key, color, points) in &series {
         if points.is_empty() {
             continue;
         }
 
         let label = key.label();
         let stroke_w = if key.is_baseline() { 3u32 } else { 2u32 };
-        let style = Into::<ShapeStyle>::into(*colour).stroke_width(stroke_w);
+        let style = Into::<ShapeStyle>::into(*color).stroke_width(stroke_w);
 
         chart
             .draw_series(LineSeries::new(points.clone(), style))?
             .label(label)
             .legend(move |(x, y)| {
-                PathElement::new(vec![(x, y), (x + 18, y)], colour.stroke_width(stroke_w))
+                PathElement::new(vec![(x, y), (x + 18, y)], color.stroke_width(stroke_w))
             });
 
         chart.draw_series(
             points
                 .iter()
-                .map(|&(x, y)| Circle::new((x, y), 4, colour.filled())),
+                .map(|&(x, y)| Circle::new((x, y), 4, color.filled())),
         )?;
     }
 

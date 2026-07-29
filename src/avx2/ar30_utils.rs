@@ -264,27 +264,9 @@ pub(crate) fn _mm_unzips_4_ar30_separate<const AR30_TYPE: usize, const AR30_ORDE
     v: __m128i,
 ) -> (__m128i, __m128i) {
     let values = _mm_unzips_3_ar30::<AR30_TYPE, AR30_ORDER>(v);
-    let a0 = (
-        _mm_unpacklo_epi16(values.0, values.1),
-        _mm_unpackhi_epi16(values.0, values.1),
-    );
-    let a1 = (
-        _mm_unpacklo_epi16(values.2, values.3),
-        _mm_unpackhi_epi16(values.2, values.3),
-    );
-    let v1 = (
-        _mm_unpacklo_epi32(a0.0, a1.0),
-        _mm_unpackhi_epi32(a0.0, a1.0),
-    );
-    let v2 = (
-        _mm_unpacklo_epi32(a0.1, a1.1),
-        _mm_unpackhi_epi32(a0.1, a1.1),
-    );
-    let k0 = v1.0;
-    let k1 = v2.0;
-    let k2 = v1.1;
-    let k3 = v2.1;
-    (_mm_unpacklo_epi64(k0, k1), _mm_unpacklo_epi64(k2, k3))
+    let rg = _mm_unpacklo_epi16(values.0, values.1);
+    let ba = _mm_unpacklo_epi16(values.2, values.3);
+    (_mm_unpacklo_epi32(rg, ba), _mm_unpackhi_epi32(rg, ba))
 }
 
 #[inline]
@@ -301,17 +283,14 @@ pub(crate) fn _mm_unzip_4_ar30_separate<const AR30_TYPE: usize, const AR30_ORDER
         _mm_unpacklo_epi16(values.2, _mm_set1_epi16(3)),
         _mm_unpackhi_epi16(values.2, _mm_set1_epi16(3)),
     );
-    let v1 = (
+    // Eight pixels in. The caller applies consecutive weight pairs to `.0`, `.1`,
+    // `.2`, `.3`, so they must come out in pixel order: {0,1}, {2,3}, {4,5}, {6,7}.
+    // The `lo` interleaves carry pixels 0-3 and the `hi` ones pixels 4-7, so the two
+    // middle results were previously swapped — weights 2-3 landed on pixels 4-5.
+    (
         _mm_unpacklo_epi32(a0.0, a1.0),
         _mm_unpackhi_epi32(a0.0, a1.0),
-    );
-    let v2 = (
         _mm_unpacklo_epi32(a0.1, a1.1),
         _mm_unpackhi_epi32(a0.1, a1.1),
-    );
-    let k0 = v1.0;
-    let k1 = v2.0;
-    let k2 = v1.1;
-    let k3 = v2.1;
-    (k0, k1, k2, k3)
+    )
 }

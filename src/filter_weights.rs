@@ -71,6 +71,56 @@ impl<T> FilterWeights<T> {
     }
 }
 
+/// Quantizes one kernel into fixed point, keeping the tap sum at exactly `precision_scale`.
+fn quantize_kernel(
+    weights: &[f32],
+    taps: usize,
+    precision_scale: f64,
+    lower_bound: f64,
+    upper_bound: f64,
+    scratch: &mut [f64],
+    order: &mut Vec<usize>,
+) {
+    let mut sum = 0f64;
+    for (i, (&weight, dst)) in weights.iter().zip(scratch.iter_mut()).enumerate() {
+        let q = (weight as f64 * precision_scale)
+            .round()
+            .min(upper_bound)
+            .max(lower_bound);
+        *dst = q;
+        if i < taps {
+            sum += q;
+        }
+    }
+
+    let mut residual = precision_scale - sum;
+    if residual == 0. || taps == 0 {
+        return;
+    }
+
+    order.clear();
+    order.extend(0..taps);
+    order.sort_unstable_by(|&a, &b| {
+        scratch[b]
+            .abs()
+            .partial_cmp(&scratch[a].abs())
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    for &i in order.iter() {
+        let delta = if residual > 0. {
+            residual.min(upper_bound - scratch[i])
+        } else {
+            residual.max(lower_bound - scratch[i])
+        };
+        scratch[i] += delta;
+        residual -= delta;
+        if residual == 0. {
+            break;
+        }
+    }
+}
+
 impl FilterWeights<f32> {
     pub(crate) fn numerical_approximation_i16<const PRECISION: i32>(
         &self,
@@ -101,16 +151,26 @@ impl FilterWeights<f32> {
         let lower_bound = J::min_value().as_();
         let upper_bound = J::max_value().as_();
 
-        for (chunk, kernel_chunk) in self
+        let mut scratch = vec![0f64; self.kernel_size];
+        let mut order: Vec<usize> = Vec::with_capacity(self.kernel_size);
+
+        for ((chunk, kernel_chunk), bounds) in self
             .weights
             .chunks_exact(self.kernel_size)
             .zip(output_kernel.chunks_exact_mut(align))
+            .zip(self.bounds.iter())
         {
-            for (&weight, kernel) in chunk.iter().zip(kernel_chunk) {
-                *kernel = (weight as f64 * precision_scale)
-                    .min(upper_bound)
-                    .max(lower_bound)
-                    .as_();
+            quantize_kernel(
+                chunk,
+                bounds.size.min(self.kernel_size),
+                precision_scale,
+                lower_bound,
+                upper_bound,
+                &mut scratch,
+                &mut order,
+            );
+            for (kernel, &value) in kernel_chunk.iter_mut().zip(scratch.iter()) {
+                *kernel = value.as_();
             }
         }
 
@@ -141,31 +201,26 @@ impl FilterWeights<f32> {
 
         let mut output_kernel = vec![0i8; self.distinct_elements * align];
 
-        for (chunk, kernel_chunk) in self
+        let mut scratch = vec![0f64; self.kernel_size];
+        let mut order: Vec<usize> = Vec::with_capacity(self.kernel_size);
+
+        for ((chunk, kernel_chunk), bounds) in self
             .weights
             .chunks_exact(self.kernel_size)
             .zip(output_kernel.chunks_exact_mut(align))
+            .zip(self.bounds.iter())
         {
-            let mut local_sum = 0i32;
-            for (&weight, kernel) in chunk.iter().zip(kernel_chunk.iter_mut()) {
-                let new_element = (weight as f64 * precision_scale)
-                    .min(i8::MAX as f64)
-                    .max(i8::MIN as f64) as i8;
-                *kernel = new_element;
-                local_sum += new_element as i32;
-            }
-            if local_sum > 128 {
-                let len = kernel_chunk.len() / 2;
-                while local_sum > 128 {
-                    local_sum -= 1;
-                    kernel_chunk[len] = kernel_chunk[len].saturating_sub(1);
-                }
-            } else if local_sum < 128 {
-                let len = kernel_chunk.len() / 2;
-                while local_sum < 128 {
-                    kernel_chunk[len] = kernel_chunk[len].saturating_add(1);
-                    local_sum += 1;
-                }
+            quantize_kernel(
+                chunk,
+                bounds.size.min(self.kernel_size),
+                precision_scale,
+                i8::MIN as f64,
+                i8::MAX as f64,
+                &mut scratch,
+                &mut order,
+            );
+            for (kernel, &value) in kernel_chunk.iter_mut().zip(scratch.iter()) {
+                *kernel = value as i8;
             }
         }
 

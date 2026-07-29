@@ -991,6 +991,13 @@ impl Scaler {
     /// AR30 stores each pixel as a 32-bit word with 10 bits per RGB channel and a
     /// 2-bit alpha.
     ///
+    /// # Alpha is not preserved
+    ///
+    /// Only the three color channels are resampled. The source alpha bits are
+    /// ignored and every output pixel is written fully opaque (`a = 3`). Do not use
+    /// this plan for images that carry meaningful transparency — unpack them to
+    /// [`Rgba16ImageStore`] and resample that instead.
+    ///
     /// The `order` argument controls the byte layout of the packed word:
     /// - [`Ar30ByteOrder::Host`] — native endianness of the current platform.
     /// - [`Ar30ByteOrder::Network`] — big-endian (network) byte order.
@@ -1031,6 +1038,13 @@ impl Scaler {
     ///
     /// RA30 stores each pixel as a 32-bit word with 10 bits per RGB channel and a
     /// 2-bit alpha in the least-significant position.
+    ///
+    /// # Alpha is not preserved
+    ///
+    /// Only the three color channels are resampled. The source alpha bits are
+    /// ignored and every output pixel is written fully opaque (`a = 3`). Do not use
+    /// this plan for images that carry meaningful transparency — unpack them to
+    /// [`Rgba16ImageStore`] and resample that instead.
     ///
     /// The `order` argument controls the byte layout of the packed word:
     /// - [`Ar30ByteOrder::Host`] — native endianness of the current platform.

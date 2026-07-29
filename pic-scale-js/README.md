@@ -90,7 +90,7 @@ Metadata is extracted automatically when you call `Image.open()` or
 - **Auto-orient** (`autoOrient: true`, default) — EXIF orientation is baked
   into pixels before resizing. The orientation tag is reset to 1 in the output
   so viewers don't rotate twice.
-- **ICC profile** (`withIcc: true`, default) — colour profile is injected into
+- **ICC profile** (`withIcc: true`, default) — color profile is injected into
   the output JPEG, PNG, or WebP.
 - **EXIF** (`withExif: true`, default) — EXIF block is injected into the output
   with the orientation tag reset to 1.

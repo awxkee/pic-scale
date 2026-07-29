@@ -110,7 +110,10 @@ mod tests {
     #[test]
     fn neighbouring_taps_carry_real_weight() {
         let ratio = gaussian(1.0f64) / gaussian(0.0f64);
-        assert!(ratio > 1e-3, "neighbour tap is negligible: w(1)/w(0) = {ratio}");
+        assert!(
+            ratio > 1e-3,
+            "neighbour tap is negligible: w(1)/w(0) = {ratio}"
+        );
     }
 
     #[test]

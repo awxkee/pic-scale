@@ -114,7 +114,7 @@ fn main() {
 
     #[allow(overflowing_literals)]
     // test_fast_image();
-    let img = ImageReader::open("./assets/asset_5.png")
+    let img = ImageReader::open("./assets/digital_art_portrait2.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -125,7 +125,7 @@ fn main() {
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
 
-    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3)
+    let mut scaler = Scaler::new(ResamplingFunction::Lanczos5Jinc)
         .set_threading_policy(ThreadingPolicy::Single)
         .set_supersampling(false);
     // scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
@@ -134,7 +134,7 @@ fn main() {
         Rgb8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     store.bit_depth = 10;
 
-    let mut t_size = ImageSize::new(dimensions.0 as usize / 6, dimensions.1 as usize / 6);
+    let mut t_size = ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2);
     // t_size.height += 1;
     let resizing_plan = scaler
         .plan_rgb_resampling(
@@ -143,8 +143,8 @@ fn main() {
         )
         .unwrap();
     let mut dst_store = Rgb8ImageStoreMut::alloc_with_depth(
-        dimensions.0 as usize / 6,
-        dimensions.1 as usize / 6,
+        dimensions.0 as usize / 2,
+        dimensions.1 as usize / 2,
         10,
     );
     resizing_plan.resample(&store, &mut dst_store).unwrap();

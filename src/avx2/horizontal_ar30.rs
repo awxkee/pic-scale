@@ -409,12 +409,17 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row1ExecutionUnit<AR_TYPE, AR_
     #[target_feature(enable = "avx2")]
     fn pass(&self, src: &[u8], dst: &mut [u8], filter_weights: &FilterWeights<i16>) {
         unsafe {
-            const PRECISION: i32 = 16;
+            // Must match `crate::support::PRECISION`, which is what the weights were
+            // quantized with; shifting by 16 halves every channel.
+            const PRECISION: i32 = 15;
             const ROUNDING: i32 = 1 << (PRECISION - 1);
 
             let init = _mm_set1_epi32(ROUNDING);
 
-            let v_cut_off = _mm_set1_epi32(1023);
+            // 16-bit lanes: the clamp is applied with `_mm_min_epi16` after
+            // `_mm_packus_epi32`. Building it with `_mm_set1_epi32` leaves every odd
+            // 16-bit lane zero, which clamps green to 0.
+            let v_cut_off = _mm_set1_epi16(1023);
 
             for ((chunk0, &bounds), weights) in dst
                 .as_chunks_mut::<4>()
