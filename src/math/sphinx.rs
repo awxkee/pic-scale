@@ -75,10 +75,7 @@ mod tests {
         for i in 100..=4000 {
             let x = i as f64 / 1000.0;
             let (got, want) = (sphinx(x), reference(x));
-            assert!(
-                (got - want).abs() < 1e-9,
-                "x = {x}: got {got}, want {want}"
-            );
+            assert!((got - want).abs() < 1e-9, "x = {x}: got {got}, want {want}");
         }
     }
 

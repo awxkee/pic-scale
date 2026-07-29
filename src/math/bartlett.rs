@@ -104,10 +104,7 @@ mod tests {
             let d = i as f64 / 1000.0;
             let got = bartlett_hann(d * 2.0);
             let want = reference_index(0.5 + d / 2.0);
-            assert!(
-                (got - want).abs() < 1e-6,
-                "d = {d}: got {got}, want {want}"
-            );
+            assert!((got - want).abs() < 1e-6, "d = {d}: got {got}, want {want}");
         }
     }
 

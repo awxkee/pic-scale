@@ -41,90 +41,77 @@ pub(crate) struct Ar30DestructuringImpl<const BYTES: usize> {
     pub(crate) rgb30: Rgb30,
 }
 
+fn decompose_rows<const BYTES: usize>(
+    rgb30: Rgb30,
+    store: &ImageStore<'_, u8, 4>,
+    into: &mut ImageStoreMut<u16, 3>,
+) {
+    let src_stride = store.stride();
+    let dst_stride = into.stride();
+    let width = store.width;
+    for (dst_row, src_row) in into
+        .buffer
+        .borrow_mut()
+        .chunks_mut(dst_stride)
+        .zip(store.buffer.chunks(src_stride))
+    {
+        for (dst, src) in dst_row[..width * 3]
+            .as_chunks_mut::<3>()
+            .0
+            .iter_mut()
+            .zip(src_row[..width * 4].as_chunks::<4>().0.iter())
+        {
+            let unpacked =
+                rgb30.unpack::<BYTES>(u32::from_ne_bytes([src[0], src[1], src[2], src[3]]));
+            dst[0] = unpacked.0 as u16;
+            dst[1] = unpacked.1 as u16;
+            dst[2] = unpacked.2 as u16;
+        }
+    }
+}
+
+fn compose_rows<const BYTES: usize>(
+    rgb30: Rgb30,
+    store: &ImageStore<u16, 3>,
+    into: &mut ImageStoreMut<'_, u8, 4>,
+) {
+    let src_stride = store.stride();
+    let dst_stride = into.stride();
+    let width = into.width;
+    for (dst_row, src_row) in into
+        .buffer
+        .borrow_mut()
+        .chunks_mut(dst_stride)
+        .zip(store.buffer.chunks(src_stride))
+    {
+        for (dst, src) in dst_row[..width * 4]
+            .as_chunks_mut::<4>()
+            .0
+            .iter_mut()
+            .zip(src_row[..width * 3].as_chunks::<3>().0.iter())
+        {
+            let packed = rgb30.pack_w_a::<BYTES>(src[0] as i32, src[1] as i32, src[2] as i32, 3);
+            let target_bytes = packed.to_ne_bytes();
+            dst[0] = target_bytes[0];
+            dst[1] = target_bytes[1];
+            dst[2] = target_bytes[2];
+            dst[3] = target_bytes[3];
+        }
+    }
+}
+
 impl<const BYTES: usize> Ar30Destructuring for Ar30DestructuringImpl<BYTES> {
     fn decompose(&self, store: &ImageStore<'_, u8, 4>, into: &mut ImageStoreMut<u16, 3>) {
         match self.rgb30 {
-            Rgb30::Ar30 => {
-                for (dst, src) in into
-                    .buffer
-                    .borrow_mut()
-                    .as_chunks_mut::<3>()
-                    .0
-                    .iter_mut()
-                    .zip(store.buffer.as_chunks::<4>().0.iter())
-                {
-                    let unpacked = Rgb30::Ar30
-                        .unpack::<BYTES>(u32::from_ne_bytes([src[0], src[1], src[2], src[3]]));
-                    dst[0] = unpacked.0 as u16;
-                    dst[1] = unpacked.1 as u16;
-                    dst[2] = unpacked.2 as u16;
-                }
-            }
-            Rgb30::Ra30 => {
-                for (dst, src) in into
-                    .buffer
-                    .borrow_mut()
-                    .as_chunks_mut::<3>()
-                    .0
-                    .iter_mut()
-                    .zip(store.buffer.as_chunks::<4>().0.iter())
-                {
-                    let unpacked = Rgb30::Ra30
-                        .unpack::<BYTES>(u32::from_ne_bytes([src[0], src[1], src[2], src[3]]));
-                    dst[0] = unpacked.0 as u16;
-                    dst[1] = unpacked.1 as u16;
-                    dst[2] = unpacked.2 as u16;
-                }
-            }
+            Rgb30::Ar30 => decompose_rows::<BYTES>(Rgb30::Ar30, store, into),
+            Rgb30::Ra30 => decompose_rows::<BYTES>(Rgb30::Ra30, store, into),
         }
     }
 
     fn compose(&self, store: &ImageStore<u16, 3>, into: &mut ImageStoreMut<'_, u8, 4>) {
         match self.rgb30 {
-            Rgb30::Ar30 => {
-                for (dst, src) in into
-                    .buffer
-                    .borrow_mut()
-                    .as_chunks_mut::<4>()
-                    .0
-                    .iter_mut()
-                    .zip(store.buffer.as_chunks::<3>().0.iter())
-                {
-                    let packed = Rgb30::Ar30.pack_w_a::<BYTES>(
-                        src[0] as i32,
-                        src[1] as i32,
-                        src[2] as i32,
-                        3,
-                    );
-                    let target_bytes = packed.to_ne_bytes();
-                    dst[0] = target_bytes[0];
-                    dst[1] = target_bytes[1];
-                    dst[2] = target_bytes[2];
-                    dst[3] = target_bytes[3];
-                }
-            }
-            Rgb30::Ra30 => {
-                for (dst, src) in into
-                    .buffer
-                    .borrow_mut()
-                    .as_chunks_mut::<4>()
-                    .0
-                    .iter_mut()
-                    .zip(store.buffer.as_chunks::<3>().0.iter())
-                {
-                    let packed = Rgb30::Ra30.pack_w_a::<BYTES>(
-                        src[0] as i32,
-                        src[1] as i32,
-                        src[2] as i32,
-                        3,
-                    );
-                    let target_bytes = packed.to_ne_bytes();
-                    dst[0] = target_bytes[0];
-                    dst[1] = target_bytes[1];
-                    dst[2] = target_bytes[2];
-                    dst[3] = target_bytes[3];
-                }
-            }
+            Rgb30::Ar30 => compose_rows::<BYTES>(Rgb30::Ar30, store, into),
+            Rgb30::Ra30 => compose_rows::<BYTES>(Rgb30::Ra30, store, into),
         }
     }
 }

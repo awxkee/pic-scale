@@ -53,8 +53,8 @@ That's the entire API change from Pillow — swap `img.resize(...)` for
 |---|---|
 | `L` | 8-bit grayscale |
 | `LA` | 8-bit grayscale + alpha |
-| `RGB` | 8-bit colour |
-| `RGBA` | 8-bit colour + alpha |
+| `RGB` | 8-bit color |
+| `RGBA` | 8-bit color + alpha |
 | `I;16` | 16-bit grayscale |
 | `F` | 32-bit float grayscale |
 
@@ -154,7 +154,7 @@ out = resize(img, (800, 600), Resampling.LANCZOS)
 ```
 
 pic-scale does not replace Pillow — it only replaces the resize step. All
-other Pillow operations (open, save, colour conversion, drawing, …) continue
+other Pillow operations (open, save, color conversion, drawing, …) continue
 to use Pillow as normal.
 
 ## License

@@ -210,7 +210,10 @@ mod tests {
             assert!((w - 1.0).abs() < 1e-9, "{name}(0) = {w}, expected 1");
         }
         // The sinc siblings already behave; keep them pinned alongside.
-        for (name, kernel) in [("lanczos2", lanczos2 as fn(f64) -> f64), ("lanczos3", lanczos3)] {
+        for (name, kernel) in [
+            ("lanczos2", lanczos2 as fn(f64) -> f64),
+            ("lanczos3", lanczos3),
+        ] {
             let w = kernel(0.0);
             assert!((w - 1.0).abs() < 1e-9, "{name}(0) = {w}, expected 1");
         }

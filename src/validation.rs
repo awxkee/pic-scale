@@ -207,7 +207,7 @@ macro_rules! validate_sizes {
                 size: $into.size(),
             });
         }
-        if $store.width == $into.width || $store.height == $into.height {
+        if $store.width == $into.width && $store.height == $into.height {
             $store.copied_to_mut($into);
             return Ok(());
         }

@@ -59,19 +59,13 @@ const fn ntohl(netlong: u32) -> u32 {
 }
 
 impl Rgb30 {
-    // #[inline]
-    // pub(crate) const fn pack_w_a<const STORE: usize>(self, r: i32, g: i32, b: i32, a: i32) -> u32 {
-    //     let value: u32 = match self {
-    //         Rgb30::Ar30 => (((a << 30) | (b << 20)) | ((g << 10) | r)) as u32,
-    //         Rgb30::Ra30 => (((r << 22) | (g << 12)) | ((b << 2) | a)) as u32,
-    //     };
-    //     if STORE == 0 {
-    //         value
-    //     } else {
-    //         htonl(value)
-    //     }
-    // }
-
+    /// Packs three 10-bit color channels, forcing alpha opaque.
+    ///
+    /// The whole AR30 pipeline is color-only: [`unpack`](Self::unpack) discards the
+    /// source alpha and the AVX2 kernels only ever de-interleave three channels, so
+    /// there is nothing to carry here. The `a` parameter is kept for signature
+    /// symmetry and deliberately ignored — see `Scaler::plan_ar30_resampling`, which
+    /// documents the limitation for callers.
     #[inline]
     pub(crate) const fn pack_w_a<const STORE: usize>(self, r: i32, g: i32, b: i32, _: i32) -> u32 {
         let value: u32 = match self {
@@ -81,6 +75,9 @@ impl Rgb30 {
         if STORE == 0 { value } else { htonl(value) }
     }
 
+    /// Unpacks the three 10-bit color channels; the returned alpha is always `3`.
+    ///
+    /// The source alpha is intentionally dropped — see [`pack_w_a`](Self::pack_w_a).
     #[inline(always)]
     pub(crate) const fn unpack<const STORE: usize>(self, value: u32) -> (u32, u32, u32, u32) {
         let pixel = if STORE == 0 { value } else { ntohl(value) };
@@ -89,11 +86,9 @@ impl Rgb30 {
                 let r10 = pixel & 0x3ff;
                 let g10 = (pixel >> 10) & 0x3ff;
                 let b10 = (pixel >> 20) & 0x3ff;
-                // let a10 = pixel >> 30;
                 (r10, g10, b10, 3)
             }
             Rgb30::Ra30 => {
-                // let a2 = pixel & 0x3;
                 let r10 = (pixel >> 22) & 0x3ff;
                 let g10 = (pixel >> 12) & 0x3ff;
                 let b10 = (pixel >> 2) & 0x3ff;

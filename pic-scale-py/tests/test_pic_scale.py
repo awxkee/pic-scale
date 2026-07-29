@@ -25,7 +25,7 @@ def noise(mode: str, w: int, h: int) -> Image.Image:
     arr = rng.integers(0, 255, (h, w, channels), dtype=np.uint8).squeeze()
     return Image.fromarray(arr)
 
-# ─── solid-colour preservation ────────────────────────────────────────────────
+# ─── solid-color preservation ────────────────────────────────────────────────
 
 @pytest.mark.parametrize("mode,color", [
     ("L",    128),
@@ -33,7 +33,7 @@ def noise(mode: str, w: int, h: int) -> Image.Image:
     ("RGBA", (100, 150, 200, 255)),
 ])
 def test_solid_preserved(mode, color):
-    """Resizing a solid colour image should keep all pixels identical."""
+    """Resizing a solid color image should keep all pixels identical."""
     img = solid(mode, 128, 128, color)
     out = resize(img, (64, 64), Resampling.LANCZOS)
     assert out.mode == mode

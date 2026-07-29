@@ -125,7 +125,11 @@ mod tests {
     #[test]
     fn kernel_is_an_interpolating_windowed_sinc() {
         // Centre tap is unity...
-        assert!((blackman(0.0f64) - 1.0).abs() < 1e-7, "w(0) = {}", blackman(0.0f64));
+        assert!(
+            (blackman(0.0f64) - 1.0).abs() < 1e-7,
+            "w(0) = {}",
+            blackman(0.0f64)
+        );
         // ...and the kernel vanishes at every other integer, so resampling on
         // an aligned grid is a no-op.
         for k in 1..=3 {
@@ -140,7 +144,10 @@ mod tests {
         let peak = blackman(0.0f64);
         for i in 0..=2000 {
             let x = i as f64 / 1000.0;
-            assert!(blackman(x) <= peak + 1e-9, "value exceeds centre tap at {x}");
+            assert!(
+                blackman(x) <= peak + 1e-9,
+                "value exceeds centre tap at {x}"
+            );
             assert!(
                 (blackman(x) - blackman(-x)).abs() < 1e-12,
                 "not symmetric at {x}"

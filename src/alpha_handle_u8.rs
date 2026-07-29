@@ -109,17 +109,23 @@ fn premultiply_alpha_gray_alpha_impl(
 
 static UNPREMULTIPLICATION_TABLE: OnceLock<Box<[u8; 65536]>> = OnceLock::new();
 
+#[inline(always)]
+pub(crate) const fn unpremultiply_index(alpha: u8, pixel: u8) -> usize {
+    ((alpha as usize) << 8) | pixel as usize
+}
+
 pub(crate) fn unpremultiplication_table() -> &'static [u8; 65536] {
     UNPREMULTIPLICATION_TABLE.get_or_init(|| {
         let mut buf = Box::new([0u8; 65536]);
-        for alpha in 0..256 {
-            for pixel in 0..256 {
+        for alpha in 0..256usize {
+            for pixel in 0..256usize {
+                let idx = (alpha << 8) | pixel;
                 #[allow(clippy::manual_checked_ops)]
                 if alpha == 0 {
-                    buf[alpha * 255 + pixel] = 0;
+                    buf[idx] = 0;
                 } else {
                     let value = (pixel * 255 + alpha / 2) / alpha;
-                    buf[alpha * 255 + pixel] = if value > 255 { 255 } else { value as u8 };
+                    buf[idx] = if value > 255 { 255 } else { value as u8 };
                 }
             }
         }
@@ -132,10 +138,9 @@ pub(crate) fn unpremultiply_alpha_rgba_row_impl(in_place: &mut [u8]) {
     let table = unpremultiplication_table();
     for dst in in_place.as_chunks_mut::<4>().0.iter_mut() {
         let a = dst[3];
-        let z = a as u16 * 255;
-        dst[0] = table[(z + dst[0] as u16) as usize];
-        dst[1] = table[(z + dst[1] as u16) as usize];
-        dst[2] = table[(z + dst[2] as u16) as usize];
+        dst[0] = table[unpremultiply_index(a, dst[0])];
+        dst[1] = table[unpremultiply_index(a, dst[1])];
+        dst[2] = table[unpremultiply_index(a, dst[2])];
     }
 }
 
@@ -144,8 +149,7 @@ pub(crate) fn unpremultiply_alpha_gray_alpha_row_impl(in_place: &mut [u8]) {
     let table = unpremultiplication_table();
     for dst in in_place.as_chunks_mut::<2>().0.iter_mut() {
         let a = dst[1];
-        let z = a as u16 * 255;
-        dst[0] = table[(z + dst[0] as u16) as usize];
+        dst[0] = table[unpremultiply_index(a, dst[0])];
     }
 }
 
