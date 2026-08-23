@@ -329,3 +329,30 @@ fn avx_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8], executor: impl Dis
         executor.disassociate(in_place);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::avx_premultiply_alpha_rgba;
+    use crate::alpha_handle_u8::premultiply_alpha_rgba_row_impl;
+
+    #[test]
+    fn avx2_premultiply_matches_scalar_reference() {
+        if !std::arch::is_x86_feature_detected!("avx2") {
+            return;
+        }
+
+        let mut src = Vec::with_capacity(256 * 256 * 4);
+        for alpha in u8::MIN..=u8::MAX {
+            for color in u8::MIN..=u8::MAX {
+                src.extend_from_slice(&[color, color, color, alpha]);
+            }
+        }
+
+        let mut expected = vec![0; src.len()];
+        premultiply_alpha_rgba_row_impl(&mut expected, &src);
+        let mut actual = vec![0; src.len()];
+        avx_premultiply_alpha_rgba(&mut actual, &src);
+
+        assert_eq!(actual, expected);
+    }
+}

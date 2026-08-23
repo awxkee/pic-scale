@@ -43,10 +43,8 @@ pub(crate) fn _mm_select_si128(mask: __m128i, true_vals: __m128i, false_vals: __
 #[inline(always)]
 pub(crate) fn _mm_div_by_255_epi16(v: __m128i) -> __m128i {
     unsafe {
-        let addition = _mm_set1_epi16(127);
-        let j0 = _mm_add_epi16(v, addition);
-        let j1 = _mm_srli_epi16::<8>(v);
-        _mm_srli_epi16::<8>(_mm_add_epi16(j0, j1))
+        let biased = _mm_add_epi16(v, _mm_set1_epi16(128));
+        _mm_srli_epi16::<8>(_mm_add_epi16(biased, _mm_srli_epi16::<8>(biased)))
     }
 }
 
@@ -308,4 +306,31 @@ fn sse_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8], executor: impl Dis
 #[target_feature(enable = "sse4.1")]
 fn sse_unpremultiply_alpha_rgba_impl(in_place: &mut [u8]) {
     sse_unpremultiply_alpha_rgba_impl_row(in_place, DisassociateAlphaDefault::default());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sse_premultiply_alpha_rgba;
+    use crate::alpha_handle_u8::premultiply_alpha_rgba_row_impl;
+
+    #[test]
+    fn sse_premultiply_matches_scalar_reference() {
+        if !std::arch::is_x86_feature_detected!("sse4.1") {
+            return;
+        }
+
+        let mut src = Vec::with_capacity(256 * 256 * 4);
+        for alpha in u8::MIN..=u8::MAX {
+            for color in u8::MIN..=u8::MAX {
+                src.extend_from_slice(&[color, color, color, alpha]);
+            }
+        }
+
+        let mut expected = vec![0; src.len()];
+        premultiply_alpha_rgba_row_impl(&mut expected, &src);
+        let mut actual = vec![0; src.len()];
+        sse_premultiply_alpha_rgba(&mut actual, &src);
+
+        assert_eq!(actual, expected);
+    }
 }

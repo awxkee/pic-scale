@@ -13,7 +13,15 @@ use fast_image_resize::{
     CpuExtensions, FilterType, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
-use pic_scale::{BufferStore, CbCr16ImageStore, CbCr16ImageStoreMut, ImageSize, ImageStore, ImageStoreMut, ImageStoreScaling, JzazbzScaler, LChScaler, LabScaler, LinearScaler, LuvScaler, Planar16ImageStore, Planar16ImageStoreMut, Planar8ImageStore, Planar8ImageStoreMut, ResamplingFunction, Rgb16ImageStore, Rgb16ImageStoreMut, Rgb8ImageStore, Rgb8ImageStoreMut, RgbF32ImageStore, RgbF32ImageStoreMut, Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore, Rgba8ImageStoreMut, RgbaF32ImageStore, RgbaF32ImageStoreMut, Scaler, SigmoidalScaler, ThreadingPolicy, TransferFunction, WorkloadStrategy, XYZScaler};
+use pic_scale::{
+    BufferStore, CbCr16ImageStore, CbCr16ImageStoreMut, ImageSize, ImageStore, ImageStoreMut,
+    ImageStoreScaling, JzazbzScaler, LChScaler, LabScaler, LinearScaler, LuvScaler,
+    Planar16ImageStore, Planar16ImageStoreMut, Planar8ImageStore, Planar8ImageStoreMut,
+    ResamplingFunction, Rgb16ImageStore, Rgb16ImageStoreMut, Rgb8ImageStore, Rgb8ImageStoreMut,
+    RgbF32ImageStore, RgbF32ImageStoreMut, Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore,
+    Rgba8ImageStoreMut, RgbaF32ImageStore, RgbaF32ImageStoreMut, Scaler, SigmoidalScaler,
+    ThreadingPolicy, TransferFunction, WorkloadStrategy, XYZScaler,
+};
 use rand::RngExt;
 use std::fs;
 

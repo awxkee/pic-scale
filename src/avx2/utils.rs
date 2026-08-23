@@ -90,10 +90,8 @@ pub(crate) fn _mm256_selecti_ps(mask: __m256i, true_vals: __m256, false_vals: __
 #[inline(always)]
 pub(crate) fn avx2_div_by255(v: __m256i) -> __m256i {
     unsafe {
-        let addition = _mm256_set1_epi16(127);
-        let j0 = _mm256_add_epi16(v, addition);
-        let j1 = _mm256_srli_epi16::<8>(v);
-        _mm256_srli_epi16::<8>(_mm256_add_epi16(j0, j1))
+        let biased = _mm256_add_epi16(v, _mm256_set1_epi16(128));
+        _mm256_srli_epi16::<8>(_mm256_add_epi16(biased, _mm256_srli_epi16::<8>(biased)))
     }
 }
 
