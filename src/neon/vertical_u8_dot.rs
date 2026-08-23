@@ -513,3 +513,97 @@ fn convolve_vertical_neon_row_upper(
     rem = rem.as_chunks_mut::<8>().1;
     convolve_items(rem, bounds, src, src_stride, weight, cx);
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::math::WeightsGenerator;
+    use crate::test_utils::XorShiftRng;
+
+    // Same Q0.7 reasoning as the horizontal i8mm dot files (`rgb_u8_dot.rs`,
+    // `rgba_u8_dot.rs`): weights are quantized to Q0.7 `i8`, and the
+    // accumulation is a genuine widening i32 dot product (`vusdotq_s32`) with
+    // a single final saturating narrow, so it's safe to model directly with
+    // an i32 accumulator: rounding bias `1 << 6`, then `>> 7`, clamped to
+    // `u8`.
+    fn scalar_reference_vertical_dot(
+        bounds: &FilterBounds,
+        src: &[u8],
+        dst: &mut [u8],
+        src_stride: usize,
+        weight: &[i8],
+    ) {
+        const ROUNDING: i32 = 1 << 6;
+        for (x, dst_x) in dst.iter_mut().enumerate() {
+            let mut acc = ROUNDING;
+            for (k, &w) in weight.iter().take(bounds.size).enumerate() {
+                let py = bounds.start + k;
+                acc += w as i32 * src[src_stride * py + x] as i32;
+            }
+            *dst_x = (acc >> 7).clamp(0, 255) as u8;
+        }
+    }
+
+    fn make_row_filter_weights_q0_7(
+        resampling: ResamplingFunction,
+        in_size: usize,
+        out_size: usize,
+    ) -> crate::filter_weights::FilterWeights<i8> {
+        let weights_f32 =
+            <u8 as WeightsGenerator<f32>>::make_weights(resampling, in_size, out_size).unwrap();
+        weights_f32.numerical_approximation_q0_7(0)
+    }
+
+    fn max_source_rows_needed(bounds: &[FilterBounds]) -> usize {
+        bounds.iter().map(|b| b.start + b.size).max().unwrap_or(0)
+    }
+
+    #[test]
+    fn neon_dot_vertical_matches_scalar_reference() {
+        if !std::arch::is_aarch64_feature_detected!("i8mm") {
+            return;
+        }
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_height, out_height) in [(64usize, 37usize), (37, 64), (5, 3)] {
+                let filter_weights = make_row_filter_weights_q0_7(resampling, in_height, out_height);
+                let needed_rows = max_source_rows_needed(&filter_weights.bounds);
+
+                for &width in &[13usize, 131usize] {
+                    let src_stride = width;
+                    let mut rng = XorShiftRng::new(
+                        0xC0FFEE ^ (in_height as u64) << 32 ^ (out_height as u64) << 16 ^ width as u64,
+                    );
+                    let src = rng.fill_u8(src_stride * needed_rows);
+
+                    for (y, bounds) in filter_weights.bounds.iter().enumerate() {
+                        let filter_offset = y * filter_weights.aligned_size;
+                        let weights = &filter_weights.weights[filter_offset..];
+
+                        let mut dst_scalar = vec![0u8; width];
+                        let mut dst_dot = vec![0u8; width];
+                        scalar_reference_vertical_dot(
+                            bounds,
+                            &src,
+                            &mut dst_scalar,
+                            src_stride,
+                            weights,
+                        );
+                        convolve_vertical_neon_i8_dot(
+                            width, bounds, &src, &mut dst_dot, src_stride, weights, 8,
+                        );
+
+                        assert_eq!(
+                            dst_scalar, dst_dot,
+                            "{resampling:?} {in_height}->{out_height} row {y} width {width}: NEON i8mm dot vertical output diverges from the scalar reference"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

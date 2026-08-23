@@ -490,3 +490,100 @@ fn convolve_vertical_neon_row_upper(
     rem = rem.as_chunks_mut::<8>().1;
     convolve_items(rem, bounds, src, src_stride, weight, cx);
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::test_utils::{XorShiftRng, make_row_filter_weights_u8};
+
+    // Unlike the horizontal `rdm` paths, the vertical one applies
+    // `vqrdmlahq_s16`/`vqrdmlah_lane_s16` to every output column
+    // independently and sequentially (each tap updates every column's
+    // accumulator once, in increasing tap order - there's no low/high
+    // even/odd-tap interleaving trick here), so this is a straightforward
+    // per-column fold: widen each byte to the same 14-bit fixed
+    // representation `expand8_to_14` uses (`(byte * 257) >> 2`), fold in each
+    // tap with the saturating rounding-doubling-multiply-accumulate formula
+    // RDM uses, then `>> 6` and clamp to `u8`.
+    fn expand8_to_14(x: u8) -> i16 {
+        (((x as u32) * 257) >> 2) as i16
+    }
+
+    fn sqrdmlah_i16(acc: i16, a: i16, b: i16) -> i16 {
+        let product2 = 2i64 * (a as i64) * (b as i64);
+        let rounded = (product2 + (1i64 << 15)) >> 16;
+        (acc as i64 + rounded).clamp(i16::MIN as i64, i16::MAX as i64) as i16
+    }
+
+    fn scalar_reference_vertical_rdm(
+        bounds: &FilterBounds,
+        src: &[u8],
+        dst: &mut [u8],
+        src_stride: usize,
+        weight: &[i16],
+    ) {
+        const ROUNDING: i16 = 1 << 5;
+        for (x, dst_x) in dst.iter_mut().enumerate() {
+            let mut store = ROUNDING;
+            for (k, &w) in weight.iter().take(bounds.size).enumerate() {
+                let py = bounds.start + k;
+                store = sqrdmlah_i16(store, expand8_to_14(src[src_stride * py + x]), w);
+            }
+            *dst_x = ((store >> 6) as i32).clamp(0, 255) as u8;
+        }
+    }
+
+    fn max_source_rows_needed(bounds: &[FilterBounds]) -> usize {
+        bounds.iter().map(|b| b.start + b.size).max().unwrap_or(0)
+    }
+
+    #[test]
+    fn neon_rdm_vertical_matches_scalar_reference() {
+        if !std::arch::is_aarch64_feature_detected!("rdm") {
+            return;
+        }
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_height, out_height) in [(64usize, 37usize), (37, 64), (5, 3)] {
+                let filter_weights =
+                    make_row_filter_weights_u8(resampling, in_height, out_height).unwrap();
+                let needed_rows = max_source_rows_needed(&filter_weights.bounds);
+
+                for &width in &[13usize, 131usize] {
+                    let src_stride = width;
+                    let mut rng = XorShiftRng::new(
+                        0xC0FFEE ^ (in_height as u64) << 32 ^ (out_height as u64) << 16 ^ width as u64,
+                    );
+                    let src = rng.fill_u8(src_stride * needed_rows);
+
+                    for (y, bounds) in filter_weights.bounds.iter().enumerate() {
+                        let filter_offset = y * filter_weights.aligned_size;
+                        let weights = &filter_weights.weights[filter_offset..];
+
+                        let mut dst_scalar = vec![0u8; width];
+                        let mut dst_rdm = vec![0u8; width];
+                        scalar_reference_vertical_rdm(
+                            bounds,
+                            &src,
+                            &mut dst_scalar,
+                            src_stride,
+                            weights,
+                        );
+                        convolve_vertical_neon_i16_precision(
+                            width, bounds, &src, &mut dst_rdm, src_stride, weights, 8,
+                        );
+
+                        assert_eq!(
+                            dst_scalar, dst_rdm,
+                            "{resampling:?} {in_height}->{out_height} row {y} width {width}: NEON rdm vertical output diverges from the scalar reference"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

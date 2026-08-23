@@ -379,3 +379,95 @@ fn convolve_horizontal_plane_sse_rows_4_impl<const FMA: bool>(
         }
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::convolve_naive_f32::{
+        convolve_horizontal_native_row_f32, convolve_horizontal_rgba_4_row_f32,
+    };
+    use crate::test_utils::{XorShiftRng, assert_f32_slices_close, make_row_filter_weights_f32};
+
+    // Unlike rgba_f32.rs (one channel per SIMD lane, no intra-lane reduction),
+    // a single-channel plane accumulates multiple taps within the same lane
+    // and needs a horizontal reduction, reordering the sum vs the scalar
+    // loop's strict left-to-right accumulation - not bit-exact (observed diffs
+    // are a single f32 ULP).
+    const ATOL: f32 = 1e-5;
+
+    #[test]
+    fn sse_row_matches_scalar_reference() {
+        if !is_x86_feature_detected!("sse4.1") {
+            return;
+        }
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64), (256, 256), (5, 3)] {
+                let filter_weights =
+                    make_row_filter_weights_f32(resampling, in_size, out_size).unwrap();
+                let mut rng = XorShiftRng::new(0xC0FFEE ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src = rng.fill_f32_unit(in_size);
+
+                let mut dst_scalar = vec![0f32; out_size];
+                let mut dst_sse = vec![0f32; out_size];
+                convolve_horizontal_native_row_f32::<1>(&src, &mut dst_scalar, &filter_weights, 8);
+                convolve_horizontal_plane_sse_row_one(&src, &mut dst_sse, &filter_weights, 8);
+
+                assert_f32_slices_close(
+                    &dst_sse,
+                    &dst_scalar,
+                    ATOL,
+                    &format!("{resampling:?} {in_size}->{out_size}: SSE plane f32 single-row"),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn sse_rows_4_matches_scalar_reference() {
+        if !is_x86_feature_detected!("sse4.1") {
+            return;
+        }
+        const ROWS: usize = 4;
+        for resampling in [ResamplingFunction::Bilinear, ResamplingFunction::Lanczos3] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64)] {
+                let filter_weights =
+                    make_row_filter_weights_f32(resampling, in_size, out_size).unwrap();
+                let mut rng = XorShiftRng::new(0xBADF00D ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src_stride = in_size;
+                let dst_stride = out_size;
+                let src = rng.fill_f32_unit(src_stride * ROWS);
+
+                let mut dst_scalar = vec![0f32; dst_stride * ROWS];
+                let mut dst_sse = vec![0f32; dst_stride * ROWS];
+                convolve_horizontal_rgba_4_row_f32::<1>(
+                    &src,
+                    src_stride,
+                    &mut dst_scalar,
+                    dst_stride,
+                    &filter_weights,
+                    8,
+                );
+                convolve_horizontal_plane_sse_rows_4(
+                    &src,
+                    src_stride,
+                    &mut dst_sse,
+                    dst_stride,
+                    &filter_weights,
+                    8,
+                );
+
+                assert_f32_slices_close(
+                    &dst_sse,
+                    &dst_scalar,
+                    ATOL,
+                    &format!("{resampling:?} {in_size}->{out_size}: SSE plane f32 4-row"),
+                );
+            }
+        }
+    }
+}

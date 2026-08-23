@@ -398,3 +398,154 @@ fn convolve_horizontal_rgba_neon_u16_hb_impl(
         }
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::math::WeightsGenerator;
+    use crate::test_utils::XorShiftRng;
+
+    const BIT_DEPTH: u32 = 16;
+
+    fn make_row_filter_weights_u16_q31(
+        resampling: ResamplingFunction,
+        in_size: usize,
+        out_size: usize,
+    ) -> FilterWeights<i32> {
+        let weights_f32 = <u16 as WeightsGenerator<f32>>::make_weights(resampling, in_size, out_size).unwrap();
+        weights_f32.numerical_approximation::<i32, 31>(0)
+    }
+
+    /// Scalar model of ARM's `SQRDMLAH`/`SQRDMULH`: `round(2*a*b / 2^32)`,
+    /// i.e. `round(a*b / 2^31)` - matches the `vqrdmlahq_s32` accumulation
+    /// used by the real NEON `_hb` kernels bit-for-bit for realistic inputs
+    /// (saturation only differs at the a=b=i32::MIN corner, unreachable here).
+    fn sqrdmulh(a: i32, b: i32) -> i32 {
+        let prod = 2i64 * (a as i64) * (b as i64) + (1i64 << 31);
+        (prod >> 32) as i32
+    }
+
+    fn scalar_ref_hb_row<const CN: usize>(
+        src: &[u16],
+        dst: &mut [u16],
+        filter_weights: &FilterWeights<i32>,
+        bit_depth: u32,
+    ) {
+        let max_colors = (1i32 << bit_depth) - 1;
+        for ((chunk, &bounds), weights) in dst
+            .as_chunks_mut::<CN>()
+            .0
+            .iter_mut()
+            .zip(filter_weights.bounds.iter())
+            .zip(
+                filter_weights
+                    .weights
+                    .chunks_exact(filter_weights.aligned_size),
+            )
+        {
+            let mut acc = [1i32 << 5; CN];
+            let px = bounds.start * CN;
+            let src_chunk = &src[px..(px + bounds.size * CN)];
+            for (&w, src_px) in weights[..bounds.size]
+                .iter()
+                .zip(src_chunk.as_chunks::<CN>().0.iter())
+            {
+                for c in 0..CN {
+                    let a = (src_px[c] as i32) << 6;
+                    acc[c] += sqrdmulh(a, w);
+                }
+            }
+            for c in 0..CN {
+                chunk[c] = (acc[c] >> 6).clamp(0, max_colors) as u16;
+            }
+        }
+    }
+
+    fn scalar_ref_hb_rows_4<const CN: usize>(
+        src: &[u16],
+        src_stride: usize,
+        dst: &mut [u16],
+        dst_stride: usize,
+        filter_weights: &FilterWeights<i32>,
+        bit_depth: u32,
+    ) {
+        let (row0, rest) = dst.split_at_mut(dst_stride);
+        let (row1, rest) = rest.split_at_mut(dst_stride);
+        let (row2, row3) = rest.split_at_mut(dst_stride);
+        for (row, offset) in [(row0, 0), (row1, src_stride), (row2, src_stride * 2), (row3, src_stride * 3)] {
+            scalar_ref_hb_row::<CN>(&src[offset..], row, filter_weights, bit_depth);
+        }
+    }
+
+    #[cfg(feature = "rdm")]
+    #[test]
+    fn neon_row_matches_scalar_reference() {
+        if !std::arch::is_aarch64_feature_detected!("rdm") {
+            return;
+        }
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64), (256, 256), (5, 3)] {
+                let filter_weights = make_row_filter_weights_u16_q31(resampling, in_size, out_size);
+                let mut rng = XorShiftRng::new(0xC0FFEE ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src = rng.fill_u16(in_size * 4, u16::MAX);
+
+                let mut dst_scalar = vec![0u16; out_size * 4];
+                let mut dst_neon = vec![0u16; out_size * 4];
+                scalar_ref_hb_row::<4>(&src, &mut dst_scalar, &filter_weights, BIT_DEPTH);
+                convolve_horizontal_rgba_neon_u16_hb_row(&src, &mut dst_neon, &filter_weights, BIT_DEPTH);
+
+                assert_eq!(
+                    dst_scalar, dst_neon,
+                    "{resampling:?} {in_size}->{out_size}: NEON RDM single-row output diverges from the scalar reference"
+                );
+            }
+        }
+    }
+
+    #[cfg(feature = "rdm")]
+    #[test]
+    fn neon_rows_4_matches_scalar_reference() {
+        if !std::arch::is_aarch64_feature_detected!("rdm") {
+            return;
+        }
+        const ROWS: usize = 4;
+        for resampling in [ResamplingFunction::Bilinear, ResamplingFunction::Lanczos3] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64)] {
+                let filter_weights = make_row_filter_weights_u16_q31(resampling, in_size, out_size);
+                let mut rng = XorShiftRng::new(0xBADF00D ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src_stride = in_size * 4;
+                let dst_stride = out_size * 4;
+                let src = rng.fill_u16(src_stride * ROWS, u16::MAX);
+
+                let mut dst_scalar = vec![0u16; dst_stride * ROWS];
+                let mut dst_neon = vec![0u16; dst_stride * ROWS];
+                scalar_ref_hb_rows_4::<4>(
+                    &src,
+                    src_stride,
+                    &mut dst_scalar,
+                    dst_stride,
+                    &filter_weights,
+                    BIT_DEPTH,
+                );
+                convolve_horizontal_rgba_neon_rows_4_hb_u16(
+                    &src,
+                    src_stride,
+                    &mut dst_neon,
+                    dst_stride,
+                    &filter_weights,
+                    BIT_DEPTH,
+                );
+
+                assert_eq!(
+                    dst_scalar, dst_neon,
+                    "{resampling:?} {in_size}->{out_size}: NEON RDM 4-row output diverges from the scalar reference"
+                );
+            }
+        }
+    }
+}

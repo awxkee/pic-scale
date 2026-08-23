@@ -495,3 +495,85 @@ fn convolve_column_lb_avx_u16_impl<const HAS_DOT: bool>(
         }
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::fixed_point_vertical::column_handler_fixed_point;
+    use crate::test_utils::{XorShiftRng, make_row_filter_weights_u16};
+
+    // Same idea as the u8 vertical tests in `src/avx2/vertical_u8.rs`: for
+    // every output row the accelerated low-bit-depth (<=12 bit) fixed-point
+    // path must agree bit-for-bit with `column_handler_fixed_point::<u16, i32>`,
+    // the same scalar reference `default_u16_column_plan` falls back to.
+    fn max_source_rows_needed(bounds: &[FilterBounds]) -> usize {
+        bounds.iter().map(|b| b.start + b.size).max().unwrap_or(0)
+    }
+
+    fn run_case(
+        run: impl Fn(usize, &FilterBounds, &[u16], &mut [u16], usize, &[i16], u32),
+        context: &str,
+    ) {
+        const BIT_DEPTH: u32 = 12;
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_height, out_height) in [(64usize, 37usize), (37, 64), (5, 3)] {
+                let filter_weights =
+                    make_row_filter_weights_u16(resampling, in_height, out_height).unwrap();
+                let needed_rows = max_source_rows_needed(&filter_weights.bounds);
+
+                for &width in &[9usize, 53usize] {
+                    let src_stride = width;
+                    let mut rng = XorShiftRng::new(
+                        0xC0FFEE ^ (in_height as u64) << 32 ^ (out_height as u64) << 16 ^ width as u64,
+                    );
+                    let src = rng.fill_u16(src_stride * needed_rows, (1u16 << BIT_DEPTH) - 1);
+
+                    for (y, bounds) in filter_weights.bounds.iter().enumerate() {
+                        let filter_offset = y * filter_weights.aligned_size;
+                        let weights = &filter_weights.weights[filter_offset..];
+
+                        let mut dst_scalar = vec![0u16; width];
+                        let mut dst_avx = vec![0u16; width];
+                        column_handler_fixed_point::<u16, i32>(
+                            width,
+                            bounds,
+                            &src,
+                            &mut dst_scalar,
+                            src_stride,
+                            weights,
+                            BIT_DEPTH,
+                        );
+                        run(width, bounds, &src, &mut dst_avx, src_stride, weights, BIT_DEPTH);
+
+                        assert_eq!(
+                            dst_scalar, dst_avx,
+                            "{resampling:?} {in_height}->{out_height} row {y} width {width}: {context} vertical lb output diverges from the scalar reference"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn avx2_vertical_lb_matches_scalar_reference() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        run_case(convolve_column_lb_avx2_u16, "AVX2");
+    }
+
+    #[cfg(feature = "avx512")]
+    #[test]
+    fn avx2_vertical_lb_vnni_matches_scalar_reference() {
+        if !is_x86_feature_detected!("avx2") || !is_x86_feature_detected!("avxvnni") {
+            return;
+        }
+        run_case(convolve_column_lb_avx2_u16_vnni, "AVX2 VNNI");
+    }
+}

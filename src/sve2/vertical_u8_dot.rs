@@ -550,3 +550,101 @@ fn convolve_vertical_sve2_row(
         cx += vl;
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::math::WeightsGenerator;
+
+    // Same Q7 rationale as sve2/rgb_u8_dot.rs: this path quantizes weights to
+    // `i8` (see `filter_weights.numerical_approximation_q0_7(0)` at its
+    // `factory/rgb_u8.rs` vertical dispatch site), a different precision than
+    // the crate's usual Q15 scalar reference, so hand-roll the Q7 vertical
+    // math instead. Vertical convolution treats the row as flat elements
+    // (channels don't interact), matching `column_handler_fixed_point`'s
+    // own `width` semantics.
+    fn scalar_reference_q7_column(
+        width: usize,
+        bounds: &FilterBounds,
+        src: &[u8],
+        dst: &mut [u8],
+        src_stride: usize,
+        weight: &[i8],
+    ) {
+        const PRECISION: i32 = 7;
+        const ROUNDING: i32 = 1 << (PRECISION - 1);
+        for (x, dst) in dst.iter_mut().enumerate().take(width) {
+            let mut acc = ROUNDING;
+            for (j, &w) in weight.iter().enumerate().take(bounds.size) {
+                let py = bounds.start + j;
+                acc += src[src_stride * py + x] as i32 * w as i32;
+            }
+            *dst = (acc >> PRECISION).clamp(0, 255) as u8;
+        }
+    }
+
+    fn max_source_rows_needed(bounds: &[FilterBounds]) -> usize {
+        bounds.iter().map(|b| b.start + b.size).max().unwrap_or(0)
+    }
+
+    #[test]
+    fn sve2_vertical_matches_scalar_reference() {
+        if !(std::arch::is_aarch64_feature_detected!("sve2")
+            && std::arch::is_aarch64_feature_detected!("i8mm"))
+        {
+            return;
+        }
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_height, out_height) in [(64usize, 37usize), (37, 64), (5, 3)] {
+                let weights_f32 =
+                    <u8 as WeightsGenerator<f32>>::make_weights(resampling, in_height, out_height)
+                        .unwrap();
+                let filter_weights = weights_f32.numerical_approximation_q0_7(0);
+                let needed_rows = max_source_rows_needed(&filter_weights.bounds);
+
+                for &width in &[9usize, 53usize] {
+                    let src_stride = width;
+                    let mut rng = crate::test_utils::XorShiftRng::new(
+                        0xC0FFEE ^ (in_height as u64) << 32 ^ (out_height as u64) << 16 ^ width as u64,
+                    );
+                    let src = rng.fill_u8(src_stride * needed_rows);
+
+                    for (y, bounds) in filter_weights.bounds.iter().enumerate() {
+                        let filter_offset = y * filter_weights.aligned_size;
+                        let weights = &filter_weights.weights[filter_offset..];
+
+                        let mut dst_scalar = vec![0u8; width];
+                        let mut dst_sve = vec![0u8; width];
+                        scalar_reference_q7_column(
+                            width,
+                            bounds,
+                            &src,
+                            &mut dst_scalar,
+                            src_stride,
+                            weights,
+                        );
+                        convolve_vertical_sve2_i8_dot(
+                            width,
+                            bounds,
+                            &src,
+                            &mut dst_sve,
+                            src_stride,
+                            weights,
+                            8,
+                        );
+
+                        assert_eq!(
+                            dst_scalar, dst_sve,
+                            "{resampling:?} {in_height}->{out_height} row {y} width {width}: SVE2 dot vertical output diverges from the Q7 scalar reference"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

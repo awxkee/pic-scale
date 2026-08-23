@@ -295,3 +295,89 @@ fn convolve_horizontal_rgb_neon_row_one_f16_impl(
         }
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::f16::{convolve_horizontal_rgb_native_row_f16, convolve_horizontal_rgba_4_row_f16};
+    use crate::test_utils::{XorShiftRng, assert_f16_slices_close, make_row_filter_weights_f32};
+
+    // NEON uses hardware FMA, which fuses/re-rounds relative to the scalar
+    // loop's separate multiply-then-add - not bit-exact.
+    const ATOL: f32 = 1e-3;
+
+    #[test]
+    fn neon_row_matches_scalar_reference() {
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64), (256, 256), (5, 3)] {
+                let filter_weights =
+                    make_row_filter_weights_f32(resampling, in_size, out_size).unwrap();
+                let mut rng = XorShiftRng::new(0xC0FFEE ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src = rng.fill_f16_unit(in_size * 3);
+
+                let mut dst_scalar = vec![0f16; out_size * 3];
+                let mut dst_neon = vec![0f16; out_size * 3];
+                convolve_horizontal_rgb_native_row_f16::<3>(
+                    &src,
+                    &mut dst_scalar,
+                    &filter_weights,
+                    8,
+                );
+                convolve_horizontal_rgb_neon_row_one_f16(&src, &mut dst_neon, &filter_weights, 8);
+
+                assert_f16_slices_close(
+                    &dst_neon,
+                    &dst_scalar,
+                    ATOL,
+                    &format!("{resampling:?} {in_size}->{out_size}: NEON rgb f16 single-row"),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn neon_rows_4_matches_scalar_reference() {
+        const ROWS: usize = 4;
+        for resampling in [ResamplingFunction::Bilinear, ResamplingFunction::Lanczos3] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64)] {
+                let filter_weights =
+                    make_row_filter_weights_f32(resampling, in_size, out_size).unwrap();
+                let mut rng = XorShiftRng::new(0xBADF00D ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src_stride = in_size * 3;
+                let dst_stride = out_size * 3;
+                let src = rng.fill_f16_unit(src_stride * ROWS);
+
+                let mut dst_scalar = vec![0f16; dst_stride * ROWS];
+                let mut dst_neon = vec![0f16; dst_stride * ROWS];
+                convolve_horizontal_rgba_4_row_f16::<3>(
+                    &src,
+                    src_stride,
+                    &mut dst_scalar,
+                    dst_stride,
+                    &filter_weights,
+                    8,
+                );
+                convolve_horizontal_rgb_neon_rows_4_f16(
+                    &src,
+                    src_stride,
+                    &mut dst_neon,
+                    dst_stride,
+                    &filter_weights,
+                    8,
+                );
+
+                assert_f16_slices_close(
+                    &dst_neon,
+                    &dst_scalar,
+                    ATOL,
+                    &format!("{resampling:?} {in_size}->{out_size}: NEON rgb f16 4-row"),
+                );
+            }
+        }
+    }
+}

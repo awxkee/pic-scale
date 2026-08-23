@@ -188,3 +188,79 @@ pub(crate) fn convolve_column_u16(
         }
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::floating_point_vertical::column_handler_floating_point;
+    use crate::test_utils::{XorShiftRng, make_row_filter_weights_f32};
+
+    // This is the base/high-bit-depth (>12 bit) NEON column path, which
+    // `factory/plane_u16.rs`'s `default_u16_column_plan` falls back to for
+    // bit depths above 12 whenever neither the `rdm` nor `sve` fast paths are
+    // taken. For that same bit-depth range, the non-NEON fallback in the same
+    // function is `column_handler_floating_point::<u16, f32, f32>` - both
+    // accumulate in `f32` with real (non-quantized) weights, so that's the
+    // correct scalar reference here (same as `sse/vertical_u16.rs`'s test).
+    const BIT_DEPTH: u32 = 16;
+
+    fn max_source_rows_needed(bounds: &[FilterBounds]) -> usize {
+        bounds.iter().map(|b| b.start + b.size).max().unwrap_or(0)
+    }
+
+    #[test]
+    fn neon_vertical_matches_scalar_reference() {
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_height, out_height) in [(64usize, 37usize), (37, 64), (5, 3)] {
+                let filter_weights =
+                    make_row_filter_weights_f32(resampling, in_height, out_height).unwrap();
+                let needed_rows = max_source_rows_needed(&filter_weights.bounds);
+
+                for &width in &[9usize, 53usize] {
+                    let src_stride = width;
+                    let mut rng = XorShiftRng::new(
+                        0xC0FFEE ^ (in_height as u64) << 32 ^ (out_height as u64) << 16 ^ width as u64,
+                    );
+                    let src =
+                        rng.fill_u16(src_stride * needed_rows, ((1u32 << BIT_DEPTH) - 1) as u16);
+
+                    for (y, bounds) in filter_weights.bounds.iter().enumerate() {
+                        let filter_offset = y * filter_weights.aligned_size;
+                        let weights = &filter_weights.weights[filter_offset..];
+
+                        let mut dst_scalar = vec![0u16; width];
+                        let mut dst_neon = vec![0u16; width];
+                        column_handler_floating_point::<u16, f32, f32>(
+                            width,
+                            bounds,
+                            &src,
+                            &mut dst_scalar,
+                            src_stride,
+                            weights,
+                            BIT_DEPTH,
+                        );
+                        convolve_column_u16(
+                            width,
+                            bounds,
+                            &src,
+                            &mut dst_neon,
+                            src_stride,
+                            weights,
+                            BIT_DEPTH,
+                        );
+
+                        assert_eq!(
+                            dst_scalar, dst_neon,
+                            "{resampling:?} {in_height}->{out_height} row {y} width {width}: NEON vertical (16-bit) output diverges from the scalar reference"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

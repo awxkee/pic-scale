@@ -333,3 +333,89 @@ fn convolve_vertical_rgb_neon_row_f16_impl(
         );
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::f16::convolve_vertical_rgb_native_row_f16;
+    use crate::filter_weights::{WeightFloat16Converter, WeightsConverter};
+    use crate::test_utils::{XorShiftRng, assert_f16_slices_close, make_row_filter_weights_f32};
+
+    // The `fhm` path widens f16 taps through `vfmlalq_low_f16`/`_high_f16`,
+    // which accumulate in f32 but the weights themselves are pre-quantized to
+    // f16 (via `WeightFloat16Converter`, the same conversion `f16.rs`'s
+    // vertical plan applies before dispatching here) - not bit-exact against
+    // the scalar f32-weighted reference, matching the horizontal fhm test in
+    // `rgb_f16_fhm.rs`.
+    const ATOL: f32 = 5e-2;
+
+    fn max_source_rows_needed(bounds: &[FilterBounds]) -> usize {
+        bounds.iter().map(|b| b.start + b.size).max().unwrap_or(0)
+    }
+
+    #[test]
+    fn neon_fhm_vertical_matches_scalar_reference() {
+        if !std::arch::is_aarch64_feature_detected!("fhm") {
+            return;
+        }
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_height, out_height) in [(64usize, 37usize), (37, 64), (5, 3)] {
+                let filter_weights_f32 =
+                    make_row_filter_weights_f32(resampling, in_height, out_height).unwrap();
+                let filter_weights_f16 =
+                    WeightFloat16Converter::default().prepare_weights(&filter_weights_f32);
+                let needed_rows = max_source_rows_needed(&filter_weights_f32.bounds);
+
+                for &width in &[9usize, 53usize] {
+                    let src_stride = width;
+                    let mut rng = XorShiftRng::new(
+                        0xC0FFEE ^ (in_height as u64) << 32 ^ (out_height as u64) << 16 ^ width as u64,
+                    );
+                    let src = rng.fill_f16_unit(src_stride * needed_rows);
+
+                    for (y, bounds) in filter_weights_f32.bounds.iter().enumerate() {
+                        let filter_offset_f32 = y * filter_weights_f32.aligned_size;
+                        let weights_f32 = &filter_weights_f32.weights[filter_offset_f32..];
+                        let filter_offset_f16 = y * filter_weights_f16.aligned_size;
+                        let weights_f16 = &filter_weights_f16.weights[filter_offset_f16..];
+
+                        let mut dst_scalar = vec![0f16; width];
+                        let mut dst_neon = vec![0f16; width];
+                        convolve_vertical_rgb_native_row_f16(
+                            width,
+                            bounds,
+                            &src,
+                            &mut dst_scalar,
+                            src_stride,
+                            weights_f32,
+                            8,
+                        );
+                        convolve_vertical_rgb_neon_row_f16_fhm(
+                            width,
+                            bounds,
+                            &src,
+                            &mut dst_neon,
+                            src_stride,
+                            weights_f16,
+                            8,
+                        );
+
+                        assert_f16_slices_close(
+                            &dst_neon,
+                            &dst_scalar,
+                            ATOL,
+                            &format!(
+                                "{resampling:?} {in_height}->{out_height} row {y} width {width}: NEON fhm vertical"
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

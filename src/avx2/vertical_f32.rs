@@ -405,3 +405,95 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         }
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::floating_point_vertical::column_handler_floating_point;
+    use crate::test_utils::{XorShiftRng, assert_f32_slices_close, make_row_filter_weights_f32};
+
+    // AVX2 folds 8/16/32 lanes at a time and the FMA variant fuses multiply+add,
+    // both of which reorder and re-round relative to the scalar loop's strictly
+    // sequential multiply-then-add - a small tolerance (not bit-exact) is
+    // expected here, mirroring the horizontal-convolution comparison tests.
+    const ATOL: f32 = 1e-5;
+
+    #[test]
+    fn avx2_default_vertical_matches_scalar_reference() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        run_vertical_comparison(convolve_vertical_avx_row_default_f32, "AVX2 default");
+    }
+
+    #[test]
+    fn avx2_fma_vertical_matches_scalar_reference() {
+        if !(is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma")) {
+            return;
+        }
+        run_vertical_comparison(convolve_vertical_avx_row_fma_f32, "AVX2 FMA");
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn run_vertical_comparison(
+        simd_fn: fn(usize, &FilterBounds, &[f32], &mut [f32], usize, &[f32], u32),
+        label: &str,
+    ) {
+        // Row widths chosen to be multiples of 1 (plane), 3 (rgb) and 4 (rgba)
+        // pixels, plus a couple of odd sizes so every SIMD tail-loop width
+        // (32/16/8/1 lanes) gets exercised at least once.
+        const ROW_WIDTHS: [usize; 7] = [1, 3, 4, 39, 99, 160, 41];
+
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_height, out_height) in [(64usize, 37usize), (37, 64), (5, 3)] {
+                let filter_weights =
+                    make_row_filter_weights_f32(resampling, in_height, out_height).unwrap();
+
+                for &row_width in ROW_WIDTHS.iter() {
+                    let src_stride = row_width;
+                    let mut rng = XorShiftRng::new(
+                        0xC0FFEE
+                            ^ (in_height as u64) << 32
+                            ^ (out_height as u64) << 16
+                            ^ row_width as u64,
+                    );
+                    let src = rng.fill_f32_unit(src_stride * in_height);
+
+                    for y in 0..out_height {
+                        let bounds = filter_weights.bounds[y];
+                        let filter_offset = y * filter_weights.aligned_size;
+                        let weights = &filter_weights.weights[filter_offset..];
+
+                        let mut dst_scalar = vec![0f32; row_width];
+                        let mut dst_simd = vec![0f32; row_width];
+
+                        column_handler_floating_point::<f32, f32, f32>(
+                            0,
+                            &bounds,
+                            &src,
+                            &mut dst_scalar,
+                            src_stride,
+                            weights,
+                            8,
+                        );
+                        simd_fn(row_width, &bounds, &src, &mut dst_simd, src_stride, weights, 8);
+
+                        assert_f32_slices_close(
+                            &dst_simd,
+                            &dst_scalar,
+                            ATOL,
+                            &format!(
+                                "{resampling:?} {in_height}->{out_height} row {y} width {row_width}: {label}"
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

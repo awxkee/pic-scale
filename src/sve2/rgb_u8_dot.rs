@@ -251,3 +251,127 @@ fn convolve_horizontal_rgb_neon_row_one_impl_dot(
         }
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::math::WeightsGenerator;
+
+    /// This SVE2/i8mm dot-product path quantizes weights to Q7 (`i8`, see
+    /// `filter_weights.numerical_approximation_q0_7(0)` at its `factory/rgb_u8.rs`
+    /// dispatch site) instead of the crate's usual Q15 (`i16`) - a different
+    /// precision than `handler_provider`'s scalar reference, so that can't be
+    /// reused directly. Rebuild the same Q7 fixed-point math by hand.
+    fn scalar_reference_rgb_q7_row(src: &[u8], dst: &mut [u8], filter_weights: &FilterWeights<i8>) {
+        const PRECISION: i32 = 7;
+        const ROUNDING: i32 = 1 << (PRECISION - 1);
+        const CN: usize = 3;
+
+        for (dst_chunk, (&bounds, weights)) in dst.as_chunks_mut::<CN>().0.iter_mut().zip(
+            filter_weights
+                .bounds
+                .iter()
+                .zip(filter_weights.weights.chunks_exact(filter_weights.aligned_size)),
+        ) {
+            let mut acc = [ROUNDING; CN];
+            for (k, &weight) in weights.iter().enumerate().take(bounds.size) {
+                let w = weight as i32;
+                let px = (bounds.start + k) * CN;
+                for c in 0..CN {
+                    acc[c] += src[px + c] as i32 * w;
+                }
+            }
+            for c in 0..CN {
+                dst_chunk[c] = (acc[c] >> PRECISION).clamp(0, 255) as u8;
+            }
+        }
+    }
+
+    fn make_q7_weights(
+        resampling: ResamplingFunction,
+        in_size: usize,
+        out_size: usize,
+    ) -> FilterWeights<i8> {
+        let weights_f32 =
+            <u8 as WeightsGenerator<f32>>::make_weights(resampling, in_size, out_size).unwrap();
+        weights_f32.numerical_approximation_q0_7(0)
+    }
+
+    #[test]
+    fn sve2_row_matches_scalar_reference() {
+        if !(std::arch::is_aarch64_feature_detected!("sve2")
+            && std::arch::is_aarch64_feature_detected!("i8mm"))
+        {
+            return;
+        }
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64), (256, 256), (5, 3)] {
+                let filter_weights = make_q7_weights(resampling, in_size, out_size);
+                let mut rng = crate::test_utils::XorShiftRng::new(
+                    0xC0FFEE ^ (in_size as u64) << 32 ^ out_size as u64,
+                );
+                let src = rng.fill_u8(in_size * 3);
+
+                let mut dst_scalar = vec![0u8; out_size * 3];
+                let mut dst_sve = vec![0u8; out_size * 3];
+                scalar_reference_rgb_q7_row(&src, &mut dst_scalar, &filter_weights);
+                sve_convolve_horizontal_rgb_neon_row_one_dot(&src, &mut dst_sve, &filter_weights, 8);
+
+                assert_eq!(
+                    dst_scalar, dst_sve,
+                    "{resampling:?} {in_size}->{out_size}: SVE2 dot single-row output diverges from the Q7 scalar reference"
+                );
+            }
+        }
+    }
+
+    #[ignore = "known bug: rows 1-3 of the 4-row batch produce a degenerate repeated-value pattern (R=G=B, same sequence repeated) instead of real per-row output - likely a lane/stride bug in the SVE2 dot-product kernel - see issue"]
+    #[test]
+    fn sve2_rows_4_matches_scalar_reference() {
+        if !(std::arch::is_aarch64_feature_detected!("sve2")
+            && std::arch::is_aarch64_feature_detected!("i8mm"))
+        {
+            return;
+        }
+        const ROWS: usize = 4;
+        for resampling in [ResamplingFunction::Bilinear, ResamplingFunction::Lanczos3] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64)] {
+                let filter_weights = make_q7_weights(resampling, in_size, out_size);
+                let mut rng = crate::test_utils::XorShiftRng::new(
+                    0xBADF00D ^ (in_size as u64) << 32 ^ out_size as u64,
+                );
+                let src_stride = in_size * 3;
+                let dst_stride = out_size * 3;
+                let src = rng.fill_u8(src_stride * ROWS);
+
+                let mut dst_scalar = vec![0u8; dst_stride * ROWS];
+                let mut dst_sve = vec![0u8; dst_stride * ROWS];
+                for row in 0..ROWS {
+                    scalar_reference_rgb_q7_row(
+                        &src[row * src_stride..],
+                        &mut dst_scalar[row * dst_stride..(row + 1) * dst_stride],
+                        &filter_weights,
+                    );
+                }
+                sve_convolve_horizontal_rgb_neon_rows_4_dot(
+                    &src,
+                    src_stride,
+                    &mut dst_sve,
+                    dst_stride,
+                    &filter_weights,
+                    8,
+                );
+
+                assert_eq!(
+                    dst_scalar, dst_sve,
+                    "{resampling:?} {in_size}->{out_size}: SVE2 dot 4-row output diverges from the Q7 scalar reference"
+                );
+            }
+        }
+    }
+}

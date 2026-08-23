@@ -213,3 +213,140 @@ impl<const AR30_TYPE: usize, const AR30_ORDER: usize> ExecutionUnit<AR30_TYPE, A
         }
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::factory::{Ar30ByteOrder, Rgb30};
+    use crate::test_utils::{XorShiftRng, make_row_filter_weights_u8};
+
+    /// Vertical counterpart of the scalar reference in `horizontal_ar30.rs`:
+    /// same Q15 fixed-point math (`support::PRECISION`), but each output
+    /// pixel accumulates taps from `bounds.size` different SOURCE ROWS
+    /// (via `src_stride`) instead of `bounds.size` taps within one row.
+    fn scalar_reference_ar30_column<const AR_TYPE: usize, const AR_ORDER: usize>(
+        width: usize,
+        bounds: &FilterBounds,
+        src: &[u8],
+        dst: &mut [u8],
+        src_stride: usize,
+        weight: &[i16],
+    ) {
+        const PRECISION: i32 = 15;
+        const ROUNDING: i32 = 1 << (PRECISION - 1);
+        let rgb_type: Rgb30 = AR_TYPE.into();
+
+        for x in 0..width {
+            let mut acc_r = ROUNDING;
+            let mut acc_g = ROUNDING;
+            let mut acc_b = ROUNDING;
+            for (j, &w) in weight.iter().enumerate().take(bounds.size) {
+                let py = bounds.start + j;
+                let offset = src_stride * py + x * 4;
+                let word = u32::from_ne_bytes(src[offset..offset + 4].try_into().unwrap());
+                let (r, g, b, _a) = rgb_type.unpack::<AR_ORDER>(word);
+                acc_r += r as i32 * w as i32;
+                acc_g += g as i32 * w as i32;
+                acc_b += b as i32 * w as i32;
+            }
+            let r = (acc_r >> PRECISION).clamp(0, 1023);
+            let g = (acc_g >> PRECISION).clamp(0, 1023);
+            let b = (acc_b >> PRECISION).clamp(0, 1023);
+            let packed = rgb_type.pack_w_a::<AR_ORDER>(r, g, b, 3);
+            let dst_offset = x * 4;
+            dst[dst_offset..dst_offset + 4].copy_from_slice(&packed.to_ne_bytes());
+        }
+    }
+
+    fn make_ar30_src<const AR_ORDER: usize>(
+        rgb_type: Rgb30,
+        rng: &mut XorShiftRng,
+        pixel_count: usize,
+    ) -> Vec<u8> {
+        let components = rng.fill_u16(pixel_count * 3, 1023);
+        let mut out = Vec::with_capacity(pixel_count * 4);
+        for chunk in components.as_chunks::<3>().0 {
+            let packed =
+                rgb_type.pack_w_a::<AR_ORDER>(chunk[0] as i32, chunk[1] as i32, chunk[2] as i32, 3);
+            out.extend_from_slice(&packed.to_ne_bytes());
+        }
+        out
+    }
+
+    fn max_source_rows_needed(bounds: &[FilterBounds]) -> usize {
+        bounds.iter().map(|b| b.start + b.size).max().unwrap_or(0)
+    }
+
+    fn run_vertical_test<const AR_TYPE: usize, const AR_ORDER: usize>(label: &str) {
+        let rgb_type: Rgb30 = AR_TYPE.into();
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_height, out_height) in [(64usize, 37usize), (37, 64), (5, 3)] {
+                let filter_weights =
+                    make_row_filter_weights_u8(resampling, in_height, out_height).unwrap();
+                let needed_rows = max_source_rows_needed(&filter_weights.bounds);
+
+                for &width in &[9usize, 53usize] {
+                    let mut rng = XorShiftRng::new(
+                        0xC0FFEE ^ (in_height as u64) << 32 ^ (out_height as u64) << 16 ^ width as u64,
+                    );
+                    let src_stride = width * 4;
+                    let src = make_ar30_src::<AR_ORDER>(rgb_type, &mut rng, width * needed_rows);
+
+                    for (y, bounds) in filter_weights.bounds.iter().enumerate() {
+                        let filter_offset = y * filter_weights.aligned_size;
+                        let weights = &filter_weights.weights[filter_offset..];
+
+                        let mut dst_scalar = vec![0u8; width * 4];
+                        let mut dst_avx = vec![0u8; width * 4];
+                        scalar_reference_ar30_column::<AR_TYPE, AR_ORDER>(
+                            width,
+                            bounds,
+                            &src,
+                            &mut dst_scalar,
+                            src_stride,
+                            weights,
+                        );
+                        avx_column_handler_fixed_point_ar30::<AR_TYPE, AR_ORDER>(
+                            width,
+                            bounds,
+                            &src,
+                            &mut dst_avx,
+                            src_stride,
+                            weights,
+                            8,
+                        );
+
+                        assert_eq!(
+                            dst_scalar, dst_avx,
+                            "{label} {resampling:?} {in_height}->{out_height} row {y} width {width}: AVX2 AR30 vertical output diverges from the scalar reference"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn avx2_vertical_matches_scalar_reference() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        run_vertical_test::<{ Rgb30::Ar30 as usize }, { Ar30ByteOrder::Host as usize }>(
+            "AR30 host",
+        );
+        run_vertical_test::<{ Rgb30::Ar30 as usize }, { Ar30ByteOrder::Network as usize }>(
+            "AR30 network",
+        );
+        run_vertical_test::<{ Rgb30::Ra30 as usize }, { Ar30ByteOrder::Host as usize }>(
+            "RA30 host",
+        );
+        run_vertical_test::<{ Rgb30::Ra30 as usize }, { Ar30ByteOrder::Network as usize }>(
+            "RA30 network",
+        );
+    }
+}

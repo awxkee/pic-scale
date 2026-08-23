@@ -221,3 +221,83 @@ fn avx_premultiply_alpha_rgba_f32_row_impl(dst: &mut [f32], src: &[f32]) {
         }
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::alpha_handle_f32::{premultiply_rgba_f32_row, unpremultiply_rgba_f32_row};
+    use crate::test_utils::{XorShiftRng, assert_f32_slices_close};
+
+    // Premultiply is a plain per-lane multiply with no reassociation, so it
+    // is bit-exact against the scalar reference. Unpremultiply is not: the
+    // scalar reference computes `1. / a` and then multiplies, while AVX2
+    // does a direct division - mathematically the same but rounded
+    // differently, so it can be off by a few ULPs. Random alpha is kept
+    // away from 0 (see `make_rgba`) so that relative error stays small in
+    // absolute terms too.
+    const ATOL: f32 = 1e-4;
+
+    /// Builds an RGBA f32 buffer in `[0, 1)` that mixes alpha == 0, alpha == 1
+    /// and fully random pixels (with random alpha kept away from 0) so both
+    /// the vectorized bulk path and the scalar tail remainder exercise every
+    /// branch the premultiply/unpremultiply math takes on alpha.
+    fn make_rgba(rng: &mut XorShiftRng, pixels: usize) -> Vec<f32> {
+        let mut buf = rng.fill_f32_unit(pixels * 4);
+        for chunk in buf.as_chunks_mut::<4>().0 {
+            chunk[3] = 0.05 + 0.95 * chunk[3];
+        }
+        if let Some(chunk) = buf.first_chunk_mut::<4>() {
+            chunk[3] = 0.;
+        }
+        if pixels > 1 {
+            buf[4 + 3] = 1.;
+        }
+        buf
+    }
+
+    #[test]
+    fn avx2_premultiply_matches_scalar_reference() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        for pixels in [1usize, 4, 17, 256] {
+            let mut rng = XorShiftRng::new(0xA11CE ^ pixels as u64);
+            let src = make_rgba(&mut rng, pixels);
+
+            let mut dst_scalar = vec![0f32; pixels * 4];
+            let mut dst_avx = vec![0f32; pixels * 4];
+            premultiply_rgba_f32_row(&mut dst_scalar, &src);
+            avx_premultiply_alpha_rgba_f32(&mut dst_avx, &src);
+
+            assert_f32_slices_close(
+                &dst_avx,
+                &dst_scalar,
+                ATOL,
+                &format!("{pixels} pixels: AVX2 premultiply"),
+            );
+        }
+    }
+
+    #[test]
+    fn avx2_unpremultiply_matches_scalar_reference() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        for pixels in [1usize, 4, 17, 256] {
+            let mut rng = XorShiftRng::new(0xB0BA ^ pixels as u64);
+            let src = make_rgba(&mut rng, pixels);
+
+            let mut scalar_buf = src.clone();
+            let mut avx_buf = src;
+            unpremultiply_rgba_f32_row(&mut scalar_buf);
+            avx_unpremultiply_alpha_rgba_f32(&mut avx_buf);
+
+            assert_f32_slices_close(
+                &avx_buf,
+                &scalar_buf,
+                ATOL,
+                &format!("{pixels} pixels: AVX2 unpremultiply"),
+            );
+        }
+    }
+}

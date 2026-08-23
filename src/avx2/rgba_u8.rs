@@ -494,3 +494,82 @@ fn convolve_horizontal_rgba_avx_rows_one_impl(
         }
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::handler_provider::{handle_fixed_row_u8, handle_fixed_rows_4_u8};
+    use crate::test_utils::{XorShiftRng, make_row_filter_weights_u8};
+
+    #[test]
+    fn avx2_row_matches_scalar_reference() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64), (256, 256), (5, 3)] {
+                let filter_weights =
+                    make_row_filter_weights_u8(resampling, in_size, out_size).unwrap();
+                let mut rng = XorShiftRng::new(0xC0FFEE ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src = rng.fill_u8(in_size * 4);
+
+                let mut dst_scalar = vec![0u8; out_size * 4];
+                let mut dst_avx2 = vec![0u8; out_size * 4];
+                handle_fixed_row_u8::<4>(&src, &mut dst_scalar, &filter_weights, 8);
+                convolve_horizontal_rgba_avx_row_1(&src, &mut dst_avx2, &filter_weights, 8);
+
+                assert_eq!(
+                    dst_scalar, dst_avx2,
+                    "{resampling:?} {in_size}->{out_size}: AVX2 single-row output diverges from the scalar reference"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn avx2_rows_4_matches_scalar_reference() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        const ROWS: usize = 4;
+        for resampling in [ResamplingFunction::Bilinear, ResamplingFunction::Lanczos3] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64)] {
+                let filter_weights =
+                    make_row_filter_weights_u8(resampling, in_size, out_size).unwrap();
+                let mut rng = XorShiftRng::new(0xBADF00D ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src_stride = in_size * 4;
+                let dst_stride = out_size * 4;
+                let src = rng.fill_u8(src_stride * ROWS);
+
+                let mut dst_scalar = vec![0u8; dst_stride * ROWS];
+                let mut dst_avx2 = vec![0u8; dst_stride * ROWS];
+                handle_fixed_rows_4_u8::<4>(
+                    &src,
+                    src_stride,
+                    &mut dst_scalar,
+                    dst_stride,
+                    &filter_weights,
+                    8,
+                );
+                convolve_horizontal_rgba_row_4(
+                    &src,
+                    src_stride,
+                    &mut dst_avx2,
+                    dst_stride,
+                    &filter_weights,
+                    8,
+                );
+
+                assert_eq!(
+                    dst_scalar, dst_avx2,
+                    "{resampling:?} {in_size}->{out_size}: AVX2 4-row output diverges from the scalar reference"
+                );
+            }
+        }
+    }
+}

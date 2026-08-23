@@ -19,3 +19,27 @@ rustflags = ["-C", "target-feature=+simd128"]
 #[target.aarch64-unknown-linux-gnu]
 #runner = "qemu-aarch64 -cpu neoverse-n2 -L /usr/aarch64-linux-gnu"
 #linker = "aarch64-linux-gnu-gcc"
+
+# Cross-arch test execution under QEMU user-mode emulation, no physical
+# hardware needed - `cargo test --target <one of these>` just works given
+# `qemu-user` on PATH and the target added via `rustup target add`. Musl
+# (not gnu) targets are used deliberately: their self-contained runtime lets
+# `rust-lld` (bundled with rustc) link a fully static binary without a
+# separate cross-gcc/cross-libc, which a `-gnu` target would need. `rust-lld`
+# replaces the host's `cc`/`ld.bfd`, which chokes on target-specific link
+# flags (e.g. aarch64's `--fix-cortex-a53-843419`). `+crt-static` is musl's
+# default anyway, but is set explicitly since omitting it made
+# riscv64gc-unknown-linux-musl fail to link with "unable to find library
+# -lgcc_s" (it otherwise pulls in a dynamic unwind stub that doesn't exist
+# for a static musl target).
+[target.aarch64-unknown-linux-musl]
+runner = "qemu-aarch64"
+rustflags = ["-C", "linker-flavor=ld.lld", "-C", "linker=rust-lld", "-C", "target-feature=+crt-static"]
+
+[target.armv7-unknown-linux-musleabihf]
+runner = "qemu-arm"
+rustflags = ["-C", "linker-flavor=ld.lld", "-C", "linker=rust-lld", "-C", "target-feature=+crt-static"]
+
+[target.riscv64gc-unknown-linux-musl]
+runner = "qemu-riscv64"
+rustflags = ["-C", "linker-flavor=ld.lld", "-C", "linker=rust-lld", "-C", "target-feature=+crt-static"]

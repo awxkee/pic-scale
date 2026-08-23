@@ -141,3 +141,64 @@ fn wasm_premultiply_alpha_rgba_impl(dst: &mut [u8], src: &[u8]) {
 
     premultiply_alpha_rgba_row_impl(rem, src_rem);
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::alpha_handle_u8::unpremultiply_alpha_rgba_row_impl;
+    use crate::test_utils::XorShiftRng;
+
+    /// Builds an RGBA8 buffer that mixes alpha == 0, alpha == 255 and fully
+    /// random pixels so both the vectorized bulk path and the scalar tail
+    /// remainder exercise the branches the premultiply/unpremultiply math
+    /// takes on alpha.
+    ///
+    /// Note: these tests are compile-checked only (see task notes) - wasm32
+    /// has no runtime installed on the x86_64 host that authored them.
+    fn make_rgba(rng: &mut XorShiftRng, pixels: usize) -> Vec<u8> {
+        let mut buf = rng.fill_u8(pixels * 4);
+        if let Some(chunk) = buf.first_chunk_mut::<4>() {
+            chunk[3] = 0;
+        }
+        if pixels > 1 {
+            buf[4 + 3] = 255;
+        }
+        buf
+    }
+
+    #[test]
+    fn wasm_premultiply_matches_scalar_reference() {
+        for pixels in [1usize, 4, 17, 256] {
+            let mut rng = XorShiftRng::new(0xA11CE ^ pixels as u64);
+            let src = make_rgba(&mut rng, pixels);
+
+            let mut dst_scalar = vec![0u8; pixels * 4];
+            let mut dst_wasm = vec![0u8; pixels * 4];
+            premultiply_alpha_rgba_row_impl(&mut dst_scalar, &src);
+            wasm_premultiply_alpha_rgba(&mut dst_wasm, &src);
+
+            assert_eq!(
+                dst_scalar, dst_wasm,
+                "{pixels} pixels: WASM premultiply diverges from the scalar reference"
+            );
+        }
+    }
+
+    #[test]
+    fn wasm_unpremultiply_matches_scalar_reference() {
+        for pixels in [1usize, 4, 17, 256] {
+            let mut rng = XorShiftRng::new(0xB0BA ^ pixels as u64);
+            let src = make_rgba(&mut rng, pixels);
+
+            let mut scalar_buf = src.clone();
+            let mut wasm_buf = src;
+            unpremultiply_alpha_rgba_row_impl(&mut scalar_buf);
+            wasm_unpremultiply_alpha_rgba(&mut wasm_buf, WorkloadStrategy::PreferSpeed);
+
+            assert_eq!(
+                scalar_buf, wasm_buf,
+                "{pixels} pixels: WASM unpremultiply diverges from the scalar reference"
+            );
+        }
+    }
+}

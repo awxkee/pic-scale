@@ -263,3 +263,83 @@ fn xconvolve_vertical_rgb_neon_row_f16_impl(
         );
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::f16::convolve_vertical_rgb_native_row_f16;
+    use crate::test_utils::{XorShiftRng, assert_f16_slices_close, make_row_filter_weights_f32};
+
+    // The "full" fp16 path accumulates natively in f16 (`vfmaq_f16`), which
+    // has far fewer significand bits than the scalar f32 accumulation used by
+    // `convolve_vertical_rgb_native_row_f16` (the same scalar fallback
+    // `f16.rs`'s vertical plan uses) - not bit-exact, and needs a looser
+    // tolerance, matching the horizontal fp16 test in `rgb_f16_full.rs`.
+    const ATOL: f32 = 5e-2;
+
+    fn max_source_rows_needed(bounds: &[FilterBounds]) -> usize {
+        bounds.iter().map(|b| b.start + b.size).max().unwrap_or(0)
+    }
+
+    #[test]
+    fn neon_fp16_vertical_matches_scalar_reference() {
+        if !std::arch::is_aarch64_feature_detected!("fp16") {
+            return;
+        }
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_height, out_height) in [(64usize, 37usize), (37, 64), (5, 3)] {
+                let filter_weights =
+                    make_row_filter_weights_f32(resampling, in_height, out_height).unwrap();
+                let needed_rows = max_source_rows_needed(&filter_weights.bounds);
+
+                for &width in &[9usize, 53usize] {
+                    let src_stride = width;
+                    let mut rng = XorShiftRng::new(
+                        0xC0FFEE ^ (in_height as u64) << 32 ^ (out_height as u64) << 16 ^ width as u64,
+                    );
+                    let src = rng.fill_f16_unit(src_stride * needed_rows);
+
+                    for (y, bounds) in filter_weights.bounds.iter().enumerate() {
+                        let filter_offset = y * filter_weights.aligned_size;
+                        let weights = &filter_weights.weights[filter_offset..];
+
+                        let mut dst_scalar = vec![0f16; width];
+                        let mut dst_neon = vec![0f16; width];
+                        convolve_vertical_rgb_native_row_f16(
+                            width,
+                            bounds,
+                            &src,
+                            &mut dst_scalar,
+                            src_stride,
+                            weights,
+                            8,
+                        );
+                        xconvolve_vertical_rgb_neon_row_f16(
+                            width,
+                            bounds,
+                            &src,
+                            &mut dst_neon,
+                            src_stride,
+                            weights,
+                            8,
+                        );
+
+                        assert_f16_slices_close(
+                            &dst_neon,
+                            &dst_scalar,
+                            ATOL,
+                            &format!(
+                                "{resampling:?} {in_height}->{out_height} row {y} width {width}: NEON fp16 vertical"
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

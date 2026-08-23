@@ -329,3 +329,94 @@ fn avx_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8], executor: impl Dis
         executor.disassociate(in_place);
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::WorkloadStrategy;
+    use crate::alpha_handle_u8::{
+        premultiply_alpha_rgba_row_impl, unpremultiply_alpha_rgba_row_impl,
+    };
+    use crate::test_utils::XorShiftRng;
+
+    /// Builds an RGBA8 buffer that mixes alpha == 0, alpha == 255 and fully
+    /// random pixels so both the vectorized bulk path and the scalar tail
+    /// remainder exercise the branches the premultiply/unpremultiply math
+    /// takes on alpha.
+    fn make_rgba(rng: &mut XorShiftRng, pixels: usize) -> Vec<u8> {
+        let mut buf = rng.fill_u8(pixels * 4);
+        if let Some(chunk) = buf.first_chunk_mut::<4>() {
+            chunk[3] = 0;
+        }
+        if pixels > 1 {
+            buf[4 + 3] = 255;
+        }
+        buf
+    }
+
+    #[ignore = "known bug: div_by_255 rounding formula uses +127 instead of +128 on one term, diverges from the scalar reference for part of the u8*u8 product range - see issue"]
+    #[test]
+    fn avx2_premultiply_matches_scalar_reference() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        for pixels in [1usize, 4, 17, 256] {
+            let mut rng = XorShiftRng::new(0xA11CE ^ pixels as u64);
+            let src = make_rgba(&mut rng, pixels);
+
+            let mut dst_scalar = vec![0u8; pixels * 4];
+            let mut dst_avx = vec![0u8; pixels * 4];
+            premultiply_alpha_rgba_row_impl(&mut dst_scalar, &src);
+            avx_premultiply_alpha_rgba(&mut dst_avx, &src);
+
+            assert_eq!(
+                dst_scalar, dst_avx,
+                "{pixels} pixels: AVX2 premultiply diverges from the scalar reference"
+            );
+        }
+    }
+
+    #[ignore = "known bug: uses an approximate reciprocal (_mm_rcp_ps/_mm256_rcp_ps) instead of exact division like the scalar reference - see issue"]
+    #[test]
+    fn avx2_unpremultiply_quality_matches_scalar_reference() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        for pixels in [1usize, 4, 17, 256] {
+            let mut rng = XorShiftRng::new(0xB0BA ^ pixels as u64);
+            let src = make_rgba(&mut rng, pixels);
+
+            let mut scalar_buf = src.clone();
+            let mut avx_buf = src;
+            unpremultiply_alpha_rgba_row_impl(&mut scalar_buf);
+            avx_unpremultiply_alpha_rgba(&mut avx_buf, WorkloadStrategy::PreferQuality);
+
+            assert_eq!(
+                scalar_buf, avx_buf,
+                "{pixels} pixels: AVX2 unpremultiply (PreferQuality) diverges from the scalar reference"
+            );
+        }
+    }
+
+    #[ignore = "known bug: uses an approximate reciprocal (_mm_rcp_ps/_mm256_rcp_ps) instead of exact division like the scalar reference - see issue"]
+    #[test]
+    fn avx2_unpremultiply_speed_matches_scalar_reference() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        for pixels in [1usize, 4, 17, 256] {
+            let mut rng = XorShiftRng::new(0xC0DE ^ pixels as u64);
+            let src = make_rgba(&mut rng, pixels);
+
+            let mut scalar_buf = src.clone();
+            let mut avx_buf = src;
+            unpremultiply_alpha_rgba_row_impl(&mut scalar_buf);
+            avx_unpremultiply_alpha_rgba(&mut avx_buf, WorkloadStrategy::PreferSpeed);
+
+            assert_eq!(
+                scalar_buf, avx_buf,
+                "{pixels} pixels: AVX2 unpremultiply (PreferSpeed) diverges from the scalar reference"
+            );
+        }
+    }
+}

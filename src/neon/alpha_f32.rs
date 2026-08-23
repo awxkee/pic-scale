@@ -159,3 +159,77 @@ fn neon_unpremultiply_alpha_rgba_f32_row(in_place: &mut [f32]) {
 pub(crate) fn neon_unpremultiply_alpha_rgba_f32(in_place: &mut [f32]) {
     unsafe { neon_unpremultiply_alpha_rgba_f32_row(in_place) }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::alpha_handle_f32::{premultiply_rgba_f32_row, unpremultiply_rgba_f32_row};
+    use crate::test_utils::{XorShiftRng, assert_f32_slices_close};
+
+    // Premultiply is a plain per-lane multiply with no reassociation, so it
+    // is bit-exact against the scalar reference. Unpremultiply is not: the
+    // scalar reference computes `1. / a` and then multiplies, while NEON
+    // does a direct division - mathematically the same but rounded
+    // differently, so it can be off by a few ULPs. Random alpha is kept
+    // away from 0 (see `make_rgba`) so that relative error stays small in
+    // absolute terms too.
+    const ATOL: f32 = 1e-4;
+
+    /// Builds an RGBA f32 buffer in `[0, 1)` that mixes alpha == 0, alpha == 1
+    /// and fully random pixels (with random alpha kept away from 0) so both
+    /// the vectorized bulk path and the scalar tail remainder exercise every
+    /// branch the premultiply/unpremultiply math takes on alpha.
+    fn make_rgba(rng: &mut XorShiftRng, pixels: usize) -> Vec<f32> {
+        let mut buf = rng.fill_f32_unit(pixels * 4);
+        for chunk in buf.as_chunks_mut::<4>().0 {
+            chunk[3] = 0.05 + 0.95 * chunk[3];
+        }
+        if let Some(chunk) = buf.first_chunk_mut::<4>() {
+            chunk[3] = 0.;
+        }
+        if pixels > 1 {
+            buf[4 + 3] = 1.;
+        }
+        buf
+    }
+
+    #[test]
+    fn neon_premultiply_matches_scalar_reference() {
+        for pixels in [1usize, 4, 17, 256] {
+            let mut rng = XorShiftRng::new(0xA11CE ^ pixels as u64);
+            let src = make_rgba(&mut rng, pixels);
+
+            let mut dst_scalar = vec![0f32; pixels * 4];
+            let mut dst_neon = vec![0f32; pixels * 4];
+            premultiply_rgba_f32_row(&mut dst_scalar, &src);
+            neon_premultiply_alpha_rgba_f32(&mut dst_neon, &src);
+
+            assert_f32_slices_close(
+                &dst_neon,
+                &dst_scalar,
+                ATOL,
+                &format!("{pixels} pixels: NEON premultiply"),
+            );
+        }
+    }
+
+    #[test]
+    fn neon_unpremultiply_matches_scalar_reference() {
+        for pixels in [1usize, 4, 17, 256] {
+            let mut rng = XorShiftRng::new(0xB0BA ^ pixels as u64);
+            let src = make_rgba(&mut rng, pixels);
+
+            let mut scalar_buf = src.clone();
+            let mut neon_buf = src;
+            unpremultiply_rgba_f32_row(&mut scalar_buf);
+            neon_unpremultiply_alpha_rgba_f32(&mut neon_buf);
+
+            assert_f32_slices_close(
+                &neon_buf,
+                &scalar_buf,
+                ATOL,
+                &format!("{pixels} pixels: NEON unpremultiply"),
+            );
+        }
+    }
+}

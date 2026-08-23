@@ -481,3 +481,170 @@ impl<const AR_TYPE: usize, const AR_ORDER: usize> Row1ExecutionUnit<AR_TYPE, AR_
         }
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::factory::{Ar30ByteOrder, Rgb30};
+    use crate::test_utils::{XorShiftRng, make_row_filter_weights_u8};
+
+    /// AR30 is a packed 10-10-10-2 format with no separate per-channel byte
+    /// layout, so `handler_provider`'s scalar row-convolution reference (which
+    /// operates on flat `u8` channel arrays) doesn't apply here. Rebuild the
+    /// same math directly on top of the crate's own `Rgb30::unpack`/`pack_w_a`,
+    /// using the identical Q15 weights (`support::PRECISION`) and rounding the
+    /// AVX2 kernel uses.
+    fn scalar_reference_ar30_row<const AR_TYPE: usize, const AR_ORDER: usize>(
+        src: &[u8],
+        dst: &mut [u8],
+        filter_weights: &FilterWeights<i16>,
+    ) {
+        const PRECISION: i32 = 15;
+        const ROUNDING: i32 = 1 << (PRECISION - 1);
+        let rgb_type: Rgb30 = AR_TYPE.into();
+
+        for (dst_chunk, (&bounds, weights)) in dst.as_chunks_mut::<4>().0.iter_mut().zip(
+            filter_weights
+                .bounds
+                .iter()
+                .zip(filter_weights.weights.chunks_exact(filter_weights.aligned_size)),
+        ) {
+            let mut acc_r = ROUNDING;
+            let mut acc_g = ROUNDING;
+            let mut acc_b = ROUNDING;
+            for (k, &weight) in weights.iter().enumerate().take(bounds.size) {
+                let w = weight as i32;
+                let px = (bounds.start + k) * 4;
+                let word = u32::from_ne_bytes(src[px..px + 4].try_into().unwrap());
+                let (r, g, b, _a) = rgb_type.unpack::<AR_ORDER>(word);
+                acc_r += r as i32 * w;
+                acc_g += g as i32 * w;
+                acc_b += b as i32 * w;
+            }
+            let r = (acc_r >> PRECISION).clamp(0, 1023);
+            let g = (acc_g >> PRECISION).clamp(0, 1023);
+            let b = (acc_b >> PRECISION).clamp(0, 1023);
+            let packed = rgb_type.pack_w_a::<AR_ORDER>(r, g, b, 3);
+            dst_chunk.copy_from_slice(&packed.to_ne_bytes());
+        }
+    }
+
+    fn make_ar30_src<const AR_ORDER: usize>(
+        rgb_type: Rgb30,
+        rng: &mut XorShiftRng,
+        pixel_count: usize,
+    ) -> Vec<u8> {
+        let components = rng.fill_u16(pixel_count * 3, 1023);
+        let mut out = Vec::with_capacity(pixel_count * 4);
+        for chunk in components.as_chunks::<3>().0 {
+            let packed =
+                rgb_type.pack_w_a::<AR_ORDER>(chunk[0] as i32, chunk[1] as i32, chunk[2] as i32, 3);
+            out.extend_from_slice(&packed.to_ne_bytes());
+        }
+        out
+    }
+
+    fn run_row_test<const AR_TYPE: usize, const AR_ORDER: usize>(label: &str) {
+        let rgb_type: Rgb30 = AR_TYPE.into();
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64), (256, 256), (5, 3)] {
+                let filter_weights =
+                    make_row_filter_weights_u8(resampling, in_size, out_size).unwrap();
+                let mut rng = XorShiftRng::new(0xC0FFEE ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src = make_ar30_src::<AR_ORDER>(rgb_type, &mut rng, in_size);
+
+                let mut dst_scalar = vec![0u8; out_size * 4];
+                let mut dst_avx = vec![0u8; out_size * 4];
+                scalar_reference_ar30_row::<AR_TYPE, AR_ORDER>(
+                    &src,
+                    &mut dst_scalar,
+                    &filter_weights,
+                );
+                avx_convolve_horizontal_rgba_rows_ar30::<AR_TYPE, AR_ORDER>(
+                    &src,
+                    &mut dst_avx,
+                    &filter_weights,
+                    8,
+                );
+
+                assert_eq!(
+                    dst_scalar, dst_avx,
+                    "{label} {resampling:?} {in_size}->{out_size}: AVX2 AR30 single-row output diverges from the scalar reference"
+                );
+            }
+        }
+    }
+
+    fn run_rows_4_test<const AR_TYPE: usize, const AR_ORDER: usize>(label: &str) {
+        let rgb_type: Rgb30 = AR_TYPE.into();
+        const ROWS: usize = 4;
+        for resampling in [ResamplingFunction::Bilinear, ResamplingFunction::Lanczos3] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64)] {
+                let filter_weights =
+                    make_row_filter_weights_u8(resampling, in_size, out_size).unwrap();
+                let mut rng = XorShiftRng::new(0xBADF00D ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src_stride = in_size * 4;
+                let dst_stride = out_size * 4;
+                let src = make_ar30_src::<AR_ORDER>(rgb_type, &mut rng, in_size * ROWS);
+
+                let mut dst_scalar = vec![0u8; dst_stride * ROWS];
+                let mut dst_avx = vec![0u8; dst_stride * ROWS];
+                for row in 0..ROWS {
+                    scalar_reference_ar30_row::<AR_TYPE, AR_ORDER>(
+                        &src[row * src_stride..],
+                        &mut dst_scalar[row * dst_stride..(row + 1) * dst_stride],
+                        &filter_weights,
+                    );
+                }
+                avx_convolve_horizontal_rgba_rows_4_ar30::<AR_TYPE, AR_ORDER>(
+                    &src,
+                    src_stride,
+                    &mut dst_avx,
+                    dst_stride,
+                    &filter_weights,
+                    8,
+                );
+
+                assert_eq!(
+                    dst_scalar, dst_avx,
+                    "{label} {resampling:?} {in_size}->{out_size}: AVX2 AR30 4-row output diverges from the scalar reference"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn avx2_row_matches_scalar_reference() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        run_row_test::<{ Rgb30::Ar30 as usize }, { Ar30ByteOrder::Host as usize }>("AR30 host");
+        run_row_test::<{ Rgb30::Ar30 as usize }, { Ar30ByteOrder::Network as usize }>(
+            "AR30 network",
+        );
+        run_row_test::<{ Rgb30::Ra30 as usize }, { Ar30ByteOrder::Host as usize }>("RA30 host");
+        run_row_test::<{ Rgb30::Ra30 as usize }, { Ar30ByteOrder::Network as usize }>(
+            "RA30 network",
+        );
+    }
+
+    #[test]
+    fn avx2_rows_4_matches_scalar_reference() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        run_rows_4_test::<{ Rgb30::Ar30 as usize }, { Ar30ByteOrder::Host as usize }>("AR30 host");
+        run_rows_4_test::<{ Rgb30::Ar30 as usize }, { Ar30ByteOrder::Network as usize }>(
+            "AR30 network",
+        );
+        run_rows_4_test::<{ Rgb30::Ra30 as usize }, { Ar30ByteOrder::Host as usize }>("RA30 host");
+        run_rows_4_test::<{ Rgb30::Ra30 as usize }, { Ar30ByteOrder::Network as usize }>(
+            "RA30 network",
+        );
+    }
+}

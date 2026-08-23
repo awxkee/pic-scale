@@ -291,3 +291,85 @@ fn convolve_horizontal_rgb_neon_u16_hb_impl(
         }
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::floating_point_horizontal::{
+        convolve_row_handler_floating_point, convolve_row_handler_floating_point_4,
+    };
+    use crate::test_utils::{XorShiftRng, make_row_filter_weights_f32};
+
+    const BIT_DEPTH: u32 = 16;
+
+    #[test]
+    fn neon_row_matches_scalar_reference() {
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64), (256, 256), (5, 3)] {
+                let filter_weights =
+                    make_row_filter_weights_f32(resampling, in_size, out_size).unwrap();
+                let mut rng = XorShiftRng::new(0xC0FFEE ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src = rng.fill_u16(in_size * 3, u16::MAX);
+
+                let mut dst_scalar = vec![0u16; out_size * 3];
+                let mut dst_neon = vec![0u16; out_size * 3];
+                convolve_row_handler_floating_point::<u16, f32, f32, 3>(
+                    &src,
+                    &mut dst_scalar,
+                    &filter_weights,
+                    BIT_DEPTH,
+                );
+                convolve_horizontal_rgb_neon_u16_row_f32(&src, &mut dst_neon, &filter_weights, BIT_DEPTH);
+
+                assert_eq!(
+                    dst_scalar, dst_neon,
+                    "{resampling:?} {in_size}->{out_size}: NEON single-row output diverges from the scalar reference"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn neon_rows_4_matches_scalar_reference() {
+        const ROWS: usize = 4;
+        for resampling in [ResamplingFunction::Bilinear, ResamplingFunction::Lanczos3] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64)] {
+                let filter_weights =
+                    make_row_filter_weights_f32(resampling, in_size, out_size).unwrap();
+                let mut rng = XorShiftRng::new(0xBADF00D ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src_stride = in_size * 3;
+                let dst_stride = out_size * 3;
+                let src = rng.fill_u16(src_stride * ROWS, u16::MAX);
+
+                let mut dst_scalar = vec![0u16; dst_stride * ROWS];
+                let mut dst_neon = vec![0u16; dst_stride * ROWS];
+                convolve_row_handler_floating_point_4::<u16, f32, f32, 3>(
+                    &src,
+                    src_stride,
+                    &mut dst_scalar,
+                    dst_stride,
+                    &filter_weights,
+                    BIT_DEPTH,
+                );
+                convolve_horizontal_rgb_neon_rows_4_u16_f32(
+                    &src,
+                    src_stride,
+                    &mut dst_neon,
+                    dst_stride,
+                    &filter_weights,
+                    BIT_DEPTH,
+                );
+
+                assert_eq!(
+                    dst_scalar, dst_neon,
+                    "{resampling:?} {in_size}->{out_size}: NEON 4-row output diverges from the scalar reference"
+                );
+            }
+        }
+    }
+}

@@ -67,7 +67,7 @@ use crate::{ImageStore, ThreadingPolicy};
 use core::{f16, f32};
 use std::sync::Arc;
 
-fn convolve_horizontal_rgba_4_row_f16<const CN: usize>(
+pub(crate) fn convolve_horizontal_rgba_4_row_f16<const CN: usize>(
     src: &[f16],
     src_stride: usize,
     dst: &mut [f16],
@@ -90,7 +90,7 @@ fn convolve_horizontal_rgba_4_row_f16<const CN: usize>(
     }
 }
 
-fn convolve_horizontal_rgb_native_row_f16<const CN: usize>(
+pub(crate) fn convolve_horizontal_rgb_native_row_f16<const CN: usize>(
     src: &[f16],
     dst: &mut [f16],
     filter_weights: &FilterWeights<f32>,
@@ -183,7 +183,7 @@ impl HorizontalFilterPass<f16, f32, 4> for ImageStore<'_, f16, 4> {
     }
 }
 
-fn convolve_vertical_rgb_native_row_f16(
+pub(crate) fn convolve_vertical_rgb_native_row_f16(
     _: usize,
     bounds: &FilterBounds,
     src: &[f16],

@@ -333,3 +333,111 @@ fn convolve_column_hb_s16_impl(
         }
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::filter_weights::FilterWeights;
+    use crate::math::WeightsGenerator;
+    use crate::test_utils::XorShiftRng;
+
+    // Signed-`i16` counterpart of `src/neon/vertical_u16_hb.rs`: see that
+    // file's test module for why a bespoke scalar reference is needed here
+    // (this Q31 accumulator path is not covered by `column_handler_fixed_point`).
+    fn max_source_rows_needed(bounds: &[FilterBounds]) -> usize {
+        bounds.iter().map(|b| b.start + b.size).max().unwrap_or(0)
+    }
+
+    fn fill_i16(rng: &mut XorShiftRng, len: usize) -> Vec<i16> {
+        rng.fill_u16(len, u16::MAX).into_iter().map(|v| v as i16).collect()
+    }
+
+    fn make_hb_weights(
+        resampling: ResamplingFunction,
+        in_size: usize,
+        out_size: usize,
+    ) -> FilterWeights<i32> {
+        let weights_f32 =
+            <i16 as WeightsGenerator<f32>>::make_weights(resampling, in_size, out_size).unwrap();
+        weights_f32.numerical_approximation::<i32, 31>(0)
+    }
+
+    fn scalar_hb_reference(
+        bounds: &FilterBounds,
+        src: &[i16],
+        dst: &mut [i16],
+        src_stride: usize,
+        weight: &[i32],
+        bit_depth: u32,
+    ) {
+        let max_colors = (1i64 << (bit_depth - 1)) - 1;
+        let min_colors = -(1i64 << (bit_depth - 1));
+        const R: i64 = 1 << 30;
+        for (x, d) in dst.iter_mut().enumerate() {
+            let mut acc: i64 = 0;
+            for (j, &w) in weight[..bounds.size].iter().enumerate() {
+                let py = bounds.start + j;
+                acc += src[src_stride * py + x] as i64 * w as i64;
+            }
+            *d = ((acc + R) >> 31).max(min_colors).min(max_colors) as i16;
+        }
+    }
+
+    #[ignore = "known bug: small (+/-1) fixed-point rounding divergence from the scalar reference, reproducible with Lanczos3 (negative-weight) kernels - see issue"]
+    #[test]
+    fn neon_vertical_hb_matches_scalar_reference() {
+        if !std::arch::is_aarch64_feature_detected!("rdm") {
+            return;
+        }
+        const BIT_DEPTH: u32 = 16;
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_height, out_height) in [(64usize, 37usize), (37, 64), (5, 3)] {
+                let filter_weights = make_hb_weights(resampling, in_height, out_height);
+                let needed_rows = max_source_rows_needed(&filter_weights.bounds);
+
+                for &width in &[9usize, 53usize] {
+                    let src_stride = width;
+                    let mut rng = XorShiftRng::new(
+                        0xC0FFEE ^ (in_height as u64) << 32 ^ (out_height as u64) << 16 ^ width as u64,
+                    );
+                    let src = fill_i16(&mut rng, src_stride * needed_rows);
+
+                    for (y, bounds) in filter_weights.bounds.iter().enumerate() {
+                        let filter_offset = y * filter_weights.aligned_size;
+                        let weights = &filter_weights.weights[filter_offset..];
+
+                        let mut dst_scalar = vec![0i16; width];
+                        let mut dst_neon = vec![0i16; width];
+                        scalar_hb_reference(
+                            bounds,
+                            &src,
+                            &mut dst_scalar,
+                            src_stride,
+                            weights,
+                            BIT_DEPTH,
+                        );
+                        convolve_column_hb_s16(
+                            width,
+                            bounds,
+                            &src,
+                            &mut dst_neon,
+                            src_stride,
+                            weights,
+                            BIT_DEPTH,
+                        );
+
+                        assert_eq!(
+                            dst_scalar, dst_neon,
+                            "{resampling:?} {in_height}->{out_height} row {y} width {width}: NEON vertical hb (s16) output diverges from the scalar reference"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

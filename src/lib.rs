@@ -96,6 +96,8 @@ mod sse;
 mod support;
 #[cfg(all(target_arch = "aarch64", feature = "sve"))]
 mod sve2;
+#[cfg(test)]
+mod test_utils;
 mod threading_policy;
 mod validation;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]

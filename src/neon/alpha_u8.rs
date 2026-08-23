@@ -364,3 +364,63 @@ pub(crate) fn neon_unpremultiply_alpha_rgba(in_place: &mut [u8], _strategy: Work
         _executor(in_place);
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::alpha_handle_u8::{
+        premultiply_alpha_rgba_row_impl, unpremultiply_alpha_rgba_row_impl,
+    };
+    use crate::test_utils::XorShiftRng;
+
+    /// Builds an RGBA8 buffer that mixes alpha == 0, alpha == 255 and fully
+    /// random pixels so both the vectorized bulk path and the scalar tail
+    /// remainder exercise the branches the premultiply/unpremultiply math
+    /// takes on alpha.
+    fn make_rgba(rng: &mut XorShiftRng, pixels: usize) -> Vec<u8> {
+        let mut buf = rng.fill_u8(pixels * 4);
+        if let Some(chunk) = buf.first_chunk_mut::<4>() {
+            chunk[3] = 0;
+        }
+        if pixels > 1 {
+            buf[4 + 3] = 255;
+        }
+        buf
+    }
+
+    #[test]
+    fn neon_premultiply_matches_scalar_reference() {
+        for pixels in [1usize, 4, 17, 256] {
+            let mut rng = XorShiftRng::new(0xA11CE ^ pixels as u64);
+            let src = make_rgba(&mut rng, pixels);
+
+            let mut dst_scalar = vec![0u8; pixels * 4];
+            let mut dst_neon = vec![0u8; pixels * 4];
+            premultiply_alpha_rgba_row_impl(&mut dst_scalar, &src);
+            neon_premultiply_alpha_rgba(&mut dst_neon, &src);
+
+            assert_eq!(
+                dst_scalar, dst_neon,
+                "{pixels} pixels: NEON premultiply diverges from the scalar reference"
+            );
+        }
+    }
+
+    #[test]
+    fn neon_unpremultiply_matches_scalar_reference() {
+        for pixels in [1usize, 4, 17, 256] {
+            let mut rng = XorShiftRng::new(0xB0BA ^ pixels as u64);
+            let src = make_rgba(&mut rng, pixels);
+
+            let mut scalar_buf = src.clone();
+            let mut neon_buf = src;
+            unpremultiply_alpha_rgba_row_impl(&mut scalar_buf);
+            neon_unpremultiply_alpha_rgba(&mut neon_buf, WorkloadStrategy::PreferSpeed);
+
+            assert_eq!(
+                scalar_buf, neon_buf,
+                "{pixels} pixels: NEON unpremultiply diverges from the scalar reference"
+            );
+        }
+    }
+}

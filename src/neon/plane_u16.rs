@@ -301,3 +301,87 @@ fn convolve_horizontal_plane_neon_f32_u16_impl(
         }
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::floating_point_horizontal::{
+        convolve_row_handler_floating_point, convolve_row_handler_floating_point_4,
+    };
+    use crate::test_utils::{XorShiftRng, make_row_filter_weights_f32};
+
+    #[ignore = "known bug: small (+/-1) fixed-point rounding divergence from the scalar reference, reproducible with Lanczos3 (negative-weight) kernels - see issue"]
+    #[test]
+    fn neon_row_matches_scalar_reference() {
+        const CN: usize = 1;
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64), (256, 256), (5, 3)] {
+                let filter_weights =
+                    make_row_filter_weights_f32(resampling, in_size, out_size).unwrap();
+                let mut rng = XorShiftRng::new(0xC0FFEE ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src = rng.fill_u16(in_size * CN, u16::MAX);
+
+                let mut dst_scalar = vec![0u16; out_size * CN];
+                let mut dst_neon = vec![0u16; out_size * CN];
+                convolve_row_handler_floating_point::<u16, f32, f32, CN>(
+                    &src,
+                    &mut dst_scalar,
+                    &filter_weights,
+                    16,
+                );
+                convolve_horizontal_plane_neon_f32_u16_row(&src, &mut dst_neon, &filter_weights, 16);
+
+                assert_eq!(
+                    dst_scalar, dst_neon,
+                    "{resampling:?} {in_size}->{out_size}: NEON single-row output diverges from the scalar reference"
+                );
+            }
+        }
+    }
+
+    #[ignore = "known bug: small (+/-1) fixed-point rounding divergence from the scalar reference, reproducible with Lanczos3 (negative-weight) kernels - see issue"]
+    #[test]
+    fn neon_rows_4_matches_scalar_reference() {
+        const CN: usize = 1;
+        const ROWS: usize = 4;
+        for resampling in [ResamplingFunction::Bilinear, ResamplingFunction::Lanczos3] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64)] {
+                let filter_weights =
+                    make_row_filter_weights_f32(resampling, in_size, out_size).unwrap();
+                let mut rng = XorShiftRng::new(0xBADF00D ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src_stride = in_size * CN;
+                let dst_stride = out_size * CN;
+                let src = rng.fill_u16(src_stride * ROWS, u16::MAX);
+
+                let mut dst_scalar = vec![0u16; dst_stride * ROWS];
+                let mut dst_neon = vec![0u16; dst_stride * ROWS];
+                convolve_row_handler_floating_point_4::<u16, f32, f32, CN>(
+                    &src,
+                    src_stride,
+                    &mut dst_scalar,
+                    dst_stride,
+                    &filter_weights,
+                    16,
+                );
+                convolve_horizontal_plane_neon_rows_4_f32_u16(
+                    &src,
+                    src_stride,
+                    &mut dst_neon,
+                    dst_stride,
+                    &filter_weights,
+                    16,
+                );
+
+                assert_eq!(
+                    dst_scalar, dst_neon,
+                    "{resampling:?} {in_size}->{out_size}: NEON 4-row output diverges from the scalar reference"
+                );
+            }
+        }
+    }
+}

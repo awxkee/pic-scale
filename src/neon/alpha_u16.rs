@@ -470,3 +470,67 @@ fn neon_unpremultiply_alpha_rgba_row_u16(in_place: &mut [u16], bit_depth: usize)
 pub(crate) fn neon_unpremultiply_alpha_rgba_u16(in_place: &mut [u16], bit_depth: usize) {
     neon_unpremultiply_alpha_rgba_row_u16(in_place, bit_depth);
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::alpha_handle_u16::{premultiply_alpha_rgba_row, unpremultiply_alpha_rgba_row};
+    use crate::test_utils::XorShiftRng;
+
+    /// Builds an RGBA16 buffer (values clamped to `bit_depth`) that mixes
+    /// alpha == 0, alpha == max and fully random pixels, so both the
+    /// vectorized bulk path and the scalar tail remainder exercise every
+    /// branch the premultiply/unpremultiply math takes on alpha.
+    fn make_rgba(rng: &mut XorShiftRng, pixels: usize, bit_depth: usize) -> Vec<u16> {
+        let max_colors = ((1u32 << bit_depth) - 1) as u16;
+        let mut buf = rng.fill_u16(pixels * 4, max_colors);
+        if let Some(chunk) = buf.first_chunk_mut::<4>() {
+            chunk[3] = 0;
+        }
+        if pixels > 1 {
+            buf[4 + 3] = max_colors;
+        }
+        buf
+    }
+
+    #[test]
+    fn neon_premultiply_matches_scalar_reference() {
+        for bit_depth in [10usize, 12, 16, 14] {
+            for pixels in [1usize, 4, 17, 256] {
+                let mut rng = XorShiftRng::new(0xA11CE ^ (bit_depth as u64) << 32 ^ pixels as u64);
+                let src = make_rgba(&mut rng, pixels, bit_depth);
+
+                let mut dst_scalar = vec![0u16; pixels * 4];
+                let mut dst_neon = vec![0u16; pixels * 4];
+                premultiply_alpha_rgba_row(&mut dst_scalar, &src, bit_depth);
+                neon_premultiply_alpha_rgba_u16(&mut dst_neon, &src, bit_depth);
+
+                assert_eq!(
+                    dst_scalar, dst_neon,
+                    "bit_depth {bit_depth}, {pixels} pixels: NEON premultiply diverges from the scalar reference"
+                );
+            }
+        }
+    }
+
+    #[ignore = "known bug: zeroes RGB when alpha==0, but the scalar u16 unpremultiply path leaves RGB untouched in that case (u8 scalar path does zero it - inconsistent across bit depths) - see issue"]
+    #[test]
+    fn neon_unpremultiply_matches_scalar_reference() {
+        for bit_depth in [10usize, 12, 16, 14] {
+            for pixels in [1usize, 4, 17, 256] {
+                let mut rng = XorShiftRng::new(0xB0BA ^ (bit_depth as u64) << 32 ^ pixels as u64);
+                let src = make_rgba(&mut rng, pixels, bit_depth);
+
+                let mut scalar_buf = src.clone();
+                let mut neon_buf = src;
+                unpremultiply_alpha_rgba_row(&mut scalar_buf, bit_depth);
+                neon_unpremultiply_alpha_rgba_u16(&mut neon_buf, bit_depth);
+
+                assert_eq!(
+                    scalar_buf, neon_buf,
+                    "bit_depth {bit_depth}, {pixels} pixels: NEON unpremultiply diverges from the scalar reference"
+                );
+            }
+        }
+    }
+}

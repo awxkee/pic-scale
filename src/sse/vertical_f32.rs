@@ -335,3 +335,87 @@ fn convolve_vertical_rgb_sse_row_f32_impl<const FMA: bool>(
         cx += 1;
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::floating_point_vertical::column_handler_floating_point;
+    use crate::test_utils::{XorShiftRng, assert_f32_slices_close, make_row_filter_weights_f32};
+
+    // SSE only has a single dispatch path here (no runtime FMA selection - see
+    // `convolve_vertical_rgb_sse_row_f32_regular` always instantiating
+    // `FMA = false`), and each lane accumulates one weighted row at a time in
+    // the same order as the scalar loop, so this backend is bit-exact.
+    const ATOL: f32 = 0.0;
+
+    #[test]
+    fn sse_vertical_matches_scalar_reference() {
+        if !is_x86_feature_detected!("sse4.1") {
+            return;
+        }
+        run_vertical_comparison(convolve_vertical_rgb_sse_row_f32, "SSE");
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn run_vertical_comparison(
+        simd_fn: fn(usize, &FilterBounds, &[f32], &mut [f32], usize, &[f32], u32),
+        label: &str,
+    ) {
+        // Row widths chosen to be multiples of 1 (plane), 3 (rgb) and 4 (rgba)
+        // pixels, plus a couple of odd sizes so every SIMD tail-loop width
+        // (24/16/8/4/1 lanes) gets exercised at least once.
+        const ROW_WIDTHS: [usize; 7] = [1, 3, 4, 39, 99, 160, 41];
+
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_height, out_height) in [(64usize, 37usize), (37, 64), (5, 3)] {
+                let filter_weights =
+                    make_row_filter_weights_f32(resampling, in_height, out_height).unwrap();
+
+                for &row_width in ROW_WIDTHS.iter() {
+                    let src_stride = row_width;
+                    let mut rng = XorShiftRng::new(
+                        0xC0FFEE
+                            ^ (in_height as u64) << 32
+                            ^ (out_height as u64) << 16
+                            ^ row_width as u64,
+                    );
+                    let src = rng.fill_f32_unit(src_stride * in_height);
+
+                    for y in 0..out_height {
+                        let bounds = filter_weights.bounds[y];
+                        let filter_offset = y * filter_weights.aligned_size;
+                        let weights = &filter_weights.weights[filter_offset..];
+
+                        let mut dst_scalar = vec![0f32; row_width];
+                        let mut dst_simd = vec![0f32; row_width];
+
+                        column_handler_floating_point::<f32, f32, f32>(
+                            0,
+                            &bounds,
+                            &src,
+                            &mut dst_scalar,
+                            src_stride,
+                            weights,
+                            8,
+                        );
+                        simd_fn(row_width, &bounds, &src, &mut dst_simd, src_stride, weights, 8);
+
+                        assert_f32_slices_close(
+                            &dst_simd,
+                            &dst_scalar,
+                            ATOL,
+                            &format!(
+                                "{resampling:?} {in_height}->{out_height} row {y} width {row_width}: {label}"
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

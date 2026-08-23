@@ -319,3 +319,103 @@ fn convolve_vertical_avx_row_f16_impl<const FMA: bool>(
         cx += 1;
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::f16::convolve_vertical_rgb_native_row_f16;
+    use crate::test_utils::{XorShiftRng, assert_f16_slices_close, make_row_filter_weights_f32};
+
+    // The scalar reference widens `f16` to `f32`, convolves, then narrows
+    // back; the AVX2 backend does the same via `f16c` `vcvtph2ps`/`vcvtps2ph`
+    // but accumulates in 8/16/32-wide chunks (and fuses multiply+add for the
+    // FMA variant), reordering relative to the scalar loop's strictly
+    // sequential multiply-then-add. `1e-5` (the `f32`-accumulator tolerance)
+    // is too tight once the result is narrowed to `f16`: a single ULP at the
+    // `f16` mantissa's precision near typical test values (~0.4) is already
+    // ~2.4e-4, so match the `1e-3` tolerance used by the existing f16
+    // horizontal comparison tests (e.g. `avx2/rgba_f16.rs`).
+    const ATOL: f32 = 1e-3;
+
+    #[test]
+    fn avx2_f16_default_vertical_matches_scalar_reference() {
+        if !(is_x86_feature_detected!("avx2") && is_x86_feature_detected!("f16c")) {
+            return;
+        }
+        run_vertical_comparison(convolve_vertical_avx_row_f16::<false>, "AVX2 f16 default");
+    }
+
+    #[test]
+    fn avx2_f16_fma_vertical_matches_scalar_reference() {
+        if !(is_x86_feature_detected!("avx2")
+            && is_x86_feature_detected!("f16c")
+            && is_x86_feature_detected!("fma"))
+        {
+            return;
+        }
+        run_vertical_comparison(convolve_vertical_avx_row_f16::<true>, "AVX2 f16 FMA");
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn run_vertical_comparison(
+        simd_fn: fn(usize, &FilterBounds, &[f16], &mut [f16], usize, &[f32], u32),
+        label: &str,
+    ) {
+        // Row widths chosen to be multiples of 1 (plane), 3 (rgb) and 4 (rgba)
+        // pixels, plus a couple of odd sizes so every SIMD tail-loop width
+        // (32/16/4/1 lanes) gets exercised at least once.
+        const ROW_WIDTHS: [usize; 7] = [1, 3, 4, 39, 99, 160, 41];
+
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_height, out_height) in [(64usize, 37usize), (37, 64), (5, 3)] {
+                let filter_weights =
+                    make_row_filter_weights_f32(resampling, in_height, out_height).unwrap();
+
+                for &row_width in ROW_WIDTHS.iter() {
+                    let src_stride = row_width;
+                    let mut rng = XorShiftRng::new(
+                        0xC0FFEE
+                            ^ (in_height as u64) << 32
+                            ^ (out_height as u64) << 16
+                            ^ row_width as u64,
+                    );
+                    let src = rng.fill_f16_unit(src_stride * in_height);
+
+                    for y in 0..out_height {
+                        let bounds = filter_weights.bounds[y];
+                        let filter_offset = y * filter_weights.aligned_size;
+                        let weights = &filter_weights.weights[filter_offset..];
+
+                        let mut dst_scalar = vec![0f16; row_width];
+                        let mut dst_simd = vec![0f16; row_width];
+
+                        convolve_vertical_rgb_native_row_f16(
+                            0,
+                            &bounds,
+                            &src,
+                            &mut dst_scalar,
+                            src_stride,
+                            weights,
+                            8,
+                        );
+                        simd_fn(row_width, &bounds, &src, &mut dst_simd, src_stride, weights, 8);
+
+                        assert_f16_slices_close(
+                            &dst_simd,
+                            &dst_scalar,
+                            ATOL,
+                            &format!(
+                                "{resampling:?} {in_height}->{out_height} row {y} width {row_width}: {label}"
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

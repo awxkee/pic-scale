@@ -193,3 +193,106 @@ pub(crate) fn convolve_horizontal_plane_neon_rows_4_f32_f64(
         }
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::PicScaleError;
+    use crate::ResamplingFunction;
+    use crate::convolve_naive_f32::{
+        convolve_horizontal_4_row_f32_f64, convolve_horizontal_native_row_f32_f64,
+    };
+    use crate::math::WeightsGenerator;
+    use crate::test_utils::{XorShiftRng, assert_f32_slices_close};
+
+    /// See the identical helper in `src/avx2/plane_f32_f64.rs` - `PreferQuality`
+    /// weights are `f64`, which `test_utils` doesn't build a helper for.
+    fn make_row_filter_weights_f64(
+        resampling: ResamplingFunction,
+        in_size: usize,
+        out_size: usize,
+    ) -> Result<FilterWeights<f64>, PicScaleError> {
+        <f32 as WeightsGenerator<f64>>::make_weights(resampling, in_size, out_size)
+    }
+
+    const ATOL: f32 = 1e-5;
+
+    #[test]
+    fn neon_row_matches_scalar_reference() {
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64), (256, 256), (5, 3)] {
+                let filter_weights =
+                    make_row_filter_weights_f64(resampling, in_size, out_size).unwrap();
+                let mut rng = XorShiftRng::new(0xC0FFEE ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src = rng.fill_f32_unit(in_size);
+
+                let mut dst_scalar = vec![0f32; out_size];
+                let mut dst_neon = vec![0f32; out_size];
+                convolve_horizontal_native_row_f32_f64::<1>(
+                    &src,
+                    &mut dst_scalar,
+                    &filter_weights,
+                    8,
+                );
+                convolve_horizontal_plane_neon_row_one_f32_f64(
+                    &src,
+                    &mut dst_neon,
+                    &filter_weights,
+                    8,
+                );
+
+                assert_f32_slices_close(
+                    &dst_neon,
+                    &dst_scalar,
+                    ATOL,
+                    &format!("{resampling:?} {in_size}->{out_size}: NEON plane f32/f64 single-row"),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn neon_rows_4_matches_scalar_reference() {
+        const ROWS: usize = 4;
+        for resampling in [ResamplingFunction::Bilinear, ResamplingFunction::Lanczos3] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64)] {
+                let filter_weights =
+                    make_row_filter_weights_f64(resampling, in_size, out_size).unwrap();
+                let mut rng = XorShiftRng::new(0xBADF00D ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src_stride = in_size;
+                let dst_stride = out_size;
+                let src = rng.fill_f32_unit(src_stride * ROWS);
+
+                let mut dst_scalar = vec![0f32; dst_stride * ROWS];
+                let mut dst_neon = vec![0f32; dst_stride * ROWS];
+                convolve_horizontal_4_row_f32_f64::<1>(
+                    &src,
+                    src_stride,
+                    &mut dst_scalar,
+                    dst_stride,
+                    &filter_weights,
+                    8,
+                );
+                convolve_horizontal_plane_neon_rows_4_f32_f64(
+                    &src,
+                    src_stride,
+                    &mut dst_neon,
+                    dst_stride,
+                    &filter_weights,
+                    8,
+                );
+
+                assert_f32_slices_close(
+                    &dst_neon,
+                    &dst_scalar,
+                    ATOL,
+                    &format!("{resampling:?} {in_size}->{out_size}: NEON plane f32/f64 4-row"),
+                );
+            }
+        }
+    }
+}

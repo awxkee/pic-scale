@@ -582,3 +582,115 @@ impl<const FMA: bool> OneRowExecutionUnit<FMA> {
         }
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::convolve_naive_f32::{convolve_horizontal_native_row_f32, convolve_horizontal_rgba_4_row_f32};
+    use crate::test_utils::{XorShiftRng, assert_f32_slices_close, make_row_filter_weights_f32};
+
+    // AVX2 packs two taps per 256-bit register and reduces the two 128-bit
+    // halves at the end, and the FMA variant fuses multiply+add - both reorder
+    // and re-round relative to the scalar loop's strictly sequential
+    // multiply-then-add, so a small tolerance (not bit-exact) is expected here.
+    const ATOL: f32 = 1e-5;
+
+    #[test]
+    fn avx2_default_row_matches_scalar_reference() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        run_row_comparison(convolve_horizontal_rgba_avx_row_one_f32_default, "AVX2 default");
+    }
+
+    #[test]
+    fn avx2_fma_row_matches_scalar_reference() {
+        if !(is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma")) {
+            return;
+        }
+        run_row_comparison(convolve_horizontal_rgba_avx_row_one_f32_fma, "AVX2 FMA");
+    }
+
+    fn run_row_comparison(
+        simd_fn: fn(&[f32], &mut [f32], &FilterWeights<f32>, u32),
+        label: &str,
+    ) {
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64), (256, 256), (5, 3)] {
+                let filter_weights =
+                    make_row_filter_weights_f32(resampling, in_size, out_size).unwrap();
+                let mut rng = XorShiftRng::new(0xC0FFEE ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src = rng.fill_f32_unit(in_size * 4);
+
+                let mut dst_scalar = vec![0f32; out_size * 4];
+                let mut dst_simd = vec![0f32; out_size * 4];
+                convolve_horizontal_native_row_f32::<4>(&src, &mut dst_scalar, &filter_weights, 8);
+                simd_fn(&src, &mut dst_simd, &filter_weights, 8);
+
+                assert_f32_slices_close(
+                    &dst_simd,
+                    &dst_scalar,
+                    ATOL,
+                    &format!("{resampling:?} {in_size}->{out_size}: {label} single-row"),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn avx2_default_rows_4_matches_scalar_reference() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        run_rows_4_comparison(convolve_horizontal_rgba_avx_rows_4_f32_default, "AVX2 default");
+    }
+
+    #[test]
+    fn avx2_fma_rows_4_matches_scalar_reference() {
+        if !(is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma")) {
+            return;
+        }
+        run_rows_4_comparison(convolve_horizontal_rgba_avx_rows_4_f32_fma, "AVX2 FMA");
+    }
+
+    fn run_rows_4_comparison(
+        simd_fn: fn(&[f32], usize, &mut [f32], usize, &FilterWeights<f32>, u32),
+        label: &str,
+    ) {
+        const ROWS: usize = 4;
+        for resampling in [ResamplingFunction::Bilinear, ResamplingFunction::Lanczos3] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64)] {
+                let filter_weights =
+                    make_row_filter_weights_f32(resampling, in_size, out_size).unwrap();
+                let mut rng = XorShiftRng::new(0xBADF00D ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src_stride = in_size * 4;
+                let dst_stride = out_size * 4;
+                let src = rng.fill_f32_unit(src_stride * ROWS);
+
+                let mut dst_scalar = vec![0f32; dst_stride * ROWS];
+                let mut dst_simd = vec![0f32; dst_stride * ROWS];
+                convolve_horizontal_rgba_4_row_f32::<4>(
+                    &src,
+                    src_stride,
+                    &mut dst_scalar,
+                    dst_stride,
+                    &filter_weights,
+                    8,
+                );
+                simd_fn(&src, src_stride, &mut dst_simd, dst_stride, &filter_weights, 8);
+
+                assert_f32_slices_close(
+                    &dst_simd,
+                    &dst_scalar,
+                    ATOL,
+                    &format!("{resampling:?} {in_size}->{out_size}: {label} 4-row"),
+                );
+            }
+        }
+    }
+}

@@ -255,3 +255,115 @@ pub(crate) fn convolve_horizontal_plane_neon_i16_lb_row(
         }
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::PicScaleError;
+    use crate::ResamplingFunction;
+    use crate::filter_weights::FilterWeights;
+    use crate::fixed_point_horizontal::{
+        convolve_row_handler_fixed_point, convolve_row_handler_fixed_point_4,
+    };
+    use crate::math::WeightsGenerator;
+    use crate::support::PRECISION;
+    use crate::test_utils::XorShiftRng;
+
+    const BIT_DEPTH: u32 = 10;
+
+    fn make_row_filter_weights_i16(
+        resampling: ResamplingFunction,
+        in_size: usize,
+        out_size: usize,
+    ) -> Result<FilterWeights<i16>, PicScaleError> {
+        let weights_f32 = <i16 as WeightsGenerator<f32>>::make_weights(resampling, in_size, out_size)?;
+        Ok(weights_f32.numerical_approximation::<i16, PRECISION>(0))
+    }
+
+    /// Signed source pixels centered near zero within `bit_depth`'s signed
+    /// range, matching how `i16` plane data is actually represented.
+    fn fill_i16_signed(rng: &mut XorShiftRng, len: usize, bit_depth: u32) -> Vec<i16> {
+        let max_unsigned = (1u16 << bit_depth) - 1;
+        rng.fill_u16(len, max_unsigned)
+            .into_iter()
+            .map(|v| (v as i32 - (1i32 << (bit_depth - 1))) as i16)
+            .collect()
+    }
+
+    #[test]
+    fn neon_row_matches_scalar_reference() {
+        const CN: usize = 1;
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64), (256, 256), (5, 3)] {
+                let filter_weights =
+                    make_row_filter_weights_i16(resampling, in_size, out_size).unwrap();
+                let mut rng = XorShiftRng::new(0xC0FFEE ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src = fill_i16_signed(&mut rng, in_size * CN, BIT_DEPTH);
+
+                let mut dst_scalar = vec![0i16; out_size * CN];
+                let mut dst_neon = vec![0i16; out_size * CN];
+                convolve_row_handler_fixed_point::<i16, i32, CN>(
+                    &src,
+                    &mut dst_scalar,
+                    &filter_weights,
+                    BIT_DEPTH,
+                );
+                convolve_horizontal_plane_neon_i16_lb_row(
+                    &src,
+                    &mut dst_neon,
+                    &filter_weights,
+                    BIT_DEPTH,
+                );
+
+                assert_eq!(
+                    dst_scalar, dst_neon,
+                    "{resampling:?} {in_size}->{out_size}: NEON single-row output diverges from the scalar reference"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn neon_rows_4_matches_scalar_reference() {
+        const CN: usize = 1;
+        const ROWS: usize = 4;
+        for resampling in [ResamplingFunction::Bilinear, ResamplingFunction::Lanczos3] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64)] {
+                let filter_weights =
+                    make_row_filter_weights_i16(resampling, in_size, out_size).unwrap();
+                let mut rng = XorShiftRng::new(0xBADF00D ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src_stride = in_size * CN;
+                let dst_stride = out_size * CN;
+                let src = fill_i16_signed(&mut rng, src_stride * ROWS, BIT_DEPTH);
+
+                let mut dst_scalar = vec![0i16; dst_stride * ROWS];
+                let mut dst_neon = vec![0i16; dst_stride * ROWS];
+                convolve_row_handler_fixed_point_4::<i16, i32, CN>(
+                    &src,
+                    src_stride,
+                    &mut dst_scalar,
+                    dst_stride,
+                    &filter_weights,
+                    BIT_DEPTH,
+                );
+                convolve_horizontal_plane_neon_rows_4_lb_i16(
+                    &src,
+                    src_stride,
+                    &mut dst_neon,
+                    dst_stride,
+                    &filter_weights,
+                    BIT_DEPTH,
+                );
+
+                assert_eq!(
+                    dst_scalar, dst_neon,
+                    "{resampling:?} {in_size}->{out_size}: NEON 4-row output diverges from the scalar reference"
+                );
+            }
+        }
+    }
+}

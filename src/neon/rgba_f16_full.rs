@@ -355,3 +355,96 @@ fn xconvolve_horizontal_rgba_neon_rows_4_f16_impl(
         }
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::f16::{convolve_horizontal_rgb_native_row_f16, convolve_horizontal_rgba_4_row_f16};
+    use crate::test_utils::{XorShiftRng, assert_f16_slices_close, make_row_filter_weights_f32};
+
+    // The "full" fp16 path accumulates natively in f16 (`vfma_f16`), which has
+    // far fewer significand bits than the scalar f32 accumulation - not
+    // bit-exact, and needs a looser tolerance than the f32-accumulating paths.
+    const ATOL: f32 = 5e-2;
+
+    #[test]
+    fn neon_fp16_row_matches_scalar_reference() {
+        if !std::arch::is_aarch64_feature_detected!("fp16") {
+            return;
+        }
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64), (256, 256), (5, 3)] {
+                let filter_weights =
+                    make_row_filter_weights_f32(resampling, in_size, out_size).unwrap();
+                let mut rng = XorShiftRng::new(0xC0FFEE ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src = rng.fill_f16_unit(in_size * 4);
+
+                let mut dst_scalar = vec![0f16; out_size * 4];
+                let mut dst_neon = vec![0f16; out_size * 4];
+                convolve_horizontal_rgb_native_row_f16::<4>(
+                    &src,
+                    &mut dst_scalar,
+                    &filter_weights,
+                    8,
+                );
+                xconvolve_horizontal_rgba_neon_row_one_f16(&src, &mut dst_neon, &filter_weights, 8);
+
+                assert_f16_slices_close(
+                    &dst_neon,
+                    &dst_scalar,
+                    ATOL,
+                    &format!("{resampling:?} {in_size}->{out_size}: NEON fp16 f16 single-row"),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn neon_fp16_rows_4_matches_scalar_reference() {
+        if !std::arch::is_aarch64_feature_detected!("fp16") {
+            return;
+        }
+        const ROWS: usize = 4;
+        for resampling in [ResamplingFunction::Bilinear, ResamplingFunction::Lanczos3] {
+            for (in_size, out_size) in [(64usize, 37usize), (37, 64)] {
+                let filter_weights =
+                    make_row_filter_weights_f32(resampling, in_size, out_size).unwrap();
+                let mut rng = XorShiftRng::new(0xBADF00D ^ (in_size as u64) << 32 ^ out_size as u64);
+                let src_stride = in_size * 4;
+                let dst_stride = out_size * 4;
+                let src = rng.fill_f16_unit(src_stride * ROWS);
+
+                let mut dst_scalar = vec![0f16; dst_stride * ROWS];
+                let mut dst_neon = vec![0f16; dst_stride * ROWS];
+                convolve_horizontal_rgba_4_row_f16::<4>(
+                    &src,
+                    src_stride,
+                    &mut dst_scalar,
+                    dst_stride,
+                    &filter_weights,
+                    8,
+                );
+                xconvolve_horizontal_rgba_neon_rows_4_f16(
+                    &src,
+                    src_stride,
+                    &mut dst_neon,
+                    dst_stride,
+                    &filter_weights,
+                    8,
+                );
+
+                assert_f16_slices_close(
+                    &dst_neon,
+                    &dst_scalar,
+                    ATOL,
+                    &format!("{resampling:?} {in_size}->{out_size}: NEON fp16 f16 4-row"),
+                );
+            }
+        }
+    }
+}

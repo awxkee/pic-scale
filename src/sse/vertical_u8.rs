@@ -357,3 +357,76 @@ fn convolve_vertical_sse_row_impl(
         cx += 1;
     }
 }
+
+#[cfg(test)]
+mod backend_comparison_tests {
+    use super::*;
+    use crate::ResamplingFunction;
+    use crate::handler_provider::handle_fixed_column_u8;
+    use crate::test_utils::{XorShiftRng, make_row_filter_weights_u8};
+
+    // Same idea as the horizontal backend-comparison tests (see
+    // `src/sse/rgba_u8.rs`), but for the vertical (column) pass: for every
+    // output row the accelerated function must agree bit-for-bit with the
+    // portable fixed-point scalar fallback given identical weights and bounds.
+    fn max_source_rows_needed(bounds: &[FilterBounds]) -> usize {
+        bounds.iter().map(|b| b.start + b.size).max().unwrap_or(0)
+    }
+
+    #[test]
+    fn sse_vertical_matches_scalar_reference() {
+        if !is_x86_feature_detected!("sse4.1") {
+            return;
+        }
+        for resampling in [
+            ResamplingFunction::Bilinear,
+            ResamplingFunction::Lanczos3,
+            ResamplingFunction::Nearest,
+        ] {
+            for (in_height, out_height) in [(64usize, 37usize), (37, 64), (5, 3)] {
+                let filter_weights =
+                    make_row_filter_weights_u8(resampling, in_height, out_height).unwrap();
+                let needed_rows = max_source_rows_needed(&filter_weights.bounds);
+
+                for &width in &[13usize, 131usize] {
+                    let src_stride = width;
+                    let mut rng = XorShiftRng::new(
+                        0xC0FFEE ^ (in_height as u64) << 32 ^ (out_height as u64) << 16 ^ width as u64,
+                    );
+                    let src = rng.fill_u8(src_stride * needed_rows);
+
+                    for (y, bounds) in filter_weights.bounds.iter().enumerate() {
+                        let filter_offset = y * filter_weights.aligned_size;
+                        let weights = &filter_weights.weights[filter_offset..];
+
+                        let mut dst_scalar = vec![0u8; width];
+                        let mut dst_sse = vec![0u8; width];
+                        handle_fixed_column_u8(
+                            width,
+                            bounds,
+                            &src,
+                            &mut dst_scalar,
+                            src_stride,
+                            weights,
+                            8,
+                        );
+                        convolve_vertical_sse_row(
+                            width,
+                            bounds,
+                            &src,
+                            &mut dst_sse,
+                            src_stride,
+                            weights,
+                            8,
+                        );
+
+                        assert_eq!(
+                            dst_scalar, dst_sse,
+                            "{resampling:?} {in_height}->{out_height} row {y} width {width}: SSE vertical output diverges from the scalar reference"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
