@@ -33,8 +33,9 @@ const require = createRequire(import.meta.url)
 
 const {Image} = require('./pic_scale.node')
 
-const img = await Image.open('../assets/digital_art_portrait2.jpg')
+const img = await Image.open('../assets/banner2.avif')
 console.log(`Loaded: ${img.width}x${img.height}, ${img.channels}ch`)
+await img.save('out.png', {quality: 60})
 
 // ── resize — cover mode, lanczos, auto-orient + keep ICC/EXIF ────────────────
 const small = await img.resize(img.width / 2, img.height / 2, {
