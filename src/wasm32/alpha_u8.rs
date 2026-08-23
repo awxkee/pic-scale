@@ -73,8 +73,8 @@ fn unpremultiply_vec(pixel: v128, alpha: v128) -> v128 {
 #[inline]
 #[target_feature(enable = "simd128")]
 pub(crate) fn wasm_u16x8_div_by_255(v: v128) -> v128 {
-    let addition = u16x8_splat(127);
-    u16x8_shr(u16x8_add(u16x8_add(v, addition), u16x8_shr(v, 8)), 8)
+    let biased = u16x8_add(v, u16x8_splat(128));
+    u16x8_shr(u16x8_add(biased, u16x8_shr(biased, 8)), 8)
 }
 
 #[inline]
