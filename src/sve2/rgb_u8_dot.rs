@@ -111,13 +111,17 @@ fn convolve_horizontal_rgb_neon_rows_4_impl(
             let w_ptr = unsafe { weights.get_unchecked(jx..) };
             let w_ld = unsafe { svld1_s8(pg4, w_ptr.as_ptr()) };
 
-            let rgb_pixel0 = unsafe { svld1_u8(pg12, src0.get_unchecked(bounds_start * CN)) };
-            let rgb_pixel1 = unsafe { svld1_u8(pg12, src1.get_unchecked(bounds_start * CN)) };
+            let rgb_pixel0 =
+                unsafe { svld1_u8(pg12, src0.get_unchecked(bounds_start * CN..).as_ptr()) };
+            let rgb_pixel1 =
+                unsafe { svld1_u8(pg12, src1.get_unchecked(bounds_start * CN..).as_ptr()) };
 
             let vw = svtbl_s8(w_ld, v_weights);
 
-            let rgb_pixel2 = unsafe { svld1_u8(pg12, src2.get_unchecked(bounds_start * CN)) };
-            let rgb_pixel3 = unsafe { svld1_u8(pg12, src3.get_unchecked(bounds_start * CN)) };
+            let rgb_pixel2 =
+                unsafe { svld1_u8(pg12, src2.get_unchecked(bounds_start * CN..).as_ptr()) };
+            let rgb_pixel3 =
+                unsafe { svld1_u8(pg12, src3.get_unchecked(bounds_start * CN..).as_ptr()) };
 
             let r0 = svtbl_u8(rgb_pixel0, v_tbl);
             let r1 = svtbl_u8(rgb_pixel1, v_tbl);
@@ -139,13 +143,17 @@ fn convolve_horizontal_rgb_neon_rows_4_impl(
             let w_ptr = unsafe { weights.get_unchecked(jx..) };
             let w_ld = unsafe { svld1_s8(pq, w_ptr.as_ptr()) };
 
-            let rgb_pixel0 = unsafe { svld1_u8(pqb, src0.get_unchecked(bounds_start * CN)) };
-            let rgb_pixel1 = unsafe { svld1_u8(pqb, src1.get_unchecked(bounds_start * CN)) };
+            let rgb_pixel0 =
+                unsafe { svld1_u8(pqb, src0.get_unchecked(bounds_start * CN..).as_ptr()) };
+            let rgb_pixel1 =
+                unsafe { svld1_u8(pqb, src1.get_unchecked(bounds_start * CN..).as_ptr()) };
 
             let vw = svtbl_s8(w_ld, v_weights);
 
-            let rgb_pixel2 = unsafe { svld1_u8(pqb, src2.get_unchecked(bounds_start * CN)) };
-            let rgb_pixel3 = unsafe { svld1_u8(pqb, src3.get_unchecked(bounds_start * CN)) };
+            let rgb_pixel2 =
+                unsafe { svld1_u8(pqb, src2.get_unchecked(bounds_start * CN..).as_ptr()) };
+            let rgb_pixel3 =
+                unsafe { svld1_u8(pqb, src3.get_unchecked(bounds_start * CN..).as_ptr()) };
 
             let r0 = svtbl_u8(rgb_pixel0, v_tbl);
             let r1 = svtbl_u8(rgb_pixel1, v_tbl);
@@ -228,7 +236,8 @@ fn convolve_horizontal_rgb_neon_row_one_impl_dot(
             let w_ptr = unsafe { weights.get_unchecked(jx..) };
             let vw = svtbl_s8(unsafe { svld1_s8(pg4, w_ptr.as_ptr()) }, v_weights);
 
-            let rgb_pixel0 = unsafe { svld1_u8(pg12, src.get_unchecked(bounds_start * CN)) };
+            let rgb_pixel0 =
+                unsafe { svld1_u8(pg12, src.get_unchecked(bounds_start * CN..).as_ptr()) };
             store_0 = svusdot_s32(store_0, svtbl_u8(rgb_pixel0, v_tbl), vw);
             jx += 4;
         }
@@ -241,7 +250,8 @@ fn convolve_horizontal_rgb_neon_row_one_impl_dot(
             let w_ptr = unsafe { weights.get_unchecked(jx..) };
             let vw = svtbl_s8(unsafe { svld1_s8(pq, w_ptr.as_ptr()) }, v_weights);
 
-            let rgb_pixel0 = unsafe { svld1_u8(pqb, src.get_unchecked(bounds_start * CN)) };
+            let rgb_pixel0 =
+                unsafe { svld1_u8(pqb, src.get_unchecked(bounds_start * CN..).as_ptr()) };
             store_0 = svusdot_s32(store_0, svtbl_u8(rgb_pixel0, v_tbl), vw);
         }
 

@@ -52,8 +52,8 @@ fn conv_horiz_4_rgb_f32(
     let src_ptr = unsafe { src.get_unchecked(start_x * CN..) };
 
     let rgb_pixel_0 = unsafe { vld1q_f32(src_ptr.as_ptr()) };
-    let rgb_pixel_1 = unsafe { vld1q_f32(src_ptr.get_unchecked(4)) };
-    let rgb_pixel_2 = unsafe { vld1q_f32(src_ptr.get_unchecked(8)) };
+    let rgb_pixel_1 = unsafe { vld1q_f32(src_ptr.get_unchecked(4..).as_ptr()) };
+    let rgb_pixel_2 = unsafe { vld1q_f32(src_ptr.get_unchecked(8..).as_ptr()) };
 
     let acc = prefer_vfmaq_laneq_f32::<0>(store, rgb_pixel_0, weights);
     let acc = prefer_vfmaq_laneq_f32::<1>(acc, vextq_f32::<3>(rgb_pixel_0, rgb_pixel_1), weights);
@@ -73,7 +73,7 @@ fn conv_horiz_2_rgb_f32(
     let src_ptr = unsafe { src.get_unchecked(start_x * CN..) };
 
     let rgb_pixel_0 = unsafe { vld1q_f32(src_ptr.as_ptr()) };
-    let rgb_pixel_1 = unsafe { vld1q_f32(src_ptr.get_unchecked(2)) };
+    let rgb_pixel_1 = unsafe { vld1q_f32(src_ptr.get_unchecked(2..).as_ptr()) };
 
     let acc = prefer_vfmaq_lane_f32::<0>(store, rgb_pixel_0, set);
     prefer_vfmaq_lane_f32::<1>(acc, vextq_f32::<1>(rgb_pixel_1, rgb_pixel_1), set)

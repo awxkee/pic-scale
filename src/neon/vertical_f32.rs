@@ -265,9 +265,9 @@ fn convolve_vertical_part_neon_4_f32(
             let v_weight = vld1q_dup_f32(weight.as_ptr());
             let src_ptr = src.get_unchecked(src_stride * py + px..);
 
-            let item_row = xvld1q_f32_x2(src_ptr.as_ptr());
+            let item_row = vld1q_f32(src_ptr.as_ptr());
 
-            store_0 = prefer_vfmaq_f32(store_0, item_row.0, v_weight);
+            store_0 = prefer_vfmaq_f32(store_0, item_row, v_weight);
         }
 
         let dst_ptr = dst.get_unchecked_mut(px..).as_mut_ptr();

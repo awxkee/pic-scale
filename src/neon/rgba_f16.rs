@@ -212,7 +212,7 @@ pub(crate) fn convolve_horizontal_rgba_neon_row_one_f16(
                 jx += 2;
             }
 
-            while jx <= bounds.size {
+            while jx < bounds.size {
                 let bounds_start = bounds.start + jx;
                 let w_s = weights.get_unchecked(jx);
                 let weight0 = vld1q_dup_f32(w_s);

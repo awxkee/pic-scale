@@ -13,15 +13,7 @@ use fast_image_resize::{
     CpuExtensions, FilterType, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
 use image::{EncodableLayout, GenericImageView, ImageReader};
-use pic_scale::{
-    BufferStore, CbCr16ImageStore, CbCr16ImageStoreMut, ImageSize, ImageStore, ImageStoreMut,
-    ImageStoreScaling, JzazbzScaler, LChScaler, LabScaler, LuvScaler, Planar16ImageStore,
-    Planar16ImageStoreMut, Planar8ImageStore, Planar8ImageStoreMut, ResamplingFunction,
-    Rgb16ImageStore, Rgb16ImageStoreMut, Rgb8ImageStore, Rgb8ImageStoreMut, RgbF32ImageStore,
-    RgbF32ImageStoreMut, Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore,
-    Rgba8ImageStoreMut, RgbaF32ImageStore, RgbaF32ImageStoreMut, Scaler, SigmoidalScaler,
-    ThreadingPolicy, TransferFunction, WorkloadStrategy, XYZScaler,
-};
+use pic_scale::{BufferStore, CbCr16ImageStore, CbCr16ImageStoreMut, ImageSize, ImageStore, ImageStoreMut, ImageStoreScaling, JzazbzScaler, LChScaler, LabScaler, LinearScaler, LuvScaler, Planar16ImageStore, Planar16ImageStoreMut, Planar8ImageStore, Planar8ImageStoreMut, ResamplingFunction, Rgb16ImageStore, Rgb16ImageStoreMut, Rgb8ImageStore, Rgb8ImageStoreMut, RgbF32ImageStore, RgbF32ImageStoreMut, Rgba16ImageStore, Rgba16ImageStoreMut, Rgba8ImageStore, Rgba8ImageStoreMut, RgbaF32ImageStore, RgbaF32ImageStoreMut, Scaler, SigmoidalScaler, ThreadingPolicy, TransferFunction, WorkloadStrategy, XYZScaler};
 use rand::RngExt;
 use std::fs;
 
@@ -114,7 +106,7 @@ fn main() {
 
     #[allow(overflowing_literals)]
     // test_fast_image();
-    let img = ImageReader::open("./assets/digital_art_portrait2.jpg")
+    let img = ImageReader::open("./assets/asset_4.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -125,16 +117,16 @@ fn main() {
 
     // img.resize_exact(dimensions.0 as u32 / 4, dimensions.1 as u32 / 4, image::imageops::FilterType::Lanczos3).save("resized.png").unwrap();
 
-    let mut scaler = Scaler::new(ResamplingFunction::Lanczos5Jinc)
+    let mut scaler = Scaler::new(ResamplingFunction::Lanczos3)
         .set_threading_policy(ThreadingPolicy::Single)
-        .set_supersampling(false);
+        .set_multi_step_upsampling(true);
     // scaler.set_workload_strategy(WorkloadStrategy::PreferSpeed);
 
     let mut store =
         Rgb8ImageStore::from_slice(&bytes, dimensions.0 as usize, dimensions.1 as usize).unwrap();
     store.bit_depth = 10;
 
-    let mut t_size = ImageSize::new(dimensions.0 as usize / 2, dimensions.1 as usize / 2);
+    let mut t_size = ImageSize::new(dimensions.0 as usize * 5, dimensions.1 as usize * 5);
     // t_size.height += 1;
     let resizing_plan = scaler
         .plan_rgb_resampling(
@@ -143,8 +135,8 @@ fn main() {
         )
         .unwrap();
     let mut dst_store = Rgb8ImageStoreMut::alloc_with_depth(
-        dimensions.0 as usize / 2,
-        dimensions.1 as usize / 2,
+        dimensions.0 as usize * 5,
+        dimensions.1 as usize * 5,
         10,
     );
     resizing_plan.resample(&store, &mut dst_store).unwrap();
