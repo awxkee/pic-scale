@@ -49,7 +49,20 @@ pub(crate) fn _mm_div_by_255_epi16(v: __m128i) -> __m128i {
 }
 
 #[inline(always)]
-pub(crate) fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
+fn sse_unpremultiply_channel<const FAST: bool>(color: __m128, alpha: __m128) -> __m128i {
+    unsafe {
+        if FAST {
+            // PreferSpeed deliberately keeps the unrefined reciprocal estimate.
+            _mm_cvtps_epi32(_mm_mul_ps(color, _mm_rcp_ps(alpha)))
+        } else {
+            // Match the scalar table's rounding of nonnegative half values upward.
+            _mm_cvttps_epi32(_mm_add_ps(_mm_div_ps(color, alpha), _mm_set1_ps(0.5)))
+        }
+    }
+}
+
+#[inline(always)]
+fn sse_unpremultiply_row<const FAST: bool>(x: __m128i, a: __m128i) -> __m128i {
     unsafe {
         let zeros = _mm_setzero_si128();
         let lo = _mm_unpacklo_epi8(x, zeros);
@@ -87,20 +100,10 @@ pub(crate) fn sse_unpremultiply_row(x: __m128i, a: __m128i) -> __m128i {
         let ahlf = _mm_cvtepi32_ps(ahlw);
         let ahhf = _mm_cvtepi32_ps(ahhw);
 
-        let a_lo_lo = _mm_rcp_ps(allf);
-        let a_lo_hi = _mm_rcp_ps(alhf);
-        let a_hi_lo = _mm_rcp_ps(ahlf);
-        let a_hi_hi = _mm_rcp_ps(ahhf);
-
-        let fllw = _mm_mul_ps(lo_lo, a_lo_lo);
-        let flhw = _mm_mul_ps(lo_hi, a_lo_hi);
-        let fhlw = _mm_mul_ps(hi_lo, a_hi_lo);
-        let fhhw = _mm_mul_ps(hi_hi, a_hi_hi);
-
-        let lo_lo = _mm_cvtps_epi32(fllw);
-        let lo_hi = _mm_cvtps_epi32(flhw);
-        let hi_lo = _mm_cvtps_epi32(fhlw);
-        let hi_hi = _mm_cvtps_epi32(fhhw);
+        let lo_lo = sse_unpremultiply_channel::<FAST>(lo_lo, allf);
+        let lo_hi = sse_unpremultiply_channel::<FAST>(lo_hi, alhf);
+        let hi_lo = sse_unpremultiply_channel::<FAST>(hi_lo, ahlf);
+        let hi_hi = sse_unpremultiply_channel::<FAST>(hi_hi, ahhf);
 
         let lo = _mm_packs_epi32(lo_lo, lo_hi);
         let hi = _mm_packs_epi32(hi_lo, hi_hi);
@@ -229,9 +232,18 @@ fn sse_premultiply_alpha_rgba_impl(dst: &mut [u8], src: &[u8]) {
     sse_premultiply_alpha_rgba_impl_row(dst, src, Sse41PremultiplyExecutor8Default::default());
 }
 
-pub(crate) fn sse_unpremultiply_alpha_rgba(in_place: &mut [u8], _: WorkloadStrategy) {
+pub(crate) fn sse_unpremultiply_alpha_rgba(in_place: &mut [u8], strategy: WorkloadStrategy) {
     unsafe {
-        sse_unpremultiply_alpha_rgba_impl(in_place);
+        match strategy {
+            WorkloadStrategy::PreferQuality => sse_unpremultiply_alpha_rgba_impl_row(
+                in_place,
+                SseDisassociateAlpha::<false>::default(),
+            ),
+            WorkloadStrategy::PreferSpeed => sse_unpremultiply_alpha_rgba_impl_row(
+                in_place,
+                SseDisassociateAlpha::<true>::default(),
+            ),
+        }
     }
 }
 
@@ -240,9 +252,9 @@ trait DisassociateAlpha {
 }
 
 #[derive(Default)]
-struct DisassociateAlphaDefault {}
+struct SseDisassociateAlpha<const FAST: bool> {}
 
-impl DisassociateAlphaDefault {
+impl<const FAST: bool> SseDisassociateAlpha<FAST> {
     #[inline(always)]
     fn disassociate_chunk(&self, in_place: &mut [u8]) {
         unsafe {
@@ -253,9 +265,9 @@ impl DisassociateAlphaDefault {
             let rgba3 = _mm_loadu_si128(src_ptr.add(48) as *const __m128i);
             let (rrr, ggg, bbb, aaa) = sse_deinterleave_rgba(rgba0, rgba1, rgba2, rgba3);
 
-            let rrr = sse_unpremultiply_row(rrr, aaa);
-            let ggg = sse_unpremultiply_row(ggg, aaa);
-            let bbb = sse_unpremultiply_row(bbb, aaa);
+            let rrr = sse_unpremultiply_row::<FAST>(rrr, aaa);
+            let ggg = sse_unpremultiply_row::<FAST>(ggg, aaa);
+            let bbb = sse_unpremultiply_row::<FAST>(bbb, aaa);
 
             let (rgba0, rgba1, rgba2, rgba3) = sse_interleave_rgba(rrr, ggg, bbb, aaa);
 
@@ -268,7 +280,7 @@ impl DisassociateAlphaDefault {
     }
 }
 
-impl DisassociateAlpha for DisassociateAlphaDefault {
+impl<const FAST: bool> DisassociateAlpha for SseDisassociateAlpha<FAST> {
     #[target_feature(enable = "sse4.1")]
     unsafe fn disassociate(&self, in_place: &mut [u8]) {
         unsafe {
@@ -303,15 +315,85 @@ fn sse_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8], executor: impl Dis
     }
 }
 
-#[target_feature(enable = "sse4.1")]
-fn sse_unpremultiply_alpha_rgba_impl(in_place: &mut [u8]) {
-    sse_unpremultiply_alpha_rgba_impl_row(in_place, DisassociateAlphaDefault::default());
-}
-
 #[cfg(test)]
 mod tests {
-    use super::sse_premultiply_alpha_rgba;
-    use crate::alpha_handle_u8::premultiply_alpha_rgba_row_impl;
+    use super::{sse_premultiply_alpha_rgba, sse_unpremultiply_alpha_rgba};
+    use crate::WorkloadStrategy;
+    use crate::alpha_handle_u8::{
+        premultiply_alpha_rgba_row_impl, unpremultiply_alpha_rgba_row_impl,
+    };
+
+    fn check_unpremultiply(strategy: WorkloadStrategy) {
+        let mut src = Vec::with_capacity(256 * 256 * 4);
+        for color in u8::MIN..=u8::MAX {
+            for alpha in u8::MIN..=u8::MAX {
+                let mut rgb = [color, color.rotate_left(3), 255 - color];
+                if strategy == WorkloadStrategy::PreferSpeed {
+                    // The approximate path is checked on valid premultiplied colors.
+                    rgb.iter_mut().for_each(|c| *c = (*c).min(alpha));
+                }
+                src.extend_from_slice(&[rgb[0], rgb[1], rgb[2], alpha]);
+            }
+        }
+
+        // Exercise full vectors, every tail length, empty rows, and mixed alpha lanes.
+        for width in (0..=33).chain([256 * 256]) {
+            let input = if width == 256 * 256 {
+                src.clone()
+            } else {
+                (0..width)
+                    .flat_map(|i| {
+                        let offset = ((i * 7919 + 1) % (256 * 256)) * 4;
+                        src[offset..offset + 4].iter().copied()
+                    })
+                    .collect::<Vec<_>>()
+            };
+            let mut expected = input.clone();
+            unpremultiply_alpha_rgba_row_impl(&mut expected);
+            let mut actual = input.clone();
+            sse_unpremultiply_alpha_rgba(&mut actual, strategy);
+
+            for ((actual, expected), input) in actual
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(expected.as_chunks::<4>().0)
+                .zip(input.as_chunks::<4>().0)
+            {
+                assert_eq!(actual[3], input[3]);
+                for c in 0..3 {
+                    let tolerance = u8::from(strategy == WorkloadStrategy::PreferSpeed);
+                    assert!(
+                        actual[c].abs_diff(expected[c]) <= tolerance,
+                        "{strategy:?}, width={width}, input={input:?}, actual={actual:?}, expected={expected:?}",
+                    );
+                }
+                if input[3] == 0 {
+                    assert_eq!(&actual[..3], &[0, 0, 0]);
+                }
+            }
+            if strategy == WorkloadStrategy::PreferSpeed && width == 256 * 256 {
+                assert!(
+                    actual != expected,
+                    "speed must retain approximate arithmetic"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn sse_unpremultiply_quality_matches_scalar_reference() {
+        if std::arch::is_x86_feature_detected!("sse4.1") {
+            check_unpremultiply(WorkloadStrategy::PreferQuality);
+        }
+    }
+
+    #[test]
+    fn sse_unpremultiply_speed_stays_within_one_of_scalar_reference() {
+        if std::arch::is_x86_feature_detected!("sse4.1") {
+            check_unpremultiply(WorkloadStrategy::PreferSpeed);
+        }
+    }
 
     #[test]
     fn sse_premultiply_matches_scalar_reference() {
