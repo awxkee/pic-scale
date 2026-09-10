@@ -160,10 +160,7 @@ impl Avx2DisassociateAlpha {
         );
         let rgba = unsafe { _mm256_loadu_si256(in_place.as_ptr().cast()) };
         let alpha_u32 = _mm256_shuffle_epi8(rgba, alpha_mask);
-        let alpha_f32 = _mm256_mul_ps(
-            _mm256_rcp_ps(_mm256_cvtepi32_ps(alpha_u32)),
-            _mm256_set1_ps(255.),
-        );
+        let alpha_f32 = _mm256_cvtepi32_ps(alpha_u32);
         let is_zero_mask = _mm256_cmpeq_epi32(alpha_u32, _mm256_setzero_si256());
 
         let a_lo = _mm256_unpacklo_epi8(rgba, _mm256_setzero_si256());
@@ -184,18 +181,23 @@ impl Avx2DisassociateAlpha {
         let a2 = _mm256_permutevar8x32_ps(alpha_f32, _mm256_setr_epi32(2, 2, 2, 2, 6, 6, 6, 6));
         let a3 = _mm256_permutevar8x32_ps(alpha_f32, _mm256_setr_epi32(3, 3, 3, 3, 7, 7, 7, 7));
 
-        v0 = _mm256_mul_ps(v0, a0);
-        v1 = _mm256_mul_ps(v1, a1);
-        v2 = _mm256_mul_ps(v2, a2);
-        v3 = _mm256_mul_ps(v3, a3);
+        // Divide color * 255 directly to avoid rounding a reciprocal before multiplication.
+        let scale = _mm256_set1_ps(255.);
+        v0 = _mm256_div_ps(_mm256_mul_ps(v0, scale), a0);
+        v1 = _mm256_div_ps(_mm256_mul_ps(v1, scale), a1);
+        v2 = _mm256_div_ps(_mm256_mul_ps(v2, scale), a2);
+        v3 = _mm256_div_ps(_mm256_mul_ps(v3, scale), a3);
 
-        let s0 = _mm256_cvtps_epi32(v0);
-        let s1 = _mm256_cvtps_epi32(v1);
-        let s2 = _mm256_cvtps_epi32(v2);
-        let s3 = _mm256_cvtps_epi32(v3);
+        // Match the scalar table's rounding of nonnegative half values upward.
+        let half = _mm256_set1_ps(0.5);
+        let s0 = _mm256_cvttps_epi32(_mm256_add_ps(v0, half));
+        let s1 = _mm256_cvttps_epi32(_mm256_add_ps(v1, half));
+        let s2 = _mm256_cvttps_epi32(_mm256_add_ps(v2, half));
+        let s3 = _mm256_cvttps_epi32(_mm256_add_ps(v3, half));
 
-        let packed16_0 = _mm256_packus_epi32(s0, s1);
-        let packed16_1 = _mm256_packus_epi32(s2, s3);
+        // Keep large values positive for the signed-input u8 saturation below.
+        let packed16_0 = _mm256_packs_epi32(s0, s1);
+        let packed16_1 = _mm256_packs_epi32(s2, s3);
 
         let mut packed = _mm256_packus_epi16(packed16_0, packed16_1);
         packed = _mm256_blendv_epi8(packed, _mm256_setzero_si256(), is_zero_mask);
@@ -254,6 +256,7 @@ impl Avx2DisassociateAlphaFast {
         let is_zero_mask = _mm256_cmpeq_epi32(alpha_u32, _mm256_setzero_si256());
         let alpha_f32 = _mm256_cvtepi32_ps(alpha_u32);
 
+        // PreferSpeed deliberately keeps the unrefined reciprocal estimate.
         let recip_f32 = _mm256_mul_ps(_mm256_set1_ps(65536.0), _mm256_rcp_ps(alpha_f32));
         let recip_i32 = _mm256_cvtps_epi32(recip_f32);
 
@@ -332,8 +335,84 @@ fn avx_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8], executor: impl Dis
 
 #[cfg(test)]
 mod tests {
-    use super::avx_premultiply_alpha_rgba;
-    use crate::alpha_handle_u8::premultiply_alpha_rgba_row_impl;
+    use super::{avx_premultiply_alpha_rgba, avx_unpremultiply_alpha_rgba};
+    use crate::WorkloadStrategy;
+    use crate::alpha_handle_u8::{
+        premultiply_alpha_rgba_row_impl, unpremultiply_alpha_rgba_row_impl,
+    };
+
+    fn check_unpremultiply(strategy: WorkloadStrategy) {
+        let mut src = Vec::with_capacity(256 * 256 * 4);
+        for color in u8::MIN..=u8::MAX {
+            for alpha in u8::MIN..=u8::MAX {
+                let mut rgb = [color, color.rotate_left(3), 255 - color];
+                if strategy == WorkloadStrategy::PreferSpeed {
+                    // The approximate path is checked on valid premultiplied colors.
+                    rgb.iter_mut().for_each(|c| *c = (*c).min(alpha));
+                }
+                src.extend_from_slice(&[rgb[0], rgb[1], rgb[2], alpha]);
+            }
+        }
+
+        // Exercise full vectors, every tail length, empty rows, and mixed alpha lanes.
+        for width in (0..=33).chain([256 * 256]) {
+            let input = if width == 256 * 256 {
+                src.clone()
+            } else {
+                (0..width)
+                    .flat_map(|i| {
+                        let offset = ((i * 7919 + 1) % (256 * 256)) * 4;
+                        src[offset..offset + 4].iter().copied()
+                    })
+                    .collect::<Vec<_>>()
+            };
+            let mut expected = input.clone();
+            unpremultiply_alpha_rgba_row_impl(&mut expected);
+            let mut actual = input.clone();
+            avx_unpremultiply_alpha_rgba(&mut actual, strategy);
+
+            for ((actual, expected), input) in actual
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(expected.as_chunks::<4>().0)
+                .zip(input.as_chunks::<4>().0)
+            {
+                assert_eq!(actual[3], input[3]);
+                for c in 0..3 {
+                    // Reciprocal estimation plus fixed-point truncation can lose two units.
+                    let tolerance = 2 * u8::from(strategy == WorkloadStrategy::PreferSpeed);
+                    assert!(
+                        actual[c].abs_diff(expected[c]) <= tolerance,
+                        "{strategy:?}, width={width}, input={input:?}, actual={actual:?}, expected={expected:?}",
+                    );
+                }
+                if input[3] == 0 {
+                    assert_eq!(&actual[..3], &[0, 0, 0]);
+                }
+            }
+            if strategy == WorkloadStrategy::PreferSpeed && width == 256 * 256 {
+                assert!(
+                    actual != expected,
+                    "speed must retain approximate arithmetic"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn avx2_unpremultiply_quality_matches_scalar_reference() {
+        if std::arch::is_x86_feature_detected!("avx2") {
+            check_unpremultiply(WorkloadStrategy::PreferQuality);
+        }
+    }
+
+    #[test]
+    fn avx2_unpremultiply_speed_stays_within_two_of_scalar_reference() {
+        if std::arch::is_x86_feature_detected!("avx2") {
+            check_unpremultiply(WorkloadStrategy::PreferSpeed);
+        }
+    }
 
     #[test]
     fn avx2_premultiply_matches_scalar_reference() {

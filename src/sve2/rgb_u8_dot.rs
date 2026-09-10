@@ -83,6 +83,12 @@ fn convolve_horizontal_rgb_neon_rows_4_impl(
     let pg3 = svwhilelt_b8_u32(0u32, 3u32);
     let pg12 = svwhilelt_b8_u32(0u32, 12u32);
 
+    // Each narrowed row occupies one quarter of the scalable packed byte vector.
+    let packed_row_bytes = (svcntb() / 4) as u8;
+    let row1_indices = svindex_u8(packed_row_bytes, 1);
+    let row2_indices = svindex_u8(packed_row_bytes * 2, 1);
+    let row3_indices = svindex_u8(packed_row_bytes * 3, 1);
+
     for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
         .iter_mut()
         .zip(iter_row1.iter_mut())
@@ -175,9 +181,9 @@ fn convolve_horizontal_rgb_neon_rows_4_impl(
         let packed = svuzp1_u8(svqxtnb_u16(s01), svqxtnb_u16(s23));
 
         unsafe {
-            let sq1 = svext_u8::<4>(packed, svdup_n_u8(0));
-            let sq2 = svext_u8::<8>(packed, svdup_n_u8(0));
-            let sq3 = svext_u8::<12>(packed, svdup_n_u8(0));
+            let sq1 = svtbl_u8(packed, row1_indices);
+            let sq2 = svtbl_u8(packed, row2_indices);
+            let sq3 = svtbl_u8(packed, row3_indices);
 
             svst1_u8(pg3, chunk0.as_mut_ptr(), packed);
             svst1_u8(pg3, chunk1.as_mut_ptr(), sq1);
@@ -259,5 +265,99 @@ fn convolve_horizontal_rgb_neon_row_one_impl_dot(
         unsafe {
             svst1_u8(pg3, dst.as_mut_ptr(), v0);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::filter_weights::FilterBounds;
+    use crate::fixed_point_horizontal::convolve_row_handler_fixed_point;
+
+    fn check_horizontal(four_rows: bool) {
+        let Some(vl) = crate::sve2::test_vector_length(true) else {
+            return;
+        };
+        let width = 19;
+        let dst_stride = width * 3 + 13;
+        for taps in [1usize, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17] {
+            let src_width = taps + width;
+            let src_stride = src_width * 3 + 11;
+            let mut src = vec![0; src_stride * 4];
+            for row in 0..4 {
+                for x in 0..src_width {
+                    for c in 0..3 {
+                        src[row * src_stride + x * 3 + c] =
+                            ((row * 67 + x * 29 + c * 43 + x * c * 11) % 256) as u8;
+                    }
+                }
+            }
+            let aligned = taps.next_multiple_of(4);
+            let mut weights = vec![0i8; aligned * width];
+            for x in 0..width {
+                for j in 0..taps {
+                    weights[x * aligned + j] = ((j * 23 + x * 13) % 63) as i8 - 31;
+                }
+                weights[x * aligned] = 96;
+            }
+            let bounds: Vec<_> = (0..width).map(|x| FilterBounds::new(x, taps)).collect();
+            let scalar_weights = FilterWeights::new(
+                weights.iter().map(|&w| i16::from(w) * 256).collect(),
+                taps,
+                aligned,
+                width,
+                0,
+                bounds.clone(),
+            );
+            let filters = FilterWeights::new(weights, taps, aligned, width, 0, bounds);
+            let mut expected = vec![0xa5; dst_stride * 4];
+            let mut actual = expected.clone();
+            for row in 0..4 {
+                convolve_row_handler_fixed_point::<u8, i32, 3>(
+                    &src[row * src_stride..][..src_width * 3],
+                    &mut expected[row * dst_stride..][..width * 3],
+                    &scalar_weights,
+                    8,
+                );
+                if !four_rows {
+                    sve_convolve_horizontal_rgb_neon_row_one_dot(
+                        &src[row * src_stride..][..src_width * 3],
+                        &mut actual[row * dst_stride..][..width * 3],
+                        &filters,
+                        8,
+                    );
+                }
+            }
+            if four_rows {
+                sve_convolve_horizontal_rgb_neon_rows_4_dot(
+                    &src,
+                    src_stride,
+                    &mut actual,
+                    dst_stride,
+                    &filters,
+                    8,
+                );
+            }
+            for (i, (&actual, &expected)) in actual.iter().zip(&expected).enumerate() {
+                assert_eq!(
+                    actual,
+                    expected,
+                    "VL={}, taps={taps}, row={}, byte={}",
+                    vl * 8,
+                    i / dst_stride,
+                    i % dst_stride,
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn sve2_rows_4_matches_scalar_reference() {
+        check_horizontal(true);
+    }
+
+    #[test]
+    fn sve2_row_one_matches_scalar_reference() {
+        check_horizontal(false);
     }
 }
