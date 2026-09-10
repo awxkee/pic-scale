@@ -68,10 +68,10 @@ macro_rules! pack_4_rows_sve_u16 {
 
 macro_rules! narrow_i64_to_u16 {
     ($a:expr, $b:expr, $c:expr, $d:expr) => {{
-        let q0 = svqrshrunb_n_s64::<{ crate::support::PRECISION }>($a);
-        let q1 = svqrshrunb_n_s64::<{ crate::support::PRECISION }>($b);
-        let q2 = svqrshrunb_n_s64::<{ crate::support::PRECISION }>($c);
-        let q3 = svqrshrunb_n_s64::<{ crate::support::PRECISION }>($d);
+        let q0 = svqshrunb_n_s64::<{ crate::support::PRECISION }>($a);
+        let q1 = svqshrunb_n_s64::<{ crate::support::PRECISION }>($b);
+        let q2 = svqshrunb_n_s64::<{ crate::support::PRECISION }>($c);
+        let q3 = svqshrunb_n_s64::<{ crate::support::PRECISION }>($d);
         let s01 = svuzp1_u32(q0, q1);
         let s23 = svuzp1_u32(q2, q3);
         svuzp1_u16(svreinterpret_u16_u32(s01), svreinterpret_u16_u32(s23))
@@ -547,5 +547,100 @@ fn convolve_vertical_sve2_u16_row(
         }
 
         cx += vl;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::fixed_point_vertical::column_handler_fixed_point;
+
+    #[test]
+    fn sve2_vertical_rounds_once() {
+        let Some(bytes) = crate::sve2::test_vector_length(false) else {
+            return;
+        };
+        let vl = bytes / 2;
+        for width in [1, vl, 2 * vl, 2 * vl + 1] {
+            // 2 * 0.5 is exactly 1; adding two rounding biases incorrectly gives 2.
+            let src = vec![2; width];
+            let mut dst = vec![0; width];
+            convolve_vertical_sve2_u16_dot(
+                width,
+                &FilterBounds::new(0, 1),
+                &src,
+                &mut dst,
+                width,
+                &[16384],
+                15,
+            );
+            assert!(dst.iter().all(|&v| v == 1), "width={width}, dst={dst:?}");
+        }
+    }
+
+    #[test]
+    fn sve2_vertical_matches_scalar_reference() {
+        let Some(bytes) = crate::sve2::test_vector_length(false) else {
+            return;
+        };
+        let vl = bytes / 2;
+        for bit_depth in [13, 14, 15] {
+            let max = (1u32 << bit_depth) - 1;
+            for width in [
+                0,
+                1,
+                vl - 1,
+                vl,
+                vl + 1,
+                2 * vl - 1,
+                2 * vl,
+                2 * vl + 1,
+                4 * vl + 3,
+            ] {
+                let stride = width + 7;
+                for taps in 1..=17 {
+                    let bounds = FilterBounds::new(2, taps);
+                    let src: Vec<_> = (0..stride * (taps + 2))
+                        .map(|i| match i % 7 {
+                            0 => 0,
+                            1 => max as u16,
+                            _ => ((i as u32 * 7919 + 1237) & max) as u16,
+                        })
+                        .collect();
+                    let mut weights: Vec<_> = (0..taps)
+                        .map(|j| ((j * 997 + taps * 53) % 4096) as i16 - 2048)
+                        .collect();
+                    weights[0] = 30000;
+                    let mut expected = vec![0xbeef; width + 2];
+                    let mut actual = expected.clone();
+                    column_handler_fixed_point::<u16, i32>(
+                        width,
+                        &bounds,
+                        &src,
+                        &mut expected[1..width + 1],
+                        stride,
+                        &weights,
+                        bit_depth,
+                    );
+                    convolve_vertical_sve2_u16_dot(
+                        width,
+                        &bounds,
+                        &src,
+                        &mut actual[1..width + 1],
+                        stride,
+                        &weights,
+                        bit_depth,
+                    );
+                    for (i, (&actual, &expected)) in actual.iter().zip(&expected).enumerate() {
+                        assert_eq!(
+                            actual,
+                            expected,
+                            "VL={}, depth={bit_depth}, width={width}, taps={taps}, index={i}",
+                            bytes * 8,
+                        );
+                    }
+                }
+            }
+        }
     }
 }

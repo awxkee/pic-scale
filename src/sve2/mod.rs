@@ -36,3 +36,23 @@ pub(crate) use rgb_u8_dot::{
 };
 pub(crate) use vertical_u8_dot::convolve_vertical_sve2_i8_dot;
 pub(crate) use vertical_u16_dot::convolve_vertical_sve2_u16_dot;
+
+#[cfg(test)]
+fn test_vector_length(require_i8mm: bool) -> Option<usize> {
+    let available = std::arch::is_aarch64_feature_detected!("sve2")
+        && (!require_i8mm || std::arch::is_aarch64_feature_detected!("i8mm"));
+    if !available {
+        assert!(
+            std::env::var_os("PIC_SCALE_REQUIRE_SVE2").is_none(),
+            "SVE2 tests were required, but the necessary CPU features are unavailable",
+        );
+        eprintln!("Skipping SVE2 test: necessary CPU features are unavailable");
+        return None;
+    }
+    let bytes = unsafe { std::arch::aarch64::svcntb() as usize };
+    if let Ok(expected) = std::env::var("PIC_SCALE_SVE_VL_BITS") {
+        assert_eq!(bytes * 8, expected.parse::<usize>().unwrap());
+    }
+    eprintln!("Testing SVE2 with {}-bit vectors", bytes * 8);
+    Some(bytes)
+}
