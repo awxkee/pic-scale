@@ -347,3 +347,78 @@ fn convolve_column_hb_impl(
         }
     }
 }
+
+#[inline]
+#[target_feature(enable = "rdm")]
+fn accumulate_pair_output(acc: &mut [int32x4_t; 4], input: [int32x4_t; 4], weight: i32) {
+    let weight = vdupq_n_s32(weight);
+    acc[0] = vqrdmlahq_s32(acc[0], input[0], weight);
+    acc[1] = vqrdmlahq_s32(acc[1], input[1], weight);
+    acc[2] = vqrdmlahq_s32(acc[2], input[2], weight);
+    acc[3] = vqrdmlahq_s32(acc[3], input[3], weight);
+}
+
+#[inline(always)]
+unsafe fn load_pair_input(src: *const u16) -> [int32x4_t; 4] {
+    unsafe {
+        let low = vld1q_u16(src);
+        let high = vld1q_u16(src.add(8));
+        [
+            vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(low))),
+            vreinterpretq_s32_u32(vshll_high_n_u16::<6>(low)),
+            vreinterpretq_s32_u32(vshll_n_u16::<6>(vget_low_u16(high))),
+            vreinterpretq_s32_u32(vshll_high_n_u16::<6>(high)),
+        ]
+    }
+}
+
+#[inline(always)]
+unsafe fn store_pair_output(dst: *mut u16, acc: [int32x4_t; 4], max: uint16x8_t) {
+    unsafe {
+        let low = vqshrun_high_n_s32::<6>(vqshrun_n_s32::<6>(acc[0]), acc[1]);
+        let high = vqshrun_high_n_s32::<6>(vqshrun_n_s32::<6>(acc[2]), acc[3]);
+        vst1q_u16(dst, vminq_u16(low, max));
+        vst1q_u16(dst.add(8), vminq_u16(high, max));
+    }
+}
+
+#[target_feature(enable = "rdm")]
+pub(crate) fn convolve_column_hb_u16_pair(
+    src: &[u16],
+    stride: usize,
+    first: &mut [u16],
+    second: &mut [u16],
+    first_weights: &[i32; super::vertical_pair::U16_PAIR_TAPS],
+    second_weights: &[i32; super::vertical_pair::U16_PAIR_TAPS],
+    bit_depth: u32,
+) {
+    use super::vertical_pair::{U16_PAIR_STEP as PAIRED_ROW_STEP, U16_PAIR_TAPS as PAIRED_TAPS};
+
+    let max = vdupq_n_u16(((1u32 << bit_depth) - 1) as u16);
+    let round = vdupq_n_s32(1 << 5);
+    for x in (0..first.len()).step_by(16) {
+        let mut a = [round; 4];
+        let mut b = [round; 4];
+        unsafe {
+            let input = src.as_ptr().add(x);
+            for (j, &weight) in first_weights[..PAIRED_ROW_STEP].iter().enumerate() {
+                accumulate_pair_output(&mut a, load_pair_input(input.add(j * stride)), weight);
+            }
+            // Each shared input row feeds both sums in tap order.
+            for j in PAIRED_ROW_STEP..PAIRED_TAPS {
+                let pixels = load_pair_input(input.add(j * stride));
+                accumulate_pair_output(&mut a, pixels, first_weights[j]);
+                accumulate_pair_output(&mut b, pixels, second_weights[j - PAIRED_ROW_STEP]);
+            }
+            for j in PAIRED_TAPS..PAIRED_TAPS + PAIRED_ROW_STEP {
+                accumulate_pair_output(
+                    &mut b,
+                    load_pair_input(input.add(j * stride)),
+                    second_weights[j - PAIRED_ROW_STEP],
+                );
+            }
+            store_pair_output(first.as_mut_ptr().add(x), a, max);
+            store_pair_output(second.as_mut_ptr().add(x), b, max);
+        }
+    }
+}

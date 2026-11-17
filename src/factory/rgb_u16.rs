@@ -50,10 +50,21 @@ impl HorizontalFilterPass<u16, f32, 3> for ImageStore<'_, u16, 3> {
                     convolve_horizontal_rgb_neon_rows_4_lb_u16,
                     convolve_horizontal_rgb_neon_u16_lb_row,
                 };
+                // Reducing separate color accumulators pays off with several
+                // eight-tap groups.
+                let deinterleave = approx.kernel_size >= 24;
                 return Arc::new(HorizontalFiltering {
                     filter_weights: approx,
-                    filter_4_rows: Some(convolve_horizontal_rgb_neon_rows_4_lb_u16),
-                    filter_row: convolve_horizontal_rgb_neon_u16_lb_row,
+                    filter_4_rows: Some(if deinterleave {
+                        convolve_horizontal_rgb_neon_rows_4_lb_u16::<true>
+                    } else {
+                        convolve_horizontal_rgb_neon_rows_4_lb_u16::<false>
+                    }),
+                    filter_row: if deinterleave {
+                        convolve_horizontal_rgb_neon_u16_lb_row::<true>
+                    } else {
+                        convolve_horizontal_rgb_neon_u16_lb_row::<false>
+                    },
                     _threading_policy: threading_policy,
                 });
             }

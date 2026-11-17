@@ -504,6 +504,11 @@ fn expand_paired_input(row: uint8x16_t) -> (int16x8_t, int16x8_t) {
     }
 }
 
+/// # Safety
+/// RDM must be available. `STEP` must not exceed `TAPS`, and each weight slice
+/// must contain at least `TAPS` entries. The output rows must have the same
+/// length, divisible by 16. Starting at a valid `start * src_stride` offset,
+/// `src` must contain that many bytes in each of the `TAPS + STEP` rows.
 #[target_feature(enable = "rdm")]
 unsafe fn convolve_row_pair<const TAPS: usize, const STEP: usize>(
     src: &[u8],
@@ -643,8 +648,9 @@ impl<const N: usize> ColumnFilter<u8, N> for PairedRdmVertical<N> {
                 None
             };
             if let Some(kernel) = kernel {
-                // The factory checks RDM. Each load stays within the
-                // supported pair's validated tap bounds and active row length.
+                // SAFETY: The factory checks RDM. The selected tap count and
+                // displacement fit the weights and the validated source or band.
+                // Both output rows are `row_len` bytes, a multiple of 16.
                 unsafe {
                     kernel(
                         source.pixels,

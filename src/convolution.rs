@@ -97,7 +97,7 @@ where
     fn filter(&self, source: &ImageStore<'_, T, N>, destination: &mut ImageStoreMut<T, N>);
     fn source_bounds(&self, row: usize) -> FilterBounds;
 
-    #[cfg(all(target_arch = "aarch64", feature = "rdm"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     fn run_on_4_rows(
         &self,
         src: &[T],
@@ -122,7 +122,7 @@ where
         bit_depth: u32,
     );
 
-    #[cfg(all(target_arch = "aarch64", feature = "rdm"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     fn run_on_band_rows(
         &self,
         source: &ColumnSource<'_, T>,

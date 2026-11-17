@@ -137,6 +137,51 @@ fn conv_horiz_rgba_8_u16(
     }
 }
 
+#[must_use]
+#[inline(always)]
+fn accumulate_deinterleaved(
+    start_x: usize,
+    src: &[u16],
+    weights: int16x8_t,
+    (red, green, blue): (int32x4_t, int32x4_t, int32x4_t),
+) -> (int32x4_t, int32x4_t, int32x4_t) {
+    unsafe {
+        const CN: usize = 3;
+        let item = vld3q_u16(src.as_ptr().add(start_x * CN));
+        let reds = vreinterpretq_s16_u16(item.0);
+        let greens = vreinterpretq_s16_u16(item.1);
+        let blues = vreinterpretq_s16_u16(item.2);
+        let low_weights = vget_low_s16(weights);
+        let red = vmlal_high_s16(
+            vmlal_s16(red, vget_low_s16(reds), low_weights),
+            reds,
+            weights,
+        );
+        let green = vmlal_high_s16(
+            vmlal_s16(green, vget_low_s16(greens), low_weights),
+            greens,
+            weights,
+        );
+        let blue = vmlal_high_s16(
+            vmlal_s16(blue, vget_low_s16(blues), low_weights),
+            blues,
+            weights,
+        );
+        (red, green, blue)
+    }
+}
+#[inline(always)]
+fn reduce_deinterleaved(
+    (red, green, blue): (int32x4_t, int32x4_t, int32x4_t),
+    init: int32x4_t,
+) -> int32x4_t {
+    unsafe {
+        let rg = vpaddq_s32(red, green);
+        let b = vpaddq_s32(blue, vdupq_n_s32(0));
+        vaddq_s32(vpaddq_s32(rg, b), init)
+    }
+}
+
 #[inline(always)]
 fn set_pixel(ptr: &mut [u16], pixel: uint16x4_t) {
     unsafe {
@@ -145,7 +190,7 @@ fn set_pixel(ptr: &mut [u16], pixel: uint16x4_t) {
     }
 }
 
-pub(crate) fn convolve_horizontal_rgb_neon_rows_4_lb_u16(
+pub(crate) fn convolve_horizontal_rgb_neon_rows_4_lb_u16<const DEINTERLEAVE: bool>(
     src: &[u16],
     src_stride: usize,
     dst: &mut [u16],
@@ -195,15 +240,41 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4_lb_u16(
             let src2 = src0.get_unchecked(src_stride * 2..);
             let src3 = src0.get_unchecked(src_stride * 3..);
 
-            while jx + 8 <= bounds_size {
-                let bounds_start = bounds.start + jx;
-                let w_ptr = weights.get_unchecked(jx..);
-                let weights = vld1q_s16(w_ptr.as_ptr());
-                store_0 = conv_horiz_rgba_8_u16(bounds_start, src0, weights, store_0);
-                store_1 = conv_horiz_rgba_8_u16(bounds_start, src1, weights, store_1);
-                store_2 = conv_horiz_rgba_8_u16(bounds_start, src2, weights, store_2);
-                store_3 = conv_horiz_rgba_8_u16(bounds_start, src3, weights, store_3);
-                jx += 8;
+            if DEINTERLEAVE && bounds_size >= 24 {
+                let zero = vdupq_n_s32(0);
+                let mut accum_store_0 = (zero, zero, zero);
+                let mut accum_store_1 = (zero, zero, zero);
+                let mut accum_store_2 = (zero, zero, zero);
+                let mut accum_store_3 = (zero, zero, zero);
+                while jx + 8 <= bounds_size {
+                    let bounds_start = bounds.start + jx;
+                    let w_ptr = weights.get_unchecked(jx..);
+                    let weights = vld1q_s16(w_ptr.as_ptr());
+                    accum_store_0 =
+                        accumulate_deinterleaved(bounds_start, src0, weights, accum_store_0);
+                    accum_store_1 =
+                        accumulate_deinterleaved(bounds_start, src1, weights, accum_store_1);
+                    accum_store_2 =
+                        accumulate_deinterleaved(bounds_start, src2, weights, accum_store_2);
+                    accum_store_3 =
+                        accumulate_deinterleaved(bounds_start, src3, weights, accum_store_3);
+                    jx += 8;
+                }
+                store_0 = reduce_deinterleaved(accum_store_0, store_0);
+                store_1 = reduce_deinterleaved(accum_store_1, store_1);
+                store_2 = reduce_deinterleaved(accum_store_2, store_2);
+                store_3 = reduce_deinterleaved(accum_store_3, store_3);
+            } else {
+                while jx + 8 <= bounds_size {
+                    let bounds_start = bounds.start + jx;
+                    let w_ptr = weights.get_unchecked(jx..);
+                    let weights = vld1q_s16(w_ptr.as_ptr());
+                    store_0 = conv_horiz_rgba_8_u16(bounds_start, src0, weights, store_0);
+                    store_1 = conv_horiz_rgba_8_u16(bounds_start, src1, weights, store_1);
+                    store_2 = conv_horiz_rgba_8_u16(bounds_start, src2, weights, store_2);
+                    store_3 = conv_horiz_rgba_8_u16(bounds_start, src3, weights, store_3);
+                    jx += 8;
+                }
             }
 
             while jx + 4 <= bounds_size {
@@ -258,7 +329,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4_lb_u16(
     }
 }
 
-pub(crate) fn convolve_horizontal_rgb_neon_u16_lb_row(
+pub(crate) fn convolve_horizontal_rgb_neon_u16_lb_row<const DEINTERLEAVE: bool>(
     src: &[u16],
     dst: &mut [u16],
     filter_weights: &FilterWeights<i16>,
@@ -287,12 +358,25 @@ pub(crate) fn convolve_horizontal_rgb_neon_u16_lb_row(
             let mut jx = 0usize;
             let mut store = vdupq_n_s32(ROUNDING_CONST);
 
-            while jx + 8 <= bounds_size {
-                let w_ptr = weights.get_unchecked(jx..);
-                let weights = vld1q_s16(w_ptr.as_ptr());
-                let bounds_start = bounds.start + jx;
-                store = conv_horiz_rgba_8_u16(bounds_start, src, weights, store);
-                jx += 8;
+            if DEINTERLEAVE && bounds_size >= 24 {
+                let zero = vdupq_n_s32(0);
+                let mut accum_store = (zero, zero, zero);
+                while jx + 8 <= bounds_size {
+                    let w_ptr = weights.get_unchecked(jx..);
+                    let weights = vld1q_s16(w_ptr.as_ptr());
+                    let bounds_start = bounds.start + jx;
+                    accum_store = accumulate_deinterleaved(bounds_start, src, weights, accum_store);
+                    jx += 8;
+                }
+                store = reduce_deinterleaved(accum_store, store);
+            } else {
+                while jx + 8 <= bounds_size {
+                    let w_ptr = weights.get_unchecked(jx..);
+                    let weights = vld1q_s16(w_ptr.as_ptr());
+                    let bounds_start = bounds.start + jx;
+                    store = conv_horiz_rgba_8_u16(bounds_start, src, weights, store);
+                    jx += 8;
+                }
             }
 
             while jx + 4 <= bounds_size {
@@ -323,6 +407,69 @@ pub(crate) fn convolve_horizontal_rgb_neon_u16_lb_row(
             let store_16_0 = vmin_u16(vqshrun_n_s32::<PRECISION>(store), v_max_colors);
 
             set_pixel(dst, store_16_0);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::filter_weights::FilterBounds;
+
+    #[test]
+    fn deinterleaved_taps_match_packed_taps_at_row_end() {
+        for depth in [10, 12] {
+            let max = (1 << depth) - 1;
+            for taps in [8, 23, 24, 25, 29, 31, 32, 49] {
+                let row_len = (taps + 1) * 3;
+                let src_stride = row_len + 7;
+                let source: Vec<u16> = (0..3 * src_stride + row_len)
+                    .map(|i| (i * 739 + i / 13) as u16 & max)
+                    .collect();
+                let weights = FilterWeights::new(
+                    (0..taps).map(|i| ((i * 731) % 2500) as i16 - 650).collect(),
+                    taps,
+                    taps,
+                    1,
+                    taps as i32,
+                    vec![FilterBounds::new(1, taps)],
+                );
+                let mut expected = [0xa5; 3];
+                let mut actual = [0xa5; 3];
+                convolve_horizontal_rgb_neon_u16_lb_row::<false>(
+                    &source[3 * src_stride..],
+                    &mut expected,
+                    &weights,
+                    depth,
+                );
+                convolve_horizontal_rgb_neon_u16_lb_row::<true>(
+                    &source[3 * src_stride..],
+                    &mut actual,
+                    &weights,
+                    depth,
+                );
+                assert_eq!(expected, actual, "{depth} bits, {taps} taps");
+
+                let mut expected = [0xa5; 3 * 5 + 3];
+                let mut actual = [0xa5; 3 * 5 + 3];
+                convolve_horizontal_rgb_neon_rows_4_lb_u16::<false>(
+                    &source,
+                    src_stride,
+                    &mut expected,
+                    5,
+                    &weights,
+                    depth,
+                );
+                convolve_horizontal_rgb_neon_rows_4_lb_u16::<true>(
+                    &source,
+                    src_stride,
+                    &mut actual,
+                    5,
+                    &weights,
+                    depth,
+                );
+                assert_eq!(expected, actual, "{depth} bits, {taps} taps");
+            }
         }
     }
 }

@@ -74,10 +74,10 @@ where
             let dst = dst_target.chunks_mut(dst_stride * 4).take(batches);
             for (y, dst) in dst.enumerate() {
                 let real_y = rows.start + y * 4;
-                #[cfg(all(target_arch = "aarch64", feature = "rdm"))]
+                #[cfg(all(target_arch = "aarch64", feature = "neon"))]
                 self.vertical_filter
                     .run_on_band_rows(source, scratch, real_y, dst_bit_depth);
-                #[cfg(not(all(target_arch = "aarch64", feature = "rdm")))]
+                #[cfg(not(all(target_arch = "aarch64", feature = "neon")))]
                 for (i, scratch_row) in scratch.chunks_exact_mut(source_row_len).enumerate() {
                     self.vertical_filter.run_on_band_row(
                         source,
@@ -150,7 +150,7 @@ where
             let dst = dst_target.chunks_mut(dst_stride * 4).take(dst_height / 4);
             for (y, dst) in dst.enumerate() {
                 let real_y = y * 4;
-                #[cfg(all(target_arch = "aarch64", feature = "rdm"))]
+                #[cfg(all(target_arch = "aarch64", feature = "neon"))]
                 self.vertical_filter.run_on_4_rows(
                     source_buffer,
                     scratch,
@@ -159,7 +159,7 @@ where
                     real_y,
                     dst_bit_depth,
                 );
-                #[cfg(not(all(target_arch = "aarch64", feature = "rdm")))]
+                #[cfg(not(all(target_arch = "aarch64", feature = "neon")))]
                 for (i, scratch_row) in scratch.chunks_mut(source.width * N).enumerate() {
                     self.vertical_filter.run_on_row(
                         source_buffer,
