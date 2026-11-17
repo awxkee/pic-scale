@@ -71,7 +71,7 @@ unsafe fn load_inputs<const VECTORS: usize>(ptr: *const f32) -> [float32x4_t; VE
 }
 
 #[inline(always)]
-unsafe fn accumulate_f32<const VECTORS: usize>(
+fn accumulate_f32<const VECTORS: usize>(
     acc: &mut [float32x4_t; VECTORS],
     pixels: [float32x4_t; VECTORS],
     weight: f32,
@@ -85,7 +85,7 @@ unsafe fn accumulate_f32<const VECTORS: usize>(
 }
 
 #[target_feature(enable = "neon")]
-unsafe fn convolve_pair_f32<const TAPS: usize, const STEP: usize, const VECTORS: usize>(
+fn convolve_pair_f32<const TAPS: usize, const STEP: usize, const VECTORS: usize>(
     input: &[f32],
     stride: usize,
     first: &mut [f32],
