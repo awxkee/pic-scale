@@ -68,8 +68,8 @@
     ]
   },
   "devDependencies": {
-    "@napi-rs/cli": "^2",
-    "typescript": "^5"
+    "@napi-rs/cli": "^3.10.12",
+    "typescript": "^7.0.2"
   },
   "peerDependenciesMeta": {
     "@types/node": {

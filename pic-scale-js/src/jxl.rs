@@ -34,8 +34,7 @@ use jixel::{
     encode_image_gray_alpha, encode_image_gray_alpha_12bit, encode_image_with_alpha,
     encode_image_with_alpha_12bit, encode_image_with_alpha_f32,
 };
-use jxl::api::{JxlColorType, JxlDataFormat};
-use jxl::headers::extra_channels::ExtraChannel;
+use jxl::api::{ExtraChannel, JxlColorType, JxlDataFormat};
 
 pub(crate) fn is_jxl(bytes: &[u8]) -> bool {
     if bytes.len() < 2 {
@@ -49,23 +48,18 @@ pub(crate) fn is_jxl(bytes: &[u8]) -> bool {
 
 pub(crate) fn decode_jxl(bytes: &[u8]) -> Result<DynamicImage, PicError> {
     use jxl::api::{
-        Endianness, JxlDecoder, JxlDecoderOptions, JxlOutputBuffer, JxlPixelFormat,
-        ProcessingResult,
+        Endianness, Event, JxlDecoder, JxlDecoderOptions, JxlOutputBuffer, JxlPixelFormat,
     };
 
     let mut input = bytes;
 
-    let mut decoder_with_image_info = match JxlDecoder::new(JxlDecoderOptions::default())
-        .process(&mut input)
-        .map_err(|x| PicError::Format(format!("jxl {x}")))?
-    {
-        ProcessingResult::Complete { result: d } => d,
-        ProcessingResult::NeedsMoreInput { .. } => {
-            return Err(PicError::Format("jxl: truncated before basic_info".into()));
-        }
-    };
+    let mut decoder = JxlDecoder::new(JxlDecoderOptions::default());
+    let map_err = |error: jxl::error::Error| PicError::Format(format!("jxl {error}"));
+    decoder.process(&mut input, None, None).map_err(map_err)?;
 
-    let info = decoder_with_image_info.basic_info();
+    let info = decoder
+        .basic_info()
+        .ok_or_else(|| PicError::Format("jxl: truncated before basic_info".into()))?;
     let (w, h) = info.size;
     let bits = info.bit_depth.bits_per_sample();
     let has_alpha = info
@@ -73,8 +67,10 @@ pub(crate) fn decode_jxl(bytes: &[u8]) -> Result<DynamicImage, PicError> {
         .iter()
         .any(|ec| ec.ec_type == ExtraChannel::Alpha);
     let is_gray = matches!(
-        decoder_with_image_info.current_pixel_format().color_type,
-        JxlColorType::Grayscale | JxlColorType::GrayscaleAlpha
+        decoder
+            .current_pixel_format()
+            .map(|format| format.color_type),
+        Some(JxlColorType::Grayscale | JxlColorType::GrayscaleAlpha)
     );
 
     let color_type = match (is_gray, has_alpha) {
@@ -90,27 +86,35 @@ pub(crate) fn decode_jxl(bytes: &[u8]) -> Result<DynamicImage, PicError> {
         },
         9..=16 => JxlDataFormat::U16 {
             bit_depth: 16,
-            endianness: Endianness::LittleEndian,
+            endianness: Endianness::native(),
         },
         _ => JxlDataFormat::F32 {
-            endianness: Endianness::LittleEndian,
+            endianness: Endianness::native(),
         },
     });
 
-    decoder_with_image_info.set_pixel_format(JxlPixelFormat {
-        color_type,
-        color_data_format,
-        extra_channel_format: vec![None; info.extra_channels.len()],
-    });
+    decoder
+        .set_pixel_format(JxlPixelFormat {
+            color_type,
+            color_data_format,
+            extra_channel_format: vec![None; info.extra_channels.len()],
+        })
+        .map_err(map_err)?;
+    if !matches!(
+        decoder.process(&mut input, None, None).map_err(map_err)?,
+        Event::FrameHeader
+    ) {
+        return Err(PicError::Format("jxl: truncated before frame info".into()));
+    }
 
-    let decoder_with_frame_info = match decoder_with_image_info
-        .process(&mut input)
-        .map_err(|x| PicError::Format(format!("jxl {x}")))?
+    let mut decode_frame = |out: &mut [JxlOutputBuffer<'_>]| match decoder
+        .process(&mut input, Some(out), None)
+        .map_err(map_err)?
     {
-        ProcessingResult::Complete { result: d } => d,
-        ProcessingResult::NeedsMoreInput { .. } => {
-            return Err(PicError::Format("jxl: truncated before frame info".into()));
-        }
+        Event::FrameComplete { .. } => Ok(()),
+        _ => Err(PicError::Format(
+            "jxl: truncated before frame pixels".into(),
+        )),
     };
 
     macro_rules! decode_pixels {
@@ -118,9 +122,7 @@ pub(crate) fn decode_jxl(bytes: &[u8]) -> Result<DynamicImage, PicError> {
             let stride = w * $channels;
             let mut buf = vec![0u8; h * stride];
             let mut out = [JxlOutputBuffer::new(buf.as_mut_slice(), h, stride)];
-            decoder_with_frame_info
-                .process(&mut input, &mut out)
-                .map_err(|x| PicError::Format(format!("jxl {x}")))?;
+            decode_frame(&mut out)?;
             DynamicImage::$img(
                 image::ImageBuffer::from_raw(w as u32, h as u32, buf)
                     .ok_or_else(|| PicError::Format(format!("jxl {} buffer mismatch", $label)))?,
@@ -134,9 +136,7 @@ pub(crate) fn decode_jxl(bytes: &[u8]) -> Result<DynamicImage, PicError> {
                 h,
                 stride_bytes,
             )];
-            decoder_with_frame_info
-                .process(&mut input, &mut out)
-                .map_err(|x| PicError::Format(format!("jxl {x}")))?;
+            decode_frame(&mut out)?;
             DynamicImage::$img(
                 image::ImageBuffer::from_raw(w as u32, h as u32, buf)
                     .ok_or_else(|| PicError::Format(format!("jxl {} buffer mismatch", $label)))?,
@@ -164,9 +164,7 @@ pub(crate) fn decode_jxl(bytes: &[u8]) -> Result<DynamicImage, PicError> {
                 h,
                 stride_bytes,
             )];
-            decoder_with_frame_info
-                .process(&mut input, &mut out)
-                .map_err(|x| PicError::Format(format!("jxl {x}")))?;
+            decode_frame(&mut out)?;
             let rgb: Vec<f32> = buf.iter().flat_map(|&v| [v, v, v]).collect();
             DynamicImage::ImageRgb32F(
                 image::ImageBuffer::from_raw(w as u32, h as u32, rgb).ok_or_else(|| {
@@ -182,9 +180,7 @@ pub(crate) fn decode_jxl(bytes: &[u8]) -> Result<DynamicImage, PicError> {
                 h,
                 stride_bytes,
             )];
-            decoder_with_frame_info
-                .process(&mut input, &mut out)
-                .map_err(|x| PicError::Format(format!("jxl {x}")))?;
+            decode_frame(&mut out)?;
             let rgba: Vec<f32> = buf
                 .as_chunks::<2>()
                 .0

@@ -29,8 +29,9 @@
 use crate::core::PicError;
 use crate::transpose::apply_orientation;
 use hpvca::{ChromaFormat, EncodeConfig};
-use hpvcd::Orientation;
-use image::{DynamicImage, Luma};
+use hpvcd::{CleanAperture, Orientation, YuvBuffer};
+use image::DynamicImage;
+use image::math::Rect;
 use std::num::NonZeroUsize;
 
 fn expand_to_16bit(buffer: &mut [u16], is12_bit: bool) {
@@ -59,7 +60,7 @@ fn to_core_orientation(orientation: hpvcd::Orientation) -> crate::metadata::Orie
 }
 
 pub(crate) fn decode_heic(bytes: &[u8]) -> crate::core::Result<DynamicImage> {
-    use hpvcd::{ChromaFormat, MatrixCoefficients};
+    use hpvcd::{ChromaFormat, MatrixCoefficients, PlanarImage};
     use yuv::{
         YuvPlanarImage, YuvPlanarImageWithAlpha, YuvRange, YuvStandardMatrix, i010_alpha_to_rgba10,
         i010_to_rgb10, i012_alpha_to_rgba12, i012_to_rgb12, i210_alpha_to_rgba10, i210_to_rgb10,
@@ -75,21 +76,17 @@ pub(crate) fn decode_heic(bytes: &[u8]) -> crate::core::Result<DynamicImage> {
 
     let dec = hpvcd::decode_heic_yuv(bytes).map_err(|e| PicError::Format(format!("hpvcd: {e}")))?;
 
-    let w = dec.width;
-    let h = dec.height;
+    let w = dec.width() as u32;
+    let h = dec.height() as u32;
     let bit_depth = dec.bit_depth.bits() as u32;
     let high_bit = bit_depth > 8;
     let is_12 = bit_depth >= 12;
 
-    // Chroma subsampling factors → tight plane strides.
     let (sub_w, sub_h) = match dec.chroma {
         ChromaFormat::Yuv420 => (2u32, 2u32),
         ChromaFormat::Yuv422 => (2, 1),
         ChromaFormat::Yuv444 | ChromaFormat::Monochrome => (1, 1),
     };
-    let y_stride = w;
-    let c_stride = w.div_ceil(sub_w);
-    let _ch = h.div_ceil(sub_h);
 
     let mut matrix = YuvStandardMatrix::Bt601;
     let mut range = YuvRange::Limited;
@@ -117,50 +114,36 @@ pub(crate) fn decode_heic(bytes: &[u8]) -> crate::core::Result<DynamicImage> {
     }
 
     if dec.chroma == ChromaFormat::Monochrome {
-        return finish_monochrome(&dec, w, h, high_bit, is_12);
+        let img = decode_monochrome(dec.planes, w, h, is_12)?;
+        return Ok(finish_heic(img, dec.clean_aperture, dec.orientation));
     }
 
     let rgb_stride = w * 3;
     let rgba_stride = w * 4;
-    let has_alpha = dec.alpha.is_some();
 
     let img = if high_bit {
-        let y16 = match dec.y.as_u16() {
-            None => {
-                return Err(PicError::Format(
-                    "HEIC RGBA10/RGBA12 Luma is not actually 10/12".to_string(),
-                ));
-            }
-            Some(v) => v,
-        };
-        let cb16 = match dec.cb.as_u16() {
-            None => {
-                return Err(PicError::Format(
-                    "HEIC RGBA10/RGBA12 Cb is not actually 10/12".to_string(),
-                ));
-            }
-            Some(v) => v,
-        };
-        let cr16 = match dec.cr.as_u16() {
-            None => {
-                return Err(PicError::Format(
-                    "HEIC RGBA10/RGBA12 Cr is not actually 10/12".to_string(),
-                ));
-            }
-            Some(v) => v,
+        let Some(PlanarImage {
+            y,
+            cb: Some(cb),
+            cr: Some(cr),
+        }) = dec.planes.as_u16()
+        else {
+            return Err(PicError::Format(
+                "HEIC: missing or unsupported YCbCr planes".into(),
+            ));
         };
 
         if is_ycgco {
             if let Some(a) = dec.alpha.as_ref().and_then(|a| a.as_u16()) {
                 let yuva = YuvPlanarImageWithAlpha {
-                    y_plane: y16,
-                    y_stride,
-                    u_plane: cb16,
-                    u_stride: c_stride,
-                    v_plane: cr16,
-                    v_stride: c_stride,
-                    a_plane: a,
-                    a_stride: y_stride,
+                    y_plane: y.data(),
+                    y_stride: y.stride() as u32,
+                    u_plane: cb.data(),
+                    u_stride: cb.stride() as u32,
+                    v_plane: cr.data(),
+                    v_stride: cr.stride() as u32,
+                    a_plane: a.data(),
+                    a_stride: a.stride() as u32,
                     width: w,
                     height: h,
                 };
@@ -178,12 +161,12 @@ pub(crate) fn decode_heic(bytes: &[u8]) -> crate::core::Result<DynamicImage> {
                 rgba16_image(w, h, out)?
             } else {
                 let yuv = YuvPlanarImage {
-                    y_plane: y16,
-                    y_stride,
-                    u_plane: cb16,
-                    u_stride: c_stride,
-                    v_plane: cr16,
-                    v_stride: c_stride,
+                    y_plane: y.data(),
+                    y_stride: y.stride() as u32,
+                    u_plane: cb.data(),
+                    u_stride: cb.stride() as u32,
+                    v_plane: cr.data(),
+                    v_stride: cr.stride() as u32,
                     width: w,
                     height: h,
                 };
@@ -202,14 +185,14 @@ pub(crate) fn decode_heic(bytes: &[u8]) -> crate::core::Result<DynamicImage> {
             }
         } else if let Some(a) = dec.alpha.as_ref().and_then(|a| a.as_u16()) {
             let yuva = YuvPlanarImageWithAlpha {
-                y_plane: y16,
-                y_stride,
-                u_plane: cb16,
-                u_stride: c_stride,
-                v_plane: cr16,
-                v_stride: c_stride,
-                a_plane: a,
-                a_stride: y_stride,
+                y_plane: y.data(),
+                y_stride: y.stride() as u32,
+                u_plane: cb.data(),
+                u_stride: cb.stride() as u32,
+                v_plane: cr.data(),
+                v_stride: cr.stride() as u32,
+                a_plane: a.data(),
+                a_stride: a.stride() as u32,
                 width: w,
                 height: h,
             };
@@ -227,12 +210,12 @@ pub(crate) fn decode_heic(bytes: &[u8]) -> crate::core::Result<DynamicImage> {
             rgba16_image(w, h, out)?
         } else {
             let yuv = YuvPlanarImage {
-                y_plane: y16,
-                y_stride,
-                u_plane: cb16,
-                u_stride: c_stride,
-                v_plane: cr16,
-                v_stride: c_stride,
+                y_plane: y.data(),
+                y_stride: y.stride() as u32,
+                u_plane: cb.data(),
+                u_stride: cb.stride() as u32,
+                v_plane: cr.data(),
+                v_stride: cr.stride() as u32,
                 width: w,
                 height: h,
             };
@@ -250,42 +233,28 @@ pub(crate) fn decode_heic(bytes: &[u8]) -> crate::core::Result<DynamicImage> {
             rgb16_image(w, h, out)?
         }
     } else {
-        let y8 = match dec.y.as_u8() {
-            None => {
-                return Err(PicError::Format(
-                    "HEIC RGBA8 Luma is not actually 8".to_string(),
-                ));
-            }
-            Some(v) => v,
-        };
-        let cb8 = match dec.cb.as_u8() {
-            None => {
-                return Err(PicError::Format(
-                    "HEIC RGBA8 Cb is not actually 8".to_string(),
-                ));
-            }
-            Some(v) => v,
-        };
-        let cr8 = match dec.cr.as_u8() {
-            None => {
-                return Err(PicError::Format(
-                    "HEIC RGBA8 Cr is not actually 8".to_string(),
-                ));
-            }
-            Some(v) => v,
+        let Some(PlanarImage {
+            y,
+            cb: Some(cb),
+            cr: Some(cr),
+        }) = dec.planes.as_u8()
+        else {
+            return Err(PicError::Format(
+                "HEIC: missing or unsupported YCbCr planes".into(),
+            ));
         };
 
         if is_ycgco {
             if let Some(a) = dec.alpha.as_ref().and_then(|a| a.as_u8()) {
                 let yuv = YuvPlanarImageWithAlpha {
-                    y_plane: y8,
-                    y_stride,
-                    u_plane: cb8,
-                    u_stride: c_stride,
-                    v_plane: cr8,
-                    v_stride: c_stride,
-                    a_plane: a,
-                    a_stride: y_stride,
+                    y_plane: y.data(),
+                    y_stride: y.stride() as u32,
+                    u_plane: cb.data(),
+                    u_stride: cb.stride() as u32,
+                    v_plane: cr.data(),
+                    v_stride: cr.stride() as u32,
+                    a_plane: a.data(),
+                    a_stride: a.stride() as u32,
                     width: w,
                     height: h,
                 };
@@ -299,12 +268,12 @@ pub(crate) fn decode_heic(bytes: &[u8]) -> crate::core::Result<DynamicImage> {
                 rgba8_image(w, h, rgba)?
             } else {
                 let yuv = YuvPlanarImage {
-                    y_plane: y8,
-                    y_stride,
-                    u_plane: cb8,
-                    u_stride: c_stride,
-                    v_plane: cr8,
-                    v_stride: c_stride,
+                    y_plane: y.data(),
+                    y_stride: y.stride() as u32,
+                    u_plane: cb.data(),
+                    u_stride: cb.stride() as u32,
+                    v_plane: cr.data(),
+                    v_stride: cr.stride() as u32,
                     width: w,
                     height: h,
                 };
@@ -319,14 +288,14 @@ pub(crate) fn decode_heic(bytes: &[u8]) -> crate::core::Result<DynamicImage> {
             }
         } else if let Some(a) = dec.alpha.as_ref().and_then(|a| a.as_u8()) {
             let yuv = YuvPlanarImageWithAlpha {
-                y_plane: y8,
-                y_stride,
-                u_plane: cb8,
-                u_stride: c_stride,
-                v_plane: cr8,
-                v_stride: c_stride,
-                a_plane: a,
-                a_stride: y_stride,
+                y_plane: y.data(),
+                y_stride: y.stride() as u32,
+                u_plane: cb.data(),
+                u_stride: cb.stride() as u32,
+                v_plane: cr.data(),
+                v_stride: cr.stride() as u32,
+                a_plane: a.data(),
+                a_stride: a.stride() as u32,
                 width: w,
                 height: h,
             };
@@ -340,12 +309,12 @@ pub(crate) fn decode_heic(bytes: &[u8]) -> crate::core::Result<DynamicImage> {
             rgba8_image(w, h, rgba)?
         } else {
             let yuv = YuvPlanarImage {
-                y_plane: y8,
-                y_stride,
-                u_plane: cb8,
-                u_stride: c_stride,
-                v_plane: cr8,
-                v_stride: c_stride,
+                y_plane: y.data(),
+                y_stride: y.stride() as u32,
+                u_plane: cb.data(),
+                u_stride: cb.stride() as u32,
+                v_plane: cr.data(),
+                v_stride: cr.stride() as u32,
                 width: w,
                 height: h,
             };
@@ -360,8 +329,7 @@ pub(crate) fn decode_heic(bytes: &[u8]) -> crate::core::Result<DynamicImage> {
         }
     };
 
-    let _ = has_alpha; // (kept for parity/readability)
-    Ok(apply_orientation(img, to_core_orientation(dec.orientation)))
+    Ok(finish_heic(img, dec.clean_aperture, dec.orientation))
 }
 
 fn rgb8_image(w: u32, h: u32, buf: Vec<u8>) -> crate::core::Result<DynamicImage> {
@@ -389,63 +357,73 @@ fn rgba16_image(w: u32, h: u32, buf: Vec<u16>) -> crate::core::Result<DynamicIma
     ))
 }
 
-/// 4:0:0 monochrome: replicate the luma plane across R, G, B.
-fn finish_monochrome(
-    dec: &hpvcd::DecodedYuv,
+fn decode_monochrome(
+    planes: YuvBuffer,
     w: u32,
     h: u32,
-    high_bit: bool,
     is_12: bool,
 ) -> crate::core::Result<DynamicImage> {
-    let img = if high_bit {
-        let mut y = dec.y.as_u16().expect("high-bit luma is u16").to_vec();
-        expand_to_16bit(&mut y, is_12);
-        DynamicImage::ImageLuma16(
-            image::ImageBuffer::<Luma<u16>, Vec<u16>>::from_raw(w, h, y.to_vec())
-                .ok_or_else(|| PicError::Format("HEIC RGB mismatch".into()))?,
-        )
-    } else {
-        let y = dec.y.as_u8().expect("8-bit luma is u8");
-        if let Some(alpha) = dec.alpha.as_ref() {
-            let y = match dec.y.as_u8() {
-                None => {
-                    return Err(PicError::Format(
-                        "HEIC RGBA8 luma 8 is not actually 8".into(),
-                    ));
-                }
-                Some(v) => v,
-            };
-            let alpha = match alpha.as_u8() {
-                None => {
-                    return Err(PicError::Format(
-                        "HEIC RGBA8 alpha 8 is not actually 8".into(),
-                    ));
-                }
-                Some(v) => v,
-            };
-            let mut new_img = vec![0u8; dec.width as usize * dec.height as usize * 2];
-            for ((dst, src), alpha) in new_img
-                .as_chunks_mut::<2>()
-                .0
-                .iter_mut()
-                .zip(y.iter())
-                .zip(alpha.iter())
-            {
-                dst[0] = *src;
-                dst[1] = *alpha;
-            }
-            DynamicImage::ImageLuma8(
-                image::GrayImage::from_raw(w, h, y.to_vec())
-                    .ok_or_else(|| PicError::Format("HEIC RGB mismatch".into()))?,
-            )
-        } else {
-            DynamicImage::ImageLuma8(
-                image::GrayImage::from_raw(w, h, y.to_vec())
-                    .ok_or_else(|| PicError::Format("HEIC RGB mismatch".into()))?,
-            )
+    let map_err = |error| PicError::Format(format!("hpvcd: {error}"));
+    let size_error = || PicError::Format("HEIC luma buffer mismatch".into());
+    let img = match planes {
+        YuvBuffer::U16(planes) => {
+            let mut y = planes.y.into_tight().map_err(map_err)?;
+            expand_to_16bit(&mut y, is_12);
+            DynamicImage::ImageLuma16(image::ImageBuffer::from_raw(w, h, y).ok_or_else(size_error)?)
+        }
+        YuvBuffer::U8(planes) => {
+            let y = planes.y.into_tight().map_err(map_err)?;
+            DynamicImage::ImageLuma8(image::GrayImage::from_raw(w, h, y).ok_or_else(size_error)?)
         }
     };
-    Ok(apply_orientation(img, to_core_orientation(dec.orientation)))
+    Ok(img)
+}
+
+fn finish_heic(
+    img: DynamicImage,
+    aperture: Option<CleanAperture>,
+    orientation: Orientation,
+) -> DynamicImage {
+    let img = match aperture.and_then(|aperture| aperture_rect(aperture, img.width(), img.height()))
+    {
+        Some(rect) => img.crop(rect),
+        None => img,
+    };
+    apply_orientation(img, to_core_orientation(orientation))
+}
+
+fn aperture_rect(aperture: CleanAperture, width: u32, height: u32) -> Option<Rect> {
+    fn crop_origin(full: u32, size: u32, offset: i32, denominator: u32) -> Option<u32> {
+        let margin = full.checked_sub(size)?;
+        let denominator = i128::from(denominator);
+        // The crop starts at half the remaining margin plus the signed center offset.
+        let numerator = i128::from(margin) * denominator + 2 * i128::from(offset);
+        let divisor = 2 * denominator;
+        if numerator.checked_rem(divisor)? != 0 {
+            return None;
+        }
+        let origin = u32::try_from(numerator / divisor).ok()?;
+        (origin <= margin).then_some(origin)
+    }
+
+    if aperture.width_n.checked_rem(aperture.width_d)? != 0
+        || aperture.height_n.checked_rem(aperture.height_d)? != 0
+    {
+        return None;
+    }
+    let w = aperture.width_pixels()?;
+    let h = aperture.height_pixels()?;
+    if w == 0 || h == 0 || (w, h) == (width, height) {
+        return None;
+    }
+    let x = crop_origin(width, w, aperture.horiz_off_n, aperture.horiz_off_d)?;
+    let y = crop_origin(height, h, aperture.vert_off_n, aperture.vert_off_d)?;
+    Some(Rect {
+        x,
+        y,
+        width: w,
+        height: h,
+    })
 }
 
 pub(crate) fn encode_heic(
