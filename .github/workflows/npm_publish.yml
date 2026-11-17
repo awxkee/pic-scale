@@ -38,7 +38,7 @@ jobs:
             toolchain: nightly
             features: aarch64_set
           - target: aarch64-apple-darwin
-            runner: macos-14
+            runner: macos-15
             toolchain: nightly
             features: aarch64_set
           - target: x86_64-pc-windows-msvc
