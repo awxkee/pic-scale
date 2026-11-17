@@ -1,6 +1,6 @@
 [package]
 name = "pic-scale-js"
-version = "0.7.12"
+version = "0.7.13"
 edition = "2024"
 description = "Node.js and WASM bindings for pic-scale image resampling"
 license = "BSD-3-Clause OR Apache-2.0"
@@ -8,10 +8,9 @@ keywords = ["scale", "resize", "image-resize"]
 authors = ["Radzivon Bartoshyk"]
 documentation = "https://github.com/awxkee/pic-scale"
 categories = ["multimedia::images", "multimedia::video"]
-homepage = "https://github.com/awxkee/pic-scale"
 repository = "https://github.com/awxkee/pic-scale"
 exclude = ["*.jpg", "/assets", "*.png", "*.sh", "/assets/*", "/.github"]
-rust-version = "1.89.0"
+rust-version = "1.94.0"
 
 [lib]
 crate-type = ["cdylib"]

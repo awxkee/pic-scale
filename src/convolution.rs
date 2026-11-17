@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+use crate::filter_weights::FilterBounds;
 use crate::filter_weights::FilterWeights;
 use crate::image_store::ImageStoreMut;
 use crate::scaler::WorkloadStrategy;
@@ -81,17 +82,63 @@ where
     fn run_on_row(&self, src: &[T], dst: &mut [T], bit_depth: u32);
 }
 
+pub(crate) struct ColumnSource<'a, T> {
+    pub(crate) pixels: &'a [T],
+    pub(crate) width: usize,
+    pub(crate) stride: usize,
+    // Filter bounds are in full-image coordinates, even for a source band.
+    pub(crate) first_row: usize,
+}
+
 pub(crate) trait ColumnFilter<T, const N: usize>
 where
     [T]: ToOwned<Owned = Vec<T>>,
 {
     fn filter(&self, source: &ImageStore<'_, T, N>, destination: &mut ImageStoreMut<T, N>);
+    fn source_bounds(&self, row: usize) -> FilterBounds;
+
+    #[cfg(all(target_arch = "aarch64", feature = "rdm"))]
+    fn run_on_4_rows(
+        &self,
+        src: &[T],
+        dst: &mut [T],
+        dst_width: usize,
+        src_stride: usize,
+        row: usize,
+        bit_depth: u32,
+    ) {
+        for (offset, dst) in dst.chunks_exact_mut(dst_width * N).enumerate() {
+            self.run_on_row(src, dst, dst_width, src_stride, row + offset, bit_depth);
+        }
+    }
+
     fn run_on_row(
         &self,
         src: &[T],
         dst: &mut [T],
         dst_width: usize,
         src_stride: usize,
+        row: usize,
+        bit_depth: u32,
+    );
+
+    #[cfg(all(target_arch = "aarch64", feature = "rdm"))]
+    fn run_on_band_rows(
+        &self,
+        source: &ColumnSource<'_, T>,
+        dst: &mut [T],
+        row: usize,
+        bit_depth: u32,
+    ) {
+        for (offset, dst) in dst.chunks_exact_mut(source.width * N).enumerate() {
+            self.run_on_band_row(source, dst, row + offset, bit_depth);
+        }
+    }
+
+    fn run_on_band_row(
+        &self,
+        source: &ColumnSource<'_, T>,
+        dst: &mut [T],
         row: usize,
         bit_depth: u32,
     );

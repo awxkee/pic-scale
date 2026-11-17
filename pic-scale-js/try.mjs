@@ -33,7 +33,7 @@ const require = createRequire(import.meta.url)
 
 const {Image} = require('./pic_scale.node')
 
-const img = await Image.open('../assets/banner2.avif')
+const img = await Image.open('../assets/anto-meneghini-IrohWzafmmA-unsplash.avif')
 console.log(`Loaded: ${img.width}x${img.height}, ${img.channels}ch`)
 await img.save('out.png', {quality: 60})
 

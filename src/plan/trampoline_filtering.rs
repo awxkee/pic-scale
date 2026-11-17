@@ -26,8 +26,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::convolution::{ColumnFilter, RowFilter, TrampolineFilter};
+use crate::convolution::{ColumnFilter, ColumnSource, RowFilter, TrampolineFilter};
 use crate::{ImageSize, ImageStore, ImageStoreMut};
+use std::ops::Range;
 use std::sync::Arc;
 
 pub(crate) struct TrampolineFiltering<T, const N: usize> {
@@ -35,6 +36,85 @@ pub(crate) struct TrampolineFiltering<T, const N: usize> {
     pub(crate) vertical_filter: Arc<dyn ColumnFilter<T, N> + Send + Sync>,
     pub(crate) source_size: ImageSize,
     pub(crate) target_size: ImageSize,
+}
+
+impl<T, const N: usize> TrampolineFiltering<T, N>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
+    // Band-relative bounds have their own dispatch so full-image calls use
+    // the original column filter entry points.
+    pub(crate) fn filter_rows(
+        &self,
+        source: &ColumnSource<'_, T>,
+        destination: &mut ImageStoreMut<T, N>,
+        scratch: &mut [T],
+        rows: Range<usize>,
+    ) {
+        let scratch_size = self.vertical_scratch_size();
+        if scratch.len() < scratch_size {
+            unreachable!(
+                "Scratch size was smaller than required in trampoline filter, this is an internal configuration error"
+            );
+        }
+        let scratch = &mut scratch[..scratch_size];
+
+        let dst_stride = destination.stride();
+        let dst_width = destination.width;
+
+        let dst_bit_depth = destination.bit_depth as u32;
+        let dst = destination.projected();
+        let end = (rows.end * dst_stride).min(dst.len());
+        let mut dst_target = &mut dst[rows.start * dst_stride..end];
+        let mut y_start = rows.start;
+        let source_row_len = source.width * N;
+
+        if rows.len() >= 4 && self.horizontal_filter.can_do_4_rows() {
+            let batches = rows.len() / 4;
+            let dst = dst_target.chunks_mut(dst_stride * 4).take(batches);
+            for (y, dst) in dst.enumerate() {
+                let real_y = rows.start + y * 4;
+                #[cfg(all(target_arch = "aarch64", feature = "rdm"))]
+                self.vertical_filter
+                    .run_on_band_rows(source, scratch, real_y, dst_bit_depth);
+                #[cfg(not(all(target_arch = "aarch64", feature = "rdm")))]
+                for (i, scratch_row) in scratch.chunks_exact_mut(source_row_len).enumerate() {
+                    self.vertical_filter.run_on_band_row(
+                        source,
+                        scratch_row,
+                        real_y + i,
+                        dst_bit_depth,
+                    );
+                }
+                self.horizontal_filter.run_on_4_rows(
+                    scratch,
+                    source_row_len,
+                    dst,
+                    dst_stride,
+                    dst_bit_depth,
+                )
+            }
+            y_start += batches * 4;
+            let processed = (batches * 4 * dst_stride).min(dst_target.len());
+            dst_target = &mut dst_target[processed..];
+        }
+
+        let scratch_row = &mut scratch[..source_row_len];
+        for (y, dst) in dst_target.chunks_mut(dst_stride).enumerate() {
+            self.vertical_filter
+                .run_on_band_row(source, scratch_row, y_start + y, dst_bit_depth);
+            self.horizontal_filter
+                .run_on_row(scratch_row, &mut dst[..dst_width * N], dst_bit_depth)
+        }
+    }
+
+    fn vertical_scratch_size(&self) -> usize {
+        if self.target_size.height >= 4 {
+            self.source_size.width * 4 * N
+        } else {
+            self.source_size.width * N
+        }
+    }
 }
 
 impl<T: Send + Sync, const N: usize> TrampolineFilter<T, N> for TrampolineFiltering<T, N>
@@ -70,6 +150,16 @@ where
             let dst = dst_target.chunks_mut(dst_stride * 4).take(dst_height / 4);
             for (y, dst) in dst.enumerate() {
                 let real_y = y * 4;
+                #[cfg(all(target_arch = "aarch64", feature = "rdm"))]
+                self.vertical_filter.run_on_4_rows(
+                    source_buffer,
+                    scratch,
+                    source.width,
+                    source.stride(),
+                    real_y,
+                    dst_bit_depth,
+                );
+                #[cfg(not(all(target_arch = "aarch64", feature = "rdm")))]
                 for (i, scratch_row) in scratch.chunks_mut(source.width * N).enumerate() {
                     self.vertical_filter.run_on_row(
                         source_buffer,
@@ -111,10 +201,6 @@ where
     }
 
     fn scratch_size(&self) -> usize {
-        if self.target_size.height >= 4 {
-            self.source_size.width * 4.min(self.target_size.height) * N
-        } else {
-            self.source_size.width * N
-        }
+        self.vertical_scratch_size()
     }
 }

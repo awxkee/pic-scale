@@ -142,7 +142,7 @@ pub(crate) fn runner_rgba_fir_f32(
 
     let mut dst_image = Image::new(
         target_size.width as u32,
-        target_size.width as u32,
+        target_size.height as u32,
         pixel_type,
     );
 

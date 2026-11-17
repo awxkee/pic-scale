@@ -30,6 +30,13 @@
 pub(crate) const PRECISION: i32 = 15;
 pub(crate) const ROUNDING_CONST: i32 = 1 << (PRECISION - 1);
 
+pub(crate) fn heap_array<T: Clone, const N: usize>(value: T) -> Box<[T; N]> {
+    vec![value; N]
+        .into_boxed_slice()
+        .try_into()
+        .unwrap_or_else(|_| unreachable!("the vector was created with exactly N elements"))
+}
+
 pub(crate) fn check_image_size_overflow(
     width: usize,
     height: usize,

@@ -29,6 +29,7 @@
 use crate::colors::common_splitter::{SplitPlanInterceptor, Splitter};
 use crate::mixed_storage::CpuRound;
 use crate::plan::Resampling;
+use crate::support::heap_array;
 use crate::validation::PicScaleError;
 use crate::{ImageSize, ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy};
 use colorutils_rs::TransferFunction;
@@ -64,7 +65,7 @@ impl LinearApproxScaler {
 }
 
 struct Common8BitSplitter<const N: usize> {
-    linearization: Box<[u16; 256]>,
+    linearization: [u16; 256],
     gamma: Box<[u8; 65536]>,
     has_alpha: bool,
 }
@@ -153,7 +154,7 @@ impl<const N: usize> Splitter<u8, u16, N> for Common8BitSplitter<N> {
 }
 
 struct Linearization {
-    linearization: Box<[u16; 256]>,
+    linearization: [u16; 256],
     gamma: Box<[u8; 65536]>,
 }
 
@@ -163,9 +164,9 @@ struct Linearization16 {
 }
 
 fn make_linearization(transfer_function: TransferFunction) -> Linearization {
-    let mut linearizing = Box::new([0u16; 256]);
+    let mut linearizing = [0u16; 256];
     let max_lin_depth = (1u32 << 12) - 1;
-    let mut gamma = Box::new([0u8; 65536]);
+    let mut gamma = heap_array(0);
 
     const S: f32 = 1. / 255.;
 
@@ -198,10 +199,10 @@ fn make_linearization16(
     if bit_depth < 8 {
         return Err(PicScaleError::UnsupportedBitDepth(bit_depth));
     }
-    let mut linearizing = Box::new([0u16; 65536]);
+    let mut linearizing = heap_array(0);
     let max_lin_depth = (1u32 << bit_depth) - 1;
     let keep_max = 1u32 << bit_depth;
-    let mut gamma = Box::new([0u16; 65536]);
+    let mut gamma = heap_array(0);
 
     let rcp_max_lin_depth = 1. / max_lin_depth as f32;
 

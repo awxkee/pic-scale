@@ -31,7 +31,30 @@ use crate::filter_weights::FilterWeights;
 use crate::support::{PRECISION, ROUNDING_CONST};
 use std::arch::x86_64::*;
 
-pub(crate) fn convolve_horizontal_rgba_row_4(
+#[inline(always)]
+fn shuffle_four_tap_remainder<const BROADCAST_REMAINDER: bool>(
+    pixels: __m128i,
+    shuffle_pairs: __m256i,
+) -> __m256i {
+    unsafe {
+        if BROADCAST_REMAINDER {
+            // The low lane selects pixels 0 and 1, and the high lane selects pixels 2 and 3.
+            let shuffle = _mm256_setr_epi8(
+                0, -1, 4, -1, 1, -1, 5, -1, 2, -1, 6, -1, 3, -1, 7, -1, 8, -1, 12, -1, 9, -1, 13,
+                -1, 10, -1, 14, -1, 11, -1, 15, -1,
+            );
+            _mm256_shuffle_epi8(_mm256_broadcastsi128_si256(pixels), shuffle)
+        } else {
+            let pixels = _mm256_permute4x64_epi64::<0x50>(_mm256_castsi128_si256(pixels));
+            _mm256_shuffle_epi8(pixels, shuffle_pairs)
+        }
+    }
+}
+
+pub(crate) fn convolve_horizontal_rgba_row_4<
+    const EXACT_FOUR: bool,
+    const BROADCAST_REMAINDER: bool,
+>(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -40,12 +63,21 @@ pub(crate) fn convolve_horizontal_rgba_row_4(
     _: u32,
 ) {
     unsafe {
-        convolve_horizontal_rgba_avx_row_4_impl(src, src_stride, dst, dst_stride, filter_weights);
+        convolve_horizontal_rgba_avx_row_4_impl::<EXACT_FOUR, BROADCAST_REMAINDER>(
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+            filter_weights,
+        );
     }
 }
 
 #[target_feature(enable = "avx2")]
-fn convolve_horizontal_rgba_avx_row_4_impl(
+fn convolve_horizontal_rgba_avx_row_4_impl<
+    const EXACT_FOUR: bool,
+    const BROADCAST_REMAINDER: bool,
+>(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -124,7 +156,35 @@ fn convolve_horizontal_rgba_avx_row_4_impl(
             let src2 = src1.get_unchecked(src_stride..);
             let src3 = src2.get_unchecked(src_stride..);
 
-            if bounds.size > 4 {
+            if EXACT_FOUR && bounds.size == 4 {
+                let src_offset = bounds.start * CN;
+                let w_ptr = weights.as_ptr().cast::<i32>();
+                let w01 = _mm256_set1_epi32(w_ptr.read_unaligned());
+                let w23 = _mm256_set1_epi32(w_ptr.add(1).read_unaligned());
+                let rgba0 = _mm_loadu_si128(src0.as_ptr().add(src_offset).cast());
+                let rgba1 = _mm_loadu_si128(src1.as_ptr().add(src_offset).cast());
+                let rgba2 = _mm_loadu_si128(src2.as_ptr().add(src_offset).cast());
+                let rgba3 = _mm_loadu_si128(src3.as_ptr().add(src_offset).cast());
+                let rows_01 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgba0), rgba1);
+                let rows_23 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgba2), rgba3);
+                store_0 = _mm256_add_epi32(
+                    store_0,
+                    _mm256_madd_epi16(_mm256_shuffle_epi8(rows_01, a_shuffle_2_table), w01),
+                );
+                store_0 = _mm256_add_epi32(
+                    store_0,
+                    _mm256_madd_epi16(_mm256_shuffle_epi8(rows_01, a_shuffle_2_table_hi), w23),
+                );
+                store_1 = _mm256_add_epi32(
+                    store_1,
+                    _mm256_madd_epi16(_mm256_shuffle_epi8(rows_23, a_shuffle_2_table), w01),
+                );
+                store_1 = _mm256_add_epi32(
+                    store_1,
+                    _mm256_madd_epi16(_mm256_shuffle_epi8(rows_23, a_shuffle_2_table_hi), w23),
+                );
+                jx = 4;
+            } else if bounds.size > 4 {
                 let mut store_avx0 = init256;
                 let mut store_avx1 = init256;
                 let mut store_avx2 = init256;
@@ -196,19 +256,22 @@ fn convolve_horizontal_rgba_avx_row_4_impl(
                     let rgb_pixel_3 =
                         _mm_loadu_si128(src3.get_unchecked((bounds_start * CN)..).as_ptr().cast());
 
-                    let rgb_pixel0 =
-                        _mm256_permute4x64_epi64::<0x50>(_mm256_castsi128_si256(rgb_pixel_0));
-                    let rgb_pixel1 =
-                        _mm256_permute4x64_epi64::<0x50>(_mm256_castsi128_si256(rgb_pixel_1));
-                    let rgb_pixel2 =
-                        _mm256_permute4x64_epi64::<0x50>(_mm256_castsi128_si256(rgb_pixel_2));
-                    let rgb_pixel3 =
-                        _mm256_permute4x64_epi64::<0x50>(_mm256_castsi128_si256(rgb_pixel_3));
-
-                    let lo0 = _mm256_shuffle_epi8(rgb_pixel0, a_shuffle_2_table);
-                    let lo1 = _mm256_shuffle_epi8(rgb_pixel1, a_shuffle_2_table);
-                    let lo2 = _mm256_shuffle_epi8(rgb_pixel2, a_shuffle_2_table);
-                    let lo3 = _mm256_shuffle_epi8(rgb_pixel3, a_shuffle_2_table);
+                    let lo0 = shuffle_four_tap_remainder::<BROADCAST_REMAINDER>(
+                        rgb_pixel_0,
+                        a_shuffle_2_table,
+                    );
+                    let lo1 = shuffle_four_tap_remainder::<BROADCAST_REMAINDER>(
+                        rgb_pixel_1,
+                        a_shuffle_2_table,
+                    );
+                    let lo2 = shuffle_four_tap_remainder::<BROADCAST_REMAINDER>(
+                        rgb_pixel_2,
+                        a_shuffle_2_table,
+                    );
+                    let lo3 = shuffle_four_tap_remainder::<BROADCAST_REMAINDER>(
+                        rgb_pixel_3,
+                        a_shuffle_2_table,
+                    );
 
                     store_avx0 = _mm256_add_epi32(store_avx0, _mm256_madd_epi16(lo0, weight01));
                     store_avx1 = _mm256_add_epi32(store_avx1, _mm256_madd_epi16(lo1, weight01));
@@ -216,6 +279,10 @@ fn convolve_horizontal_rgba_avx_row_4_impl(
                     store_avx3 = _mm256_add_epi32(store_avx3, _mm256_madd_epi16(lo3, weight01));
 
                     jx += 4;
+                    if BROADCAST_REMAINDER {
+                        // The eight-tap loop leaves at most one four-tap group.
+                        break;
+                    }
                 }
 
                 store_0 = _mm256_add_epi32(
@@ -295,45 +362,57 @@ fn convolve_horizontal_rgba_avx_row_4_impl(
             store_0 = _mm256_srai_epi32::<PRECISION>(store_0);
             store_1 = _mm256_srai_epi32::<PRECISION>(store_1);
 
-            let store_16_8_0 = _mm256_packus_epi32(store_0, store_0);
-            let store_16_8_1 = _mm256_packus_epi32(store_1, store_1);
+            if EXACT_FOUR {
+                // The low lane holds rows 0 and 2, and the high lane holds rows 1 and 3.
+                let packed16 = _mm256_packus_epi32(store_0, store_1);
+                let packed8 = _mm256_packus_epi16(packed16, packed16);
+                let low = _mm256_castsi256_si128(packed8);
+                let high = _mm256_extracti128_si256::<1>(packed8);
 
-            let packed16_0 = _mm256_packus_epi16(store_16_8_0, store_16_8_0);
-            let packed16_1 = _mm256_packus_epi16(store_16_8_1, store_16_8_1);
+                _mm_storeu_si32(chunk0.as_mut_ptr().cast(), low);
+                _mm_storeu_si32(chunk1.as_mut_ptr().cast(), high);
+                _mm_storeu_si32(chunk2.as_mut_ptr().cast(), _mm_srli_si128::<4>(low));
+                _mm_storeu_si32(chunk3.as_mut_ptr().cast(), _mm_srli_si128::<4>(high));
+            } else {
+                let packed16_0 = _mm256_packus_epi32(store_0, store_0);
+                let packed16_1 = _mm256_packus_epi32(store_1, store_1);
+                let packed8_0 = _mm256_packus_epi16(packed16_0, packed16_0);
+                let packed8_1 = _mm256_packus_epi16(packed16_1, packed16_1);
 
-            _mm_storeu_si32(
-                chunk0.as_mut_ptr() as *mut _,
-                _mm256_castsi256_si128(packed16_0),
-            );
-            _mm_storeu_si32(
-                chunk1.as_mut_ptr() as *mut _,
-                _mm256_extracti128_si256::<1>(packed16_0),
-            );
-            _mm_storeu_si32(
-                chunk2.as_mut_ptr() as *mut _,
-                _mm256_castsi256_si128(packed16_1),
-            );
-            _mm_storeu_si32(
-                chunk3.as_mut_ptr() as *mut _,
-                _mm256_extracti128_si256::<1>(packed16_1),
-            );
+                _mm_storeu_si32(
+                    chunk0.as_mut_ptr().cast(),
+                    _mm256_castsi256_si128(packed8_0),
+                );
+                _mm_storeu_si32(
+                    chunk1.as_mut_ptr().cast(),
+                    _mm256_extracti128_si256::<1>(packed8_0),
+                );
+                _mm_storeu_si32(
+                    chunk2.as_mut_ptr().cast(),
+                    _mm256_castsi256_si128(packed8_1),
+                );
+                _mm_storeu_si32(
+                    chunk3.as_mut_ptr().cast(),
+                    _mm256_extracti128_si256::<1>(packed8_1),
+                );
+            }
         }
     }
 }
 
-pub(crate) fn convolve_horizontal_rgba_avx_row_1(
+pub(crate) fn convolve_horizontal_rgba_avx_row_1<const BROADCAST_REMAINDER: bool>(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
     _: u32,
 ) {
     unsafe {
-        convolve_horizontal_rgba_avx_rows_one_impl(src, dst, filter_weights);
+        convolve_horizontal_rgba_avx_rows_one_impl::<BROADCAST_REMAINDER>(src, dst, filter_weights);
     }
 }
 
 #[target_feature(enable = "avx2")]
-fn convolve_horizontal_rgba_avx_rows_one_impl(
+fn convolve_horizontal_rgba_avx_rows_one_impl<const BROADCAST_REMAINDER: bool>(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
@@ -431,14 +510,17 @@ fn convolve_horizontal_rgba_avx_rows_one_impl(
 
                     let src_ptr = src.get_unchecked((bounds_start * CN)..);
 
-                    let rgb_pixel = _mm256_permute4x64_epi64::<0x50>(_mm256_castsi128_si256(
-                        _mm_loadu_si128(src_ptr.as_ptr().cast()),
-                    ));
-
-                    let lo = _mm256_shuffle_epi8(rgb_pixel, a_shuffle_2_table);
+                    let pixels = _mm_loadu_si128(src_ptr.as_ptr().cast());
+                    let lo = shuffle_four_tap_remainder::<BROADCAST_REMAINDER>(
+                        pixels,
+                        a_shuffle_2_table,
+                    );
 
                     store_avx = _mm256_add_epi32(store_avx, _mm256_madd_epi16(lo, weight01));
                     jx += 4;
+                    if BROADCAST_REMAINDER {
+                        break;
+                    }
                 }
 
                 store = _mm_add_epi32(
@@ -491,6 +573,61 @@ fn convolve_horizontal_rgba_avx_rows_one_impl(
                 dst.as_mut_ptr() as *mut _,
                 _mm_packus_epi16(store_0, store_0),
             );
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{convolve_horizontal_rgba_avx_row_1, convolve_horizontal_rgba_row_4};
+    use crate::filter_weights::{FilterBounds, FilterWeights};
+    use crate::handler_provider::{handle_fixed_row_u8, handle_fixed_rows_4_u8};
+
+    #[test]
+    fn rgba_tap_blocks_match_scalar_at_row_end() {
+        if !std::arch::is_x86_feature_detected!("avx2") {
+            return;
+        }
+
+        for taps in [2, 4, 5, 8, 12, 13, 24, 28] {
+            let src_row_len = (taps + 1) * 4;
+            let src_stride = src_row_len + 3;
+            let src: Vec<u8> = (0..3 * src_stride + src_row_len)
+                .map(|i| (i * 73 + i / src_stride * 19) as u8)
+                .collect();
+            let bounds = vec![
+                FilterBounds::new(0, taps - 1),
+                FilterBounds::new(0, taps),
+                FilterBounds::new(1, taps),
+            ];
+            let dst_row_len = bounds.len() * 4;
+            let dst_stride = dst_row_len + 5;
+            let weights = (0..taps * bounds.len())
+                .map(|i| (9_431 + i * 12_457) as i16)
+                .collect();
+            let filter = FilterWeights::new(weights, taps, taps, bounds.len(), taps as i32, bounds);
+            let mut expected = vec![0xd3; 3 * dst_stride + dst_row_len];
+            let mut actual = expected.clone();
+            handle_fixed_rows_4_u8::<4>(&src, src_stride, &mut expected, dst_stride, &filter, 0);
+            let convolve: fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>, u32) = match taps
+            {
+                4 => convolve_horizontal_rgba_row_4::<true, false>,
+                12 | 13 | 28 => convolve_horizontal_rgba_row_4::<false, true>,
+                _ => convolve_horizontal_rgba_row_4::<false, false>,
+            };
+            convolve(&src, src_stride, &mut actual, dst_stride, &filter, 0);
+            assert_eq!(actual, expected, "four rows, taps={taps}");
+
+            let src = &src[3 * src_stride..];
+            let mut expected = vec![0xd3; dst_row_len];
+            let mut actual = expected.clone();
+            handle_fixed_row_u8::<4>(src, &mut expected, &filter, 0);
+            if matches!(taps, 12 | 13 | 28) {
+                convolve_horizontal_rgba_avx_row_1::<true>(src, &mut actual, &filter, 0);
+            } else {
+                convolve_horizontal_rgba_avx_row_1::<false>(src, &mut actual, &filter, 0);
+            }
+            assert_eq!(actual, expected, "one row, taps={taps}");
         }
     }
 }

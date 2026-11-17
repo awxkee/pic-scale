@@ -26,8 +26,11 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::convolution::{ColumnFilter, ColumnSource};
 use crate::filter_weights::FilterBounds;
-use crate::neon::utils::{expand8_to_14, xvld1q_u8_x2, xvst1q_u8_x2};
+use crate::neon::utils::{expand8_high_to_14, expand8_to_14, xvld1q_u8_x2, xvst1q_u8_x2};
+use crate::plan::VerticalFiltering;
+use crate::{ImageStore, ImageStoreMut};
 use std::arch::aarch64::*;
 
 /// Checking NEON `rdm` availability is required before a call.
@@ -489,4 +492,234 @@ fn convolve_vertical_neon_row_upper(
 
     rem = rem.as_chunks_mut::<8>().1;
     convolve_items(rem, bounds, src, src_stride, weight, cx);
+}
+
+#[inline(always)]
+fn expand_paired_input(row: uint8x16_t) -> (int16x8_t, int16x8_t) {
+    unsafe {
+        (
+            vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip1q_u8(row, row)))),
+            expand8_high_to_14(row),
+        )
+    }
+}
+
+#[target_feature(enable = "rdm")]
+unsafe fn convolve_row_pair<const TAPS: usize, const STEP: usize>(
+    src: &[u8],
+    start: usize,
+    src_stride: usize,
+    first: &mut [u8],
+    second: &mut [u8],
+    first_weights: &[i16],
+    second_weights: &[i16],
+) {
+    let base = unsafe { src.as_ptr().add(start * src_stride) };
+    let first_weights: [_; TAPS] = std::array::from_fn(|i| vdupq_n_s16(first_weights[i]));
+    let second_weights: [_; TAPS] = std::array::from_fn(|i| vdupq_n_s16(second_weights[i]));
+    let rounding = vdupq_n_s16(1 << 5);
+
+    for x in (0..first.len()).step_by(16) {
+        let mut first_low = rounding;
+        let mut first_high = rounding;
+        let mut second_low = rounding;
+        let mut second_high = rounding;
+        unsafe {
+            let source = base.add(x);
+            for (j, &weight) in first_weights[..STEP].iter().enumerate() {
+                let (lo, hi) = expand_paired_input(vld1q_u8(source.add(j * src_stride)));
+                first_low = vqrdmlahq_s16(first_low, lo, weight);
+                first_high = vqrdmlahq_s16(first_high, hi, weight);
+            }
+            // The shared rows feed both accumulators in their original tap order.
+            for j in STEP..TAPS {
+                let (lo, hi) = expand_paired_input(vld1q_u8(source.add(j * src_stride)));
+                first_low = vqrdmlahq_s16(first_low, lo, first_weights[j]);
+                first_high = vqrdmlahq_s16(first_high, hi, first_weights[j]);
+                second_low = vqrdmlahq_s16(second_low, lo, second_weights[j - STEP]);
+                second_high = vqrdmlahq_s16(second_high, hi, second_weights[j - STEP]);
+            }
+            for j in TAPS..TAPS + STEP {
+                let (lo, hi) = expand_paired_input(vld1q_u8(source.add(j * src_stride)));
+                second_low = vqrdmlahq_s16(second_low, lo, second_weights[j - STEP]);
+                second_high = vqrdmlahq_s16(second_high, hi, second_weights[j - STEP]);
+            }
+
+            vst1q_u8(
+                first.as_mut_ptr().add(x),
+                vqshrun_high_n_s16::<6>(vqshrun_n_s16::<6>(first_low), first_high),
+            );
+            vst1q_u8(
+                second.as_mut_ptr().add(x),
+                vqshrun_high_n_s16::<6>(vqshrun_n_s16::<6>(second_low), second_high),
+            );
+        }
+    }
+}
+
+pub(crate) struct PairedRdmVertical<const N: usize>(pub(crate) VerticalFiltering<u8, i16, N>);
+
+type RdmRowPair = unsafe fn(&[u8], usize, usize, &mut [u8], &mut [u8], &[i16], &[i16]);
+
+impl<const N: usize> ColumnFilter<u8, N> for PairedRdmVertical<N> {
+    fn filter(&self, source: &ImageStore<'_, u8, N>, destination: &mut ImageStoreMut<'_, u8, N>) {
+        self.0.filter(source, destination);
+    }
+
+    fn source_bounds(&self, row: usize) -> FilterBounds {
+        self.0.source_bounds(row)
+    }
+
+    fn run_on_row(
+        &self,
+        src: &[u8],
+        dst: &mut [u8],
+        dst_width: usize,
+        src_stride: usize,
+        row: usize,
+        bit_depth: u32,
+    ) {
+        self.0
+            .run_on_row(src, dst, dst_width, src_stride, row, bit_depth);
+    }
+
+    fn run_on_4_rows(
+        &self,
+        src: &[u8],
+        dst: &mut [u8],
+        dst_width: usize,
+        src_stride: usize,
+        row: usize,
+        bit_depth: u32,
+    ) {
+        let source = ColumnSource {
+            pixels: src,
+            width: dst_width,
+            stride: src_stride,
+            first_row: 0,
+        };
+        self.run_on_band_rows(&source, dst, row, bit_depth);
+    }
+
+    fn run_on_band_row(
+        &self,
+        source: &ColumnSource<'_, u8>,
+        dst: &mut [u8],
+        row: usize,
+        bit_depth: u32,
+    ) {
+        self.0.run_on_band_row(source, dst, row, bit_depth);
+    }
+
+    fn run_on_band_rows(
+        &self,
+        source: &ColumnSource<'_, u8>,
+        dst: &mut [u8],
+        row: usize,
+        bit_depth: u32,
+    ) {
+        let row_len = source.width * N;
+        let filter = &self.0.filter_weights;
+        for (index, pair) in dst.chunks_exact_mut(2 * row_len).enumerate() {
+            let y = row + index * 2;
+            let (first, second) = pair.split_at_mut(row_len);
+            let a = filter.bounds[y];
+            let b = filter.bounds[y + 1];
+            let displacement = b.start.checked_sub(a.start);
+            let kernel: Option<RdmRowPair> = if a.size == b.size && row_len.is_multiple_of(16) {
+                match (a.size, displacement) {
+                    (2, Some(0)) => Some(convolve_row_pair::<2, 0>),
+                    (2, Some(1)) => Some(convolve_row_pair::<2, 1>),
+                    (4, Some(0)) => Some(convolve_row_pair::<4, 0>),
+                    (4, Some(1)) => Some(convolve_row_pair::<4, 1>),
+                    (4, Some(2)) => Some(convolve_row_pair::<4, 2>),
+                    (6, Some(0)) => Some(convolve_row_pair::<6, 0>),
+                    (6, Some(1)) => Some(convolve_row_pair::<6, 1>),
+                    (8, Some(2)) => Some(convolve_row_pair::<8, 2>),
+                    (12, Some(2)) => Some(convolve_row_pair::<12, 2>),
+                    _ => None,
+                }
+            } else {
+                None
+            };
+            if let Some(kernel) = kernel {
+                // The factory checks RDM. Each load stays within the
+                // supported pair's validated tap bounds and active row length.
+                unsafe {
+                    kernel(
+                        source.pixels,
+                        a.start - source.first_row,
+                        source.stride,
+                        first,
+                        second,
+                        &filter.weights[y * filter.aligned_size..],
+                        &filter.weights[(y + 1) * filter.aligned_size..],
+                    );
+                }
+            } else {
+                self.0.run_on_band_row(source, first, y, bit_depth);
+                self.0.run_on_band_row(source, second, y + 1, bit_depth);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::filter_weights::FilterWeights;
+
+    #[test]
+    fn paired_rdm_rows_match_individual_rows() {
+        if !std::arch::is_aarch64_feature_detected!("rdm") {
+            return;
+        }
+        for width in [8, 9, 20] {
+            let row_len = width * 4;
+            let src_stride = row_len + 5;
+            for (taps, step) in [
+                (2, 0),
+                (2, 1),
+                (4, 0),
+                (4, 1),
+                (4, 2),
+                (6, 0),
+                (6, 1),
+                (8, 2),
+                (12, 2),
+                (5, 1),
+                (6, 3),
+            ] {
+                let bounds = [1, 1 + step, 4, 4 + step].map(|start| FilterBounds::new(start, taps));
+                let height = bounds[3].start + taps;
+                let src: Vec<u8> = (0..(height - 1) * src_stride + row_len)
+                    .map(|i| (i * 37 + i / src_stride * 53) as u8)
+                    .collect();
+                let weights = (0..taps * 4).map(|i| (3659 * i + 17123) as i16).collect();
+                let filter = PairedRdmVertical(VerticalFiltering::<_, _, 4> {
+                    filter_weights: FilterWeights::new(
+                        weights,
+                        taps,
+                        taps,
+                        4,
+                        taps as i32,
+                        bounds.to_vec(),
+                    ),
+                    filter_row: convolve_vertical_neon_i16_precision,
+                    threading_policy: crate::ThreadingPolicy::Single,
+                });
+                let source = ColumnSource {
+                    pixels: &src[src_stride..],
+                    width,
+                    stride: src_stride,
+                    first_row: 1,
+                };
+                let mut expected = vec![0; row_len * 4];
+                filter.0.run_on_band_rows(&source, &mut expected, 0, 8);
+                let mut actual = vec![0; row_len * 4];
+                filter.run_on_band_rows(&source, &mut actual, 0, 8);
+                assert_eq!(actual, expected, "width={width}, taps={taps}, step={step}");
+            }
+        }
+    }
 }

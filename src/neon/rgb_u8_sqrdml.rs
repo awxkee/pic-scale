@@ -31,6 +31,54 @@ use crate::filter_weights::FilterWeights;
 use crate::neon::utils::load_3b_as_u8x16;
 use std::arch::aarch64::*;
 
+static RGB_SHUFFLE_45: [u8; 16] = [4, 4, 5, 5, 6, 6, 255, 255, 7, 7, 8, 8, 9, 9, 255, 255];
+static RGB_SHUFFLE_67: [u8; 16] = [
+    10, 10, 11, 11, 12, 12, 255, 255, 13, 13, 14, 14, 15, 15, 255, 255,
+];
+static WEIGHT_SHUFFLE_45: [u8; 16] = [8, 9, 8, 9, 8, 9, 255, 255, 10, 11, 10, 11, 10, 11, 255, 255];
+static WEIGHT_SHUFFLE_67: [u8; 16] = [
+    12, 13, 12, 13, 12, 13, 255, 255, 14, 15, 14, 15, 14, 15, 255, 255,
+];
+
+#[must_use]
+#[inline]
+#[target_feature(enable = "rdm")]
+fn conv_horiz_rgb_8(
+    start_x: usize,
+    src: &[u8],
+    weights: [int16x8_t; 4],
+    store: int16x8_t,
+    shuffles: [uint8x16_t; 4],
+) -> int16x8_t {
+    unsafe {
+        let src = src.as_ptr().add(start_x * 3);
+        // These windows span exactly 24 bytes, including at the end of a row.
+        let first = vld1q_u8(src);
+        let last = vld1q_u8(src.add(8));
+        let pair_01 = vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vqtbl1q_u8(
+            first,
+            shuffles[0],
+        ))));
+        let pair_23 = vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vqtbl1q_u8(
+            first,
+            shuffles[1],
+        ))));
+        let pair_45 = vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vqtbl1q_u8(
+            last,
+            shuffles[2],
+        ))));
+        let pair_67 = vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vqtbl1q_u8(
+            last,
+            shuffles[3],
+        ))));
+
+        let store = vqrdmlahq_s16(store, pair_01, weights[0]);
+        let store = vqrdmlahq_s16(store, pair_23, weights[1]);
+        let store = vqrdmlahq_s16(store, pair_45, weights[2]);
+        vqrdmlahq_s16(store, pair_67, weights[3])
+    }
+}
+
 #[must_use]
 #[inline]
 #[target_feature(enable = "rdm")]
@@ -120,7 +168,7 @@ fn write_accumulator_u8(store: int16x8_t, dst: &mut [u8]) {
     }
 }
 
-pub(crate) fn convolve_horizontal_rgb_neon_rdm_rows_4(
+pub(crate) fn convolve_horizontal_rgb_neon_rdm_rows_4<const WIDE: bool>(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -129,7 +177,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_rdm_rows_4(
     _: u32,
 ) {
     unsafe {
-        convolve_horizontal_rgb_neon_rdm_rows_4_impl(
+        convolve_horizontal_rgb_neon_rdm_rows_4_impl::<WIDE>(
             src,
             src_stride,
             dst,
@@ -140,7 +188,7 @@ pub(crate) fn convolve_horizontal_rgb_neon_rdm_rows_4(
 }
 
 #[target_feature(enable = "rdm")]
-fn convolve_horizontal_rgb_neon_rdm_rows_4_impl(
+fn convolve_horizontal_rgb_neon_rdm_rows_4_impl<const WIDE: bool>(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -159,6 +207,19 @@ fn convolve_horizontal_rgb_neon_rdm_rows_4_impl(
         let w01 = vld1q_u8(weights01_shuf.as_ptr());
         let weights23_shuf: [u8; 16] = [4, 5, 4, 5, 4, 5, 255, 255, 6, 7, 6, 7, 6, 7, 255, 255];
         let w23 = vld1q_u8(weights23_shuf.as_ptr());
+
+        let wide_pixel_shuffles = [
+            shuffle_lo,
+            shuffle_hi,
+            vld1q_u8(RGB_SHUFFLE_45.as_ptr()),
+            vld1q_u8(RGB_SHUFFLE_67.as_ptr()),
+        ];
+        let wide_weight_shuffles = [
+            w01,
+            w23,
+            vld1q_u8(WEIGHT_SHUFFLE_45.as_ptr()),
+            vld1q_u8(WEIGHT_SHUFFLE_67.as_ptr()),
+        ];
 
         const ROUNDING_CONST: i16 = 1 << 5;
         let base_values: [i16; 8] = [
@@ -204,6 +265,18 @@ fn convolve_horizontal_rgb_neon_rdm_rows_4_impl(
             let src1 = src0.get_unchecked(src_stride..);
             let src2 = src1.get_unchecked(src_stride..);
             let src3 = src2.get_unchecked(src_stride..);
+
+            while WIDE && jx + 8 <= bounds.size {
+                let start_x = bounds.start + jx;
+                let weights = vreinterpretq_u8_s16(vld1q_s16(weights.as_ptr().add(jx)));
+                let weights = wide_weight_shuffles
+                    .map(|shuffle| vreinterpretq_s16_u8(vqtbl1q_u8(weights, shuffle)));
+                store_0 = conv_horiz_rgb_8(start_x, src0, weights, store_0, wide_pixel_shuffles);
+                store_1 = conv_horiz_rgb_8(start_x, src1, weights, store_1, wide_pixel_shuffles);
+                store_2 = conv_horiz_rgb_8(start_x, src2, weights, store_2, wide_pixel_shuffles);
+                store_3 = conv_horiz_rgb_8(start_x, src3, weights, store_3, wide_pixel_shuffles);
+                jx += 8;
+            }
 
             while jx + 4 <= bounds.size {
                 let bounds_start = bounds.start + jx;
@@ -253,19 +326,19 @@ fn convolve_horizontal_rgb_neon_rdm_rows_4_impl(
     }
 }
 
-pub(crate) fn convolve_horizontal_rgb_neon_rdm_row_one(
+pub(crate) fn convolve_horizontal_rgb_neon_rdm_row_one<const WIDE: bool>(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
     _: u32,
 ) {
     unsafe {
-        convolve_horizontal_rgb_neon_row_rdm_one_impl(src, dst, filter_weights);
+        convolve_horizontal_rgb_neon_row_rdm_one_impl::<WIDE>(src, dst, filter_weights);
     }
 }
 
 #[target_feature(enable = "rdm")]
-fn convolve_horizontal_rgb_neon_row_rdm_one_impl(
+fn convolve_horizontal_rgb_neon_row_rdm_one_impl<const WIDE: bool>(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
@@ -282,6 +355,19 @@ fn convolve_horizontal_rgb_neon_row_rdm_one_impl(
         let w01 = vld1q_u8(weights01_shuf.as_ptr());
         let weights23_shuf: [u8; 16] = [4, 5, 4, 5, 4, 5, 255, 255, 6, 7, 6, 7, 6, 7, 255, 255];
         let w23 = vld1q_u8(weights23_shuf.as_ptr());
+
+        let wide_pixel_shuffles = [
+            shuffle_lo,
+            shuffle_hi,
+            vld1q_u8(RGB_SHUFFLE_45.as_ptr()),
+            vld1q_u8(RGB_SHUFFLE_67.as_ptr()),
+        ];
+        let wide_weight_shuffles = [
+            w01,
+            w23,
+            vld1q_u8(WEIGHT_SHUFFLE_45.as_ptr()),
+            vld1q_u8(WEIGHT_SHUFFLE_67.as_ptr()),
+        ];
 
         const ROUNDING_CONST: i16 = 1 << 5;
 
@@ -313,6 +399,15 @@ fn convolve_horizontal_rgb_neon_row_rdm_one_impl(
             let mut jx = 0usize;
             let mut store = v_base;
 
+            while WIDE && jx + 8 <= bounds_size {
+                let start_x = bounds.start + jx;
+                let weights = vreinterpretq_u8_s16(vld1q_s16(weights.as_ptr().add(jx)));
+                let weights = wide_weight_shuffles
+                    .map(|shuffle| vreinterpretq_s16_u8(vqtbl1q_u8(weights, shuffle)));
+                store = conv_horiz_rgb_8(start_x, src, weights, store, wide_pixel_shuffles);
+                jx += 8;
+            }
+
             while jx + 4 <= bounds_size {
                 let bounds_start = bounds.start + jx;
                 let w_ptr = weights.get_unchecked(jx..);
@@ -341,6 +436,78 @@ fn convolve_horizontal_rgb_neon_row_rdm_one_impl(
             }
 
             write_accumulator_u8(store, dst);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        convolve_horizontal_rgb_neon_rdm_row_one, convolve_horizontal_rgb_neon_rdm_rows_4,
+    };
+    use crate::filter_weights::{FilterBounds, FilterWeights};
+
+    #[test]
+    fn eight_tap_blocks_match_original_rgb_filter() {
+        if !std::arch::is_aarch64_feature_detected!("rdm") {
+            return;
+        }
+
+        for taps in 8..=25 {
+            let src_row_len = (taps + 2) * 3;
+            let bounds = vec![
+                FilterBounds::new(0, 1),
+                FilterBounds::new(0, taps),
+                FilterBounds::new(1, taps - 1),
+                FilterBounds::new(2, taps),
+            ];
+            let dst_row_len = bounds.len() * 3;
+            let weights = (0..taps * bounds.len())
+                .map(|i| (8293 + i * 10949) as i16)
+                .collect();
+            let filter = FilterWeights::new(weights, taps, taps, bounds.len(), taps as i32, bounds);
+
+            for padding in [0, 5] {
+                let src_stride = src_row_len + padding;
+                let dst_stride = dst_row_len + padding;
+                let src: Vec<u8> = (0..3 * src_stride + src_row_len)
+                    .map(|i| (i * 101 + i / src_stride * 11) as u8)
+                    .collect();
+                let mut expected = vec![0xd3; 3 * dst_stride + dst_row_len];
+                let mut actual = expected.clone();
+                convolve_horizontal_rgb_neon_rdm_rows_4::<false>(
+                    &src,
+                    src_stride,
+                    &mut expected,
+                    dst_stride,
+                    &filter,
+                    0,
+                );
+                convolve_horizontal_rgb_neon_rdm_rows_4::<true>(
+                    &src,
+                    src_stride,
+                    &mut actual,
+                    dst_stride,
+                    &filter,
+                    0,
+                );
+                assert_eq!(
+                    actual, expected,
+                    "four rows, taps={taps}, padding={padding}"
+                );
+
+                let last_src = &src[3 * src_stride..];
+                let mut expected = vec![0xd3; dst_row_len];
+                let mut actual = expected.clone();
+                convolve_horizontal_rgb_neon_rdm_row_one::<false>(
+                    last_src,
+                    &mut expected,
+                    &filter,
+                    0,
+                );
+                convolve_horizontal_rgb_neon_rdm_row_one::<true>(last_src, &mut actual, &filter, 0);
+                assert_eq!(actual, expected, "one row, taps={taps}, padding={padding}");
+            }
         }
     }
 }

@@ -29,7 +29,7 @@
 use crate::convolution::{ColumnFilter, RowFilter, TrampolineFilter};
 use crate::image_store::CheckStoreDensity;
 use crate::validation::{try_vec, validate_scratch, validate_sizes};
-use crate::{ImageSize, ImageStore, ImageStoreMut, PicScaleError, ResamplingPlan, ThreadingPolicy};
+use crate::{ImageSize, ImageStore, ImageStoreMut, PicScaleError, ResamplingPlan};
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -139,7 +139,7 @@ pub(crate) struct BothAxesConvolvePlan<T: Send + Sync, const N: usize> {
     pub(crate) horizontal_filter: Arc<dyn RowFilter<T, N> + Send + Sync>,
     pub(crate) vertical_filter: Arc<dyn ColumnFilter<T, N> + Send + Sync>,
     pub(crate) trampoline_filter: Arc<dyn TrampolineFilter<T, N> + Send + Sync>,
-    pub(crate) threading_policy: ThreadingPolicy,
+    pub(crate) streaming: bool,
 }
 
 impl<T: Copy + Send + Sync + Clone + Debug + Default, const N: usize> ResamplingPlan<T, N>
@@ -167,7 +167,7 @@ where
         if into.should_have_bit_depth() && !(1..=16).contains(&into.bit_depth) {
             return Err(PicScaleError::UnsupportedBitDepth(into.bit_depth));
         }
-        if self.threading_policy == ThreadingPolicy::Single {
+        if self.streaming {
             self.trampoline_filter.filter(store, into, scratch);
         } else {
             let mut new_image_vertical =
@@ -185,7 +185,7 @@ where
     }
 
     fn scratch_size(&self) -> usize {
-        if self.threading_policy == ThreadingPolicy::Single {
+        if self.streaming {
             self.trampoline_filter.scratch_size()
         } else {
             self.source_size.width * self.target_size.height * N

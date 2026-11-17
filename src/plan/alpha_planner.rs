@@ -26,9 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::convolution::{
-    ConvolutionOptions, HorizontalFilterPass, TrampolineFilter, VerticalConvolutionPass,
-};
+use crate::convolution::{ConvolutionOptions, HorizontalFilterPass, VerticalConvolutionPass};
 use crate::image_store::{AssociateAlpha, CheckStoreDensity, UnassociateAlpha};
 use crate::math::WeightsGenerator;
 use crate::plan::default_planner::DefaultPlanner;
@@ -395,8 +393,7 @@ impl AlphaPlanner {
                 vertical_filter: vertical_plan.as_ref().unwrap().clone(),
                 source_size,
                 target_size: destination_size,
-            })
-                as Arc<dyn TrampolineFilter<T, N> + Send + Sync>)
+            }))
         } else {
             None
         };

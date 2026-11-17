@@ -32,7 +32,7 @@ use crate::filter_weights::FilterWeights;
 use crate::support::{PRECISION, ROUNDING_CONST};
 use std::arch::x86_64::*;
 
-pub(crate) fn convolve_horizontal_rgb_avx_rows_4(
+pub(crate) fn convolve_horizontal_rgb_avx_rows_4<const EXACT_FOUR: bool>(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -44,7 +44,7 @@ pub(crate) fn convolve_horizontal_rgb_avx_rows_4(
         #[cfg(feature = "avx512")]
         {
             if std::arch::is_x86_feature_detected!("avxvnni") {
-                return convolve_horizontal_rgb_avx_rows_4_vnni(
+                return convolve_horizontal_rgb_avx_rows_4_vnni::<EXACT_FOUR>(
                     src,
                     src_stride,
                     dst,
@@ -53,12 +53,18 @@ pub(crate) fn convolve_horizontal_rgb_avx_rows_4(
                 );
             }
         }
-        convolve_horizontal_rgb_avx_rows_4_reg(src, src_stride, dst, dst_stride, filter_weights);
+        convolve_horizontal_rgb_avx_rows_4_reg::<EXACT_FOUR>(
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+            filter_weights,
+        );
     }
 }
 
 #[target_feature(enable = "avx2")]
-fn convolve_horizontal_rgb_avx_rows_4_reg(
+fn convolve_horizontal_rgb_avx_rows_4_reg<const EXACT_FOUR: bool>(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -66,12 +72,12 @@ fn convolve_horizontal_rgb_avx_rows_4_reg(
     filter_weights: &FilterWeights<i16>,
 ) {
     let unit = Row4ExecutionUnit::<false>::default();
-    unit.pass(src, src_stride, dst, dst_stride, filter_weights);
+    unit.pass::<EXACT_FOUR>(src, src_stride, dst, dst_stride, filter_weights);
 }
 
 #[cfg(feature = "avx512")]
 #[target_feature(enable = "avx2", enable = "avxvnni")]
-fn convolve_horizontal_rgb_avx_rows_4_vnni(
+fn convolve_horizontal_rgb_avx_rows_4_vnni<const EXACT_FOUR: bool>(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -79,7 +85,7 @@ fn convolve_horizontal_rgb_avx_rows_4_vnni(
     filter_weights: &FilterWeights<i16>,
 ) {
     let unit = Row4ExecutionUnit::<true>::default();
-    unit.pass(src, src_stride, dst, dst_stride, filter_weights);
+    unit.pass::<EXACT_FOUR>(src, src_stride, dst, dst_stride, filter_weights);
 }
 
 #[inline(always)]
@@ -123,44 +129,23 @@ fn load_distr_x4_rgb(src: &[u8], shuf: __m256i) -> __m256i {
 }
 
 #[inline(always)]
-fn load_distr_x8_rgb(src: &[u8], shuf: __m256i) -> (__m256i, __m256i) {
+fn load_distr_x8_rgb(src: &[u8]) -> (__m256i, __m256i) {
     unsafe {
-        let pixel_lo = _mm_loadu_si128(src.as_ptr() as *const _);
-        let pixel_hi = _mm_loadu_si64(src.get_unchecked(16..).as_ptr() as *const _);
-
-        let first_4 = make_first_4(pixel_lo, shuf);
-        let second_4 = make_second_4(pixel_lo, pixel_hi, shuf);
-        (first_4, second_4)
-    }
-}
-
-#[inline(always)]
-fn make_first_4(pixel: __m128i, shuf: __m256i) -> __m256i {
-    unsafe {
-        // Extracting top pixel part
-        let top_pixels = _mm_alignr_epi8::<6>(pixel, pixel);
-
-        _mm256_shuffle_epi8(
-            _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(pixel), top_pixels),
-            shuf,
-        )
-    }
-}
-
-#[inline(always)]
-fn make_second_4(pixel: __m128i, pixel2: __m128i, shuf: __m256i) -> __m256i {
-    unsafe {
-        // Low part
-        // [R0, G0, B0] [R1, G1, B1] [R2 G2 B2] [R3 G3 B3] [R4 G4 B4] [R5]
-        // High part
-        // [G5, B5] [R6, G6, B6] [R7, G7, B7]
-
-        let low_part = _mm_alignr_epi8::<12>(pixel2, pixel);
-        let hi_part = _mm_alignr_epi8::<2>(pixel2, pixel2);
-
-        _mm256_shuffle_epi8(
-            _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(low_part), hi_part),
-            shuf,
+        // After each broadcast, the low and high lanes select different pixel pairs.
+        let shuffle_first = _mm256_setr_epi8(
+            0, -1, 3, -1, 1, -1, 4, -1, 2, -1, 5, -1, -1, -1, -1, -1, 6, -1, 9, -1, 7, -1, 10, -1,
+            8, -1, 11, -1, -1, -1, -1, -1,
+        );
+        let shuffle_last = _mm256_setr_epi8(
+            4, -1, 7, -1, 5, -1, 8, -1, 6, -1, 9, -1, -1, -1, -1, -1, 10, -1, 13, -1, 11, -1, 14,
+            -1, 12, -1, 15, -1, -1, -1, -1, -1,
+        );
+        // The overlapping windows read exactly 24 bytes, even at the right edge.
+        let first = _mm256_broadcastsi128_si256(_mm_loadu_si128(src.as_ptr().cast()));
+        let last = _mm256_broadcastsi128_si256(_mm_loadu_si128(src.as_ptr().add(8).cast()));
+        (
+            _mm256_shuffle_epi8(first, shuffle_first),
+            _mm256_shuffle_epi8(last, shuffle_last),
         )
     }
 }
@@ -194,7 +179,7 @@ impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
     }
 
     #[inline(always)]
-    fn pass(
+    fn pass<const EXACT_FOUR: bool>(
         &self,
         src: &[u8],
         src_stride: usize,
@@ -208,6 +193,11 @@ impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
             let shuffle_lo = _mm256_setr_epi8(
                 0, -1, 3, -1, 1, -1, 4, -1, 2, -1, 5, -1, -1, -1, -1, -1, 0, -1, 3, -1, 1, -1, 4,
                 -1, 2, -1, 5, -1, -1, -1, -1, -1,
+            );
+
+            let shuffle_hi = _mm256_setr_epi8(
+                6, -1, 9, -1, 7, -1, 10, -1, 8, -1, 11, -1, -1, -1, -1, -1, 6, -1, 9, -1, 7, -1,
+                10, -1, 8, -1, 11, -1, -1, -1, -1, -1,
             );
 
             let weights_idx = _mm256_setr_epi32(0, 0, 0, 0, 1, 1, 1, 1);
@@ -255,7 +245,40 @@ impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
 
                 // [R0, G0, B0] [R1, G1, B1] [R2 G2 B2] [R3 G3 B3]
 
-                if bounds.size > 4 {
+                if EXACT_FOUR && bounds.size == 4 {
+                    let src_offset = bounds.start * CN;
+                    let w_ptr = weights.as_ptr().cast::<i32>();
+                    let w01 = _mm256_set1_epi32(w_ptr.read_unaligned());
+                    let w23 = _mm256_set1_epi32(w_ptr.add(1).read_unaligned());
+                    let rgb0 = load_rgb_x4(src0.get_unchecked(src_offset..));
+                    let rgb1 = load_rgb_x4(src1.get_unchecked(src_offset..));
+                    let rgb2 = load_rgb_x4(src2.get_unchecked(src_offset..));
+                    let rgb3 = load_rgb_x4(src3.get_unchecked(src_offset..));
+                    // Keep two rows in each vector while applying both coefficient pairs.
+                    let rows_01 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgb0), rgb1);
+                    let rows_23 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgb2), rgb3);
+                    store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(
+                        store_0,
+                        _mm256_shuffle_epi8(rows_01, shuffle_lo),
+                        w01,
+                    );
+                    store_0 = _mm256_dot16_avx_epi32::<HAS_DOT>(
+                        store_0,
+                        _mm256_shuffle_epi8(rows_01, shuffle_hi),
+                        w23,
+                    );
+                    store_1 = _mm256_dot16_avx_epi32::<HAS_DOT>(
+                        store_1,
+                        _mm256_shuffle_epi8(rows_23, shuffle_lo),
+                        w01,
+                    );
+                    store_1 = _mm256_dot16_avx_epi32::<HAS_DOT>(
+                        store_1,
+                        _mm256_shuffle_epi8(rows_23, shuffle_hi),
+                        w23,
+                    );
+                    jx = 4;
+                } else if bounds.size > 4 {
                     let mut store0 = _mm256_setr_epi32(
                         ROUNDING_CONST,
                         ROUNDING_CONST,
@@ -313,14 +336,10 @@ impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
 
                         let bounds_start = (bounds.start + jx) * CN;
 
-                        let rgb_pixel_0 =
-                            load_distr_x8_rgb(src0.get_unchecked(bounds_start..), shuffle_pixels_4);
-                        let rgb_pixel_1 =
-                            load_distr_x8_rgb(src1.get_unchecked(bounds_start..), shuffle_pixels_4);
-                        let rgb_pixel_2 =
-                            load_distr_x8_rgb(src2.get_unchecked(bounds_start..), shuffle_pixels_4);
-                        let rgb_pixel_3 =
-                            load_distr_x8_rgb(src3.get_unchecked(bounds_start..), shuffle_pixels_4);
+                        let rgb_pixel_0 = load_distr_x8_rgb(src0.get_unchecked(bounds_start..));
+                        let rgb_pixel_1 = load_distr_x8_rgb(src1.get_unchecked(bounds_start..));
+                        let rgb_pixel_2 = load_distr_x8_rgb(src2.get_unchecked(bounds_start..));
+                        let rgb_pixel_3 = load_distr_x8_rgb(src3.get_unchecked(bounds_start..));
 
                         store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store0, rgb_pixel_0.0, w0);
                         store1 = _mm256_dot16_avx_epi32::<HAS_DOT>(store1, rgb_pixel_1.0, w0);
@@ -535,11 +554,6 @@ impl<const HAS_DOT: bool> Row1Execution<HAS_DOT> {
                 -1, 2, -1, 5, -1, -1, -1, -1, -1,
             );
 
-            // Low part
-            // [R0, G0, B0] [R1, G1, B1] [R2 G2 B2] [R3 G3 B3] [R4 G4 B4] [R5]
-            // High part
-            // [G5, B5] [R6, G6, B6] [R7, G7, B7]
-
             for ((dst, bounds), weights) in dst
                 .as_chunks_mut::<CN>()
                 .0
@@ -581,12 +595,7 @@ impl<const HAS_DOT: bool> Row1Execution<HAS_DOT> {
                     let bounds_start = bounds.start + jx;
                     let src_ptr_0 = src.get_unchecked((bounds_start * CN)..);
 
-                    let pixel_lo = _mm_loadu_si128(src_ptr_0.as_ptr() as *const _);
-                    let pixel_hi =
-                        _mm_loadu_si64(src_ptr_0.get_unchecked(16..).as_ptr() as *const _);
-
-                    let first_4 = make_first_4(pixel_lo, shuffle_pixels_4);
-                    let second_4 = make_second_4(pixel_lo, pixel_hi, shuffle_pixels_4);
+                    let (first_4, second_4) = load_distr_x8_rgb(src_ptr_0);
 
                     store = _mm256_dot16_avx_epi32::<HAS_DOT>(store, first_4, w0);
                     store = _mm256_dot16_avx_epi32::<HAS_DOT>(store, second_4, w1);
@@ -643,6 +652,170 @@ impl<const HAS_DOT: bool> Row1Execution<HAS_DOT> {
                 let first_byte = u16::from_le_bytes([bytes[0], bytes[1]]);
                 (dst.as_mut_ptr() as *mut u16).write_unaligned(first_byte);
                 *dst.get_unchecked_mut(2) = bytes[2];
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        convolve_horizontal_rgb_avx_row_one, convolve_horizontal_rgb_avx_row_one_reg,
+        convolve_horizontal_rgb_avx_rows_4, convolve_horizontal_rgb_avx_rows_4_reg,
+    };
+    use crate::filter_weights::{FilterBounds, FilterWeights};
+    use crate::handler_provider::{handle_fixed_row_u8, handle_fixed_rows_4_u8};
+    use crate::support::PRECISION;
+    use crate::{ImageStore, ImageStoreMut, ResamplingFunction, Scaler, ThreadingPolicy};
+
+    fn check_odd_tap_tails(four_rows: bool) {
+        for taps in (1usize..=17).step_by(2) {
+            for start in [0, 1, 3] {
+                let width = start + taps;
+                let src_stride = width * 3 + 5;
+                let dst_stride = 8;
+                let rows = if four_rows { 4 } else { 1 };
+                let mut src = vec![0xd3; src_stride * rows];
+                for y in 0..rows {
+                    for x in 0..width {
+                        let offset = y * src_stride + x * 3;
+                        src[offset..offset + 3].copy_from_slice(&[
+                            ((17 + x * 31 + y * 47) % 251) as u8,
+                            ((99 + x * 71 + y * 13) % 253) as u8,
+                            ((153 + x * 19 + y * 53) % 255) as u8,
+                        ]);
+                    }
+                }
+                // Isolate the final tap after each combination of 8/4/2-pixel
+                // loops. Its R/G must come from the same pixel as its blue.
+                let aligned_size = taps.next_multiple_of(8);
+                let mut weights = vec![0; aligned_size];
+                weights[taps - 1] = 1 << (PRECISION - 1);
+                let filter = FilterWeights::new(
+                    weights,
+                    taps,
+                    aligned_size,
+                    1,
+                    taps as i32,
+                    vec![FilterBounds::new(start, taps)],
+                );
+                let mut expected = vec![0xcc; dst_stride * rows];
+                let mut actual = expected.clone();
+                if four_rows {
+                    handle_fixed_rows_4_u8::<3>(
+                        &src,
+                        src_stride,
+                        &mut expected,
+                        dst_stride,
+                        &filter,
+                        0,
+                    );
+                    unsafe {
+                        convolve_horizontal_rgb_avx_rows_4_reg::<false>(
+                            &src,
+                            src_stride,
+                            &mut actual,
+                            dst_stride,
+                            &filter,
+                        );
+                    }
+                } else {
+                    handle_fixed_row_u8::<3>(&src, &mut expected, &filter, 0);
+                    unsafe {
+                        convolve_horizontal_rgb_avx_row_one_reg(&src, &mut actual, &filter);
+                    }
+                }
+                assert_eq!(actual, expected, "taps={taps} start={start} rows={rows}");
+            }
+        }
+    }
+
+    #[test]
+    fn rgb_single_row_odd_tap_tail_matches_scalar() {
+        if !std::arch::is_x86_feature_detected!("avx2") {
+            return;
+        }
+        check_odd_tap_tails(false);
+    }
+
+    #[test]
+    fn rgb_four_rows_odd_tap_tail_matches_scalar() {
+        if !std::arch::is_x86_feature_detected!("avx2") {
+            return;
+        }
+        check_odd_tap_tails(true);
+    }
+
+    #[test]
+    fn rgb_packed_tap_blocks_match_scalar_at_row_end() {
+        if !std::arch::is_x86_feature_detected!("avx2") {
+            return;
+        }
+
+        for taps in [4, 8, 9, 12, 15, 16, 23, 24, 25] {
+            let src_row_len = (taps + 2) * 3;
+            let src_stride = src_row_len + 5;
+            let src: Vec<u8> = (0..3 * src_stride + src_row_len)
+                .map(|i| (i * 101 + i / src_stride * 11) as u8)
+                .collect();
+            let bounds = vec![
+                FilterBounds::new(0, 3),
+                FilterBounds::new(1, taps - 1),
+                FilterBounds::new(2, taps),
+            ];
+            let dst_row_len = bounds.len() * 3;
+            let dst_stride = dst_row_len + 5;
+            let weights = (0..taps * bounds.len())
+                .map(|i| (8293 + i * 10949) as i16)
+                .collect();
+            let filter = FilterWeights::new(weights, taps, taps, bounds.len(), taps as i32, bounds);
+
+            let mut expected = vec![0xd3; 3 * dst_stride + dst_row_len];
+            let mut actual = expected.clone();
+            handle_fixed_rows_4_u8::<3>(&src, src_stride, &mut expected, dst_stride, &filter, 0);
+            let convolve: fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>, u32) =
+                if taps == 4 {
+                    convolve_horizontal_rgb_avx_rows_4::<true>
+                } else {
+                    convolve_horizontal_rgb_avx_rows_4::<false>
+                };
+            convolve(&src, src_stride, &mut actual, dst_stride, &filter, 0);
+            assert_eq!(actual, expected, "four rows, taps={taps}");
+
+            let src = &src[3 * src_stride..];
+            let mut expected = vec![0xd3; dst_row_len];
+            let mut actual = expected.clone();
+            handle_fixed_row_u8::<3>(src, &mut expected, &filter, 0);
+            convolve_horizontal_rgb_avx_row_one(src, &mut actual, &filter, 0);
+            assert_eq!(actual, expected, "one row, taps={taps}");
+        }
+    }
+
+    #[test]
+    fn hermite_rgb_issue_165() {
+        if !std::arch::is_x86_feature_detected!("avx2") {
+            return;
+        }
+        let scaler =
+            Scaler::new(ResamplingFunction::Hermite).set_threading_policy(ThreadingPolicy::Single);
+        for height in [1, 4, 5, 9] {
+            let pixels = [255u8, 0, 0, 0, 255, 0, 0, 0, 255].repeat(height);
+            let src = ImageStore::<u8, 3>::from_slice(&pixels, 3, height).unwrap();
+            for width in [2, 1] {
+                let mut dst = ImageStoreMut::<u8, 3>::alloc(width, height);
+                scaler
+                    .plan_rgb_resampling(src.size(), dst.size())
+                    .unwrap()
+                    .resample(&src, &mut dst)
+                    .unwrap();
+                let expected: &[u8] = if width == 2 {
+                    &[166, 89, 0, 0, 89, 166]
+                } else {
+                    &[76, 103, 76]
+                };
+                for row in dst.buffer.borrow().chunks_exact(width * 3) {
+                    assert_eq!(row, expected, "3x{height} -> {width}x{height}");
+                }
             }
         }
     }

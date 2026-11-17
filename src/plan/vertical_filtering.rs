@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::convolution::ColumnFilter;
+use crate::convolution::{ColumnFilter, ColumnSource};
 use crate::filter_weights::{FilterBounds, FilterWeights};
 use crate::{ImageSize, ImageStore, ImageStoreMut, ThreadingPolicy};
 #[cfg(feature = "threading")]
@@ -104,6 +104,10 @@ where
         }
     }
 
+    fn source_bounds(&self, row: usize) -> FilterBounds {
+        self.filter_weights.bounds[row]
+    }
+
     fn run_on_row(
         &self,
         src: &[T],
@@ -123,6 +127,29 @@ where
             src,
             &mut dst[..dst_width * N],
             src_stride,
+            weights,
+            bit_depth,
+        );
+    }
+
+    fn run_on_band_row(
+        &self,
+        source: &ColumnSource<'_, T>,
+        dst: &mut [T],
+        y: usize,
+        bit_depth: u32,
+    ) {
+        let mut bounds = self.filter_weights.bounds[y];
+        bounds.start -= source.first_row;
+        let filter_offset = y * self.filter_weights.aligned_size;
+        let weights = &self.filter_weights.weights[filter_offset..];
+        let row_filter = self.filter_row;
+        row_filter(
+            source.width,
+            &bounds,
+            source.pixels,
+            &mut dst[..source.width * N],
+            source.stride,
             weights,
             bit_depth,
         );

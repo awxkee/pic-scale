@@ -124,8 +124,20 @@ impl HorizontalFilterPass<u8, f32, 4> for ImageStore<'_, u8, 4> {
                 use crate::avx2::{
                     convolve_horizontal_rgba_avx_row_1, convolve_horizontal_rgba_row_4,
                 };
-                _dispatcher_4_rows = Some(convolve_horizontal_rgba_row_4);
-                _dispatcher_1_row = convolve_horizontal_rgba_avx_row_1;
+                let kernel_size = filter_weights.kernel_size;
+                let broadcast_remainder = kernel_size >= 12 && kernel_size % 8 >= 4;
+                _dispatcher_4_rows = if kernel_size == 4 {
+                    Some(convolve_horizontal_rgba_row_4::<true, false>)
+                } else if broadcast_remainder {
+                    Some(convolve_horizontal_rgba_row_4::<false, true>)
+                } else {
+                    Some(convolve_horizontal_rgba_row_4::<false, false>)
+                };
+                _dispatcher_1_row = if broadcast_remainder {
+                    convolve_horizontal_rgba_avx_row_1::<true>
+                } else {
+                    convolve_horizontal_rgba_avx_row_1::<false>
+                };
             }
         }
         #[cfg(all(feature = "avx512", target_arch = "x86_64"))]

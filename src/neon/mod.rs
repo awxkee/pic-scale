@@ -266,7 +266,7 @@ pub(crate) use vertical_u8::convolve_vertical_neon_i32_precision;
 #[cfg(feature = "nightly_i8mm")]
 pub(crate) use vertical_u8_dot::convolve_vertical_neon_i8_dot;
 #[cfg(feature = "rdm")]
-pub(crate) use vertical_u8_rdm::convolve_vertical_neon_i16_precision;
+pub(crate) use vertical_u8_rdm::{PairedRdmVertical, convolve_vertical_neon_i16_precision};
 pub(crate) use vertical_u16::convolve_column_u16;
 #[cfg(feature = "rdm")]
 pub(crate) use vertical_u16_hb::convolve_column_hb_u16;
