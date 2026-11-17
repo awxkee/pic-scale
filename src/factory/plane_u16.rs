@@ -209,13 +209,22 @@ pub(crate) fn default_u16_column_plan<const CN: usize>(
             if std::arch::is_aarch64_feature_detected!("rdm")
                 && options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
             {
+                use crate::neon::{
+                    PairedU16Vertical, convolve_column_hb_u16, convolve_column_hb_u16_pair,
+                };
                 let filter_weights = filter_weights.numerical_approximation::<i32, 31>(0);
-                use crate::neon::convolve_column_hb_u16;
-                return Arc::new(VerticalFiltering {
+                let filter = VerticalFiltering {
                     filter_weights,
                     filter_row: convolve_column_hb_u16,
                     threading_policy,
-                });
+                };
+                if filter.filter_weights.kernel_size == 12 {
+                    return Arc::new(PairedU16Vertical {
+                        filter,
+                        convolve_pair: convolve_column_hb_u16_pair,
+                    });
+                }
+                return Arc::new(filter);
             }
         }
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
@@ -272,11 +281,20 @@ pub(crate) fn default_u16_column_plan<const CN: usize>(
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             use crate::neon::convolve_column_lb_u16;
-            Arc::new(VerticalFiltering {
+            let filter = VerticalFiltering {
                 filter_weights,
                 threading_policy,
                 filter_row: convolve_column_lb_u16,
-            })
+            };
+            #[cfg(feature = "rdm")]
+            if filter.filter_weights.kernel_size == 12 {
+                use crate::neon::{PairedU16Vertical, convolve_column_lb_u16_pair};
+                return Arc::new(PairedU16Vertical {
+                    filter,
+                    convolve_pair: convolve_column_lb_u16_pair,
+                });
+            }
+            Arc::new(filter)
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {

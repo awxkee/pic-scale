@@ -76,24 +76,21 @@ fn acc_4_dot_rgb<const D: bool>(
     src: &[u16],
     w0: __m256i,
     store: __m256i,
-    shuffle: __m256i,
 ) -> __m256i {
     unsafe {
         const CN: usize = 3;
-        let src_ptr = src.get_unchecked((start_x * CN)..);
+        let src_ptr = src.get_unchecked(start_x * CN..).as_ptr();
 
-        let lo = _mm_loadu_si128(src_ptr.as_ptr().cast());
-        let hi = _mm_loadu_si64(src_ptr.get_unchecked(8..).as_ptr().cast());
+        // Four RGB16 pixels occupy 24 bytes. The loads overlap by eight bytes.
+        let lo = _mm_loadu_si128(src_ptr.cast());
+        let hi = _mm_loadu_si128(src_ptr.add(4).cast());
+        let pixels = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(lo), hi);
+        let shuffle = _mm256_setr_epi8(
+            0, 1, 6, 7, 2, 3, 8, 9, 4, 5, 10, 11, -1, -1, -1, -1, 4, 5, 10, 11, 6, 7, 12, 13, 8, 9,
+            14, 15, -1, -1, -1, -1,
+        );
 
-        let shuf = _mm_setr_epi8(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, -1, -1, -1, -1);
-        let hi_src = _mm_alignr_epi8(hi, lo, 12);
-
-        let lo_shuf = _mm_shuffle_epi8(lo, shuf);
-        let hi_shuf = _mm_shuffle_epi8(hi_src, shuf);
-
-        let pixel = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(lo_shuf), hi_shuf);
-        let q_px = _mm256_shuffle_epi8(pixel, shuffle);
-        _mm256_dot16_avx_epi32::<D>(store, q_px, w0)
+        _mm256_dot16_avx_epi32::<D>(store, _mm256_shuffle_epi8(pixels, shuffle), w0)
     }
 }
 
@@ -104,10 +101,9 @@ fn acc_8_dot_rgb<const D: bool>(
     w0: __m256i,
     w1: __m256i,
     store: __m256i,
-    shuffle: __m256i,
 ) -> __m256i {
-    let store = acc_4_dot_rgb::<D>(start_x, src, w0, store, shuffle);
-    acc_4_dot_rgb::<D>(start_x + 4, src, w1, store, shuffle)
+    let store = acc_4_dot_rgb::<D>(start_x, src, w0, store);
+    acc_4_dot_rgb::<D>(start_x + 4, src, w1, store)
 }
 
 pub(crate) fn convolve_horizontal_rgb_avx_rows_4_u16(
@@ -347,14 +343,10 @@ impl<const D: bool> Row4ExecutionHandlerRgb<D> {
                         a_shuffle_weights_table,
                     );
                     let bounds_start = bounds.start + jx;
-                    astore_0 =
-                        acc_8_dot_rgb::<D>(bounds_start, src0, w0, w1, astore_0, a_shuffle_2_table);
-                    astore_1 =
-                        acc_8_dot_rgb::<D>(bounds_start, src1, w0, w1, astore_1, a_shuffle_2_table);
-                    astore_2 =
-                        acc_8_dot_rgb::<D>(bounds_start, src2, w0, w1, astore_2, a_shuffle_2_table);
-                    astore_3 =
-                        acc_8_dot_rgb::<D>(bounds_start, src3, w0, w1, astore_3, a_shuffle_2_table);
+                    astore_0 = acc_8_dot_rgb::<D>(bounds_start, src0, w0, w1, astore_0);
+                    astore_1 = acc_8_dot_rgb::<D>(bounds_start, src1, w0, w1, astore_1);
+                    astore_2 = acc_8_dot_rgb::<D>(bounds_start, src2, w0, w1, astore_2);
+                    astore_3 = acc_8_dot_rgb::<D>(bounds_start, src3, w0, w1, astore_3);
                     jx += 8;
                 }
 
@@ -368,14 +360,10 @@ impl<const D: bool> Row4ExecutionHandlerRgb<D> {
                         ),
                         a_shuffle_weights_table,
                     );
-                    astore_0 =
-                        acc_4_dot_rgb::<D>(bounds_start, src0, w0, astore_0, a_shuffle_2_table);
-                    astore_1 =
-                        acc_4_dot_rgb::<D>(bounds_start, src1, w0, astore_1, a_shuffle_2_table);
-                    astore_2 =
-                        acc_4_dot_rgb::<D>(bounds_start, src2, w0, astore_2, a_shuffle_2_table);
-                    astore_3 =
-                        acc_4_dot_rgb::<D>(bounds_start, src3, w0, astore_3, a_shuffle_2_table);
+                    astore_0 = acc_4_dot_rgb::<D>(bounds_start, src0, w0, astore_0);
+                    astore_1 = acc_4_dot_rgb::<D>(bounds_start, src1, w0, astore_1);
+                    astore_2 = acc_4_dot_rgb::<D>(bounds_start, src2, w0, astore_2);
+                    astore_3 = acc_4_dot_rgb::<D>(bounds_start, src3, w0, astore_3);
                     jx += 4;
                 }
 
@@ -519,11 +507,6 @@ impl<const D: bool> OneRowExecutionUnitRgb<D> {
                 0, 1, 2, 3,
             );
 
-            let a_shuffle_2_table = _mm256_setr_epi8(
-                0, 1, 6, 7, 2, 3, 8, 9, 4, 5, 10, 11, -1, -1, -1, -1, 0, 1, 6, 7, 2, 3, 8, 9, 4, 5,
-                10, 11, -1, -1, -1, -1,
-            );
-
             let shuffle_2_table =
                 _mm_setr_epi8(0, 1, 6, 7, 2, 3, 8, 9, 4, 5, 10, 11, -1, -1, -1, -1);
 
@@ -570,8 +553,7 @@ impl<const D: bool> OneRowExecutionUnitRgb<D> {
                         a_shuffle_weights_table,
                     );
                     let bounds_start = bounds.start + jx;
-                    store256 =
-                        acc_8_dot_rgb::<D>(bounds_start, src, w0, w1, store256, a_shuffle_2_table);
+                    store256 = acc_8_dot_rgb::<D>(bounds_start, src, w0, w1, store256);
                     jx += 8;
                 }
 
@@ -585,8 +567,7 @@ impl<const D: bool> OneRowExecutionUnitRgb<D> {
                         a_shuffle_weights_table,
                     );
                     let bounds_start = bounds.start + jx;
-                    store256 =
-                        acc_4_dot_rgb::<D>(bounds_start, src, w0, store256, a_shuffle_2_table);
+                    store256 = acc_4_dot_rgb::<D>(bounds_start, src, w0, store256);
                     jx += 4;
                 }
 
@@ -618,6 +599,83 @@ impl<const D: bool> OneRowExecutionUnitRgb<D> {
                 let v_st = _mm_min_epi16(_mm_packus_epi32(store, store), v_max_colors);
 
                 set_pixel_sse(dst, v_st);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::filter_weights::FilterBounds;
+
+    #[test]
+    fn packed_rgb_taps_match_scalar_at_row_end() {
+        if !std::arch::is_x86_feature_detected!("avx2") {
+            return;
+        }
+
+        let width = 35;
+        let output_width = 3;
+        for bit_depth in [10, 12] {
+            let max_colors = (1 << bit_depth) - 1;
+            for padding in [0, 5] {
+                let source_stride = width * 3 + padding;
+                let target_stride = output_width * 3 + padding;
+                let source: Vec<_> = (0..source_stride * 3 + width * 3)
+                    .map(|index| ((index * 997 + index * index) & max_colors) as u16)
+                    .collect();
+                for taps in 1..=32 {
+                    let counts = [taps, (taps - 1).max(1), taps];
+                    let bounds = counts
+                        .map(|count| FilterBounds::new(width - count, count))
+                        .to_vec();
+                    let weights = (0..taps * output_width)
+                        .map(|index| ((index * 3851 + 19677) % 12001) as i16 - 3000)
+                        .collect();
+                    let filter =
+                        FilterWeights::new(weights, taps, taps, output_width, taps as i32, bounds);
+                    let mut expected = vec![u16::MAX; target_stride * 3 + output_width * 3];
+                    for y in 0..4 {
+                        for (x, bounds) in filter.bounds.iter().enumerate() {
+                            for channel in 0..3 {
+                                let mut sum = ROUNDING_CONST;
+                                for tap in 0..bounds.size {
+                                    let pixel = source
+                                        [y * source_stride + (bounds.start + tap) * 3 + channel];
+                                    sum += i32::from(pixel)
+                                        * i32::from(filter.weights[x * taps + tap]);
+                                }
+                                expected[y * target_stride + x * 3 + channel] =
+                                    (sum >> PRECISION).clamp(0, max_colors as i32) as u16;
+                            }
+                        }
+                    }
+
+                    let mut actual = vec![u16::MAX; expected.len()];
+                    convolve_horizontal_rgb_avx_rows_4_u16(
+                        &source,
+                        source_stride,
+                        &mut actual,
+                        target_stride,
+                        &filter,
+                        bit_depth,
+                    );
+                    assert_eq!(actual, expected, "four rows, {taps} taps, {bit_depth} bits");
+
+                    actual.fill(u16::MAX);
+                    for y in 0..4 {
+                        let src_start = y * source_stride;
+                        let dst_start = y * target_stride;
+                        convolve_horizontal_rgb_avx_u16lp_row(
+                            &source[src_start..src_start + width * 3],
+                            &mut actual[dst_start..dst_start + output_width * 3],
+                            &filter,
+                            bit_depth,
+                        );
+                    }
+                    assert_eq!(actual, expected, "one row, {taps} taps, {bit_depth} bits");
+                }
             }
         }
     }

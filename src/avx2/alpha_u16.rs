@@ -72,25 +72,12 @@ pub(crate) fn _mm256_div_by_4095_epi32(v: __m256i) -> __m256i {
     }
 }
 
-/// Exact division by 65535 with rounding to nearest
-#[inline(always)]
-pub(crate) fn _mm256_div_by_65535_epi32(v: __m256i) -> __m256i {
-    unsafe {
-        const DIVIDING_BY: i32 = 16;
-        let addition = _mm256_set1_epi32(1 << (DIVIDING_BY - 1));
-        let v = _mm256_add_epi32(v, addition);
-        _mm256_srli_epi32::<DIVIDING_BY>(_mm256_add_epi32(v, _mm256_srli_epi32::<DIVIDING_BY>(v)))
-    }
-}
-
 #[inline(always)]
 fn _mm256_div_by_epi32<const BIT_DEPTH: usize>(v: __m256i) -> __m256i {
     if BIT_DEPTH == 10 {
         _mm256_div_by_1023_epi32(v)
-    } else if BIT_DEPTH == 12 {
-        _mm256_div_by_4095_epi32(v)
     } else {
-        _mm256_div_by_65535_epi32(v)
+        _mm256_div_by_4095_epi32(v)
     }
 }
 
@@ -119,24 +106,36 @@ impl<const BIT_DEPTH: usize> Avx2PremultiplyExecutorDefault<BIT_DEPTH> {
         let copy_alpha_mask = _mm256_set1_epi64x(i64::from_ne_bytes([0, 0, 0, 0, 0, 0, 255, 255]));
 
         let alpha = _mm256_shuffle_epi8(rgba, shuffle_alpha_mask);
+        let output = if BIT_DEPTH == 16 {
+            // Multiply the alpha channel by 65535 so the division preserves it.
+            let alpha = _mm256_or_si256(alpha, copy_alpha_mask);
+            let low = _mm256_mullo_epi16(rgba, alpha);
+            let high = _mm256_mulhi_epu16(rgba, alpha);
 
-        let p0 = _mm256_unpacklo_epi16(rgba, _mm256_setzero_si256());
-        let p1 = _mm256_unpackhi_epi16(rgba, _mm256_setzero_si256());
+            // Exact rounded division by 65535 is (biased + (biased >> 16)) >> 16,
+            // with biased = product + 32768. Propagate both carries in 16-bit lanes.
+            let rounding_carry = _mm256_cmpgt_epi16(_mm256_setzero_si256(), low);
+            let biased_high = _mm256_sub_epi16(high, rounding_carry);
+            // The second carry occurs when biased_low > !biased_high. Comparing the
+            // sign-flipped words as signed also accounts for biased_low = low ^ 0x8000.
+            let carry_threshold = _mm256_xor_si256(biased_high, _mm256_set1_epi16(i16::MAX));
+            let carry = _mm256_cmpgt_epi16(low, carry_threshold);
+            _mm256_sub_epi16(biased_high, carry)
+        } else {
+            let p0 = _mm256_unpacklo_epi16(rgba, _mm256_setzero_si256());
+            let p1 = _mm256_unpackhi_epi16(rgba, _mm256_setzero_si256());
 
-        let a0 = _mm256_unpacklo_epi16(alpha, _mm256_setzero_si256());
-        let a1 = _mm256_unpackhi_epi16(alpha, _mm256_setzero_si256());
+            let a0 = _mm256_unpacklo_epi16(alpha, _mm256_setzero_si256());
+            let a1 = _mm256_unpackhi_epi16(alpha, _mm256_setzero_si256());
 
-        let mut s0 = _mm256_madd_epi16(p0, a0);
-        let mut s1 = _mm256_madd_epi16(p1, a1);
+            let s0 = _mm256_div_by_epi32::<BIT_DEPTH>(_mm256_madd_epi16(p0, a0));
+            let s1 = _mm256_div_by_epi32::<BIT_DEPTH>(_mm256_madd_epi16(p1, a1));
 
-        s0 = _mm256_div_by_epi32::<BIT_DEPTH>(s0);
-        s1 = _mm256_div_by_epi32::<BIT_DEPTH>(s1);
-
-        let u0 = _mm256_packus_epi32(s0, s1);
-        let q0 = _mm256_blendv_epi8(u0, rgba, copy_alpha_mask);
+            _mm256_blendv_epi8(_mm256_packus_epi32(s0, s1), rgba, copy_alpha_mask)
+        };
 
         unsafe {
-            _mm256_storeu_si256(dst.as_mut_ptr().cast(), q0);
+            _mm256_storeu_si256(dst.as_mut_ptr().cast(), output);
         }
     }
 }
@@ -260,6 +259,13 @@ fn avx_premultiply_alpha_rgba_u16_row(dst: &mut [u16], src: &[u16], bit_depth: u
             src,
             bit_depth,
             Avx2PremultiplyExecutorDefault::<12>::default(),
+        );
+    } else if bit_depth == 16 {
+        avx_pa_dispatch(
+            dst,
+            src,
+            bit_depth,
+            Avx2PremultiplyExecutorDefault::<16>::default(),
         );
     } else {
         avx_pa_dispatch(
@@ -466,5 +472,35 @@ fn avx_unpremultiply_alpha_rgba_u16_row_avx(in_place: &mut [u16], bit_depth: usi
         }
 
         rem.copy_from_slice(&dst_buffer[..rem.len()]);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::avx_premultiply_alpha_rgba_u16;
+    use crate::alpha_handle_u16::premultiply_alpha_rgba_row;
+
+    #[test]
+    fn avx2_premultiply_full_depth_matches_scalar_with_tails() {
+        if !std::arch::is_x86_feature_detected!("avx2") {
+            return;
+        }
+
+        let pixels: Vec<_> = (0..=u16::MAX)
+            .flat_map(|alpha| [4227, alpha.wrapping_mul(3743), u16::MAX - alpha, alpha])
+            .collect();
+        let check = |source: &[u16]| {
+            let mut expected = vec![0; source.len()];
+            premultiply_alpha_rgba_row(&mut expected, source, 16);
+            let mut actual = vec![0; source.len()];
+            avx_premultiply_alpha_rgba_u16(&mut actual, source, 16);
+            assert_eq!(actual, expected, "width {}", source.len() / 4);
+        };
+
+        check(&pixels);
+        let start = 64531 * 4;
+        for width in 0..=17 {
+            check(&pixels[start..start + width * 4]);
+        }
     }
 }

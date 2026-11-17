@@ -181,11 +181,15 @@ impl VerticalConvolutionPass<f32, f32, 4> for ImageStore<'_, f32, 4> {
                 }
             }
         }
-        Arc::new(VerticalFiltering {
+        let filter = VerticalFiltering {
             filter_weights,
             filter_row: _dispatcher,
             threading_policy,
-        })
+        };
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+        return crate::neon::paired_vertical_f32(filter);
+        #[cfg(not(all(target_arch = "aarch64", feature = "neon")))]
+        Arc::new(filter)
     }
 }
 
@@ -222,10 +226,14 @@ impl VerticalConvolutionPass<f32, f64, 4> for ImageStore<'_, f32, 4> {
                 }
             }
         }
-        Arc::new(VerticalFiltering {
+        let filter = VerticalFiltering {
             filter_weights,
             filter_row: _dispatcher,
             threading_policy,
-        })
+        };
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+        return crate::neon::paired_vertical_f64(filter);
+        #[cfg(not(all(target_arch = "aarch64", feature = "neon")))]
+        Arc::new(filter)
     }
 }

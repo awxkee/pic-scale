@@ -87,6 +87,27 @@ fn convolve_column_lb_avx_u16_reg(
 }
 
 #[inline(always)]
+fn accumulate_pair<const HAS_DOT: bool>(
+    sum: &mut [__m256i; 2],
+    first: __m256i,
+    second: __m256i,
+    weights: __m256i,
+) {
+    unsafe {
+        sum[0] = _mm256_dot16_avx_epi32::<HAS_DOT>(
+            sum[0],
+            _mm256_unpacklo_epi16(first, second),
+            weights,
+        );
+        sum[1] = _mm256_dot16_avx_epi32::<HAS_DOT>(
+            sum[1],
+            _mm256_unpackhi_epi16(first, second),
+            weights,
+        );
+    }
+}
+
+#[inline(always)]
 fn convolve_column_lb_32<const HAS_DOT: bool>(
     chunks: &mut [[u16; 32]],
     bounds: &FilterBounds,
@@ -97,184 +118,52 @@ fn convolve_column_lb_32<const HAS_DOT: bool>(
     cx: usize,
 ) -> usize {
     unsafe {
-        let v_px = cx;
         let mut cx = cx;
-        let max_colors = (1 << bit_depth) - 1;
-        let v_max_colors = _mm256_set1_epi16(max_colors);
-        let bounds_size = bounds.size;
+        let max_colors = _mm256_set1_epi16((1 << bit_depth) - 1);
+        let rounding = _mm256_set1_epi32(ROUNDING_CONST);
+        let zero = _mm256_setzero_si256();
+        let (pairs, tail) = weights.as_chunks::<2>();
 
-        for (x, dst) in chunks.iter_mut().enumerate() {
-            let mut store0 = _mm256_set1_epi32(ROUNDING_CONST);
-            let mut store1 = _mm256_set1_epi32(ROUNDING_CONST);
-            let mut store2 = _mm256_set1_epi32(ROUNDING_CONST);
-            let mut store3 = _mm256_set1_epi32(ROUNDING_CONST);
-
-            let v_dx = v_px + x * 32;
-
-            let mut j = 0usize;
-
-            while j + 4 <= bounds_size {
-                let py = bounds.start + j;
-                let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
-
-                let weights = _mm_loadu_si64(weights.get_unchecked(j..).as_ptr().cast());
-                let w0 = _mm256_broadcastw_epi16(weights); // elem 0
-                let w1 = _mm256_broadcastw_epi16(_mm_srli_si128::<2>(weights)); // elem 1 (shift by 2 bytes)
-                let w2 = _mm256_broadcastw_epi16(_mm_srli_si128::<4>(weights)); // elem 2
-                let w3 = _mm256_broadcastw_epi16(_mm_srli_si128::<6>(weights)); // elem 3
-
-                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr().cast());
-                let item_row1 = _mm256_loadu_si256(src_ptr.get_unchecked(16..).as_ptr().cast());
-
-                store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store0,
-                    _mm256_unpacklo_epi16(item_row0, _mm256_setzero_si256()),
-                    w0,
+        for dst in chunks {
+            let mut low = [rounding; 2];
+            let mut high = [rounding; 2];
+            let start = src.as_ptr().wrapping_add(bounds.start * src_stride + cx);
+            // Pair each sample with the one under it so one dot product covers two taps.
+            for (index, coefficients) in pairs.iter().enumerate() {
+                let weights = _mm256_broadcastd_epi32(_mm_loadu_si32(coefficients.as_ptr().cast()));
+                let first = start.add(index * 2 * src_stride);
+                let second = first.add(src_stride);
+                accumulate_pair::<HAS_DOT>(
+                    &mut low,
+                    _mm256_loadu_si256(first.cast()),
+                    _mm256_loadu_si256(second.cast()),
+                    weights,
                 );
-                store1 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store1,
-                    _mm256_unpackhi_epi16(item_row0, _mm256_setzero_si256()),
-                    w0,
+                accumulate_pair::<HAS_DOT>(
+                    &mut high,
+                    _mm256_loadu_si256(first.add(16).cast()),
+                    _mm256_loadu_si256(second.add(16).cast()),
+                    weights,
                 );
-                store2 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store2,
-                    _mm256_unpacklo_epi16(item_row1, _mm256_setzero_si256()),
-                    w0,
-                );
-                store3 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store3,
-                    _mm256_unpackhi_epi16(item_row1, _mm256_setzero_si256()),
-                    w0,
-                );
-
-                let item_row0 =
-                    _mm256_loadu_si256(src_ptr.get_unchecked(src_stride..).as_ptr().cast());
-                let item_row1 =
-                    _mm256_loadu_si256(src_ptr.get_unchecked(src_stride + 16..).as_ptr().cast());
-
-                store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store0,
-                    _mm256_unpacklo_epi16(item_row0, _mm256_setzero_si256()),
-                    w1,
-                );
-                store1 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store1,
-                    _mm256_unpackhi_epi16(item_row0, _mm256_setzero_si256()),
-                    w1,
-                );
-                store2 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store2,
-                    _mm256_unpacklo_epi16(item_row1, _mm256_setzero_si256()),
-                    w1,
-                );
-                store3 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store3,
-                    _mm256_unpackhi_epi16(item_row1, _mm256_setzero_si256()),
-                    w1,
-                );
-
-                let item_row0 =
-                    _mm256_loadu_si256(src_ptr.get_unchecked(src_stride * 2..).as_ptr().cast());
-                let item_row1 = _mm256_loadu_si256(
-                    src_ptr.get_unchecked(src_stride * 2 + 16..).as_ptr().cast(),
-                );
-
-                store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store0,
-                    _mm256_unpacklo_epi16(item_row0, _mm256_setzero_si256()),
-                    w2,
-                );
-                store1 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store1,
-                    _mm256_unpackhi_epi16(item_row0, _mm256_setzero_si256()),
-                    w2,
-                );
-                store2 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store2,
-                    _mm256_unpacklo_epi16(item_row1, _mm256_setzero_si256()),
-                    w2,
-                );
-                store3 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store3,
-                    _mm256_unpackhi_epi16(item_row1, _mm256_setzero_si256()),
-                    w2,
-                );
-
-                let item_row0 =
-                    _mm256_loadu_si256(src_ptr.get_unchecked(src_stride * 3..).as_ptr().cast());
-                let item_row1 = _mm256_loadu_si256(
-                    src_ptr.get_unchecked(src_stride * 3 + 16..).as_ptr().cast(),
-                );
-
-                store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store0,
-                    _mm256_unpacklo_epi16(item_row0, _mm256_setzero_si256()),
-                    w3,
-                );
-                store1 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store1,
-                    _mm256_unpackhi_epi16(item_row0, _mm256_setzero_si256()),
-                    w3,
-                );
-                store2 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store2,
-                    _mm256_unpacklo_epi16(item_row1, _mm256_setzero_si256()),
-                    w3,
-                );
-                store3 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store3,
-                    _mm256_unpackhi_epi16(item_row1, _mm256_setzero_si256()),
-                    w3,
-                );
-
-                j += 4;
             }
-
-            let weights = &weights[j..bounds_size];
-            let sj = j + bounds.start;
-
-            for (j, &k_weight) in weights.iter().enumerate() {
-                let py = sj + j;
-                let src_ptr = src.get_unchecked((src_stride * py + v_dx)..);
-
-                let v_weight = _mm256_set1_epi16(k_weight);
-
-                let item_row0 = _mm256_loadu_si256(src_ptr.as_ptr().cast());
-                let item_row1 = _mm256_loadu_si256(src_ptr.get_unchecked(16..).as_ptr().cast());
-
-                store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store0,
-                    _mm256_unpacklo_epi16(item_row0, _mm256_setzero_si256()),
-                    v_weight,
-                );
-                store1 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store1,
-                    _mm256_unpackhi_epi16(item_row0, _mm256_setzero_si256()),
-                    v_weight,
-                );
-                store2 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store2,
-                    _mm256_unpacklo_epi16(item_row1, _mm256_setzero_si256()),
-                    v_weight,
-                );
-                store3 = _mm256_dot16_avx_epi32::<HAS_DOT>(
-                    store3,
-                    _mm256_unpackhi_epi16(item_row1, _mm256_setzero_si256()),
-                    v_weight,
+            if let [weight] = *tail {
+                let weights = _mm256_set1_epi32(i32::from(weight as u16));
+                let row = start.add(pairs.len() * 2 * src_stride);
+                accumulate_pair::<HAS_DOT>(&mut low, _mm256_loadu_si256(row.cast()), zero, weights);
+                accumulate_pair::<HAS_DOT>(
+                    &mut high,
+                    _mm256_loadu_si256(row.add(16).cast()),
+                    zero,
+                    weights,
                 );
             }
 
-            let v_st0 = _mm256_srai_epi32::<PRECISION>(store0);
-            let v_st1 = _mm256_srai_epi32::<PRECISION>(store1);
-            let v_st2 = _mm256_srai_epi32::<PRECISION>(store2);
-            let v_st3 = _mm256_srai_epi32::<PRECISION>(store3);
-
-            let item0 = _mm256_min_epi16(_mm256_packus_epi32(v_st0, v_st1), v_max_colors);
-            let item1 = _mm256_min_epi16(_mm256_packus_epi32(v_st2, v_st3), v_max_colors);
-
-            _mm256_storeu_si256(dst.as_mut_ptr().cast(), item0);
-            _mm256_storeu_si256(dst.get_unchecked_mut(16..).as_mut_ptr().cast(), item1);
-
+            for (index, [low, high]) in [low, high].into_iter().enumerate() {
+                let low = _mm256_srai_epi32::<PRECISION>(low);
+                let high = _mm256_srai_epi32::<PRECISION>(high);
+                let packed = _mm256_min_epi16(_mm256_packus_epi32(low, high), max_colors);
+                _mm256_storeu_si256(dst.as_mut_ptr().add(index * 16).cast(), packed);
+            }
             cx += 32;
         }
         cx
@@ -492,6 +381,87 @@ fn convolve_column_lb_avx_u16_impl<const HAS_DOT: bool>(
             }
 
             *dst = (store0 >> PRECISION).max(0).min(max_colors as i32) as u16;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::convolve_column_lb_avx2_u16;
+    use crate::filter_weights::FilterBounds;
+    use crate::support::{PRECISION, ROUNDING_CONST};
+
+    type Kernel = fn(usize, &FilterBounds, &[u16], &mut [u16], usize, &[i16], u32);
+
+    fn check_q15_rows(kernel: Kernel) {
+        for depth in [10, 12] {
+            let max = (1 << depth) - 1;
+            for width in 1..=101 {
+                let stride = width + (width % 2) * 5;
+                for taps in 1..=32 {
+                    let bounds = FilterBounds::new(taps % 3, taps);
+                    // The last tap reaches the final active sample, without row-end padding.
+                    let len = (bounds.start + taps - 1) * stride + width;
+                    let source: Vec<_> = (0..len)
+                        .map(|i| ((i * 317 + i / 17 * 89) as u16) & max)
+                        .collect();
+                    let mut weights: Vec<_> = (0..taps)
+                        .map(|i| ((i * 199 + taps * 229) % 1024) as i16 - 512)
+                        .collect();
+                    if taps == 1 {
+                        weights[0] = i16::MAX;
+                    } else {
+                        let tail_sum: i32 = weights[2..].iter().map(|&w| i32::from(w)).sum();
+                        weights[0] = (16384 - tail_sum) as i16;
+                        weights[1] = 16384;
+                    }
+                    let mut output = vec![0; width];
+                    kernel(
+                        width,
+                        &bounds,
+                        &source,
+                        &mut output,
+                        stride,
+                        &weights,
+                        depth,
+                    );
+                    for (x, actual) in output.into_iter().enumerate() {
+                        let expected =
+                            weights
+                                .iter()
+                                .enumerate()
+                                .fold(ROUNDING_CONST, |sum, (tap, &w)| {
+                                    sum.wrapping_add(
+                                        i32::from(source[(bounds.start + tap) * stride + x])
+                                            * i32::from(w),
+                                    )
+                                });
+                        let expected = (expected >> PRECISION).clamp(0, i32::from(max)) as u16;
+                        assert_eq!(
+                            actual, expected,
+                            "depth {depth}, width {width}, {taps} taps, x {x}"
+                        );
+                    }
+                }
+            }
+        }
+
+        // Seventeen maximum positive products wrap the accumulator below zero.
+        let bounds = FilterBounds::new(0, 17);
+        let source = vec![4095; 17 * 65];
+        let mut output = [u16::MAX; 65];
+        kernel(65, &bounds, &source, &mut output, 65, &[32767; 17], 12);
+        assert_eq!(output, [0; 65]);
+    }
+
+    #[test]
+    fn avx2_q15_vertical_pairs_match_scalar() {
+        if std::is_x86_feature_detected!("avx2") {
+            check_q15_rows(convolve_column_lb_avx2_u16);
+        }
+        #[cfg(feature = "avx512")]
+        if std::is_x86_feature_detected!("avxvnni") {
+            check_q15_rows(super::convolve_column_lb_avx2_u16_vnni);
         }
     }
 }

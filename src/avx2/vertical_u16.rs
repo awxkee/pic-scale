@@ -29,7 +29,6 @@
 
 use crate::avx2::utils::{_mm_prefer_fma_ps, _mm256_prefer_fma_ps, shuffle};
 use crate::filter_weights::FilterBounds;
-use crate::mlaf::mlaf;
 use std::arch::x86_64::*;
 
 pub(crate) fn convolve_column_avx_u16_fma(
@@ -571,7 +570,7 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
         let tail4 = tail8.as_chunks_mut::<4>().1;
 
         for (x, dst) in tail4.iter_mut().enumerate() {
-            let mut store0 = 0.;
+            let mut store0 = zeros_ps;
 
             let v_px = cx + x;
 
@@ -580,10 +579,78 @@ fn convolve_column_lb_u16_impl<const FMA: bool>(
                 let offset = src_stride * py + v_px;
                 let src_ptr = src.get_unchecked(offset);
 
-                store0 = mlaf(store0, *src_ptr as f32, k_weight);
+                store0 = _mm_prefer_fma_ps::<FMA>(
+                    store0,
+                    _mm_set_ss(*src_ptr as f32),
+                    _mm_set_ss(k_weight),
+                );
             }
 
-            *dst = store0.round().max(0.).min(max_colors as f32) as u16;
+            // Keep the same conversion and rounding mode as the vector lanes.
+            *dst = _mm_cvtss_si32(store0).clamp(0, max_colors) as u16;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{convolve_column_avx_u16_default, convolve_column_avx_u16_fma};
+    use crate::filter_weights::FilterBounds;
+
+    #[test]
+    fn avx2_full_depth_vertical_tail_matches_vector_rounding() {
+        if !std::is_x86_feature_detected!("avx2") {
+            return;
+        }
+
+        let bounds = FilterBounds::new(0, 2);
+        // The first pair gives exact ties. The second rounds differently with
+        // fused multiplication in the final tap.
+        let weights = [
+            [0.5, 0.5],
+            [f32::from_bits(0x3edd_3055), f32::from_bits(0x3f11_67d6)],
+        ];
+
+        for width in [7, 11, 19, 35, 67] {
+            let mut source = vec![0; 2 * width];
+            let mut output = vec![0; width];
+            source[..width].fill(5);
+            convolve_column_avx_u16_default(
+                width,
+                &bounds,
+                &source,
+                &mut output,
+                width,
+                &weights[0],
+                16,
+            );
+            assert_eq!(output, vec![2; width]);
+
+            source[..width].fill(54650);
+            source[width..].fill(54172);
+            convolve_column_avx_u16_default(
+                width,
+                &bounds,
+                &source,
+                &mut output,
+                width,
+                &weights[1],
+                16,
+            );
+            assert_eq!(output, vec![54378; width]);
+
+            if std::is_x86_feature_detected!("fma") {
+                convolve_column_avx_u16_fma(
+                    width,
+                    &bounds,
+                    &source,
+                    &mut output,
+                    width,
+                    &weights[1],
+                    16,
+                );
+                assert_eq!(output, vec![54379; width]);
+            }
         }
     }
 }

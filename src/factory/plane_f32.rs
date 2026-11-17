@@ -185,11 +185,15 @@ impl VerticalConvolutionPass<f32, f32, 1> for ImageStore<'_, f32, 1> {
                 }
             }
         }
-        Arc::new(VerticalFiltering {
+        let filter = VerticalFiltering {
             filter_weights,
             filter_row: _dispatcher,
             threading_policy,
-        })
+        };
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+        return crate::neon::paired_vertical_f32(filter);
+        #[cfg(not(all(target_arch = "aarch64", feature = "neon")))]
+        Arc::new(filter)
     }
 }
 
@@ -197,7 +201,7 @@ impl VerticalConvolutionPass<f32, f64, 1> for ImageStore<'_, f32, 1> {
     fn vertical_plan(
         filter_weights: FilterWeights<f64>,
         threading_policy: ThreadingPolicy,
-        _: ConvolutionOptions,
+        _options: ConvolutionOptions,
     ) -> Arc<dyn ColumnFilter<f32, 1> + Send + Sync> {
         #[allow(clippy::type_complexity)]
         let mut _dispatcher: fn(
@@ -214,10 +218,119 @@ impl VerticalConvolutionPass<f32, f64, 1> for ImageStore<'_, f32, 1> {
             use crate::neon::convolve_vertical_neon_row_f32_f64;
             _dispatcher = convolve_vertical_neon_row_f32_f64;
         }
-        Arc::new(VerticalFiltering {
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        if _options.src_size.width >= 8 && std::arch::is_x86_feature_detected!("avx2") {
+            use crate::avx2::{
+                convolve_vertical_avx_row_f32_f64_default, convolve_vertical_avx_row_f32_f64_fma,
+            };
+            // Match the scalar path's compile-time choice of fused arithmetic.
+            _dispatcher = if cfg!(target_feature = "fma") {
+                convolve_vertical_avx_row_f32_f64_fma
+            } else {
+                convolve_vertical_avx_row_f32_f64_default
+            };
+        }
+        let filter = VerticalFiltering {
             filter_weights,
             filter_row: _dispatcher,
             threading_policy,
-        })
+        };
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+        return crate::neon::paired_vertical_f64(filter);
+        #[cfg(not(all(target_arch = "aarch64", feature = "neon")))]
+        Arc::new(filter)
+    }
+}
+
+#[cfg(all(test, target_arch = "x86_64", feature = "avx"))]
+mod tests {
+    use super::*;
+    use crate::{ImageSize, WorkloadStrategy};
+
+    fn planar_quality_vertical_plan(
+        width: usize,
+        weights: [f64; 2],
+    ) -> Arc<dyn ColumnFilter<f32, 1> + Send + Sync> {
+        let filter =
+            FilterWeights::new(weights.to_vec(), 2, 2, 1, 2, vec![FilterBounds::new(0, 2)]);
+        <ImageStore<'_, f32, 1> as VerticalConvolutionPass<f32, f64, 1>>::vertical_plan(
+            filter,
+            ThreadingPolicy::Single,
+            ConvolutionOptions {
+                workload_strategy: WorkloadStrategy::PreferQuality,
+                bit_depth: 0,
+                src_size: ImageSize::new(width, 2),
+                dst_size: ImageSize::new(width, 1),
+            },
+        )
+    }
+
+    #[test]
+    fn planar_quality_vertical_preserves_scalar_cancellation() {
+        if !std::arch::is_x86_feature_detected!("avx2") {
+            return;
+        }
+
+        // This width exercises both vector block sizes and the single-element tail.
+        let width = 25;
+        let stride = width + 3;
+        let mut source = vec![1.0; stride + width];
+        source[stride..].fill(3.0);
+        let weights = [-(3.0 + 4.0 * f64::EPSILON), 1.0 + f64::EPSILON];
+        let plan = planar_quality_vertical_plan(width, weights);
+        let mut output = vec![f32::NAN; width];
+        plan.run_on_row(&source, &mut output, width, stride, 0, 0);
+        let expected = if cfg!(target_feature = "fma") {
+            -f64::EPSILON as f32
+        } else {
+            0.0
+        };
+        assert!(
+            output
+                .iter()
+                .all(|value| value.to_bits() == expected.to_bits())
+        );
+    }
+
+    #[test]
+    fn planar_quality_vertical_propagates_nans() {
+        if !std::arch::is_x86_feature_detected!("avx2") {
+            return;
+        }
+
+        let width = 25;
+        let stride = width + 3;
+        let weights = [0.25, 0.75];
+        let plan = planar_quality_vertical_plan(width, weights);
+        // Test both vector block sizes and the scalar tail.
+        for nan_column in [0, 16, 24] {
+            let mut source = vec![1.0; stride + width];
+            source[nan_column] = f32::from_bits(0xffc0_5678);
+            source[stride + nan_column] = f32::from_bits(0x7fc0_9a20);
+            let mut expected = vec![0.0; width];
+            convolve_vertical_rgb_native_row_f64(
+                width,
+                &FilterBounds::new(0, 2),
+                &source,
+                &mut expected,
+                stride,
+                &weights,
+                0,
+            );
+            assert!(expected[nan_column].is_nan());
+
+            let mut output = vec![0.0; width];
+            plan.run_on_row(&source, &mut output, width, stride, 0, 0);
+            assert!(
+                output
+                    .iter()
+                    .zip(&expected)
+                    .all(|(actual, expected)| if expected.is_nan() {
+                        actual.is_nan()
+                    } else {
+                        actual.to_bits() == expected.to_bits()
+                    })
+            );
+        }
     }
 }

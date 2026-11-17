@@ -314,7 +314,9 @@ where
 {
     fn plan_band_scratch_size(&self) -> Option<usize> {
         if N == 4
-            && TypeId::of::<T>() == TypeId::of::<u8>()
+            && (TypeId::of::<T>() == TypeId::of::<u8>()
+                || TypeId::of::<T>() == TypeId::of::<u16>()
+                || TypeId::of::<T>() == TypeId::of::<f32>())
             && self.streaming
             && self.alpha.needs_alpha_forward
             && self.alpha.needs_alpha_backward
@@ -346,6 +348,9 @@ where
             Some(scratch) => Some(validate_scratch!(scratch, band_size + filter_size)),
             None => None,
         };
+        if into.should_have_bit_depth() && !(1..=16).contains(&into.bit_depth) {
+            return Err(PicScaleError::UnsupportedBitDepth(into.bit_depth));
+        }
         let premultiply = store.is_alpha_premultiplication_needed();
         let mut allocated_scratch;
         let (scratch, alpha_size) = match scratch {
@@ -615,6 +620,144 @@ mod tests {
                     actual, expected,
                     "{source_size:?} → {target_size:?}, frame {frame}"
                 );
+            }
+        }
+    }
+
+    #[test]
+    fn banded_rgba_u16_reuses_scratch_at_10_and_16_bits() {
+        let source_size = ImageSize::new(64, 70);
+        let target_size = ImageSize::new(32, 35);
+        let src_stride = source_size.width * 4 + 3;
+        let src_len = (source_size.height - 1) * src_stride + source_size.width * 4;
+        let dst_stride = target_size.width * 4 + 7;
+        let dst_len = (target_size.height - 1) * dst_stride + target_size.width * 4;
+        let pool = ThreadingPolicy::Single.get_nova_pool(target_size);
+        let scaler = Scaler::new(ResamplingFunction::Lanczos3);
+
+        for bit_depth in [10, 16] {
+            let max_value = ((1u32 << bit_depth) - 1) as u16;
+            let pixels: Vec<u16> = (0..src_len)
+                .map(|i| (i * 29819 + i / 17) as u16 & max_value)
+                .collect();
+            let mut source =
+                ImageStore::from_slice(&pixels, source_size.width, source_size.height).unwrap();
+            source.stride = src_stride;
+            source.bit_depth = bit_depth;
+            let mut expected = vec![0xa5; dst_len];
+            let mut actual = vec![0xa5; dst_len];
+            let mut expected_dst =
+                ImageStoreMut::from_slice(&mut expected, target_size.width, target_size.height)
+                    .unwrap();
+            let mut actual_dst =
+                ImageStoreMut::from_slice(&mut actual, target_size.width, target_size.height)
+                    .unwrap();
+            expected_dst.stride = dst_stride;
+            expected_dst.bit_depth = bit_depth;
+            actual_dst.stride = dst_stride;
+            actual_dst.bit_depth = bit_depth;
+
+            let reference = scaler
+                .plan_rgba_resampling16(source_size, target_size, false, bit_depth)
+                .unwrap();
+            let mut full_alpha = vec![0; source_size.width * source_size.height * 4];
+            let input = premultiply_alpha(&source, &mut full_alpha, bit_depth, &pool).unwrap();
+            reference.resample(&input, &mut expected_dst).unwrap();
+            expected_dst.unpremultiply_alpha(&pool, WorkloadStrategy::PreferSpeed);
+
+            let plan = scaler
+                .plan_rgba_resampling16(source_size, target_size, true, bit_depth)
+                .unwrap();
+            let mut scratch = plan.alloc_scratch();
+            assert_eq!(scratch.len(), 46 * source_size.width * 4);
+            actual_dst.bit_depth = 17;
+            assert!(matches!(
+                plan.resample_with_scratch(&source, &mut actual_dst, &mut scratch),
+                Err(PicScaleError::UnsupportedBitDepth(17))
+            ));
+            actual_dst.bit_depth = bit_depth;
+            plan.resample_with_scratch(&source, &mut actual_dst, &mut scratch)
+                .unwrap();
+            assert_eq!(actual, expected, "{bit_depth}-bit");
+        }
+    }
+
+    #[test]
+    fn banded_rgba_f32_preserves_bits_with_padded_rows() {
+        let source_size = ImageSize::new(65, 73);
+        let target_size = ImageSize::new(31, 27);
+        let src_stride = source_size.width * 4 + 5;
+        let src_len = (source_size.height - 1) * src_stride + source_size.width * 4;
+        let dst_stride = target_size.width * 4 + 11;
+        let dst_len = (target_size.height - 1) * dst_stride + target_size.width * 4;
+        let samples = [
+            0.0f32,
+            -0.0,
+            f32::from_bits(1),
+            f32::NEG_INFINITY,
+            f32::INFINITY,
+            f32::from_bits(0x7fc0_002a),
+            f32::from_bits(0xffc0_0013),
+            f32::from_bits(0x7f80_0009),
+            -4.125,
+            0.3,
+            1.0,
+            4.25,
+        ];
+        let pixels: Vec<f32> = (0..src_len)
+            .map(|i| samples[(i * 3 + i / 7) % samples.len()])
+            .collect();
+        let mut source =
+            ImageStore::from_slice(&pixels, source_size.width, source_size.height).unwrap();
+        source.stride = src_stride;
+        let pool = ThreadingPolicy::Single.get_nova_pool(target_size);
+        let full_alpha_size = source_size.width * source_size.height * 4;
+        let mut full_alpha = vec![0.0; full_alpha_size];
+        let input = premultiply_alpha(&source, &mut full_alpha, 0, &pool).unwrap();
+        let guard = -32.25;
+
+        for strategy in [
+            WorkloadStrategy::PreferSpeed,
+            WorkloadStrategy::PreferQuality,
+        ] {
+            let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+            scaler.set_workload_strategy(strategy);
+            let reference = scaler
+                .plan_rgba_resampling_f32(source_size, target_size, false)
+                .unwrap();
+            let plan = scaler
+                .plan_rgba_resampling_f32(source_size, target_size, true)
+                .unwrap();
+            let mut scratch = plan.alloc_scratch();
+            assert!(scratch.len() < full_alpha_size + reference.scratch_size());
+
+            let mut expected = vec![guard; dst_len];
+            let mut expected_dst =
+                ImageStoreMut::from_slice(&mut expected, target_size.width, target_size.height)
+                    .unwrap();
+            expected_dst.stride = dst_stride;
+            reference.resample(&input, &mut expected_dst).unwrap();
+            expected_dst.unpremultiply_alpha(&pool, strategy);
+
+            for caller_scratch in [true, false] {
+                let mut actual = vec![guard; dst_len];
+                let mut actual_dst =
+                    ImageStoreMut::from_slice(&mut actual, target_size.width, target_size.height)
+                        .unwrap();
+                actual_dst.stride = dst_stride;
+                if caller_scratch {
+                    plan.resample_with_scratch(&source, &mut actual_dst, &mut scratch)
+                        .unwrap();
+                } else {
+                    plan.resample(&source, &mut actual_dst).unwrap();
+                }
+                for (i, (actual, expected)) in actual.iter().zip(&expected).enumerate() {
+                    assert_eq!(
+                        actual.to_bits(),
+                        expected.to_bits(),
+                        "{strategy:?}, index {i}"
+                    );
+                }
             }
         }
     }
