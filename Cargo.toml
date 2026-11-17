@@ -4,7 +4,7 @@ exclude = ["picscale", "fuzz", "pic-scale-py"]
 
 [package]
 name = "pic-scale"
-version = "0.7.12"
+version = "0.7.13"
 edition = "2024"
 description = "High performance image scaling"
 readme = "README.md"
@@ -13,7 +13,6 @@ license = "BSD-3-Clause OR Apache-2.0"
 authors = ["Radzivon Bartoshyk"]
 documentation = "https://github.com/awxkee/pic-scale"
 categories = ["multimedia::images", "multimedia::video"]
-homepage = "https://github.com/awxkee/pic-scale"
 repository = "https://github.com/awxkee/pic-scale"
 exclude = ["*.jpg", "/assets", "*.png", "*.sh", "/assets/*", "/.github"]
 rust-version = "1.89.0"

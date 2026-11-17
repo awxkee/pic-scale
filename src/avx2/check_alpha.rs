@@ -29,7 +29,7 @@
 
 use std::arch::x86_64::*;
 
-/// Checks if image has constant alpha by xor rows
+/// Checks whether any alpha differs from the first pixel's alpha.
 pub(crate) fn avx_has_non_constant_cap_alpha_rgba8(
     store: &[u8],
     width: usize,
@@ -40,85 +40,62 @@ pub(crate) fn avx_has_non_constant_cap_alpha_rgba8(
 
 #[target_feature(enable = "avx2")]
 fn avx_has_non_constant_cap_alpha_rgba8_impl(store: &[u8], width: usize, stride: usize) -> bool {
-    unsafe {
-        if store.is_empty() {
+    if store.is_empty() {
+        return true;
+    }
+
+    let first_alpha = store[3];
+    let expected = _mm256_set1_epi32(i32::from(first_alpha) << 24);
+    let alpha_mask = _mm256_set1_epi32(0xff00_0000u32 as i32);
+    let zero = _mm256_setzero_si256();
+
+    for row in store.chunks(stride) {
+        let (blocks, tail) = row[..width * 4].as_chunks::<128>();
+        let mut differences_0 = zero;
+        let mut differences_1 = zero;
+        let mut differences_2 = zero;
+        let mut differences_3 = zero;
+
+        for block in blocks {
+            let ptr = block.as_ptr();
+            // All four loads stay inside the 128-byte block.
+            let (pixels_0, pixels_1, pixels_2, pixels_3) = unsafe {
+                (
+                    _mm256_loadu_si256(ptr.cast()),
+                    _mm256_loadu_si256(ptr.add(32).cast()),
+                    _mm256_loadu_si256(ptr.add(64).cast()),
+                    _mm256_loadu_si256(ptr.add(96).cast()),
+                )
+            };
+            differences_0 = _mm256_or_si256(differences_0, _mm256_xor_si256(expected, pixels_0));
+            differences_1 = _mm256_or_si256(differences_1, _mm256_xor_si256(expected, pixels_1));
+            differences_2 = _mm256_or_si256(differences_2, _mm256_xor_si256(expected, pixels_2));
+            differences_3 = _mm256_or_si256(differences_3, _mm256_xor_si256(expected, pixels_3));
+        }
+
+        let (vectors, tail) = tail.as_chunks::<32>();
+        let mut differences = _mm256_or_si256(
+            _mm256_or_si256(differences_0, differences_1),
+            _mm256_or_si256(differences_2, differences_3),
+        );
+        for vector in vectors {
+            let pixels = unsafe { _mm256_loadu_si256(vector.as_ptr().cast()) };
+            differences = _mm256_or_si256(differences, _mm256_xor_si256(expected, pixels));
+        }
+
+        // RGB bytes stay packed and are ignored by the masked test at the end of the row.
+        if _mm256_testz_si256(differences, alpha_mask) == 0
+            || tail
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .any(|pixel| pixel[3] != first_alpha)
+        {
             return true;
         }
-
-        let ash0 = _mm256_setr_epi8(
-            3, -1, -1, -1, 7, -1, -1, -1, 11, -1, -1, -1, 15, -1, -1, -1, 3, -1, -1, -1, 7, -1, -1,
-            -1, 11, -1, -1, -1, 15, -1, -1, -1,
-        );
-
-        let sh0 = _mm_setr_epi8(3, -1, -1, -1, 7, -1, -1, -1, 11, -1, -1, -1, 15, -1, -1, -1);
-
-        let first_alpha = store[3];
-        let def_alpha = _mm256_set1_epi32(first_alpha as i32);
-
-        for row in store.chunks(stride) {
-            let row = &row[..width * 4];
-            let mut sums = _mm256_set1_epi32(0);
-
-            for chunk in row.as_chunks::<128>().0.iter() {
-                let mut r0 = _mm256_loadu_si256(chunk.as_ptr().cast());
-                let mut r1 = _mm256_loadu_si256(chunk.get_unchecked(32..).as_ptr().cast());
-                let mut r2 = _mm256_loadu_si256(chunk.get_unchecked(64..).as_ptr().cast());
-                let mut r3 = _mm256_loadu_si256(chunk.get_unchecked(96..).as_ptr().cast());
-
-                r0 = _mm256_xor_si256(_mm256_shuffle_epi8(r0, ash0), def_alpha);
-                r1 = _mm256_xor_si256(_mm256_shuffle_epi8(r1, ash0), def_alpha);
-                r2 = _mm256_xor_si256(_mm256_shuffle_epi8(r2, ash0), def_alpha);
-                r3 = _mm256_xor_si256(_mm256_shuffle_epi8(r3, ash0), def_alpha);
-
-                sums = _mm256_add_epi32(sums, r0);
-                sums = _mm256_add_epi32(sums, r1);
-                sums = _mm256_add_epi32(sums, r2);
-                sums = _mm256_add_epi32(sums, r3);
-            }
-
-            let row = row.as_chunks::<128>().1;
-
-            for chunk in row.as_chunks::<32>().0.iter() {
-                let mut r0 = _mm256_loadu_si256(chunk.as_ptr().cast());
-
-                r0 = _mm256_xor_si256(_mm256_shuffle_epi8(r0, ash0), def_alpha);
-
-                sums = _mm256_add_epi32(sums, r0);
-            }
-
-            let row = row.as_chunks::<32>().1;
-
-            let mut sums = _mm_add_epi32(
-                _mm256_castsi256_si128(sums),
-                _mm256_extracti128_si256::<1>(sums),
-            );
-            let def_alpha = _mm_set1_epi32(first_alpha as i32);
-
-            for chunk in row.as_chunks::<16>().0.iter() {
-                let mut r0 = _mm_loadu_si128(chunk.as_ptr() as *const __m128i);
-
-                r0 = _mm_shuffle_epi8(r0, sh0);
-
-                let alphas = _mm_xor_si128(r0, def_alpha);
-
-                sums = _mm_add_epi32(sums, alphas);
-            }
-
-            let row = row.as_chunks::<16>().1;
-
-            use crate::avx2::routines::_mm_hsum_epi32;
-            let mut h_sum = _mm_hsum_epi32(sums);
-
-            for chunk in row.as_chunks::<4>().0.iter() {
-                h_sum += chunk[3] as i32 ^ first_alpha as i32;
-            }
-
-            if h_sum != 0 {
-                return true;
-            }
-        }
-        false
     }
+
+    false
 }
 
 /// Checks if image has constant alpha by xor rows for image 16bits
@@ -223,6 +200,46 @@ mod tests {
         let image = vec![255u8; image_size * image_size * 4];
         let has_alpha = avx_has_non_constant_cap_alpha_rgba8(&image, image_size, image_size * 4);
         assert_eq!(false, has_alpha);
+    }
+
+    #[test]
+    fn rgba8_alpha_scan_ignores_rgb_and_padding() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        assert!(avx_has_non_constant_cap_alpha_rgba8(&[], 0, 0));
+
+        for width in [1, 7, 8, 15, 31, 32, 33, 39, 40, 65, 67] {
+            let row_len = width * 4;
+            for padding in [0, 5] {
+                let stride = row_len + padding;
+                let mut image: Vec<u8> = (0..2 * stride + row_len)
+                    .map(|byte| (byte * 53 + 17) as u8)
+                    .collect();
+                for alpha in [0, 117, 255] {
+                    for row in image.chunks_mut(stride) {
+                        for pixel in row[..row_len].as_chunks_mut::<4>().0 {
+                            pixel[3] = alpha;
+                        }
+                    }
+                    assert!(!avx_has_non_constant_cap_alpha_rgba8(&image, width, stride));
+
+                    // The second row exercises all block and tail positions.
+                    // The third row ends exactly at the end of the input slice.
+                    for offset in (0..width)
+                        .map(|pixel| stride + pixel * 4 + 3)
+                        .chain([2 * stride + row_len - 1])
+                    {
+                        image[offset] ^= 0x80;
+                        assert!(
+                            avx_has_non_constant_cap_alpha_rgba8(&image, width, stride),
+                            "width={width}, padding={padding}, alpha={alpha}, offset={offset}"
+                        );
+                        image[offset] ^= 0x80;
+                    }
+                }
+            }
+        }
     }
 
     #[test]

@@ -92,6 +92,17 @@ impl ThreadingPolicy {
 }
 
 impl ThreadingPolicy {
+    pub(crate) fn is_single_worker(&self, _for_size: ImageSize) -> bool {
+        #[cfg(feature = "threading")]
+        {
+            self.thread_count(_for_size) == 1
+        }
+        #[cfg(not(feature = "threading"))]
+        {
+            true
+        }
+    }
+
     pub(crate) fn get_nova_pool(&self, _for_size: ImageSize) -> ScalingPool {
         #[cfg(feature = "threading")]
         {

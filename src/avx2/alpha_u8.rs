@@ -132,8 +132,11 @@ fn avx_premultiply_alpha_rgba_impl(dst: &mut [u8], src: &[u8]) {
 pub(crate) fn avx_unpremultiply_alpha_rgba(in_place: &mut [u8], strategy: WorkloadStrategy) {
     unsafe {
         match strategy {
+            WorkloadStrategy::PreferQuality if std::arch::is_x86_feature_detected!("fma") => {
+                Avx2DisassociateAlpha::<true>.disassociate(in_place)
+            }
             WorkloadStrategy::PreferQuality => {
-                avx_unpremultiply_alpha_rgba_impl_row(in_place, Avx2DisassociateAlpha::default())
+                Avx2DisassociateAlpha::<false>.disassociate(in_place)
             }
             WorkloadStrategy::PreferSpeed => avx_unpremultiply_alpha_rgba_impl_row(
                 in_place,
@@ -147,94 +150,73 @@ trait DisassociateAlpha {
     unsafe fn disassociate(&self, in_place: &mut [u8]);
 }
 
-#[derive(Default)]
-struct Avx2DisassociateAlpha {}
+struct Avx2DisassociateAlpha<const FMA: bool>;
 
-impl Avx2DisassociateAlpha {
-    #[inline]
-    #[target_feature(enable = "avx2")]
-    fn disassociate_chunk(&self, in_place: &mut [u8; 32]) {
-        let alpha_mask = _mm256_setr_epi8(
-            3, -1, -1, -1, 7, -1, -1, -1, 11, -1, -1, -1, 15, -1, -1, -1, 3, -1, -1, -1, 7, -1, -1,
-            -1, 11, -1, -1, -1, 15, -1, -1, -1,
-        );
-        let rgba = unsafe { _mm256_loadu_si256(in_place.as_ptr().cast()) };
-        let alpha_u32 = _mm256_shuffle_epi8(rgba, alpha_mask);
-        let alpha_f32 = _mm256_cvtepi32_ps(alpha_u32);
-        let is_zero_mask = _mm256_cmpeq_epi32(alpha_u32, _mm256_setzero_si256());
-
-        let a_lo = _mm256_unpacklo_epi8(rgba, _mm256_setzero_si256());
-        let a_hi = _mm256_unpackhi_epi8(rgba, _mm256_setzero_si256());
-
-        let p0 = _mm256_unpacklo_epi16(a_lo, _mm256_setzero_si256());
-        let p1 = _mm256_unpackhi_epi16(a_lo, _mm256_setzero_si256());
-        let p2 = _mm256_unpacklo_epi16(a_hi, _mm256_setzero_si256());
-        let p3 = _mm256_unpackhi_epi16(a_hi, _mm256_setzero_si256());
-
-        let mut v0 = _mm256_cvtepi32_ps(p0);
-        let mut v1 = _mm256_cvtepi32_ps(p1);
-        let mut v2 = _mm256_cvtepi32_ps(p2);
-        let mut v3 = _mm256_cvtepi32_ps(p3);
-
-        let a0 = _mm256_permutevar8x32_ps(alpha_f32, _mm256_setr_epi32(0, 0, 0, 0, 4, 4, 4, 4));
-        let a1 = _mm256_permutevar8x32_ps(alpha_f32, _mm256_setr_epi32(1, 1, 1, 1, 5, 5, 5, 5));
-        let a2 = _mm256_permutevar8x32_ps(alpha_f32, _mm256_setr_epi32(2, 2, 2, 2, 6, 6, 6, 6));
-        let a3 = _mm256_permutevar8x32_ps(alpha_f32, _mm256_setr_epi32(3, 3, 3, 3, 7, 7, 7, 7));
-
-        // Divide color * 255 directly to avoid rounding a reciprocal before multiplication.
-        let scale = _mm256_set1_ps(255.);
-        v0 = _mm256_div_ps(_mm256_mul_ps(v0, scale), a0);
-        v1 = _mm256_div_ps(_mm256_mul_ps(v1, scale), a1);
-        v2 = _mm256_div_ps(_mm256_mul_ps(v2, scale), a2);
-        v3 = _mm256_div_ps(_mm256_mul_ps(v3, scale), a3);
-
-        // Match the scalar table's rounding of nonnegative half values upward.
-        let half = _mm256_set1_ps(0.5);
-        let s0 = _mm256_cvttps_epi32(_mm256_add_ps(v0, half));
-        let s1 = _mm256_cvttps_epi32(_mm256_add_ps(v1, half));
-        let s2 = _mm256_cvttps_epi32(_mm256_add_ps(v2, half));
-        let s3 = _mm256_cvttps_epi32(_mm256_add_ps(v3, half));
-
-        // Keep large values positive for the signed-input u8 saturation below.
-        let packed16_0 = _mm256_packs_epi32(s0, s1);
-        let packed16_1 = _mm256_packs_epi32(s2, s3);
-
-        let mut packed = _mm256_packus_epi16(packed16_0, packed16_1);
-        packed = _mm256_blendv_epi8(packed, _mm256_setzero_si256(), is_zero_mask);
-        packed = _mm256_blendv_epi8(
-            packed,
-            rgba,
-            _mm256_set1_epi32(i32::from_ne_bytes([0, 0, 0, 255])),
-        );
+impl<const FMA: bool> Avx2DisassociateAlpha<FMA> {
+    #[inline(always)]
+    unsafe fn disassociate_chunk(&self, in_place: &mut [u8; 32]) {
         unsafe {
-            _mm256_storeu_si256(in_place.as_mut_ptr().cast(), packed);
+            let rgba = _mm256_loadu_si256(in_place.as_ptr().cast());
+            let alpha = _mm256_srli_epi32::<24>(rgba);
+            let denominator = _mm256_cvtepi32_ps(_mm256_max_epu32(alpha, _mm256_set1_epi32(1)));
+            let factor = _mm256_div_ps(_mm256_set1_ps(255.), denominator);
+
+            // Clamping colors to alpha gives saturation at 255 and zero RGB at alpha zero.
+            // The extra bias covers f32 rounding error at ties. Non-ties are at least
+            // 1 / (2 * 255) away from a half-integer, so their rounding is unaffected.
+            let rounding_bias = _mm256_set1_ps(0.5 + 1.0 / 4096.0);
+            let scale_channel = |channel| {
+                let clamped = _mm256_cvtepi32_ps(_mm256_min_epu32(channel, alpha));
+                let biased = if FMA {
+                    _mm256_fmadd_ps(clamped, factor, rounding_bias)
+                } else {
+                    _mm256_add_ps(_mm256_mul_ps(clamped, factor), rounding_bias)
+                };
+                _mm256_cvttps_epi32(biased)
+            };
+            let channel_mask = _mm256_set1_epi32(255);
+            let r = scale_channel(_mm256_and_si256(rgba, channel_mask));
+            let g = scale_channel(_mm256_and_si256(_mm256_srli_epi32::<8>(rgba), channel_mask));
+            let b = scale_channel(_mm256_and_si256(
+                _mm256_srli_epi32::<16>(rgba),
+                channel_mask,
+            ));
+            let rb = _mm256_or_si256(r, _mm256_slli_epi32::<16>(b));
+            let ga = _mm256_or_si256(
+                _mm256_slli_epi32::<8>(g),
+                _mm256_and_si256(rgba, _mm256_set1_epi32(0xff000000u32 as i32)),
+            );
+            _mm256_storeu_si256(in_place.as_mut_ptr().cast(), _mm256_or_si256(rb, ga));
+        }
+    }
+
+    #[inline(always)]
+    unsafe fn disassociate_row(&self, in_place: &mut [u8]) {
+        let (chunks, rem) = in_place.as_chunks_mut::<32>();
+        for dst in chunks {
+            unsafe { self.disassociate_chunk(dst) };
+        }
+
+        if !rem.is_empty() {
+            let mut buffer = [0; 32];
+            buffer[..rem.len()].copy_from_slice(rem);
+            unsafe { self.disassociate_chunk(&mut buffer) };
+            rem.copy_from_slice(&buffer[..rem.len()]);
         }
     }
 }
 
-impl DisassociateAlpha for Avx2DisassociateAlpha {
+impl DisassociateAlpha for Avx2DisassociateAlpha<false> {
     #[target_feature(enable = "avx2")]
     unsafe fn disassociate(&self, in_place: &mut [u8]) {
-        let mut rem = in_place;
+        unsafe { self.disassociate_row(in_place) };
+    }
+}
 
-        for dst in rem.as_chunks_mut::<32>().0.iter_mut() {
-            self.disassociate_chunk(dst);
-        }
-
-        rem = rem.as_chunks_mut::<32>().1;
-
-        if !rem.is_empty() {
-            const PART_SIZE: usize = 32;
-            assert!(rem.len() < PART_SIZE);
-
-            let mut buffer: [u8; PART_SIZE] = [0u8; PART_SIZE];
-
-            buffer[..rem.len()].copy_from_slice(rem);
-
-            self.disassociate_chunk(&mut buffer);
-
-            rem.copy_from_slice(&buffer[..rem.len()]);
-        }
+impl DisassociateAlpha for Avx2DisassociateAlpha<true> {
+    #[target_feature(enable = "avx2,fma")]
+    unsafe fn disassociate(&self, in_place: &mut [u8]) {
+        unsafe { self.disassociate_row(in_place) };
     }
 }
 
@@ -335,13 +317,16 @@ fn avx_unpremultiply_alpha_rgba_impl_row(in_place: &mut [u8], executor: impl Dis
 
 #[cfg(test)]
 mod tests {
-    use super::{avx_premultiply_alpha_rgba, avx_unpremultiply_alpha_rgba};
+    use super::{
+        Avx2DisassociateAlpha, DisassociateAlpha, avx_premultiply_alpha_rgba,
+        avx_unpremultiply_alpha_rgba,
+    };
     use crate::WorkloadStrategy;
     use crate::alpha_handle_u8::{
         premultiply_alpha_rgba_row_impl, unpremultiply_alpha_rgba_row_impl,
     };
 
-    fn check_unpremultiply(strategy: WorkloadStrategy) {
+    fn check_unpremultiply(strategy: WorkloadStrategy, unpremultiply: impl Fn(&mut [u8])) {
         let mut src = Vec::with_capacity(256 * 256 * 4);
         for color in u8::MIN..=u8::MAX {
             for alpha in u8::MIN..=u8::MAX {
@@ -369,7 +354,7 @@ mod tests {
             let mut expected = input.clone();
             unpremultiply_alpha_rgba_row_impl(&mut expected);
             let mut actual = input.clone();
-            avx_unpremultiply_alpha_rgba(&mut actual, strategy);
+            unpremultiply(&mut actual);
 
             for ((actual, expected), input) in actual
                 .as_chunks::<4>()
@@ -403,14 +388,21 @@ mod tests {
     #[test]
     fn avx2_unpremultiply_quality_matches_scalar_reference() {
         if std::arch::is_x86_feature_detected!("avx2") {
-            check_unpremultiply(WorkloadStrategy::PreferQuality);
+            check_unpremultiply(WorkloadStrategy::PreferQuality, |row| unsafe {
+                Avx2DisassociateAlpha::<false>.disassociate(row)
+            });
+            check_unpremultiply(WorkloadStrategy::PreferQuality, |row| {
+                avx_unpremultiply_alpha_rgba(row, WorkloadStrategy::PreferQuality)
+            });
         }
     }
 
     #[test]
     fn avx2_unpremultiply_speed_stays_within_two_of_scalar_reference() {
         if std::arch::is_x86_feature_detected!("avx2") {
-            check_unpremultiply(WorkloadStrategy::PreferSpeed);
+            check_unpremultiply(WorkloadStrategy::PreferSpeed, |row| {
+                avx_unpremultiply_alpha_rgba(row, WorkloadStrategy::PreferSpeed)
+            });
         }
     }
 

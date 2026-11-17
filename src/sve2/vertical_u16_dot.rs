@@ -45,7 +45,7 @@ pub(crate) fn convolve_vertical_sve2_u16_dot(
 }
 
 macro_rules! pack_4_rows_sve_u16 {
-    ($a:expr, $b:expr, $c:expr, $d:expr) => {{
+    ([$lo0:ident, $lo1:ident, $hi0:ident, $hi1:ident], $a:expr, $b:expr, $c:expr, $d:expr) => {
         let ab_lo = svzip1_u16($a, $b);
         let ab_hi = svzip2_u16($a, $b);
 
@@ -57,13 +57,12 @@ macro_rules! pack_4_rows_sve_u16 {
         let hi0 = svzip1_u32(svreinterpret_u32_u16(ab_hi), svreinterpret_u32_u16(cd_hi));
         let hi1 = svzip2_u32(svreinterpret_u32_u16(ab_hi), svreinterpret_u32_u16(cd_hi));
 
-        [
-            svreinterpret_u16_u32(lo0),
-            svreinterpret_u16_u32(lo1),
-            svreinterpret_u16_u32(hi0),
-            svreinterpret_u16_u32(hi1),
-        ]
-    }};
+        // Keep each scalable vector in its own local to preserve all lanes.
+        let $lo0 = svreinterpret_u16_u32(lo0);
+        let $lo1 = svreinterpret_u16_u32(lo1);
+        let $hi0 = svreinterpret_u16_u32(hi0);
+        let $hi1 = svreinterpret_u16_u32(hi1);
+    };
 }
 
 macro_rules! narrow_i64_to_u16 {
@@ -206,14 +205,34 @@ fn work_wide_chunks_u16(
                 )
             };
 
-            let [packed_lo_0, packed_lo_1, packed_lo_2, packed_lo_3] =
-                pack_4_rows_sve_u16!(row0_lo, row1_lo, row2_lo, row3_lo);
-            let [packed_hi_0, packed_hi_1, packed_hi_2, packed_hi_3] =
-                pack_4_rows_sve_u16!(row0_hi, row1_hi, row2_hi, row3_hi);
-            let [packed_lo_4, packed_lo_5, packed_lo_6, packed_lo_7] =
-                pack_4_rows_sve_u16!(row4_lo, row5_lo, row6_lo, row7_lo);
-            let [packed_hi_4, packed_hi_5, packed_hi_6, packed_hi_7] =
-                pack_4_rows_sve_u16!(row4_hi, row5_hi, row6_hi, row7_hi);
+            pack_4_rows_sve_u16!(
+                [packed_lo_0, packed_lo_1, packed_lo_2, packed_lo_3],
+                row0_lo,
+                row1_lo,
+                row2_lo,
+                row3_lo
+            );
+            pack_4_rows_sve_u16!(
+                [packed_hi_0, packed_hi_1, packed_hi_2, packed_hi_3],
+                row0_hi,
+                row1_hi,
+                row2_hi,
+                row3_hi
+            );
+            pack_4_rows_sve_u16!(
+                [packed_lo_4, packed_lo_5, packed_lo_6, packed_lo_7],
+                row4_lo,
+                row5_lo,
+                row6_lo,
+                row7_lo
+            );
+            pack_4_rows_sve_u16!(
+                [packed_hi_4, packed_hi_5, packed_hi_6, packed_hi_7],
+                row4_hi,
+                row5_hi,
+                row6_hi,
+                row7_hi
+            );
 
             acc_lo_0 = svdot_s64(acc_lo_0, svreinterpret_s16_u16(packed_lo_0), vw0);
             acc_lo_1 = svdot_s64(acc_lo_1, svreinterpret_s16_u16(packed_lo_1), vw0);
@@ -284,10 +303,20 @@ fn work_wide_chunks_u16(
                 )
             };
 
-            let [packed_lo_0, packed_lo_1, packed_lo_2, packed_lo_3] =
-                pack_4_rows_sve_u16!(row0_lo, row1_lo, row2_lo, row3_lo);
-            let [packed_hi_0, packed_hi_1, packed_hi_2, packed_hi_3] =
-                pack_4_rows_sve_u16!(row0_hi, row1_hi, row2_hi, row3_hi);
+            pack_4_rows_sve_u16!(
+                [packed_lo_0, packed_lo_1, packed_lo_2, packed_lo_3],
+                row0_lo,
+                row1_lo,
+                row2_lo,
+                row3_lo
+            );
+            pack_4_rows_sve_u16!(
+                [packed_hi_0, packed_hi_1, packed_hi_2, packed_hi_3],
+                row0_hi,
+                row1_hi,
+                row2_hi,
+                row3_hi
+            );
 
             acc_lo_0 = svdot_s64(acc_lo_0, svreinterpret_s16_u16(packed_lo_0), vw);
             acc_lo_1 = svdot_s64(acc_lo_1, svreinterpret_s16_u16(packed_lo_1), vw);
@@ -322,10 +351,20 @@ fn work_wide_chunks_u16(
             };
 
             let zero = svdup_n_u16(0);
-            let [packed_lo_0, packed_lo_1, packed_lo_2, packed_lo_3] =
-                pack_4_rows_sve_u16!(row0_lo, row1_lo, zero, zero);
-            let [packed_hi_0, packed_hi_1, packed_hi_2, packed_hi_3] =
-                pack_4_rows_sve_u16!(row0_hi, row1_hi, zero, zero);
+            pack_4_rows_sve_u16!(
+                [packed_lo_0, packed_lo_1, packed_lo_2, packed_lo_3],
+                row0_lo,
+                row1_lo,
+                zero,
+                zero
+            );
+            pack_4_rows_sve_u16!(
+                [packed_hi_0, packed_hi_1, packed_hi_2, packed_hi_3],
+                row0_hi,
+                row1_hi,
+                zero,
+                zero
+            );
 
             acc_lo_0 = svdot_s64(acc_lo_0, svreinterpret_s16_u16(packed_lo_0), vw);
             acc_lo_1 = svdot_s64(acc_lo_1, svreinterpret_s16_u16(packed_lo_1), vw);
@@ -352,10 +391,20 @@ fn work_wide_chunks_u16(
             let row_hi = unsafe { svld1_u16(pg_full, src.get_unchecked(base0 + vl..).as_ptr()) };
             let zero = svdup_n_u16(0);
 
-            let [packed_lo_0, packed_lo_1, packed_lo_2, packed_lo_3] =
-                pack_4_rows_sve_u16!(row_lo, zero, zero, zero);
-            let [packed_hi_0, packed_hi_1, packed_hi_2, packed_hi_3] =
-                pack_4_rows_sve_u16!(row_hi, zero, zero, zero);
+            pack_4_rows_sve_u16!(
+                [packed_lo_0, packed_lo_1, packed_lo_2, packed_lo_3],
+                row_lo,
+                zero,
+                zero,
+                zero
+            );
+            pack_4_rows_sve_u16!(
+                [packed_hi_0, packed_hi_1, packed_hi_2, packed_hi_3],
+                row_hi,
+                zero,
+                zero,
+                zero
+            );
 
             acc_lo_0 = svdot_s64(acc_lo_0, svreinterpret_s16_u16(packed_lo_0), vw);
             acc_lo_1 = svdot_s64(acc_lo_1, svreinterpret_s16_u16(packed_lo_1), vw);
@@ -450,10 +499,20 @@ fn convolve_vertical_sve2_u16_row(
             let row7 =
                 unsafe { svld1_u16(pg, src.get_unchecked(base0 + src_stride * 7..).as_ptr()) };
 
-            let [packed0_0, packed1_0, packed2_0, packed3_0] =
-                pack_4_rows_sve_u16!(row0, row1, row2, row3);
-            let [packed0_1, packed1_1, packed2_1, packed3_1] =
-                pack_4_rows_sve_u16!(row4, row5, row6, row7);
+            pack_4_rows_sve_u16!(
+                [packed0_0, packed1_0, packed2_0, packed3_0],
+                row0,
+                row1,
+                row2,
+                row3
+            );
+            pack_4_rows_sve_u16!(
+                [packed0_1, packed1_1, packed2_1, packed3_1],
+                row4,
+                row5,
+                row6,
+                row7
+            );
 
             acc_0 = svdot_s64(acc_0, svreinterpret_s16_u16(packed0_0), vw0);
             acc_1 = svdot_s64(acc_1, svreinterpret_s16_u16(packed1_0), vw0);
@@ -484,7 +543,7 @@ fn convolve_vertical_sve2_u16_row(
             let row3 =
                 unsafe { svld1_u16(pg, src.get_unchecked(base0 + src_stride * 3..).as_ptr()) };
 
-            let [packed0, packed1, packed2, packed3] = pack_4_rows_sve_u16!(row0, row1, row2, row3);
+            pack_4_rows_sve_u16!([packed0, packed1, packed2, packed3], row0, row1, row2, row3);
 
             acc_0 = svdot_s64(acc_0, svreinterpret_s16_u16(packed0), vw);
             acc_1 = svdot_s64(acc_1, svreinterpret_s16_u16(packed1), vw);
@@ -507,7 +566,7 @@ fn convolve_vertical_sve2_u16_row(
             let row1 = unsafe { svld1_u16(pg, src.get_unchecked(base0 + src_stride..).as_ptr()) };
             let zero = svdup_n_u16(0);
 
-            let [packed0, packed1, packed2, packed3] = pack_4_rows_sve_u16!(row0, row1, zero, zero);
+            pack_4_rows_sve_u16!([packed0, packed1, packed2, packed3], row0, row1, zero, zero);
 
             acc_0 = svdot_s64(acc_0, svreinterpret_s16_u16(packed0), vw);
             acc_1 = svdot_s64(acc_1, svreinterpret_s16_u16(packed1), vw);
@@ -529,7 +588,7 @@ fn convolve_vertical_sve2_u16_row(
             let row = unsafe { svld1_u16(pg, src.get_unchecked(base0..).as_ptr()) };
             let zero = svdup_n_u16(0);
 
-            let [packed0, packed1, packed2, packed3] = pack_4_rows_sve_u16!(row, zero, zero, zero);
+            pack_4_rows_sve_u16!([packed0, packed1, packed2, packed3], row, zero, zero, zero);
 
             acc_0 = svdot_s64(acc_0, svreinterpret_s16_u16(packed0), vw);
             acc_1 = svdot_s64(acc_1, svreinterpret_s16_u16(packed1), vw);

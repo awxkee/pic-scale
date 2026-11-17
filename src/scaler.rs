@@ -211,7 +211,7 @@ impl Scaler {
                     horizontal_filter: h,
                     vertical_filter: v,
                     trampoline_filter: trampoline,
-                    threading_policy: self.threading_policy,
+                    streaming: self.threading_policy.is_single_worker(destination_size),
                 }))
             }
             (true, false) => Ok(Arc::new(VerticalConvolvePlan {
@@ -957,7 +957,7 @@ impl Scaler {
                             horizontal_filter: h,
                             vertical_filter: v,
                             trampoline_filter: trampoline,
-                            threading_policy: self.threading_policy,
+                            streaming: self.threading_policy.is_single_worker(destination_size),
                         })
                     }
                     (true, false) => Arc::new(VerticalConvolvePlan {
@@ -1164,6 +1164,76 @@ def_image_scaling_alpha!(RgbaF32ImageStore, f32, 4);
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn single_worker_rgba8_two_axis_plans_stream() {
+        let source_size = ImageSize::new(13, 11);
+        let target_size = ImageSize::new(7, 9);
+        let source_stride = source_size.width * 4 + 5;
+        let source_len = (source_size.height - 1) * source_stride + source_size.width * 4;
+        let pixels: Vec<u8> = (0..source_len).map(|i| (19 * i + i / 3) as u8).collect();
+        let mut source =
+            ImageStore::from_slice(&pixels, source_size.width, source_size.height).unwrap();
+        source.stride = source_stride;
+
+        let target_stride = target_size.width * 4 + 7;
+        let target_len = (target_size.height - 1) * target_stride + target_size.width * 4;
+        let mut scaler = Scaler::new(ResamplingFunction::Lanczos3);
+        for premultiply in [false, true] {
+            let alpha_scratch = if premultiply {
+                source_size.width * source_size.height * 4
+            } else {
+                0
+            };
+            let streaming_scratch = alpha_scratch + source_size.width * 4 * 4;
+            let full_scratch = alpha_scratch + source_size.width * target_size.height * 4;
+
+            let single = scaler
+                .set_threading_policy(ThreadingPolicy::Single)
+                .plan_rgba_resampling(source_size, target_size, premultiply)
+                .unwrap();
+            let mut expected = vec![0xa5; target_len];
+            let mut destination =
+                ImageStoreMut::from_slice(&mut expected, target_size.width, target_size.height)
+                    .unwrap();
+            destination.stride = target_stride;
+            single.resample(&source, &mut destination).unwrap();
+
+            for policy in [
+                ThreadingPolicy::Fixed(0),
+                ThreadingPolicy::Fixed(1),
+                ThreadingPolicy::Adaptive,
+                ThreadingPolicy::Fixed(2),
+            ] {
+                let plan = scaler
+                    .set_threading_policy(policy)
+                    .plan_rgba_resampling(source_size, target_size, premultiply)
+                    .unwrap();
+                let materializes_intermediate = policy == ThreadingPolicy::Fixed(2)
+                    && cfg!(all(feature = "threading", not(target_arch = "wasm32")));
+                let required = if materializes_intermediate {
+                    full_scratch
+                } else {
+                    streaming_scratch
+                };
+                assert_eq!(plan.scratch_size(), required, "{policy:?}");
+                assert_eq!(plan.alloc_scratch().len(), required, "{policy:?}");
+                if materializes_intermediate {
+                    continue;
+                }
+
+                let mut actual = vec![0xa5; target_len];
+                let mut destination =
+                    ImageStoreMut::from_slice(&mut actual, target_size.width, target_size.height)
+                        .unwrap();
+                destination.stride = target_stride;
+                let mut scratch = vec![0; full_scratch];
+                plan.resample_with_scratch(&source, &mut destination, &mut scratch)
+                    .unwrap();
+                assert_eq!(actual, expected, "{policy:?}, premultiply={premultiply}");
+            }
+        }
+    }
 
     macro_rules! check_rgba8 {
         ($dst: expr, $image_width: expr, $max: expr) => {

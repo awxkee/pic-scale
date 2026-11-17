@@ -66,92 +66,68 @@ where
         let dst_stride = destination.stride();
         let dst_width = destination.width;
 
-        let mut processed_4 = false;
-
         let dst_height = destination.height;
         let dst_bit_depth = destination.bit_depth as u32;
         let dst_buffer = destination.projected();
         let src = source.projected();
 
-        if let Some(dispatcher) = self.filter_4_rows {
+        let mut already_processed_y = 0;
+        if let Some(dispatcher) = self.filter_4_rows
+            && dst_height >= 4
+        {
+            let groups = dst_height / 4;
+            let src_group_stride = src_stride * 4;
+            let dst_group_stride = dst_stride * 4;
+            let filter_group = |i, dst: &mut [T]| {
+                let src_group = &src[i * src_group_stride..];
+                dispatcher(
+                    &src_group[..src_group.len().min(src_group_stride)],
+                    src_stride,
+                    dst,
+                    dst_stride,
+                    &self.filter_weights,
+                    dst_bit_depth,
+                );
+            };
+
+            // Projected images omit padding after the last active row.
             #[cfg(feature = "threading")]
             dst_buffer
-                .tb_par_chunks_mut(dst_stride * 4)
-                .take(dst_height / 4)
-                .zip(src.chunks(src_stride * 4).take(dst_height / 4))
-                .for_each(&pool, |(dst, src)| {
-                    dispatcher(
-                        src,
-                        src_stride,
-                        dst,
-                        dst_stride,
-                        &self.filter_weights,
-                        dst_bit_depth,
-                    );
-                });
+                .tb_par_chunks_mut(dst_group_stride)
+                .take(groups)
+                .for_each_enumerated(&pool, filter_group);
             #[cfg(not(feature = "threading"))]
             dst_buffer
-                .chunks_mut(dst_stride * 4)
-                .take(dst_height / 4)
-                .zip(src.chunks(src_stride * 4).take(dst_height / 4))
-                .for_each(|(dst, src)| {
-                    dispatcher(
-                        src,
-                        src_stride,
-                        dst,
-                        dst_stride,
-                        &self.filter_weights,
-                        dst_bit_depth,
-                    );
-                });
-            processed_4 = true;
+                .chunks_mut(dst_group_stride)
+                .take(groups)
+                .enumerate()
+                .for_each(|(i, dst)| filter_group(i, dst));
+            already_processed_y = groups * 4;
         }
 
-        let safe_4_chunks = (dst_height / 4) * 4;
-
-        let already_processed_y = safe_4_chunks;
-
         if already_processed_y < dst_height {
-            let left_src = if processed_4 {
-                &src[already_processed_y * src_stride..]
-            } else {
-                src
-            };
-
-            let max_length = dst_buffer.len();
-            let left_dst = if processed_4 {
-                let offset = (already_processed_y * dst_stride).min(max_length);
-                &mut dst_buffer[offset..]
-            } else {
-                dst_buffer
-            };
-
+            let left_src = &src[already_processed_y * src_stride..];
+            let left_dst = &mut dst_buffer[already_processed_y * dst_stride..];
             let one_row_filter = self.filter_row;
+            let filter_row = |i, dst: &mut [T]| {
+                let src_row = &left_src[i * src_stride..];
+                one_row_filter(
+                    &src_row[..src_row.len().min(src_stride)],
+                    &mut dst[..dst_width * N],
+                    &self.filter_weights,
+                    dst_bit_depth,
+                );
+            };
 
             #[cfg(feature = "threading")]
             left_dst
                 .tb_par_chunks_mut(dst_stride)
-                .zip(left_src.chunks(src_stride))
-                .for_each(&pool, |(dst, src)| {
-                    one_row_filter(
-                        src,
-                        &mut dst[..dst_width * N],
-                        &self.filter_weights,
-                        dst_bit_depth,
-                    );
-                });
+                .for_each_enumerated(&pool, filter_row);
             #[cfg(not(feature = "threading"))]
             left_dst
                 .chunks_mut(dst_stride)
-                .zip(left_src.chunks(src_stride))
-                .for_each(|(dst, src)| {
-                    one_row_filter(
-                        src,
-                        &mut dst[..dst_width * N],
-                        &self.filter_weights,
-                        dst_bit_depth,
-                    );
-                });
+                .enumerate()
+                .for_each(|(i, dst)| filter_row(i, dst));
         }
     }
 
@@ -186,5 +162,78 @@ where
     fn run_on_row(&self, src: &[T], dst: &mut [T], bit_depth: u32) {
         let one_row_filter = self.filter_row;
         one_row_filter(src, dst, &self.filter_weights, bit_depth);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{ResamplingFunction, Scaler};
+
+    #[test]
+    fn horizontal_filter_keeps_final_padded_rows() {
+        const SRC_WIDTH: usize = 13;
+        const DST_WIDTH: usize = 7;
+        const SRC_STRIDE: usize = SRC_WIDTH * 4 + 5;
+        const DST_STRIDE: usize = DST_WIDTH * 4 + 7;
+        const PAD: u8 = 0xa5;
+
+        for dst_height in [4, 5, 8, 9] {
+            for src_height in [dst_height, dst_height + 3] {
+                for opaque in [false, true] {
+                    let mut pixels: Vec<u8> = (0..(src_height - 1) * SRC_STRIDE + SRC_WIDTH * 4)
+                        .map(|i| (i * 19 + i / 3) as u8)
+                        .collect();
+                    if opaque {
+                        for row in pixels.chunks_mut(SRC_STRIDE) {
+                            for pixel in row[..SRC_WIDTH * 4].chunks_exact_mut(4) {
+                                pixel[3] = 255;
+                            }
+                        }
+                    }
+                    let mut src = ImageStore::from_slice(&pixels, SRC_WIDTH, src_height).unwrap();
+                    src.stride = SRC_STRIDE;
+
+                    let [single, parallel] = [ThreadingPolicy::Single, ThreadingPolicy::Fixed(2)]
+                        .map(|policy| {
+                            let mut out = vec![PAD; (dst_height - 1) * DST_STRIDE + DST_WIDTH * 4];
+                            let mut dst =
+                                ImageStoreMut::from_slice(&mut out, DST_WIDTH, dst_height).unwrap();
+                            dst.stride = DST_STRIDE;
+                            let plan = Scaler::new(ResamplingFunction::Lanczos3)
+                                .set_threading_policy(policy)
+                                .plan_rgba_resampling(src.size(), dst.size(), true)
+                                .unwrap();
+                            plan.resample(&src, &mut dst).unwrap();
+                            out
+                        });
+                    assert_eq!(
+                        parallel, single,
+                        "{src_height} → {dst_height}, opaque={opaque}"
+                    );
+                    for row in parallel.chunks(DST_STRIDE) {
+                        assert!(row[..DST_WIDTH * 4].iter().any(|&v| v != PAD));
+                        assert!(row[DST_WIDTH * 4..].iter().all(|&v| v == PAD));
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn horizontal_filter_without_four_row_dispatcher_filters_every_row() {
+        let mut src = ImageStore::<u8, 1>::from_slice(&[1, 0, 2, 0, 3, 0, 4, 0, 5], 1, 5).unwrap();
+        src.stride = 2;
+        let mut data = [9; 9];
+        let mut dst = ImageStoreMut::from_slice(&mut data, 1, 5).unwrap();
+        dst.stride = 2;
+        let filter = HorizontalFiltering {
+            filter_4_rows: None,
+            filter_row: |src, dst, _, _| dst[0] = src[0],
+            filter_weights: FilterWeights::<()>::new(vec![], 0, 0, 0, 0, vec![]),
+            _threading_policy: ThreadingPolicy::Fixed(2),
+        };
+        filter.filter(&src, &mut dst);
+        assert_eq!(data, [1, 9, 2, 9, 3, 9, 4, 9, 5]);
     }
 }

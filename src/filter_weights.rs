@@ -28,6 +28,7 @@
  */
 #![forbid(unsafe_code)]
 use num_traits::{AsPrimitive, Bounded};
+use std::ops::Range;
 
 #[derive(Debug, Clone)]
 pub(crate) struct FilterWeights<T> {
@@ -37,6 +38,8 @@ pub(crate) struct FilterWeights<T> {
     pub aligned_size: usize,
     pub distinct_elements: usize,
     pub coeffs_size: i32,
+    /// Output indices whose normalized weights and tap counts are identical.
+    pub(crate) repeated_phase: Option<Range<usize>>,
 }
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -67,6 +70,7 @@ impl<T> FilterWeights<T> {
             aligned_size,
             distinct_elements,
             coeffs_size,
+            repeated_phase: None,
         }
     }
 }
@@ -154,12 +158,12 @@ impl FilterWeights<f32> {
         let mut scratch = vec![0f64; self.kernel_size];
         let mut order: Vec<usize> = Vec::with_capacity(self.kernel_size);
 
-        for ((chunk, kernel_chunk), bounds) in self
+        let mut rows = self
             .weights
             .chunks_exact(self.kernel_size)
             .zip(output_kernel.chunks_exact_mut(align))
-            .zip(self.bounds.iter())
-        {
+            .zip(self.bounds.iter());
+        let mut convert = |chunk: &[f32], kernel_chunk: &mut [J], bounds: &FilterBounds| {
             quantize_kernel(
                 chunk,
                 bounds.size.min(self.kernel_size),
@@ -172,6 +176,22 @@ impl FilterWeights<f32> {
             for (kernel, &value) in kernel_chunk.iter_mut().zip(scratch.iter()) {
                 *kernel = value.as_();
             }
+        };
+
+        if let Some(phase) = &self.repeated_phase {
+            for ((chunk, kernel_chunk), bounds) in rows.by_ref().take(phase.start) {
+                convert(chunk, kernel_chunk, bounds);
+            }
+            let ((chunk, reference), bounds) = rows
+                .next()
+                .expect("Repeated phase must have a first kernel");
+            convert(chunk, reference, bounds);
+            for ((_, kernel_chunk), _) in rows.by_ref().take(phase.len() - 1) {
+                kernel_chunk.copy_from_slice(reference);
+            }
+        }
+        for ((chunk, kernel_chunk), bounds) in rows {
+            convert(chunk, kernel_chunk, bounds);
         }
 
         let mut new_bounds = vec![FilterBounds::new(0, 0); self.bounds.len()];
@@ -192,52 +212,7 @@ impl FilterWeights<f32> {
 
     #[allow(dead_code)]
     pub(crate) fn numerical_approximation_q0_7(&self, alignment: usize) -> FilterWeights<i8> {
-        let align = if alignment != 0 {
-            (self.kernel_size.div_ceil(alignment)) * alignment
-        } else {
-            self.kernel_size
-        };
-        let precision_scale: f64 = (1i64 << 7) as f64;
-
-        let mut output_kernel = vec![0i8; self.distinct_elements * align];
-
-        let mut scratch = vec![0f64; self.kernel_size];
-        let mut order: Vec<usize> = Vec::with_capacity(self.kernel_size);
-
-        for ((chunk, kernel_chunk), bounds) in self
-            .weights
-            .chunks_exact(self.kernel_size)
-            .zip(output_kernel.chunks_exact_mut(align))
-            .zip(self.bounds.iter())
-        {
-            quantize_kernel(
-                chunk,
-                bounds.size.min(self.kernel_size),
-                precision_scale,
-                i8::MIN as f64,
-                i8::MAX as f64,
-                &mut scratch,
-                &mut order,
-            );
-            for (kernel, &value) in kernel_chunk.iter_mut().zip(scratch.iter()) {
-                *kernel = value as i8;
-            }
-        }
-
-        let mut new_bounds = vec![FilterBounds::new(0, 0); self.bounds.len()];
-
-        for (dst, src) in new_bounds.iter_mut().zip(self.bounds.iter()) {
-            *dst = *src;
-        }
-
-        FilterWeights::new(
-            output_kernel,
-            self.kernel_size,
-            align,
-            self.distinct_elements,
-            self.coeffs_size,
-            new_bounds,
-        )
+        self.numerical_approximation::<i8, 7>(alignment)
     }
 }
 
@@ -285,5 +260,46 @@ impl WeightsConverter<f16> for WeightFloat16Converter {
             weights.coeffs_size,
             new_bounds,
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ResamplingFunction;
+    use crate::math::WeightsGenerator;
+
+    #[test]
+    fn repeated_lanczos_phase_matches_per_kernel_quantization() {
+        for (source_size, destination_size) in [(126, 63), (252, 63)] {
+            let filter = <u8 as WeightsGenerator<f32>>::make_weights(
+                ResamplingFunction::Lanczos3,
+                source_size,
+                destination_size,
+            )
+            .unwrap();
+            let phase = filter.repeated_phase.clone().unwrap();
+            assert!(phase.start > 0 && phase.end < destination_size);
+
+            let mut reference = filter.clone();
+            reference.repeated_phase = None;
+            for alignment in [0, 16] {
+                let expected = reference.numerical_approximation_i16::<15>(alignment);
+                let actual = filter.numerical_approximation_i16::<15>(alignment);
+                assert_eq!(expected.weights, actual.weights);
+                assert_eq!(expected.bounds, actual.bounds);
+                assert_eq!(
+                    reference.numerical_approximation_q0_7(alignment).weights,
+                    filter.numerical_approximation_q0_7(alignment).weights
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn fractional_lanczos_scale_has_no_repeated_phase() {
+        let filter =
+            <u8 as WeightsGenerator<f32>>::make_weights(ResamplingFunction::Lanczos3, 125, 63)
+                .unwrap();
+        assert!(filter.repeated_phase.is_none());
     }
 }

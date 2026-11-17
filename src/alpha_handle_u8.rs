@@ -35,6 +35,7 @@ use crate::avx2::{avx_premultiply_alpha_rgba, avx_unpremultiply_alpha_rgba};
 use crate::neon::{neon_premultiply_alpha_rgba, neon_unpremultiply_alpha_rgba};
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::*;
+use crate::support::heap_array;
 use crate::threading_policy::ScalingPool;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128",))]
 use crate::wasm32::{wasm_premultiply_alpha_rgba, wasm_unpremultiply_alpha_rgba};
@@ -116,7 +117,7 @@ pub(crate) const fn unpremultiply_index(alpha: u8, pixel: u8) -> usize {
 
 pub(crate) fn unpremultiplication_table() -> &'static [u8; 65536] {
     UNPREMULTIPLICATION_TABLE.get_or_init(|| {
-        let mut buf = Box::new([0u8; 65536]);
+        let mut buf = heap_array(0);
         for alpha in 0..256usize {
             for pixel in 0..256usize {
                 let idx = (alpha << 8) | pixel;

@@ -109,6 +109,74 @@ impl WeightsGenerator<f32> for f16 {
     }
 }
 
+fn generate_bilinear_weights<T>(
+    in_size: usize,
+    out_size: usize,
+) -> Result<FilterWeights<T>, PicScaleError>
+where
+    T: Copy + Default + AsPrimitive<f64> + 'static,
+    f64: AsPrimitive<T>,
+{
+    let scale = in_size as f64 / out_size as f64;
+    let support = 2 * in_size as u128;
+    let kernel_size = usize::try_from(support.div_ceil(out_size as u128).max(2))
+        .map_err(|_| PicScaleError::DestinationImageIsTooLarge)?;
+    let weight_count = kernel_size
+        .checked_mul(out_size)
+        .ok_or(PicScaleError::DestinationImageIsTooLarge)?;
+    let mut weights = try_vec![T::default(); weight_count];
+    let mut bounds = try_vec![FilterBounds::new(0, 0); out_size];
+    let kernels = bounds.iter_mut().zip(weights.chunks_exact_mut(kernel_size));
+
+    if in_size < out_size {
+        let last = in_size - 1;
+        for (i, (bound, kernel)) in kernels.enumerate() {
+            let center = ((i as f64 + 0.5) * scale - 0.5).clamp(0.0, last as f64);
+            let left = center.floor() as usize;
+            let fraction = center - left as f64;
+            if left == last || fraction == 0.0 {
+                *bound = FilterBounds::new(left, 1);
+                kernel[0] = 1.0.as_();
+            } else {
+                *bound = FilterBounds::new(left, 2);
+                kernel[0] = (1.0 - fraction).as_();
+                kernel[1] = fraction.as_();
+            }
+        }
+    } else {
+        // Express centers and the radius in units of 1 / (2 * out_size).
+        // Integer bounds keep even the smallest positive taps at fractional ratios.
+        let denominator = 2 * out_size as u128;
+        let mut center = (in_size - out_size) as u128;
+        for (bound, kernel) in kernels {
+            let start = center
+                .checked_sub(support)
+                .map_or(0, |lower| lower / denominator + 1) as usize;
+            let end = (center + support)
+                .div_ceil(denominator)
+                .min(in_size as u128) as usize;
+            let size = end - start;
+            *bound = FilterBounds::new(start, size);
+            let values = (start..end)
+                .map(|sample| (support - center.abs_diff(sample as u128 * denominator)) as f64);
+            let inverse_sum = values.clone().sum::<f64>().recip();
+            for (weight, value) in kernel[..size].iter_mut().zip(values) {
+                *weight = (value * inverse_sum).as_();
+            }
+            center += support;
+        }
+    }
+
+    Ok(FilterWeights::new(
+        weights,
+        kernel_size,
+        kernel_size,
+        out_size,
+        scale.max(1.0) as i32,
+        bounds,
+    ))
+}
+
 fn generate_weights<
     T,
     W: AddAssign
@@ -155,6 +223,15 @@ where
     i32: AsPrimitive<T>,
     usize: AsPrimitive<T>,
 {
+    if function == ResamplingFunction::Bilinear {
+        if in_size == 0 || out_size == 0 {
+            return Err(PicScaleError::ZeroImageDimensions);
+        }
+        // Integer downscales already use the full support and keep their existing coefficients.
+        if !in_size.is_multiple_of(out_size) {
+            return generate_bilinear_weights(in_size, out_size);
+        }
+    }
     let resampling_filter = function.get_resampling_filter();
     let scale = in_size.as_() / out_size.as_();
     let is_resizable_kernel = resampling_filter.is_resizable_kernel;
@@ -179,6 +256,12 @@ where
         let mut weights: Vec<T> = try_vec![T::default(); kernel_size * out_size];
         let mut local_filters = try_vec![T::default(); kernel_size];
         let mut filter_position = 0usize;
+        // At these integral scales, all tap coordinates and centers are exactly
+        // representable, including half-integer centers in the f32 generator.
+        let replay_phase =
+            kernel_size >= 8 && in_size <= (1 << 22) && in_size.is_multiple_of(out_size);
+        let mut previous_phase = None;
+        let mut repeated_phase: Option<std::ops::Range<usize>> = None;
         let blur_scale: T = match window_func {
             None => 1f32.as_(),
             Some(window) => {
@@ -203,6 +286,27 @@ where
                 .as_();
 
             let center = center_x - 0.5.as_();
+            let size = end - start;
+            *bound = FilterBounds::new(start, size);
+
+            if replay_phase {
+                let phase = (start.as_() - center, size);
+                if previous_phase == Some(phase) {
+                    weights.copy_within(
+                        filter_position - kernel_size..filter_position,
+                        filter_position,
+                    );
+                    filter_position += kernel_size;
+
+                    match &mut repeated_phase {
+                        Some(span) if span.end == i => span.end += 1,
+                        None => repeated_phase = Some(i - 1..i + 1),
+                        _ => {}
+                    }
+                    continue;
+                }
+                previous_phase = Some(phase);
+            }
 
             for (k, filter) in (start..end).zip(local_filters.iter_mut()) {
                 let dx = k.as_() - center;
@@ -270,10 +374,6 @@ where
                 }
             }
 
-            let size = end - start;
-
-            *bound = FilterBounds::new(start, size);
-
             if weights_sum != 0f32.as_() {
                 let ones_w: W = 1f32.as_();
                 let recpeq = ones_w / weights_sum;
@@ -292,14 +392,16 @@ where
             filter_position += kernel_size;
         }
 
-        Ok(FilterWeights::<T>::new(
+        let mut filter_weights = FilterWeights::<T>::new(
             weights,
             kernel_size,
             kernel_size,
             out_size,
             filter_radius.as_(),
             bounds,
-        ))
+        );
+        filter_weights.repeated_phase = repeated_phase;
+        Ok(filter_weights)
     } else {
         // Simulating INTER_AREA from OpenCV, for up scaling here,
         // this is necessary because weight computation is different
@@ -370,5 +472,69 @@ where
             filter_radius.as_(),
             bounds,
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn bilinear(in_size: usize, out_size: usize) -> FilterWeights<f32> {
+        u8::make_weights(ResamplingFunction::Bilinear, in_size, out_size).unwrap()
+    }
+
+    fn assert_taps(weights: &FilterWeights<f32>, output: usize, start: usize, expected: &[f32]) {
+        assert_eq!(
+            weights.bounds[output],
+            FilterBounds::new(start, expected.len())
+        );
+        let offset = output * weights.aligned_size;
+        for (&actual, &expected) in weights.weights[offset..].iter().zip(expected) {
+            assert!((actual - expected).abs() < 1e-6, "{actual} != {expected}");
+        }
+    }
+
+    #[test]
+    fn bilinear_upscale_uses_both_interior_taps_and_clamps_edges() {
+        let weights = bilinear(4, 6);
+        assert_eq!(weights.kernel_size, 2);
+        assert_taps(&weights, 0, 0, &[1.0]);
+        assert_taps(&weights, 2, 1, &[5.0 / 6.0, 1.0 / 6.0]);
+        assert_taps(&weights, 3, 1, &[1.0 / 6.0, 5.0 / 6.0]);
+        assert_taps(&weights, 5, 3, &[1.0]);
+    }
+
+    #[test]
+    fn bilinear_fractional_downscale_keeps_full_triangle() {
+        let weights = bilinear(15, 10);
+        assert_taps(&weights, 0, 0, &[5.0 / 8.0, 3.0 / 8.0]);
+        assert_taps(&weights, 1, 1, &[1.0 / 3.0, 5.0 / 9.0, 1.0 / 9.0]);
+        assert_taps(&weights, 9, 13, &[3.0 / 8.0, 5.0 / 8.0]);
+
+        let weights = bilinear(12, 10);
+        assert_eq!(weights.kernel_size, 3);
+        assert_taps(&weights, 4, 4, &[1.0 / 5.0, 11.0 / 15.0, 1.0 / 15.0]);
+    }
+
+    #[test]
+    fn bilinear_integer_downscale_keeps_existing_kernel() {
+        let weights = bilinear(8, 4);
+        assert_eq!(weights.kernel_size, 4);
+        assert_taps(&weights, 0, 0, &[3.0 / 7.0, 3.0 / 7.0, 1.0 / 7.0]);
+        assert_taps(&weights, 1, 1, &[0.125, 0.375, 0.375, 0.125]);
+    }
+
+    #[test]
+    fn bilinear_handles_single_sample_and_rejects_empty_axes() {
+        let weights = bilinear(1, 5);
+        for output in 0..5 {
+            assert_taps(&weights, output, 0, &[1.0]);
+        }
+        for (input, output) in [(0, 5), (5, 0)] {
+            assert!(matches!(
+                u8::make_weights(ResamplingFunction::Bilinear, input, output),
+                Err(PicScaleError::ZeroImageDimensions)
+            ));
+        }
     }
 }

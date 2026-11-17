@@ -95,8 +95,15 @@ impl HorizontalFilterPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
                             convolve_horizontal_rgb_neon_rdm_row_one,
                             convolve_horizontal_rgb_neon_rdm_rows_4,
                         };
-                        _dispatcher_4_rows = Some(convolve_horizontal_rgb_neon_rdm_rows_4);
-                        _dispatcher_1_row = convolve_horizontal_rgb_neon_rdm_row_one;
+                        if filter_weights.kernel_size >= 8 {
+                            _dispatcher_4_rows =
+                                Some(convolve_horizontal_rgb_neon_rdm_rows_4::<true>);
+                            _dispatcher_1_row = convolve_horizontal_rgb_neon_rdm_row_one::<true>;
+                        } else {
+                            _dispatcher_4_rows =
+                                Some(convolve_horizontal_rgb_neon_rdm_rows_4::<false>);
+                            _dispatcher_1_row = convolve_horizontal_rgb_neon_rdm_row_one::<false>;
+                        }
                     }
                     #[cfg(feature = "nightly_i8mm")]
                     if _scale_factor < 5.5 && std::arch::is_aarch64_feature_detected!("i8mm") {
@@ -128,7 +135,11 @@ impl HorizontalFilterPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
                 use crate::avx2::{
                     convolve_horizontal_rgb_avx_row_one, convolve_horizontal_rgb_avx_rows_4,
                 };
-                _dispatcher_4_rows = Some(convolve_horizontal_rgb_avx_rows_4);
+                _dispatcher_4_rows = if filter_weights.kernel_size == 4 {
+                    Some(convolve_horizontal_rgb_avx_rows_4::<true>)
+                } else {
+                    Some(convolve_horizontal_rgb_avx_rows_4::<false>)
+                };
                 _dispatcher_1_row = convolve_horizontal_rgb_avx_row_one;
             }
         }
@@ -167,6 +178,8 @@ pub(crate) fn vertical_strategy_u8<const N: usize>(
     _options: ConvolutionOptions,
 ) -> Arc<dyn ColumnFilter<u8, N> + Send + Sync> {
     let _scale_factor = _options.src_size.height as f32 / _options.dst_size.height as f32;
+    #[cfg(all(target_arch = "aarch64", feature = "rdm"))]
+    let mut use_rdm = false;
     #[allow(clippy::type_complexity)]
     let mut _dispatcher: fn(usize, &FilterBounds, &[u8], &mut [u8], usize, &[i16], u32) =
         handle_fixed_column_u8;
@@ -201,6 +214,7 @@ pub(crate) fn vertical_strategy_u8<const N: usize>(
                 if _scale_factor < 8. && std::arch::is_aarch64_feature_detected!("rdm") {
                     use crate::neon::convolve_vertical_neon_i16_precision;
                     _dispatcher = convolve_vertical_neon_i16_precision;
+                    use_rdm = true;
                 } else {
                     use crate::neon::convolve_vertical_neon_i32_precision;
                     _dispatcher = convolve_vertical_neon_i32_precision;
@@ -241,9 +255,20 @@ pub(crate) fn vertical_strategy_u8<const N: usize>(
     }
     use crate::support::PRECISION;
     let i_weights = filter_weights.numerical_approximation::<i16, PRECISION>(0);
-    Arc::new(VerticalFiltering {
+    let filter = VerticalFiltering {
         filter_weights: i_weights,
         filter_row: _dispatcher,
         threading_policy,
-    })
+    };
+    #[cfg(all(target_arch = "aarch64", feature = "rdm"))]
+    if use_rdm
+        && N == 4
+        && filter.filter_weights.kernel_size <= 12
+        && _options.src_size.width.is_multiple_of(4)
+        && _options.src_size.width != _options.dst_size.width
+        && _options.dst_size.height >= 4
+    {
+        return Arc::new(crate::neon::PairedRdmVertical(filter));
+    }
+    Arc::new(filter)
 }
