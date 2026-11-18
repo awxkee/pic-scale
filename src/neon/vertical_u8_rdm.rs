@@ -63,9 +63,9 @@ fn vdot<const SCALE: i32>(
     row: uint8x16_t,
     weight: int16x8_t,
 ) -> (int16x8_t, int16x8_t) {
-    let lo0 = vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip1q_u8(row, row))));
+    let lo0 = expand8_to_14(vget_low_u8(row));
     let store0 = vqrdmlahq_s16(store0, lo0, weight);
-    let hi0 = vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip2q_u8(row, row))));
+    let hi0 = expand8_high_to_14(row);
     let store1 = vqrdmlahq_s16(store1, hi0, weight);
     (store0, store1)
 }
@@ -79,9 +79,9 @@ fn vdot_lane<const SCALE: i32, const LANE: i32>(
     row: uint8x16_t,
     weight: int16x4_t,
 ) -> (int16x8_t, int16x8_t) {
-    let lo0 = vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip1q_u8(row, row))));
+    let lo0 = expand8_to_14(vget_low_u8(row));
     let store0 = vqrdmlahq_lane_s16::<LANE>(store0, lo0, weight);
-    let hi0 = vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip2q_u8(row, row))));
+    let hi0 = expand8_high_to_14(row);
     let store1 = vqrdmlahq_lane_s16::<LANE>(store1, hi0, weight);
     (store0, store1)
 }
@@ -496,12 +496,10 @@ fn convolve_vertical_neon_row_upper(
 
 #[inline(always)]
 fn expand_paired_input(row: uint8x16_t) -> (int16x8_t, int16x8_t) {
-    unsafe {
-        (
-            vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip1q_u8(row, row)))),
-            expand8_high_to_14(row),
-        )
-    }
+    (
+        expand8_to_14(unsafe { vget_low_u8(row) }),
+        expand8_high_to_14(row),
+    )
 }
 
 /// # Safety
@@ -510,7 +508,7 @@ fn expand_paired_input(row: uint8x16_t) -> (int16x8_t, int16x8_t) {
 /// length, divisible by 16. Starting at a valid `start * src_stride` offset,
 /// `src` must contain that many bytes in each of the `TAPS + STEP` rows.
 #[target_feature(enable = "rdm")]
-unsafe fn convolve_row_pair<const TAPS: usize, const STEP: usize>(
+fn convolve_row_pair<const TAPS: usize, const STEP: usize>(
     src: &[u8],
     start: usize,
     src_stride: usize,
@@ -575,19 +573,6 @@ impl<const N: usize> ColumnFilter<u8, N> for PairedRdmVertical<N> {
         self.0.source_bounds(row)
     }
 
-    fn run_on_row(
-        &self,
-        src: &[u8],
-        dst: &mut [u8],
-        dst_width: usize,
-        src_stride: usize,
-        row: usize,
-        bit_depth: u32,
-    ) {
-        self.0
-            .run_on_row(src, dst, dst_width, src_stride, row, bit_depth);
-    }
-
     fn run_on_4_rows(
         &self,
         src: &[u8],
@@ -606,14 +591,17 @@ impl<const N: usize> ColumnFilter<u8, N> for PairedRdmVertical<N> {
         self.run_on_band_rows(&source, dst, row, bit_depth);
     }
 
-    fn run_on_band_row(
+    fn run_on_row(
         &self,
-        source: &ColumnSource<'_, u8>,
+        src: &[u8],
         dst: &mut [u8],
+        dst_width: usize,
+        src_stride: usize,
         row: usize,
         bit_depth: u32,
     ) {
-        self.0.run_on_band_row(source, dst, row, bit_depth);
+        self.0
+            .run_on_row(src, dst, dst_width, src_stride, row, bit_depth);
     }
 
     fn run_on_band_rows(
@@ -642,6 +630,7 @@ impl<const N: usize> ColumnFilter<u8, N> for PairedRdmVertical<N> {
                     (6, Some(1)) => Some(convolve_row_pair::<6, 1>),
                     (8, Some(2)) => Some(convolve_row_pair::<8, 2>),
                     (12, Some(2)) => Some(convolve_row_pair::<12, 2>),
+                    (24, Some(4)) => Some(convolve_row_pair::<24, 4>),
                     _ => None,
                 }
             } else {
@@ -668,6 +657,16 @@ impl<const N: usize> ColumnFilter<u8, N> for PairedRdmVertical<N> {
             }
         }
     }
+
+    fn run_on_band_row(
+        &self,
+        source: &ColumnSource<'_, u8>,
+        dst: &mut [u8],
+        row: usize,
+        bit_depth: u32,
+    ) {
+        self.0.run_on_band_row(source, dst, row, bit_depth);
+    }
 }
 
 #[cfg(test)]
@@ -675,13 +674,81 @@ mod tests {
     use super::*;
     use crate::filter_weights::FilterWeights;
 
+    fn scalar_q6_row(
+        src: &[u8],
+        dst: &mut [u8],
+        bounds: FilterBounds,
+        stride: usize,
+        weights: &[i16],
+    ) {
+        for (x, pixel) in dst.iter_mut().enumerate() {
+            let mut accumulator = 32i64;
+            for (tap, &weight) in weights[..bounds.size].iter().enumerate() {
+                let sample = i64::from(src[(bounds.start + tap) * stride + x]);
+                let product = (sample * 64 * i64::from(weight) + (1 << 14)) >> 15;
+                accumulator = (accumulator + product).clamp(i16::MIN as i64, i16::MAX as i64);
+            }
+            *pixel = (accumulator >> 6).clamp(0, 255) as u8;
+        }
+    }
+
     #[test]
-    fn paired_rdm_rows_match_individual_rows() {
+    fn rdm_vertical_matches_scalar_q6_across_vector_blocks_and_tails() {
         if !std::arch::is_aarch64_feature_detected!("rdm") {
             return;
         }
-        for width in [8, 9, 20] {
-            let row_len = width * 4;
+        for width in [1, 3, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 65] {
+            let stride = width + 5;
+            for taps in [1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 24] {
+                for pattern in 0..3 {
+                    let weights: Vec<i16> = (0..taps)
+                        .map(|tap| match pattern {
+                            0 => (32768 / taps + usize::from(tap < 32768 % taps))
+                                .min(i16::MAX as usize) as i16,
+                            1 => {
+                                if tap < taps.div_ceil(2) {
+                                    i16::MAX
+                                } else {
+                                    i16::MIN
+                                }
+                            }
+                            _ => (tap * 3659 + 17123) as i16,
+                        })
+                        .collect();
+                    let src: Vec<u8> = (0..taps * stride + width)
+                        .map(|i| {
+                            if pattern == 0 {
+                                128
+                            } else {
+                                (i * 101 + i / stride * 53) as u8
+                            }
+                        })
+                        .collect();
+                    let bounds = FilterBounds::new(1, taps);
+                    let mut expected = vec![0xa5; width + 2];
+                    scalar_q6_row(&src, &mut expected[1..width + 1], bounds, stride, &weights);
+                    let mut actual = vec![0xa5; width + 2];
+                    convolve_vertical_neon_i16_precision(
+                        width,
+                        &bounds,
+                        &src,
+                        &mut actual[1..width + 1],
+                        stride,
+                        &weights,
+                        8,
+                    );
+                    assert_eq!(
+                        actual, expected,
+                        "width={width}, taps={taps}, pattern={pattern}"
+                    );
+                }
+            }
+        }
+    }
+
+    fn check_paired_rows<const N: usize>() {
+        for width in [1, 4, 5, 8, 9, 16, 17, 20] {
+            let row_len = width * N;
             let src_stride = row_len + 5;
             for (taps, step) in [
                 (2, 0),
@@ -693,39 +760,92 @@ mod tests {
                 (6, 1),
                 (8, 2),
                 (12, 2),
+                (24, 4),
                 (5, 1),
                 (6, 3),
+                (24, 3),
             ] {
-                let bounds = [1, 1 + step, 4, 4 + step].map(|start| FilterBounds::new(start, taps));
-                let height = bounds[3].start + taps;
-                let src: Vec<u8> = (0..(height - 1) * src_stride + row_len)
-                    .map(|i| (i * 37 + i / src_stride * 53) as u8)
-                    .collect();
-                let weights = (0..taps * 4).map(|i| (3659 * i + 17123) as i16).collect();
-                let filter = PairedRdmVertical(VerticalFiltering::<_, _, 4> {
-                    filter_weights: FilterWeights::new(
-                        weights,
-                        taps,
-                        taps,
-                        4,
-                        taps as i32,
-                        bounds.to_vec(),
-                    ),
-                    filter_row: convolve_vertical_neon_i16_precision,
-                    threading_policy: crate::ThreadingPolicy::Single,
-                });
-                let source = ColumnSource {
-                    pixels: &src[src_stride..],
-                    width,
-                    stride: src_stride,
-                    first_row: 1,
-                };
-                let mut expected = vec![0; row_len * 4];
-                filter.0.run_on_band_rows(&source, &mut expected, 0, 8);
-                let mut actual = vec![0; row_len * 4];
-                filter.run_on_band_rows(&source, &mut actual, 0, 8);
-                assert_eq!(actual, expected, "width={width}, taps={taps}, step={step}");
+                for clipped in [false, true] {
+                    let mut bounds = [
+                        1,
+                        1 + step,
+                        5 + step,
+                        5 + 2 * step,
+                        9 + 2 * step,
+                        9 + 3 * step,
+                    ]
+                    .map(|start| FilterBounds::new(start, taps));
+                    if clipped {
+                        bounds[3].size -= 1;
+                    }
+                    let height = bounds[5].start + taps;
+                    let src: Vec<u8> = (0..(height - 1) * src_stride + row_len)
+                        .map(|i| (i * 37 + i / src_stride * 53) as u8)
+                        .collect();
+                    let aligned_size = taps + 3;
+                    let weights = (0..aligned_size * bounds.len())
+                        .map(|i| (3659 * i + 17123) as i16)
+                        .collect();
+                    let filter = PairedRdmVertical(VerticalFiltering::<_, _, N> {
+                        filter_weights: FilterWeights::new(
+                            weights,
+                            taps,
+                            aligned_size,
+                            bounds.len(),
+                            taps as i32,
+                            bounds.to_vec(),
+                        ),
+                        filter_row: convolve_vertical_neon_i16_precision,
+                        threading_policy: crate::ThreadingPolicy::Single,
+                    });
+                    let source = ColumnSource {
+                        pixels: &src[src_stride..],
+                        width,
+                        stride: src_stride,
+                        first_row: 1,
+                    };
+                    let output_len = row_len * bounds.len();
+                    let mut expected = vec![0xa5; output_len + 9];
+                    for (row, dst) in expected[1..output_len + 1]
+                        .chunks_exact_mut(row_len)
+                        .enumerate()
+                    {
+                        scalar_q6_row(
+                            &src,
+                            dst,
+                            bounds[row],
+                            src_stride,
+                            &filter.0.filter_weights.weights[row * aligned_size..],
+                        );
+                    }
+                    let mut actual = vec![0xa5; output_len + 9];
+                    filter.run_on_band_rows(&source, &mut actual[1..output_len + 1], 0, 8);
+                    assert_eq!(
+                        actual, expected,
+                        "N={N}, width={width}, taps={taps}, step={step}, clipped={clipped}"
+                    );
+
+                    actual[1..row_len * 4 + 1].fill(0xa5);
+                    filter.run_on_4_rows(
+                        &src,
+                        &mut actual[1..row_len * 4 + 1],
+                        width,
+                        src_stride,
+                        0,
+                        8,
+                    );
+                    assert_eq!(actual, expected);
+                }
             }
         }
+    }
+
+    #[test]
+    fn paired_rdm_rows_match_individual_rows() {
+        if !std::arch::is_aarch64_feature_detected!("rdm") {
+            return;
+        }
+        check_paired_rows::<3>();
+        check_paired_rows::<4>();
     }
 }
