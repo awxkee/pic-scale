@@ -191,17 +191,18 @@ pub(crate) fn default_u16_column_plan<const CN: usize>(
     if options.bit_depth > 12 {
         #[cfg(all(target_arch = "aarch64", feature = "sve"))]
         {
-            if options.bit_depth <= 15 {
+            if options.bit_depth <= 15
+                && std::arch::is_aarch64_feature_detected!("sve2")
+                && (options.bit_depth < 15 || !filter_weights.has_single_tap())
+            {
                 use crate::sve2::convolve_vertical_sve2_u16_dot;
                 let filter_weights =
                     DefaultWeightsConverter::default().prepare_weights(&filter_weights);
-                if std::arch::is_aarch64_feature_detected!("sve2") {
-                    return Arc::new(VerticalFiltering {
-                        filter_weights,
-                        threading_policy,
-                        filter_row: convolve_vertical_sve2_u16_dot,
-                    });
-                }
+                return Arc::new(VerticalFiltering {
+                    filter_weights,
+                    threading_policy,
+                    filter_row: convolve_vertical_sve2_u16_dot,
+                });
             }
         }
         #[cfg(all(target_arch = "aarch64", feature = "neon", feature = "rdm"))]

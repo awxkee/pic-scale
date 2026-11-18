@@ -55,6 +55,13 @@ impl FilterBounds {
 }
 
 impl<T> FilterWeights<T> {
+    /// A normalized one-tap filter needs an exact unit coefficient, which does
+    /// not fit in signed Q7 or Q15. Dispatch can select a wider coefficient type.
+    #[allow(dead_code)]
+    pub(crate) fn has_single_tap(&self) -> bool {
+        self.bounds.iter().any(|bounds| bounds.size == 1)
+    }
+
     pub(crate) fn new(
         slice_ref: Vec<T>,
         kernel_size: usize,

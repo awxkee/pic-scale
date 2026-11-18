@@ -34,7 +34,7 @@ use std::arch::aarch64::*;
 fn write_accumulator_u8(store: int32x4_t, dst: &mut [u8]) {
     unsafe {
         let store_16 = vqshrun_n_s32::<7>(store);
-        let store_16_8 = vqmovn_u16(vcombine_u16(store_16, store_16));
+        let store_16_8 = vqmovn_u16(vcombine_u16(store_16, vdup_n_u16(0)));
         vst1_lane_u16::<0>(
             dst.as_mut_ptr() as *mut u16,
             vreinterpret_u16_u8(store_16_8),
@@ -87,12 +87,28 @@ pub(crate) fn convolve_horizontal_rgb_neon_rows_4_dot(
     _: u32,
 ) {
     unsafe {
-        convolve_horizontal_rgb_neon_rows_4_impl(src, src_stride, dst, dst_stride, filter_weights);
+        if filter_weights.kernel_size >= 8 {
+            convolve_horizontal_rgb_neon_rows_4_impl::<true>(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                filter_weights,
+            );
+        } else {
+            convolve_horizontal_rgb_neon_rows_4_impl::<false>(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                filter_weights,
+            );
+        }
     }
 }
 
 #[target_feature(enable = "i8mm")]
-fn convolve_horizontal_rgb_neon_rows_4_impl(
+fn convolve_horizontal_rgb_neon_rows_4_impl<const PACKED: bool>(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -102,9 +118,9 @@ fn convolve_horizontal_rgb_neon_rows_4_impl(
     unsafe {
         static TBL0: [u8; 16] = [0, 3, 6, 9, 1, 4, 7, 10, 2, 5, 8, 11, 255, 255, 255, 255];
         let v_tbl = vld1q_u8(TBL0.as_ptr());
+        let v_tbl_hi =
+            vld1q_u8([4, 7, 10, 13, 5, 8, 11, 14, 6, 9, 12, 15, 255, 255, 255, 255].as_ptr());
         let v_weights = vreinterpretq_u8_u32(vdupq_n_u32(u32::from_ne_bytes([0, 1, 2, 3])));
-
-        // (r0 g0 b0 r1) (g2 b2 r3 g3) (b3 r4 g4 b4) (r5 g5 b5 r6)
 
         let rnd_const: i32 = 1 << 6;
 
@@ -141,6 +157,37 @@ fn convolve_horizontal_rgb_neon_rows_4_impl(
             let src1 = src0.get_unchecked(src_stride..);
             let src2 = src1.get_unchecked(src_stride..);
             let src3 = src2.get_unchecked(src_stride..);
+
+            // Two overlapping 16-byte loads cover exactly eight packed RGB pixels.
+            while PACKED && jx + 8 <= bounds.size {
+                let start = (bounds.start + jx) * CN;
+                let w = vcombine_s8(vld1_s8(weights.get_unchecked(jx..).as_ptr()), vdup_n_s8(0));
+                let p00 = vld1q_u8(src0.get_unchecked(start..).as_ptr());
+                let p01 = vld1q_u8(src1.get_unchecked(start..).as_ptr());
+                let p02 = vld1q_u8(src2.get_unchecked(start..).as_ptr());
+                let p03 = vld1q_u8(src3.get_unchecked(start..).as_ptr());
+                let p10 = vld1q_u8(src0.get_unchecked(start + 8..).as_ptr());
+                let p11 = vld1q_u8(src1.get_unchecked(start + 8..).as_ptr());
+                let p12 = vld1q_u8(src2.get_unchecked(start + 8..).as_ptr());
+                let p13 = vld1q_u8(src3.get_unchecked(start + 8..).as_ptr());
+                let c00 = vqtbl1q_u8(p00, v_tbl);
+                let c01 = vqtbl1q_u8(p01, v_tbl);
+                let c02 = vqtbl1q_u8(p02, v_tbl);
+                let c03 = vqtbl1q_u8(p03, v_tbl);
+                let c10 = vqtbl1q_u8(p10, v_tbl_hi);
+                let c11 = vqtbl1q_u8(p11, v_tbl_hi);
+                let c12 = vqtbl1q_u8(p12, v_tbl_hi);
+                let c13 = vqtbl1q_u8(p13, v_tbl_hi);
+                store_0 = vusdotq_laneq_s32::<0>(store_0, c00, w);
+                store_1 = vusdotq_laneq_s32::<0>(store_1, c01, w);
+                store_2 = vusdotq_laneq_s32::<0>(store_2, c02, w);
+                store_3 = vusdotq_laneq_s32::<0>(store_3, c03, w);
+                store_0 = vusdotq_laneq_s32::<1>(store_0, c10, w);
+                store_1 = vusdotq_laneq_s32::<1>(store_1, c11, w);
+                store_2 = vusdotq_laneq_s32::<1>(store_2, c12, w);
+                store_3 = vusdotq_laneq_s32::<1>(store_3, c13, w);
+                jx += 8;
+            }
 
             while jx + 4 <= bounds.size {
                 let bounds_start = bounds.start + jx;
@@ -195,10 +242,20 @@ fn convolve_horizontal_rgb_neon_rows_4_impl(
                 jx += 1;
             }
 
-            write_accumulator_u8(store_0, chunk0);
-            write_accumulator_u8(store_1, chunk1);
-            write_accumulator_u8(store_2, chunk2);
-            write_accumulator_u8(store_3, chunk3);
+            let narrow0 = vqshrun_n_s32::<7>(store_0);
+            let narrow1 = vqshrun_n_s32::<7>(store_1);
+            let narrow2 = vqshrun_n_s32::<7>(store_2);
+            let narrow3 = vqshrun_n_s32::<7>(store_3);
+            let packed01 = vqmovn_u16(vcombine_u16(narrow0, narrow1));
+            let packed23 = vqmovn_u16(vcombine_u16(narrow2, narrow3));
+            vst1_lane_u16::<0>(chunk0.as_mut_ptr().cast(), vreinterpret_u16_u8(packed01));
+            vst1_lane_u8::<2>(chunk0.get_unchecked_mut(2..).as_mut_ptr(), packed01);
+            vst1_lane_u16::<2>(chunk1.as_mut_ptr().cast(), vreinterpret_u16_u8(packed01));
+            vst1_lane_u8::<6>(chunk1.get_unchecked_mut(2..).as_mut_ptr(), packed01);
+            vst1_lane_u16::<0>(chunk2.as_mut_ptr().cast(), vreinterpret_u16_u8(packed23));
+            vst1_lane_u8::<2>(chunk2.get_unchecked_mut(2..).as_mut_ptr(), packed23);
+            vst1_lane_u16::<2>(chunk3.as_mut_ptr().cast(), vreinterpret_u16_u8(packed23));
+            vst1_lane_u8::<6>(chunk3.get_unchecked_mut(2..).as_mut_ptr(), packed23);
         }
     }
 }
@@ -210,12 +267,16 @@ pub(crate) fn convolve_horizontal_rgb_neon_row_one_dot(
     _: u32,
 ) {
     unsafe {
-        convolve_horizontal_rgb_neon_row_one_impl_dot(src, dst, filter_weights);
+        if filter_weights.kernel_size >= 8 {
+            convolve_horizontal_rgb_neon_row_one_impl_dot::<true>(src, dst, filter_weights);
+        } else {
+            convolve_horizontal_rgb_neon_row_one_impl_dot::<false>(src, dst, filter_weights);
+        }
     }
 }
 
 #[target_feature(enable = "i8mm")]
-fn convolve_horizontal_rgb_neon_row_one_impl_dot(
+fn convolve_horizontal_rgb_neon_row_one_impl_dot<const PACKED: bool>(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i8>,
@@ -225,6 +286,8 @@ fn convolve_horizontal_rgb_neon_row_one_impl_dot(
 
         let tbl: [u8; 16] = [0, 3, 6, 9, 1, 4, 7, 10, 2, 5, 8, 11, 255, 255, 255, 255];
         let v_tbl = vld1q_u8(tbl.as_ptr());
+        let v_tbl_hi =
+            vld1q_u8([4, 7, 10, 13, 5, 8, 11, 14, 6, 9, 12, 15, 255, 255, 255, 255].as_ptr());
         let v_weights = vreinterpretq_u8_u32(vdupq_n_u32(u32::from_ne_bytes([0, 1, 2, 3])));
 
         let rnd_const: i32 = 1 << 6;
@@ -244,6 +307,18 @@ fn convolve_horizontal_rgb_neon_row_one_impl_dot(
 
             let mut jx = 0usize;
             let mut store = vdupq_n_s32(rnd_const);
+
+            while PACKED && jx + 8 <= bounds_size {
+                let start = (bounds.start + jx) * CN;
+                let w = vcombine_s8(vld1_s8(weights.get_unchecked(jx..).as_ptr()), vdup_n_s8(0));
+                let p0 = vld1q_u8(src.get_unchecked(start..).as_ptr());
+                let p1 = vld1q_u8(src.get_unchecked(start + 8..).as_ptr());
+                let c0 = vqtbl1q_u8(p0, v_tbl);
+                let c1 = vqtbl1q_u8(p1, v_tbl_hi);
+                store = vusdotq_laneq_s32::<0>(store, c0, w);
+                store = vusdotq_laneq_s32::<1>(store, c1, w);
+                jx += 8;
+            }
 
             while jx + 4 <= bounds_size {
                 let bounds_start = bounds.start + jx;

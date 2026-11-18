@@ -1165,6 +1165,160 @@ def_image_scaling_alpha!(RgbaF32ImageStore, f32, 4);
 mod tests {
     use super::*;
 
+    fn check_public_single_tap<T, const N: usize>(
+        depths: &[usize],
+        has_alpha: bool,
+        make_plan: impl Fn(&Scaler, ImageSize, ImageSize, bool, usize) -> Arc<Resampling<T, N>>,
+    ) where
+        T: Copy + Default + Debug + PartialEq + From<u8> + Send + Sync + 'static,
+        u16: num_traits::AsPrimitive<T>,
+    {
+        use num_traits::AsPrimitive;
+        for &depth in depths {
+            let max = ((1u32 << depth) - 1) as u16;
+            for level in [0, 1, max / 2, max / 2 + 1, max - 1, max] {
+                for (from, to) in [
+                    ((1, 1), (7, 5)),
+                    ((1, 5), (7, 5)),
+                    ((5, 1), (5, 7)),
+                    ((2, 4), (5, 4)),
+                    ((4, 2), (4, 5)),
+                ] {
+                    let mixed = from.0 == 2 || from.1 == 2;
+                    for filter in [
+                        ResamplingFunction::Bilinear,
+                        ResamplingFunction::Lanczos3,
+                        ResamplingFunction::MitchellNetravalli,
+                    ] {
+                        if mixed && filter != ResamplingFunction::Bilinear {
+                            continue;
+                        }
+                        for strategy in [
+                            WorkloadStrategy::PreferSpeed,
+                            WorkloadStrategy::PreferQuality,
+                        ] {
+                            let scaler = Scaler::new(filter).set_workload_strategy(strategy);
+                            for alpha in
+                                [false, true]
+                                    .into_iter()
+                                    .take(if has_alpha { 2 } else { 1 })
+                            {
+                                for padding in [0, 5] {
+                                    let source_stride = from.0 * N + padding;
+                                    let source_len = (from.1 - 1) * source_stride + from.0 * N;
+                                    let value = |far_edge: bool, channel: usize| -> T {
+                                        if alpha && channel == N - 1 {
+                                            max.as_()
+                                        } else {
+                                            let sample = if far_edge { max - level } else { level };
+                                            sample.saturating_sub(channel as u16).as_()
+                                        }
+                                    };
+                                    let mut pixels = vec![T::from(0xa5); source_len];
+                                    for y in 0..from.1 {
+                                        for x in 0..from.0 {
+                                            let far =
+                                                (from.0 == 2 && x == 1) || (from.1 == 2 && y == 1);
+                                            for c in 0..N {
+                                                pixels[y * source_stride + x * N + c] =
+                                                    value(far, c);
+                                            }
+                                        }
+                                    }
+                                    let mut source =
+                                        ImageStore::<T, N>::from_slice(&pixels, from.0, from.1)
+                                            .unwrap();
+                                    source.stride = source_stride;
+                                    source.bit_depth = depth;
+                                    let target_stride = to.0 * N + padding;
+                                    let target_len = (to.1 - 1) * target_stride + to.0 * N;
+                                    let mut output = vec![T::from(0xa5); target_len + 2];
+                                    let mut target = ImageStoreMut::<T, N>::from_slice(
+                                        &mut output[1..target_len + 1],
+                                        to.0,
+                                        to.1,
+                                    )
+                                    .unwrap();
+                                    target.stride = target_stride;
+                                    target.bit_depth = depth;
+                                    let plan = make_plan(
+                                        &scaler,
+                                        source.size(),
+                                        target.size(),
+                                        alpha,
+                                        depth,
+                                    );
+                                    plan.resample_with_scratch(
+                                        &source,
+                                        &mut target,
+                                        &mut plan.alloc_scratch(),
+                                    )
+                                    .unwrap();
+                                    for y in 0..to.1 {
+                                        for x in 0..to.0 {
+                                            // Interior Bilinear outputs blend two samples; only the clamped edges are single-tap.
+                                            if (from.0 == 2 && x != 0 && x != to.0 - 1)
+                                                || (from.1 == 2 && y != 0 && y != to.1 - 1)
+                                            {
+                                                continue;
+                                            }
+                                            let far = (from.0 == 2 && x == to.0 - 1)
+                                                || (from.1 == 2 && y == to.1 - 1);
+                                            for c in 0..N {
+                                                assert_eq!(
+                                                    output[1 + y * target_stride + x * N + c],
+                                                    value(far, c),
+                                                    "depth={depth}, N={N}, {from:?}->{to:?}, {filter:?}, {strategy:?}, alpha={alpha}, level={level}, ({x},{y},{c})"
+                                                );
+                                            }
+                                        }
+                                        let end = 1 + y * target_stride + to.0 * N;
+                                        let next =
+                                            (1 + (y + 1) * target_stride).min(target_len + 1);
+                                        assert!(
+                                            output[end..next].iter().all(|&v| v == T::from(0xa5))
+                                        );
+                                    }
+                                    assert_eq!(output[0], T::from(0xa5));
+                                    assert_eq!(output[target_len + 1], T::from(0xa5));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn public_u8_single_tap_preserves_samples() {
+        check_public_single_tap::<u8, 1>(&[8], false, |s, a, b, _, _| {
+            s.plan_planar_resampling(a, b).unwrap()
+        });
+        check_public_single_tap::<u8, 2>(&[8], true, |s, a, b, alpha, _| {
+            s.plan_gray_alpha_resampling(a, b, alpha).unwrap()
+        });
+        check_public_single_tap::<u8, 3>(&[8], false, |s, a, b, _, _| {
+            s.plan_rgb_resampling(a, b).unwrap()
+        });
+        check_public_single_tap::<u8, 4>(&[8], true, |s, a, b, alpha, _| {
+            s.plan_rgba_resampling(a, b, alpha).unwrap()
+        });
+    }
+
+    #[test]
+    fn public_u16_single_tap_preserves_samples() {
+        check_public_single_tap::<u16, 1>(&[13, 14, 15, 16], false, |s, a, b, _, d| {
+            s.plan_planar_resampling16(a, b, d).unwrap()
+        });
+        check_public_single_tap::<u16, 3>(&[13, 14, 15, 16], false, |s, a, b, _, d| {
+            s.plan_rgb_resampling16(a, b, d).unwrap()
+        });
+        check_public_single_tap::<u16, 4>(&[13, 14, 15, 16], true, |s, a, b, alpha, d| {
+            s.plan_rgba_resampling16(a, b, alpha, d).unwrap()
+        });
+    }
+
     #[test]
     fn single_worker_rgba8_two_axis_plans_stream() {
         let source_size = ImageSize::new(13, 11);

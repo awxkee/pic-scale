@@ -94,7 +94,10 @@ impl HorizontalFilterPass<u8, f32, 4> for ImageStore<'_, u8, 4> {
                         _dispatcher_1_row = convolve_horizontal_rgba_neon_row;
                     }
                     #[cfg(feature = "nightly_i8mm")]
-                    if _scale_factor < 10. && std::arch::is_aarch64_feature_detected!("i8mm") {
+                    if _scale_factor < 10.
+                        && std::arch::is_aarch64_feature_detected!("i8mm")
+                        && !filter_weights.has_single_tap()
+                    {
                         let _dispatcher_4_rows: Option<
                             fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i8>, u32),
                         > = Some(convolve_horizontal_rgba_neon_rows_4_u8_dot);

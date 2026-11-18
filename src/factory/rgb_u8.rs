@@ -75,6 +75,7 @@ impl HorizontalFilterPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
                     if _scale_factor < 10.
                         && std::arch::is_aarch64_feature_detected!("sve2")
                         && std::arch::is_aarch64_feature_detected!("i8mm")
+                        && !filter_weights.has_single_tap()
                     {
                         use crate::sve2::{
                             sve_convolve_horizontal_rgb_neon_row_one_dot,
@@ -106,7 +107,10 @@ impl HorizontalFilterPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
                         }
                     }
                     #[cfg(feature = "nightly_i8mm")]
-                    if _scale_factor < 5.5 && std::arch::is_aarch64_feature_detected!("i8mm") {
+                    if _scale_factor < 5.5
+                        && std::arch::is_aarch64_feature_detected!("i8mm")
+                        && !filter_weights.has_single_tap()
+                    {
                         use crate::neon::{
                             convolve_horizontal_rgb_neon_row_one_dot,
                             convolve_horizontal_rgb_neon_rows_4_dot,
@@ -197,6 +201,7 @@ pub(crate) fn vertical_strategy_u8<const N: usize>(
             if _scale_factor < 10.
                 && std::arch::is_aarch64_feature_detected!("sve2")
                 && std::arch::is_aarch64_feature_detected!("i8mm")
+                && !filter_weights.has_single_tap()
             {
                 use crate::sve2::convolve_vertical_sve2_i8_dot;
                 let i_weights = filter_weights.numerical_approximation_q0_7(0);
@@ -226,7 +231,10 @@ pub(crate) fn vertical_strategy_u8<const N: usize>(
                     _dispatcher = convolve_vertical_neon_i32_precision;
                 }
                 #[cfg(feature = "nightly_i8mm")]
-                if _scale_factor < 10. && std::arch::is_aarch64_feature_detected!("i8mm") {
+                if _scale_factor < 10.
+                    && std::arch::is_aarch64_feature_detected!("i8mm")
+                    && !filter_weights.has_single_tap()
+                {
                     use crate::neon::convolve_vertical_neon_i8_dot;
                     let i_weights = filter_weights.numerical_approximation_q0_7(0);
                     return Arc::new(VerticalFiltering {

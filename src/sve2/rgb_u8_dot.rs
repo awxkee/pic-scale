@@ -43,15 +43,6 @@ pub(crate) fn sve_convolve_horizontal_rgb_neon_rows_4_dot(
     }
 }
 
-macro_rules! pack_s32x4_to_u8 {
-    ($a:expr) => {{
-        let n = svqshrunb_n_s32::<7>($a);
-        let n_packed = svuzp1_u16(n, n);
-        let b = svqxtnb_u16(n_packed);
-        svuzp1_u8(b, b)
-    }};
-}
-
 #[target_feature(enable = "sve2,sve,i8mm")]
 fn convolve_horizontal_rgb_neon_rows_4_impl(
     src: &[u8],
@@ -62,9 +53,6 @@ fn convolve_horizontal_rgb_neon_rows_4_impl(
 ) {
     static TBL0: [u8; 16] = [0, 3, 6, 9, 1, 4, 7, 10, 2, 5, 8, 11, 255, 255, 255, 255];
     let v_tbl = unsafe { svld1_u8(svwhilelt_b8_u32(0u32, 16u32), TBL0.as_ptr()) };
-    let v_weights = svreinterpret_u8_u32(svdup_n_u32(u32::from_ne_bytes([0, 1, 2, 3])));
-
-    // (r0 g0 b0 r1) (g2 b2 r3 g3) (b3 r4 g4 b4) (r5 g5 b5 r6)
 
     let rnd_const: i32 = 1 << 6;
 
@@ -80,14 +68,9 @@ fn convolve_horizontal_rgb_neon_rows_4_impl(
     let iter_row3 = row3_ref.as_chunks_mut::<CN>().0;
 
     let pg4 = svwhilelt_b8_u32(0u32, 4u32);
-    let pg3 = svwhilelt_b8_u32(0u32, 3u32);
+    let pg_weights12 = svwhilelt_b8_u32(0u32, 12u32);
+    let pg3 = svwhilelt_b32_u32(0u32, 3u32);
     let pg12 = svwhilelt_b8_u32(0u32, 12u32);
-
-    // Each narrowed row occupies one quarter of the scalable packed byte vector.
-    let packed_row_bytes = (svcntb() / 4) as u8;
-    let row1_indices = svindex_u8(packed_row_bytes, 1);
-    let row2_indices = svindex_u8(packed_row_bytes * 2, 1);
-    let row3_indices = svindex_u8(packed_row_bytes * 3, 1);
 
     for (((((chunk0, chunk1), chunk2), chunk3), &bounds), weights) in iter_row0
         .iter_mut()
@@ -112,6 +95,58 @@ fn convolve_horizontal_rgb_neon_rows_4_impl(
         let src2 = unsafe { src1.get_unchecked(src_stride..) };
         let src3 = unsafe { src2.get_unchecked(src_stride..) };
 
+        // Three indexed dot products share one coefficient load for 12/24-tap filters.
+        while jx + 12 <= bounds.size {
+            let bounds_start = (bounds.start + jx) * CN;
+            let w_ptr = unsafe { weights.get_unchecked(jx..) };
+            let w_ld = unsafe { svld1_s8(pg_weights12, w_ptr.as_ptr()) };
+            let pixels_00 = unsafe { svld1_u8(pg12, src0.get_unchecked(bounds_start..).as_ptr()) };
+            let pixels_01 = unsafe { svld1_u8(pg12, src1.get_unchecked(bounds_start..).as_ptr()) };
+            let pixels_02 = unsafe { svld1_u8(pg12, src2.get_unchecked(bounds_start..).as_ptr()) };
+            let pixels_03 = unsafe { svld1_u8(pg12, src3.get_unchecked(bounds_start..).as_ptr()) };
+            let pixels_10 =
+                unsafe { svld1_u8(pg12, src0.get_unchecked(bounds_start + 12..).as_ptr()) };
+            let pixels_11 =
+                unsafe { svld1_u8(pg12, src1.get_unchecked(bounds_start + 12..).as_ptr()) };
+            let pixels_12 =
+                unsafe { svld1_u8(pg12, src2.get_unchecked(bounds_start + 12..).as_ptr()) };
+            let pixels_13 =
+                unsafe { svld1_u8(pg12, src3.get_unchecked(bounds_start + 12..).as_ptr()) };
+            let pixels_20 =
+                unsafe { svld1_u8(pg12, src0.get_unchecked(bounds_start + 24..).as_ptr()) };
+            let pixels_21 =
+                unsafe { svld1_u8(pg12, src1.get_unchecked(bounds_start + 24..).as_ptr()) };
+            let pixels_22 =
+                unsafe { svld1_u8(pg12, src2.get_unchecked(bounds_start + 24..).as_ptr()) };
+            let pixels_23 =
+                unsafe { svld1_u8(pg12, src3.get_unchecked(bounds_start + 24..).as_ptr()) };
+            let channels_00 = svtbl_u8(pixels_00, v_tbl);
+            let channels_01 = svtbl_u8(pixels_01, v_tbl);
+            let channels_02 = svtbl_u8(pixels_02, v_tbl);
+            let channels_03 = svtbl_u8(pixels_03, v_tbl);
+            let channels_10 = svtbl_u8(pixels_10, v_tbl);
+            let channels_11 = svtbl_u8(pixels_11, v_tbl);
+            let channels_12 = svtbl_u8(pixels_12, v_tbl);
+            let channels_13 = svtbl_u8(pixels_13, v_tbl);
+            let channels_20 = svtbl_u8(pixels_20, v_tbl);
+            let channels_21 = svtbl_u8(pixels_21, v_tbl);
+            let channels_22 = svtbl_u8(pixels_22, v_tbl);
+            let channels_23 = svtbl_u8(pixels_23, v_tbl);
+            store_0 = svusdot_lane_s32::<0>(store_0, channels_00, w_ld);
+            store_1 = svusdot_lane_s32::<0>(store_1, channels_01, w_ld);
+            store_2 = svusdot_lane_s32::<0>(store_2, channels_02, w_ld);
+            store_3 = svusdot_lane_s32::<0>(store_3, channels_03, w_ld);
+            store_0 = svusdot_lane_s32::<1>(store_0, channels_10, w_ld);
+            store_1 = svusdot_lane_s32::<1>(store_1, channels_11, w_ld);
+            store_2 = svusdot_lane_s32::<1>(store_2, channels_12, w_ld);
+            store_3 = svusdot_lane_s32::<1>(store_3, channels_13, w_ld);
+            store_0 = svusdot_lane_s32::<2>(store_0, channels_20, w_ld);
+            store_1 = svusdot_lane_s32::<2>(store_1, channels_21, w_ld);
+            store_2 = svusdot_lane_s32::<2>(store_2, channels_22, w_ld);
+            store_3 = svusdot_lane_s32::<2>(store_3, channels_23, w_ld);
+            jx += 12;
+        }
+
         while jx + 4 <= bounds.size {
             let bounds_start = bounds.start + jx;
             let w_ptr = unsafe { weights.get_unchecked(jx..) };
@@ -121,8 +156,6 @@ fn convolve_horizontal_rgb_neon_rows_4_impl(
                 unsafe { svld1_u8(pg12, src0.get_unchecked(bounds_start * CN..).as_ptr()) };
             let rgb_pixel1 =
                 unsafe { svld1_u8(pg12, src1.get_unchecked(bounds_start * CN..).as_ptr()) };
-
-            let vw = svtbl_s8(w_ld, v_weights);
 
             let rgb_pixel2 =
                 unsafe { svld1_u8(pg12, src2.get_unchecked(bounds_start * CN..).as_ptr()) };
@@ -134,10 +167,10 @@ fn convolve_horizontal_rgb_neon_rows_4_impl(
             let r2 = svtbl_u8(rgb_pixel2, v_tbl);
             let r3 = svtbl_u8(rgb_pixel3, v_tbl);
 
-            store_0 = svusdot_s32(store_0, r0, vw);
-            store_1 = svusdot_s32(store_1, r1, vw);
-            store_2 = svusdot_s32(store_2, r2, vw);
-            store_3 = svusdot_s32(store_3, r3, vw);
+            store_0 = svusdot_lane_s32::<0>(store_0, r0, w_ld);
+            store_1 = svusdot_lane_s32::<0>(store_1, r1, w_ld);
+            store_2 = svusdot_lane_s32::<0>(store_2, r2, w_ld);
+            store_3 = svusdot_lane_s32::<0>(store_3, r3, w_ld);
             jx += 4;
         }
 
@@ -154,8 +187,6 @@ fn convolve_horizontal_rgb_neon_rows_4_impl(
             let rgb_pixel1 =
                 unsafe { svld1_u8(pqb, src1.get_unchecked(bounds_start * CN..).as_ptr()) };
 
-            let vw = svtbl_s8(w_ld, v_weights);
-
             let rgb_pixel2 =
                 unsafe { svld1_u8(pqb, src2.get_unchecked(bounds_start * CN..).as_ptr()) };
             let rgb_pixel3 =
@@ -165,30 +196,27 @@ fn convolve_horizontal_rgb_neon_rows_4_impl(
             let r1 = svtbl_u8(rgb_pixel1, v_tbl);
             let r2 = svtbl_u8(rgb_pixel2, v_tbl);
             let r3 = svtbl_u8(rgb_pixel3, v_tbl);
-            store_0 = svusdot_s32(store_0, r0, vw);
-            store_1 = svusdot_s32(store_1, r1, vw);
-            store_2 = svusdot_s32(store_2, r2, vw);
-            store_3 = svusdot_s32(store_3, r3, vw);
+            store_0 = svusdot_lane_s32::<0>(store_0, r0, w_ld);
+            store_1 = svusdot_lane_s32::<0>(store_1, r1, w_ld);
+            store_2 = svusdot_lane_s32::<0>(store_2, r2, w_ld);
+            store_3 = svusdot_lane_s32::<0>(store_3, r3, w_ld);
         }
 
+        // Each result occupies the low byte of its original 32-bit lane.
+        // Narrow stores compact the three active lanes into exactly three bytes.
         let n0 = svqshrunb_n_s32::<7>(store_0);
         let n1 = svqshrunb_n_s32::<7>(store_1);
         let n2 = svqshrunb_n_s32::<7>(store_2);
         let n3 = svqshrunb_n_s32::<7>(store_3);
-
-        let s01 = svuzp1_u16(n0, n1);
-        let s23 = svuzp1_u16(n2, n3);
-        let packed = svuzp1_u8(svqxtnb_u16(s01), svqxtnb_u16(s23));
-
+        let b0 = svreinterpret_u32_u8(svqxtnb_u16(n0));
+        let b1 = svreinterpret_u32_u8(svqxtnb_u16(n1));
+        let b2 = svreinterpret_u32_u8(svqxtnb_u16(n2));
+        let b3 = svreinterpret_u32_u8(svqxtnb_u16(n3));
         unsafe {
-            let sq1 = svtbl_u8(packed, row1_indices);
-            let sq2 = svtbl_u8(packed, row2_indices);
-            let sq3 = svtbl_u8(packed, row3_indices);
-
-            svst1_u8(pg3, chunk0.as_mut_ptr(), packed);
-            svst1_u8(pg3, chunk1.as_mut_ptr(), sq1);
-            svst1_u8(pg3, chunk2.as_mut_ptr(), sq2);
-            svst1_u8(pg3, chunk3.as_mut_ptr(), sq3);
+            svst1b_u32(pg3, chunk0.as_mut_ptr(), b0);
+            svst1b_u32(pg3, chunk1.as_mut_ptr(), b1);
+            svst1b_u32(pg3, chunk2.as_mut_ptr(), b2);
+            svst1b_u32(pg3, chunk3.as_mut_ptr(), b3);
         }
     }
 }
@@ -214,13 +242,13 @@ fn convolve_horizontal_rgb_neon_row_one_impl_dot(
 
     static TBL0: [u8; 16] = [0, 3, 6, 9, 1, 4, 7, 10, 2, 5, 8, 11, 255, 255, 255, 255];
     let v_tbl = unsafe { svld1_u8(svwhilelt_b8_u32(0u32, 16u32), TBL0.as_ptr()) };
-    let v_weights = svreinterpret_u8_u32(svdup_n_u32(u32::from_ne_bytes([0, 1, 2, 3])));
 
     let rnd_const: i32 = 1 << 6;
     let init = svdup_n_s32(rnd_const);
 
     let pg4 = svwhilelt_b8_u32(0u32, 4u32);
-    let pg3 = svwhilelt_b8_u32(0u32, 3u32);
+    let pg_weights12 = svwhilelt_b8_u32(0u32, 12u32);
+    let pg3 = svwhilelt_b32_u32(0u32, 3u32);
     let pg12 = svwhilelt_b8_u32(0u32, 12u32);
 
     for ((dst, bounds), weights) in dst
@@ -237,14 +265,32 @@ fn convolve_horizontal_rgb_neon_row_one_impl_dot(
         let mut jx = 0usize;
         let mut store_0 = init;
 
+        while jx + 12 <= bounds.size {
+            let bounds_start = (bounds.start + jx) * CN;
+            let w_ptr = unsafe { weights.get_unchecked(jx..) };
+            let w_ld = unsafe { svld1_s8(pg_weights12, w_ptr.as_ptr()) };
+            let pixels_0 = unsafe { svld1_u8(pg12, src.get_unchecked(bounds_start..).as_ptr()) };
+            let pixels_1 =
+                unsafe { svld1_u8(pg12, src.get_unchecked(bounds_start + 12..).as_ptr()) };
+            let pixels_2 =
+                unsafe { svld1_u8(pg12, src.get_unchecked(bounds_start + 24..).as_ptr()) };
+            let channels_0 = svtbl_u8(pixels_0, v_tbl);
+            let channels_1 = svtbl_u8(pixels_1, v_tbl);
+            let channels_2 = svtbl_u8(pixels_2, v_tbl);
+            store_0 = svusdot_lane_s32::<0>(store_0, channels_0, w_ld);
+            store_0 = svusdot_lane_s32::<1>(store_0, channels_1, w_ld);
+            store_0 = svusdot_lane_s32::<2>(store_0, channels_2, w_ld);
+            jx += 12;
+        }
+
         while jx + 4 <= bounds.size {
             let bounds_start = bounds.start + jx;
             let w_ptr = unsafe { weights.get_unchecked(jx..) };
-            let vw = svtbl_s8(unsafe { svld1_s8(pg4, w_ptr.as_ptr()) }, v_weights);
+            let w_ld = unsafe { svld1_s8(pg4, w_ptr.as_ptr()) };
 
             let rgb_pixel0 =
                 unsafe { svld1_u8(pg12, src.get_unchecked(bounds_start * CN..).as_ptr()) };
-            store_0 = svusdot_s32(store_0, svtbl_u8(rgb_pixel0, v_tbl), vw);
+            store_0 = svusdot_lane_s32::<0>(store_0, svtbl_u8(rgb_pixel0, v_tbl), w_ld);
             jx += 4;
         }
 
@@ -254,16 +300,17 @@ fn convolve_horizontal_rgb_neon_row_one_impl_dot(
 
             let bounds_start = bounds.start + jx;
             let w_ptr = unsafe { weights.get_unchecked(jx..) };
-            let vw = svtbl_s8(unsafe { svld1_s8(pq, w_ptr.as_ptr()) }, v_weights);
+            let w_ld = unsafe { svld1_s8(pq, w_ptr.as_ptr()) };
 
             let rgb_pixel0 =
                 unsafe { svld1_u8(pqb, src.get_unchecked(bounds_start * CN..).as_ptr()) };
-            store_0 = svusdot_s32(store_0, svtbl_u8(rgb_pixel0, v_tbl), vw);
+            store_0 = svusdot_lane_s32::<0>(store_0, svtbl_u8(rgb_pixel0, v_tbl), w_ld);
         }
 
-        let v0 = pack_s32x4_to_u8!(store_0);
+        let n = svqshrunb_n_s32::<7>(store_0);
+        let b = svreinterpret_u32_u8(svqxtnb_u16(n));
         unsafe {
-            svst1_u8(pg3, dst.as_mut_ptr(), v0);
+            svst1b_u32(pg3, dst.as_mut_ptr(), b);
         }
     }
 }
@@ -272,81 +319,119 @@ fn convolve_horizontal_rgb_neon_row_one_impl_dot(
 mod tests {
     use super::*;
     use crate::filter_weights::FilterBounds;
-    use crate::fixed_point_horizontal::convolve_row_handler_fixed_point;
 
     fn check_horizontal(four_rows: bool) {
         let Some(vl) = crate::sve2::test_vector_length(true) else {
             return;
         };
-        let width = 19;
-        let dst_stride = width * 3 + 13;
-        for taps in [1usize, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17] {
-            let src_width = taps + width;
-            let src_stride = src_width * 3 + 11;
-            let mut src = vec![0; src_stride * 4];
-            for row in 0..4 {
-                for x in 0..src_width {
-                    for c in 0..3 {
-                        src[row * src_stride + x * 3 + c] =
-                            ((row * 67 + x * 29 + c * 43 + x * c * 11) % 256) as u8;
+        for width in [1usize, 2, 3, 7, 19, 33] {
+            let dst_stride = width * 3 + 13;
+            for taps in [
+                1usize, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 23, 24, 25, 31, 32,
+                33, 47, 48, 49, 63, 64, 65,
+            ] {
+                let src_width = taps + width - 1;
+                let src_stride = src_width * 3 + 11;
+                // The last source row has no padding, including the final tap.
+                let mut src = vec![0x9b; src_stride * 3 + src_width * 3];
+                for row in 0..4 {
+                    for x in 0..src_width {
+                        for c in 0..3 {
+                            src[row * src_stride + x * 3 + c] =
+                                ((row * 67 + x * 29 + c * 43 + x * c * 11) % 256) as u8;
+                        }
                     }
                 }
-            }
-            let aligned = taps.next_multiple_of(4);
-            let mut weights = vec![0i8; aligned * width];
-            for x in 0..width {
-                for j in 0..taps {
-                    weights[x * aligned + j] = ((j * 23 + x * 13) % 63) as i8 - 31;
+                let aligned = taps.next_multiple_of(4);
+                for clipped in [false, true] {
+                    let bounds: Vec<_> = (0..width)
+                        .map(|x| {
+                            let size = if clipped && x == 0 {
+                                taps.div_ceil(2)
+                            } else if clipped {
+                                taps - (x % 4).min(taps - 1)
+                            } else {
+                                taps
+                            };
+                            let start = if x == width - 1 { src_width - size } else { x };
+                            FilterBounds::new(start, size)
+                        })
+                        .collect();
+                    for pattern in 0..3 {
+                        let mut weights = vec![-128i8; aligned * width];
+                        for x in 0..width {
+                            for j in 0..bounds[x].size {
+                                weights[x * aligned + j] = match pattern {
+                                    0 => ((j * 23 + x * 13) % 127) as i8 - 63,
+                                    1 => {
+                                        if j < bounds[x].size.div_ceil(2) {
+                                            127
+                                        } else {
+                                            -128
+                                        }
+                                    }
+                                    _ => {
+                                        if j % 2 == 0 {
+                                            -128
+                                        } else {
+                                            127
+                                        }
+                                    }
+                                };
+                            }
+                            if pattern == 0 {
+                                weights[x * aligned] = 96;
+                            }
+                        }
+                        let filters =
+                            FilterWeights::new(weights, taps, aligned, width, 0, bounds.clone());
+                        let mut expected = vec![0xa5; dst_stride * 3 + width * 3];
+                        let mut actual = expected.clone();
+                        for row in 0..4 {
+                            for x in 0..width {
+                                let b = &filters.bounds[x];
+                                for c in 0..3 {
+                                    let mut sum = 64i64;
+                                    for j in 0..b.size {
+                                        sum += i64::from(
+                                            src[row * src_stride + (b.start + j) * 3 + c],
+                                        ) * i64::from(filters.weights[x * aligned + j]);
+                                    }
+                                    expected[row * dst_stride + x * 3 + c] =
+                                        (sum >> 7).clamp(0, 255) as u8;
+                                }
+                            }
+                            if !four_rows {
+                                sve_convolve_horizontal_rgb_neon_row_one_dot(
+                                    &src[row * src_stride..][..src_width * 3],
+                                    &mut actual[row * dst_stride..][..width * 3],
+                                    &filters,
+                                    8,
+                                );
+                            }
+                        }
+                        if four_rows {
+                            sve_convolve_horizontal_rgb_neon_rows_4_dot(
+                                &src,
+                                src_stride,
+                                &mut actual,
+                                dst_stride,
+                                &filters,
+                                8,
+                            );
+                        }
+                        for (i, (&actual, &expected)) in actual.iter().zip(&expected).enumerate() {
+                            assert_eq!(
+                                actual,
+                                expected,
+                                "VL={}, width={width}, taps={taps}, clipped={clipped}, pattern={pattern}, row={}, byte={}",
+                                vl * 8,
+                                i / dst_stride,
+                                i % dst_stride
+                            );
+                        }
+                    }
                 }
-                weights[x * aligned] = 96;
-            }
-            let bounds: Vec<_> = (0..width).map(|x| FilterBounds::new(x, taps)).collect();
-            let scalar_weights = FilterWeights::new(
-                weights.iter().map(|&w| i16::from(w) * 256).collect(),
-                taps,
-                aligned,
-                width,
-                0,
-                bounds.clone(),
-            );
-            let filters = FilterWeights::new(weights, taps, aligned, width, 0, bounds);
-            let mut expected = vec![0xa5; dst_stride * 4];
-            let mut actual = expected.clone();
-            for row in 0..4 {
-                convolve_row_handler_fixed_point::<u8, i32, 3>(
-                    &src[row * src_stride..][..src_width * 3],
-                    &mut expected[row * dst_stride..][..width * 3],
-                    &scalar_weights,
-                    8,
-                );
-                if !four_rows {
-                    sve_convolve_horizontal_rgb_neon_row_one_dot(
-                        &src[row * src_stride..][..src_width * 3],
-                        &mut actual[row * dst_stride..][..width * 3],
-                        &filters,
-                        8,
-                    );
-                }
-            }
-            if four_rows {
-                sve_convolve_horizontal_rgb_neon_rows_4_dot(
-                    &src,
-                    src_stride,
-                    &mut actual,
-                    dst_stride,
-                    &filters,
-                    8,
-                );
-            }
-            for (i, (&actual, &expected)) in actual.iter().zip(&expected).enumerate() {
-                assert_eq!(
-                    actual,
-                    expected,
-                    "VL={}, taps={taps}, row={}, byte={}",
-                    vl * 8,
-                    i / dst_stride,
-                    i % dst_stride,
-                );
             }
         }
     }
@@ -355,7 +440,6 @@ mod tests {
     fn sve2_rows_4_matches_scalar_reference() {
         check_horizontal(true);
     }
-
     #[test]
     fn sve2_row_one_matches_scalar_reference() {
         check_horizontal(false);
