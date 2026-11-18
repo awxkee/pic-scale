@@ -166,6 +166,27 @@ fn load_distr_x8_rgb(src: &[u8]) -> (__m256i, __m256i) {
     }
 }
 
+#[inline(always)]
+fn load_distr_x4_rgb_wide<const LAST: bool>(src: &[u8]) -> __m256i {
+    unsafe {
+        let shuffle = if LAST {
+            _mm256_setr_epi8(
+                4, -1, 7, -1, 5, -1, 8, -1, 6, -1, 9, -1, -1, -1, -1, -1, 10, -1, 13, -1, 11, -1,
+                14, -1, 12, -1, 15, -1, -1, -1, -1, -1,
+            )
+        } else {
+            _mm256_setr_epi8(
+                0, -1, 3, -1, 1, -1, 4, -1, 2, -1, 5, -1, -1, -1, -1, -1, 6, -1, 9, -1, 7, -1, 10,
+                -1, 8, -1, 11, -1, -1, -1, -1, -1,
+            )
+        };
+        _mm256_shuffle_epi8(
+            _mm256_broadcastsi128_si256(_mm_loadu_si128(src.as_ptr().cast())),
+            shuffle,
+        )
+    }
+}
+
 #[derive(Copy, Clone, Default)]
 struct Row4ExecutionUnit<const HAS_DOT: bool> {}
 
@@ -336,11 +357,10 @@ impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
                         0,
                     );
 
-                    while jx + 8 <= bounds.size {
-                        let w_ptr = weights.get_unchecked(jx..);
+                    // Full 12-tap filters read exactly 36 RGB bytes in three windows.
+                    if BROADCAST_REMAINDER && bounds.size == 12 {
                         let full_weights =
-                            _mm256_castsi128_si256(_mm_loadu_si128(w_ptr.as_ptr() as *const _));
-
+                            _mm256_castsi128_si256(_mm_loadu_si128(weights.as_ptr().cast()));
                         let w0 = _mm256_shuffle_epi8(
                             _mm256_permutevar8x32_epi32(full_weights, weights_idx),
                             shuffle_weights,
@@ -349,61 +369,114 @@ impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
                             _mm256_permutevar8x32_epi32(full_weights, weights_idx23),
                             shuffle_weights,
                         );
-
-                        let bounds_start = (bounds.start + jx) * CN;
-
-                        let rgb_pixel_0 = load_distr_x8_rgb(src0.get_unchecked(bounds_start..));
-                        let rgb_pixel_1 = load_distr_x8_rgb(src1.get_unchecked(bounds_start..));
-                        let rgb_pixel_2 = load_distr_x8_rgb(src2.get_unchecked(bounds_start..));
-                        let rgb_pixel_3 = load_distr_x8_rgb(src3.get_unchecked(bounds_start..));
-
-                        store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store0, rgb_pixel_0.0, w0);
-                        store1 = _mm256_dot16_avx_epi32::<HAS_DOT>(store1, rgb_pixel_1.0, w0);
-                        store2 = _mm256_dot16_avx_epi32::<HAS_DOT>(store2, rgb_pixel_2.0, w0);
-                        store3 = _mm256_dot16_avx_epi32::<HAS_DOT>(store3, rgb_pixel_3.0, w0);
-
-                        store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store0, rgb_pixel_0.1, w1);
-                        store1 = _mm256_dot16_avx_epi32::<HAS_DOT>(store1, rgb_pixel_1.1, w1);
-                        store2 = _mm256_dot16_avx_epi32::<HAS_DOT>(store2, rgb_pixel_2.1, w1);
-                        store3 = _mm256_dot16_avx_epi32::<HAS_DOT>(store3, rgb_pixel_3.1, w1);
-
-                        jx += 8;
-                    }
-
-                    while jx + 4 <= bounds.size {
-                        let w_ptr = weights.get_unchecked(jx..);
-                        let weights = _mm256_shuffle_epi8(
-                            _mm256_permutevar8x32_epi32(
-                                _mm256_castsi128_si256(_mm_loadu_si64(w_ptr.as_ptr() as *const u8)),
-                                weights_idx,
-                            ),
+                        let last_weights =
+                            _mm256_castsi128_si256(_mm_loadu_si64(weights.as_ptr().add(8).cast()));
+                        let w2 = _mm256_shuffle_epi8(
+                            _mm256_permutevar8x32_epi32(last_weights, weights_idx),
                             shuffle_weights,
                         );
-                        let bounds_start = (bounds.start + jx) * CN;
+                        let start = bounds.start * CN;
+                        let p0 = load_distr_x4_rgb_wide::<false>(src0.get_unchecked(start..));
+                        let p1 = load_distr_x4_rgb_wide::<false>(src1.get_unchecked(start..));
+                        let p2 = load_distr_x4_rgb_wide::<false>(src2.get_unchecked(start..));
+                        let p3 = load_distr_x4_rgb_wide::<false>(src3.get_unchecked(start..));
+                        store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store0, p0, w0);
+                        store1 = _mm256_dot16_avx_epi32::<HAS_DOT>(store1, p1, w0);
+                        store2 = _mm256_dot16_avx_epi32::<HAS_DOT>(store2, p2, w0);
+                        store3 = _mm256_dot16_avx_epi32::<HAS_DOT>(store3, p3, w0);
+                        let p0 = load_distr_x4_rgb_wide::<false>(src0.get_unchecked(start + 12..));
+                        let p1 = load_distr_x4_rgb_wide::<false>(src1.get_unchecked(start + 12..));
+                        let p2 = load_distr_x4_rgb_wide::<false>(src2.get_unchecked(start + 12..));
+                        let p3 = load_distr_x4_rgb_wide::<false>(src3.get_unchecked(start + 12..));
+                        store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store0, p0, w1);
+                        store1 = _mm256_dot16_avx_epi32::<HAS_DOT>(store1, p1, w1);
+                        store2 = _mm256_dot16_avx_epi32::<HAS_DOT>(store2, p2, w1);
+                        store3 = _mm256_dot16_avx_epi32::<HAS_DOT>(store3, p3, w1);
+                        let p0 = load_distr_x4_rgb_wide::<true>(src0.get_unchecked(start + 20..));
+                        let p1 = load_distr_x4_rgb_wide::<true>(src1.get_unchecked(start + 20..));
+                        let p2 = load_distr_x4_rgb_wide::<true>(src2.get_unchecked(start + 20..));
+                        let p3 = load_distr_x4_rgb_wide::<true>(src3.get_unchecked(start + 20..));
+                        store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store0, p0, w2);
+                        store1 = _mm256_dot16_avx_epi32::<HAS_DOT>(store1, p1, w2);
+                        store2 = _mm256_dot16_avx_epi32::<HAS_DOT>(store2, p2, w2);
+                        store3 = _mm256_dot16_avx_epi32::<HAS_DOT>(store3, p3, w2);
+                        jx = 12;
+                    } else {
+                        while jx + 8 <= bounds.size {
+                            let w_ptr = weights.get_unchecked(jx..);
+                            let full_weights =
+                                _mm256_castsi128_si256(_mm_loadu_si128(w_ptr.as_ptr() as *const _));
 
-                        let rgb_pixel_0 = load_distr_x4_rgb::<BROADCAST_REMAINDER>(
-                            src0.get_unchecked(bounds_start..),
-                            shuffle_pixels_4,
-                        );
-                        let rgb_pixel_1 = load_distr_x4_rgb::<BROADCAST_REMAINDER>(
-                            src1.get_unchecked(bounds_start..),
-                            shuffle_pixels_4,
-                        );
-                        let rgb_pixel_2 = load_distr_x4_rgb::<BROADCAST_REMAINDER>(
-                            src2.get_unchecked(bounds_start..),
-                            shuffle_pixels_4,
-                        );
-                        let rgb_pixel_3 = load_distr_x4_rgb::<BROADCAST_REMAINDER>(
-                            src3.get_unchecked(bounds_start..),
-                            shuffle_pixels_4,
-                        );
+                            let w0 = _mm256_shuffle_epi8(
+                                _mm256_permutevar8x32_epi32(full_weights, weights_idx),
+                                shuffle_weights,
+                            );
+                            let w1 = _mm256_shuffle_epi8(
+                                _mm256_permutevar8x32_epi32(full_weights, weights_idx23),
+                                shuffle_weights,
+                            );
 
-                        store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store0, rgb_pixel_0, weights);
-                        store1 = _mm256_dot16_avx_epi32::<HAS_DOT>(store1, rgb_pixel_1, weights);
-                        store2 = _mm256_dot16_avx_epi32::<HAS_DOT>(store2, rgb_pixel_2, weights);
-                        store3 = _mm256_dot16_avx_epi32::<HAS_DOT>(store3, rgb_pixel_3, weights);
+                            let bounds_start = (bounds.start + jx) * CN;
 
-                        jx += 4;
+                            let rgb_pixel_0 = load_distr_x8_rgb(src0.get_unchecked(bounds_start..));
+                            let rgb_pixel_1 = load_distr_x8_rgb(src1.get_unchecked(bounds_start..));
+                            let rgb_pixel_2 = load_distr_x8_rgb(src2.get_unchecked(bounds_start..));
+                            let rgb_pixel_3 = load_distr_x8_rgb(src3.get_unchecked(bounds_start..));
+
+                            store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store0, rgb_pixel_0.0, w0);
+                            store1 = _mm256_dot16_avx_epi32::<HAS_DOT>(store1, rgb_pixel_1.0, w0);
+                            store2 = _mm256_dot16_avx_epi32::<HAS_DOT>(store2, rgb_pixel_2.0, w0);
+                            store3 = _mm256_dot16_avx_epi32::<HAS_DOT>(store3, rgb_pixel_3.0, w0);
+
+                            store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store0, rgb_pixel_0.1, w1);
+                            store1 = _mm256_dot16_avx_epi32::<HAS_DOT>(store1, rgb_pixel_1.1, w1);
+                            store2 = _mm256_dot16_avx_epi32::<HAS_DOT>(store2, rgb_pixel_2.1, w1);
+                            store3 = _mm256_dot16_avx_epi32::<HAS_DOT>(store3, rgb_pixel_3.1, w1);
+
+                            jx += 8;
+                        }
+
+                        while jx + 4 <= bounds.size {
+                            let w_ptr = weights.get_unchecked(jx..);
+                            let weights = _mm256_shuffle_epi8(
+                                _mm256_permutevar8x32_epi32(
+                                    _mm256_castsi128_si256(_mm_loadu_si64(
+                                        w_ptr.as_ptr() as *const u8
+                                    )),
+                                    weights_idx,
+                                ),
+                                shuffle_weights,
+                            );
+                            let bounds_start = (bounds.start + jx) * CN;
+
+                            let rgb_pixel_0 = load_distr_x4_rgb::<BROADCAST_REMAINDER>(
+                                src0.get_unchecked(bounds_start..),
+                                shuffle_pixels_4,
+                            );
+                            let rgb_pixel_1 = load_distr_x4_rgb::<BROADCAST_REMAINDER>(
+                                src1.get_unchecked(bounds_start..),
+                                shuffle_pixels_4,
+                            );
+                            let rgb_pixel_2 = load_distr_x4_rgb::<BROADCAST_REMAINDER>(
+                                src2.get_unchecked(bounds_start..),
+                                shuffle_pixels_4,
+                            );
+                            let rgb_pixel_3 = load_distr_x4_rgb::<BROADCAST_REMAINDER>(
+                                src3.get_unchecked(bounds_start..),
+                                shuffle_pixels_4,
+                            );
+
+                            store0 =
+                                _mm256_dot16_avx_epi32::<HAS_DOT>(store0, rgb_pixel_0, weights);
+                            store1 =
+                                _mm256_dot16_avx_epi32::<HAS_DOT>(store1, rgb_pixel_1, weights);
+                            store2 =
+                                _mm256_dot16_avx_epi32::<HAS_DOT>(store2, rgb_pixel_2, weights);
+                            store3 =
+                                _mm256_dot16_avx_epi32::<HAS_DOT>(store3, rgb_pixel_3, weights);
+
+                            jx += 4;
+                        }
                     }
 
                     store_0 = _mm256_add_epi32(
@@ -611,11 +684,9 @@ impl<const HAS_DOT: bool> Row1Execution<HAS_DOT> {
                     0,
                 );
 
-                while jx + 8 <= bounds.size {
-                    let w_ptr = weights.get_unchecked(jx..);
+                if BROADCAST_REMAINDER && bounds.size == 12 {
                     let full_weights =
-                        _mm256_castsi128_si256(_mm_loadu_si128(w_ptr.as_ptr() as *const _));
-
+                        _mm256_castsi128_si256(_mm_loadu_si128(weights.as_ptr().cast()));
                     let w0 = _mm256_shuffle_epi8(
                         _mm256_permutevar8x32_epi32(full_weights, weights_idx),
                         shuffle_weights01,
@@ -624,35 +695,64 @@ impl<const HAS_DOT: bool> Row1Execution<HAS_DOT> {
                         _mm256_permutevar8x32_epi32(full_weights, weights_idx23),
                         shuffle_weights01,
                     );
-
-                    let bounds_start = bounds.start + jx;
-                    let src_ptr_0 = src.get_unchecked((bounds_start * CN)..);
-
-                    let (first_4, second_4) = load_distr_x8_rgb(src_ptr_0);
-
-                    store = _mm256_dot16_avx_epi32::<HAS_DOT>(store, first_4, w0);
-                    store = _mm256_dot16_avx_epi32::<HAS_DOT>(store, second_4, w1);
-
-                    jx += 8;
-                }
-
-                while jx + 4 <= bounds.size {
-                    let w_ptr = weights.get_unchecked(jx..);
-                    let weights = _mm256_shuffle_epi8(
-                        _mm256_permutevar8x32_epi32(
-                            _mm256_castsi128_si256(_mm_loadu_si64(w_ptr.as_ptr() as *const u8)),
-                            weights_idx,
-                        ),
+                    let last_weights =
+                        _mm256_castsi128_si256(_mm_loadu_si64(weights.as_ptr().add(8).cast()));
+                    let w2 = _mm256_shuffle_epi8(
+                        _mm256_permutevar8x32_epi32(last_weights, weights_idx),
                         shuffle_weights01,
                     );
+                    let start = bounds.start * CN;
+                    let p = load_distr_x4_rgb_wide::<false>(src.get_unchecked(start..));
+                    store = _mm256_dot16_avx_epi32::<HAS_DOT>(store, p, w0);
+                    let p = load_distr_x4_rgb_wide::<false>(src.get_unchecked(start + 12..));
+                    store = _mm256_dot16_avx_epi32::<HAS_DOT>(store, p, w1);
+                    let p = load_distr_x4_rgb_wide::<true>(src.get_unchecked(start + 20..));
+                    store = _mm256_dot16_avx_epi32::<HAS_DOT>(store, p, w2);
+                    jx = 12;
+                } else {
+                    while jx + 8 <= bounds.size {
+                        let w_ptr = weights.get_unchecked(jx..);
+                        let full_weights =
+                            _mm256_castsi128_si256(_mm_loadu_si128(w_ptr.as_ptr() as *const _));
 
-                    let bounds_start = bounds.start + jx;
-                    let src_ptr_0 = src.get_unchecked((bounds_start * CN)..);
+                        let w0 = _mm256_shuffle_epi8(
+                            _mm256_permutevar8x32_epi32(full_weights, weights_idx),
+                            shuffle_weights01,
+                        );
+                        let w1 = _mm256_shuffle_epi8(
+                            _mm256_permutevar8x32_epi32(full_weights, weights_idx23),
+                            shuffle_weights01,
+                        );
 
-                    let rgb_pixel =
-                        load_distr_x4_rgb::<BROADCAST_REMAINDER>(src_ptr_0, shuffle_pixels_4);
-                    store = _mm256_dot16_avx_epi32::<HAS_DOT>(store, rgb_pixel, weights);
-                    jx += 4;
+                        let bounds_start = bounds.start + jx;
+                        let src_ptr_0 = src.get_unchecked((bounds_start * CN)..);
+
+                        let (first_4, second_4) = load_distr_x8_rgb(src_ptr_0);
+
+                        store = _mm256_dot16_avx_epi32::<HAS_DOT>(store, first_4, w0);
+                        store = _mm256_dot16_avx_epi32::<HAS_DOT>(store, second_4, w1);
+
+                        jx += 8;
+                    }
+
+                    while jx + 4 <= bounds.size {
+                        let w_ptr = weights.get_unchecked(jx..);
+                        let weights = _mm256_shuffle_epi8(
+                            _mm256_permutevar8x32_epi32(
+                                _mm256_castsi128_si256(_mm_loadu_si64(w_ptr.as_ptr() as *const u8)),
+                                weights_idx,
+                            ),
+                            shuffle_weights01,
+                        );
+
+                        let bounds_start = bounds.start + jx;
+                        let src_ptr_0 = src.get_unchecked((bounds_start * CN)..);
+
+                        let rgb_pixel =
+                            load_distr_x4_rgb::<BROADCAST_REMAINDER>(src_ptr_0, shuffle_pixels_4);
+                        store = _mm256_dot16_avx_epi32::<HAS_DOT>(store, rgb_pixel, weights);
+                        jx += 4;
+                    }
                 }
 
                 let mut store = _mm_add_epi32(
@@ -882,6 +982,247 @@ mod tests {
                     assert_eq!(row, expected, "3x{height} -> {width}x{height}");
                 }
             }
+        }
+    }
+
+    fn avx12_available() -> bool {
+        let found = std::arch::is_x86_feature_detected!("avx2");
+        assert!(
+            found || std::env::var_os("PIC_SCALE_REQUIRE_AVX2").is_none(),
+            "AVX2 required but unavailable"
+        );
+        found
+    }
+
+    // Q15 oracle: one rounding bias, full-width accumulation, then clamp.
+    fn avx12_scalar(
+        src: &[u8],
+        ss: usize,
+        ds: usize,
+        width: usize,
+        f: &FilterWeights<i16>,
+    ) -> Vec<u8> {
+        let mut out = vec![0xd3; ds * 3 + width * 3];
+        for row in 0..4 {
+            for x in 0..width {
+                for c in 0..3 {
+                    let b = &f.bounds[x];
+                    let mut sum = 16384i64;
+                    for j in 0..b.size {
+                        sum += i64::from(src[row * ss + (b.start + j) * 3 + c])
+                            * i64::from(f.weights[x * f.aligned_size + j]);
+                    }
+                    out[row * ds + x * 3 + c] = (sum >> 15).clamp(0, 255) as u8;
+                }
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn avx12_signed_coefficients_clipped_tight_rows_match_independent_scalar() {
+        if !avx12_available() {
+            return;
+        }
+        let mut cases = 0;
+        for aligned in [12usize, 17] {
+            for src_padding in [0usize, 1, 5] {
+                for dst_padding in [0usize, 7] {
+                    for prefix in [0usize, 1, 7] {
+                        for width in [1usize, 3, 7, 13] {
+                            let src_pixels = 12 + prefix;
+                            let src_row_len = src_pixels * 3;
+                            let ss = src_row_len + src_padding;
+                            let mut storage = vec![0xadu8; prefix + ss * 3 + src_row_len];
+                            let src = &mut storage[prefix..];
+                            for row in 0..4 {
+                                for x in 0..src_pixels {
+                                    for c in 0..3 {
+                                        src[row * ss + x * 3 + c] =
+                                            ((row * 67 + x * 29 + c * 43 + x * c * 11) % 256) as u8;
+                                    }
+                                }
+                            }
+                            let bounds: Vec<_> = (0..width)
+                                .map(|x| {
+                                    let size = 13 - width + x;
+                                    FilterBounds::new(src_pixels - size, size)
+                                })
+                                .collect();
+                            let ds = width * 3 + dst_padding;
+                            for pattern in 0..15 {
+                                let mut weights = vec![32767i16; aligned * width];
+                                for x in 0..width {
+                                    for j in 0..bounds[x].size {
+                                        weights[x * aligned + j] = match pattern {
+                                            0 => (8251usize + j * 10949 + x * 8311) as i16,
+                                            1 => {
+                                                if j % 2 == 0 {
+                                                    i16::MAX
+                                                } else {
+                                                    i16::MIN
+                                                }
+                                            }
+                                            2 => i16::MAX,
+                                            _ => {
+                                                if j == pattern - 3 {
+                                                    16384
+                                                } else {
+                                                    0
+                                                }
+                                            }
+                                        };
+                                    }
+                                }
+                                let f = FilterWeights::new(
+                                    weights,
+                                    12,
+                                    aligned,
+                                    width,
+                                    12,
+                                    bounds.clone(),
+                                );
+                                let expected = avx12_scalar(src, ss, ds, width, &f);
+                                for specialized in [false, true] {
+                                    let mut guarded = vec![0xd3; expected.len() + 8];
+                                    if specialized {
+                                        unsafe {
+                                            convolve_horizontal_rgb_avx_rows_4_reg::<false, true>(
+                                                src,
+                                                ss,
+                                                &mut guarded[3..expected.len() + 3],
+                                                ds,
+                                                &f,
+                                            )
+                                        }
+                                    } else {
+                                        unsafe {
+                                            convolve_horizontal_rgb_avx_rows_4_reg::<false, false>(
+                                                src,
+                                                ss,
+                                                &mut guarded[3..expected.len() + 3],
+                                                ds,
+                                                &f,
+                                            )
+                                        }
+                                    }
+                                    assert_eq!(
+                                        &guarded[3..expected.len() + 3],
+                                        &expected,
+                                        "4rows aligned={aligned} srcpad={src_padding} dstpad={dst_padding} prefix={prefix} width={width} pattern={pattern} special={specialized}"
+                                    );
+                                    assert!(
+                                        guarded[..3]
+                                            .iter()
+                                            .chain(&guarded[expected.len() + 3..])
+                                            .all(|&x| x == 0xd3)
+                                    );
+                                    for row in 0..4 {
+                                        let mut guarded = vec![0xd3; width * 3 + 8];
+                                        let source = &src[row * ss..][..src_row_len];
+                                        if specialized {
+                                            unsafe {
+                                                convolve_horizontal_rgb_avx_row_one_reg::<true>(
+                                                    source,
+                                                    &mut guarded[3..width * 3 + 3],
+                                                    &f,
+                                                )
+                                            }
+                                        } else {
+                                            unsafe {
+                                                convolve_horizontal_rgb_avx_row_one_reg::<false>(
+                                                    source,
+                                                    &mut guarded[3..width * 3 + 3],
+                                                    &f,
+                                                )
+                                            }
+                                        }
+                                        assert_eq!(
+                                            &guarded[3..width * 3 + 3],
+                                            &expected[row * ds..][..width * 3],
+                                            "1row row={row} aligned={aligned} srcpad={src_padding} dstpad={dst_padding} prefix={prefix} width={width} pattern={pattern} special={specialized}"
+                                        );
+                                        assert!(
+                                            guarded[..3]
+                                                .iter()
+                                                .chain(&guarded[width * 3 + 3..])
+                                                .all(|&x| x == 0xd3)
+                                        );
+                                    }
+                                    cases += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        eprintln!("AVX12 Q15: {cases} matrices, each4row+four1row callbacks exact");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn avx12_full_and_clipped_source_ends_at_guard_page() {
+        if !avx12_available() {
+            return;
+        }
+        use std::ffi::c_void;
+        unsafe extern "C" {
+            fn mmap(
+                addr: *mut c_void,
+                len: usize,
+                prot: i32,
+                flags: i32,
+                fd: i32,
+                off: isize,
+            ) -> *mut c_void;
+            fn mprotect(addr: *mut c_void, len: usize, prot: i32) -> i32;
+            fn munmap(addr: *mut c_void, len: usize) -> i32;
+            fn getpagesize() -> i32;
+        }
+        unsafe {
+            let page = getpagesize() as usize;
+            assert!(page >= 144);
+            // Linux: PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS.
+            let memory = mmap(std::ptr::null_mut(), page * 2, 1 | 2, 2 | 0x20, -1, 0);
+            assert_ne!(memory as isize, -1);
+            assert_eq!(mprotect(memory.cast::<u8>().add(page).cast(), page, 0), 0);
+            for taps in 1..=12 {
+                let ss = taps * 3;
+                let len = ss * 4;
+                let p = memory.cast::<u8>().add(page - len);
+                for i in 0..len {
+                    p.add(i).write((17 + i * 43 + i / ss * 11) as u8);
+                }
+                let src = std::slice::from_raw_parts(p, len);
+                for tap in 0..taps {
+                    let mut w = vec![0i16; 12];
+                    w[tap] = 16384;
+                    let f = FilterWeights::new(w, 12, 12, 1, 12, vec![FilterBounds::new(0, taps)]);
+                    let expected = avx12_scalar(src, ss, 3, 1, &f);
+                    let mut actual = vec![0xd3; 12];
+                    convolve_horizontal_rgb_avx_rows_4_reg::<false, true>(
+                        src,
+                        ss,
+                        &mut actual,
+                        3,
+                        &f,
+                    );
+                    assert_eq!(actual, expected, "guard4rows taps={taps},isolated={tap}");
+                    let mut actual = vec![0xd3; 3];
+                    convolve_horizontal_rgb_avx_row_one_reg::<true>(
+                        &src[ss * 3..],
+                        &mut actual,
+                        &f,
+                    );
+                    assert_eq!(
+                        &actual,
+                        &expected[9..],
+                        "guard1row taps={taps},isolated={tap}"
+                    );
+                }
+            }
+            assert_eq!(munmap(memory, page * 2), 0);
         }
     }
 }

@@ -45,7 +45,23 @@ pub(crate) fn convolve_horizontal_rgb_sse_rows_4(
     _: u32,
 ) {
     unsafe {
-        convolve_horizontal_rgb_sse_rows_4_impl(src, src_stride, dst, dst_stride, filter_weights);
+        if filter_weights.kernel_size >= 8 {
+            convolve_horizontal_rgb_sse_rows_4_impl::<true>(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                filter_weights,
+            );
+        } else {
+            convolve_horizontal_rgb_sse_rows_4_impl::<false>(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                filter_weights,
+            );
+        }
     }
 }
 
@@ -74,8 +90,51 @@ fn load_rgb_x4(src: &[u8]) -> __m128i {
     }
 }
 
+#[inline(always)]
+fn convolve_rgb_x8(src: &[u8], mut sum: __m128i, weights: __m128i) -> __m128i {
+    unsafe {
+        // Their union is exactly 24 bytes, including the final packed RGB pixel.
+        let first = _mm_loadu_si128(src.as_ptr().cast());
+        let second = _mm_loadu_si128(src.as_ptr().add(8).cast());
+        let sh01 = _mm_setr_epi8(0, -1, 3, -1, 1, -1, 4, -1, 2, -1, 5, -1, -1, -1, -1, -1);
+        let sh23 = _mm_setr_epi8(6, -1, 9, -1, 7, -1, 10, -1, 8, -1, 11, -1, -1, -1, -1, -1);
+        let sh45 = _mm_setr_epi8(4, -1, 7, -1, 5, -1, 8, -1, 6, -1, 9, -1, -1, -1, -1, -1);
+        let sh67 = _mm_setr_epi8(
+            10, -1, 13, -1, 11, -1, 14, -1, 12, -1, 15, -1, -1, -1, -1, -1,
+        );
+        sum = _mm_add_epi32(
+            sum,
+            _mm_madd_epi16(
+                _mm_shuffle_epi8(first, sh01),
+                _mm_shuffle_epi32::<0x00>(weights),
+            ),
+        );
+        sum = _mm_add_epi32(
+            sum,
+            _mm_madd_epi16(
+                _mm_shuffle_epi8(first, sh23),
+                _mm_shuffle_epi32::<0x55>(weights),
+            ),
+        );
+        sum = _mm_add_epi32(
+            sum,
+            _mm_madd_epi16(
+                _mm_shuffle_epi8(second, sh45),
+                _mm_shuffle_epi32::<0xaa>(weights),
+            ),
+        );
+        _mm_add_epi32(
+            sum,
+            _mm_madd_epi16(
+                _mm_shuffle_epi8(second, sh67),
+                _mm_shuffle_epi32::<0xff>(weights),
+            ),
+        )
+    }
+}
+
 #[target_feature(enable = "sse4.1")]
-fn convolve_horizontal_rgb_sse_rows_4_impl(
+fn convolve_horizontal_rgb_sse_rows_4_impl<const WIDE: bool>(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -137,6 +196,16 @@ fn convolve_horizontal_rgb_sse_rows_4_impl(
             let src1 = src0.get_unchecked(src_stride..);
             let src2 = src1.get_unchecked(src_stride..);
             let src3 = src2.get_unchecked(src_stride..);
+
+            while WIDE && jx + 8 <= bounds.size {
+                let weights8 = _mm_loadu_si128(weights.as_ptr().add(jx).cast());
+                let start = (bounds.start + jx) * CN;
+                store_0 = convolve_rgb_x8(src0.get_unchecked(start..), store_0, weights8);
+                store_1 = convolve_rgb_x8(src1.get_unchecked(start..), store_1, weights8);
+                store_2 = convolve_rgb_x8(src2.get_unchecked(start..), store_2, weights8);
+                store_3 = convolve_rgb_x8(src3.get_unchecked(start..), store_3, weights8);
+                jx += 8;
+            }
 
             // Will make step in 4 items however since it is RGB it is necessary to make a safe offset
             while jx + 4 <= bounds.size {
@@ -216,20 +285,17 @@ fn convolve_horizontal_rgb_sse_rows_4_impl(
                 jx += 1;
             }
 
-            let store_0_8 = compress_i32(store_0);
-            let store_1_8 = compress_i32(store_1);
-            let store_2_8 = compress_i32(store_2);
-            let store_3_8 = compress_i32(store_3);
-
-            let store_0_8 = _mm_packus_epi16(store_0_8, store_0_8);
-            let store_1_8 = _mm_packus_epi16(store_1_8, store_1_8);
-            let store_2_8 = _mm_packus_epi16(store_2_8, store_2_8);
-            let store_3_8 = _mm_packus_epi16(store_3_8, store_3_8);
-
-            let element_0 = _mm_extract_epi32::<0>(store_0_8);
-            let element_1 = _mm_extract_epi32::<0>(store_1_8);
-            let element_2 = _mm_extract_epi32::<0>(store_2_8);
-            let element_3 = _mm_extract_epi32::<0>(store_3_8);
+            let shifted0 = _mm_srai_epi32::<{ crate::support::PRECISION }>(store_0);
+            let shifted1 = _mm_srai_epi32::<{ crate::support::PRECISION }>(store_1);
+            let shifted2 = _mm_srai_epi32::<{ crate::support::PRECISION }>(store_2);
+            let shifted3 = _mm_srai_epi32::<{ crate::support::PRECISION }>(store_3);
+            let packed01 = _mm_packus_epi32(shifted0, shifted1);
+            let packed23 = _mm_packus_epi32(shifted2, shifted3);
+            let packed = _mm_packus_epi16(packed01, packed23);
+            let element_0 = _mm_extract_epi32::<0>(packed);
+            let element_1 = _mm_extract_epi32::<1>(packed);
+            let element_2 = _mm_extract_epi32::<2>(packed);
+            let element_3 = _mm_extract_epi32::<3>(packed);
 
             let bytes = element_0.to_le_bytes();
             let first_byte = u16::from_le_bytes([bytes[0], bytes[1]]);
@@ -261,13 +327,17 @@ pub(crate) fn convolve_horizontal_rgb_sse_row_one(
     _: u32,
 ) {
     unsafe {
-        convolve_horizontal_rgb_sse_row_one_impl(src, dst, filter_weights);
+        if filter_weights.kernel_size >= 8 {
+            convolve_horizontal_rgb_sse_row_one_impl::<true>(src, dst, filter_weights);
+        } else {
+            convolve_horizontal_rgb_sse_row_one_impl::<false>(src, dst, filter_weights);
+        }
     }
 }
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
-fn convolve_horizontal_rgb_sse_row_one_impl(
+fn convolve_horizontal_rgb_sse_row_one_impl<const WIDE: bool>(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
@@ -293,6 +363,13 @@ fn convolve_horizontal_rgb_sse_row_one_impl(
             let bounds_size = bounds.size;
             let mut jx = 0usize;
             let mut store = _mm_set1_epi32(ROUNDING_CONST);
+
+            while WIDE && jx + 8 <= bounds.size {
+                let weights8 = _mm_loadu_si128(weights.as_ptr().add(jx).cast());
+                let start = (bounds.start + jx) * CN;
+                store = convolve_rgb_x8(src.get_unchecked(start..), store, weights8);
+                jx += 8;
+            }
 
             while jx + 4 <= bounds.size {
                 let w_ptr = weights.get_unchecked(jx..(jx + 4));
@@ -341,5 +418,162 @@ fn convolve_horizontal_rgb_sse_row_one_impl(
             (dst.as_mut_ptr() as *mut u16).write_unaligned(first_byte);
             *dst.get_unchecked_mut(2) = bytes[2];
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::filter_weights::FilterBounds;
+
+    fn check_rows(four_rows: bool) {
+        if !std::arch::is_x86_feature_detected!("sse4.1") {
+            return;
+        }
+        for width in [1usize, 2, 3, 7, 19, 33] {
+            for taps in [
+                1usize, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 23, 24, 25, 31, 32,
+                33, 47, 48, 49, 63, 64, 65, 127, 255,
+            ] {
+                let source_width = taps + width + 2;
+                for padding in [0, 5] {
+                    let source_stride = source_width * 3 + padding;
+                    let mut source = vec![0x9b; source_stride * 3 + source_width * 3];
+                    for row in 0..4 {
+                        for x in 0..source_width {
+                            for c in 0..3 {
+                                source[row * source_stride + x * 3 + c] =
+                                    (row * 67 + x * 29 + c * 43 + x * c * 11) as u8;
+                            }
+                        }
+                    }
+                    let aligned = taps.next_multiple_of(4);
+                    for clipped in [false, true] {
+                        let bounds: Vec<_> = (0..width)
+                            .map(|x| {
+                                let size = if clipped && x == 0 {
+                                    taps.div_ceil(2)
+                                } else if clipped {
+                                    taps - (x % 4).min(taps - 1)
+                                } else {
+                                    taps
+                                };
+                                let start = if x == width - 1 {
+                                    source_width - size
+                                } else {
+                                    x + 2
+                                };
+                                FilterBounds::new(start, size)
+                            })
+                            .collect();
+                        for pattern in 0..4 {
+                            // Unused coefficient slots are deliberately nonzero.
+                            let mut weights = vec![i16::MIN; aligned * width];
+                            for (x, bound) in bounds.iter().enumerate() {
+                                let active = &mut weights[x * aligned..][..bound.size];
+                                for (j, w) in active.iter_mut().enumerate() {
+                                    *w = match pattern {
+                                        0 => ((j * 997 + x * 53) % 4096) as i16 - 2048,
+                                        1 => {
+                                            if j % 2 == 0 {
+                                                i16::MIN
+                                            } else {
+                                                i16::MAX
+                                            }
+                                        }
+                                        2 => i16::MAX,
+                                        _ => {
+                                            if j < bound.size.div_ceil(2) {
+                                                i16::MAX
+                                            } else {
+                                                i16::MIN
+                                            }
+                                        }
+                                    };
+                                }
+                                if pattern == 0 {
+                                    active[0] = 30000;
+                                    let mut residual =
+                                        32768 - active.iter().map(|&v| i32::from(v)).sum::<i32>();
+                                    for w in active {
+                                        let delta = residual.clamp(
+                                            i32::from(i16::MIN) - i32::from(*w),
+                                            i32::from(i16::MAX) - i32::from(*w),
+                                        );
+                                        *w = (i32::from(*w) + delta) as i16;
+                                        residual -= delta;
+                                    }
+                                }
+                            }
+                            let filter = FilterWeights::new(
+                                weights,
+                                taps,
+                                aligned,
+                                width,
+                                0,
+                                bounds.clone(),
+                            );
+                            let target_stride = width * 3 + padding;
+                            let len = target_stride * 3 + width * 3;
+                            let mut expected = vec![0xa5; len + 2];
+                            for row in 0..4 {
+                                for (x, bound) in bounds.iter().enumerate() {
+                                    for c in 0..3 {
+                                        let mut sum = ROUNDING_CONST;
+                                        for j in 0..bound.size {
+                                            sum = sum.wrapping_add(
+                                                i32::from(
+                                                    source[row * source_stride
+                                                        + (bound.start + j) * 3
+                                                        + c],
+                                                ) * i32::from(filter.weights[x * aligned + j]),
+                                            );
+                                        }
+                                        // Preserve the existing unsigned-word then signed-word byte packing.
+                                        let word = (sum >> 15).clamp(0, 65535) as u16;
+                                        expected[1 + row * target_stride + x * 3 + c] =
+                                            (word as i16).clamp(0, 255) as u8;
+                                    }
+                                }
+                            }
+                            let mut actual = vec![0xa5; len + 2];
+                            if four_rows {
+                                convolve_horizontal_rgb_sse_rows_4(
+                                    &source,
+                                    source_stride,
+                                    &mut actual[1..len + 1],
+                                    target_stride,
+                                    &filter,
+                                    8,
+                                );
+                            } else {
+                                for row in 0..4 {
+                                    convolve_horizontal_rgb_sse_row_one(
+                                        &source[row * source_stride..][..source_width * 3],
+                                        &mut actual[1 + row * target_stride..][..width * 3],
+                                        &filter,
+                                        8,
+                                    );
+                                }
+                            }
+                            assert_eq!(
+                                actual, expected,
+                                "four_rows={four_rows}, width={width}, taps={taps}, padding={padding}, clipped={clipped}, pattern={pattern}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn sse_rgb_one_row_matches_scalar_q15_exact_ends() {
+        check_rows(false);
+    }
+
+    #[test]
+    fn sse_rgb_four_rows_match_scalar_q15_exact_ends() {
+        check_rows(true);
     }
 }

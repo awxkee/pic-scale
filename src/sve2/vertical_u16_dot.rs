@@ -46,17 +46,18 @@ pub(crate) fn convolve_vertical_sve2_u16_dot(
 
 macro_rules! pack_4_rows_sve_u16 {
     ([$lo0:ident, $lo1:ident, $hi0:ident, $hi1:ident], $a:expr, $b:expr, $c:expr, $d:expr) => {
-        let ab_lo = svzip1_u16($a, $b);
-        let ab_hi = svzip2_u16($a, $b);
+        let ab_lo = svtrn1_u16($a, $b);
+        let ab_hi = svtrn2_u16($a, $b);
 
-        let cd_lo = svzip1_u16($c, $d);
-        let cd_hi = svzip2_u16($c, $d);
+        let cd_lo = svtrn1_u16($c, $d);
+        let cd_hi = svtrn2_u16($c, $d);
 
-        let lo0 = svzip1_u32(svreinterpret_u32_u16(ab_lo), svreinterpret_u32_u16(cd_lo));
-        let lo1 = svzip2_u32(svreinterpret_u32_u16(ab_lo), svreinterpret_u32_u16(cd_lo));
-        let hi0 = svzip1_u32(svreinterpret_u32_u16(ab_hi), svreinterpret_u32_u16(cd_hi));
-        let hi1 = svzip2_u32(svreinterpret_u32_u16(ab_hi), svreinterpret_u32_u16(cd_hi));
+        let lo0 = svtrn1_u32(svreinterpret_u32_u16(ab_lo), svreinterpret_u32_u16(cd_lo));
+        let lo1 = svtrn2_u32(svreinterpret_u32_u16(ab_lo), svreinterpret_u32_u16(cd_lo));
+        let hi0 = svtrn1_u32(svreinterpret_u32_u16(ab_hi), svreinterpret_u32_u16(cd_hi));
+        let hi1 = svtrn2_u32(svreinterpret_u32_u16(ab_hi), svreinterpret_u32_u16(cd_hi));
 
+        // The four outputs contain columns congruent to [0, 2, 1, 3] modulo four.
         // Keep each scalable vector in its own local to preserve all lanes.
         let $lo0 = svreinterpret_u16_u32(lo0);
         let $lo1 = svreinterpret_u16_u32(lo1);
@@ -68,17 +69,16 @@ macro_rules! pack_4_rows_sve_u16 {
 macro_rules! narrow_i64_to_u16 {
     ($a:expr, $b:expr, $c:expr, $d:expr) => {{
         let q0 = svqshrunb_n_s64::<{ crate::support::PRECISION }>($a);
-        let q1 = svqshrunb_n_s64::<{ crate::support::PRECISION }>($b);
+        let q01 = svqshrunt_n_s64::<{ crate::support::PRECISION }>(q0, $b);
         let q2 = svqshrunb_n_s64::<{ crate::support::PRECISION }>($c);
-        let q3 = svqshrunb_n_s64::<{ crate::support::PRECISION }>($d);
-        let s01 = svuzp1_u32(q0, q1);
-        let s23 = svuzp1_u32(q2, q3);
-        svuzp1_u16(svreinterpret_u16_u32(s01), svreinterpret_u16_u32(s23))
+        let q23 = svqshrunt_n_s64::<{ crate::support::PRECISION }>(q2, $d);
+        // Interleave the even and odd columns, saturating before narrowing to u16.
+        svqxtnt_u32(svqxtnb_u32(q01), q23)
     }};
 }
 
 #[target_feature(enable = "sve,sve2")]
-fn work_wide_chunks_u16(
+fn work_wide_chunks_u16<const BOUNDS: usize>(
     bounds: &FilterBounds,
     src: &[u16],
     dst: &mut [u16],
@@ -86,23 +86,14 @@ fn work_wide_chunks_u16(
     weights: &[i16],
     bit_depth: u32,
 ) -> usize {
+    let bounds_size = if BOUNDS == 0 { bounds.size } else { BOUNDS };
     let vl = svcnth() as usize;
     let mut cx = 0usize;
     let len = dst.len();
 
     let pg_full = svptrue_b16();
 
-    let pg8 = svwhilelt_b16_u32(0u32, 8u32);
-    let pg4 = svwhilelt_b16_u32(0u32, 4u32);
-    let pg2 = svwhilelt_b16_u32(0u32, 2u32);
-    let pg1 = svwhilelt_b16_u32(0u32, 1u32);
-
     let max_colors = svdup_n_u16(((1u32 << bit_depth) - 1) as u16);
-
-    let shuf4 = svreinterpret_u8_s64(svdup_n_s64(i64::from_ne_bytes([0, 1, 2, 3, 4, 5, 6, 7])));
-    let shuf4hi = svreinterpret_u8_s64(svdup_n_s64(i64::from_ne_bytes([
-        8, 9, 10, 11, 12, 13, 14, 15,
-    ])));
 
     while cx + vl * 2 <= len {
         let rounding = svdup_n_s64(ROUNDING_CONST as i64);
@@ -118,13 +109,16 @@ fn work_wide_chunks_u16(
 
         let mut j = 0usize;
 
-        while j + 8 <= bounds.size {
+        while j + 8 <= bounds_size {
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j..) };
 
-            let wq = unsafe { svreinterpret_s8_s16(svld1_s16(pg8, w.as_ptr())) };
-            let vw0 = svreinterpret_s16_s8(svtbl_s8(wq, shuf4));
-            let vw1 = svreinterpret_s16_s8(svtbl_s8(wq, shuf4hi));
+            let vw0 = svreinterpret_s16_u64(svdup_n_u64(unsafe {
+                w.as_ptr().cast::<u64>().read_unaligned()
+            }));
+            let vw1 = svreinterpret_s16_u64(svdup_n_u64(unsafe {
+                w.as_ptr().add(4).cast::<u64>().read_unaligned()
+            }));
 
             let base0 = src_stride * py + cx;
             let base1 = base0 + src_stride * 4;
@@ -255,13 +249,12 @@ fn work_wide_chunks_u16(
             j += 8;
         }
 
-        while j + 4 <= bounds.size {
+        while j + 4 <= bounds_size {
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j..) };
-            let vw = svreinterpret_s16_s8(svtbl_s8(
-                unsafe { svreinterpret_s8_s16(svld1_s16(pg4, w.as_ptr())) },
-                shuf4,
-            ));
+            let vw = svreinterpret_s16_u64(svdup_n_u64(unsafe {
+                w.as_ptr().cast::<u64>().read_unaligned()
+            }));
 
             let base0 = src_stride * py + cx;
 
@@ -330,13 +323,12 @@ fn work_wide_chunks_u16(
             j += 4;
         }
 
-        while j + 2 <= bounds.size {
+        while j + 2 <= bounds_size {
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j..) };
-            let vw = svreinterpret_s16_s8(svtbl_s8(
-                unsafe { svreinterpret_s8_s16(svld1_s16(pg2, w.as_ptr())) },
-                shuf4,
-            ));
+            let vw = svreinterpret_s16_u64(svdup_n_u64(unsafe {
+                w.as_ptr().cast::<u32>().read_unaligned() as u64
+            }));
 
             let base0 = src_stride * py + cx;
             let row0_lo = unsafe { svld1_u16(pg_full, src.get_unchecked(base0..).as_ptr()) };
@@ -378,13 +370,12 @@ fn work_wide_chunks_u16(
             j += 2;
         }
 
-        while j < bounds.size {
+        while j < bounds_size {
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j..) };
-            let vw = svreinterpret_s16_s8(svtbl_s8(
-                unsafe { svreinterpret_s8_s16(svld1_s16(pg1, w.as_ptr())) },
-                shuf4,
-            ));
+            let vw = svreinterpret_s16_u64(svdup_n_u64(unsafe {
+                w.as_ptr().cast::<u16>().read_unaligned() as u64
+            }));
 
             let base0 = src_stride * py + cx;
             let row_lo = unsafe { svld1_u16(pg_full, src.get_unchecked(base0..).as_ptr()) };
@@ -448,18 +439,12 @@ fn convolve_vertical_sve2_u16_row(
     bit_depth: u32,
 ) {
     let vl = svcnth() as usize;
-    let mut cx = work_wide_chunks_u16(bounds, src, dst, src_stride, weights, bit_depth);
+    // Unroll 12 taps so coefficients and row addresses can stay outside the column loop.
+    let mut cx = match bounds.size {
+        12 => work_wide_chunks_u16::<12>(bounds, src, dst, src_stride, weights, bit_depth),
+        _ => work_wide_chunks_u16::<0>(bounds, src, dst, src_stride, weights, bit_depth),
+    };
     let len = dst.len();
-
-    let pg8 = svwhilelt_b16_u32(0u32, 8u32);
-    let pg4 = svwhilelt_b16_u32(0u32, 4u32);
-    let pg2 = svwhilelt_b16_u32(0u32, 2u32);
-    let pg1 = svwhilelt_b16_u32(0u32, 1u32);
-
-    let shuf4 = svreinterpret_u8_s64(svdup_n_s64(i64::from_ne_bytes([0, 1, 2, 3, 4, 5, 6, 7])));
-    let shuf4hi = svreinterpret_u8_s64(svdup_n_s64(i64::from_ne_bytes([
-        8, 9, 10, 11, 12, 13, 14, 15,
-    ])));
 
     let max_colors = svdup_n_u16(((1u32 << bit_depth) - 1) as u16);
 
@@ -478,9 +463,12 @@ fn convolve_vertical_sve2_u16_row(
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j..) };
 
-            let wq = unsafe { svreinterpret_s8_s16(svld1_s16(pg8, w.as_ptr())) };
-            let vw0 = svreinterpret_s16_s8(svtbl_s8(wq, shuf4));
-            let vw1 = svreinterpret_s16_s8(svtbl_s8(wq, shuf4hi));
+            let vw0 = svreinterpret_s16_u64(svdup_n_u64(unsafe {
+                w.as_ptr().cast::<u64>().read_unaligned()
+            }));
+            let vw1 = svreinterpret_s16_u64(svdup_n_u64(unsafe {
+                w.as_ptr().add(4).cast::<u64>().read_unaligned()
+            }));
 
             let base0 = src_stride * py + cx;
             // Load 8 rows
@@ -530,10 +518,9 @@ fn convolve_vertical_sve2_u16_row(
         while j + 4 <= bounds.size {
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j..) };
-            let vw = svreinterpret_s16_s8(svtbl_s8(
-                unsafe { svreinterpret_s8_s16(svld1_s16(pg4, w.as_ptr())) },
-                shuf4,
-            ));
+            let vw = svreinterpret_s16_u64(svdup_n_u64(unsafe {
+                w.as_ptr().cast::<u64>().read_unaligned()
+            }));
 
             let base0 = src_stride * py + cx;
             let row0 = unsafe { svld1_u16(pg, src.get_unchecked(base0..).as_ptr()) };
@@ -556,10 +543,9 @@ fn convolve_vertical_sve2_u16_row(
         while j + 2 <= bounds.size {
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j..) };
-            let vw = svreinterpret_s16_s8(svtbl_s8(
-                unsafe { svreinterpret_s8_s16(svld1_s16(pg2, w.as_ptr())) },
-                shuf4,
-            ));
+            let vw = svreinterpret_s16_u64(svdup_n_u64(unsafe {
+                w.as_ptr().cast::<u32>().read_unaligned() as u64
+            }));
 
             let base0 = src_stride * py + cx;
             let row0 = unsafe { svld1_u16(pg, src.get_unchecked(base0..).as_ptr()) };
@@ -579,10 +565,9 @@ fn convolve_vertical_sve2_u16_row(
         while j < bounds.size {
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j..) };
-            let vw = svreinterpret_s16_s8(svtbl_s8(
-                unsafe { svreinterpret_s8_s16(svld1_s16(pg1, w.as_ptr())) },
-                shuf4,
-            ));
+            let vw = svreinterpret_s16_u64(svdup_n_u64(unsafe {
+                w.as_ptr().cast::<u16>().read_unaligned() as u64
+            }));
 
             let base0 = src_stride * py + cx;
             let row = unsafe { svld1_u16(pg, src.get_unchecked(base0..).as_ptr()) };
@@ -634,6 +619,80 @@ mod tests {
                 15,
             );
             assert!(dst.iter().all(|&v| v == 1), "width={width}, dst={dst:?}");
+        }
+    }
+
+    #[test]
+    fn sve2_vertical_u16_saturates_before_removing_upper_halfwords() {
+        let Some(bytes) = crate::sve2::test_vector_length(false) else {
+            return;
+        };
+        let vl = bytes / 2;
+        for depth in [13, 14, 15] {
+            let max = ((1u32 << depth) - 1) as u16;
+            let full = 1usize << (16 - depth);
+            let mut weights = vec![i16::MAX; full + 1];
+            weights.extend(std::iter::repeat_n(i16::MIN, full - 1));
+            weights.push(full as i16 - i16::MAX);
+            assert_eq!(weights.iter().map(|&w| i32::from(w)).sum::<i32>(), 32768);
+            let tap_counts = [weights.len(), weights.len().max(12)];
+            for taps in tap_counts {
+                weights.resize(taps, 0);
+                for width in [
+                    1,
+                    vl - 1,
+                    vl,
+                    vl + 1,
+                    2 * vl - 1,
+                    2 * vl,
+                    2 * vl + 1,
+                    4 * vl + 3,
+                ] {
+                    for padding in [0, 5] {
+                        let stride = width + padding;
+                        let start = 2;
+                        let mut src = vec![0; stride * (start + taps - 1) + width];
+                        for row in 0..full {
+                            src[(start + row) * stride..][..width].fill(max);
+                        }
+                        for x in 0..width {
+                            src[(start + full) * stride + x] = (full + 2 + x % 5) as u16;
+                        }
+                        let expected: Vec<_> = (0..width)
+                            .map(|x| {
+                                let sum: i64 = weights
+                                    .iter()
+                                    .enumerate()
+                                    .map(|(j, &w)| {
+                                        i64::from(src[(start + j) * stride + x]) * i64::from(w)
+                                    })
+                                    .sum();
+                                let rounded = (sum + (1 << 14)) >> 15;
+                                assert!(rounded >= 65536, "exercise narrowing overflow");
+                                rounded.clamp(0, i64::from(max)) as u16
+                            })
+                            .collect();
+                        let mut actual = vec![0xbeef; width + 2];
+                        convolve_vertical_sve2_u16_dot(
+                            width,
+                            &FilterBounds::new(start, taps),
+                            &src,
+                            &mut actual[1..width + 1],
+                            stride,
+                            &weights,
+                            depth,
+                        );
+                        assert_eq!(
+                            &actual[1..width + 1],
+                            expected,
+                            "VL={}, depth={depth}, taps={taps}, width={width}, padding={padding}",
+                            bytes * 8
+                        );
+                        assert_eq!(actual[0], 0xbeef);
+                        assert_eq!(actual[width + 1], 0xbeef);
+                    }
+                }
+            }
         }
     }
 

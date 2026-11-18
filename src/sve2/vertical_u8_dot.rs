@@ -56,74 +56,108 @@ pub(crate) fn convolve_vertical_sve2_i8_dot(
 }
 
 macro_rules! pack_4_rows_sve {
-    ($a:expr, $b:expr, $c:expr, $d:expr) => {{
-        let ab_lo = svzip1_u8($a, $b);
-        let ab_hi = svzip2_u8($a, $b);
+    ([$lo0:ident, $lo1:ident, $hi0:ident, $hi1:ident],
+     $a:expr, $b:expr, $c:expr, $d:expr) => {
+        // Bind scalable vectors separately: arrays use fixed-size stack slots in debug builds.
+        let ab_lo = svtrn1_u8($a, $b);
+        let ab_hi = svtrn2_u8($a, $b);
 
-        let cd_lo = svzip1_u8($c, $d);
-        let cd_hi = svzip2_u8($c, $d);
+        let cd_lo = svtrn1_u8($c, $d);
+        let cd_hi = svtrn2_u8($c, $d);
 
-        let lo0 = svzip1_u8(ab_lo, cd_lo);
-        let lo1 = svzip2_u8(ab_lo, cd_lo);
-        let hi0 = svzip1_u8(ab_hi, cd_hi);
-        let hi1 = svzip2_u8(ab_hi, cd_hi);
-
-        [lo0, lo1, hi0, hi1]
-    }};
+        // Each dot group is [a, b, c, d], with columns ordered modulo four:
+        // lo0: 0,4,...; lo1: 2,6,...; hi0: 1,5,...; hi1: 3,7,... .
+        // This order lets the bottom/top narrows interleave the final bytes.
+        let $lo0 = svreinterpret_u8_u16(svtrn1_u16(
+            svreinterpret_u16_u8(ab_lo),
+            svreinterpret_u16_u8(cd_lo),
+        ));
+        let $lo1 = svreinterpret_u8_u16(svtrn2_u16(
+            svreinterpret_u16_u8(ab_lo),
+            svreinterpret_u16_u8(cd_lo),
+        ));
+        let $hi0 = svreinterpret_u8_u16(svtrn1_u16(
+            svreinterpret_u16_u8(ab_hi),
+            svreinterpret_u16_u8(cd_hi),
+        ));
+        let $hi1 = svreinterpret_u8_u16(svtrn2_u16(
+            svreinterpret_u16_u8(ab_hi),
+            svreinterpret_u16_u8(cd_hi),
+        ));
+    };
 }
 
 macro_rules! pack_8_rows_sve {
-    ($a:expr, $b:expr, $c:expr, $d:expr,
-     $e:expr, $f:expr, $g:expr, $h:expr) => {{
-        let ab_lo = svzip1_u8($a, $b);
-        let ef_lo = svzip1_u8($e, $f);
+    ([$lo0:ident, $lo1:ident, $hi0:ident, $hi1:ident,
+      $lo4:ident, $lo5:ident, $hi4:ident, $hi5:ident],
+     $a:expr, $b:expr, $c:expr, $d:expr,
+     $e:expr, $f:expr, $g:expr, $h:expr) => {
+        // Bind scalable vectors separately: arrays use fixed-size stack slots in debug builds.
+        let ab_lo = svtrn1_u8($a, $b);
+        let ef_lo = svtrn1_u8($e, $f);
 
-        let ab_hi = svzip2_u8($a, $b);
-        let ef_hi = svzip2_u8($e, $f);
+        let ab_hi = svtrn2_u8($a, $b);
+        let ef_hi = svtrn2_u8($e, $f);
 
-        let cd_lo = svzip1_u8($c, $d);
-        let gh_lo = svzip1_u8($g, $h);
+        let cd_lo = svtrn1_u8($c, $d);
+        let gh_lo = svtrn1_u8($g, $h);
 
-        let cd_hi = svzip2_u8($c, $d);
-        let gh_hi = svzip2_u8($g, $h);
+        let cd_hi = svtrn2_u8($c, $d);
+        let gh_hi = svtrn2_u8($g, $h);
 
-        let lo0 = svzip1_u8(ab_lo, cd_lo);
-        let lo4 = svzip1_u8(ef_lo, gh_lo);
+        let $lo0 = svreinterpret_u8_u16(svtrn1_u16(
+            svreinterpret_u16_u8(ab_lo),
+            svreinterpret_u16_u8(cd_lo),
+        ));
+        let $lo4 = svreinterpret_u8_u16(svtrn1_u16(
+            svreinterpret_u16_u8(ef_lo),
+            svreinterpret_u16_u8(gh_lo),
+        ));
 
-        let lo1 = svzip2_u8(ab_lo, cd_lo);
-        let lo5 = svzip2_u8(ef_lo, gh_lo);
+        let $lo1 = svreinterpret_u8_u16(svtrn2_u16(
+            svreinterpret_u16_u8(ab_lo),
+            svreinterpret_u16_u8(cd_lo),
+        ));
+        let $lo5 = svreinterpret_u8_u16(svtrn2_u16(
+            svreinterpret_u16_u8(ef_lo),
+            svreinterpret_u16_u8(gh_lo),
+        ));
 
-        let hi0 = svzip1_u8(ab_hi, cd_hi);
-        let hi4 = svzip1_u8(ef_hi, gh_hi);
+        let $hi0 = svreinterpret_u8_u16(svtrn1_u16(
+            svreinterpret_u16_u8(ab_hi),
+            svreinterpret_u16_u8(cd_hi),
+        ));
+        let $hi4 = svreinterpret_u8_u16(svtrn1_u16(
+            svreinterpret_u16_u8(ef_hi),
+            svreinterpret_u16_u8(gh_hi),
+        ));
 
-        let hi1 = svzip2_u8(ab_hi, cd_hi);
-        let hi5 = svzip2_u8(ef_hi, gh_hi);
+        let $hi1 = svreinterpret_u8_u16(svtrn2_u16(
+            svreinterpret_u16_u8(ab_hi),
+            svreinterpret_u16_u8(cd_hi),
+        ));
+        let $hi5 = svreinterpret_u8_u16(svtrn2_u16(
+            svreinterpret_u16_u8(ef_hi),
+            svreinterpret_u16_u8(gh_hi),
+        ));
 
-        [lo0, lo1, hi0, hi1, lo4, lo5, hi4, hi5]
-    }};
+    };
 }
 
 #[target_feature(enable = "sve,sve2,i8mm")]
-fn work_32_chunks(
+fn work_32_chunks<const BOUNDS: usize>(
     bounds: &FilterBounds,
     src: &[u8],
     dst: &mut [u8],
     src_stride: usize,
     weights: &[i8],
 ) -> usize {
+    let bounds_size = if BOUNDS == 0 { bounds.size } else { BOUNDS };
     let vl = svcntb() as usize;
 
     let mut cx = 0usize;
 
     let len = dst.len();
-
-    let pg4 = svwhilelt_b8_u32(0u32, 4u32);
-    let pg8 = svwhilelt_b8_u32(0u32, 8u32);
-    let pg2 = svwhilelt_b8_u32(0u32, 2u32);
-    let pg1 = svwhilelt_b8_u32(0u32, 1u32);
-
-    let shuf4 = svreinterpret_u8_s32(svdup_n_s32(i32::from_ne_bytes([0, 2, 1, 3])));
-    let shuf4_hi = svreinterpret_u8_s32(svdup_n_s32(i32::from_ne_bytes([4, 6, 5, 7])));
 
     let pg_full = svptrue_b8();
 
@@ -140,10 +174,15 @@ fn work_32_chunks(
 
         let mut j = 0usize;
 
-        while j + 8 <= bounds.size {
+        while j + 8 <= bounds_size {
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j..) };
-            let vw = unsafe { svld1_s8(pg8, w.as_ptr()) };
+            let vw0 = svreinterpret_s8_s32(svdup_n_s32(unsafe {
+                w.as_ptr().cast::<i32>().read_unaligned()
+            }));
+            let vw1 = svreinterpret_s8_s32(svdup_n_s32(unsafe {
+                w.as_ptr().add(4).cast::<i32>().read_unaligned()
+            }));
 
             let base0 = src_stride * py + cx;
             let base1 = src_stride * (py + 4) + cx;
@@ -183,20 +222,18 @@ fn work_32_chunks(
                 )
             };
 
-            let vw0 = svtbl_s8(vw, shuf4);
-            let vw1 = svtbl_s8(vw, shuf4_hi);
-
-            let [
-                packed0,
-                packed1,
-                packed2,
-                packed3,
-                packed4,
-                packed5,
-                packed6,
-                packed7,
-            ] = pack_8_rows_sve!(
-                row0_lo, row1_lo, row2_lo, row3_lo, row0_hi, row1_hi, row2_hi, row3_hi
+            pack_8_rows_sve!(
+                [
+                    packed0, packed1, packed2, packed3, packed4, packed5, packed6, packed7
+                ],
+                row0_lo,
+                row1_lo,
+                row2_lo,
+                row3_lo,
+                row0_hi,
+                row1_hi,
+                row2_hi,
+                row3_hi
             );
 
             acc_0 = svusdot_s32(acc_0, packed0, vw0);
@@ -243,17 +280,18 @@ fn work_32_chunks(
                 )
             };
 
-            let [
-                packed0,
-                packed1,
-                packed2,
-                packed3,
-                packed4,
-                packed5,
-                packed6,
-                packed7,
-            ] = pack_8_rows_sve!(
-                row0_lo, row1_lo, row2_lo, row3_lo, row0_hi, row1_hi, row2_hi, row3_hi
+            pack_8_rows_sve!(
+                [
+                    packed0, packed1, packed2, packed3, packed4, packed5, packed6, packed7
+                ],
+                row0_lo,
+                row1_lo,
+                row2_lo,
+                row3_lo,
+                row0_hi,
+                row1_hi,
+                row2_hi,
+                row3_hi
             );
 
             acc_0 = svusdot_s32(acc_0, packed0, vw1);
@@ -268,10 +306,12 @@ fn work_32_chunks(
             j += 8;
         }
 
-        while j + 4 <= bounds.size {
+        while j + 4 <= bounds_size {
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j..) };
-            let w_ld = unsafe { svld1_s8(pg4, w.as_ptr()) };
+            let vw = svreinterpret_s8_s32(svdup_n_s32(unsafe {
+                w.as_ptr().cast::<i32>().read_unaligned()
+            }));
 
             let base0 = src_stride * py + cx;
             let row0_lo = unsafe { svld1_u8(pg_full, src.get_unchecked(base0..).as_ptr()) };
@@ -310,19 +350,18 @@ fn work_32_chunks(
                 )
             };
 
-            let vw = svtbl_s8(w_ld, shuf4);
-
-            let [
-                packed0,
-                packed1,
-                packed2,
-                packed3,
-                packed4,
-                packed5,
-                packed6,
-                packed7,
-            ] = pack_8_rows_sve!(
-                row0_lo, row1_lo, row2_lo, row3_lo, row0_hi, row1_hi, row2_hi, row3_hi
+            pack_8_rows_sve!(
+                [
+                    packed0, packed1, packed2, packed3, packed4, packed5, packed6, packed7
+                ],
+                row0_lo,
+                row1_lo,
+                row2_lo,
+                row3_lo,
+                row0_hi,
+                row1_hi,
+                row2_hi,
+                row3_hi
             );
 
             acc_0 = svusdot_s32(acc_0, packed0, vw);
@@ -337,10 +376,12 @@ fn work_32_chunks(
             j += 4;
         }
 
-        while j + 2 <= bounds.size {
+        while j + 2 <= bounds_size {
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j..) };
-            let w_ld = unsafe { svld1_s8(pg2, w.as_ptr()) };
+            let vw = svreinterpret_s8_s32(svdup_n_s32(unsafe {
+                w.as_ptr().cast::<u16>().read_unaligned() as i32
+            }));
 
             let base0 = src_stride * py + cx;
             let row0_lo = unsafe { svld1_u8(pg_full, src.get_unchecked(base0..).as_ptr()) };
@@ -355,12 +396,20 @@ fn work_32_chunks(
             };
             let zero = svdup_n_u8(0);
 
-            let vw = svtbl_s8(w_ld, shuf4);
-
-            let [packed0, packed1, packed2, packed3] =
-                pack_4_rows_sve!(row0_lo, row1_lo, zero, zero);
-            let [packed4, packed5, packed6, packed7] =
-                pack_4_rows_sve!(row0_hi, row1_hi, zero, zero);
+            pack_4_rows_sve!(
+                [packed0, packed1, packed2, packed3],
+                row0_lo,
+                row1_lo,
+                zero,
+                zero
+            );
+            pack_4_rows_sve!(
+                [packed4, packed5, packed6, packed7],
+                row0_hi,
+                row1_hi,
+                zero,
+                zero
+            );
 
             acc_0 = svusdot_s32(acc_0, packed0, vw);
             acc_1 = svusdot_s32(acc_1, packed1, vw);
@@ -374,18 +423,30 @@ fn work_32_chunks(
             j += 2;
         }
 
-        while j < bounds.size {
+        while j < bounds_size {
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j) };
-            let vw = svtbl_s8(unsafe { svld1_s8(pg1, w) }, shuf4);
+            let vw = svreinterpret_s8_s32(svdup_n_s32(*w as u8 as i32));
 
             let base0 = src_stride * py + cx;
             let row_lo = unsafe { svld1_u8(pg_full, src.get_unchecked(base0..).as_ptr()) };
             let row_hi = unsafe { svld1_u8(pg_full, src.get_unchecked(base0 + vl..).as_ptr()) };
             let zero = svdup_n_u8(0);
 
-            let [packed0, packed1, packed2, packed3] = pack_4_rows_sve!(row_lo, zero, zero, zero);
-            let [packed4, packed5, packed6, packed7] = pack_4_rows_sve!(row_hi, zero, zero, zero);
+            pack_4_rows_sve!(
+                [packed0, packed1, packed2, packed3],
+                row_lo,
+                zero,
+                zero,
+                zero
+            );
+            pack_4_rows_sve!(
+                [packed4, packed5, packed6, packed7],
+                row_hi,
+                zero,
+                zero,
+                zero
+            );
 
             acc_0 = svusdot_s32(acc_0, packed0, vw);
             acc_1 = svusdot_s32(acc_1, packed1, vw);
@@ -399,24 +460,14 @@ fn work_32_chunks(
             j += 1;
         }
 
-        let n0 = svqshrunb_n_s32::<SCALE>(acc_0);
-        let n1 = svqshrunb_n_s32::<SCALE>(acc_1);
-        let n2 = svqshrunb_n_s32::<SCALE>(acc_2);
-        let n3 = svqshrunb_n_s32::<SCALE>(acc_3);
-        let result_lo = svuzp1_u8(
-            svqxtnb_u16(svuzp1_u16(n0, n1)),
-            svqxtnb_u16(svuzp1_u16(n2, n3)),
-        );
+        let even = svqshrunt_n_s32::<SCALE>(svqshrunb_n_s32::<SCALE>(acc_0), acc_1);
+        let odd = svqshrunt_n_s32::<SCALE>(svqshrunb_n_s32::<SCALE>(acc_2), acc_3);
+        let result_lo = svqxtnt_u16(svqxtnb_u16(even), odd);
         unsafe { svst1_u8(pg_full, dst.get_unchecked_mut(cx..).as_mut_ptr(), result_lo) };
 
-        let n4 = svqshrunb_n_s32::<SCALE>(acc_4);
-        let n5 = svqshrunb_n_s32::<SCALE>(acc_5);
-        let n6 = svqshrunb_n_s32::<SCALE>(acc_6);
-        let n7 = svqshrunb_n_s32::<SCALE>(acc_7);
-        let result_hi = svuzp1_u8(
-            svqxtnb_u16(svuzp1_u16(n4, n5)),
-            svqxtnb_u16(svuzp1_u16(n6, n7)),
-        );
+        let even = svqshrunt_n_s32::<SCALE>(svqshrunb_n_s32::<SCALE>(acc_4), acc_5);
+        let odd = svqshrunt_n_s32::<SCALE>(svqshrunb_n_s32::<SCALE>(acc_6), acc_7);
+        let result_hi = svqxtnt_u16(svqxtnb_u16(even), odd);
         unsafe {
             svst1_u8(
                 pg_full,
@@ -441,15 +492,14 @@ fn convolve_vertical_sve2_row(
 ) {
     let vl = svcntb() as usize;
 
-    let mut cx = work_32_chunks(bounds, src, dst, src_stride, weights);
+    // Unroll 12 taps so coefficients and row addresses can stay outside the column loop.
+    // Larger specializations increase register pressure on 128-bit SVE machines.
+    let mut cx = match bounds.size {
+        12 => work_32_chunks::<12>(bounds, src, dst, src_stride, weights),
+        _ => work_32_chunks::<0>(bounds, src, dst, src_stride, weights),
+    };
 
     let len = dst.len();
-
-    let pg4 = svwhilelt_b8_u32(0u32, 4u32);
-    let pg2 = svwhilelt_b8_u32(0u32, 2u32);
-    let pg1 = svwhilelt_b8_u32(0u32, 1u32);
-
-    let shuf4 = svreinterpret_u8_s32(svdup_n_s32(i32::from_ne_bytes([0, 2, 1, 3])));
 
     while cx < dst.len() {
         let pg = svwhilelt_b8_u64(cx as u64, len as u64);
@@ -465,7 +515,9 @@ fn convolve_vertical_sve2_row(
         while j + 4 <= bounds.size {
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j..) };
-            let w_ld = unsafe { svld1_s8(pg4, w.as_ptr()) };
+            let vw = svreinterpret_s8_s32(svdup_n_s32(unsafe {
+                w.as_ptr().cast::<i32>().read_unaligned()
+            }));
 
             let base0 = src_stride * py + cx;
             let row0 = unsafe { svld1_u8(pg, src.get_unchecked(base0..).as_ptr()) };
@@ -475,9 +527,7 @@ fn convolve_vertical_sve2_row(
             let row3 =
                 unsafe { svld1_u8(pg, src.get_unchecked(base0 + src_stride * 3..).as_ptr()) };
 
-            let vw = svtbl_s8(w_ld, shuf4);
-
-            let [packed0, packed1, packed2, packed3] = pack_4_rows_sve!(row0, row1, row2, row3);
+            pack_4_rows_sve!([packed0, packed1, packed2, packed3], row0, row1, row2, row3);
 
             acc_0 = svusdot_s32(acc_0, packed0, vw);
             acc_1 = svusdot_s32(acc_1, packed1, vw);
@@ -490,7 +540,9 @@ fn convolve_vertical_sve2_row(
         while j + 2 <= bounds.size {
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j..) };
-            let w_ld = unsafe { svld1_s8(pg2, w.as_ptr()) };
+            let vw = svreinterpret_s8_s32(svdup_n_s32(unsafe {
+                w.as_ptr().cast::<u16>().read_unaligned() as i32
+            }));
 
             let base0 = src_stride * py + cx;
             let row0 = unsafe { svld1_u8(pg, src.get_unchecked(base0..).as_ptr()) };
@@ -498,9 +550,7 @@ fn convolve_vertical_sve2_row(
 
             let zero = svdup_n_u8(0);
 
-            let vw = svtbl_s8(w_ld, shuf4);
-
-            let [packed0, packed1, packed2, packed3] = pack_4_rows_sve!(row0, row1, zero, zero);
+            pack_4_rows_sve!([packed0, packed1, packed2, packed3], row0, row1, zero, zero);
 
             acc_0 = svusdot_s32(acc_0, packed0, vw);
             acc_1 = svusdot_s32(acc_1, packed1, vw);
@@ -513,14 +563,14 @@ fn convolve_vertical_sve2_row(
         while j < bounds.size {
             let py = bounds.start + j;
             let w = unsafe { weights.get_unchecked(j) };
-            let vw = svtbl_s8(unsafe { svld1_s8(pg1, w) }, shuf4);
+            let vw = svreinterpret_s8_s32(svdup_n_s32(*w as u8 as i32));
 
             let base0 = src_stride * py + cx;
             let row = unsafe { svld1_u8(pg, src.get_unchecked(base0..).as_ptr()) };
 
             let zero = svdup_n_u8(0);
 
-            let [packed0, packed1, packed2, packed3] = pack_4_rows_sve!(row, zero, zero, zero);
+            pack_4_rows_sve!([packed0, packed1, packed2, packed3], row, zero, zero, zero);
 
             acc_0 = svusdot_s32(acc_0, packed0, vw);
             acc_1 = svusdot_s32(acc_1, packed1, vw);
@@ -530,23 +580,119 @@ fn convolve_vertical_sve2_row(
             j += 1;
         }
 
-        let n0 = svqshrunb_n_s32::<SCALE>(acc_0);
-        let n1 = svqshrunb_n_s32::<SCALE>(acc_1);
-        let n2 = svqshrunb_n_s32::<SCALE>(acc_2);
-        let n3 = svqshrunb_n_s32::<SCALE>(acc_3);
-
-        let s01_packed = svuzp1_u16(n0, n1);
-        let s23_packed = svuzp1_u16(n2, n3);
-
-        let b01 = svqxtnb_u16(s01_packed);
-        let b23 = svqxtnb_u16(s23_packed);
-
-        let result = svuzp1_u8(b01, b23);
+        let even = svqshrunt_n_s32::<SCALE>(svqshrunb_n_s32::<SCALE>(acc_0), acc_1);
+        let odd = svqshrunt_n_s32::<SCALE>(svqshrunb_n_s32::<SCALE>(acc_2), acc_3);
+        let result = svqxtnt_u16(svqxtnb_u16(even), odd);
 
         unsafe {
             svst1_u8(pg, dst.get_unchecked_mut(cx..).as_mut_ptr(), result);
         }
 
         cx += vl;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::convolve_vertical_sve2_i8_dot;
+    use crate::filter_weights::FilterBounds;
+
+    #[test]
+    fn sve2_vertical_u8_matches_scalar_reference() {
+        let Some(vl) = crate::sve2::test_vector_length(true) else {
+            return;
+        };
+        let mut widths = vec![
+            0,
+            1,
+            vl / 4 - 1,
+            vl / 2 - 1,
+            vl / 2 + 1,
+            vl - 1,
+            vl,
+            vl + 1,
+            vl * 2 - 1,
+            vl * 2,
+            vl * 2 + 1,
+            vl * 3 + 3,
+            vl * 5 + 7,
+        ];
+        widths.sort_unstable();
+        widths.dedup();
+        let mut cases = 0;
+        for width in widths {
+            for padding in [0, 5] {
+                let stride = width + padding;
+                for taps in [
+                    0usize, 1, 2, 3, 4, 5, 7, 8, 9, 12, 15, 16, 17, 24, 31, 32, 48, 63, 64, 127,
+                ] {
+                    let start = 2;
+                    let rows = (start + taps).max(1);
+                    let mut src = vec![0xBC; stride * (rows - 1) + width];
+                    for y in 0..rows {
+                        for x in 0..width {
+                            src[y * stride + x] = (x * 97 + y * 53 + (x ^ (y * 17)) * 13) as u8;
+                        }
+                    }
+                    for mode in 0..4 {
+                        let mut weights: Vec<i8> = (0..taps)
+                            .map(|i| match mode {
+                                0 => ((i * 43 + 19) % 65) as i8 - 32,
+                                1 => {
+                                    if i % 2 == 0 {
+                                        -128
+                                    } else {
+                                        127
+                                    }
+                                }
+                                2 => 127,
+                                _ => -128,
+                            })
+                            .collect();
+                        if mode == 0 {
+                            let mut residual =
+                                128 - weights.iter().map(|&w| i32::from(w)).sum::<i32>();
+                            for w in &mut weights {
+                                let delta =
+                                    residual.clamp(-128 - i32::from(*w), 127 - i32::from(*w));
+                                *w = (i32::from(*w) + delta) as i8;
+                                residual -= delta;
+                            }
+                        }
+                        let expected: Vec<u8> = (0..width)
+                            .map(|x| {
+                                let mut sum = 64i32;
+                                for (i, &w) in weights.iter().enumerate() {
+                                    sum += i32::from(src[(start + i) * stride + x]) * i32::from(w);
+                                }
+                                (sum >> 7).clamp(0, 255) as u8
+                            })
+                            .collect();
+                        let mut dst = vec![0xA5; width + 8];
+                        convolve_vertical_sve2_i8_dot(
+                            width,
+                            &FilterBounds { start, size: taps },
+                            &src,
+                            &mut dst[1..width + 1],
+                            stride,
+                            &weights,
+                            0,
+                        );
+                        assert_eq!(
+                            &dst[1..width + 1],
+                            expected,
+                            "VL={vl}, width={width}, padding={padding}, taps={taps}, mode={mode}"
+                        );
+                        assert_eq!(dst[0], 0xA5);
+                        assert!(dst[width + 1..].iter().all(|&v| v == 0xA5));
+                        cases += 1;
+                    }
+                }
+            }
+        }
+        eprintln!(
+            "vertical u8 Q7: {cases} exact scalar cases at {} bits",
+            vl * 8
+        );
     }
 }

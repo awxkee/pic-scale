@@ -330,7 +330,7 @@ fn convolve_column_hb_impl(
 
         let tail4 = tail8.as_chunks_mut::<4>().1;
         for (x, dst) in tail4.iter_mut().enumerate() {
-            let mut store0 = 0;
+            let mut store0 = 1 << 5;
 
             let v_px = cx + x;
 
@@ -339,11 +339,11 @@ fn convolve_column_hb_impl(
                 let offset = src_stride * py + v_px;
                 let src_ptr = src.get_unchecked(offset);
 
-                store0 += *src_ptr as i64 * k_weight as i64;
+                // Match the vector blocks: round each Q31 product into Q6.
+                store0 = vqrdmlahs_s32(store0, i32::from(*src_ptr) << 6, k_weight);
             }
 
-            const R: i64 = 1 << 30;
-            *dst = ((store0 + R) >> 31).max(0).min(max_colors as i64) as u16;
+            *dst = (store0 >> 6).max(0).min(max_colors as i32) as u16;
         }
     }
 }
@@ -419,6 +419,251 @@ pub(crate) fn convolve_column_hb_u16_pair(
             }
             store_pair_output(first.as_mut_ptr().add(x), a, max);
             store_pair_output(second.as_mut_ptr().add(x), b, max);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn scalar_q6_rdm(samples: impl IntoIterator<Item = (u16, i32)>, depth: u32) -> u16 {
+        let mut sum = 32i32;
+        for (sample, weight) in samples {
+            // Independent fused SQRDMLAH pseudocode, with a wide exact intermediate.
+            let product = (i128::from(sample) << 6) * i128::from(weight);
+            let fused = (i128::from(sum) << 32) + product * 2;
+            let rounded = (fused + (1i128 << 31)) >> 32;
+            sum = rounded.clamp(i128::from(i32::MIN), i128::from(i32::MAX)) as i32;
+        }
+        (sum >> 6).clamp(0, ((1u32 << depth) - 1) as i32) as u16
+    }
+
+    fn weights(taps: usize, mode: usize) -> Vec<i32> {
+        (0..taps)
+            .map(|i| match mode {
+                0 => {
+                    if i % 2 == 0 {
+                        1073741760
+                    } else {
+                        1073741888
+                    }
+                }
+                1 => {
+                    if i % 2 == 0 {
+                        i32::MIN
+                    } else {
+                        i32::MAX
+                    }
+                }
+                2 => i32::MAX,
+                3 => i32::MIN,
+                _ => {
+                    if i < taps.div_ceil(2) {
+                        i32::MAX
+                    } else {
+                        i32::MIN
+                    }
+                }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn hb_vertical_half_boundary_matches_vector_and_scalar_tail() {
+        if !std::arch::is_aarch64_feature_detected!("rdm") {
+            return;
+        }
+        for depth in [13, 14, 15, 16] {
+            for width in 1..=40 {
+                let mut src = vec![1u16; width];
+                src.extend(std::iter::repeat_n(0, width));
+                let mut dst = vec![0u16; width];
+                convolve_column_hb_u16(
+                    width,
+                    &FilterBounds { start: 0, size: 2 },
+                    &src,
+                    &mut dst,
+                    width,
+                    &[1073741760, 1073741888],
+                    depth,
+                );
+                assert!(
+                    dst.iter().all(|&v| v == 1),
+                    "depth={depth}, width={width}, {dst:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn hb_vertical_matches_independent_scalar_q6_all_blocks_and_tails() {
+        if !std::arch::is_aarch64_feature_detected!("rdm") {
+            return;
+        }
+        let mut widths: Vec<usize> = (1..=40).collect();
+        widths.extend([63, 65, 127]);
+        for depth in [13, 14, 15, 16] {
+            let max = ((1u32 << depth) - 1) as u16;
+            for width in widths.iter().copied() {
+                for padding in [0, 5] {
+                    let stride = width + padding;
+                    for taps in [
+                        0usize, 1, 2, 3, 4, 5, 7, 8, 9, 12, 13, 15, 16, 17, 24, 31, 32, 48, 63, 64,
+                        127, 513,
+                    ] {
+                        let start = 2;
+                        let rows = start + taps;
+                        // Final input row ends exactly at the last active sample.
+                        let mut src = vec![0xbeef; stride * (rows - 1) + width];
+                        for y in 0..rows {
+                            for x in 0..width {
+                                src[y * stride + x] = match (x + y) % 5 {
+                                    0 => 0,
+                                    1 => max,
+                                    2 => 1,
+                                    _ => ((x * 997 + y * 53 + x * y * 19) as u16) & max,
+                                };
+                            }
+                        }
+                        for mode in 0..5 {
+                            let w = weights(taps, mode);
+                            let expected: Vec<_> = (0..width)
+                                .map(|x| {
+                                    scalar_q6_rdm(
+                                        w.iter()
+                                            .enumerate()
+                                            .map(|(i, &c)| (src[(start + i) * stride + x], c)),
+                                        depth,
+                                    )
+                                })
+                                .collect();
+                            let mut dst = vec![0xa55a; width + 8];
+                            convolve_column_hb_u16(
+                                width,
+                                &FilterBounds { start, size: taps },
+                                &src,
+                                &mut dst[1..width + 1],
+                                stride,
+                                &w,
+                                depth,
+                            );
+                            assert_eq!(
+                                &dst[1..width + 1],
+                                expected,
+                                "depth={depth}, width={width}, padding={padding}, taps={taps}, mode={mode}"
+                            );
+                            assert_eq!(dst[0], 0xa55a);
+                            assert!(dst[width + 1..].iter().all(|&v| v == 0xa55a));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn hb_vertical_q6_saturates_before_negative_taps() {
+        if !std::arch::is_aarch64_feature_detected!("rdm") {
+            return;
+        }
+        for depth in [13, 14, 15, 16] {
+            let max = ((1u32 << depth) - 1) as u16;
+            let negative_taps = i32::MAX as usize / (usize::from(max) << 6);
+            let mut weights = vec![i32::MAX; negative_taps + 2];
+            weights.extend(std::iter::repeat_n(i32::MIN, negative_taps));
+            let src = vec![max; weights.len() * 5];
+            let mut dst = [0; 5];
+            let expected = scalar_q6_rdm(weights.iter().map(|&w| (max, w)), depth);
+            convolve_column_hb_u16(
+                5,
+                &FilterBounds {
+                    start: 0,
+                    size: weights.len(),
+                },
+                &src,
+                &mut dst,
+                5,
+                &weights,
+                depth,
+            );
+            assert_eq!(dst, [expected; 5], "depth={depth}");
+            assert!(
+                expected < max,
+                "must return from saturation into the visible range"
+            );
+        }
+    }
+
+    #[test]
+    fn hb_vertical_paired_twelve_matches_single_and_independent_q6() {
+        if !std::arch::is_aarch64_feature_detected!("rdm") {
+            return;
+        }
+        for depth in [13, 14, 15, 16] {
+            let max = ((1u32 << depth) - 1) as u16;
+            for width in [16usize, 32, 48, 64, 80, 128] {
+                for padding in [0, 5] {
+                    let stride = width + padding;
+                    let mut src = vec![0xbeef; stride * 13 + width];
+                    for y in 0..14 {
+                        for x in 0..width {
+                            src[y * stride + x] = match (x + y) % 3 {
+                                0 => 0,
+                                1 => max,
+                                _ => ((x * 97 + y * 953) as u16) & max,
+                            };
+                        }
+                    }
+                    for mode in 0..5 {
+                        let wa: [i32; 12] = weights(12, mode).try_into().unwrap();
+                        let wb: [i32; 12] = weights(12, (mode + 1) % 5).try_into().unwrap();
+                        let mut a = vec![0xa55a; width + 2];
+                        let mut b = a.clone();
+                        unsafe {
+                            convolve_column_hb_u16_pair(
+                                &src,
+                                stride,
+                                &mut a[1..width + 1],
+                                &mut b[1..width + 1],
+                                &wa,
+                                &wb,
+                                depth,
+                            );
+                        }
+                        for (output, start, w) in [(&a, 0, &wa), (&b, 2, &wb)] {
+                            let expected: Vec<_> = (0..width)
+                                .map(|x| {
+                                    scalar_q6_rdm(
+                                        w.iter()
+                                            .enumerate()
+                                            .map(|(i, &c)| (src[(start + i) * stride + x], c)),
+                                        depth,
+                                    )
+                                })
+                                .collect();
+                            assert_eq!(
+                                &output[1..width + 1],
+                                expected,
+                                "paired depth={depth}, width={width}, padding={padding}, mode={mode}"
+                            );
+                            let mut single = vec![0; width];
+                            convolve_column_hb_u16(
+                                width,
+                                &FilterBounds { start, size: 12 },
+                                &src,
+                                &mut single,
+                                stride,
+                                w,
+                                depth,
+                            );
+                            assert_eq!(single, expected);
+                            assert_eq!(output[0], 0xa55a);
+                            assert_eq!(output[width + 1], 0xa55a);
+                        }
+                    }
+                }
+            }
         }
     }
 }

@@ -43,6 +43,8 @@ mod cbcr_u16_lb;
 mod check_alpha;
 #[cfg(feature = "nightly_f16")]
 mod convolve_f16;
+#[cfg(all(test, feature = "nightly_i8mm"))]
+mod i8mm_tests;
 mod plane_f32;
 mod plane_f32_f64;
 #[cfg(feature = "rdm")]

@@ -71,6 +71,7 @@ impl HorizontalFilterPass<u8, f32, 2> for ImageStore<'_, u8, 2> {
             if _scale_factor < 10.
                 && std::arch::is_aarch64_feature_detected!("i8mm")
                 && _options.workload_strategy == crate::WorkloadStrategy::PreferSpeed
+                && !filter_weights.has_single_tap()
             {
                 use crate::neon::{
                     convolve_horizontal_cbcr_neon_dot_row,
