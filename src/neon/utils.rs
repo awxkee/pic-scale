@@ -32,16 +32,13 @@ use std::arch::aarch64::*;
 #[inline(always)]
 #[cfg(feature = "rdm")]
 pub(crate) fn expand8_to_14(row: uint8x8_t) -> int16x8_t {
-    unsafe {
-        let row = vcombine_u8(row, row);
-        vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip1q_u8(row, row))))
-    }
+    unsafe { vreinterpretq_s16_u16(vshll_n_u8::<6>(row)) }
 }
 
 #[inline(always)]
 #[cfg(feature = "rdm")]
 pub(crate) fn expand8_high_to_14(row: uint8x16_t) -> int16x8_t {
-    unsafe { vreinterpretq_s16_u16(vshrq_n_u16::<2>(vreinterpretq_u16_u8(vzip2q_u8(row, row)))) }
+    unsafe { vreinterpretq_s16_u16(vshll_high_n_u8::<6>(row)) }
 }
 
 #[inline(always)]

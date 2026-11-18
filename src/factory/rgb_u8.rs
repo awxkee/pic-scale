@@ -136,11 +136,17 @@ impl HorizontalFilterPass<u8, f32, 3> for ImageStore<'_, u8, 3> {
                     convolve_horizontal_rgb_avx_row_one, convolve_horizontal_rgb_avx_rows_4,
                 };
                 _dispatcher_4_rows = if filter_weights.kernel_size == 4 {
-                    Some(convolve_horizontal_rgb_avx_rows_4::<true>)
+                    Some(convolve_horizontal_rgb_avx_rows_4::<true, false>)
+                } else if filter_weights.kernel_size == 12 {
+                    Some(convolve_horizontal_rgb_avx_rows_4::<false, true>)
                 } else {
-                    Some(convolve_horizontal_rgb_avx_rows_4::<false>)
+                    Some(convolve_horizontal_rgb_avx_rows_4::<false, false>)
                 };
-                _dispatcher_1_row = convolve_horizontal_rgb_avx_row_one;
+                _dispatcher_1_row = if filter_weights.kernel_size == 12 {
+                    convolve_horizontal_rgb_avx_row_one::<true>
+                } else {
+                    convolve_horizontal_rgb_avx_row_one::<false>
+                };
             }
         }
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
@@ -262,9 +268,12 @@ pub(crate) fn vertical_strategy_u8<const N: usize>(
     };
     #[cfg(all(target_arch = "aarch64", feature = "rdm"))]
     if use_rdm
-        && N == 4
-        && filter.filter_weights.kernel_size <= 12
-        && _options.src_size.width.is_multiple_of(4)
+        && (N == 3 || N == 4)
+        && (filter.filter_weights.kernel_size <= 12 || filter.filter_weights.kernel_size == 24)
+        && _options
+            .src_size
+            .width
+            .is_multiple_of(if N == 3 { 16 } else { 4 })
         && _options.src_size.width != _options.dst_size.width
         && _options.dst_size.height >= 4
     {

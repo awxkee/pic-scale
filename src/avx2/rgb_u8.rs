@@ -32,7 +32,10 @@ use crate::filter_weights::FilterWeights;
 use crate::support::{PRECISION, ROUNDING_CONST};
 use std::arch::x86_64::*;
 
-pub(crate) fn convolve_horizontal_rgb_avx_rows_4<const EXACT_FOUR: bool>(
+pub(crate) fn convolve_horizontal_rgb_avx_rows_4<
+    const EXACT_FOUR: bool,
+    const BROADCAST_REMAINDER: bool,
+>(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -44,7 +47,7 @@ pub(crate) fn convolve_horizontal_rgb_avx_rows_4<const EXACT_FOUR: bool>(
         #[cfg(feature = "avx512")]
         {
             if std::arch::is_x86_feature_detected!("avxvnni") {
-                return convolve_horizontal_rgb_avx_rows_4_vnni::<EXACT_FOUR>(
+                return convolve_horizontal_rgb_avx_rows_4_vnni::<EXACT_FOUR, BROADCAST_REMAINDER>(
                     src,
                     src_stride,
                     dst,
@@ -53,7 +56,7 @@ pub(crate) fn convolve_horizontal_rgb_avx_rows_4<const EXACT_FOUR: bool>(
                 );
             }
         }
-        convolve_horizontal_rgb_avx_rows_4_reg::<EXACT_FOUR>(
+        convolve_horizontal_rgb_avx_rows_4_reg::<EXACT_FOUR, BROADCAST_REMAINDER>(
             src,
             src_stride,
             dst,
@@ -64,7 +67,10 @@ pub(crate) fn convolve_horizontal_rgb_avx_rows_4<const EXACT_FOUR: bool>(
 }
 
 #[target_feature(enable = "avx2")]
-fn convolve_horizontal_rgb_avx_rows_4_reg<const EXACT_FOUR: bool>(
+fn convolve_horizontal_rgb_avx_rows_4_reg<
+    const EXACT_FOUR: bool,
+    const BROADCAST_REMAINDER: bool,
+>(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -72,12 +78,15 @@ fn convolve_horizontal_rgb_avx_rows_4_reg<const EXACT_FOUR: bool>(
     filter_weights: &FilterWeights<i16>,
 ) {
     let unit = Row4ExecutionUnit::<false>::default();
-    unit.pass::<EXACT_FOUR>(src, src_stride, dst, dst_stride, filter_weights);
+    unit.pass::<EXACT_FOUR, BROADCAST_REMAINDER>(src, src_stride, dst, dst_stride, filter_weights);
 }
 
 #[cfg(feature = "avx512")]
 #[target_feature(enable = "avx2", enable = "avxvnni")]
-fn convolve_horizontal_rgb_avx_rows_4_vnni<const EXACT_FOUR: bool>(
+fn convolve_horizontal_rgb_avx_rows_4_vnni<
+    const EXACT_FOUR: bool,
+    const BROADCAST_REMAINDER: bool,
+>(
     src: &[u8],
     src_stride: usize,
     dst: &mut [u8],
@@ -85,7 +94,7 @@ fn convolve_horizontal_rgb_avx_rows_4_vnni<const EXACT_FOUR: bool>(
     filter_weights: &FilterWeights<i16>,
 ) {
     let unit = Row4ExecutionUnit::<true>::default();
-    unit.pass::<EXACT_FOUR>(src, src_stride, dst, dst_stride, filter_weights);
+    unit.pass::<EXACT_FOUR, BROADCAST_REMAINDER>(src, src_stride, dst, dst_stride, filter_weights);
 }
 
 #[inline(always)]
@@ -114,17 +123,24 @@ fn load_rgb_x4(src: &[u8]) -> __m128i {
 }
 
 #[inline(always)]
-fn load_distr_x4_rgb(src: &[u8], shuf: __m256i) -> __m256i {
+fn load_distr_x4_rgb<const BROADCAST_REMAINDER: bool>(src: &[u8], shuf: __m256i) -> __m256i {
     unsafe {
         let rgb_pixel = load_rgb_x4(src);
 
-        // Extracting top pixel part
-        let top_pixels = _mm_alignr_epi8::<6>(rgb_pixel, rgb_pixel);
-
-        _mm256_shuffle_epi8(
-            _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgb_pixel), top_pixels),
-            shuf,
-        )
+        if BROADCAST_REMAINDER {
+            // Select two pixel pairs from the same 12-byte load in separate lanes.
+            let shuffle = _mm256_setr_epi8(
+                0, -1, 3, -1, 1, -1, 4, -1, 2, -1, 5, -1, -1, -1, -1, -1, 6, -1, 9, -1, 7, -1, 10,
+                -1, 8, -1, 11, -1, -1, -1, -1, -1,
+            );
+            _mm256_shuffle_epi8(_mm256_broadcastsi128_si256(rgb_pixel), shuffle)
+        } else {
+            let top_pixels = _mm_alignr_epi8::<6>(rgb_pixel, rgb_pixel);
+            _mm256_shuffle_epi8(
+                _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(rgb_pixel), top_pixels),
+                shuf,
+            )
+        }
     }
 }
 
@@ -179,7 +195,7 @@ impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
     }
 
     #[inline(always)]
-    fn pass<const EXACT_FOUR: bool>(
+    fn pass<const EXACT_FOUR: bool, const BROADCAST_REMAINDER: bool>(
         &self,
         src: &[u8],
         src_stride: usize,
@@ -365,14 +381,22 @@ impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
                         );
                         let bounds_start = (bounds.start + jx) * CN;
 
-                        let rgb_pixel_0 =
-                            load_distr_x4_rgb(src0.get_unchecked(bounds_start..), shuffle_pixels_4);
-                        let rgb_pixel_1 =
-                            load_distr_x4_rgb(src1.get_unchecked(bounds_start..), shuffle_pixels_4);
-                        let rgb_pixel_2 =
-                            load_distr_x4_rgb(src2.get_unchecked(bounds_start..), shuffle_pixels_4);
-                        let rgb_pixel_3 =
-                            load_distr_x4_rgb(src3.get_unchecked(bounds_start..), shuffle_pixels_4);
+                        let rgb_pixel_0 = load_distr_x4_rgb::<BROADCAST_REMAINDER>(
+                            src0.get_unchecked(bounds_start..),
+                            shuffle_pixels_4,
+                        );
+                        let rgb_pixel_1 = load_distr_x4_rgb::<BROADCAST_REMAINDER>(
+                            src1.get_unchecked(bounds_start..),
+                            shuffle_pixels_4,
+                        );
+                        let rgb_pixel_2 = load_distr_x4_rgb::<BROADCAST_REMAINDER>(
+                            src2.get_unchecked(bounds_start..),
+                            shuffle_pixels_4,
+                        );
+                        let rgb_pixel_3 = load_distr_x4_rgb::<BROADCAST_REMAINDER>(
+                            src3.get_unchecked(bounds_start..),
+                            shuffle_pixels_4,
+                        );
 
                         store0 = _mm256_dot16_avx_epi32::<HAS_DOT>(store0, rgb_pixel_0, weights);
                         store1 = _mm256_dot16_avx_epi32::<HAS_DOT>(store1, rgb_pixel_1, weights);
@@ -471,7 +495,7 @@ impl<const HAS_DOT: bool> Row4ExecutionUnit<HAS_DOT> {
     }
 }
 
-pub(crate) fn convolve_horizontal_rgb_avx_row_one(
+pub(crate) fn convolve_horizontal_rgb_avx_row_one<const BROADCAST_REMAINDER: bool>(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
@@ -481,32 +505,36 @@ pub(crate) fn convolve_horizontal_rgb_avx_row_one(
         #[cfg(feature = "avx512")]
         {
             if std::arch::is_x86_feature_detected!("avxvnni") {
-                return convolve_horizontal_rgb_avx_row_one_vnni(src, dst, filter_weights);
+                return convolve_horizontal_rgb_avx_row_one_vnni::<BROADCAST_REMAINDER>(
+                    src,
+                    dst,
+                    filter_weights,
+                );
             }
         }
-        convolve_horizontal_rgb_avx_row_one_reg(src, dst, filter_weights);
+        convolve_horizontal_rgb_avx_row_one_reg::<BROADCAST_REMAINDER>(src, dst, filter_weights);
     }
 }
 
 #[target_feature(enable = "avx2")]
-fn convolve_horizontal_rgb_avx_row_one_reg(
+fn convolve_horizontal_rgb_avx_row_one_reg<const BROADCAST_REMAINDER: bool>(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
 ) {
     let unit = Row1Execution::<false>::default();
-    unit.pass(src, dst, filter_weights);
+    unit.pass::<BROADCAST_REMAINDER>(src, dst, filter_weights);
 }
 
 #[cfg(feature = "avx512")]
 #[target_feature(enable = "avx2", enable = "avxvnni")]
-fn convolve_horizontal_rgb_avx_row_one_vnni(
+fn convolve_horizontal_rgb_avx_row_one_vnni<const BROADCAST_REMAINDER: bool>(
     src: &[u8],
     dst: &mut [u8],
     filter_weights: &FilterWeights<i16>,
 ) {
     let unit = Row1Execution::<true>::default();
-    unit.pass(src, dst, filter_weights);
+    unit.pass::<BROADCAST_REMAINDER>(src, dst, filter_weights);
 }
 
 #[inline(always)]
@@ -535,7 +563,12 @@ struct Row1Execution<const HAS_DOT: bool> {}
 
 impl<const HAS_DOT: bool> Row1Execution<HAS_DOT> {
     #[inline(always)]
-    fn pass(&self, src: &[u8], dst: &mut [u8], filter_weights: &FilterWeights<i16>) {
+    fn pass<const BROADCAST_REMAINDER: bool>(
+        &self,
+        src: &[u8],
+        dst: &mut [u8],
+        filter_weights: &FilterWeights<i16>,
+    ) {
         unsafe {
             const CN: usize = 3;
 
@@ -616,7 +649,8 @@ impl<const HAS_DOT: bool> Row1Execution<HAS_DOT> {
                     let bounds_start = bounds.start + jx;
                     let src_ptr_0 = src.get_unchecked((bounds_start * CN)..);
 
-                    let rgb_pixel = load_distr_x4_rgb(src_ptr_0, shuffle_pixels_4);
+                    let rgb_pixel =
+                        load_distr_x4_rgb::<BROADCAST_REMAINDER>(src_ptr_0, shuffle_pixels_4);
                     store = _mm256_dot16_avx_epi32::<HAS_DOT>(store, rgb_pixel, weights);
                     jx += 4;
                 }
@@ -711,7 +745,7 @@ mod tests {
                         0,
                     );
                     unsafe {
-                        convolve_horizontal_rgb_avx_rows_4_reg::<false>(
+                        convolve_horizontal_rgb_avx_rows_4_reg::<false, false>(
                             &src,
                             src_stride,
                             &mut actual,
@@ -722,7 +756,11 @@ mod tests {
                 } else {
                     handle_fixed_row_u8::<3>(&src, &mut expected, &filter, 0);
                     unsafe {
-                        convolve_horizontal_rgb_avx_row_one_reg(&src, &mut actual, &filter);
+                        convolve_horizontal_rgb_avx_row_one_reg::<false>(
+                            &src,
+                            &mut actual,
+                            &filter,
+                        );
                     }
                 }
                 assert_eq!(actual, expected, "taps={taps} start={start} rows={rows}");
@@ -752,42 +790,69 @@ mod tests {
             return;
         }
 
-        for taps in [4, 8, 9, 12, 15, 16, 23, 24, 25] {
-            let src_row_len = (taps + 2) * 3;
-            let src_stride = src_row_len + 5;
-            let src: Vec<u8> = (0..3 * src_stride + src_row_len)
-                .map(|i| (i * 101 + i / src_stride * 11) as u8)
-                .collect();
-            let bounds = vec![
-                FilterBounds::new(0, 3),
-                FilterBounds::new(1, taps - 1),
-                FilterBounds::new(2, taps),
-            ];
-            let dst_row_len = bounds.len() * 3;
-            let dst_stride = dst_row_len + 5;
-            let weights = (0..taps * bounds.len())
-                .map(|i| (8293 + i * 10949) as i16)
-                .collect();
-            let filter = FilterWeights::new(weights, taps, taps, bounds.len(), taps as i32, bounds);
-
-            let mut expected = vec![0xd3; 3 * dst_stride + dst_row_len];
-            let mut actual = expected.clone();
-            handle_fixed_rows_4_u8::<3>(&src, src_stride, &mut expected, dst_stride, &filter, 0);
-            let convolve: fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>, u32) =
-                if taps == 4 {
-                    convolve_horizontal_rgb_avx_rows_4::<true>
+        for taps in 4..=32 {
+            for padding in [0, 5] {
+                let src_row_len = (taps + 2) * 3;
+                let src_stride = src_row_len + padding;
+                let src: Vec<u8> = (0..3 * src_stride + src_row_len)
+                    .map(|i| (i * 101 + i / src_stride * 11) as u8)
+                    .collect();
+                let bounds = if taps == 12 {
+                    // The selected plan can have any clipped tap count at the image edges.
+                    (1..=taps)
+                        .map(|size| FilterBounds::new(taps + 2 - size, size))
+                        .collect::<Vec<_>>()
                 } else {
-                    convolve_horizontal_rgb_avx_rows_4::<false>
+                    vec![
+                        FilterBounds::new(0, 3),
+                        FilterBounds::new(1, taps - 1),
+                        FilterBounds::new(2, taps),
+                    ]
                 };
-            convolve(&src, src_stride, &mut actual, dst_stride, &filter, 0);
-            assert_eq!(actual, expected, "four rows, taps={taps}");
+                let dst_row_len = bounds.len() * 3;
+                let dst_stride = dst_row_len + padding;
+                let weights = (0..taps * bounds.len())
+                    .map(|i| (8293 + i * 10949) as i16)
+                    .collect();
+                let filter =
+                    FilterWeights::new(weights, taps, taps, bounds.len(), taps as i32, bounds);
 
-            let src = &src[3 * src_stride..];
-            let mut expected = vec![0xd3; dst_row_len];
-            let mut actual = expected.clone();
-            handle_fixed_row_u8::<3>(src, &mut expected, &filter, 0);
-            convolve_horizontal_rgb_avx_row_one(src, &mut actual, &filter, 0);
-            assert_eq!(actual, expected, "one row, taps={taps}");
+                let mut expected = vec![0xd3; 3 * dst_stride + dst_row_len];
+                let mut actual = expected.clone();
+                handle_fixed_rows_4_u8::<3>(
+                    &src,
+                    src_stride,
+                    &mut expected,
+                    dst_stride,
+                    &filter,
+                    0,
+                );
+                let convolve: fn(&[u8], usize, &mut [u8], usize, &FilterWeights<i16>, u32) =
+                    if taps == 4 {
+                        convolve_horizontal_rgb_avx_rows_4::<true, false>
+                    } else if taps == 12 {
+                        convolve_horizontal_rgb_avx_rows_4::<false, true>
+                    } else {
+                        convolve_horizontal_rgb_avx_rows_4::<false, false>
+                    };
+                convolve(&src, src_stride, &mut actual, dst_stride, &filter, 0);
+                assert_eq!(
+                    actual, expected,
+                    "four rows, taps={taps}, padding={padding}"
+                );
+
+                let src = &src[3 * src_stride..];
+                let mut expected = vec![0xd3; dst_row_len];
+                let mut actual = expected.clone();
+                handle_fixed_row_u8::<3>(src, &mut expected, &filter, 0);
+                let convolve = if taps == 12 {
+                    convolve_horizontal_rgb_avx_row_one::<true>
+                } else {
+                    convolve_horizontal_rgb_avx_row_one::<false>
+                };
+                convolve(src, &mut actual, &filter, 0);
+                assert_eq!(actual, expected, "one row, taps={taps}, padding={padding}");
+            }
         }
     }
 
